@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.62",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557997556",
-  "launcherSha256": "480f07531c19777eac76175a6b053628447f2d194b660411c1214f4b6ebe7b5f",
+  "launcherVersion": "1.0.63",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558014335",
+  "launcherSha256": "af1915251d215df7be1ec99398ee11e1905263e6b571cccbb8e3dc0179700cb9",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -311,9 +311,55 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557997560",
       "sha256": "cc7dae5cda94824c66c19d039824f032c11783973672ddbf49eeca62f61188fc",
       "notes": "Starting Location first and working again, Main is now Confirm"
+    },
+    {
+      "id": "20260911-1507",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558014336",
+      "sha256": "ceb1d1660153034f607796118f1ea9c8b3b87031b97717fc4439bfbd4a3bec56",
+      "notes": "Nine holds and nothing else, and Preview Mode is gone"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Nine holds and nothing else, and Preview Mode is gone",
+      "body": "",
+      "details": [
+        "Launcher 1.0.63",
+        "Launcher rebuilt: Updater.cs",
+        "27 files to download, 0.2 MB"
+      ],
+      "files": [
+        "Data\\Scripts\\_RaceMenuMorphsHIMBO.pex",
+        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
+        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Merchant.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
+        "steam_appid.txt",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Starting Location first and working again, Main is now Confirm",
@@ -932,22 +978,6 @@
         "- Data\\Scripts\\RaceMenuPluginWeapons.pex",
         "loadorder.txt  (load order)",
         "plugins.txt  (load order)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Corrected the starter class values and cleared the body mod installer leftovers",
-      "body": "",
-      "details": [
-        "Launcher 1.0.41",
-        "Launcher rebuilt: Updater.cs",
-        "3 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
