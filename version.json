@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.71",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558153562",
-  "launcherSha256": "b63bc3af2c4069e860fb455def4e1064887a24f11e89f8770bfbb0adda7a4884",
+  "launcherVersion": "1.0.72",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558160879",
+  "launcherSha256": "9ca45450b8ef5ce287f41f1cba64024427eacd40cad8b5567c8a34a9188a25a1",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -353,9 +353,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558153564",
       "sha256": "4878e39c608509e2cc12f0dd5d4d40255a2c4f7477971e272dd6d862473e1237",
       "notes": "Load order baseline matches what the game actually loads"
+    },
+    {
+      "id": "20260911-1657",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558160881",
+      "sha256": "701a615fd2e154bb26fad12e4ccd4ff3cafd667c7ca3e2b8271823f00351fb88",
+      "notes": "Fast travel actually blocked, inventory panel stops at the bottom bar"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Fast travel actually blocked, inventory panel stops at the bottom bar",
+      "body": "",
+      "details": [
+        "Launcher 1.0.72",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Interface\\inventorymenu.swf",
+        "Data\\Scripts\\_RespawnScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "steam_appid.txt",
+        "- Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Load order baseline matches what the game actually loads",
@@ -945,47 +974,6 @@
         "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)",
         "tools\\ui.xaml  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Fast travel stays off, the shortcut icon refreshes properly, and the party count reads awake",
-      "body": "",
-      "details": [
-        "Launcher 1.0.51",
-        "Launcher rebuilt: Online.cs, Updater.cs",
-        "27 files to download, 0.2 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\_RespawnScript.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBEUIExtensions.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBEUIListMenu.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBEUIMenuBase.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBEUITextEntryMenu.pex",
-        "Data\\Scripts\\SkyrimUnboundModuleLocations.pex",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\Thornswood.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\ThornswoodCooking.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\ThornswoodFishing.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\ThornswoodSurvival.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Merchant.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
-        "tools\\app\\Online.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
       ]
     }
   ],
