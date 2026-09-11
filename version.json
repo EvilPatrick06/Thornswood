@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.63",
+  "launcherVersion": "1.0.64",
   "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558014335",
-  "launcherSha256": "af1915251d215df7be1ec99398ee11e1905263e6b571cccbb8e3dc0179700cb9",
+  "launcherSha256": "d189f52cf5324305053f2053ee4a44a08b8cc67c610cfe012b34770e89aca461",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -320,6 +320,18 @@
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Survival is actually switched on, addon gear finally lands, and towns join the cities",
+      "body": "",
+      "details": [
+        "Launcher 1.0.64",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Nine holds and nothing else, and Preview Mode is gone",
@@ -953,31 +965,6 @@
         "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIListMenu.pex",
         "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIMenuBase.pex",
         "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUITextEntryMenu.pex",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Two broken plugins removed, body mod leftovers cleared, starter class values corrected, SunHelm settings now apply themselves",
-      "body": "",
-      "details": [
-        "Launcher 1.0.42",
-        "Launcher rebuilt: Updater.cs",
-        "5 files to download, 0.7 MB",
-        "The load order moved, so start a new character or expect the old save to complain"
-      ],
-      "files": [
-        "Data\\McmRecorder\\Thornswood\\0001_SunHelm.json",
-        "Data\\Scripts\\MCMShortcutNG.pex",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.dll",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.json",
-        "- Data\\CFTO-JK-Patch.esp",
-        "- Data\\RaceMenuPlugin.esp",
-        "- Data\\Scripts\\RaceMenuPluginFemales.pex",
-        "- Data\\Scripts\\RaceMenuPluginWeapons.pex",
-        "loadorder.txt  (load order)",
-        "plugins.txt  (load order)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
