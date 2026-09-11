@@ -1,7 +1,7 @@
 {
-    "launcherVersion":  "1.0.28",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557065307",
-    "launcherSha256":  "9dbbefff855cbdbc77f045e65363cf3bc63b8c0d964bdc5635a56e7c74abf692",
+    "launcherVersion":  "1.0.29",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557089072",
+    "launcherSha256":  "fe66dc82bd4cbe318f7c2dec02820a0cd7c49c9ca975ddead06ef26025ea16eb",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -125,9 +125,51 @@
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557065308",
                       "sha256":  "d63a0b351d00932d0825c0df3aee7602efca67bbcb238786201ab0e8418609e8",
                       "notes":  "Server address off the launcher pages, news posts now list what actually changed"
+                  },
+                  {
+                      "id":  "20260911-0507",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557089074",
+                      "sha256":  "1716b4cfdb38d5bd9677968d3c0fe33770814814731c9d7a7b6a2cab626fd1fc",
+                      "notes":  "Hunger, thirst, exhaustion and cold now switch themselves on. The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus."
                   }
               ],
     "news":  [
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Hunger, thirst, exhaustion and cold now switch themselves on",
+                     "body":  "The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus.",
+                     "details":  [
+                                     "Launcher 1.0.29",
+                                     "25 files to download, 2.9 MB"
+                                 ],
+                     "files":  [
+                                   "Data\\McmRecorder\\Thornswood.json",
+                                   "Data\\McmRecorder\\Thornswood\\0001_SunHelm.json",
+                                   "Data\\Scripts\\JArray.pex",
+                                   "Data\\Scripts\\JAtomic.pex",
+                                   "Data\\Scripts\\JContainers.pex",
+                                   "Data\\Scripts\\JContainers_DomainExample.pex",
+                                   "Data\\Scripts\\JDB.pex",
+                                   "Data\\Scripts\\JFormDB.pex",
+                                   "Data\\Scripts\\JFormMap.pex",
+                                   "Data\\Scripts\\JIntMap.pex",
+                                   "Data\\Scripts\\JLua.pex",
+                                   "Data\\Scripts\\JMap.pex",
+                                   "Data\\Scripts\\JString.pex",
+                                   "Data\\Scripts\\JValue.pex",
+                                   "Data\\SKSE\\Plugins\\JCData\\Domains\\.force-install",
+                                   "Data\\SKSE\\Plugins\\JCData\\InternalLuaScripts\\api_for_lua.h",
+                                   "Data\\SKSE\\Plugins\\JCData\\InternalLuaScripts\\init.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\InternalLuaScripts\\jc.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\jc\\init.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\basic.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\init.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\jc-tests.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\misc.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\test.lua",
+                                   "Data\\SKSE\\Plugins\\JContainers64.dll"
+                               ]
+                 },
                  {
                      "date":  "11 Sep 2026",
                      "title":  "Server address off the launcher pages, news posts now list what actually changed",
@@ -226,11 +268,6 @@
                  {
                      "date":  "11 Sep 2026",
                      "title":  "Fixed the plugin list",
-                     "body":  ""
-                 },
-                 {
-                     "date":  "10 Sep 2026",
-                     "title":  "Server password and auto join",
                      "body":  ""
                  }
              ],
