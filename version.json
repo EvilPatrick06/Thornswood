@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.65",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558020318",
-  "launcherSha256": "a4ac107a556a1fe990c30ec65b5eeb0d5a1317090246c1444a00b283c2090339",
+  "launcherVersion": "1.0.66",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558033370",
+  "launcherSha256": "3718d53dd864de7ff5c9e50f3cca30c8d1927336430642a87ed5f4af7aa003c4",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -326,6 +326,21 @@
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Another modlist's Skyrim is no longer mistaken for this one",
+      "body": "",
+      "details": [
+        "Launcher 1.0.66",
+        "Launcher rebuilt: Checks.cs, Diag.cs, Shell.cs, Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Checks.cs  (launcher)",
+        "tools\\app\\Diag.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Tab says Confirm, because that is what it does",
@@ -945,28 +960,6 @@
       ],
       "files": [
         "tools\\app\\Pages.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Turned off the MCM recorder that was throwing the Could not find MCM prompts",
-      "body": "",
-      "details": [
-        "Launcher 1.0.44",
-        "Launcher rebuilt: Updater.cs",
-        "9 files to download, 0.7 MB"
-      ],
-      "files": [
-        "Data\\McmRecorder\\Thornswood.json",
-        "Data\\McmRecorder\\Thornswood\\0001_SunHelm.json",
-        "Data\\Scripts\\MCMShortcutNG.pex",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.dll",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
