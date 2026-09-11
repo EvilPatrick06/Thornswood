@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.58",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557979501",
-  "launcherSha256": "22a390511a742ed0433378cee52938b9228a9dc516a320e0bd333aa48ab8209a",
+  "launcherVersion": "1.0.59",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557980143",
+  "launcherSha256": "019f8161015dfc8cea31312bc091c4d0c1e5c87731e01d09aea9db09e54bc0f8",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -296,6 +296,18 @@
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Sixteen ways to start: fifteen trades or let it pick",
+      "body": "",
+      "details": [
+        "Launcher 1.0.59",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Begin your adventure is back, the location page is locked down, and Papyrus is talking",
@@ -973,39 +985,6 @@
       "files": [
         "Data\\Scripts\\MCMShortcutNG.pex",
         "Data\\SKSE\\Plugins\\MCMShortcutNG.dll",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Character creation locked to looks, class and location",
-      "body": "",
-      "details": [
-        "The class menu lists only the classes now. No cancel entry, no random roll, and no way out of it into the free settings",
-        "Skyrim Unbound's config menu is down to a single page, Starting Location. Main, Equipment, Spells, Inventory and Other Settings are gone, which also removes the [New] and [Blank] preset entries",
-        "Begin Your Adventure lived on the Main page, so picking a class is now the only way to leave the starting room",
-        "Play is greyed out in the launcher while an update is waiting and reads UPDATE FIRST",
-        "Launcher 1.0.37",
-        "Launcher rebuilt: Shell.cs, Updater.cs",
-        "15 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\Accuracy.pex",
-        "Data\\Scripts\\CoreImpactFramework.pex",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\Scripts\\SkyrimUnboundQuestScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
-        "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
