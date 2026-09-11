@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.67",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558088827",
-  "launcherSha256": "2278d97942dd63f7059c443418d85669b83b68097888e62cf864deefc1a6e8dc",
+  "launcherVersion": "1.0.68",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558111059",
+  "launcherSha256": "dbf7d529a51f0a7ccb27bcfa7c7a828e37f6491ea799c0b13d9bcf6b5bf33457",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -329,9 +329,56 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558088818",
       "sha256": "3a8e43a13d3f5f5140a2f24795e59092981a6bc9988f59e60db4073bf07b6ff6",
       "notes": "No more starting staves, menus sized to your screen, exhaustion off"
+    },
+    {
+      "id": "20260911-1617",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558111058",
+      "sha256": "bea3037f6a1f92574e4da942bf6c97daa0f5c20813eacc2c06afb0dd8d920263",
+      "notes": "Towns are pickable, dead MCM space gone, inventory columns back inside the frame"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Towns are pickable, dead MCM space gone, inventory columns back inside the frame",
+      "body": "",
+      "details": [
+        "Launcher 1.0.68",
+        "Launcher rebuilt: Display.cs, Updater.cs",
+        "27 files to download, 0.2 MB"
+      ],
+      "files": [
+        "Data\\Interface\\skyui\\config.shipped.txt",
+        "Data\\Interface\\skyui\\config.txt",
+        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Merchant.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
+        "steam_appid.txt",
+        "tools\\app\\Display.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "No more starting staves, menus sized to your screen, exhaustion off",
@@ -955,45 +1002,6 @@
         "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
         "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
         "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Thirteen starter classes with real weapons, armour and trade gear",
-      "body": "",
-      "details": [
-        "Launcher 1.0.47",
-        "Launcher rebuilt: Updater.cs",
-        "26 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\McmRecorder\\Thornswood.json",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\Thornswood.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\ThornswoodFishing.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
-        "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
