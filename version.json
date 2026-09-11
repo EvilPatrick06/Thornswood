@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.41",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557678534",
-  "launcherSha256": "71d00c857c9d579cc06b17985b5f6a78193eb729a8fa5e53d39124cb915152be",
+  "launcherVersion": "1.0.42",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557695646",
+  "launcherSha256": "f4afc92c3afb7c7cc849c6d1e061a7c7a1a2cf30a732a4414987d9e56f601287",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -215,9 +215,40 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557678533",
       "sha256": "69ee60ed5c656678d87489b44cc8bcb388e16b44142fd109c70cc32b2bb378c1",
       "notes": "Corrected the starter class values and cleared the body mod installer leftovers"
+    },
+    {
+      "id": "20260911-1132",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557695645",
+      "sha256": "d45e7107098518df85c747bcc8a373c4871191629d0d1a408ec70cee6ce51c2d",
+      "notes": "Two broken plugins removed, body mod leftovers cleared, starter class values corrected, SunHelm settings now apply themselves"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Two broken plugins removed, body mod leftovers cleared, starter class values corrected, SunHelm settings now apply themselves",
+      "body": "",
+      "details": [
+        "Launcher 1.0.42",
+        "Launcher rebuilt: Updater.cs",
+        "5 files to download, 0.7 MB",
+        "The load order moved, so start a new character or expect the old save to complain"
+      ],
+      "files": [
+        "Data\\McmRecorder\\Thornswood\\0001_SunHelm.json",
+        "Data\\Scripts\\MCMShortcutNG.pex",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.dll",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.json",
+        "- Data\\CFTO-JK-Patch.esp",
+        "- Data\\RaceMenuPlugin.esp",
+        "- Data\\Scripts\\RaceMenuPluginFemales.pex",
+        "- Data\\Scripts\\RaceMenuPluginWeapons.pex",
+        "loadorder.txt  (load order)",
+        "plugins.txt  (load order)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Corrected the starter class values and cleared the body mod installer leftovers",
@@ -721,11 +752,6 @@
     {
       "date": "11 Sep 2026",
       "title": "Favourites crash, empty world map, doubled HUD bars, bigger inventory text",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Favourites crash, empty world map, doubled HUD bars",
       "body": ""
     }
   ],
