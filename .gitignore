@@ -1,0 +1,7 @@
+# Never commit build output or credentials.
+config.json
+*.7z
+*.zip
+*.exe
+_dist/
+published.json

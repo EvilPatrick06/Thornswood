@@ -1,0 +1,10 @@
+{
+    "ServerAddress":  "192.135.119.166",
+    "ServerPort":  "25565",
+    "ExpectedExeBytes":  37157144,
+    "UpdateRepo":  "EvilPatrick06/skyrim-together",
+    "UpdateToken":  "",
+    "UpdateBranch":  "main",
+    "Theme":  "Nightfall",
+    "AutoUpdate":  true
+}

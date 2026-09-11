@@ -1,0 +1,69 @@
+Skyrim co-op. One file, one install, and it does not touch the Skyrim you
+already have.
+
+DOWNLOAD
+https://drive.google.com/drive/folders/1zESrSYy6s-kzUtCVF6g0RMrfCUvooTaT?usp=drive_link
+
+It is about 11 GB. Google Drive will say it cannot scan a file that size for
+viruses. Click "Download anyway".
+
+
+WHAT YOU NEED
+- Skyrim Special Edition on Steam, on this PC
+- About 25 GB free
+- Steam signed in and running
+
+
+INSTALL
+Run SkyrimTogether-Setup.exe.
+
+Windows will say "Windows protected your PC" because the file is not signed.
+More info, then Run anyway. Every unsigned program does this.
+
+Press Install and leave it. It unpacks, copies the base game out of your Steam
+folder into C:\SkyrimTogether, and sets that copy up with the whole mod list
+already installed. You do not install any mods. You do not need a Nexus
+account, Vortex, or Nemesis.
+
+Your Steam copy of Skyrim is only read from. Nothing there is renamed, patched
+or deleted, so anything else you play with it keeps working exactly as it does.
+
+One thing it may stop and ask for: our server runs game build 1.6.1170 and
+Steam ships a newer one. If yours is newer, the installer shows you three
+download_depot commands and puts them on your clipboard. Paste them into the
+Steam console one at a time and wait for each to say Done. There is no progress
+bar. Then press Enter back in the installer. That is Steam handing you an older
+build of a game you already own, into Steam's own folder, and it does not
+change your installed game.
+
+
+PLAYING
+You get a "Skyrim Together" shortcut on your desktop.
+
+First time only:
+  - Make a new character and NAME IT AFTER YOURSELF. That name is what the rest
+    of us see floating over your head, and changing it later means a new
+    character.
+  - Save once before you connect.
+
+Then press Play. Connect to the address shown in the launcher. Password is in
+this chat.
+
+F2 opens the multiplayer menu: party, who is online, teleport to someone, chat.
+
+
+THINGS TO KNOW
+- Sleeping and waiting do nothing. Time is shared across the server.
+- Menus do not pause the game. Do not sort your bags mid fight.
+- You get hungry, thirsty and cold. Eat, drink, stay warm.
+- Party up before starting a quest and let one person lead it.
+- Do not run Steam's "Verify Integrity of Game Files" on Skyrim.
+- Do not add mods with a plugin. The launcher checks your list before it lets
+  you play and will stop you, because a mismatched list desyncs everyone.
+  Textures and meshes are fine, there is a folder for them under Mods.
+
+Updates come through the launcher. When the mod list changes you get only the
+files that changed, not the whole thing again. Take them when it offers.
+
+If something is wrong, the launcher's Play page shows five checks and any red
+row is the actual problem. Screenshot it and send it over.
