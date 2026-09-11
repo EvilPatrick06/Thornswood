@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.66",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558033370",
-  "launcherSha256": "3718d53dd864de7ff5c9e50f3cca30c8d1927336430642a87ed5f4af7aa003c4",
+  "launcherVersion": "1.0.67",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558088827",
+  "launcherSha256": "2278d97942dd63f7059c443418d85669b83b68097888e62cf864deefc1a6e8dc",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -323,9 +323,56 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558020320",
       "sha256": "fc32d75032cd722970f479058944e67d633d7a7f0c15c4d9ea2804f55a5d87b3",
       "notes": "Tab says Confirm, because that is what it does"
+    },
+    {
+      "id": "20260911-1600",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558088818",
+      "sha256": "3a8e43a13d3f5f5140a2f24795e59092981a6bc9988f59e60db4073bf07b6ff6",
+      "notes": "No more starting staves, menus sized to your screen, exhaustion off"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "No more starting staves, menus sized to your screen, exhaustion off",
+      "body": "",
+      "details": [
+        "Launcher 1.0.67",
+        "Launcher rebuilt: Display.cs, Shell.cs, Updater.cs",
+        "26 files to download, 0.2 MB"
+      ],
+      "files": [
+        "Data\\Interface\\uilib\\UILIB_1_ListMenu.swf",
+        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Merchant.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
+        "steam_appid.txt",
+        "tools\\app\\Display.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Another modlist's Skyrim is no longer mistaken for this one",
@@ -947,19 +994,6 @@
         "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
         "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini",
         "steam_appid.txt",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Eleven more keys remappable in the launcher, and the two that cannot be are now labelled as such",
-      "body": "",
-      "details": [
-        "Launcher 1.0.45",
-        "Launcher rebuilt: Pages.cs, Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Pages.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
