@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.47",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557816927",
-  "launcherSha256": "4ea8fdf86d6e9b3737367064a53025ecff0a18a91df03141d91ee56c2b9a0a07",
+  "launcherVersion": "1.0.48",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557831384",
+  "launcherSha256": "ac560e9ccc0bc8b88fa66e20fc34df783336be397827c58cc2224d60ba5fedd1",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -239,9 +239,44 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557816926",
       "sha256": "3cfffbbb2f0a7d6c490e0bb90fb09b9784c99b570fae4adab691c9cd5ce9825f",
       "notes": "Thirteen starter classes with real weapons, armour and trade gear"
+    },
+    {
+      "id": "20260911-1302",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557831385",
+      "sha256": "557cb0e97bdd9801127079218fa6c9cbf40f384c2c7a18db0c02bf5f95f013f7",
+      "notes": "Fifteen classes now, with a bard, a merchant, a two handed woodworker, and your pick of any hold to start in"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Fifteen classes now, with a bard, a merchant, a two handed woodworker, and your pick of any hold to start in",
+      "body": "",
+      "details": [
+        "Launcher 1.0.48",
+        "Launcher rebuilt: Updater.cs",
+        "16 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\Thornswood.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Merchant.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Thirteen starter classes with real weapons, armour and trade gear",
@@ -838,11 +873,6 @@
       "date": "11 Sep 2026",
       "title": "The notice boards work now",
       "body": "Missives puts real contracts on the boards in and around every town, generated fresh, and each of you takes your own off the board rather than sharing one."
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Map markers at full brightness, bigger inventory text and icons, no more weapon recoil off walls, Recheck also checks for updates",
-      "body": ""
     }
   ],
   "serverPassword": "6622"
