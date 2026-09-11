@@ -1,7 +1,7 @@
 {
-    "launcherVersion":  "1.0.30",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557099064",
-    "launcherSha256":  "c1e7ccb98811eb14e83e091c7ea707614f9d36a075777cc2fab41770e2e3f045",
+    "launcherVersion":  "1.0.31",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557107862",
+    "launcherSha256":  "1c81b8ad4178065a2b57da1a4f2e06ada163413ca5130bc6a8f1e58c43820eef",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -137,9 +137,29 @@
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557099065",
                       "sha256":  "30291896ed964b9ab71246d785a1580f8cdd4fa6bce3a758b808d2753f16cb8d",
                       "notes":  "Hunger, thirst, exhaustion and cold now switch themselves on. The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus."
+                  },
+                  {
+                      "id":  "20260911-0519",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557107860",
+                      "sha256":  "42cba95b39d1d0437c7cd709d6c533e68037645b56be6ce24231dcf45a07e2a1",
+                      "notes":  "Three test starter classes, so I can confirm how Unbound stores them"
                   }
               ],
     "news":  [
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Three test starter classes, so I can confirm how Unbound stores them",
+                     "body":  "",
+                     "details":  [
+                                     "Launcher 1.0.31",
+                                     "3 files to download, 0.0 MB"
+                                 ],
+                     "files":  [
+                                   "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Default\\Smith.json",
+                                   "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Default\\Thief.json",
+                                   "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Default\\Warrior.json"
+                               ]
+                 },
                  {
                      "date":  "11 Sep 2026",
                      "title":  "Hunger, thirst, exhaustion and cold now switch themselves on",
@@ -269,11 +289,6 @@
                  {
                      "date":  "11 Sep 2026",
                      "title":  "Launch the build\u0027s Skyrim, not Steam\u0027s",
-                     "body":  ""
-                 },
-                 {
-                     "date":  "11 Sep 2026",
-                     "title":  "Fixed the plugin list",
                      "body":  ""
                  }
              ],
