@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.36",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557506034",
-  "launcherSha256": "1df14d3b3a382b495c70650b554f79493d1f0fcfd1eafe60bb1f5bde36039263",
+  "launcherVersion": "1.0.37",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557530443",
+  "launcherSha256": "791aa10929b33443c622b979a22ab6889f4a68bbb6f8ba191228aece4fe28b9c",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -185,9 +185,48 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557506038",
       "sha256": "789218cd781049b7aca8c9b5276aa52d8dab43e102e8989014eb2d039bebac5e",
       "notes": "Starter classes, and the menu that offers them\n- Smith, Thief and Warrior moved into Presets, not Presets\\Default, which is the only folder Skyrim Unbound reads\n- The cancel entry now reads \"Set my character up myself\" and the random roll reads \"Surprise me\", since neither can be deleted, only renamed\n- The current settings entry stays hidden"
+    },
+    {
+      "id": "20260911-0945",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557530448",
+      "sha256": "90ea609efdcd3944243cd2bf766d3cee1bf38be7c64abd544d232decdde32631",
+      "notes": "Character creation locked to looks, class and location\n- The class menu lists only the classes now. No cancel entry, no random roll, and no way out of it into the free settings\n- Skyrim Unbound's config menu is down to a single page, Starting Location. Main, Equipment, Spells, Inventory and Other Settings are gone, which also removes the [New] and [Blank] preset entries\n- Begin Your Adventure lived on the Main page, so picking a class is now the only way to leave the starting room\n- Play is greyed out in the launcher while an update is waiting and reads UPDATE FIRST"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Character creation locked to looks, class and location",
+      "body": "",
+      "details": [
+        "The class menu lists only the classes now. No cancel entry, no random roll, and no way out of it into the free settings",
+        "Skyrim Unbound's config menu is down to a single page, Starting Location. Main, Equipment, Spells, Inventory and Other Settings are gone, which also removes the [New] and [Blank] preset entries",
+        "Begin Your Adventure lived on the Main page, so picking a class is now the only way to leave the starting room",
+        "Play is greyed out in the launcher while an update is waiting and reads UPDATE FIRST",
+        "Launcher 1.0.37",
+        "Launcher rebuilt: Shell.cs, Updater.cs",
+        "15 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Scripts\\Accuracy.pex",
+        "Data\\Scripts\\CoreImpactFramework.pex",
+        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
+        "Data\\Scripts\\SkyrimUnboundQuestScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "steam_appid.txt",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Starter classes, and the menu that offers them",
@@ -542,11 +581,6 @@
     {
       "date": "11 Sep 2026",
       "title": "Mod list rows open the mod's page",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Installer window rebuilt",
       "body": ""
     }
   ],
