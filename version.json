@@ -1,7 +1,7 @@
 {
-    "launcherVersion":  "1.0.31",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557107862",
-    "launcherSha256":  "1c81b8ad4178065a2b57da1a4f2e06ada163413ca5130bc6a8f1e58c43820eef",
+    "launcherVersion":  "1.0.32",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557112096",
+    "launcherSha256":  "2f3561520d95ddf8a2037263562c537ad611d8c910d07956a2cb8d2add41178e",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -141,6 +141,12 @@
                   {
                       "id":  "20260911-0519",
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557107860",
+                      "sha256":  "42cba95b39d1d0437c7cd709d6c533e68037645b56be6ce24231dcf45a07e2a1",
+                      "notes":  "Three test starter classes, so I can confirm how Unbound stores them"
+                  },
+                  {
+                      "id":  "20260911-0522",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557112097",
                       "sha256":  "42cba95b39d1d0437c7cd709d6c533e68037645b56be6ce24231dcf45a07e2a1",
                       "notes":  "Three test starter classes, so I can confirm how Unbound stores them"
                   }
