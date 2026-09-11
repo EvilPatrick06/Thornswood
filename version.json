@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.51",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557905147",
-  "launcherSha256": "71f046c74cf7edee7b2323bc1a1ce93bc9261be3b7d24fb1612af37e0fa1a380",
+  "launcherVersion": "1.0.52",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557915079",
+  "launcherSha256": "38dd93acad9bc1e720a167bdea7b52e292e1e0febbb69a57ec285cbdb2da21ff",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -263,9 +263,33 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557905150",
       "sha256": "c1d2d0cc4a8701460db18943afa75bb47d506e7c4860c903500dca34ad7d0fa6",
       "notes": "Fast travel stays off, the shortcut icon refreshes properly, and the party count reads awake"
+    },
+    {
+      "id": "20260911-1358",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557915080",
+      "sha256": "4edb5bc130c74495667319cd1d0a83e59749ab8137de00612c942dffc4ab2434",
+      "notes": "The launcher keeps the shortcut icon current by itself"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "The launcher keeps the shortcut icon current by itself",
+      "body": "",
+      "details": [
+        "Launcher 1.0.52",
+        "Launcher rebuilt: Icons.cs, Shell.cs, ui.xaml, Updater.cs",
+        "2 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\CalienteTools\\BodySlide\\Config.xml",
+        "Data\\CalienteTools\\BodySlide\\SliderPresets\\Thornswood.xml",
+        "tools\\app\\Icons.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)",
+        "tools\\ui.xaml  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Fast travel stays off, the shortcut icon refreshes properly, and the party count reads awake",
@@ -989,16 +1013,6 @@
         "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\misc.lua",
         "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\test.lua",
         "Data\\SKSE\\Plugins\\JContainers64.dll"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Server address off the launcher pages, news posts now list what actually changed",
-      "body": "",
-      "details": [
-        "Launcher 1.0.28",
-        "4 interface and settings files retuned",
-        "25 files to download, 1.2 MB"
       ]
     }
   ],
