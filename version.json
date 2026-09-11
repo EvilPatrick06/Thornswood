@@ -1,9 +1,23 @@
 {
-  "launcherVersion": "1.0.5",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556528338",
-  "launcherSha256": "3fcafdf03660ae309fe2587512d62918cce6ee3591116ba52bf944a8c3bb3d4c",
+  "launcherVersion": "1.0.6",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556583848",
+  "launcherSha256": "4b19cd731b0e801050bb46a59e2b13826fbf3236ee6e604168493cffc299de7b",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
-  "packs": []
+  "packs": [
+    {
+      "id": "20260910-2345",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556583849",
+      "sha256": "2ff9a4fdcd15382f7cc40bd051d22fe1221550f5a7ce36018fda29ce9cc15864",
+      "notes": "Skyrim Unbound. No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded."
+    }
+  ],
+  "news": [
+    {
+      "date": "10 Sep 2026",
+      "title": "Skyrim Unbound",
+      "body": "No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded."
+    }
+  ]
 }
