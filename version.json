@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.12",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556710481",
-  "launcherSha256": "5f16a06ad945c2a74a73e286d9c6ed77c538a398f0c2a4b1f5d47f6ccb266a36",
+  "launcherVersion": "1.0.13",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556716456",
+  "launcherSha256": "1dcd129a44483bcfc635fcd212be19cd9061e271b49fc3f717bfab2654f4ba8d",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -50,6 +50,11 @@
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Installer window rebuilt",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Stop publishing the client's browser cache",
