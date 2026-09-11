@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.6",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556583848",
-  "launcherSha256": "4b19cd731b0e801050bb46a59e2b13826fbf3236ee6e604168493cffc299de7b",
+  "launcherVersion": "1.0.7",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556584197",
+  "launcherSha256": "9977d894d8151a1bf5d4379c56bd96ca9fb9513aba9d42e71a9f8c40120ef262",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -14,6 +14,11 @@
     }
   ],
   "news": [
+    {
+      "date": "10 Sep 2026",
+      "title": "Skyrim Unbound",
+      "body": "No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded."
+    },
     {
       "date": "10 Sep 2026",
       "title": "Skyrim Unbound",
