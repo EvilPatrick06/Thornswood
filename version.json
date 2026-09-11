@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.9",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556629590",
-  "launcherSha256": "763c4396971a243d5c68d3eee0810f62257dcd7a863983370b89a599856df9b6",
+  "launcherVersion": "1.0.11",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556698191",
+  "launcherSha256": "4736046044bf1b7457e31bf776d6466f5ef4a7e3486f07316fd39e08111bef98",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -29,9 +29,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556629591",
       "sha256": "42815c96ec954d2109968ed0673a742c5997e0b1ed0cf93578ec769ac8de3e38",
       "notes": "Launch the build's Skyrim, not Steam's"
+    },
+    {
+      "id": "20260911-0104",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556698192",
+      "sha256": "3a3694d8a40c0369b5c2a6df2ee58fcb567c56821f17047b2fdf70c5ac615ca4",
+      "notes": "Server preset, launcher opens on the main monitor"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Server preset, launcher opens on the main monitor",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Launch the build's Skyrim, not Steam's",
