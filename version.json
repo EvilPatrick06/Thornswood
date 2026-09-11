@@ -1,7 +1,7 @@
-﻿{
-    "launcherVersion":  "1.0.26",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557034436",
-    "launcherSha256":  "009363b9b7a4928ed776327ae930af8bc9524e6ee8fd89338ab92428f164e5e2",
+{
+    "launcherVersion":  "1.0.27",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557048510",
+    "launcherSha256":  "e0e06328968278e52c33e5b2f987e06e5a025a463cc52848241c1633cd7e6366",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -113,9 +113,20 @@
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557034434",
                       "sha256":  "c21cc32686f9407af523f2982a6e7ae24611b2663dd5369f1126423820939ea6",
                       "notes":  "Dying now sends you to the Temple of Kynareth or the nearest Hall of the Dead instead of dropping you next to your own corpse. Walk back for your things."
+                  },
+                  {
+                      "id":  "20260911-0442",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557048512",
+                      "sha256":  "41644e7e52ae8eed05e8a26889257833bfe2f4e3ac96287febf25e940b15c3ae",
+                      "notes":  "Fixed the update check, quieter publish output, Yoku Weapons links to its page"
                   }
               ],
     "news":  [
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Fixed the update check, quieter publish output, Yoku Weapons links to its page",
+                     "body":  ""
+                 },
                  {
                      "date":  "11 Sep 2026",
                      "title":  "Dying now sends you to the Temple of Kynareth or the nearest Hall of the Dead instead of dropping you next to your own corpse. Walk back for your things.",
@@ -210,11 +221,6 @@
                      "date":  "10 Sep 2026",
                      "title":  "Server password",
                      "body":  ""
-                 },
-                 {
-                     "date":  "10 Sep 2026",
-                     "title":  "Skyrim Unbound",
-                     "body":  "No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded."
                  }
              ],
     "serverPassword":  "6622"
