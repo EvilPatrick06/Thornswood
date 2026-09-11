@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.60",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557987222",
-  "launcherSha256": "f3b513d9dc8f1a5321dd39b6825415adbf3671e92a0271342bd7db4dd1842a19",
+  "launcherVersion": "1.0.61",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557995350",
+  "launcherSha256": "ed363a83149101bea6f33676f92fd2828441833c85a14a6e018a15e9026f8c62",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -299,9 +299,39 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557987223",
       "sha256": "00325703fbcb90784b678413d4ae8cc2528bd4d59f3c5548be4deef7d69a09c6",
       "notes": "Location page is just the holds, bigger inventory text, and the taskbar pin survives an update"
+    },
+    {
+      "id": "20260911-1455",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557995352",
+      "sha256": "53d0f131ddfb7d052a22a5a389aff2a7c083e739f8b3992d4c313283b5b12f91",
+      "notes": "The body tabs say which sex they are for"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "The body tabs say which sex they are for",
+      "body": "",
+      "details": [
+        "Launcher 1.0.61",
+        "Launcher rebuilt: Updater.cs",
+        "11 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\MCM\\Settings\\SkyUI_SE.ini",
+        "Data\\Scripts\\_RaceMenuMorphsHIMBO.pex",
+        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
+        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "steam_appid.txt",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Location page is just the holds, bigger inventory text, and the taskbar pin survives an update",
@@ -991,24 +1021,6 @@
         "- Data\\20 red - 1K\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
         "- Data\\20 red - 1K\\textures\\actors\\character\\female\\femalebody_etc_v2_1.dds",
         "... and 190 more files"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "MCM Shortcut NG, so character creation opens itself",
-      "body": "Skyrim Unbound cannot open its own config menu without this plugin. With it in, the starting location page comes up on its own after the face, and Enter brings up the class menu.",
-      "details": [
-        "Launcher 1.0.39",
-        "Launcher rebuilt: Updater.cs",
-        "5 files to download, 0.8 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\MCMShortcutNG.pex",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\Scripts\\SkyrimUnboundQuestScript.pex",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.dll",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
-        "tools\\app\\Updater.cs  (launcher)"
       ]
     }
   ],
