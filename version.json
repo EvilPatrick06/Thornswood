@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.17",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556889188",
-  "launcherSha256": "ad52e4e451159f1f969f2427b6072d14e5bb02309c7c4527e2d5e5eb94fb7ed1",
+  "launcherVersion": "1.0.18",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556893633",
+  "launcherSha256": "b74428981f205f78ee52580dec9aed3ad58b4009efe86c457a89733359738262",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -65,9 +65,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556889189",
       "sha256": "53a77dc3647280b4cf0f1fbbe1dc273cd48e5e15235fac8f1d81893d8068702b",
       "notes": "Fixes the favourites menu crash and the empty world map"
+    },
+    {
+      "id": "20260911-0307",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556893637",
+      "sha256": "46a88ce1596062c8d8328ff52e8e3f68b33d8988b86b83fdf032b51e05632f6f",
+      "notes": "Favourites crash, empty world map, doubled HUD bars"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Favourites crash, empty world map, doubled HUD bars",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Fixes the favourites menu crash and the empty world map",
