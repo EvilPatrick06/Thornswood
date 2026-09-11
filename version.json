@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.13",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556716456",
-  "launcherSha256": "1dcd129a44483bcfc635fcd212be19cd9061e271b49fc3f717bfab2654f4ba8d",
+  "launcherVersion": "1.0.14",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556776657",
+  "launcherSha256": "1639a6573a2146293b5e9d0cd62f5c74fdcd991429853bf7acab6b9a7d226081",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -47,9 +47,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556710483",
       "sha256": "1114fa6b10a9d10864bf1afe43fa31bfcdfeb69e55684d2a14c96e684e0bdebc",
       "notes": "Stop publishing the client's browser cache"
+    },
+    {
+      "id": "20260911-0156",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556776651",
+      "sha256": "ae9c8fb4b2474456430c29e4e10d8f1056cbeb2d9ae967cf0c50fd73a99bf46c",
+      "notes": "Mod list rows open the mod's page"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Mod list rows open the mod's page",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Installer window rebuilt",
