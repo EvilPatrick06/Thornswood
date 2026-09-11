@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.11",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556698191",
-  "launcherSha256": "4736046044bf1b7457e31bf776d6466f5ef4a7e3486f07316fd39e08111bef98",
+  "launcherVersion": "1.0.12",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556706324",
+  "launcherSha256": "ecd72e942ca144e61ee09f6d408a07e6d5c4d49ca2aca84c26bc29fdc81cb881",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -34,6 +34,12 @@
       "id": "20260911-0104",
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556698192",
       "sha256": "3a3694d8a40c0369b5c2a6df2ee58fcb567c56821f17047b2fdf70c5ac615ca4",
+      "notes": "Server preset, launcher opens on the main monitor"
+    },
+    {
+      "id": "20260911-0109",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556706322",
+      "sha256": "1147a27b2c10a561a76c6add3f7752bdf851452567111ab47b71e48d8bc32ef5",
       "notes": "Server preset, launcher opens on the main monitor"
     }
   ],
