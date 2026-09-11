@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.42",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557695646",
-  "launcherSha256": "f4afc92c3afb7c7cc849c6d1e061a7c7a1a2cf30a732a4414987d9e56f601287",
+  "launcherVersion": "1.0.43",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557720064",
+  "launcherSha256": "6432b390bf723a117077f1b8f837d3b90af4fc8c2b098b0fcc6a5fda1a89c51a",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -221,9 +221,33 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557695645",
       "sha256": "d45e7107098518df85c747bcc8a373c4871191629d0d1a408ec70cee6ce51c2d",
       "notes": "Two broken plugins removed, body mod leftovers cleared, starter class values corrected, SunHelm settings now apply themselves"
+    },
+    {
+      "id": "20260911-1149",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557720068",
+      "sha256": "780def73785d77ac76113af338e725d631517a44cd4b2571abeb2874cd68af71",
+      "notes": "Last of the body mod installer leftovers cleared"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Last of the body mod installer leftovers cleared",
+      "body": "",
+      "details": [
+        "Launcher 1.0.43",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "- Data\\00 RaceMenuMorphs - CBBE\\RaceMenuMorphsCBBE.esp",
+        "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBE.pex",
+        "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIExtensions.pex",
+        "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIListMenu.pex",
+        "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIMenuBase.pex",
+        "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUITextEntryMenu.pex",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Two broken plugins removed, body mod leftovers cleared, starter class values corrected, SunHelm settings now apply themselves",
@@ -747,11 +771,6 @@
     {
       "date": "11 Sep 2026",
       "title": "Tab menu lockup, favourites crash, doubled bars, minimap, editable keybinds",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Favourites crash, empty world map, doubled HUD bars, bigger inventory text",
       "body": ""
     }
   ],
