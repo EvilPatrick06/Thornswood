@@ -1,332 +1,445 @@
 {
-  "launcherVersion": "1.0.33",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557116344",
-  "launcherSha256": "8f08e02523055aae05387cb20f2f4e67dc06a7fe6d1356ff0572b53c0f2f79d3",
-  "serverAddress": "192.135.119.166",
-  "serverPort": "25565",
-  "message": "",
-  "packs": [
-    {
-      "id": "20260910-2345",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556583849",
-      "sha256": "2ff9a4fdcd15382f7cc40bd051d22fe1221550f5a7ce36018fda29ce9cc15864",
-      "notes": "Skyrim Unbound. No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded."
-    },
-    {
-      "id": "20260910-2354",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556595262",
-      "sha256": "3cb83576caca4f88c1337b3bfe0f85b14a0e7880cd8998aecb4c8e3b47d8579b",
-      "notes": "Server password"
-    },
-    {
-      "id": "20260911-0004",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556609854",
-      "sha256": "505b016a6e912150055361f59a6aa4f8fe350fd9233b0a94bc6dba49317d3763",
-      "notes": "Fixed the plugin list"
-    },
-    {
-      "id": "20260911-0017",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556629591",
-      "sha256": "42815c96ec954d2109968ed0673a742c5997e0b1ed0cf93578ec769ac8de3e38",
-      "notes": "Launch the build's Skyrim, not Steam's"
-    },
-    {
-      "id": "20260911-0104",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556698192",
-      "sha256": "3a3694d8a40c0369b5c2a6df2ee58fcb567c56821f17047b2fdf70c5ac615ca4",
-      "notes": "Server preset, launcher opens on the main monitor"
-    },
-    {
-      "id": "20260911-0109",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556706322",
-      "sha256": "1147a27b2c10a561a76c6add3f7752bdf851452567111ab47b71e48d8bc32ef5",
-      "notes": "Server preset, launcher opens on the main monitor"
-    },
-    {
-      "id": "20260911-0112",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556710483",
-      "sha256": "1114fa6b10a9d10864bf1afe43fa31bfcdfeb69e55684d2a14c96e684e0bdebc",
-      "notes": "Stop publishing the client's browser cache"
-    },
-    {
-      "id": "20260911-0156",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556776651",
-      "sha256": "ae9c8fb4b2474456430c29e4e10d8f1056cbeb2d9ae967cf0c50fd73a99bf46c",
-      "notes": "Mod list rows open the mod's page"
-    },
-    {
-      "id": "20260911-0205",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556790876",
-      "sha256": "ae9c8fb4b2474456430c29e4e10d8f1056cbeb2d9ae967cf0c50fd73a99bf46c",
-      "notes": "Mod list rows link to their mod page, and a Skyrim that will not close gets closed"
-    },
-    {
-      "id": "20260911-0304",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556889189",
-      "sha256": "53a77dc3647280b4cf0f1fbbe1dc273cd48e5e15235fac8f1d81893d8068702b",
-      "notes": "Fixes the favourites menu crash and the empty world map"
-    },
-    {
-      "id": "20260911-0307",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556893637",
-      "sha256": "46a88ce1596062c8d8328ff52e8e3f68b33d8988b86b83fdf032b51e05632f6f",
-      "notes": "Favourites crash, empty world map, doubled HUD bars"
-    },
-    {
-      "id": "20260911-0317",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556909951",
-      "sha256": "35c6d0d9b3e5ace65b071bcc7bad1dfbe67ac99d1f12c73ab64061a23a1a3f7c",
-      "notes": "Favourites crash, empty world map, doubled HUD bars, bigger inventory text"
-    },
-    {
-      "id": "20260911-0333",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556937074",
-      "sha256": "76628a7674e21beffc56669bf83cf0869803f33b43a0668c5aa1db6ce2e4b823",
-      "notes": "Tab menu lockup, favourites crash, doubled bars, minimap, editable keybinds"
-    },
-    {
-      "id": "20260911-0354",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556973862",
-      "sha256": "72a877ff84e5d401b427fdc50b7d578215c538dccd4acaef39fcf9f9481e418d",
-      "notes": "Remove the icon injector, fix the inventory overhang, minimap position"
-    },
-    {
-      "id": "20260911-0410",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557000062",
-      "sha256": "8363829acae96d458964a19edb81d70f659a3352fcffdbbdb297481df7f6e3bb",
-      "notes": "Map markers at full brightness and bigger, larger inventory text and icons, Recheck now also checks for updates"
-    },
-    {
-      "id": "20260911-0425",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557022122",
-      "sha256": "3f17f0cd1034c6fbfbcda087347da750cef9f69bc2631d2ee187566cf2246c96",
-      "notes": "Map markers at full brightness, bigger inventory text and icons, no more weapon recoil off walls, Recheck also checks for updates"
-    },
-    {
-      "id": "20260911-0432",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557033942",
-      "sha256": "77b0c70f25ff371744e944b5bb37bda276f338c923ffcff114a7c4b0ebfec749",
-      "notes": "The notice boards work now. Missives puts real contracts on the boards in and around every town, generated fresh, and each of you takes your own off the board rather than sharing one."
-    },
-    {
-      "id": "20260911-0433",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557034434",
-      "sha256": "c21cc32686f9407af523f2982a6e7ae24611b2663dd5369f1126423820939ea6",
-      "notes": "Dying now sends you to the Temple of Kynareth or the nearest Hall of the Dead instead of dropping you next to your own corpse. Walk back for your things."
-    },
-    {
-      "id": "20260911-0442",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557048512",
-      "sha256": "41644e7e52ae8eed05e8a26889257833bfe2f4e3ac96287febf25e940b15c3ae",
-      "notes": "Fixed the update check, quieter publish output, Yoku Weapons links to its page"
-    },
-    {
-      "id": "20260911-0452",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557065308",
-      "sha256": "d63a0b351d00932d0825c0df3aee7602efca67bbcb238786201ab0e8418609e8",
-      "notes": "Server address off the launcher pages, news posts now list what actually changed"
-    },
-    {
-      "id": "20260911-0507",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557089074",
-      "sha256": "1716b4cfdb38d5bd9677968d3c0fe33770814814731c9d7a7b6a2cab626fd1fc",
-      "notes": "Hunger, thirst, exhaustion and cold now switch themselves on. The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus."
-    },
-    {
-      "id": "20260911-0513",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557099065",
-      "sha256": "30291896ed964b9ab71246d785a1580f8cdd4fa6bce3a758b808d2753f16cb8d",
-      "notes": "Hunger, thirst, exhaustion and cold now switch themselves on. The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus."
-    },
-    {
-      "id": "20260911-0519",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557107860",
-      "sha256": "42cba95b39d1d0437c7cd709d6c533e68037645b56be6ce24231dcf45a07e2a1",
-      "notes": "Three test starter classes, so I can confirm how Unbound stores them"
-    },
-    {
-      "id": "20260911-0522",
-      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557112097",
-      "sha256": "42cba95b39d1d0437c7cd709d6c533e68037645b56be6ce24231dcf45a07e2a1",
-      "notes": "Three test starter classes, so I can confirm how Unbound stores them"
-    }
-  ],
-  "news": [
-    {
-      "date": "11 Sep 2026",
-      "title": "News posts now say what actually changed",
-      "body": "",
-      "details": [
-        "release notes can be a real list, one line per change",
-        "launcher changes show up at all, they used to be invisible because none of it ships as a file",
-        "every file that moved is listed under the post, launcher code included",
-        "Launcher 1.0.33",
-        "Launcher rebuilt: Art.cs, AutoJoin.cs, Bootstrap.cs, Checks.cs, Config.cs, Diag.cs, and 15 more"
-      ],
-      "files": [
-        "tools\\app\\Art.cs  (launcher)",
-        "tools\\app\\AutoJoin.cs  (launcher)",
-        "tools\\app\\Checks.cs  (launcher)",
-        "tools\\app\\Config.cs  (launcher)",
-        "tools\\app\\Diag.cs  (launcher)",
-        "tools\\app\\Display.cs  (launcher)",
-        "tools\\app\\Enforce.cs  (launcher)",
-        "tools\\app\\Files.cs  (launcher)",
-        "tools\\app\\Help.cs  (launcher)",
-        "tools\\app\\Keys.cs  (launcher)",
-        "tools\\app\\Links.cs  (launcher)",
-        "tools\\app\\Pages.cs  (launcher)",
-        "tools\\app\\Paths.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Stats.cs  (launcher)",
-        "tools\\app\\Swap.cs  (launcher)",
-        "tools\\app\\Themes.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)",
-        "tools\\app\\Verify.cs  (launcher)",
-        "tools\\setup\\Bootstrap.cs  (launcher)",
-        "tools\\ui.xaml  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Three test starter classes, so I can confirm how Unbound stores them",
-      "body": "",
-      "details": [
-        "Launcher 1.0.31",
-        "3 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Default\\Smith.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Default\\Thief.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Default\\Warrior.json"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Hunger, thirst, exhaustion and cold now switch themselves on",
-      "body": "The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus.",
-      "details": [
-        "Launcher 1.0.29",
-        "25 files to download, 2.9 MB"
-      ],
-      "files": [
-        "Data\\McmRecorder\\Thornswood.json",
-        "Data\\McmRecorder\\Thornswood\\0001_SunHelm.json",
-        "Data\\Scripts\\JArray.pex",
-        "Data\\Scripts\\JAtomic.pex",
-        "Data\\Scripts\\JContainers.pex",
-        "Data\\Scripts\\JContainers_DomainExample.pex",
-        "Data\\Scripts\\JDB.pex",
-        "Data\\Scripts\\JFormDB.pex",
-        "Data\\Scripts\\JFormMap.pex",
-        "Data\\Scripts\\JIntMap.pex",
-        "Data\\Scripts\\JLua.pex",
-        "Data\\Scripts\\JMap.pex",
-        "Data\\Scripts\\JString.pex",
-        "Data\\Scripts\\JValue.pex",
-        "Data\\SKSE\\Plugins\\JCData\\Domains\\.force-install",
-        "Data\\SKSE\\Plugins\\JCData\\InternalLuaScripts\\api_for_lua.h",
-        "Data\\SKSE\\Plugins\\JCData\\InternalLuaScripts\\init.lua",
-        "Data\\SKSE\\Plugins\\JCData\\InternalLuaScripts\\jc.lua",
-        "Data\\SKSE\\Plugins\\JCData\\lua\\jc\\init.lua",
-        "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\basic.lua",
-        "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\init.lua",
-        "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\jc-tests.lua",
-        "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\misc.lua",
-        "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\test.lua",
-        "Data\\SKSE\\Plugins\\JContainers64.dll"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Server address off the launcher pages, news posts now list what actually changed",
-      "body": "",
-      "details": [
-        "Launcher 1.0.28",
-        "4 interface and settings files retuned",
-        "25 files to download, 1.2 MB"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Fixed the update check, quieter publish output, Yoku Weapons links to its page",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Dying now sends you to the Temple of Kynareth or the nearest Hall of the Dead instead of dropping you next to your own corpse. Walk back for your things.",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "The notice boards work now",
-      "body": "Missives puts real contracts on the boards in and around every town, generated fresh, and each of you takes your own off the board rather than sharing one."
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Map markers at full brightness, bigger inventory text and icons, no more weapon recoil off walls, Recheck also checks for updates",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Map markers at full brightness and bigger, larger inventory text and icons, Recheck now also checks for updates",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Remove the icon injector, fix the inventory overhang, minimap position",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Tab menu lockup, favourites crash, doubled bars, minimap, editable keybinds",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Favourites crash, empty world map, doubled HUD bars, bigger inventory text",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Favourites crash, empty world map, doubled HUD bars",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Fixes the favourites menu crash and the empty world map",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Thornswood: new look, new name, four new pages, pick your own drive",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Mod list rows link to their mod page, and a Skyrim that will not close gets closed",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Mod list rows open the mod's page",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Installer window rebuilt",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Stop publishing the client's browser cache",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Server preset, launcher opens on the main monitor",
-      "body": ""
-    }
-  ],
-  "serverPassword": "6622"
+    "launcherVersion":  "1.0.35",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557419689",
+    "launcherSha256":  "b9378d00c3b383ca345185cb20cf8bca282905b9f81824eb535f138b674aa74f",
+    "serverAddress":  "192.135.119.166",
+    "serverPort":  "25565",
+    "message":  "",
+    "packs":  [
+                  {
+                      "id":  "20260910-2345",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556583849",
+                      "sha256":  "2ff9a4fdcd15382f7cc40bd051d22fe1221550f5a7ce36018fda29ce9cc15864",
+                      "notes":  "Skyrim Unbound. No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded."
+                  },
+                  {
+                      "id":  "20260910-2354",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556595262",
+                      "sha256":  "3cb83576caca4f88c1337b3bfe0f85b14a0e7880cd8998aecb4c8e3b47d8579b",
+                      "notes":  "Server password"
+                  },
+                  {
+                      "id":  "20260911-0004",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556609854",
+                      "sha256":  "505b016a6e912150055361f59a6aa4f8fe350fd9233b0a94bc6dba49317d3763",
+                      "notes":  "Fixed the plugin list"
+                  },
+                  {
+                      "id":  "20260911-0017",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556629591",
+                      "sha256":  "42815c96ec954d2109968ed0673a742c5997e0b1ed0cf93578ec769ac8de3e38",
+                      "notes":  "Launch the build\u0027s Skyrim, not Steam\u0027s"
+                  },
+                  {
+                      "id":  "20260911-0104",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556698192",
+                      "sha256":  "3a3694d8a40c0369b5c2a6df2ee58fcb567c56821f17047b2fdf70c5ac615ca4",
+                      "notes":  "Server preset, launcher opens on the main monitor"
+                  },
+                  {
+                      "id":  "20260911-0109",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556706322",
+                      "sha256":  "1147a27b2c10a561a76c6add3f7752bdf851452567111ab47b71e48d8bc32ef5",
+                      "notes":  "Server preset, launcher opens on the main monitor"
+                  },
+                  {
+                      "id":  "20260911-0112",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556710483",
+                      "sha256":  "1114fa6b10a9d10864bf1afe43fa31bfcdfeb69e55684d2a14c96e684e0bdebc",
+                      "notes":  "Stop publishing the client\u0027s browser cache"
+                  },
+                  {
+                      "id":  "20260911-0156",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556776651",
+                      "sha256":  "ae9c8fb4b2474456430c29e4e10d8f1056cbeb2d9ae967cf0c50fd73a99bf46c",
+                      "notes":  "Mod list rows open the mod\u0027s page"
+                  },
+                  {
+                      "id":  "20260911-0205",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556790876",
+                      "sha256":  "ae9c8fb4b2474456430c29e4e10d8f1056cbeb2d9ae967cf0c50fd73a99bf46c",
+                      "notes":  "Mod list rows link to their mod page, and a Skyrim that will not close gets closed"
+                  },
+                  {
+                      "id":  "20260911-0304",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556889189",
+                      "sha256":  "53a77dc3647280b4cf0f1fbbe1dc273cd48e5e15235fac8f1d81893d8068702b",
+                      "notes":  "Fixes the favourites menu crash and the empty world map"
+                  },
+                  {
+                      "id":  "20260911-0307",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556893637",
+                      "sha256":  "46a88ce1596062c8d8328ff52e8e3f68b33d8988b86b83fdf032b51e05632f6f",
+                      "notes":  "Favourites crash, empty world map, doubled HUD bars"
+                  },
+                  {
+                      "id":  "20260911-0317",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556909951",
+                      "sha256":  "35c6d0d9b3e5ace65b071bcc7bad1dfbe67ac99d1f12c73ab64061a23a1a3f7c",
+                      "notes":  "Favourites crash, empty world map, doubled HUD bars, bigger inventory text"
+                  },
+                  {
+                      "id":  "20260911-0333",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556937074",
+                      "sha256":  "76628a7674e21beffc56669bf83cf0869803f33b43a0668c5aa1db6ce2e4b823",
+                      "notes":  "Tab menu lockup, favourites crash, doubled bars, minimap, editable keybinds"
+                  },
+                  {
+                      "id":  "20260911-0354",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556973862",
+                      "sha256":  "72a877ff84e5d401b427fdc50b7d578215c538dccd4acaef39fcf9f9481e418d",
+                      "notes":  "Remove the icon injector, fix the inventory overhang, minimap position"
+                  },
+                  {
+                      "id":  "20260911-0410",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557000062",
+                      "sha256":  "8363829acae96d458964a19edb81d70f659a3352fcffdbbdb297481df7f6e3bb",
+                      "notes":  "Map markers at full brightness and bigger, larger inventory text and icons, Recheck now also checks for updates"
+                  },
+                  {
+                      "id":  "20260911-0425",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557022122",
+                      "sha256":  "3f17f0cd1034c6fbfbcda087347da750cef9f69bc2631d2ee187566cf2246c96",
+                      "notes":  "Map markers at full brightness, bigger inventory text and icons, no more weapon recoil off walls, Recheck also checks for updates"
+                  },
+                  {
+                      "id":  "20260911-0432",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557033942",
+                      "sha256":  "77b0c70f25ff371744e944b5bb37bda276f338c923ffcff114a7c4b0ebfec749",
+                      "notes":  "The notice boards work now. Missives puts real contracts on the boards in and around every town, generated fresh, and each of you takes your own off the board rather than sharing one."
+                  },
+                  {
+                      "id":  "20260911-0433",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557034434",
+                      "sha256":  "c21cc32686f9407af523f2982a6e7ae24611b2663dd5369f1126423820939ea6",
+                      "notes":  "Dying now sends you to the Temple of Kynareth or the nearest Hall of the Dead instead of dropping you next to your own corpse. Walk back for your things."
+                  },
+                  {
+                      "id":  "20260911-0442",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557048512",
+                      "sha256":  "41644e7e52ae8eed05e8a26889257833bfe2f4e3ac96287febf25e940b15c3ae",
+                      "notes":  "Fixed the update check, quieter publish output, Yoku Weapons links to its page"
+                  },
+                  {
+                      "id":  "20260911-0452",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557065308",
+                      "sha256":  "d63a0b351d00932d0825c0df3aee7602efca67bbcb238786201ab0e8418609e8",
+                      "notes":  "Server address off the launcher pages, news posts now list what actually changed"
+                  },
+                  {
+                      "id":  "20260911-0507",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557089074",
+                      "sha256":  "1716b4cfdb38d5bd9677968d3c0fe33770814814731c9d7a7b6a2cab626fd1fc",
+                      "notes":  "Hunger, thirst, exhaustion and cold now switch themselves on. The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus."
+                  },
+                  {
+                      "id":  "20260911-0513",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557099065",
+                      "sha256":  "30291896ed964b9ab71246d785a1580f8cdd4fa6bce3a758b808d2753f16cb8d",
+                      "notes":  "Hunger, thirst, exhaustion and cold now switch themselves on. The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus."
+                  },
+                  {
+                      "id":  "20260911-0519",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557107860",
+                      "sha256":  "42cba95b39d1d0437c7cd709d6c533e68037645b56be6ce24231dcf45a07e2a1",
+                      "notes":  "Three test starter classes, so I can confirm how Unbound stores them"
+                  },
+                  {
+                      "id":  "20260911-0522",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557112097",
+                      "sha256":  "42cba95b39d1d0437c7cd709d6c533e68037645b56be6ce24231dcf45a07e2a1",
+                      "notes":  "Three test starter classes, so I can confirm how Unbound stores them"
+                  },
+                  {
+                      "id":  "20260911-0835-1",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557419690",
+                      "sha256":  "43964361864e1f699cbd081521fc4b85d53d5c35a57a16a327a5c59ad2461100",
+                      "notes":  "Character slots, carriages, and damage that knows where it hit\n- Play now asks who you are, two slots with their own saves, and walks straight past Skyrim\u0027s main menu\n- an empty slot makes a new character, and characters can be deleted without the saves being destroyed\n- carriages and ferries run between the holds, as a fade rather than a scripted ride so it survives co-op\n- where you hit somebody now matters, with the settings shipped identically to everyone\n- new bodies for everyone, CBBE and 3BA for women, HIMBO and The New Gentleman for men, with CBPC physics\n- three starter classes to test, Smith, Thief and Warrior"
+                  },
+                  {
+                      "id":  "20260911-0835-2",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557419686",
+                      "sha256":  "6ac3a8c7096238ca244b296add4f483dc58afd9dcaa4951c0282a1f9a0113985",
+                      "notes":  "Character slots, carriages, and damage that knows where it hit\n- Play now asks who you are, two slots with their own saves, and walks straight past Skyrim\u0027s main menu\n- an empty slot makes a new character, and characters can be deleted without the saves being destroyed\n- carriages and ferries run between the holds, as a fade rather than a scripted ride so it survives co-op\n- where you hit somebody now matters, with the settings shipped identically to everyone\n- new bodies for everyone, CBBE and 3BA for women, HIMBO and The New Gentleman for men, with CBPC physics\n- three starter classes to test, Smith, Thief and Warrior"
+                  },
+                  {
+                      "id":  "20260911-0835-3",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557419691",
+                      "sha256":  "37215beaac702c0cbd5351c143d5fa3d48827188c54497cd8c89311c9a06c4ee",
+                      "notes":  "Character slots, carriages, and damage that knows where it hit\n- Play now asks who you are, two slots with their own saves, and walks straight past Skyrim\u0027s main menu\n- an empty slot makes a new character, and characters can be deleted without the saves being destroyed\n- carriages and ferries run between the holds, as a fade rather than a scripted ride so it survives co-op\n- where you hit somebody now matters, with the settings shipped identically to everyone\n- new bodies for everyone, CBBE and 3BA for women, HIMBO and The New Gentleman for men, with CBPC physics\n- three starter classes to test, Smith, Thief and Warrior"
+                  }
+              ],
+    "news":  [
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Character slots, carriages, and damage that knows where it hit",
+                     "body":  "",
+                     "details":  [
+                                     "Play now asks who you are, two slots with their own saves, and walks straight past Skyrim\u0027s main menu",
+                                     "an empty slot makes a new character, and characters can be deleted without the saves being destroyed",
+                                     "carriages and ferries run between the holds, as a fade rather than a scripted ride so it survives co-op",
+                                     "where you hit somebody now matters, with the settings shipped identically to everyone",
+                                     "new bodies for everyone, CBBE and 3BA for women, HIMBO and The New Gentleman for men, with CBPC physics",
+                                     "three starter classes to test, Smith, Thief and Warrior",
+                                     "Launcher 1.0.35",
+                                     "Launcher rebuilt: Chars.cs, Checks.cs, Config.cs, Keys.cs, Online.cs, Pages.cs, and 3 more",
+                                     "6,127 files to download, 4,254.4 MB",
+                                     "The load order moved, so start a new character or expect the old save to complain"
+                                 ],
+                     "files":  [
+                                   "Data\\00 base - 1K\\textures\\actors\\character\\female\\femalebody_etc_1_msn.dds",
+                                   "Data\\00 base - 1K\\textures\\actors\\character\\female\\femalebody_etc_1_s.dds",
+                                   "Data\\00 base - 1K\\textures\\actors\\character\\female\\femalebody_etc_1_sk.dds",
+                                   "Data\\00 base - 1K\\textures\\actors\\character\\female\\femalebody_etc_v2_1_msn.dds",
+                                   "Data\\00 base - 1K\\textures\\actors\\character\\female\\femalebody_etc_v2_1_s.dds",
+                                   "Data\\00 base - 1K\\textures\\actors\\character\\female\\femalebody_etc_v2_1_sk.dds",
+                                   "Data\\00 base - 2K\\textures\\actors\\character\\female\\femalebody_etc_1_msn.dds",
+                                   "Data\\00 base - 2K\\textures\\actors\\character\\female\\femalebody_etc_1_s.dds",
+                                   "Data\\00 base - 2K\\textures\\actors\\character\\female\\femalebody_etc_1_sk.dds",
+                                   "Data\\00 base - 2K\\textures\\actors\\character\\female\\femalebody_etc_v2_1_msn.dds",
+                                   "Data\\00 base - 2K\\textures\\actors\\character\\female\\femalebody_etc_v2_1_s.dds",
+                                   "Data\\00 base - 2K\\textures\\actors\\character\\female\\femalebody_etc_v2_1_sk.dds",
+                                   "Data\\00 base\\textures\\actors\\character\\female\\femalebody_etc_1_msn.dds",
+                                   "Data\\00 base\\textures\\actors\\character\\female\\femalebody_etc_1_s.dds",
+                                   "Data\\00 base\\textures\\actors\\character\\female\\femalebody_etc_1_sk.dds",
+                                   "Data\\00 base\\textures\\actors\\character\\female\\femalebody_etc_v2_1_msn.dds",
+                                   "Data\\00 base\\textures\\actors\\character\\female\\femalebody_etc_v2_1_s.dds",
+                                   "Data\\00 base\\textures\\actors\\character\\female\\femalebody_etc_v2_1_sk.dds",
+                                   "Data\\00 CBPC Base\\SKSE\\Plugins\\CBPCMasterConfig_3BA.txt",
+                                   "Data\\00 CBPC Base\\SKSE\\Plugins\\CBPCMasterConfig_SOSScroum.txt",
+                                   "Data\\00 CBPC Base\\SKSE\\Plugins\\CBPCollisionConfig.txt",
+                                   "Data\\00 CBPC Base\\SKSE\\Plugins\\CBPConfig_SOSScroum.txt",
+                                   "Data\\00 RaceMenuMorphs - CBBE\\RaceMenuMorphsCBBE.esp",
+                                   "Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBE.pex",
+                                   "Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIExtensions.pex",
+                                   "Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIListMenu.pex",
+                                   "Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIMenuBase.pex",
+                                   "Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUITextEntryMenu.pex",
+                                   "Data\\01 base - sk_black\\textures\\actors\\character\\female\\femalebody_etc_1_sk.dds",
+                                   "Data\\01 base - sk_black\\textures\\actors\\character\\female\\femalebody_etc_v2_1_sk.dds",
+                                   "Data\\01 SMP Base\\CalienteTools\\BodySlide\\ShapeData\\3BBB Collision Armor\\3BBB Collision Armor Amazing A.nif",
+                                   "Data\\01 SMP Base\\CalienteTools\\BodySlide\\ShapeData\\3BBB Collision Armor\\3BBB Collision Armor Amazing B.nif",
+                                   "Data\\01 SMP Base\\CalienteTools\\BodySlide\\ShapeData\\3BBB Collision Armor\\3BBB Collision Armor Amazing C.nif",
+                                   "Data\\01 SMP Base\\CalienteTools\\BodySlide\\ShapeData\\3BBB Collision Armor\\3BBB Collision Armor Amazing D.nif",
+                                   "Data\\01 SMP Base\\CalienteTools\\BodySlide\\ShapeData\\3BBB Collision Armor\\3BBB Collision Armor Amazing.nif",
+                                   "Data\\01 SMP Base\\CalienteTools\\BodySlide\\ShapeData\\3BBB Collision Armor\\3BBB Collision Armor Amazing.osd",
+                                   "Data\\01 SMP Base\\CalienteTools\\BodySlide\\SliderSets\\3BBB Collision Armor Amazing.osp",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF1.tri",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF1_0.nif",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF1_1.nif",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF2.tri",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF2_0.nif",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF2_1.nif",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF3.tri",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF3_0.nif",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF3_1.nif",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF4.tri",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF4_0.nif",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorF4_1.nif",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorP.tri",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorP_0.nif",
+                                   "Data\\01 SMP Base\\meshes\\armor\\Mu3B\\3BBBCollisionArmorP_1.nif",
+                                   "Data\\01 SMP Base\\SKSE\\Plugins\\hdtSkinnedMeshConfigs\\Boner.xml",
+                                   "Data\\01 SMP Base\\SKSE\\Plugins\\hdtSkinnedMeshConfigs\\HeadMale.xml",
+                                   "Data\\01 SMP Base\\SKSE\\Plugins\\hdtSkinnedMeshConfigs\\MaleBody.xml",
+                                   "Data\\01 SMP Base\\SKSE\\Plugins\\hdtSkinnedMeshConfigs\\MaleGenitals.xml",
+                                   "Data\\01 SMP Base\\SKSE\\Plugins\\hdtSkinnedMeshConfigs\\MaleHands.xml",
+                                   "Data\\01 SMP Base\\SKSE\\Plugins\\hdtSkinnedMeshConfigs\\penis.xml",
+                                   "Data\\05 CBPCSystem01\\SKSE\\Plugins\\CBPCSystem.ini",
+                                   "Data\\05 CBPCSystem02\\SKSE\\Plugins\\CBPCSystem.ini",
+                                   "Data\\05 CBPCSystem03\\SKSE\\Plugins\\CBPCSystem.ini",
+                                   "Data\\11 pink - 1K\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
+                                   "Data\\11 pink - 1K\\textures\\actors\\character\\female\\femalebody_etc_v2_1.dds",
+                                   "Data\\11 pink - 2K\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
+                                   "Data\\11 pink - 2K\\textures\\actors\\character\\female\\femalebody_etc_v2_1.dds",
+                                   "Data\\11 pink\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
+                                   "Data\\11 pink\\textures\\actors\\character\\female\\femalebody_etc_v2_1.dds",
+                                   "Data\\11 Type B\\Meshes\\actors\\character\\character assets\\CUSTOM CBBE SMP.xml",
+                                   "Data\\11 Type B\\SKSE\\Plugins\\hdtSkinnedMeshConfigs\\defaultBBPs.xml",
+                                   "Data\\13 black and pink - 1K\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
+                                   "Data\\13 black and pink - 1K\\textures\\actors\\character\\female\\femalebody_etc_v2_1.dds",
+                                   "Data\\13 black and pink - 2K\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
+                                   "Data\\13 black and pink - 2K\\textures\\actors\\character\\female\\femalebody_etc_v2_1.dds",
+                                   "Data\\13 black and pink\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
+                                   "Data\\13 black and pink\\textures\\actors\\character\\female\\femalebody_etc_v2_1.dds",
+                                   "Data\\15 pale pink - 1K\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
+                                   "Data\\15 pale pink - 1K\\textures\\actors\\character\\female\\femalebody_etc_v2_1.dds",
+                                   "Data\\15 pale pink - 2K\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
+                                   "Data\\15 pale pink - 2K\\textures\\actors\\character\\female\\femalebody_etc_v2_1.dds",
+                                   "Data\\15 pale pink\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
+                                   "... and 6,058 more files"
+                               ]
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "News posts now say what actually changed",
+                     "body":  "",
+                     "details":  [
+                                     "release notes can be a real list, one line per change",
+                                     "launcher changes show up at all, they used to be invisible because none of it ships as a file",
+                                     "every file that moved is listed under the post, launcher code included",
+                                     "Launcher 1.0.33",
+                                     "Launcher rebuilt: Art.cs, AutoJoin.cs, Bootstrap.cs, Checks.cs, Config.cs, Diag.cs, and 15 more"
+                                 ],
+                     "files":  [
+                                   "tools\\app\\Art.cs  (launcher)",
+                                   "tools\\app\\AutoJoin.cs  (launcher)",
+                                   "tools\\app\\Checks.cs  (launcher)",
+                                   "tools\\app\\Config.cs  (launcher)",
+                                   "tools\\app\\Diag.cs  (launcher)",
+                                   "tools\\app\\Display.cs  (launcher)",
+                                   "tools\\app\\Enforce.cs  (launcher)",
+                                   "tools\\app\\Files.cs  (launcher)",
+                                   "tools\\app\\Help.cs  (launcher)",
+                                   "tools\\app\\Keys.cs  (launcher)",
+                                   "tools\\app\\Links.cs  (launcher)",
+                                   "tools\\app\\Pages.cs  (launcher)",
+                                   "tools\\app\\Paths.cs  (launcher)",
+                                   "tools\\app\\Shell.cs  (launcher)",
+                                   "tools\\app\\Stats.cs  (launcher)",
+                                   "tools\\app\\Swap.cs  (launcher)",
+                                   "tools\\app\\Themes.cs  (launcher)",
+                                   "tools\\app\\Updater.cs  (launcher)",
+                                   "tools\\app\\Verify.cs  (launcher)",
+                                   "tools\\setup\\Bootstrap.cs  (launcher)",
+                                   "tools\\ui.xaml  (launcher)"
+                               ]
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Three test starter classes, so I can confirm how Unbound stores them",
+                     "body":  "",
+                     "details":  [
+                                     "Launcher 1.0.31",
+                                     "3 files to download, 0.0 MB"
+                                 ],
+                     "files":  [
+                                   "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Default\\Smith.json",
+                                   "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Default\\Thief.json",
+                                   "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Default\\Warrior.json"
+                               ]
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Hunger, thirst, exhaustion and cold now switch themselves on",
+                     "body":  "The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus.",
+                     "details":  [
+                                     "Launcher 1.0.29",
+                                     "25 files to download, 2.9 MB"
+                                 ],
+                     "files":  [
+                                   "Data\\McmRecorder\\Thornswood.json",
+                                   "Data\\McmRecorder\\Thornswood\\0001_SunHelm.json",
+                                   "Data\\Scripts\\JArray.pex",
+                                   "Data\\Scripts\\JAtomic.pex",
+                                   "Data\\Scripts\\JContainers.pex",
+                                   "Data\\Scripts\\JContainers_DomainExample.pex",
+                                   "Data\\Scripts\\JDB.pex",
+                                   "Data\\Scripts\\JFormDB.pex",
+                                   "Data\\Scripts\\JFormMap.pex",
+                                   "Data\\Scripts\\JIntMap.pex",
+                                   "Data\\Scripts\\JLua.pex",
+                                   "Data\\Scripts\\JMap.pex",
+                                   "Data\\Scripts\\JString.pex",
+                                   "Data\\Scripts\\JValue.pex",
+                                   "Data\\SKSE\\Plugins\\JCData\\Domains\\.force-install",
+                                   "Data\\SKSE\\Plugins\\JCData\\InternalLuaScripts\\api_for_lua.h",
+                                   "Data\\SKSE\\Plugins\\JCData\\InternalLuaScripts\\init.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\InternalLuaScripts\\jc.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\jc\\init.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\basic.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\init.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\jc-tests.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\misc.lua",
+                                   "Data\\SKSE\\Plugins\\JCData\\lua\\testing\\test.lua",
+                                   "Data\\SKSE\\Plugins\\JContainers64.dll"
+                               ]
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Server address off the launcher pages, news posts now list what actually changed",
+                     "body":  "",
+                     "details":  [
+                                     "Launcher 1.0.28",
+                                     "4 interface and settings files retuned",
+                                     "25 files to download, 1.2 MB"
+                                 ]
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Fixed the update check, quieter publish output, Yoku Weapons links to its page",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Dying now sends you to the Temple of Kynareth or the nearest Hall of the Dead instead of dropping you next to your own corpse. Walk back for your things.",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "The notice boards work now",
+                     "body":  "Missives puts real contracts on the boards in and around every town, generated fresh, and each of you takes your own off the board rather than sharing one."
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Map markers at full brightness, bigger inventory text and icons, no more weapon recoil off walls, Recheck also checks for updates",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Map markers at full brightness and bigger, larger inventory text and icons, Recheck now also checks for updates",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Remove the icon injector, fix the inventory overhang, minimap position",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Tab menu lockup, favourites crash, doubled bars, minimap, editable keybinds",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Favourites crash, empty world map, doubled HUD bars, bigger inventory text",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Favourites crash, empty world map, doubled HUD bars",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Fixes the favourites menu crash and the empty world map",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Thornswood: new look, new name, four new pages, pick your own drive",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Mod list rows link to their mod page, and a Skyrim that will not close gets closed",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Mod list rows open the mod\u0027s page",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Installer window rebuilt",
+                     "body":  ""
+                 },
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Stop publishing the client\u0027s browser cache",
+                     "body":  ""
+                 }
+             ],
+    "serverPassword":  "6622"
 }
