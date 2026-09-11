@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.48",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557831384",
-  "launcherSha256": "ac560e9ccc0bc8b88fa66e20fc34df783336be397827c58cc2224d60ba5fedd1",
+  "launcherVersion": "1.0.49",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557843567",
+  "launcherSha256": "f1fdf5403a7dd7008c9121867fcd2bbceb8fa19a8080f25059e1fe169a872964",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -245,9 +245,61 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557831385",
       "sha256": "557cb0e97bdd9801127079218fa6c9cbf40f384c2c7a18db0c02bf5f95f013f7",
       "notes": "Fifteen classes now, with a bard, a merchant, a two handed woodworker, and your pick of any hold to start in"
+    },
+    {
+      "id": "20260911-1309",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557843568",
+      "sha256": "3ba74490beb9020ce350422772bd1f5b0299d0cff73c4894133c56fd18b32c95",
+      "notes": "Proper starting kit for every trade, everyone starts poor, and the CBBE morphs tab is back"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Proper starting kit for every trade, everyone starts poor, and the CBBE morphs tab is back",
+      "body": "",
+      "details": [
+        "Launcher 1.0.49",
+        "Launcher rebuilt: Updater.cs",
+        "33 files to download, 0.2 MB"
+      ],
+      "files": [
+        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
+        "Data\\Scripts\\RaceMenuMorphsCBBEUIExtensions.pex",
+        "Data\\Scripts\\RaceMenuMorphsCBBEUIListMenu.pex",
+        "Data\\Scripts\\RaceMenuMorphsCBBEUIMenuBase.pex",
+        "Data\\Scripts\\RaceMenuMorphsCBBEUITextEntryMenu.pex",
+        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\Thornswood.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\ThornswoodCooking.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\ThornswoodFishing.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Merchant.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
+        "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini",
+        "steam_appid.txt",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Fifteen classes now, with a bard, a merchant, a two handed woodworker, and your pick of any hold to start in",
@@ -868,11 +920,6 @@
       "date": "11 Sep 2026",
       "title": "Dying now sends you to the Temple of Kynareth or the nearest Hall of the Dead instead of dropping you next to your own corpse. Walk back for your things.",
       "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "The notice boards work now",
-      "body": "Missives puts real contracts on the boards in and around every town, generated fresh, and each of you takes your own off the board rather than sharing one."
     }
   ],
   "serverPassword": "6622"
