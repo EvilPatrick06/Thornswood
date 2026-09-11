@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.7",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556595827",
-  "launcherSha256": "ef89cfea3db01d31567b5c139f6d92df90557ac28b185029bddefcf55526f09c",
+  "launcherVersion": "1.0.8",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556609853",
+  "launcherSha256": "6af418324cdf90b2cc4537a89237e3598b54507f01b53e53f8e528e105e12b5d",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -17,9 +17,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556595262",
       "sha256": "3cb83576caca4f88c1337b3bfe0f85b14a0e7880cd8998aecb4c8e3b47d8579b",
       "notes": "Server password"
+    },
+    {
+      "id": "20260911-0004",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556609854",
+      "sha256": "505b016a6e912150055361f59a6aa4f8fe350fd9233b0a94bc6dba49317d3763",
+      "notes": "Fixed the plugin list"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Fixed the plugin list",
+      "body": ""
+    },
     {
       "date": "10 Sep 2026",
       "title": "Server password and auto join",
