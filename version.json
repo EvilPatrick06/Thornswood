@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.44",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557736374",
-  "launcherSha256": "58f6b44b34ffca834ca9ce93f06fa494f4dec936134671b854912ffc4523cfca",
+  "launcherVersion": "1.0.45",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557743930",
+  "launcherSha256": "312d8fade5ee6683c49e70104baeae4b739c6adfd161dd7fc00e399e13e81b68",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -236,6 +236,19 @@
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Eleven more keys remappable in the launcher, and the two that cannot be are now labelled as such",
+      "body": "",
+      "details": [
+        "Launcher 1.0.45",
+        "Launcher rebuilt: Pages.cs, Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Pages.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Turned off the MCM recorder that was throwing the Could not find MCM prompts",
@@ -789,11 +802,6 @@
     {
       "date": "11 Sep 2026",
       "title": "Map markers at full brightness and bigger, larger inventory text and icons, Recheck now also checks for updates",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Remove the icon injector, fix the inventory overhang, minimap position",
       "body": ""
     }
   ],
