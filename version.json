@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.40",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557653725",
-  "launcherSha256": "0226ffcdc5a8f9324c9c2e594bbf446594708c422cb4bf495fa819e75b46f5c2",
+  "launcherVersion": "1.0.41",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557678534",
+  "launcherSha256": "71d00c857c9d579cc06b17985b5f6a78193eb729a8fa5e53d39124cb915152be",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -209,9 +209,31 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557653726",
       "sha256": "86500c4c1f036f37308cd5c334e37b332df0811e7ddd31ab186d7861beb7ecd3",
       "notes": "Cleared out about 4 GB of body mod installer leftovers that Skyrim never read"
+    },
+    {
+      "id": "20260911-1121",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557678533",
+      "sha256": "69ee60ed5c656678d87489b44cc8bcb388e16b44142fd109c70cc32b2bb378c1",
+      "notes": "Corrected the starter class values and cleared the body mod installer leftovers"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Corrected the starter class values and cleared the body mod installer leftovers",
+      "body": "",
+      "details": [
+        "Launcher 1.0.41",
+        "Launcher rebuilt: Updater.cs",
+        "3 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Cleared out about 4 GB of body mod installer leftovers that Skyrim never read",
@@ -704,11 +726,6 @@
     {
       "date": "11 Sep 2026",
       "title": "Favourites crash, empty world map, doubled HUD bars",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Fixes the favourites menu crash and the empty world map",
       "body": ""
     }
   ],
