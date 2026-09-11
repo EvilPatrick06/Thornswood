@@ -1,7 +1,7 @@
 {
-    "launcherVersion":  "1.0.29",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557089072",
-    "launcherSha256":  "fe66dc82bd4cbe318f7c2dec02820a0cd7c49c9ca975ddead06ef26025ea16eb",
+    "launcherVersion":  "1.0.30",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557099064",
+    "launcherSha256":  "c1e7ccb98811eb14e83e091c7ea707614f9d36a075777cc2fab41770e2e3f045",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -130,6 +130,12 @@
                       "id":  "20260911-0507",
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557089074",
                       "sha256":  "1716b4cfdb38d5bd9677968d3c0fe33770814814731c9d7a7b6a2cab626fd1fc",
+                      "notes":  "Hunger, thirst, exhaustion and cold now switch themselves on. The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus."
+                  },
+                  {
+                      "id":  "20260911-0513",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557099065",
+                      "sha256":  "30291896ed964b9ab71246d785a1580f8cdd4fa6bce3a758b808d2753f16cb8d",
                       "notes":  "Hunger, thirst, exhaustion and cold now switch themselves on. The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus."
                   }
               ],
