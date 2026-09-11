@@ -1,7 +1,7 @@
 ﻿{
-    "launcherVersion":  "1.0.25",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557033941",
-    "launcherSha256":  "a1a0f1658e8e6e4c396b9489c5126c2d161fa6846e3d008b63f5ab236ca0bfbe",
+    "launcherVersion":  "1.0.26",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557034436",
+    "launcherSha256":  "009363b9b7a4928ed776327ae930af8bc9524e6ee8fd89338ab92428f164e5e2",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -107,9 +107,20 @@
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557033942",
                       "sha256":  "77b0c70f25ff371744e944b5bb37bda276f338c923ffcff114a7c4b0ebfec749",
                       "notes":  "The notice boards work now. Missives puts real contracts on the boards in and around every town, generated fresh, and each of you takes your own off the board rather than sharing one."
+                  },
+                  {
+                      "id":  "20260911-0433",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557034434",
+                      "sha256":  "c21cc32686f9407af523f2982a6e7ae24611b2663dd5369f1126423820939ea6",
+                      "notes":  "Dying now sends you to the Temple of Kynareth or the nearest Hall of the Dead instead of dropping you next to your own corpse. Walk back for your things."
                   }
               ],
     "news":  [
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Dying now sends you to the Temple of Kynareth or the nearest Hall of the Dead instead of dropping you next to your own corpse. Walk back for your things.",
+                     "body":  ""
+                 },
                  {
                      "date":  "11 Sep 2026",
                      "title":  "The notice boards work now",
