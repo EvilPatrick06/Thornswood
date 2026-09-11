@@ -1,7 +1,7 @@
 {
   "launcherVersion": "1.0.7",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556584197",
-  "launcherSha256": "9977d894d8151a1bf5d4379c56bd96ca9fb9513aba9d42e71a9f8c40120ef262",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556595263",
+  "launcherSha256": "56938649032451a0bf886fcdf5252c95ce8919977d08a9ef1be8eea86ab13f9f",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -11,18 +11,25 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556583849",
       "sha256": "2ff9a4fdcd15382f7cc40bd051d22fe1221550f5a7ce36018fda29ce9cc15864",
       "notes": "Skyrim Unbound. No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded."
+    },
+    {
+      "id": "20260910-2354",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556595262",
+      "sha256": "3cb83576caca4f88c1337b3bfe0f85b14a0e7880cd8998aecb4c8e3b47d8579b",
+      "notes": "Server password"
     }
   ],
   "news": [
     {
       "date": "10 Sep 2026",
-      "title": "Skyrim Unbound",
-      "body": "No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded."
+      "title": "Server password",
+      "body": ""
     },
     {
       "date": "10 Sep 2026",
       "title": "Skyrim Unbound",
       "body": "No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded."
     }
-  ]
+  ],
+  "serverPassword": "6622"
 }
