@@ -1,7 +1,7 @@
 {
-    "launcherVersion":  "1.0.27",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557048510",
-    "launcherSha256":  "e0e06328968278e52c33e5b2f987e06e5a025a463cc52848241c1633cd7e6366",
+    "launcherVersion":  "1.0.28",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557065307",
+    "launcherSha256":  "9dbbefff855cbdbc77f045e65363cf3bc63b8c0d964bdc5635a56e7c74abf692",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -119,9 +119,25 @@
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557048512",
                       "sha256":  "41644e7e52ae8eed05e8a26889257833bfe2f4e3ac96287febf25e940b15c3ae",
                       "notes":  "Fixed the update check, quieter publish output, Yoku Weapons links to its page"
+                  },
+                  {
+                      "id":  "20260911-0452",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557065308",
+                      "sha256":  "d63a0b351d00932d0825c0df3aee7602efca67bbcb238786201ab0e8418609e8",
+                      "notes":  "Server address off the launcher pages, news posts now list what actually changed"
                   }
               ],
     "news":  [
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Server address off the launcher pages, news posts now list what actually changed",
+                     "body":  "",
+                     "details":  [
+                                     "Launcher 1.0.28",
+                                     "4 interface and settings files retuned",
+                                     "25 files to download, 1.2 MB"
+                                 ]
+                 },
                  {
                      "date":  "11 Sep 2026",
                      "title":  "Fixed the update check, quieter publish output, Yoku Weapons links to its page",
@@ -215,11 +231,6 @@
                  {
                      "date":  "10 Sep 2026",
                      "title":  "Server password and auto join",
-                     "body":  ""
-                 },
-                 {
-                     "date":  "10 Sep 2026",
-                     "title":  "Server password",
                      "body":  ""
                  }
              ],
