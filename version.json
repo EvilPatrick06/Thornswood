@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.43",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557720064",
-  "launcherSha256": "6432b390bf723a117077f1b8f837d3b90af4fc8c2b098b0fcc6a5fda1a89c51a",
+  "launcherVersion": "1.0.44",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557736374",
+  "launcherSha256": "58f6b44b34ffca834ca9ce93f06fa494f4dec936134671b854912ffc4523cfca",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -227,9 +227,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557720068",
       "sha256": "780def73785d77ac76113af338e725d631517a44cd4b2571abeb2874cd68af71",
       "notes": "Last of the body mod installer leftovers cleared"
+    },
+    {
+      "id": "20260911-1200",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557736372",
+      "sha256": "5f8f672c0994461649f5b4a934f77fb3a9f3825a1777d79cdeac2aeb2426acfb",
+      "notes": "Turned off the MCM recorder that was throwing the Could not find MCM prompts"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Turned off the MCM recorder that was throwing the Could not find MCM prompts",
+      "body": "",
+      "details": [
+        "Launcher 1.0.44",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 0.7 MB"
+      ],
+      "files": [
+        "Data\\McmRecorder\\Thornswood.json",
+        "Data\\McmRecorder\\Thornswood\\0001_SunHelm.json",
+        "Data\\Scripts\\MCMShortcutNG.pex",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.dll",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Last of the body mod installer leftovers cleared",
@@ -766,11 +794,6 @@
     {
       "date": "11 Sep 2026",
       "title": "Remove the icon injector, fix the inventory overhang, minimap position",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Tab menu lockup, favourites crash, doubled bars, minimap, editable keybinds",
       "body": ""
     }
   ],
