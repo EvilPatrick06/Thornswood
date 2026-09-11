@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.46",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557744220",
-  "launcherSha256": "fe1d8bf6f658d302c9720b0d083c1069c333bf70673fa9c2d8bc4b9c68bdc6be",
+  "launcherVersion": "1.0.47",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557816927",
+  "launcherSha256": "4ea8fdf86d6e9b3737367064a53025ecff0a18a91df03141d91ee56c2b9a0a07",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -233,9 +233,54 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557736372",
       "sha256": "5f8f672c0994461649f5b4a934f77fb3a9f3825a1777d79cdeac2aeb2426acfb",
       "notes": "Turned off the MCM recorder that was throwing the Could not find MCM prompts"
+    },
+    {
+      "id": "20260911-1253",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557816926",
+      "sha256": "3cfffbbb2f0a7d6c490e0bb90fb09b9784c99b570fae4adab691c9cd5ce9825f",
+      "notes": "Thirteen starter classes with real weapons, armour and trade gear"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Thirteen starter classes with real weapons, armour and trade gear",
+      "body": "",
+      "details": [
+        "Launcher 1.0.47",
+        "Launcher rebuilt: Updater.cs",
+        "26 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\McmRecorder\\Thornswood.json",
+        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\Thornswood.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\ThornswoodFishing.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
+        "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini",
+        "steam_appid.txt",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Eleven more keys remappable in the launcher, and the two that cannot be are now labelled as such",
@@ -797,11 +842,6 @@
     {
       "date": "11 Sep 2026",
       "title": "Map markers at full brightness, bigger inventory text and icons, no more weapon recoil off walls, Recheck also checks for updates",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Map markers at full brightness and bigger, larger inventory text and icons, Recheck now also checks for updates",
       "body": ""
     }
   ],
