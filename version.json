@@ -1,7 +1,7 @@
 ﻿{
-    "launcherVersion":  "1.0.24",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557022126",
-    "launcherSha256":  "fe19963cdc5d8240639a0abda0fd510bc3c79d20fe2e14a4969780abd535862a",
+    "launcherVersion":  "1.0.25",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557033941",
+    "launcherSha256":  "a1a0f1658e8e6e4c396b9489c5126c2d161fa6846e3d008b63f5ab236ca0bfbe",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -101,9 +101,20 @@
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557022122",
                       "sha256":  "3f17f0cd1034c6fbfbcda087347da750cef9f69bc2631d2ee187566cf2246c96",
                       "notes":  "Map markers at full brightness, bigger inventory text and icons, no more weapon recoil off walls, Recheck also checks for updates"
+                  },
+                  {
+                      "id":  "20260911-0432",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557033942",
+                      "sha256":  "77b0c70f25ff371744e944b5bb37bda276f338c923ffcff114a7c4b0ebfec749",
+                      "notes":  "The notice boards work now. Missives puts real contracts on the boards in and around every town, generated fresh, and each of you takes your own off the board rather than sharing one."
                   }
               ],
     "news":  [
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "The notice boards work now",
+                     "body":  "Missives puts real contracts on the boards in and around every town, generated fresh, and each of you takes your own off the board rather than sharing one."
+                 },
                  {
                      "date":  "11 Sep 2026",
                      "title":  "Map markers at full brightness, bigger inventory text and icons, no more weapon recoil off walls, Recheck also checks for updates",
