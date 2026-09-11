@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.55",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557949534",
-  "launcherSha256": "d7fb1f361babaedbd36d6ffdb7a5d0b84a4d32dcbbecbd252feefadcf15b8c5f",
+  "launcherVersion": "1.0.56",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557951344",
+  "launcherSha256": "19e2abcab6a60d99f068bbd2fab6c14e1bf49208bdd714cf0609c6edba45a941",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -284,6 +284,18 @@
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "The report brings every plugin log back, not just two",
+      "body": "",
+      "details": [
+        "Launcher 1.0.56",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "One body's sliders per character, resolution matched on Play, and a Quit Skyrim button",
@@ -1126,41 +1138,6 @@
         "Data\\15 pale pink - 2K\\textures\\actors\\character\\female\\femalebody_etc_v2_1.dds",
         "Data\\15 pale pink\\textures\\actors\\character\\female\\femalebody_etc_1.dds",
         "... and 6,058 more files"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "News posts now say what actually changed",
-      "body": "",
-      "details": [
-        "release notes can be a real list, one line per change",
-        "launcher changes show up at all, they used to be invisible because none of it ships as a file",
-        "every file that moved is listed under the post, launcher code included",
-        "Launcher 1.0.33",
-        "Launcher rebuilt: Art.cs, AutoJoin.cs, Bootstrap.cs, Checks.cs, Config.cs, Diag.cs, and 15 more"
-      ],
-      "files": [
-        "tools\\app\\Art.cs  (launcher)",
-        "tools\\app\\AutoJoin.cs  (launcher)",
-        "tools\\app\\Checks.cs  (launcher)",
-        "tools\\app\\Config.cs  (launcher)",
-        "tools\\app\\Diag.cs  (launcher)",
-        "tools\\app\\Display.cs  (launcher)",
-        "tools\\app\\Enforce.cs  (launcher)",
-        "tools\\app\\Files.cs  (launcher)",
-        "tools\\app\\Help.cs  (launcher)",
-        "tools\\app\\Keys.cs  (launcher)",
-        "tools\\app\\Links.cs  (launcher)",
-        "tools\\app\\Pages.cs  (launcher)",
-        "tools\\app\\Paths.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Stats.cs  (launcher)",
-        "tools\\app\\Swap.cs  (launcher)",
-        "tools\\app\\Themes.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)",
-        "tools\\app\\Verify.cs  (launcher)",
-        "tools\\setup\\Bootstrap.cs  (launcher)",
-        "tools\\ui.xaml  (launcher)"
       ]
     }
   ],
