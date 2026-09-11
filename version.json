@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.37",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557530443",
-  "launcherSha256": "791aa10929b33443c622b979a22ab6889f4a68bbb6f8ba191228aece4fe28b9c",
+  "launcherVersion": "1.0.38",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557537314",
+  "launcherSha256": "d4f8de12b9a7791e36e96e786c643b9d516eb898a9ef710bf912acee22486e96",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -191,9 +191,30 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557530448",
       "sha256": "90ea609efdcd3944243cd2bf766d3cee1bf38be7c64abd544d232decdde32631",
       "notes": "Character creation locked to looks, class and location\n- The class menu lists only the classes now. No cancel entry, no random roll, and no way out of it into the free settings\n- Skyrim Unbound's config menu is down to a single page, Starting Location. Main, Equipment, Spells, Inventory and Other Settings are gone, which also removes the [New] and [Blank] preset entries\n- Begin Your Adventure lived on the Main page, so picking a class is now the only way to leave the starting room\n- Play is greyed out in the launcher while an update is waiting and reads UPDATE FIRST"
+    },
+    {
+      "id": "20260911-0949",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557537320",
+      "sha256": "155511bac293e7ff3c5cdd1a82eb9ae4fb8eb3bcbe210959066c084079318dc5",
+      "notes": "Making a character now walks you through it. The starting location menu opens on its own after the face, and the class menu follows."
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Making a character now walks you through it",
+      "body": "The starting location menu opens on its own after the face, and the class menu follows.",
+      "details": [
+        "Launcher 1.0.38",
+        "Launcher rebuilt: Updater.cs",
+        "2 files to download, 0.7 MB"
+      ],
+      "files": [
+        "Data\\Scripts\\MCMShortcutNG.pex",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.dll",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Character creation locked to looks, class and location",
@@ -576,11 +597,6 @@
     {
       "date": "11 Sep 2026",
       "title": "Mod list rows link to their mod page, and a Skyrim that will not close gets closed",
-      "body": ""
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Mod list rows open the mod's page",
       "body": ""
     }
   ],
