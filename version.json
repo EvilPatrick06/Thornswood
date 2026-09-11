@@ -1,9 +1,9 @@
 {
-    "launcherVersion": "1.0.0",
-    "launcherUrl": "",
-    "launcherSha256": "",
-    "serverAddress": "192.135.119.166",
-    "serverPort": "25565",
-    "message": "",
-    "packs": []
+  "launcherVersion": "1.0.1",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556495688",
+  "launcherSha256": "fde76b933f062f7211938593e97318516276a6472b2c920cf04d0bb67ace220e",
+  "serverAddress": "192.135.119.166",
+  "serverPort": "25565",
+  "message": "",
+  "packs": []
 }
