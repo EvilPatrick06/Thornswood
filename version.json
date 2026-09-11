@@ -1,7 +1,7 @@
 {
   "launcherVersion": "1.0.7",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556595263",
-  "launcherSha256": "56938649032451a0bf886fcdf5252c95ce8919977d08a9ef1be8eea86ab13f9f",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556595827",
+  "launcherSha256": "ef89cfea3db01d31567b5c139f6d92df90557ac28b185029bddefcf55526f09c",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -20,6 +20,11 @@
     }
   ],
   "news": [
+    {
+      "date": "10 Sep 2026",
+      "title": "Server password and auto join",
+      "body": ""
+    },
     {
       "date": "10 Sep 2026",
       "title": "Server password",
