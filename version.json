@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.16",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556847037",
-  "launcherSha256": "d20ec0a3096b8b2c897ddfb625c9a1fc8d58660df59bad149469559dca9c566a",
+  "launcherVersion": "1.0.17",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556889188",
+  "launcherSha256": "ad52e4e451159f1f969f2427b6072d14e5bb02309c7c4527e2d5e5eb94fb7ed1",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -59,9 +59,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556790876",
       "sha256": "ae9c8fb4b2474456430c29e4e10d8f1056cbeb2d9ae967cf0c50fd73a99bf46c",
       "notes": "Mod list rows link to their mod page, and a Skyrim that will not close gets closed"
+    },
+    {
+      "id": "20260911-0304",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556889189",
+      "sha256": "53a77dc3647280b4cf0f1fbbe1dc273cd48e5e15235fac8f1d81893d8068702b",
+      "notes": "Fixes the favourites menu crash and the empty world map"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Fixes the favourites menu crash and the empty world map",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Thornswood: new look, new name, four new pages, pick your own drive",
