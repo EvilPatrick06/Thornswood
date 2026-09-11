@@ -1,7 +1,7 @@
 {
   "launcherVersion": "1.0.12",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556706324",
-  "launcherSha256": "ecd72e942ca144e61ee09f6d408a07e6d5c4d49ca2aca84c26bc29fdc81cb881",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556710481",
+  "launcherSha256": "5f16a06ad945c2a74a73e286d9c6ed77c538a398f0c2a4b1f5d47f6ccb266a36",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -41,9 +41,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556706322",
       "sha256": "1147a27b2c10a561a76c6add3f7752bdf851452567111ab47b71e48d8bc32ef5",
       "notes": "Server preset, launcher opens on the main monitor"
+    },
+    {
+      "id": "20260911-0112",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556710483",
+      "sha256": "1114fa6b10a9d10864bf1afe43fa31bfcdfeb69e55684d2a14c96e684e0bdebc",
+      "notes": "Stop publishing the client's browser cache"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Stop publishing the client's browser cache",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Server preset, launcher opens on the main monitor",
