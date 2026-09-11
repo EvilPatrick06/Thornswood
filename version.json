@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.2",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556503223",
-  "launcherSha256": "28a214dd342f6b65635c8778fbc9ee9165d9bcc4a2de81c14aec8575e9303727",
+  "launcherVersion": "1.0.3",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556508771",
+  "launcherSha256": "300753d30a69ebf31b683a5fc9c93c582e6d2b1974ee45b6471976c700bbc5d2",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
