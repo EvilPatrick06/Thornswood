@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.21",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556944847",
-  "launcherSha256": "768c9d96f78283b9fb367cf55d31df171a1f353798de6c4741dbe1a7d1cf0a87",
+  "launcherVersion": "1.0.22",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556973866",
+  "launcherSha256": "4f1b72d026889ec0c623eb8c61ca135e203eb987f830ba98667c6f0734fbea19",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -83,9 +83,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556937074",
       "sha256": "76628a7674e21beffc56669bf83cf0869803f33b43a0668c5aa1db6ce2e4b823",
       "notes": "Tab menu lockup, favourites crash, doubled bars, minimap, editable keybinds"
+    },
+    {
+      "id": "20260911-0354",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556973862",
+      "sha256": "72a877ff84e5d401b427fdc50b7d578215c538dccd4acaef39fcf9f9481e418d",
+      "notes": "Remove the icon injector, fix the inventory overhang, minimap position"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Remove the icon injector, fix the inventory overhang, minimap position",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Tab menu lockup, favourites crash, doubled bars, minimap, editable keybinds",
