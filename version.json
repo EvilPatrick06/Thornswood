@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.69",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558129786",
-  "launcherSha256": "0c60636bae00f5d5d423143cf4a0c823a922f00ac13356cd3a5a553852ca12f9",
+  "launcherVersion": "1.0.70",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558146754",
+  "launcherSha256": "6e5385e2a5e4fc551bbbf0c02156e2757db36159869e069c863ad230ef2579ff",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -341,9 +341,42 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558129787",
       "sha256": "2eabb216ec84b22d53a6bde427abcd19939b120aab1aefb1e782bbcc7812463d",
       "notes": "Item menus scaled up properly, exhaustion off, temperature explained"
+    },
+    {
+      "id": "20260911-1645",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558146753",
+      "sha256": "67e2bccd972bf541385b7e28c20f61617db62160828bbc0d6f20040d517f094f",
+      "notes": "Class names spelled properly, quieter morph sync logging"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Class names spelled properly, quieter morph sync logging",
+      "body": "",
+      "details": [
+        "Launcher 1.0.70",
+        "Launcher rebuilt: Files.cs, Shell.cs, Updater.cs",
+        "12 files to download, 0.2 MB"
+      ],
+      "files": [
+        "Data\\Interface\\skyui\\config.shipped.txt",
+        "Data\\Interface\\skyui\\config.txt",
+        "Data\\Interface\\skyui\\inventorylists.swf",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\MorphSyncTogether.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
+        "steam_appid.txt",
+        "tools\\app\\Files.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Item menus scaled up properly, exhaustion off, temperature explained",
@@ -958,52 +991,6 @@
         "tools\\app\\Help.cs  (launcher)",
         "tools\\app\\Keys.cs  (launcher)",
         "tools\\app\\Pages.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Proper starting kit for every trade, everyone starts poor, and the CBBE morphs tab is back",
-      "body": "",
-      "details": [
-        "Launcher 1.0.49",
-        "Launcher rebuilt: Updater.cs",
-        "33 files to download, 0.2 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBEUIExtensions.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBEUIListMenu.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBEUIMenuBase.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBEUITextEntryMenu.pex",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\Thornswood.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\ThornswoodCooking.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Addons\\ThornswoodFishing.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Merchant.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
-        "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
