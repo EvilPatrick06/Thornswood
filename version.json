@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.59",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557980143",
-  "launcherSha256": "019f8161015dfc8cea31312bc091c4d0c1e5c87731e01d09aea9db09e54bc0f8",
+  "launcherVersion": "1.0.60",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557987222",
+  "launcherSha256": "f3b513d9dc8f1a5321dd39b6825415adbf3671e92a0271342bd7db4dd1842a19",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -293,9 +293,47 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557979499",
       "sha256": "dffdf0b05b9320be476efe90395ebff527b856681efe28c551994753215a0054",
       "notes": "Begin your adventure is back, the location page is locked down, and Papyrus is talking"
+    },
+    {
+      "id": "20260911-1449",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/557987223",
+      "sha256": "00325703fbcb90784b678413d4ae8cc2528bd4d59f3c5548be4deef7d69a09c6",
+      "notes": "Location page is just the holds, bigger inventory text, and the taskbar pin survives an update"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Location page is just the holds, bigger inventory text, and the taskbar pin survives an update",
+      "body": "",
+      "details": [
+        "Launcher 1.0.60",
+        "Launcher rebuilt: Config.cs, Icons.cs, Shell.cs, Updater.cs",
+        "16 files to download, 0.2 MB"
+      ],
+      "files": [
+        "Data\\MCM\\Settings\\SkyUI_SE.ini",
+        "Data\\Scripts\\_RaceMenuMorphsHIMBO.pex",
+        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
+        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
+        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
+        "Data\\Scripts\\SkyrimUnboundQuestScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
+        "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "steam_appid.txt",
+        "tools\\app\\Config.cs  (launcher)",
+        "tools\\app\\Icons.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Sixteen ways to start: fifteen trades or let it pick",
@@ -970,21 +1008,6 @@
         "Data\\Scripts\\SkyrimUnboundQuestScript.pex",
         "Data\\SKSE\\Plugins\\MCMShortcutNG.dll",
         "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Making a character now walks you through it",
-      "body": "The starting location menu opens on its own after the face, and the class menu follows.",
-      "details": [
-        "Launcher 1.0.38",
-        "Launcher rebuilt: Updater.cs",
-        "2 files to download, 0.7 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\MCMShortcutNG.pex",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.dll",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
