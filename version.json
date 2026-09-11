@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.8",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556609853",
-  "launcherSha256": "6af418324cdf90b2cc4537a89237e3598b54507f01b53e53f8e528e105e12b5d",
+  "launcherVersion": "1.0.9",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556629590",
+  "launcherSha256": "763c4396971a243d5c68d3eee0810f62257dcd7a863983370b89a599856df9b6",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -23,9 +23,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556609854",
       "sha256": "505b016a6e912150055361f59a6aa4f8fe350fd9233b0a94bc6dba49317d3763",
       "notes": "Fixed the plugin list"
+    },
+    {
+      "id": "20260911-0017",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556629591",
+      "sha256": "42815c96ec954d2109968ed0673a742c5997e0b1ed0cf93578ec769ac8de3e38",
+      "notes": "Launch the build's Skyrim, not Steam's"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Launch the build's Skyrim, not Steam's",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Fixed the plugin list",
