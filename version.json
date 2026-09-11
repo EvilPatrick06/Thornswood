@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.19",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556909950",
-  "launcherSha256": "9416b3b8234e074d1d1e2a8c5607ae9894b9553441caedebe557308a28f485f2",
+  "launcherVersion": "1.0.20",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556937073",
+  "launcherSha256": "ed69a28dafbc39a7a7aaea8a132d3c1406ec37073a7fba668d1f7307e2b2e0f8",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -77,9 +77,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556909951",
       "sha256": "35c6d0d9b3e5ace65b071bcc7bad1dfbe67ac99d1f12c73ab64061a23a1a3f7c",
       "notes": "Favourites crash, empty world map, doubled HUD bars, bigger inventory text"
+    },
+    {
+      "id": "20260911-0333",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556937074",
+      "sha256": "76628a7674e21beffc56669bf83cf0869803f33b43a0668c5aa1db6ce2e4b823",
+      "notes": "Tab menu lockup, favourites crash, doubled bars, minimap, editable keybinds"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Tab menu lockup, favourites crash, doubled bars, minimap, editable keybinds",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Favourites crash, empty world map, doubled HUD bars, bigger inventory text",
