@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.14",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556776657",
-  "launcherSha256": "1639a6573a2146293b5e9d0cd62f5c74fdcd991429853bf7acab6b9a7d226081",
+  "launcherVersion": "1.0.15",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556790874",
+  "launcherSha256": "db5ae2431d8bd4c087f1c43cad69106081a3bf1f72bc6e75cd35cbdc4b6f6bb5",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -53,9 +53,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556776651",
       "sha256": "ae9c8fb4b2474456430c29e4e10d8f1056cbeb2d9ae967cf0c50fd73a99bf46c",
       "notes": "Mod list rows open the mod's page"
+    },
+    {
+      "id": "20260911-0205",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556790876",
+      "sha256": "ae9c8fb4b2474456430c29e4e10d8f1056cbeb2d9ae967cf0c50fd73a99bf46c",
+      "notes": "Mod list rows link to their mod page, and a Skyrim that will not close gets closed"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Mod list rows link to their mod page, and a Skyrim that will not close gets closed",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Mod list rows open the mod's page",
