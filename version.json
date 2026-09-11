@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.64",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558014335",
-  "launcherSha256": "d189f52cf5324305053f2053ee4a44a08b8cc67c610cfe012b34770e89aca461",
+  "launcherVersion": "1.0.65",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558020318",
+  "launcherSha256": "a4ac107a556a1fe990c30ec65b5eeb0d5a1317090246c1444a00b283c2090339",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -317,9 +317,29 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558014336",
       "sha256": "ceb1d1660153034f607796118f1ea9c8b3b87031b97717fc4439bfbd4a3bec56",
       "notes": "Nine holds and nothing else, and Preview Mode is gone"
+    },
+    {
+      "id": "20260911-1511",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558020320",
+      "sha256": "fc32d75032cd722970f479058944e67d633d7a7f0c15c4d9ea2804f55a5d87b3",
+      "notes": "Tab says Confirm, because that is what it does"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Tab says Confirm, because that is what it does",
+      "body": "",
+      "details": [
+        "Launcher 1.0.65",
+        "Launcher rebuilt: Updater.cs",
+        "1 file to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\Interface\\uilib\\UILIB_1_ListMenu.swf",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Survival is actually switched on, addon gear finally lands, and towns join the cities",
@@ -947,24 +967,6 @@
         "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
         "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
         "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Last of the body mod installer leftovers cleared",
-      "body": "",
-      "details": [
-        "Launcher 1.0.43",
-        "Launcher rebuilt: Updater.cs"
-      ],
-      "files": [
-        "- Data\\00 RaceMenuMorphs - CBBE\\RaceMenuMorphsCBBE.esp",
-        "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBE.pex",
-        "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIExtensions.pex",
-        "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIListMenu.pex",
-        "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUIMenuBase.pex",
-        "- Data\\00 RaceMenuMorphs - CBBE\\Scripts\\RaceMenuMorphsCBBEUITextEntryMenu.pex",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
