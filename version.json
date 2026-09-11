@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.18",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556893633",
-  "launcherSha256": "b74428981f205f78ee52580dec9aed3ad58b4009efe86c457a89733359738262",
+  "launcherVersion": "1.0.19",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556909950",
+  "launcherSha256": "9416b3b8234e074d1d1e2a8c5607ae9894b9553441caedebe557308a28f485f2",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -71,9 +71,20 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556893637",
       "sha256": "46a88ce1596062c8d8328ff52e8e3f68b33d8988b86b83fdf032b51e05632f6f",
       "notes": "Favourites crash, empty world map, doubled HUD bars"
+    },
+    {
+      "id": "20260911-0317",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/556909951",
+      "sha256": "35c6d0d9b3e5ace65b071bcc7bad1dfbe67ac99d1f12c73ab64061a23a1a3f7c",
+      "notes": "Favourites crash, empty world map, doubled HUD bars, bigger inventory text"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Favourites crash, empty world map, doubled HUD bars, bigger inventory text",
+      "body": ""
+    },
     {
       "date": "11 Sep 2026",
       "title": "Favourites crash, empty world map, doubled HUD bars",
