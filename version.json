@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.95",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558535328",
-  "launcherSha256": "208381637455f4fb9c07f9f6d331231f53277aaac088321a2c0af652ef60ef59",
+  "launcherVersion": "1.0.96",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558562371",
+  "launcherSha256": "6458f2656f6df8d8f964feeb3b758ba030034788cc1650c6bd5db1e4957f7c70",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -473,9 +473,45 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558535327",
       "sha256": "f601c38d14da1b6b8fee04bfade9adf9cd0c7b9df8f620a46672ffe245b32384",
       "notes": "Bodies rebuilt from the Thornswood preset, body and outfits finally match"
+    },
+    {
+      "id": "20260911-2158",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558562372",
+      "sha256": "c66dd7fd982deecd287be386890f761129ba2e33be0d57e838fd0e3f3e61d8e7",
+      "notes": "Minimap removed"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Minimap removed",
+      "body": "",
+      "details": [
+        "Launcher 1.0.96",
+        "Launcher rebuilt: Enforce.cs, Help.cs, Links.cs, Shell.cs, ui.xaml, Updater.cs",
+        "8 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\SKSE\\Plugins\\CBPCMasterConfig_Thornswood.txt",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "steam_appid.txt",
+        "- Data\\Interface\\MenuManager_WideScreen.swf",
+        "- Data\\Interface\\MenuManager.swf",
+        "- Data\\Interface\\MiniMapMenu.swf",
+        "- Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.dll",
+        "tools\\app\\Enforce.cs  (launcher)",
+        "tools\\app\\Help.cs  (launcher)",
+        "tools\\app\\Links.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)",
+        "tools\\ui.xaml  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Bodies rebuilt from the Thornswood preset, body and outfits finally match",
@@ -1105,22 +1141,6 @@
         "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini",
         "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
         "steam_appid.txt",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Item menus bigger again, category icons given their own room",
-      "body": "",
-      "details": [
-        "Launcher 1.0.73",
-        "Launcher rebuilt: Updater.cs",
-        "3 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Interface\\inventorymenu.swf",
-        "Data\\Interface\\skyui\\inventorylists.swf",
-        "Data\\Scripts\\_RespawnScript.pex",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
