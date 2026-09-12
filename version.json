@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.81",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558298019",
-  "launcherSha256": "6d1952a4de4638fd06eb5c6ba13f937fe00520c1bc5e5621a06d41e8eb9db5c3",
+  "launcherVersion": "1.0.82",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558308325",
+  "launcherSha256": "67e99b071ce9ac14edf161986f03dec3d1fcfeec736c007568cfa03b0b84477a",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -394,6 +394,12 @@
       "id": "20260911-1830",
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558298017",
       "sha256": "6c2e4762d8f18145d48d9112e1b7afd3b599bedd5b911f29893386f5b452110f",
+      "notes": "Cook's knife and Enchanter's gloves written into the kit list"
+    },
+    {
+      "id": "20260911-1837",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558308324",
+      "sha256": "8eeadb3d089bcb8a365c62d2a4d0bcf5bee9561009a32264205b083657c1d77a",
       "notes": "Cook's knife and Enchanter's gloves written into the kit list"
     }
   ],
