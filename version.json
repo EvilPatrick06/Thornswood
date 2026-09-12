@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.91",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558459295",
-  "launcherSha256": "7e6d6ba10ae53b85fb738f18170113cf8fa9bb60a63f55aeb396302a2bd24e0f",
+  "launcherVersion": "1.0.92",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558521998",
+  "launcherSha256": "62c7d4820312606be12235b044121db2079a9365f00941bc366586f52f17873e",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -455,9 +455,40 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558459293",
       "sha256": "13cb9603140caee76be87647afc86031690a834b98e4c25e1aa63a68c8c4be62",
       "notes": "Respawn actually fires again, the delay in front of the bleedout check was mine"
+    },
+    {
+      "id": "20260911-2126",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558521997",
+      "sha256": "b440ad3642ca6dffd009f6d89f3e6b61570334efefd1f1df3afd614a4014b604",
+      "notes": "Death clears combat, the alarm and your bounty, so guards stop camping the hall of the dead"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Death clears combat, the alarm and your bounty, so guards stop camping the hall of the dead",
+      "body": "",
+      "details": [
+        "Launcher 1.0.92",
+        "Launcher rebuilt: Enforce.cs, Updater.cs",
+        "11 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\CalienteTools\\BodySlide\\BodySlide.xml",
+        "Data\\CalienteTools\\BodySlide\\BuildSelection.xml",
+        "Data\\CalienteTools\\BodySlide\\Log_BS.txt",
+        "Data\\Scripts\\_RespawnScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "steam_appid.txt",
+        "tools\\app\\Enforce.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Respawn actually fires again, the delay in front of the bleedout check was mine",
@@ -1021,33 +1052,6 @@
         "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
         "steam_appid.txt",
         "plugins.txt  (load order)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Class names spelled properly, quieter morph sync logging",
-      "body": "",
-      "details": [
-        "Launcher 1.0.70",
-        "Launcher rebuilt: Files.cs, Shell.cs, Updater.cs",
-        "12 files to download, 0.2 MB"
-      ],
-      "files": [
-        "Data\\Interface\\skyui\\config.shipped.txt",
-        "Data\\Interface\\skyui\\config.txt",
-        "Data\\Interface\\skyui\\inventorylists.swf",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\MorphSyncTogether.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
-        "steam_appid.txt",
-        "tools\\app\\Files.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
