@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.89",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558437189",
-  "launcherSha256": "fef494dc96fd4f6edc3117219c9d6ab261e5881eb1812e67d7276f18e3f220be",
+  "launcherVersion": "1.0.90",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558451829",
+  "launcherSha256": "75878b6072ed2c52f333168890cc0ac3f923ecb1508c47efe8a89330d40b7622",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -443,9 +443,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558437188",
       "sha256": "12a94a8f5591cfebe3c1818ed78bd859a4f770a32d154471f0a7788cb07bfe2b",
       "notes": "Playable instruments, Bard flute that plays, face material rebind off while the facegen crash is chased"
+    },
+    {
+      "id": "20260911-2029",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558451828",
+      "sha256": "e07e12c5311a332d8fe96f88c666ca6b8ea43bf216455880cce8b0b66ba4c1af",
+      "notes": "Playable instruments, Bard flute that plays, and the Fishing in Skyrim face that was crashing everyone"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Playable instruments, Bard flute that plays, and the Fishing in Skyrim face that was crashing everyone",
+      "body": "",
+      "details": [
+        "Launcher 1.0.90",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 0.3 MB"
+      ],
+      "files": [
+        "Data\\meshes\\actors\\character\\facegendata\\facegeom\\fishinginskyrim.esp\\0002a07c.nif.off",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\MorphSyncTogether.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "steam_appid.txt",
+        "- Data\\meshes\\actors\\character\\facegendata\\facegeom\\fishinginskyrim.esp\\0002a07c.nif",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Playable instruments, Bard flute that plays, face material rebind off while the facegen crash is chased",
@@ -1015,47 +1044,6 @@
         "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
         "Data\\SunHelm\\Config\\Default\\SunHelm.json",
         "steam_appid.txt",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Towns are pickable, dead MCM space gone, inventory columns back inside the frame",
-      "body": "",
-      "details": [
-        "Launcher 1.0.68",
-        "Launcher rebuilt: Display.cs, Updater.cs",
-        "27 files to download, 0.2 MB"
-      ],
-      "files": [
-        "Data\\Interface\\skyui\\config.shipped.txt",
-        "Data\\Interface\\skyui\\config.txt",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Merchant.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
-        "steam_appid.txt",
-        "tools\\app\\Display.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
