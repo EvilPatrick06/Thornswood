@@ -1,7 +1,7 @@
 {
-    "launcherVersion":  "1.0.101",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558671602",
-    "launcherSha256":  "dac3fb4659537cfcf232387fd503795f21013b733fc32ff5fde04a3133b5896c",
+    "launcherVersion":  "1.0.102",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558676272",
+    "launcherSha256":  "bcfc534d44138551ce1f97393f7faa552ab3a96661de55105938e53a0a8ddb9f",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -503,9 +503,29 @@
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558671600",
                       "sha256":  "19ce5192882dbb00d6bffb9ecfff4788e7155575aefa1a77ffe1e6cc7265f092",
                       "notes":  "Load order fix: TheNewGentleman late, flute re-registered, Keizaal barriers and boards removed, Expert difficulty"
+                  },
+                  {
+                      "id":  "20260911-2325",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558676274",
+                      "sha256":  "40bdabeb51a0d09b3428c532fada07358dd319cc7b1ef5b46505853b520a843f",
+                      "notes":  "Respawn: clear combat and bounty before the teleport, fixes the Hall of the Dead crash"
                   }
               ],
     "news":  [
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Respawn: clear combat and bounty before the teleport, fixes the Hall of the Dead crash",
+                     "body":  "",
+                     "details":  [
+                                     "Launcher 1.0.102",
+                                     "Launcher rebuilt: Updater.cs",
+                                     "1 file to download, 0.0 MB"
+                                 ],
+                     "files":  [
+                                   "Data\\Scripts\\_RespawnScript.pex",
+                                   "tools\\app\\Updater.cs  (launcher)"
+                               ]
+                 },
                  {
                      "date":  "11 Sep 2026",
                      "title":  "Load order fix: TheNewGentleman late, flute re-registered, Keizaal barriers and boards removed, Expert difficulty",
@@ -1142,18 +1162,6 @@
                                    "steam_appid.txt",
                                    "tools\\app\\Display.cs  (launcher)",
                                    "tools\\app\\Shell.cs  (launcher)",
-                                   "tools\\app\\Updater.cs  (launcher)"
-                               ]
-                 },
-                 {
-                     "date":  "11 Sep 2026",
-                     "title":  "Leftover Skyrim gets closed properly again, and the profile swap waits it out",
-                     "body":  "",
-                     "details":  [
-                                     "Launcher 1.0.79",
-                                     "Launcher rebuilt: Updater.cs"
-                                 ],
-                     "files":  [
                                    "tools\\app\\Updater.cs  (launcher)"
                                ]
                  }
