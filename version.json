@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.79",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558275734",
-  "launcherSha256": "8e99d4e752b93a5efe964477924cd39f66944ed3841d4480d3fc9c74c29edc0e",
+  "launcherVersion": "1.0.80",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558295905",
+  "launcherSha256": "9b9823d10b3ce72e58be94a5096eb36ff9c254a69b6517d8aed6d5e3bc588842",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -383,9 +383,43 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558275735",
       "sha256": "a532dbe814000f61276c30453e3cd6e443176f6bec24322ad1387058beab3882",
       "notes": "Solstheim off the location list, minimap catches the first load"
+    },
+    {
+      "id": "20260911-1828",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558295907",
+      "sha256": "723040296b975b52e23c69ab30911c71a666dfeee4f0b0ccf5655211b6ad7799",
+      "notes": "Inventory fits the screen, minimap finds the real corner, nobody starts hungry"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Inventory fits the screen, minimap finds the real corner, nobody starts hungry",
+      "body": "",
+      "details": [
+        "Launcher 1.0.80",
+        "Launcher rebuilt: Display.cs, Shell.cs, Updater.cs",
+        "13 files to download, 0.8 MB"
+      ],
+      "files": [
+        "Data\\Interface\\inventorymenu.swf",
+        "Data\\Interface\\skyui\\inventorylists.swf",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "Data\\Skyrim Unbound.esp",
+        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
+        "Data\\SunHelmSurvival.esp",
+        "steam_appid.txt",
+        "tools\\app\\Display.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Leftover Skyrim gets closed properly again, and the profile swap waits it out",
@@ -826,18 +860,6 @@
         "tools\\app\\Config.cs  (launcher)",
         "tools\\app\\Icons.cs  (launcher)",
         "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Sixteen ways to start: fifteen trades or let it pick",
-      "body": "",
-      "details": [
-        "Launcher 1.0.59",
-        "Launcher rebuilt: Updater.cs"
-      ],
-      "files": [
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
