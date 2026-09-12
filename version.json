@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.94",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558532461",
-  "launcherSha256": "ce6adb323ace9b088808848f80bc2165b8aff76154cf90c2bdffb2d35a0ef26b",
+  "launcherVersion": "1.0.95",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558535328",
+  "launcherSha256": "208381637455f4fb9c07f9f6d331231f53277aaac088321a2c0af652ef60ef59",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -466,6 +466,12 @@
       "id": "20260911-2134",
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558532459",
       "sha256": "1b8175e00945cd9422a98a00c94997a8656121d5dd42ed39c04b382814d2b50e",
+      "notes": "Bodies rebuilt from the Thornswood preset, body and outfits finally match"
+    },
+    {
+      "id": "20260911-2136",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558535327",
+      "sha256": "f601c38d14da1b6b8fee04bfade9adf9cd0c7b9df8f620a46672ffe245b32384",
       "notes": "Bodies rebuilt from the Thornswood preset, body and outfits finally match"
     }
   ],
