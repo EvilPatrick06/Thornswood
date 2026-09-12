@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.96",
+  "launcherVersion": "1.0.97",
   "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558562371",
-  "launcherSha256": "6458f2656f6df8d8f964feeb3b758ba030034788cc1650c6bd5db1e4957f7c70",
+  "launcherSha256": "49c8b0f9c73b974050e00984a1061ae9385e6df88c0a6b0620f2c08d3d4533f0",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -482,6 +482,18 @@
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "CBPC now drives the 3BA breast chain, so skin moves as well as clothes",
+      "body": "",
+      "details": [
+        "Launcher 1.0.97",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Minimap removed",
@@ -1114,33 +1126,6 @@
         "Launcher rebuilt: Updater.cs"
       ],
       "files": [
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Picking a class no longer throws away the location you chose",
-      "body": "",
-      "details": [
-        "Launcher 1.0.74",
-        "Launcher rebuilt: Updater.cs",
-        "14 files to download, 0.3 MB"
-      ],
-      "files": [
-        "Data\\Interface\\inventorymenu.swf",
-        "Data\\Interface\\skyui\\config.txt",
-        "Data\\Interface\\skyui\\inventorylists.swf",
-        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
-        "Data\\Scripts\\SkyrimUnboundModuleLocations.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
