@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.90",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558451829",
-  "launcherSha256": "75878b6072ed2c52f333168890cc0ac3f923ecb1508c47efe8a89330d40b7622",
+  "launcherVersion": "1.0.91",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558459295",
+  "launcherSha256": "7e6d6ba10ae53b85fb738f18170113cf8fa9bb60a63f55aeb396302a2bd24e0f",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -449,9 +449,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558451828",
       "sha256": "e07e12c5311a332d8fe96f88c666ca6b8ea43bf216455880cce8b0b66ba4c1af",
       "notes": "Playable instruments, Bard flute that plays, and the Fishing in Skyrim face that was crashing everyone"
+    },
+    {
+      "id": "20260911-2034",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558459293",
+      "sha256": "13cb9603140caee76be87647afc86031690a834b98e4c25e1aa63a68c8c4be62",
+      "notes": "Respawn actually fires again, the delay in front of the bleedout check was mine"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Respawn actually fires again, the delay in front of the bleedout check was mine",
+      "body": "",
+      "details": [
+        "Launcher 1.0.91",
+        "Launcher rebuilt: Updater.cs",
+        "10 files to download, 0.3 MB"
+      ],
+      "files": [
+        "Data\\meshes\\actors\\character\\facegendata\\facegeom\\fishinginskyrim.esp\\0002a07c.nif.off",
+        "Data\\Scripts\\_RespawnScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\MorphSyncTogether.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "steam_appid.txt",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Playable instruments, Bard flute that plays, and the Fishing in Skyrim face that was crashing everyone",
@@ -1019,31 +1048,6 @@
         "steam_appid.txt",
         "tools\\app\\Files.cs  (launcher)",
         "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Item menus scaled up properly, exhaustion off, temperature explained",
-      "body": "",
-      "details": [
-        "Launcher 1.0.69",
-        "Launcher rebuilt: Updater.cs",
-        "12 files to download, 0.2 MB"
-      ],
-      "files": [
-        "Data\\Interface\\skyui\\config.txt",
-        "Data\\Interface\\skyui\\inventorylists.swf",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
