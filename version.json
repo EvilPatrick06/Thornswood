@@ -1,7 +1,7 @@
 {
-    "launcherVersion":  "1.0.100",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558649045",
-    "launcherSha256":  "b9126a7a2c615a83dc079cc889d0add3668306dbc42acf60742cbdd0aa665c66",
+    "launcherVersion":  "1.0.101",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558671602",
+    "launcherSha256":  "dac3fb4659537cfcf232387fd503795f21013b733fc32ff5fde04a3133b5896c",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -497,9 +497,36 @@
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558649048",
                       "sha256":  "26b5fa891d64b6492dca103102c4867c57a0408d2a1f16dd6ada71ac59652a92",
                       "notes":  "your message"
+                  },
+                  {
+                      "id":  "20260911-2321",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558671600",
+                      "sha256":  "19ce5192882dbb00d6bffb9ecfff4788e7155575aefa1a77ffe1e6cc7265f092",
+                      "notes":  "Load order fix: TheNewGentleman late, flute re-registered, Keizaal barriers and boards removed, Expert difficulty"
                   }
               ],
     "news":  [
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "Load order fix: TheNewGentleman late, flute re-registered, Keizaal barriers and boards removed, Expert difficulty",
+                     "body":  "",
+                     "details":  [
+                                     "Launcher 1.0.101",
+                                     "Launcher rebuilt: Updater.cs",
+                                     "8 files to download, 0.0 MB"
+                                 ],
+                     "files":  [
+                                   "Data\\SKSE\\Plugins\\CrashLogger.ini",
+                                   "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+                                   "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+                                   "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+                                   "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+                                   "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+                                   "Data\\SkyrimTogetherReborn\\config\\STServer.ini",
+                                   "steam_appid.txt",
+                                   "tools\\app\\Updater.cs  (launcher)"
+                               ]
+                 },
                  {
                      "date":  "11 Sep 2026",
                      "title":  "your message",
@@ -1127,23 +1154,6 @@
                                      "Launcher rebuilt: Updater.cs"
                                  ],
                      "files":  [
-                                   "tools\\app\\Updater.cs  (launcher)"
-                               ]
-                 },
-                 {
-                     "date":  "11 Sep 2026",
-                     "title":  "Solstheim off the location list, minimap catches the first load",
-                     "body":  "",
-                     "details":  [
-                                     "Launcher 1.0.78",
-                                     "Launcher rebuilt: Checks.cs, Swap.cs, Updater.cs",
-                                     "2 files to download, 0.5 MB"
-                                 ],
-                     "files":  [
-                                   "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-                                   "Data\\Skyrim Unbound.esp",
-                                   "tools\\app\\Checks.cs  (launcher)",
-                                   "tools\\app\\Swap.cs  (launcher)",
                                    "tools\\app\\Updater.cs  (launcher)"
                                ]
                  }
