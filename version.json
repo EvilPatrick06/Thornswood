@@ -1,7 +1,7 @@
 {
-    "launcherVersion":  "1.0.99",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558581081",
-    "launcherSha256":  "b28a53e880504dc7eceb7fbe3b9d146d61244338503be04e1dae28168f940b0c",
+    "launcherVersion":  "1.0.100",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558649045",
+    "launcherSha256":  "b9126a7a2c615a83dc079cc889d0add3668306dbc42acf60742cbdd0aa665c66",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -490,6 +490,12 @@
                       "id":  "20260911-2212",
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558581082",
                       "sha256":  "928dff0ff49a6ee4d208c7be6df9c1196c11ac4c762071a4399226af99c69cfd",
+                      "notes":  "your message"
+                  },
+                  {
+                      "id":  "20260911-2302",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558649048",
+                      "sha256":  "26b5fa891d64b6492dca103102c4867c57a0408d2a1f16dd6ada71ac59652a92",
                       "notes":  "your message"
                   }
               ],
