@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.77",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558262493",
-  "launcherSha256": "7c3971aed348d20e68295d1ee744ccd3fa8d57ccffcf0c8babdb997f55e28151",
+  "launcherVersion": "1.0.78",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558275734",
+  "launcherSha256": "8ebb9811a18b3d5b22956eb7209d93ece06716837437bd9fe1fe4935b49e5a62",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -377,9 +377,32 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558262494",
       "sha256": "b2eb002c782062e6a30d57fa1589dd430c566c82f164947ff7d3ea58babb5b6a",
       "notes": "Bottom bar moves with the panel, machine settings stay off the wire"
+    },
+    {
+      "id": "20260911-1817",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558275735",
+      "sha256": "a532dbe814000f61276c30453e3cd6e443176f6bec24322ad1387058beab3882",
+      "notes": "Solstheim off the location list, minimap catches the first load"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Solstheim off the location list, minimap catches the first load",
+      "body": "",
+      "details": [
+        "Launcher 1.0.78",
+        "Launcher rebuilt: Checks.cs, Swap.cs, Updater.cs",
+        "2 files to download, 0.5 MB"
+      ],
+      "files": [
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\Skyrim Unbound.esp",
+        "tools\\app\\Checks.cs  (launcher)",
+        "tools\\app\\Swap.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Bottom bar moves with the panel, machine settings stay off the wire",
@@ -833,29 +856,6 @@
         "steam_appid.txt",
         "tools\\app\\Config.cs  (launcher)",
         "tools\\app\\Diag.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "One body's sliders per character, resolution matched on Play, Quit Skyrim, and a report that carries the netcode log",
-      "body": "",
-      "details": [
-        "Launcher 1.0.57",
-        "Launcher rebuilt: Updater.cs",
-        "10 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\_RaceMenuMorphsHIMBO.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
