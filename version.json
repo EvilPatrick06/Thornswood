@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.87",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558403093",
-  "launcherSha256": "eb1823f87eea12c1be6e9425b794f959e7af8517706c6febc7a3e0bdd61173c8",
+  "launcherVersion": "1.0.88",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558418466",
+  "launcherSha256": "b82d7cff0420bcf8fb7a42fcb9ac547b9879c572904b97d429509a3ca69df2be",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -431,9 +431,76 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558403094",
       "sha256": "2a4038f44b16637a17f2410995bbb51042218dc3b8aed54e936b2d63c01e4dd7",
       "notes": "Presets and Makeup out of RaceMenu, holds column removed from Unbound, emotes reachable, facegen morphing serialised"
+    },
+    {
+      "id": "20260911-2002",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558418467",
+      "sha256": "9e2fda9499cdc790e9911dd1287d498e5a999aa01cad88edc50d31a62e1e1c9e",
+      "notes": "Playable instruments, Bard gets a flute that actually plays, minimap handed back to Enforce"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Playable instruments, Bard gets a flute that actually plays, minimap handed back to Enforce",
+      "body": "",
+      "details": [
+        "Launcher 1.0.88",
+        "Launcher rebuilt: Display.cs, Enforce.cs, Help.cs, Shell.cs, Updater.cs",
+        "41 files to download, 4.8 MB",
+        "The load order moved, so start a new character or expect the old save to complain"
+      ],
+      "files": [
+        "Data\\meshes\\fineflute.nif",
+        "Data\\meshes\\playdrum.nif",
+        "Data\\meshes\\playlute.nif",
+        "Data\\PlayFluteLuteDrum.esp",
+        "Data\\Scripts\\instrumentConfig.pex",
+        "Data\\Scripts\\instrumentConfigMenu.pex",
+        "Data\\Scripts\\instrumentOnEquip.pex",
+        "Data\\Scripts\\instrumentPlay.pex",
+        "Data\\Scripts\\instrumentPlayDrum.pex",
+        "Data\\Scripts\\instrumentPlayLute.pex",
+        "Data\\Scripts\\instrumentPlayOcarina.pex",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
+        "Data\\sound\\fx\\chords\\a.wav",
+        "Data\\sound\\fx\\chords\\a#.wav",
+        "Data\\sound\\fx\\chords\\am.wav",
+        "Data\\sound\\fx\\chords\\bm.wav",
+        "Data\\sound\\fx\\chords\\c.wav",
+        "Data\\sound\\fx\\chords\\d.wav",
+        "Data\\sound\\fx\\chords\\dm.wav",
+        "Data\\sound\\fx\\chords\\e.wav",
+        "Data\\sound\\fx\\chords\\f.wav",
+        "Data\\sound\\fx\\chords\\f#.wav",
+        "Data\\sound\\fx\\chords\\g.wav",
+        "Data\\sound\\fx\\chords\\gm.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_a_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_a_sharp_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_b_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_c_2_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_c_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_c_sharp_2_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_c_sharp_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_d_2_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_d_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_d_sharp_2_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_d_sharp_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_e_2_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_e_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_f_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_f_sharp_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_g_long.wav",
+        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_g_sharp_long.wav",
+        "loadorder.txt  (load order)",
+        "plugins.txt  (load order)",
+        "tools\\app\\Display.cs  (launcher)",
+        "tools\\app\\Enforce.cs  (launcher)",
+        "tools\\app\\Help.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Presets and Makeup out of RaceMenu, holds column removed from Unbound, emotes reachable, facegen morphing serialised",
@@ -930,21 +997,6 @@
         "Data\\SunHelm\\Config\\Default\\SunHelm.json",
         "steam_appid.txt",
         "tools\\app\\Display.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Another modlist's Skyrim is no longer mistaken for this one",
-      "body": "",
-      "details": [
-        "Launcher 1.0.66",
-        "Launcher rebuilt: Checks.cs, Diag.cs, Shell.cs, Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Checks.cs  (launcher)",
-        "tools\\app\\Diag.cs  (launcher)",
         "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
