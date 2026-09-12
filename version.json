@@ -1,7 +1,7 @@
 {
-    "launcherVersion":  "1.0.98",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558578869",
-    "launcherSha256":  "b1fcd78d288dfec21afe7e1610e307aa7decaf39ce717347e1faf7e8609ba652",
+    "launcherVersion":  "1.0.99",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558581081",
+    "launcherSha256":  "b28a53e880504dc7eceb7fbe3b9d146d61244338503be04e1dae28168f940b0c",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -485,9 +485,29 @@
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558578870",
                       "sha256":  "03bd6bb3b93418991836c5431ee9949a9c990483f60d0adc304300c4840e92f4",
                       "notes":  "Keizaal barriers and notice boards removed, difficulty to Expert, respawn watchdog fix"
+                  },
+                  {
+                      "id":  "20260911-2212",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558581082",
+                      "sha256":  "928dff0ff49a6ee4d208c7be6df9c1196c11ac4c762071a4399226af99c69cfd",
+                      "notes":  "your message"
                   }
               ],
     "news":  [
+                 {
+                     "date":  "11 Sep 2026",
+                     "title":  "your message",
+                     "body":  "",
+                     "details":  [
+                                     "Launcher 1.0.99",
+                                     "Launcher rebuilt: Updater.cs",
+                                     "1 file to download, 0.0 MB"
+                                 ],
+                     "files":  [
+                                   "Data\\Scripts\\_RespawnScript.pex",
+                                   "tools\\app\\Updater.cs  (launcher)"
+                               ]
+                 },
                  {
                      "date":  "11 Sep 2026",
                      "title":  "Keizaal barriers and notice boards removed, difficulty to Expert, respawn watchdog fix",
@@ -1118,32 +1138,6 @@
                                    "Data\\Skyrim Unbound.esp",
                                    "tools\\app\\Checks.cs  (launcher)",
                                    "tools\\app\\Swap.cs  (launcher)",
-                                   "tools\\app\\Updater.cs  (launcher)"
-                               ]
-                 },
-                 {
-                     "date":  "11 Sep 2026",
-                     "title":  "Bottom bar moves with the panel, machine settings stay off the wire",
-                     "body":  "",
-                     "details":  [
-                                     "Launcher 1.0.77",
-                                     "Launcher rebuilt: Updater.cs",
-                                     "13 files to download, 0.3 MB"
-                                 ],
-                     "files":  [
-                                   "Data\\Interface\\inventorymenu.swf",
-                                   "Data\\Interface\\skyui\\config.txt",
-                                   "Data\\Interface\\skyui\\inventorylists.swf",
-                                   "Data\\Scripts\\_RespawnOverhaulMCM.pex",
-                                   "Data\\Scripts\\SkyrimUnboundModuleLocations.pex",
-                                   "Data\\SKSE\\Plugins\\CrashLogger.ini",
-                                   "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-                                   "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-                                   "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-                                   "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-                                   "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-                                   "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-                                   "steam_appid.txt",
                                    "tools\\app\\Updater.cs  (launcher)"
                                ]
                  }
