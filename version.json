@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.85",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558356732",
-  "launcherSha256": "4641ff892f7235c7f753f7b2e0756c322c9d9815a5deb55dfe76f72f4ef06a4e",
+  "launcherVersion": "1.0.86",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558385275",
+  "launcherSha256": "b392b40dad3756eeeedcfe2bbd3273ebff7c45aad3e1942ecb979d0e8a969d01",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -419,9 +419,32 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558356731",
       "sha256": "b2eb2d3e1d2acc5ece4687204f163bcf862a6a6c5d2ebb819597ddd3513dbd60",
       "notes": "Male and female naked bodies rebuilt, respawn hard-wired to nearest hall of the dead, paint options removed, minimap timing"
+    },
+    {
+      "id": "20260911-1933",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558385278",
+      "sha256": "9bb9aa2021562f2a8a79aac024fe9da5f2fb7a16e7d2100c9280839af3e994a1",
+      "notes": "Fall damage restored, carry weight back to standard, minimap placement now sticks, respawn hardening"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Fall damage restored, carry weight back to standard, minimap placement now sticks, respawn hardening",
+      "body": "",
+      "details": [
+        "Launcher 1.0.86",
+        "Launcher rebuilt: Display.cs, Updater.cs",
+        "3 files to download, 0.2 MB"
+      ],
+      "files": [
+        "Data\\Scripts\\_RespawnScript.pex",
+        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
+        "Data\\SunHelmSurvival.esp",
+        "tools\\app\\Display.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Male and female naked bodies rebuilt, respawn hard-wired to nearest hall of the dead, paint options removed, minimap timing",
@@ -860,18 +883,6 @@
       ],
       "files": [
         "Data\\Interface\\uilib\\UILIB_1_ListMenu.swf",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Survival is actually switched on, addon gear finally lands, and towns join the cities",
-      "body": "",
-      "details": [
-        "Launcher 1.0.64",
-        "Launcher rebuilt: Updater.cs"
-      ],
-      "files": [
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
