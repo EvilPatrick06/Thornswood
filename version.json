@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.83",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558315391",
-  "launcherSha256": "cbe22e12545ce99d9cd862b0d6ffbc43ea7650863a3fa049d98d6e989d7fa391",
+  "launcherVersion": "1.0.84",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558328259",
+  "launcherSha256": "ab46f4b9c702f89b339395a3a1984a999f3dc4dea9e99163598d74edf3948246",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -407,9 +407,43 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558315390",
       "sha256": "d3b7811e4ac419a5fec1a889b99601dd25f2ff2ff788da59faee1357fa73abe0",
       "notes": "Inventory sized the way SkyUI intends, cook and enchanter kit notes"
+    },
+    {
+      "id": "20260911-1850",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558328258",
+      "sha256": "bcb09056b717fa8cc13eee886ddee3e1fa0a626cfddc5cf873e9b09a8b56f3d4",
+      "notes": "Respawn back to the Temple of Kynareth, nearest hold was breaking death"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Respawn back to the Temple of Kynareth, nearest hold was breaking death",
+      "body": "",
+      "details": [
+        "Launcher 1.0.84",
+        "Launcher rebuilt: Updater.cs",
+        "15 files to download, 0.6 MB"
+      ],
+      "files": [
+        "Data\\Interface\\inventorymenu.swf",
+        "Data\\Interface\\skyui\\config.shipped.txt",
+        "Data\\Interface\\skyui\\config.txt",
+        "Data\\Interface\\skyui\\inventorylists.swf",
+        "Data\\meshes\\furniture\\blacksmithforgemarkerwr.nif.off",
+        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "steam_appid.txt",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Inventory sized the way SkyUI intends, cook and enchanter kit notes",
@@ -851,20 +885,6 @@
         "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
         "Data\\SunHelm\\Config\\Default\\SunHelm.json",
         "steam_appid.txt",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Starting Location first and working again, Main is now Confirm",
-      "body": "",
-      "details": [
-        "Launcher 1.0.62",
-        "Launcher rebuilt: Updater.cs",
-        "1 file to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
