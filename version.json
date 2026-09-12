@@ -1,7 +1,7 @@
 {
-    "launcherVersion":  "1.0.102",
-    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558676272",
-    "launcherSha256":  "bcfc534d44138551ce1f97393f7faa552ab3a96661de55105938e53a0a8ddb9f",
+    "launcherVersion":  "1.0.103",
+    "launcherUrl":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/559721212",
+    "launcherSha256":  "a809a06a3807e6f33e46f70371649523b0245a42d3eb6d6d46e71348ef500075",
     "serverAddress":  "192.135.119.166",
     "serverPort":  "25565",
     "message":  "",
@@ -509,9 +509,36 @@
                       "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558676274",
                       "sha256":  "40bdabeb51a0d09b3428c532fada07358dd319cc7b1ef5b46505853b520a843f",
                       "notes":  "Respawn: clear combat and bounty before the teleport, fixes the Hall of the Dead crash"
+                  },
+                  {
+                      "id":  "20260912-1214",
+                      "url":  "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/559721214",
+                      "sha256":  "464ce54d192d40038e7df9aa153f7cc6e338fe8637339ca298759ca8f3b3d1b3",
+                      "notes":  "Respawn chain rebuilt: nearest Hall of the Dead per hold, Whiterun temple as fallback"
                   }
               ],
     "news":  [
+                 {
+                     "date":  "12 Sep 2026",
+                     "title":  "Respawn chain rebuilt: nearest Hall of the Dead per hold, Whiterun temple as fallback",
+                     "body":  "",
+                     "details":  [
+                                     "Launcher 1.0.103",
+                                     "Launcher rebuilt: Updater.cs",
+                                     "8 files to download, 0.0 MB"
+                                 ],
+                     "files":  [
+                                   "Data\\Scripts\\_RespawnScript.pex",
+                                   "Data\\SKSE\\Plugins\\CrashLogger.ini",
+                                   "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+                                   "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+                                   "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+                                   "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+                                   "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+                                   "steam_appid.txt",
+                                   "tools\\app\\Updater.cs  (launcher)"
+                               ]
+                 },
                  {
                      "date":  "11 Sep 2026",
                      "title":  "Respawn: clear combat and bounty before the teleport, fixes the Hall of the Dead crash",
@@ -1134,34 +1161,6 @@
                                    "Data\\SunHelmSurvival.esp",
                                    "steam_appid.txt",
                                    "tools\\app\\Help.cs  (launcher)",
-                                   "tools\\app\\Updater.cs  (launcher)"
-                               ]
-                 },
-                 {
-                     "date":  "11 Sep 2026",
-                     "title":  "Inventory fits the screen, minimap finds the real corner, nobody starts hungry",
-                     "body":  "",
-                     "details":  [
-                                     "Launcher 1.0.80",
-                                     "Launcher rebuilt: Display.cs, Shell.cs, Updater.cs",
-                                     "13 files to download, 0.8 MB"
-                                 ],
-                     "files":  [
-                                   "Data\\Interface\\inventorymenu.swf",
-                                   "Data\\Interface\\skyui\\inventorylists.swf",
-                                   "Data\\SKSE\\Plugins\\CrashLogger.ini",
-                                   "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-                                   "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-                                   "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-                                   "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-                                   "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-                                   "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-                                   "Data\\Skyrim Unbound.esp",
-                                   "Data\\SunHelm\\Config\\Default\\SunHelm.json",
-                                   "Data\\SunHelmSurvival.esp",
-                                   "steam_appid.txt",
-                                   "tools\\app\\Display.cs  (launcher)",
-                                   "tools\\app\\Shell.cs  (launcher)",
                                    "tools\\app\\Updater.cs  (launcher)"
                                ]
                  }
