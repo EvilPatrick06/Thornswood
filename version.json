@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.76",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558237108",
-  "launcherSha256": "3089208cedaa34a80d9a791784a2594ff93b266b2e4032c7cb919750ccfa99b3",
+  "launcherVersion": "1.0.77",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558262493",
+  "launcherSha256": "7c3971aed348d20e68295d1ee744ccd3fa8d57ccffcf0c8babdb997f55e28151",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -371,9 +371,41 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558225371",
       "sha256": "4ddefc7bfb073e935daf338dc7137baddcfc8830fb6773816846e227dd346c6e",
       "notes": "Picking a class no longer throws away the location you chose"
+    },
+    {
+      "id": "20260911-1809",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558262494",
+      "sha256": "b2eb002c782062e6a30d57fa1589dd430c566c82f164947ff7d3ea58babb5b6a",
+      "notes": "Bottom bar moves with the panel, machine settings stay off the wire"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Bottom bar moves with the panel, machine settings stay off the wire",
+      "body": "",
+      "details": [
+        "Launcher 1.0.77",
+        "Launcher rebuilt: Updater.cs",
+        "13 files to download, 0.3 MB"
+      ],
+      "files": [
+        "Data\\Interface\\inventorymenu.swf",
+        "Data\\Interface\\skyui\\config.txt",
+        "Data\\Interface\\skyui\\inventorylists.swf",
+        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
+        "Data\\Scripts\\SkyrimUnboundModuleLocations.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "steam_appid.txt",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Respawn at the nearest hall of the dead, inventory rows and category icons sized right",
@@ -824,18 +856,6 @@
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
         "steam_appid.txt",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "The report brings every plugin log back, not just two",
-      "body": "",
-      "details": [
-        "Launcher 1.0.56",
-        "Launcher rebuilt: Updater.cs"
-      ],
-      "files": [
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
