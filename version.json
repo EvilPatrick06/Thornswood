@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.82",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558308325",
-  "launcherSha256": "67e99b071ce9ac14edf161986f03dec3d1fcfeec736c007568cfa03b0b84477a",
+  "launcherVersion": "1.0.83",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558315391",
+  "launcherSha256": "cbe22e12545ce99d9cd862b0d6ffbc43ea7650863a3fa049d98d6e989d7fa391",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -401,9 +401,33 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558308324",
       "sha256": "8eeadb3d089bcb8a365c62d2a4d0bcf5bee9561009a32264205b083657c1d77a",
       "notes": "Cook's knife and Enchanter's gloves written into the kit list"
+    },
+    {
+      "id": "20260911-1842",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558315390",
+      "sha256": "d3b7811e4ac419a5fec1a889b99601dd25f2ff2ff788da59faee1357fa73abe0",
+      "notes": "Inventory sized the way SkyUI intends, cook and enchanter kit notes"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Inventory sized the way SkyUI intends, cook and enchanter kit notes",
+      "body": "",
+      "details": [
+        "Launcher 1.0.83",
+        "Launcher rebuilt: Updater.cs",
+        "5 files to download, 0.2 MB"
+      ],
+      "files": [
+        "Data\\Interface\\inventorymenu.swf",
+        "Data\\Interface\\skyui\\config.shipped.txt",
+        "Data\\Interface\\skyui\\config.txt",
+        "Data\\Interface\\skyui\\inventorylists.swf",
+        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Cook's knife and Enchanter's gloves written into the kit list",
@@ -841,30 +865,6 @@
       ],
       "files": [
         "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "The body tabs say which sex they are for",
-      "body": "",
-      "details": [
-        "Launcher 1.0.61",
-        "Launcher rebuilt: Updater.cs",
-        "11 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\MCM\\Settings\\SkyUI_SE.ini",
-        "Data\\Scripts\\_RaceMenuMorphsHIMBO.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
