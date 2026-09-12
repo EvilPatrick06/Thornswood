@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.78",
+  "launcherVersion": "1.0.79",
   "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558275734",
-  "launcherSha256": "8ebb9811a18b3d5b22956eb7209d93ece06716837437bd9fe1fe4935b49e5a62",
+  "launcherSha256": "8e99d4e752b93a5efe964477924cd39f66944ed3841d4480d3fc9c74c29edc0e",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -386,6 +386,18 @@
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Leftover Skyrim gets closed properly again, and the profile swap waits it out",
+      "body": "",
+      "details": [
+        "Launcher 1.0.79",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Solstheim off the location list, minimap catches the first load",
@@ -826,36 +838,6 @@
         "Launcher rebuilt: Updater.cs"
       ],
       "files": [
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Begin your adventure is back, the location page is locked down, and Papyrus is talking",
-      "body": "",
-      "details": [
-        "Launcher 1.0.58",
-        "Launcher rebuilt: Config.cs, Diag.cs, Updater.cs",
-        "15 files to download, 0.2 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\_RaceMenuMorphsHIMBO.pex",
-        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\Scripts\\SkyrimUnboundQuestScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
-        "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
-        "tools\\app\\Config.cs  (launcher)",
-        "tools\\app\\Diag.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
