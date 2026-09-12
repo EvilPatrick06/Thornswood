@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.84",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558328259",
-  "launcherSha256": "ab46f4b9c702f89b339395a3a1984a999f3dc4dea9e99163598d74edf3948246",
+  "launcherVersion": "1.0.85",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558356732",
+  "launcherSha256": "4641ff892f7235c7f753f7b2e0756c322c9d9815a5deb55dfe76f72f4ef06a4e",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -413,9 +413,36 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558328258",
       "sha256": "bcb09056b717fa8cc13eee886ddee3e1fa0a626cfddc5cf873e9b09a8b56f3d4",
       "notes": "Respawn back to the Temple of Kynareth, nearest hold was breaking death"
+    },
+    {
+      "id": "20260911-1911",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558356731",
+      "sha256": "b2eb2d3e1d2acc5ece4687204f163bcf862a6a6c5d2ebb819597ddd3513dbd60",
+      "notes": "Male and female naked bodies rebuilt, respawn hard-wired to nearest hall of the dead, paint options removed, minimap timing"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Male and female naked bodies rebuilt, respawn hard-wired to nearest hall of the dead, paint options removed, minimap timing",
+      "body": "",
+      "details": [
+        "Launcher 1.0.85",
+        "Launcher rebuilt: Display.cs, Updater.cs",
+        "7 files to download, 5.9 MB"
+      ],
+      "files": [
+        "Data\\meshes\\actors\\character\\character assets\\femalebody_0.nif",
+        "Data\\meshes\\actors\\character\\character assets\\femalebody_1.nif",
+        "Data\\meshes\\actors\\character\\character assets\\malebody_0.nif",
+        "Data\\meshes\\actors\\character\\character assets\\malebody_1.nif",
+        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
+        "Data\\Scripts\\_RespawnScript.pex",
+        "Data\\SKSE\\Plugins\\skee64.ini",
+        "tools\\app\\Display.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Respawn back to the Temple of Kynareth, nearest hold was breaking death",
@@ -845,46 +872,6 @@
         "Launcher rebuilt: Updater.cs"
       ],
       "files": [
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Nine holds and nothing else, and Preview Mode is gone",
-      "body": "",
-      "details": [
-        "Launcher 1.0.63",
-        "Launcher rebuilt: Updater.cs",
-        "27 files to download, 0.2 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\_RaceMenuMorphsHIMBO.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Alchemist.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Cook.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Enchanter.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Farmer.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Fisher.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Merchant.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Miner.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Priest.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Scholar.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Smith.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Thief.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Warrior.json",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Woodworker.json",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
