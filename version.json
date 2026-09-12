@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.92",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558521998",
-  "launcherSha256": "62c7d4820312606be12235b044121db2079a9365f00941bc366586f52f17873e",
+  "launcherVersion": "1.0.93",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558522464",
+  "launcherSha256": "9977e7177d62ee92f8f8cd89525d2d8b4d99366d232904a5fa8c5b4671a1c466",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -464,6 +464,18 @@
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Respawn protection restored, plus the bounty clear that never made it into the last pack",
+      "body": "",
+      "details": [
+        "Launcher 1.0.93",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Death clears combat, the alarm and your bounty, so guards stop camping the hall of the dead",
@@ -1027,31 +1039,6 @@
         "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
         "steam_appid.txt",
         "- Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Load order baseline matches what the game actually loads",
-      "body": "",
-      "details": [
-        "Launcher 1.0.71",
-        "Launcher rebuilt: Updater.cs",
-        "10 files to download, 0.1 MB",
-        "The load order moved, so start a new character or expect the old save to complain"
-      ],
-      "files": [
-        "Data\\Interface\\skyui\\config.txt",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\MorphSyncTogether.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
-        "plugins.txt  (load order)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
