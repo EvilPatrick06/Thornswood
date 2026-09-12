@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.86",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558385275",
-  "launcherSha256": "b392b40dad3756eeeedcfe2bbd3273ebff7c45aad3e1942ecb979d0e8a969d01",
+  "launcherVersion": "1.0.87",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558403093",
+  "launcherSha256": "eb1823f87eea12c1be6e9425b794f959e7af8517706c6febc7a3e0bdd61173c8",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -425,9 +425,86 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558385278",
       "sha256": "9bb9aa2021562f2a8a79aac024fe9da5f2fb7a16e7d2100c9280839af3e994a1",
       "notes": "Fall damage restored, carry weight back to standard, minimap placement now sticks, respawn hardening"
+    },
+    {
+      "id": "20260911-1949",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558403094",
+      "sha256": "2a4038f44b16637a17f2410995bbb51042218dc3b8aed54e936b2d63c01e4dd7",
+      "notes": "Presets and Makeup out of RaceMenu, holds column removed from Unbound, emotes reachable, facegen morphing serialised"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Presets and Makeup out of RaceMenu, holds column removed from Unbound, emotes reachable, facegen morphing serialised",
+      "body": "",
+      "details": [
+        "Launcher 1.0.87",
+        "Launcher rebuilt: Updater.cs",
+        "58 files to download, 6.3 MB"
+      ],
+      "files": [
+        "attention.txt",
+        "bow1.txt",
+        "bow2.txt",
+        "bow3.txt",
+        "cheer.txt",
+        "cleansword.txt",
+        "cross.txt",
+        "cut.txt",
+        "dance1.txt",
+        "dance2.txt",
+        "dance3.txt",
+        "Data\\Interface\\racesex_menu.swf",
+        "Data\\Interface\\skyui\\config.txt",
+        "Data\\meshes\\actors\\character\\character assets\\femalebody_0.nif",
+        "Data\\meshes\\actors\\character\\character assets\\femalebody_1.nif",
+        "Data\\meshes\\actors\\character\\character assets\\malebody_0.nif",
+        "Data\\meshes\\actors\\character\\character assets\\malebody_1.nif",
+        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
+        "Data\\Scripts\\_RespawnScript.pex",
+        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\skee64.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
+        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
+        "Data\\SunHelmSurvival.esp",
+        "def.txt",
+        "drink.txt",
+        "follow.txt",
+        "give.txt",
+        "horn1.txt",
+        "horn2.txt",
+        "ledger1.txt",
+        "ledger2.txt",
+        "pickup.txt",
+        "point.txt",
+        "readbook.txt",
+        "readnote.txt",
+        "ritual1.txt",
+        "ritual2.txt",
+        "ritual3.txt",
+        "salute.txt",
+        "scout.txt",
+        "search.txt",
+        "shield.txt",
+        "steam_appid.txt",
+        "study.txt",
+        "surrender.txt",
+        "table.txt",
+        "take.txt",
+        "think.txt",
+        "warm1.txt",
+        "warm2.txt",
+        "wave.txt",
+        "welcome.txt",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Fall damage restored, carry weight back to standard, minimap placement now sticks, respawn hardening",
@@ -869,20 +946,6 @@
         "tools\\app\\Checks.cs  (launcher)",
         "tools\\app\\Diag.cs  (launcher)",
         "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Tab says Confirm, because that is what it does",
-      "body": "",
-      "details": [
-        "Launcher 1.0.65",
-        "Launcher rebuilt: Updater.cs",
-        "1 file to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Interface\\uilib\\UILIB_1_ListMenu.swf",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
