@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.80",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558295905",
-  "launcherSha256": "9b9823d10b3ce72e58be94a5096eb36ff9c254a69b6517d8aed6d5e3bc588842",
+  "launcherVersion": "1.0.81",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558298019",
+  "launcherSha256": "6d1952a4de4638fd06eb5c6ba13f937fe00520c1bc5e5621a06d41e8eb9db5c3",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -389,9 +389,40 @@
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558295907",
       "sha256": "723040296b975b52e23c69ab30911c71a666dfeee4f0b0ccf5655211b6ad7799",
       "notes": "Inventory fits the screen, minimap finds the real corner, nobody starts hungry"
+    },
+    {
+      "id": "20260911-1830",
+      "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/558298017",
+      "sha256": "6c2e4762d8f18145d48d9112e1b7afd3b599bedd5b911f29893386f5b452110f",
+      "notes": "Cook's knife and Enchanter's gloves written into the kit list"
     }
   ],
   "news": [
+    {
+      "date": "11 Sep 2026",
+      "title": "Cook's knife and Enchanter's gloves written into the kit list",
+      "body": "",
+      "details": [
+        "Launcher 1.0.81",
+        "Launcher rebuilt: Help.cs, Updater.cs",
+        "11 files to download, 0.3 MB"
+      ],
+      "files": [
+        "Data\\Interface\\inventorymenu.swf",
+        "Data\\Interface\\skyui\\config.txt",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
+        "Data\\SunHelmSurvival.esp",
+        "steam_appid.txt",
+        "tools\\app\\Help.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "11 Sep 2026",
       "title": "Inventory fits the screen, minimap finds the real corner, nobody starts hungry",
@@ -828,38 +859,6 @@
         "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "steam_appid.txt",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Location page is just the holds, bigger inventory text, and the taskbar pin survives an update",
-      "body": "",
-      "details": [
-        "Launcher 1.0.60",
-        "Launcher rebuilt: Config.cs, Icons.cs, Shell.cs, Updater.cs",
-        "16 files to download, 0.2 MB"
-      ],
-      "files": [
-        "Data\\MCM\\Settings\\SkyUI_SE.ini",
-        "Data\\Scripts\\_RaceMenuMorphsHIMBO.pex",
-        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
-        "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\Scripts\\SkyrimUnboundQuestScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\SkyrimUnbound.json",
-        "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
-        "tools\\app\\Config.cs  (launcher)",
-        "tools\\app\\Icons.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
