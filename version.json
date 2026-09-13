@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.134",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560897779",
-  "launcherSha256": "ba4797738832fec49f034c39011152cf8efc7987b8bd70d3899ac0a11eb68c29",
+  "launcherVersion": "1.0.135",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560968340",
+  "launcherSha256": "1e055c4356c21fcc27f0c4aa3c58de3f94a6a290d8adcacc6798a3a2b8045771",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -641,9 +641,43 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560891955",
       "sha256": "7cde2de54ad7e8d5f9a3fb755b03faba716ab551c9251fafc57983eda204dd08",
       "notes": "Dice rolls, chat box cleaned up, everyone gets dressed"
+    },
+    {
+      "id": "20260913-0355",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560968339",
+      "sha256": "8cdaac0eefeb0cb98faf1b19db6d3b84055faba47717c85ec08a054504c129d3",
+      "notes": "Chat moved and cleaned up, shrines and nirnroot work, emote wheel on G"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Chat moved and cleaned up, shrines and nirnroot work, emote wheel on G",
+      "body": "",
+      "details": [
+        "Launcher 1.0.135",
+        "Launcher rebuilt: Updater.cs",
+        "15 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-chargen.js",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\UI\\thornswood-bridge.js",
+        "Data\\Platform\\UI\\thornswood-chat.js",
+        "Data\\Platform\\UI\\thornswood-emotes.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Markarth arrival point measured properly",
