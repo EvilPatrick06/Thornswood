@@ -712,6 +712,20 @@
   "news": [
     {
       "date": "13 Sep 2026",
+      "title": "Server updated",
+      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
+      "details": [
+        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
+        "Load order: 61 plugins server side",
+        "Nothing to download for this one. It is on the server, so it is already live."
+      ],
+      "files": [],
+      "kind": "server",
+      "stamp": "2026-09-13T14:14:06.3960816-06:00",
+      "named": false
+    },
+    {
+      "date": "13 Sep 2026",
       "title": "Wait for the server before handing out a profile id on a blank machine",
       "body": "",
       "details": [
