@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.157",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561963540",
-  "launcherSha256": "45af34f606c444d40ccb190146a1dc3019926c44e91824171dfa5c67d72fab19",
+  "launcherVersion": "1.0.158",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561965028",
+  "launcherSha256": "e8cacc1d320c38746a363406017a0aa479484887b02b2d0e6a93961e279b1c82",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -776,6 +776,18 @@
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Shut the console when it opens by itself, and put the last location on the card",
+      "body": "",
+      "details": [
+        "Launcher 1.0.158",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Server updated",
@@ -1606,32 +1618,6 @@
         "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Chat box cleaned up, everyone gets dressed, race menu no longer opens twice",
-      "body": "",
-      "details": [
-        "Launcher 1.0.131",
-        "Launcher rebuilt: Creation.cs, Updater.cs",
-        "12 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\Plugins\\thornswood-mark.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-chat.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Creation.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
