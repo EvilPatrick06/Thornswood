@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.133",
-  "launcherUrl": "",
-  "launcherSha256": "ef09dba1af40e4b542c87592373876399837b7a7b3947bdd11fa842d2dd5edab",
+  "launcherVersion": "1.0.134",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560897779",
+  "launcherSha256": "ba4797738832fec49f034c39011152cf8efc7987b8bd70d3899ac0a11eb68c29",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -646,6 +646,18 @@
   "news": [
     {
       "date": "13 Sep 2026",
+      "title": "Launcher upload retry",
+      "body": "",
+      "details": [
+        "Launcher 1.0.134",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
+    {
+      "date": "13 Sep 2026",
       "title": "Dice rolls, chat box cleaned up, everyone gets dressed",
       "body": "",
       "details": [
@@ -1010,100 +1022,6 @@
         "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)",
         "tools\\ui.xaml  (launcher)"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Play no longer passes CEF switches; update source is editable",
-      "body": "",
-      "details": [
-        "Launcher 1.0.118",
-        "Launcher rebuilt: Shell.cs, Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Play no longer passes CEF switches to the game",
-      "body": "",
-      "details": [
-        "Launcher 1.0.117",
-        "Launcher rebuilt: Keys.cs, Updater.cs",
-        "10 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\UI\\index.html",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-emotes.html",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "- Data\\Platform\\Plugins\\thornswood-front.js",
-        "- Data\\Platform\\Plugins\\thornswood-voice.js",
-        "- Data\\Platform\\UI\\thornswood-emotes.js",
-        "- Data\\Platform\\UI\\thornswood-voice.js",
-        "tools\\app\\Keys.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Voice runs in the game, no browser window",
-      "body": "",
-      "details": [
-        "Launcher 1.0.116",
-        "Launcher rebuilt: Shell.cs, ui.xaml, Updater.cs",
-        "12 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\Platform\\UI\\thornswood-emotes.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "- Data\\Platform\\Plugins\\thornswood-probe.js",
-        "- Data\\Platform\\UI\\thornswood-emotes.html",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)",
-        "tools\\ui.xaml  (launcher)"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Quick keys column fits long key names",
-      "body": "",
-      "details": [
-        "Launcher 1.0.114",
-        "Launcher rebuilt: Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Voice opens without a prompt, voice status on the Server page",
-      "body": "",
-      "details": [
-        "Launcher 1.0.113",
-        "Launcher rebuilt: Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Updater.cs  (launcher)"
       ]
     }
   ],
