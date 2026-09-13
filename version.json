@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.164",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562030192",
-  "launcherSha256": "c6da98e74874259ce8927ebebf3ab4d5d2eeb2489081bbb27e2fe41851174b88",
+  "launcherVersion": "1.0.165",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562060192",
+  "launcherSha256": "413b1c057e38f2ee289886f07439d2813e98524c72f1a59b31791094b195ef7b",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -809,9 +809,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562030202",
       "sha256": "ddf1f8da36d8d1e6995620115d1506ce99d4a0bd720f411689047ba21c91bf15",
       "notes": "Fixed the second save load that hung the loading screen, startup no longer drops the connection"
+    },
+    {
+      "id": "20260913-1642",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562060193",
+      "sha256": "f129e038e443c27c2b838543f7f208b4403f1a0c91a87e7d880c659e1bd5bbff",
+      "notes": "Fixed the keyboard lock and the second save load, controls watchdog, card shows where you actually were"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Fixed the keyboard lock and the second save load, controls watchdog, card shows where you actually were",
+      "body": "",
+      "details": [
+        "Launcher 1.0.165",
+        "Launcher rebuilt: Updater.cs",
+        "10 files to download, 16.3 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Fixed the second save load that hung the loading screen, startup no longer drops the connection",
@@ -1659,34 +1688,6 @@
       "kind": "server",
       "stamp": "2026-09-13T04:05:30.3963058-06:00",
       "named": true
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Chat moved and cleaned up, shrines and nirnroot work, emote wheel on G",
-      "body": "",
-      "details": [
-        "Launcher 1.0.135",
-        "Launcher rebuilt: Updater.cs",
-        "15 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-chat.js",
-        "Data\\Platform\\UI\\thornswood-emotes.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
     }
   ],
   "serverPassword": "6622",
