@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.120",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560681756",
-  "launcherSha256": "b2df7624b8235456ce52abb301dfcfe3b5c8d6f73a6b925015d60597df7a4724",
+  "launcherVersion": "1.0.121",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560689141",
+  "launcherSha256": "189d9356f5d4adaeb2376c519c266894d529b94d5f889614b2f841f25feb6b48",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -584,6 +584,19 @@
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Creation window matches the theme; better trade and town descriptions",
+      "body": "",
+      "details": [
+        "Launcher 1.0.121",
+        "Launcher rebuilt: Creation.cs, Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Creation.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Trade and town are chosen in the launcher now",
@@ -1268,20 +1281,6 @@
         "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
         "Data\\SkyrimTogetherReborn\\config\\STServer.ini",
         "steam_appid.txt",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "your message",
-      "body": "",
-      "details": [
-        "Launcher 1.0.99",
-        "Launcher rebuilt: Updater.cs",
-        "1 file to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\_RespawnScript.pex",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
