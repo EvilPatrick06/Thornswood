@@ -730,6 +730,20 @@
   "news": [
     {
       "date": "13 Sep 2026",
+      "title": "Server updated",
+      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
+      "details": [
+        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
+        "Load order: 61 plugins server side",
+        "Nothing to download for this one. It is on the server, so it is already live."
+      ],
+      "files": [],
+      "kind": "server",
+      "stamp": "2026-09-13T14:27:30.1208975-06:00",
+      "named": false
+    },
+    {
+      "date": "13 Sep 2026",
       "title": "Restore brings back trade, town and playtime too",
       "body": "",
       "details": [
@@ -1559,29 +1573,6 @@
       "files": [
         "tools\\app\\Creation.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Trade and town are chosen in the launcher now",
-      "body": "",
-      "details": [
-        "Launcher 1.0.120",
-        "Launcher rebuilt: Creation.cs, Shell.cs, ui.xaml, Updater.cs",
-        "7 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SkyUI_SE.esp",
-        "Data\\SkyUI_SE.esp.bak",
-        "tools\\app\\Creation.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)",
-        "tools\\ui.xaml  (launcher)"
       ]
     }
   ],
