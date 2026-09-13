@@ -1,7 +1,7 @@
 {
   "launcherVersion": "1.0.107",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560433326",
-  "launcherSha256": "5db8b4d690a44d87b8b127de1ae1880141be33514fce88c740bae7600f84da39",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560447902",
+  "launcherSha256": "a69889b3d6cecfb0d324e3dd49b9ff27d6a0ef26f7b3c016c62a3f2033d755e3",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -524,6 +524,18 @@
     }
   ],
   "news": [
+    {
+      "date": "12 Sep 2026",
+      "title": "Repo renamed, update check survives it, scripts no longer hardcode the repo folder",
+      "body": "",
+      "details": [
+        "Launcher 1.0.107",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "12 Sep 2026",
       "title": "Thornswood throughout, character slots pick a server profile, dead packs no longer lock Play",
@@ -1225,27 +1237,6 @@
         "Data\\Scripts\\_RespawnScript.pex",
         "Data\\SunHelm\\Config\\Default\\SunHelm.json",
         "Data\\SunHelmSurvival.esp",
-        "tools\\app\\Display.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Male and female naked bodies rebuilt, respawn hard-wired to nearest hall of the dead, paint options removed, minimap timing",
-      "body": "",
-      "details": [
-        "Launcher 1.0.85",
-        "Launcher rebuilt: Display.cs, Updater.cs",
-        "7 files to download, 5.9 MB"
-      ],
-      "files": [
-        "Data\\meshes\\actors\\character\\character assets\\femalebody_0.nif",
-        "Data\\meshes\\actors\\character\\character assets\\femalebody_1.nif",
-        "Data\\meshes\\actors\\character\\character assets\\malebody_0.nif",
-        "Data\\meshes\\actors\\character\\character assets\\malebody_1.nif",
-        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
-        "Data\\Scripts\\_RespawnScript.pex",
-        "Data\\SKSE\\Plugins\\skee64.ini",
         "tools\\app\\Display.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
