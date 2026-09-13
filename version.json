@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.149",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561877118",
-  "launcherSha256": "390cd26ccf315ab07cfa0c7145597a0ddf9b28355635b70b06713ac2b89d9cb2",
+  "launcherVersion": "1.0.150",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561893164",
+  "launcherSha256": "bc8a15fd60e571a90a62b5f57d88ff1555169393dbfc306a3615c89edc225a11",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -731,9 +731,41 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561877120",
       "sha256": "a74e97236d3e18243c1b9aa3562798c3933da3ea94b0c05f8b532286790cd7b8",
       "notes": "Take the weapon-drawn pin off after dressing, faster teleport"
+    },
+    {
+      "id": "20260913-1438",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561893165",
+      "sha256": "2a86de7121f7fca5e5fa78c1cab16654cc8b122e025d9a7e3f9faa2665fadc0a",
+      "notes": "Chat gives the keyboard back, and three ways it cannot fail to"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Chat gives the keyboard back, and three ways it cannot fail to",
+      "body": "",
+      "details": [
+        "Launcher 1.0.150",
+        "Launcher rebuilt: Shell.cs, Updater.cs",
+        "12 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-chargen.js",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\UI\\thornswood-bridge.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Server updated",
@@ -1568,19 +1600,6 @@
         "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
         "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Profile ids are unique per person; two people could share one character",
-      "body": "",
-      "details": [
-        "Launcher 1.0.123",
-        "Launcher rebuilt: Chars.cs, Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Chars.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
