@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.154",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561934516",
-  "launcherSha256": "9ad8f0e86ef322a7989596fcd30da4305f6e05c2cd35b80823563fa2bed86405",
+  "launcherVersion": "1.0.155",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561943110",
+  "launcherSha256": "655b566779396710a2b8b6adf5a6c21a5872149b82059cfed794a1e729cd889e",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -755,9 +755,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561934510",
       "sha256": "62a4cb0fb88e9d864137c868fe1005dc8200165819f706e045713200872df046",
       "notes": "Fix the window proc hook behind the keyboard lockups"
+    },
+    {
+      "id": "20260913-1512",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561943111",
+      "sha256": "e3d1568085a305171e4d67c9d8ef83be2ffc144b52fa3660638464afb8831063",
+      "notes": "Log the input pulse so the lockup can be identified"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Log the input pulse so the lockup can be identified",
+      "body": "",
+      "details": [
+        "Launcher 1.0.155",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 15.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Fix the window proc hook behind the keyboard lockups",
@@ -1579,27 +1607,6 @@
         "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "tools\\app\\AutoJoin.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Creation timing, chat focus, character cards",
-      "body": "",
-      "details": [
-        "Launcher 1.0.129",
-        "Launcher rebuilt: Updater.cs",
-        "8 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
