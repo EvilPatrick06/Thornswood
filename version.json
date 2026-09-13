@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.159",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561966337",
-  "launcherSha256": "82afcf6e6e98fcb13472772bba37c609d509c02bf32e98933507d4e3d891b24f",
+  "launcherVersion": "1.0.160",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561976089",
+  "launcherSha256": "35d5a0d96cef212e57b2bd6d7e2d35549174eac95a9040112dcead1acd94c1b2",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -779,9 +779,35 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561966338",
       "sha256": "0a0b17745da4b6eeb89e0ea9dd086924e80d2bb34a70be18f85ec4c2ebf904c0",
       "notes": "Show the last location on the character card"
+    },
+    {
+      "id": "20260913-1535",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561976086",
+      "sha256": "187a2ec2e2a70753c26df2f4a3613922bd338351b49904b8f554b35470b5e0f8",
+      "notes": "Re-acquire the keyboard when DirectInput loses it"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Re-acquire the keyboard when DirectInput loses it",
+      "body": "",
+      "details": [
+        "Launcher 1.0.160",
+        "Launcher rebuilt: Updater.cs",
+        "7 files to download, 15.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Show the last location on the character card",
@@ -1608,20 +1634,6 @@
       "files": [
         "tools\\app\\Updater.cs  (launcher)"
       ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Race menu no longer opens twice",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
-        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": [],
-      "kind": "server",
-      "stamp": "2026-09-13T02:45:13.785493-06:00",
-      "named": true
     }
   ],
   "serverPassword": "6622",
