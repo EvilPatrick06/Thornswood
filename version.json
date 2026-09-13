@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.121",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560689141",
-  "launcherSha256": "189d9356f5d4adaeb2376c519c266894d529b94d5f889614b2f841f25feb6b48",
+  "launcherVersion": "1.0.122",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560699472",
+  "launcherSha256": "afc876e5c3eded7ff4ffde29a084386722f37ac1bd3550280e6578606896c0a4",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -581,9 +581,34 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560681755",
       "sha256": "603b962c207ff602291d2a8a5fb966c187f75d04d6f0ac38a3d58499132fe4a4",
       "notes": "Trade and town are chosen in the launcher now"
+    },
+    {
+      "id": "20260913-0019",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560699471",
+      "sha256": "e0aae5e9e974494990a248f145d0e90a3b2f889780767c0ab9732d75de325758",
+      "notes": "Starter class and starter location; Raven Rock removed"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Starter class and starter location; Raven Rock removed",
+      "body": "",
+      "details": [
+        "Launcher 1.0.122",
+        "Launcher rebuilt: Creation.cs, Updater.cs",
+        "5 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "tools\\app\\Creation.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Creation window matches the theme; better trade and town descriptions",
@@ -1260,27 +1285,6 @@
       ],
       "files": [
         "Data\\Scripts\\_RespawnScript.pex",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Load order fix: TheNewGentleman late, flute re-registered, Keizaal barriers and boards removed, Expert difficulty",
-      "body": "",
-      "details": [
-        "Launcher 1.0.101",
-        "Launcher rebuilt: Updater.cs",
-        "8 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "Data\\SkyrimTogetherReborn\\config\\STServer.ini",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
