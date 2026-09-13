@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.156",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561950916",
-  "launcherSha256": "7985beb2e252a8b905e7f2db1d8086e646b6615c0e5c0720f4aad59450caccc6",
+  "launcherVersion": "1.0.157",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561963540",
+  "launcherSha256": "45af34f606c444d40ccb190146a1dc3019926c44e91824171dfa5c67d72fab19",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -767,9 +767,36 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561950914",
       "sha256": "94b1706eed4be6adbd318ae6a5d58002dc56aa6a8fe2977455e28629d73cae62",
       "notes": "Name the menu that is open when the input dies"
+    },
+    {
+      "id": "20260913-1526",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561963539",
+      "sha256": "ce38a41b12bf4ac3becfdfe992bc56f2d20f35f689f4c87bcc4ad82480b3990c",
+      "notes": "Shut the console when it opens by itself, and put the last location on the card"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Shut the console when it opens by itself, and put the last location on the card",
+      "body": "",
+      "details": [
+        "Launcher 1.0.157",
+        "Launcher rebuilt: Updater.cs",
+        "8 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Server updated",
@@ -1603,16 +1630,6 @@
         "Thief starts in leather rather than hide",
         "Priest gets amulets of Arkay and Mara",
         "Fisher gets a rod, a net and a filleting kit",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": []
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Bards start with instruments",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
         "Load order: 61 plugins server side",
         "Nothing to download for this one. It is on the server, so it is already live."
       ],
