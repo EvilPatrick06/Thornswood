@@ -778,6 +778,19 @@
   "news": [
     {
       "date": "13 Sep 2026",
+      "title": "Server updated",
+      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
+      "details": [
+        "Load order: 61 plugins server side",
+        "Nothing to download for this one. It is on the server, so it is already live."
+      ],
+      "files": [],
+      "kind": "server",
+      "stamp": "2026-09-13T15:27:30.2937349-06:00",
+      "named": false
+    },
+    {
+      "date": "13 Sep 2026",
       "title": "Shut the console when it opens by itself, and put the last location on the card",
       "body": "",
       "details": [
@@ -1621,19 +1634,6 @@
         "tools\\app\\Creation.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Trade kits fixed",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
-        "Thief starts in leather rather than hide",
-        "Priest gets amulets of Arkay and Mara",
-        "Fisher gets a rod, a net and a filleting kit",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": []
     }
   ],
   "serverPassword": "6622",
