@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.130",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560817889",
-  "launcherSha256": "86abcada91ea22b05d45b4693cbef04abe96da8a7aa59a3e836350ab9f3eb267",
+  "launcherVersion": "1.0.131",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560886403",
+  "launcherSha256": "b6af7f98b289f2238398015acb02ed37b60121d24157f77770130b251fcdf4d0",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -629,9 +629,41 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560817890",
       "sha256": "42dfa4c4201f61e4c87a8fa7f88eec8ac712ecae3aa5cd88cd28f22fa53224ad",
       "notes": "Creation timing, chat focus, load order manifest, character cards"
+    },
+    {
+      "id": "20260913-0238",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560886405",
+      "sha256": "4e3ca0e73af1d5459941c5e5d5fbf6aa00cbc5b9ca2c8c0606541c26c15fd40b",
+      "notes": "Chat box cleaned up, everyone gets dressed, race menu no longer opens twice"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Chat box cleaned up, everyone gets dressed, race menu no longer opens twice",
+      "body": "",
+      "details": [
+        "Launcher 1.0.131",
+        "Launcher rebuilt: Creation.cs, Updater.cs",
+        "12 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-chargen.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\Plugins\\thornswood-mark.js",
+        "Data\\Platform\\UI\\thornswood-bridge.js",
+        "Data\\Platform\\UI\\thornswood-chat.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Creation.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Trade kits fixed",
