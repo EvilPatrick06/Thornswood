@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.148",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561870043",
-  "launcherSha256": "533b847b0b773c9782fa016ccb64da2b31fd15415bdd90d11e6a2281c1dba85a",
+  "launcherVersion": "1.0.149",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561877118",
+  "launcherSha256": "390cd26ccf315ab07cfa0c7145597a0ddf9b28355635b70b06713ac2b89d9cb2",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -725,9 +725,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561870041",
       "sha256": "9ff73d0f2fcb751c368d4fd61a63b2ee5ed801e3f17410692f3ca8c227cb3ae1",
       "notes": "Restore brings back trade, town and playtime too"
+    },
+    {
+      "id": "20260913-1427",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561877120",
+      "sha256": "a74e97236d3e18243c1b9aa3562798c3933da3ea94b0c05f8b532286790cd7b8",
+      "notes": "Take the weapon-drawn pin off after dressing, faster teleport"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Take the weapon-drawn pin off after dressing, faster teleport",
+      "body": "",
+      "details": [
+        "Launcher 1.0.149",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-chargen.js",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Server updated",
@@ -1558,19 +1586,6 @@
         "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
         "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "tools\\app\\Creation.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Creation window matches the theme; better trade and town descriptions",
-      "body": "",
-      "details": [
-        "Launcher 1.0.121",
-        "Launcher rebuilt: Creation.cs, Updater.cs"
-      ],
-      "files": [
         "tools\\app\\Creation.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
