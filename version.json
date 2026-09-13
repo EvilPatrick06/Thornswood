@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.117",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560625067",
-  "launcherSha256": "743ee9285f1f12f02ba404f16216edacf86e86a56c3d09762f1e0c68652a2e77",
+  "launcherVersion": "1.0.118",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560626098",
+  "launcherSha256": "e107ef6c37cd4088685eaa99045c5985422298a3f6fc84d4ae6a42b95e3c7252",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -572,6 +572,19 @@
     }
   ],
   "news": [
+    {
+      "date": "12 Sep 2026",
+      "title": "Play no longer passes CEF switches; update source is editable",
+      "body": "",
+      "details": [
+        "Launcher 1.0.118",
+        "Launcher rebuilt: Shell.cs, Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "12 Sep 2026",
       "title": "Play no longer passes CEF switches to the game",
@@ -1243,36 +1256,6 @@
       ],
       "files": [
         "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Minimap removed",
-      "body": "",
-      "details": [
-        "Launcher 1.0.96",
-        "Launcher rebuilt: Enforce.cs, Help.cs, Links.cs, Shell.cs, ui.xaml, Updater.cs",
-        "8 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\SKSE\\Plugins\\CBPCMasterConfig_Thornswood.txt",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
-        "- Data\\Interface\\MenuManager_WideScreen.swf",
-        "- Data\\Interface\\MenuManager.swf",
-        "- Data\\Interface\\MiniMapMenu.swf",
-        "- Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.dll",
-        "tools\\app\\Enforce.cs  (launcher)",
-        "tools\\app\\Help.cs  (launcher)",
-        "tools\\app\\Links.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)",
-        "tools\\ui.xaml  (launcher)"
       ]
     }
   ],
