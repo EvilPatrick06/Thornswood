@@ -1,7 +1,7 @@
 {
   "launcherVersion": "1.0.135",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560968340",
-  "launcherSha256": "1e055c4356c21fcc27f0c4aa3c58de3f94a6a290d8adcacc6798a3a2b8045771",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561591267",
+  "launcherSha256": "10ed7a056a869a6c389e7d24f815914d24019bacd52d52e7b695bdb1492454db",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -647,9 +647,45 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560968339",
       "sha256": "8cdaac0eefeb0cb98faf1b19db6d3b84055faba47717c85ec08a054504c129d3",
       "notes": "Chat moved and cleaned up, shrines and nirnroot work, emote wheel on G"
+    },
+    {
+      "id": "20260913-1104",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561591263",
+      "sha256": "a1ec3d9dc2481337be165d9266cbe6409dd27f57d33ab90b85e0c4a9f92e3e08",
+      "notes": "Voice chat works, chat and emote wheel fixed"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Voice chat works, chat and emote wheel fixed",
+      "body": "",
+      "details": [
+        "Launcher 1.0.135",
+        "Launcher rebuilt: Shell.cs",
+        "17 files to download, 30.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll.backup",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-chargen.js",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\UI\\thornswood-bridge.js",
+        "Data\\Platform\\UI\\thornswood-chat.js",
+        "Data\\Platform\\UI\\thornswood-emotes.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Shell.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Shrines, nirnroot, /tp and /where, NPCs off",
