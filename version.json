@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.137",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561625753",
-  "launcherSha256": "5e40596b47d34b599bcf916228568b880739ba99dc0cc20ea10f3c5461bdffd9",
+  "launcherVersion": "1.0.138",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561641749",
+  "launcherSha256": "028fb066848b20980793ca83572a0f8e3e64172f25d94f87f93ae77e5af00f31",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -665,9 +665,36 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561625749",
       "sha256": "543409c86f3ee9b2cf559db35df35551161b36646263e2e0fe42b578cc69191e",
       "notes": "Launcher no longer passes a switch skse64_loader refuses"
+    },
+    {
+      "id": "20260913-1141",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561641747",
+      "sha256": "3f6f740219ba991661ede4ea2c354df04797b6fb59058ff7ced8075abda5aecc",
+      "notes": "Browser focus can no longer strand the keyboard in character creation"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Browser focus can no longer strand the keyboard in character creation",
+      "body": "",
+      "details": [
+        "Launcher 1.0.138",
+        "Launcher rebuilt: Updater.cs",
+        "8 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Launcher no longer passes a switch skse64_loader refuses",
