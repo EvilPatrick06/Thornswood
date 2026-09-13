@@ -634,6 +634,17 @@
   "news": [
     {
       "date": "13 Sep 2026",
+      "title": "Server updated",
+      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
+      "details": [
+        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
+        "Load order: 61 plugins server side",
+        "Nothing to download for this one. It is on the server, so it is already live."
+      ],
+      "files": []
+    },
+    {
+      "date": "13 Sep 2026",
       "title": "Creation timing, chat focus, load order manifest, character cards",
       "body": "",
       "details": [
@@ -1167,26 +1178,6 @@
         "Data\\Scripts\\Source\\QF_MQ201_00035D5F.psc",
         "Data\\Scripts\\Source\\TIF__000361DF.psc",
         "... and 26 more files"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Client settings writer no longer corrupts the file",
-      "body": "",
-      "details": [
-        "Launcher 1.0.110",
-        "Launcher rebuilt: AutoJoin.cs, Updater.cs",
-        "6 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "tools\\app\\AutoJoin.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
       ]
     }
   ],
