@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.139",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561728279",
-  "launcherSha256": "9a57ce0ba0f916a56eef6fcd5ef01f6629df6993dc53f15b29484b39c0ece67d",
+  "launcherVersion": "1.0.140",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561758011",
+  "launcherSha256": "e942f2a343d077227ac2698f1dbce82ba99f051faff6ba670e79aad654f01041",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -677,9 +677,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561728282",
       "sha256": "9bb456600d7e7ae7d70e315d406ee5b29290862f5584da7ab4ecaf968b6252b4",
       "notes": "Remove the old Skyrim Together files from the build"
+    },
+    {
+      "id": "20260913-1305",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561758010",
+      "sha256": "54013bfd42fcd03d8557cd55454de521830fa9990f737ddd9948b7670912a4a4",
+      "notes": "Emotes play, faster teleport out of the hall, microphone on after creation"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Emotes play, faster teleport out of the hall, microphone on after creation",
+      "body": "",
+      "details": [
+        "Launcher 1.0.140",
+        "Launcher rebuilt: Updater.cs",
+        "10 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Server updated",
@@ -691,7 +720,7 @@
       ],
       "files": [],
       "kind": "server",
-      "stamp": "2026-09-13T13:05:00.7047970-06:00",
+      "stamp": "2026-09-13T13:05:00.704797-06:00",
       "named": false
     },
     {
