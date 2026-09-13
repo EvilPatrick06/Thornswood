@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.112",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560528733",
-  "launcherSha256": "4af910f78729747c874d79f9cf58b25830e24b5fbb07a06f6c77615aad55545f",
+  "launcherVersion": "1.0.113",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560531557",
+  "launcherSha256": "b39cb10c6eed3d1859940e81cd71168234da9f6fa3623780b7ec9876f6b7acf5",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -554,6 +554,18 @@
     }
   ],
   "news": [
+    {
+      "date": "12 Sep 2026",
+      "title": "Voice opens without a prompt, voice status on the Server page",
+      "body": "",
+      "details": [
+        "Launcher 1.0.113",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "12 Sep 2026",
       "title": "Voice opens without a prompt, server page shows voice status",
@@ -1303,29 +1315,6 @@
         "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
         "steam_appid.txt",
         "tools\\app\\Enforce.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Respawn actually fires again, the delay in front of the bleedout check was mine",
-      "body": "",
-      "details": [
-        "Launcher 1.0.91",
-        "Launcher rebuilt: Updater.cs",
-        "10 files to download, 0.3 MB"
-      ],
-      "files": [
-        "Data\\meshes\\actors\\character\\facegendata\\facegeom\\fishinginskyrim.esp\\0002a07c.nif.off",
-        "Data\\Scripts\\_RespawnScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\MorphSyncTogether.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
