@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.150",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561893164",
-  "launcherSha256": "bc8a15fd60e571a90a62b5f57d88ff1555169393dbfc306a3615c89edc225a11",
+  "launcherVersion": "1.0.151",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561894058",
+  "launcherSha256": "c22f067653e51c276dee79acfe167e136f2b3a7d967245b21a7b3c1875ef69aa",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -740,6 +740,18 @@
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Chat gives the keyboard back, and the profile id comes off the card",
+      "body": "",
+      "details": [
+        "Launcher 1.0.151",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Chat gives the keyboard back, and three ways it cannot fail to",
@@ -1573,28 +1585,6 @@
       "files": [
         "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
         "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Overlay held shut during creation so the cursor works",
-      "body": "",
-      "details": [
-        "Launcher 1.0.124",
-        "Launcher rebuilt: Updater.cs",
-        "9 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\UI\\thornswood-emotes.html",
         "Data\\SKSE\\Plugins\\CrashLogger.ini",
         "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
         "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
