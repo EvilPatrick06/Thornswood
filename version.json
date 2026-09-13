@@ -2,8 +2,8 @@
   "launcherVersion": "1.0.107",
   "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560447902",
   "launcherSha256": "a69889b3d6cecfb0d324e3dd49b9ff27d6a0ef26f7b3c016c62a3f2033d755e3",
-  "serverAddress": "192.135.119.166",
-  "serverPort": "25565",
+  "serverAddress": "192.135.112.23",
+  "serverPort": "7777",
   "message": "",
   "packs": [
     {
