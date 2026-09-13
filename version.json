@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.158",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561965028",
-  "launcherSha256": "e8cacc1d320c38746a363406017a0aa479484887b02b2d0e6a93961e279b1c82",
+  "launcherVersion": "1.0.159",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561966337",
+  "launcherSha256": "82afcf6e6e98fcb13472772bba37c609d509c02bf32e98933507d4e3d891b24f",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -773,9 +773,36 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561963539",
       "sha256": "ce38a41b12bf4ac3becfdfe992bc56f2d20f35f689f4c87bcc4ad82480b3990c",
       "notes": "Shut the console when it opens by itself, and put the last location on the card"
+    },
+    {
+      "id": "20260913-1528",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561966338",
+      "sha256": "0a0b17745da4b6eeb89e0ea9dd086924e80d2bb34a70be18f85ec4c2ebf904c0",
+      "notes": "Show the last location on the character card"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Show the last location on the character card",
+      "body": "",
+      "details": [
+        "Launcher 1.0.159",
+        "Launcher rebuilt: Roster.cs, Updater.cs",
+        "7 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Roster.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Shut the console when it opens by itself, and put the last location on the card",
@@ -1595,31 +1622,6 @@
       "kind": "server",
       "stamp": "2026-09-13T02:45:13.785493-06:00",
       "named": true
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Dice rolls, chat box cleaned up, everyone gets dressed",
-      "body": "",
-      "details": [
-        "Launcher 1.0.132",
-        "Launcher rebuilt: Updater.cs",
-        "12 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\Plugins\\thornswood-mark.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-chat.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
     }
   ],
   "serverPassword": "6622",
