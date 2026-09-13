@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.153",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561925244",
-  "launcherSha256": "079940ea72d23bb90cc58876df53c1e5b0c8c664f4b87f4b18848f9dfd54ae7b",
+  "launcherVersion": "1.0.154",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561934516",
+  "launcherSha256": "9ad8f0e86ef322a7989596fcd30da4305f6e05c2cd35b80823563fa2bed86405",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -749,9 +749,39 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561925245",
       "sha256": "4e052e24db34c529508f9b090a01126a056f87c1cb76fc31dfc0dca0928065f3",
       "notes": "Open the microphone away from the teleport, and never two at once"
+    },
+    {
+      "id": "20260913-1507",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561934510",
+      "sha256": "62a4cb0fb88e9d864137c868fe1005dc8200165819f706e045713200872df046",
+      "notes": "Fix the window proc hook behind the keyboard lockups"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Fix the window proc hook behind the keyboard lockups",
+      "body": "",
+      "details": [
+        "Launcher 1.0.154",
+        "Launcher rebuilt: Shell.cs, Updater.cs",
+        "10 files to download, 15.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Open the microphone away from the teleport, and never two at once",
@@ -1570,35 +1600,6 @@
         "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
         "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Fixed the startup crash, character cards, text chat",
-      "body": "",
-      "details": [
-        "Launcher 1.0.128",
-        "Launcher rebuilt: Chars.cs, Creation.cs, Roster.cs, Shell.cs, Updater.cs",
-        "12 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-chat.js",
-        "Data\\Platform\\UI\\thornswood-emotes.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Chars.cs  (launcher)",
-        "tools\\app\\Creation.cs  (launcher)",
-        "tools\\app\\Roster.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
