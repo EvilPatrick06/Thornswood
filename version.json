@@ -517,12 +517,6 @@
       "notes": "Respawn chain rebuilt: nearest Hall of the Dead per hold, Whiterun temple as fallback"
     },
     {
-      "id": "20260912-1538",
-      "url": "",
-      "sha256": "6800b7a3e5e7ccc5ce19e5e12fe5a7c4b4abc09a5c855111d8d83fdab79abe7c",
-      "notes": "Respawn: wake at the nearest hold's temple or Hall of the Dead. Bounty, violent bounty and guard hostility all cleared on death."
-    },
-    {
       "id": "20260912-2040",
       "url": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/560412449",
       "sha256": "edf4005a58a3414e497c6b9e81f129b0a48a9be8e8aef23cb02e2a0113bcbcc1",
