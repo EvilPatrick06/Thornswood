@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.143",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561829481",
-  "launcherSha256": "29504b9048fc0130cf70de66d769611b393be6dfbc82a1c5374a460ff5e21ff8",
+  "launcherVersion": "1.0.144",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561837547",
+  "launcherSha256": "db50f32a3b20bb2eb8dabed748bc9bb3b3c4123797f8a76d4c40f918a9f1bdc9",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -704,6 +704,23 @@
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Characters follow your Steam account, so a reinstall gets them back",
+      "body": "",
+      "details": [
+        "Launcher 1.0.144",
+        "Launcher rebuilt: Account.cs, Chars.cs, CharSync.cs, Shell.cs, Steam.cs, Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Account.cs  (launcher)",
+        "tools\\app\\Chars.cs  (launcher)",
+        "tools\\app\\CharSync.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Steam.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Microphone waits for the world to finish loading before it opens",
