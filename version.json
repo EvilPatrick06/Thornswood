@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.119",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560674350",
-  "launcherSha256": "553d1bd91bb82555ca77493b4e94569005db92fefb5bcd93395ea8943f4af2cc",
+  "launcherVersion": "1.0.120",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560681756",
+  "launcherSha256": "b2df7624b8235456ce52abb301dfcfe3b5c8d6f73a6b925015d60597df7a4724",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -575,9 +575,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560674359",
       "sha256": "533982962e2855cbfaacf50b29da20b1676d88b85ea40646458bdce99f2c393e",
       "notes": "Settings declutter; server address, update source and voice port now ship in the update"
+    },
+    {
+      "id": "20260913-0005",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560681755",
+      "sha256": "603b962c207ff602291d2a8a5fb966c187f75d04d6f0ac38a3d58499132fe4a4",
+      "notes": "Trade and town are chosen in the launcher now"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Trade and town are chosen in the launcher now",
+      "body": "",
+      "details": [
+        "Launcher 1.0.120",
+        "Launcher rebuilt: Creation.cs, Shell.cs, ui.xaml, Updater.cs",
+        "7 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SkyUI_SE.esp",
+        "Data\\SkyUI_SE.esp.bak",
+        "tools\\app\\Creation.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)",
+        "tools\\ui.xaml  (launcher)"
+      ]
+    },
     {
       "date": "12 Sep 2026",
       "title": "Settings declutter; server address, update source and voice port now ship in the update",
@@ -1253,30 +1282,6 @@
       ],
       "files": [
         "Data\\Scripts\\_RespawnScript.pex",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Keizaal barriers and notice boards removed, difficulty to Expert, respawn watchdog fix",
-      "body": "",
-      "details": [
-        "Launcher 1.0.98",
-        "Launcher rebuilt: Updater.cs",
-        "11 files to download, 3.0 MB"
-      ],
-      "files": [
-        "Data\\Keizaal.esp",
-        "Data\\Scripts\\_RespawnScript.pex",
-        "Data\\SKSE\\Plugins\\CBPCMasterConfig_Thornswood.txt",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "Data\\SkyrimTogetherReborn\\config\\STServer.ini",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
