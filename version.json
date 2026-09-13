@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.163",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562015867",
-  "launcherSha256": "e55354f65e462bbbf8d2156db0ae123bb731ab39dac91593994c78795e72c1e1",
+  "launcherVersion": "1.0.164",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562030192",
+  "launcherSha256": "c6da98e74874259ce8927ebebf3ab4d5d2eeb2489081bbb27e2fe41851174b88",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -803,9 +803,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562015865",
       "sha256": "3cc3b5d660171e2bbdd6a191a13058dba970b793a5a2b94fc21cce4d5e9ff47c",
       "notes": "Startup no longer drops the connection, key releases reach the game while the browser has focus, card shows where you actually were"
+    },
+    {
+      "id": "20260913-1620",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562030202",
+      "sha256": "ddf1f8da36d8d1e6995620115d1506ce99d4a0bd720f411689047ba21c91bf15",
+      "notes": "Fixed the second save load that hung the loading screen, startup no longer drops the connection"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Fixed the second save load that hung the loading screen, startup no longer drops the connection",
+      "body": "",
+      "details": [
+        "Launcher 1.0.164",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 16.3 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Startup no longer drops the connection, key releases reach the game while the browser has focus, card shows where you actually were",
@@ -1659,20 +1687,6 @@
         "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Markarth arrival point measured properly",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
-        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": [],
-      "kind": "server",
-      "stamp": "2026-09-13T03:19:03.3147069-06:00",
-      "named": true
     }
   ],
   "serverPassword": "6622",
