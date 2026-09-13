@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.144",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561837547",
-  "launcherSha256": "db50f32a3b20bb2eb8dabed748bc9bb3b3c4123797f8a76d4c40f918a9f1bdc9",
+  "launcherVersion": "1.0.145",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561842030",
+  "launcherSha256": "fa6c871eca1f372479998f5812470d201dfd67874b5e63d71d59b525c81ed8d0",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -701,9 +701,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561829484",
       "sha256": "fd8d05d5f3a56b90042cb06b3b5c44111b9ed11d273f632aeee91c904e1ac481",
       "notes": "Microphone waits for the world to finish loading before it opens"
+    },
+    {
+      "id": "20260913-1404",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561842027",
+      "sha256": "d3f90b293f93b0cc3be4a70a6dfc0edd73d5d960a1721c8c8839e833aab8637f",
+      "notes": "Wait for the server before handing out a profile id on a blank machine"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Wait for the server before handing out a profile id on a blank machine",
+      "body": "",
+      "details": [
+        "Launcher 1.0.145",
+        "Launcher rebuilt: CharSync.cs, Shell.cs, Updater.cs",
+        "7 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "tools\\app\\CharSync.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Characters follow your Steam account, so a reinstall gets them back",
