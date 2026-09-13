@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.114",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560545850",
-  "launcherSha256": "7906d75afb313092b3e0eef2803311fe6fea615e92ec4735833b7784433e9da0",
+  "launcherVersion": "1.0.115",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560563750",
+  "launcherSha256": "78429a2240d92de51dee60d5abfe1dff10e5412c4e272b064e7edd1ca0df87bb",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -551,6 +551,12 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560528735",
       "sha256": "123485e5007628d400803602e35e65b095816181a7e54481ad0525cf77448405",
       "notes": "Voice opens without a prompt, server page shows voice status"
+    },
+    {
+      "id": "20260912-2237",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560563747",
+      "sha256": "123c664539678a292e94b285abd70fbf9246568b3ebbccb301e51bf89b9f52da",
+      "notes": "Quick keys column fits long key names"
     }
   ],
   "news": [
