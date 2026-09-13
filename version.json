@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.155",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561943110",
-  "launcherSha256": "655b566779396710a2b8b6adf5a6c21a5872149b82059cfed794a1e729cd889e",
+  "launcherVersion": "1.0.156",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561950916",
+  "launcherSha256": "7985beb2e252a8b905e7f2db1d8086e646b6615c0e5c0720f4aad59450caccc6",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -761,9 +761,36 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561943111",
       "sha256": "e3d1568085a305171e4d67c9d8ef83be2ffc144b52fa3660638464afb8831063",
       "notes": "Log the input pulse so the lockup can be identified"
+    },
+    {
+      "id": "20260913-1517",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561950914",
+      "sha256": "94b1706eed4be6adbd318ae6a5d58002dc56aa6a8fe2977455e28629d73cae62",
+      "notes": "Name the menu that is open when the input dies"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Name the menu that is open when the input dies",
+      "body": "",
+      "details": [
+        "Launcher 1.0.156",
+        "Launcher rebuilt: Updater.cs",
+        "8 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Log the input pulse so the lockup can be identified",
@@ -1587,28 +1614,6 @@
         "Nothing to download for this one. It is on the server, so it is already live."
       ],
       "files": []
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Creation timing, chat focus, load order manifest, character cards",
-      "body": "",
-      "details": [
-        "Launcher 1.0.130",
-        "Launcher rebuilt: AutoJoin.cs, Updater.cs",
-        "8 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "tools\\app\\AutoJoin.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
     }
   ],
   "serverPassword": "6622",
