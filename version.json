@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.109",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560479787",
-  "launcherSha256": "f8ddd64e26e9c83934b3e60c706a47ed92866b76b197a361ebf28f95a8eed0ab",
+  "launcherVersion": "1.0.110",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560495995",
+  "launcherSha256": "0bbe0a123fb289d5670db9845256b8076553069a57194a176dd18c34a07e00ac",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -533,9 +533,35 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560479788",
       "sha256": "45d0575002ad6744de1a5c6ba6bf23d0ced04bb9681cfd5c1fdc68308c8b0e73",
       "notes": "Help and Controls rewritten against what this build actually runs"
+    },
+    {
+      "id": "20260912-2147",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560495993",
+      "sha256": "a8543e68f272c837ce269859734006ce4cf2a02303ec91e8d076517c5a9b82a2",
+      "notes": "Client settings writer no longer corrupts the file"
     }
   ],
   "news": [
+    {
+      "date": "12 Sep 2026",
+      "title": "Client settings writer no longer corrupts the file",
+      "body": "",
+      "details": [
+        "Launcher 1.0.110",
+        "Launcher rebuilt: AutoJoin.cs, Updater.cs",
+        "6 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "tools\\app\\AutoJoin.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "12 Sep 2026",
       "title": "Help and Controls rewritten against what this build actually runs",
@@ -1219,67 +1245,6 @@
         "scout.txt",
         "search.txt",
         "... and 12 more files"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Playable instruments, Bard gets a flute that actually plays, minimap handed back to Enforce",
-      "body": "",
-      "details": [
-        "Launcher 1.0.88",
-        "Launcher rebuilt: Display.cs, Enforce.cs, Help.cs, Shell.cs, Updater.cs",
-        "41 files to download, 4.8 MB",
-        "The load order moved, so start a new character or expect the old save to complain"
-      ],
-      "files": [
-        "Data\\meshes\\fineflute.nif",
-        "Data\\meshes\\playdrum.nif",
-        "Data\\meshes\\playlute.nif",
-        "Data\\PlayFluteLuteDrum.esp",
-        "Data\\Scripts\\instrumentConfig.pex",
-        "Data\\Scripts\\instrumentConfigMenu.pex",
-        "Data\\Scripts\\instrumentOnEquip.pex",
-        "Data\\Scripts\\instrumentPlay.pex",
-        "Data\\Scripts\\instrumentPlayDrum.pex",
-        "Data\\Scripts\\instrumentPlayLute.pex",
-        "Data\\Scripts\\instrumentPlayOcarina.pex",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Bard.json",
-        "Data\\sound\\fx\\chords\\a.wav",
-        "Data\\sound\\fx\\chords\\a#.wav",
-        "Data\\sound\\fx\\chords\\am.wav",
-        "Data\\sound\\fx\\chords\\bm.wav",
-        "Data\\sound\\fx\\chords\\c.wav",
-        "Data\\sound\\fx\\chords\\d.wav",
-        "Data\\sound\\fx\\chords\\dm.wav",
-        "Data\\sound\\fx\\chords\\e.wav",
-        "Data\\sound\\fx\\chords\\f.wav",
-        "Data\\sound\\fx\\chords\\f#.wav",
-        "Data\\sound\\fx\\chords\\g.wav",
-        "Data\\sound\\fx\\chords\\gm.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_a_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_a_sharp_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_b_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_c_2_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_c_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_c_sharp_2_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_c_sharp_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_d_2_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_d_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_d_sharp_2_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_d_sharp_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_e_2_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_e_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_f_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_f_sharp_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_g_long.wav",
-        "Data\\sound\\fx\\ocarina\\oot_notes_ocarina_g_sharp_long.wav",
-        "loadorder.txt  (load order)",
-        "plugins.txt  (load order)",
-        "tools\\app\\Display.cs  (launcher)",
-        "tools\\app\\Enforce.cs  (launcher)",
-        "tools\\app\\Help.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
       ]
     }
   ],
