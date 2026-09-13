@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.145",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561842030",
-  "launcherSha256": "fa6c871eca1f372479998f5812470d201dfd67874b5e63d71d59b525c81ed8d0",
+  "launcherVersion": "1.0.146",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561857869",
+  "launcherSha256": "dcae1f714116e2d990c8b1f411db4ec238673e8e951196d0c0b37f75cb97bf66",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -707,9 +707,39 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561842027",
       "sha256": "d3f90b293f93b0cc3be4a70a6dfc0edd73d5d960a1721c8c8839e833aab8637f",
       "notes": "Wait for the server before handing out a profile id on a blank machine"
+    },
+    {
+      "id": "20260913-1414",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561857873",
+      "sha256": "85c658bc81d247183dad6bc3f3163d8d5c0137c6ac2806c5e86b5334ad4c056a",
+      "notes": "Name the microphone, drop the ready stance before an emote, faster teleport"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Name the microphone, drop the ready stance before an emote, faster teleport",
+      "body": "",
+      "details": [
+        "Launcher 1.0.146",
+        "Launcher rebuilt: Updater.cs",
+        "11 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Server updated",
