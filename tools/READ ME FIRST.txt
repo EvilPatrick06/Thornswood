@@ -1,7 +1,8 @@
 SKYRIM TOGETHER
 ===============
 
-Run SkyrimTogether-Setup.exe. That is the whole thing.
+Run SkyrimTogether-Setup.exe, with SkyrimTogether-Setup.zip sitting in the same
+folder. Do not unzip it yourself, the exe does that.
 
 Windows will probably say "Windows protected your PC" because the file is not
 signed. Click "More info", then "Run anyway". That warning appears for any
@@ -10,7 +11,7 @@ program without a code-signing certificate.
 
 What it does
 ------------
-Builds a complete, self-contained Skyrim at C:\SkyrimTogether with our whole
+Builds a complete, self-contained Skyrim on the drive you pick, with our whole
 mod list already set up. You do not install mods. You do not run Nemesis. You
 do not need a Nexus account, Vortex, or Mod Organizer.
 
@@ -22,7 +23,7 @@ as it does now.
 What you need
 -------------
 - Skyrim Special Edition installed on Steam, on this PC
-- About 25 GB free
+- About 32 GB free on whichever drive you choose
 - Steam signed in and running
 
 
@@ -40,7 +41,7 @@ downloads into Steam's own folder and does not change your installed game.
 
 Playing
 -------
-You get a "Skyrim Together" shortcut on your desktop. Open it and press PLAY.
+You get a "Thornswood" shortcut on your desktop. Open it and press PLAY.
 
 First time only:
 - Make a new character and NAME IT AFTER YOURSELF. That name is what the rest

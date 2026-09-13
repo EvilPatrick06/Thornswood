@@ -6,16 +6,16 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace SkyrimTogether
+namespace Thornswood
 {
     static class Updater
     {
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.140";
 
         static WebClient Client(Config cfg, bool octet, string url)
         {
             var wc = new WebClient();
-            wc.Headers["User-Agent"] = "SkyrimTogetherLauncher/" + Version;
+            wc.Headers["User-Agent"] = "ThornswoodLauncher/" + Version;
             // The token only ever goes to GitHub's own API, never to whatever
             // host an asset URL happens to point at.
             bool github = false;
@@ -44,28 +44,130 @@ namespace SkyrimTogether
         }
 
         /// <summary>Reads version.json from the repo. Returns null if updates are off or unreachable.</summary>
+        /// <summary>
+        /// True only when the published launcher is genuinely newer than the
+        /// one running.
+        ///
+        /// This used to be a plain "different from mine" test, and different
+        /// includes older. So a machine that had just built a launcher would
+        /// open it, see an older number in the release, call that an update,
+        /// and overwrite the build it had just made with the one it replaced.
+        /// It looks exactly like the build silently not happening, and the
+        /// person who did the building is the only one it can happen to.
+        /// </summary>
+        public static bool IsNewer(string remote, string local)
+        {
+            if (string.IsNullOrEmpty(remote)) return false;
+            if (string.IsNullOrEmpty(local)) return true;
+            if (string.Equals(remote, local, StringComparison.OrdinalIgnoreCase)) return false;
+
+            int[] a = Parts(remote), b = Parts(local);
+            if (a == null || b == null)
+            {
+                // Unparseable on either side: fall back to the old behaviour
+                // rather than refusing an update nobody can then install.
+                return !string.Equals(remote, local, StringComparison.OrdinalIgnoreCase);
+            }
+            int n = Math.Max(a.Length, b.Length);
+            for (int i = 0; i < n; i++)
+            {
+                int x = i < a.Length ? a[i] : 0;
+                int y = i < b.Length ? b[i] : 0;
+                if (x != y) return x > y;
+            }
+            return false;
+        }
+
+        static int[] Parts(string v)
+        {
+            try
+            {
+                string[] bits = v.Trim().TrimStart('v', 'V').Split('.');
+                var o = new int[bits.Length];
+                for (int i = 0; i < bits.Length; i++)
+                {
+                    if (!int.TryParse(bits[i], out o[i])) return null;
+                }
+                return o;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// The repository names worth trying, in order. The project was renamed
+        /// from skyrim-together to Thornswood, and a config.json written either
+        /// side of that rename is still out there on somebody's machine.
+        ///
+        /// Rewriting the name in the config on load was the obvious fix and the
+        /// wrong one: it renamed everybody's config before the repository
+        /// itself was renamed, so every launcher started asking GitHub for
+        /// something that did not exist yet. Trying is the only thing that
+        /// works whichever side of the rename a machine is on.
+        /// </summary>
+        static List<string> RepoCandidates(string repo)
+        {
+            var l = new List<string>();
+            if (string.IsNullOrEmpty(repo)) return l;
+            l.Add(repo);
+
+            int slash = repo.LastIndexOf('/');
+            if (slash <= 0) return l;
+            string owner = repo.Substring(0, slash + 1);
+            string name = repo.Substring(slash + 1);
+
+            if (string.Equals(name, "skyrim-together", StringComparison.OrdinalIgnoreCase)) l.Add(owner + "Thornswood");
+            else if (string.Equals(name, "Thornswood", StringComparison.OrdinalIgnoreCase)) l.Add(owner + "skyrim-together");
+            return l;
+        }
+
         public static VersionDoc Check(Config cfg)
         {
             if (!Enabled(cfg)) return null;
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
-            string url = "https://api.github.com/repos/" + cfg.UpdateRepo +
-                         "/contents/version.json?ref=" + (string.IsNullOrEmpty(cfg.UpdateBranch) ? "main" : cfg.UpdateBranch);
-            try
+
+            string branch = string.IsNullOrEmpty(cfg.UpdateBranch) ? "main" : cfg.UpdateBranch;
+            List<string> tries = RepoCandidates(cfg.UpdateRepo);
+            Exception last = null;
+
+            foreach (string repo in tries)
             {
-                using (var wc = Client(cfg, false, url))
-                    return VersionDoc.Parse(wc.DownloadData(url));
-            }
-            catch (WebException wex)
-            {
-                var r = wex.Response as HttpWebResponse;
-                if (r != null)
+                string url = "https://api.github.com/repos/" + repo +
+                             "/contents/version.json?ref=" + branch;
+                try
                 {
-                    int code = (int)r.StatusCode;
-                    if (code == 404) throw new Exception("the repo or the branch could not be read, check UpdateRepo and that the token still has access");
-                    if (code == 401 || code == 403) throw new Exception("the access token was refused, it may have expired");
+                    VersionDoc doc;
+                    using (var wc = Client(cfg, false, url))
+                        doc = VersionDoc.Parse(wc.DownloadData(url));
+
+                    // Settle on whichever one answered, so the next check is one
+                    // request rather than two.
+                    if (!string.Equals(repo, cfg.UpdateRepo, StringComparison.Ordinal))
+                    {
+                        cfg.UpdateRepo = repo;
+                        try { cfg.Save(Paths.CfgFile); } catch { }
+                    }
+                    return doc;
                 }
-                throw new Exception("could not reach GitHub");
+                catch (WebException wex)
+                {
+                    var r = wex.Response as HttpWebResponse;
+                    if (r != null)
+                    {
+                        int code = (int)r.StatusCode;
+                        // Only a missing repo is worth trying the other name for.
+                        // A refused token would fail identically on both and the
+                        // second attempt would only hide what is actually wrong.
+                        if (code == 404)
+                        {
+                            last = new Exception("the repo or the branch could not be read, check UpdateRepo and that the token still has access");
+                            continue;
+                        }
+                        if (code == 401 || code == 403) throw new Exception("the access token was refused, it may have expired");
+                    }
+                    throw new Exception("could not reach GitHub");
+                }
             }
+            throw (last != null ? last : new Exception("could not reach GitHub"));
         }
 
         public static HashSet<string> Applied()
@@ -74,6 +176,16 @@ namespace SkyrimTogether
             try { if (File.Exists(Paths.AppliedFile)) foreach (string l in File.ReadAllLines(Paths.AppliedFile)) if (l.Trim().Length > 0) s.Add(l.Trim()); }
             catch { }
             return s;
+        }
+
+        /// <summary>
+        /// Write a pack off without applying it. For one that cannot be
+        /// downloaded at all, so it stops being offered on every check.
+        /// </summary>
+        public static void Skip(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return;
+            MarkApplied(id);
         }
 
         static void MarkApplied(string id)

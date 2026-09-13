@@ -1,0 +1,191 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Text.RegularExpressions;
+
+namespace Thornswood
+{
+    /// <summary>
+    /// Who each profile id is, according to the server.
+    ///
+    /// The launcher picks a character by profile id and that is all it knows
+    /// about them. The race and the sex are chosen inside the game, and the
+    /// trade is applied by the gamemode, so none of it is written down on this
+    /// machine: the character is a change form on the server.
+    ///
+    /// The gamemode writes a small file into the folder the server already
+    /// serves over HTTP, the same way the online count works, and this reads
+    /// it. Nothing new is opened on either end.
+    ///
+    /// Everything here fails quietly. A server that is down, a file that is not
+    /// there yet, a character nobody has played since the roster was added:
+    /// each of those means one line on a card is shorter than it might be, and
+    /// none of them is worth an error.
+    /// </summary>
+    static class Roster
+    {
+        const int ResourcePort = 3000;
+
+        public class Row
+        {
+            public string Name = "";
+            public string Race = "";
+            public bool Female;
+            public string Trade = "";     // the gamemode key, eg "smith"
+            public string Town = "";      // the gamemode key, eg "riften"
+        }
+
+        static Dictionary<int, Row> cache = new Dictionary<int, Row>();
+        static DateTime cachedAt = DateTime.MinValue;
+        // Separate from cachedAt on purpose. A server that is down never moves
+        // cachedAt, so without this a launcher left open would queue a fetch
+        // every time the cards were drawn and never stop.
+        static DateTime triedAt = DateTime.MinValue;
+        static readonly object gate = new object();
+
+        /// <summary>The row for one profile, or null. Never blocks.</summary>
+        public static Row For(int profileId)
+        {
+            lock (gate)
+            {
+                Row r;
+                if (cache.TryGetValue(profileId, out r)) return r;
+                return null;
+            }
+        }
+
+        /// <summary>True when there is no point asking again yet, answer or no answer.</summary>
+        public static bool Fresh
+        {
+            get
+            {
+                lock (gate)
+                {
+                    if ((DateTime.UtcNow - cachedAt).TotalMinutes < 2) return true;
+                    return (DateTime.UtcNow - triedAt).TotalSeconds < 20;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Blocking. Call it off the UI thread. Returns true when the roster
+        /// changed, so the caller knows whether redrawing is worth it.
+        /// </summary>
+        public static bool Refresh(Config cfg)
+        {
+            if (cfg == null || string.IsNullOrEmpty(cfg.ServerAddress)) return false;
+            lock (gate) { triedAt = DateTime.UtcNow; }
+
+            string text = null;
+            try
+            {
+                string url = "http://" + cfg.ServerAddress + ":" + ResourcePort + "/characters.json";
+                using (var q = new Quick())
+                {
+                    q.Ms = 2500;
+                    q.Headers["User-Agent"] = "ThornswoodLauncher/" + Updater.Version;
+                    byte[] raw = q.DownloadData(url);
+                    if (raw == null || raw.Length == 0) return false;
+                    int at = 0;
+                    if (raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF) at = 3;
+                    text = System.Text.Encoding.UTF8.GetString(raw, at, raw.Length - at);
+                }
+            }
+            catch { return false; }
+
+            var got = new Dictionary<int, Row>();
+            try
+            {
+                // Read with a regex rather than a serializer on purpose. The
+                // launcher targets the .NET Framework that ships in Windows,
+                // whose only serializer is the data contract one, and that
+                // cannot read a dictionary keyed by an arbitrary number without
+                // being told the shape in advance. This file has to survive the
+                // gamemode adding a field to it, which a declared shape would
+                // not.
+                var each = Regex.Matches(text,
+                    "\"(\\d+)\"\\s*:\\s*\\{(.*?)\\}", RegexOptions.Singleline);
+                foreach (Match m in each)
+                {
+                    int pid;
+                    if (!int.TryParse(m.Groups[1].Value, out pid)) continue;
+                    string body = m.Groups[2].Value;
+
+                    var row = new Row();
+                    row.Name = Str(body, "name");
+                    row.Race = Str(body, "race");
+                    row.Trade = Str(body, "trade");
+                    row.Town = Str(body, "town");
+                    row.Female = Regex.IsMatch(body, "\"female\"\\s*:\\s*true");
+                    got[pid] = row;
+                }
+            }
+            catch { return false; }
+
+            if (got.Count == 0) return false;
+
+            bool changed;
+            lock (gate)
+            {
+                changed = got.Count != cache.Count;
+                if (!changed)
+                {
+                    foreach (var kv in got)
+                    {
+                        Row was;
+                        if (!cache.TryGetValue(kv.Key, out was) ||
+                            was.Name != kv.Value.Name || was.Race != kv.Value.Race ||
+                            was.Female != kv.Value.Female || was.Trade != kv.Value.Trade ||
+                            was.Town != kv.Value.Town)
+                        { changed = true; break; }
+                    }
+                }
+                cache = got;
+                cachedAt = DateTime.UtcNow;
+            }
+            return changed;
+        }
+
+        static string Str(string body, string key)
+        {
+            var m = Regex.Match(body, "\"" + key + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+            if (!m.Success) return "";
+            return m.Groups[1].Value
+                    .Replace("\\\"", "\"")
+                    .Replace("\\\\", "\\");
+        }
+
+        // WebClient has no timeout worth the name, and the default is long
+        // enough that a server which is merely slow looks like a hung launcher.
+        class Quick : WebClient
+        {
+            public int Ms = 2500;
+            protected override WebRequest GetWebRequest(Uri address)
+            {
+                var r = base.GetWebRequest(address);
+                if (r != null) { r.Timeout = Ms; }
+                return r;
+            }
+        }
+
+        /// <summary>"Nord woman, smith in Riften", as much of it as is known.</summary>
+        public static string Describe(Row r)
+        {
+            if (r == null) return "";
+            var bits = new List<string>();
+
+            string who = r.Race;
+            if (who.Length > 0) who += " " + (r.Female ? "woman" : "man");
+            else who = r.Female ? "woman" : "";
+            if (who.Length > 0) bits.Add(who);
+
+            string trade = Creation.LabelOf(Creation.Trades, r.Trade);
+            string town = Creation.LabelOf(Creation.Towns, r.Town);
+            if (trade.Length > 0 && town.Length > 0) bits.Add(trade + " in " + town);
+            else if (trade.Length > 0) bits.Add(trade);
+            else if (town.Length > 0) bits.Add("started in " + town);
+
+            return string.Join(",  ", bits.ToArray());
+        }
+    }
+}

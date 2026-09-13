@@ -1,0 +1,8653 @@
+{
+ "source": "Keizaal.esp",
+ "stations": [
+  {
+   "category": "workbench",
+   "base": "CraftingEnchantingWorkbench",
+   "baseFormId": "0x000BAD0D",
+   "cell": "0x02001DBA",
+   "cellName": "DLC1DawnguardHQ01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -3611.6,
+    232.9,
+    -128.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x02001DBA",
+   "cellName": "DLC1DawnguardHQ01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -3803.4,
+    269.0,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "salt",
+   "base": "FireSalts",
+   "baseFormId": "0x0003AD5E",
+   "cell": "0x02001DBA",
+   "cellName": "DLC1DawnguardHQ01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -3774.3,
+    76.5,
+    -36.7
+   ],
+   "rot": [
+    6.3,
+    0.0,
+    0.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x02001DBA",
+   "cellName": "DLC1DawnguardHQ01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -3789.2,
+    277.7,
+    -128.5
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x02001DBA",
+   "cellName": "DLC1DawnguardHQ01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -3676.5,
+    1208.0,
+    -132.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotOpen01",
+   "baseFormId": "0x00054173",
+   "cell": "0x0200285A",
+   "cellName": "DLC1VampireCastleDungeon02",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -3381.5,
+    3521.9,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.1
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotOpenLoose01",
+   "baseFormId": "0x00054181",
+   "cell": "0x0200285A",
+   "cellName": "DLC1VampireCastleDungeon02",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -3465.4,
+    3524.9,
+    -30000.0
+   ],
+   "rot": [
+    3.1,
+    0.0,
+    2.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitFarmhouse01",
+   "baseFormId": "0x0010C73A",
+   "cell": "0x05001342",
+   "cellName": "KzlHaltedStreamCampHouse",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    3019.0,
+    1131.3,
+    -320.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSm",
+   "baseFormId": "0x001010B3",
+   "cell": "0x05001342",
+   "cellName": "KzlHaltedStreamCampHouse",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    3018.9,
+    1132.0,
+    -318.9
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x000DDF7C",
+   "cellName": "AnisesCabin01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    1887.9,
+    -784.4,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.9
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x000DDF7C",
+   "cellName": "AnisesCabin01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1864.7,
+    -785.8,
+    4002.1
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotClosed01",
+   "baseFormId": "0x00054175",
+   "cell": "0x0001677F",
+   "cellName": "WindhelmNewGnisisCornerclub",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2548.8,
+    -2411.8,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.2
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x0001677F",
+   "cellName": "WindhelmNewGnisisCornerclub",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    2640.9,
+    -2220.7,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSm",
+   "baseFormId": "0x001010B3",
+   "cell": "0x0001677F",
+   "cellName": "WindhelmNewGnisisCornerclub",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    2595.8,
+    -2418.0,
+    3.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x02000803",
+   "cellName": "DLC1VampireCastleGuildhall",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    1584.0,
+    -4288.0,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitSm01",
+   "baseFormId": "0x001018E3",
+   "cell": "0x02000803",
+   "cellName": "DLC1VampireCastleGuildhall",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    5409.9,
+    -2456.8,
+    7095.3
+   ],
+   "rot": [
+    0.0,
+    -0.0,
+    3.1
+   ],
+   "scale": 0.4,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x02000803",
+   "cellName": "DLC1VampireCastleGuildhall",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1582.1,
+    -4281.6,
+    6656.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x00097299",
+   "cellName": "WindhelmPalaceUpstairs01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -2435.3,
+    -2898.7,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x00097299",
+   "cellName": "WindhelmPalaceUpstairs01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -2425.3,
+    -2912.4,
+    768.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSmNoHandle",
+   "baseFormId": "0x00108230",
+   "cell": "0x00036ED5",
+   "cellName": "WhiterunSeverioPelagiasHouse",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -65.5,
+    -143.9,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSm",
+   "baseFormId": "0x001010B3",
+   "cell": "0x00036ED5",
+   "cellName": "WhiterunSeverioPelagiasHouse",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -100.9,
+    -24.4,
+    64.8
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitFarmhouse01",
+   "baseFormId": "0x0010C73A",
+   "cell": "0x00036ED5",
+   "cellName": "WhiterunSeverioPelagiasHouse",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -101.0,
+    -33.1,
+    63.9
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotOpenLoose01",
+   "baseFormId": "0x00054181",
+   "cell": "0x00016776",
+   "cellName": "WindhelmArgonianAssemblage",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2082.0,
+    -927.8,
+    102.3
+   ],
+   "rot": [
+    0.0,
+    6.3,
+    0.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotOpenLoose01",
+   "baseFormId": "0x00054181",
+   "cell": "0x00016776",
+   "cellName": "WindhelmArgonianAssemblage",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2007.8,
+    -926.1,
+    102.5
+   ],
+   "rot": [
+    6.3,
+    6.3,
+    0.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotOpenLoose01",
+   "baseFormId": "0x00054181",
+   "cell": "0x00016776",
+   "cellName": "WindhelmArgonianAssemblage",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2109.1,
+    -809.0,
+    126.8
+   ],
+   "rot": [
+    6.3,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotOpen01",
+   "baseFormId": "0x00054173",
+   "cell": "0x00016776",
+   "cellName": "WindhelmArgonianAssemblage",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2069.0,
+    -1028.4,
+    62.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x00016776",
+   "cellName": "WindhelmArgonianAssemblage",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    1997.7,
+    -820.7,
+    119.0
+   ],
+   "rot": [
+    6.3,
+    6.3,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotClosedLoose01",
+   "baseFormId": "0x00054174",
+   "cell": "0x00016776",
+   "cellName": "WindhelmArgonianAssemblage",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2105.8,
+    -1213.3,
+    102.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x000C5AA0",
+   "cellName": "HonningbrewMeadery03",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    6576.6,
+    -9587.3,
+    -982.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSmNoHandle",
+   "baseFormId": "0x00108230",
+   "cell": "0x000C5AA0",
+   "cellName": "HonningbrewMeadery03",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    6634.5,
+    -9597.9,
+    -958.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "woodChop",
+   "base": "ChoppingBlock01",
+   "baseFormId": "0x0002F590",
+   "cell": "0x0001527C",
+   "cellName": "FortGreymoor01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2285.4,
+    758.5,
+    -192.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00015286",
+   "cellName": "FaldarsTooth01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    1310.5,
+    3382.2,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.2
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x000152C3",
+   "cellName": "Alftand01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2196.1,
+    11329.0,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.4
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x000161FF",
+   "cellName": "GoldenglowEstate01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -685.4,
+    -777.8,
+    573.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingBlacksmithArmorWorkbench",
+   "baseFormId": "0x000D932F",
+   "cell": "0x00015273",
+   "cellName": "GallowsRock01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    3422.1,
+    -2531.3,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.2
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "grindstone",
+   "base": "CraftingBlacksmithSharpeningWheel",
+   "baseFormId": "0x0006E9C2",
+   "cell": "0x00043FAB",
+   "cellName": "HaltedStreamCamp01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2388.9,
+    1819.6,
+    -789.9
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00043FAB",
+   "cellName": "HaltedStreamCamp01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    1891.9,
+    1358.5,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.7
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "oreVein",
+   "base": "OreSilver",
+   "baseFormId": "0x0005ACDF",
+   "cell": "0x00043FAB",
+   "cellName": "HaltedStreamCamp01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2232.1,
+    2425.9,
+    -600.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingFireSpit",
+   "baseFormId": "0x00068ADB",
+   "cell": "0x000165B5",
+   "cellName": "WhiterunJorrvaskr",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -392.2,
+    -131.3,
+    -13.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "oreVein",
+   "base": "OreCorundum",
+   "baseFormId": "0x0005ACDB",
+   "cell": "0x00013A8C",
+   "cellName": "DarkwaterCrossingVernersHouse",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -1418.6,
+    -902.7,
+    66.1
+   ],
+   "rot": [
+    6.3,
+    0.0,
+    5.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "VoidSalts",
+   "baseFormId": "0x0003AD60",
+   "cell": "0x00016782",
+   "cellName": "WindhelmSadrisUsedWares",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -759.8,
+    -1480.7,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.3
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x00016782",
+   "cellName": "WindhelmSadrisUsedWares",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -1338.1,
+    -1196.0,
+    -62.5
+   ],
+   "rot": [
+    6.3,
+    6.3,
+    6.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSm",
+   "baseFormId": "0x001010B3",
+   "cell": "0x00016782",
+   "cellName": "WindhelmSadrisUsedWares",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -895.6,
+    -2167.2,
+    -128.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitFarmhouse01",
+   "baseFormId": "0x0010C73A",
+   "cell": "0x00016782",
+   "cellName": "WindhelmSadrisUsedWares",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -885.3,
+    -2167.4,
+    -125.1
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.1
+   ],
+   "scale": 0.97,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x00016BCE",
+   "cellName": "RiftenElgrimsElixirs",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -397.4,
+    779.5,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.5
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x00016BCE",
+   "cellName": "RiftenElgrimsElixirs",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -428.6,
+    755.2,
+    108.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x0001678C",
+   "cellName": "WindhelmWhitePhial",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2251.9,
+    -5044.5,
+    64.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.5
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x0001678C",
+   "cellName": "WindhelmWhitePhial",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    2043.5,
+    -5036.7,
+    64.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.5
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x000165B6",
+   "cellName": "WhiterunArcadiasCauldron",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -18.6,
+    -10.5,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "salt",
+   "base": "FrostSalts",
+   "baseFormId": "0x0003AD5F",
+   "cell": "0x000165B6",
+   "cellName": "WhiterunArcadiasCauldron",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -134.3,
+    547.8,
+    167.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "FireSalts",
+   "baseFormId": "0x0003AD5E",
+   "cell": "0x000165B6",
+   "cellName": "WhiterunArcadiasCauldron",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -131.7,
+    564.8,
+    210.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "VoidSalts",
+   "baseFormId": "0x0003AD60",
+   "cell": "0x000165B6",
+   "cellName": "WhiterunArcadiasCauldron",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -133.6,
+    535.4,
+    125.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "FireSalts",
+   "baseFormId": "0x0003AD5E",
+   "cell": "0x000165B6",
+   "cellName": "WhiterunArcadiasCauldron",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -336.3,
+    -457.0,
+    164.4
+   ],
+   "rot": [
+    0.0,
+    6.3,
+    6.3
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x000165B6",
+   "cellName": "WhiterunArcadiasCauldron",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -271.7,
+    496.3,
+    63.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingFireSpit",
+   "baseFormId": "0x00068ADB",
+   "cell": "0x00013870",
+   "cellName": "RoriksteadFrostfruitInn",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1568.7,
+    -232.7,
+    15.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": 0.8,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x00013870",
+   "cellName": "RoriksteadFrostfruitInn",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1339.2,
+    725.7,
+    18.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x00013870",
+   "cellName": "RoriksteadFrostfruitInn",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1354.7,
+    715.0,
+    18.8
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x00013870",
+   "cellName": "RoriksteadFrostfruitInn",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1336.9,
+    710.1,
+    18.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x00013870",
+   "cellName": "RoriksteadFrostfruitInn",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    2316.7,
+    840.4,
+    -256.8
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotClosed01",
+   "baseFormId": "0x00054175",
+   "cell": "0x00015238",
+   "cellName": "NarzulburMauhulakhsLonghouse",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    314.5,
+    -24.5,
+    -14.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.5
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSmNoHandle",
+   "baseFormId": "0x00108230",
+   "cell": "0x00015238",
+   "cellName": "NarzulburMauhulakhsLonghouse",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    68.9,
+    -155.3,
+    2.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotClosedLoose01",
+   "baseFormId": "0x00054174",
+   "cell": "0x00016A0C",
+   "cellName": "SolitudeBardsCollege",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    161.1,
+    51.1,
+    81.7
+   ],
+   "rot": [
+    6.3,
+    0.0,
+    4.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x00016A0C",
+   "cellName": "SolitudeBardsCollege",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -115.6,
+    -269.3,
+    353.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSmNoHandle",
+   "baseFormId": "0x00108230",
+   "cell": "0x00016A0C",
+   "cellName": "SolitudeBardsCollege",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    94.0,
+    20.4,
+    31.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "tanningRack",
+   "base": "CraftingTanningRackMarker",
+   "baseFormId": "0x000727A1",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -4007.2,
+    -892.3,
+    123.4
+   ],
+   "rot": [
+    0.3,
+    0.0,
+    3.4
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "woodChop",
+   "base": "WoodChoppingBlock",
+   "baseFormId": "0x0007022E",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -4258.4,
+    -3782.1,
+    1268.0
+   ],
+   "rot": [
+    0.3,
+    0.0,
+    4.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForgeWR",
+   "baseFormId": "0x000BF9E1",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -4191.0,
+    -812.7,
+    97.3
+   ],
+   "rot": [
+    0.3,
+    0.0,
+    3.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "smelter",
+   "base": "CraftingSmelterMarker1",
+   "baseFormId": "0x0009C6CE",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -4477.0,
+    -529.5,
+    57.3
+   ],
+   "rot": [
+    0.3,
+    0.0,
+    4.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "grindstone",
+   "base": "CraftingBlacksmithSharpeningWheel",
+   "baseFormId": "0x0006E9C2",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -3849.2,
+    -880.7,
+    118.6
+   ],
+   "rot": [
+    0.3,
+    0.0,
+    5.5
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingBlacksmithArmorWorkbench",
+   "baseFormId": "0x000D932F",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -3948.8,
+    -1117.4,
+    193.0
+   ],
+   "rot": [
+    0.3,
+    0.0,
+    3.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "woodChop",
+   "base": "WoodChoppingBlock",
+   "baseFormId": "0x0007022E",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -2885.5,
+    -5790.6,
+    2011.2
+   ],
+   "rot": [
+    0.3,
+    0.0,
+    4.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "woodChop",
+   "base": "WoodChoppingBlock",
+   "baseFormId": "0x0007022E",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -4605.5,
+    3585.5,
+    216.2
+   ],
+   "rot": [
+    6.0,
+    0.0,
+    2.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "woodChop",
+   "base": "ChoppingBlock01",
+   "baseFormId": "0x0002F590",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -5517.8,
+    4985.3,
+    1076.7
+   ],
+   "rot": [
+    6.0,
+    0.0,
+    4.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "grindstone",
+   "base": "CraftingBlacksmithSharpeningWheel",
+   "baseFormId": "0x0006E9C2",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -4410.4,
+    6407.1,
+    1527.7
+   ],
+   "rot": [
+    6.0,
+    0.0,
+    1.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -4361.2,
+    6664.3,
+    1603.9
+   ],
+   "rot": [
+    6.0,
+    0.0,
+    2.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingBlacksmithArmorWorkbench",
+   "baseFormId": "0x000D932F",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -4470.0,
+    6933.8,
+    1680.1
+   ],
+   "rot": [
+    6.0,
+    0.0,
+    4.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "tanningRack",
+   "base": "CraftingTanningRackMarker",
+   "baseFormId": "0x000727A1",
+   "cell": "0x05005900",
+   "cellName": "KeizaalStartingCell",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    -4606.0,
+    6354.2,
+    1505.6
+   ],
+   "rot": [
+    6.0,
+    0.0,
+    2.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x0002BCD7",
+   "cellName": "WinterholdCollegeMidden01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -1413.1,
+    -1317.6,
+    530.6
+   ],
+   "rot": [
+    4.6,
+    5.9,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "grindstone",
+   "base": "CraftingBlacksmithSharpeningWheel",
+   "baseFormId": "0x0006E9C2",
+   "cell": "0x00079F9F",
+   "cellName": "KnifepointRidge01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2577.3,
+    7832.8,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.5
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00016BCF",
+   "cellName": "RiftenRaggedFlagon",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -1392.6,
+    2988.7,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "BeeHiveHusk",
+   "baseFormId": "0x000A9191",
+   "cell": "0x02005EAB",
+   "cellName": "DLC1RedwaterDen01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -2892.3,
+    -65.4,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.1
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "salt",
+   "base": "FrostSalts",
+   "baseFormId": "0x0003AD5F",
+   "cell": "0x02005EAB",
+   "cellName": "DLC1RedwaterDen01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -2907.6,
+    -68.6,
+    -30000.0
+   ],
+   "rot": [
+    6.3,
+    6.3,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x02005EAB",
+   "cellName": "DLC1RedwaterDen01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -2546.9,
+    217.4,
+    6452.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitSm01",
+   "baseFormId": "0x001018E3",
+   "cell": "0x02005EAB",
+   "cellName": "DLC1RedwaterDen01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -2519.3,
+    -502.7,
+    6502.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitSm01",
+   "baseFormId": "0x001018E3",
+   "cell": "0x02005EAB",
+   "cellName": "DLC1RedwaterDen01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -2621.4,
+    -503.8,
+    6502.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitRiften01",
+   "baseFormId": "0x0010D3DB",
+   "cell": "0x02005EAB",
+   "cellName": "DLC1RedwaterDen01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -2523.4,
+    -543.6,
+    6474.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": 0.8,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitRiften01",
+   "baseFormId": "0x0010D3DB",
+   "cell": "0x02005EAB",
+   "cellName": "DLC1RedwaterDen01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -2626.9,
+    -546.9,
+    6474.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": 0.8,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitRiften01",
+   "baseFormId": "0x0010D3DB",
+   "cell": "0x02005EAB",
+   "cellName": "DLC1RedwaterDen01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -2403.3,
+    -494.1,
+    6474.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.5
+   ],
+   "scale": 0.8,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitSm01",
+   "baseFormId": "0x001018E3",
+   "cell": "0x02005EAB",
+   "cellName": "DLC1RedwaterDen01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -2430.2,
+    -458.7,
+    6502.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.5
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x000165A3",
+   "cellName": "WhiterunDragonsreach",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    1304.7,
+    2572.5,
+    -80.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x000165A3",
+   "cellName": "WhiterunDragonsreach",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1293.6,
+    1989.5,
+    -81.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.5
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlacksmithForgeSTATIC",
+   "baseFormId": "0x00048748",
+   "cell": "0x0004401B",
+   "cellName": "DruadachRedoubt01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    691.4,
+    3198.3,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.6
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00015239",
+   "cellName": "Morvunskar01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    1863.7,
+    1630.2,
+    1087.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingBlacksmithArmorWorkbench",
+   "baseFormId": "0x000D932F",
+   "cell": "0x00015239",
+   "cellName": "Morvunskar01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    1778.5,
+    1293.6,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.8
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotOpenLoose01",
+   "baseFormId": "0x00054181",
+   "cell": "0x00016784",
+   "cellName": "WindhelmAretinoResidence",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -448.0,
+    -2352.0,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x00016784",
+   "cellName": "WindhelmAretinoResidence",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -277.1,
+    -2703.4,
+    513.7
+   ],
+   "rot": [
+    6.3,
+    6.3,
+    6.3
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingFireSpit",
+   "baseFormId": "0x00068ADB",
+   "cell": "0x00013A5C",
+   "cellName": "IvarsteadVilemyrInn",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1836.2,
+    -61.2,
+    16.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotClosedLoose01",
+   "baseFormId": "0x00054174",
+   "cell": "0x00016A04",
+   "cellName": "SolitudeBluePalace",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -2712.3,
+    -238.5,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x00016A04",
+   "cellName": "SolitudeBluePalace",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -2636.3,
+    890.6,
+    576.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSmNoHandle",
+   "baseFormId": "0x00108230",
+   "cell": "0x00016A04",
+   "cellName": "SolitudeBluePalace",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -2716.3,
+    -285.7,
+    318.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x0001380E",
+   "cellName": "WinterholdCollegeHallofTheElements",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    852.8,
+    -2177.9,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x0001380E",
+   "cellName": "WinterholdCollegeHallofTheElements",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    414.7,
+    -1445.1,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x0001380E",
+   "cellName": "WinterholdCollegeHallofTheElements",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -415.5,
+    -1457.7,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x0001380E",
+   "cellName": "WinterholdCollegeHallofTheElements",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -852.9,
+    -2180.1,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x00016A0E",
+   "cellName": "SolitudeWinkingSkeever",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    865.8,
+    -1248.1,
+    -291.9
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSm",
+   "baseFormId": "0x001010B3",
+   "cell": "0x00016A0E",
+   "cellName": "SolitudeWinkingSkeever",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    525.9,
+    -527.5,
+    24.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "grindstone",
+   "base": "CraftingBlacksmithSharpeningWheel",
+   "baseFormId": "0x0006E9C2",
+   "cell": "0x05001E06",
+   "cellName": "aaWindhelmPitBloodworksNew",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    624.0,
+    1192.0,
+    8.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x05001E06",
+   "cellName": "aaWindhelmPitBloodworksNew",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    880.0,
+    2034.0,
+    73.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.3
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "oreVein",
+   "base": "OreIron",
+   "baseFormId": "0x00071CF3",
+   "cell": "0x05001E06",
+   "cellName": "aaWindhelmPitBloodworksNew",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    1952.0,
+    2268.0,
+    275.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "oreVein",
+   "base": "OreCorundum",
+   "baseFormId": "0x0005ACDB",
+   "cell": "0x05001E06",
+   "cellName": "aaWindhelmPitBloodworksNew",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    1947.0,
+    2305.0,
+    275.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x05001E06",
+   "cellName": "aaWindhelmPitBloodworksNew",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    868.0,
+    2043.0,
+    73.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x05001E06",
+   "cellName": "aaWindhelmPitBloodworksNew",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    865.0,
+    2028.0,
+    73.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitSm01",
+   "baseFormId": "0x001018E3",
+   "cell": "0x05001E06",
+   "cellName": "aaWindhelmPitBloodworksNew",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    517.0,
+    2298.0,
+    22.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSm",
+   "baseFormId": "0x001010B3",
+   "cell": "0x05001E06",
+   "cellName": "aaWindhelmPitBloodworksNew",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    563.7,
+    2295.0,
+    8.8
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotClosedLoose01",
+   "baseFormId": "0x00054174",
+   "cell": "0x05001E06",
+   "cellName": "aaWindhelmPitBloodworksNew",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    484.0,
+    1953.0,
+    89.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "SpitPotClosedLoose01",
+   "baseFormId": "0x00054174",
+   "cell": "0x000213A0",
+   "cellName": "SolitudeCastleDour",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -1928.4,
+    2182.1,
+    -199.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSmNoHandle",
+   "baseFormId": "0x00108230",
+   "cell": "0x000213A0",
+   "cellName": "SolitudeCastleDour",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -1967.3,
+    2116.0,
+    -254.1
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x000213A0",
+   "cellName": "SolitudeCastleDour",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -1130.5,
+    933.1,
+    -0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitSm01",
+   "baseFormId": "0x001018E3",
+   "cell": "0x05001349",
+   "cellName": "aaSillasTest",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    2252.5,
+    2255.9,
+    147.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.3
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSm",
+   "baseFormId": "0x001010B3",
+   "cell": "0x05001349",
+   "cellName": "aaSillasTest",
+   "vanillaCell": false,
+   "added": true,
+   "pos": [
+    2248.9,
+    2208.9,
+    133.5
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.3
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x00013A7C",
+   "cellName": "DragonBridgeFourShieldsTavern",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1264.8,
+    -380.7,
+    -0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingBlacksmithArmorWorkbench",
+   "baseFormId": "0x000D932F",
+   "cell": "0x000B6BE6",
+   "cellName": "EmbershardMine01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -2065.3,
+    2344.1,
+    8107.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x000B6BE6",
+   "cellName": "EmbershardMine01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -2355.0,
+    2274.2,
+    8108.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "grindstone",
+   "base": "CraftingBlacksmithSharpeningWheel",
+   "baseFormId": "0x0006E9C2",
+   "cell": "0x000B6BE6",
+   "cellName": "EmbershardMine01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -2195.5,
+    2257.6,
+    8114.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.3
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x00016BD2",
+   "cellName": "RiftenMistveilKeep",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -1933.5,
+    -265.4,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.1
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x00016BD2",
+   "cellName": "RiftenMistveilKeep",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -1937.4,
+    -265.0,
+    64.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    2135.9,
+    -4235.5,
+    385.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "SaltPile",
+   "baseFormId": "0x00034CDF",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    1863.3,
+    -4479.5,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    6.3,
+    6.3
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "salt",
+   "base": "FireSalts",
+   "baseFormId": "0x0003AD5E",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1816.9,
+    -4563.8,
+    465.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": 1.15,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    2042.4,
+    -4759.1,
+    64.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSm",
+   "baseFormId": "0x001010B3",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    2117.8,
+    -4710.6,
+    65.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "FrostSalts",
+   "baseFormId": "0x0003AD5F",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1966.9,
+    -4899.1,
+    193.1
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "VoidSalts",
+   "baseFormId": "0x0003AD60",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1924.4,
+    -4894.5,
+    192.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": 1.07,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "FireSalts",
+   "baseFormId": "0x0003AD5E",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1910.8,
+    -4889.0,
+    193.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": 0.89,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingEnchantingWorkbench",
+   "baseFormId": "0x000BAD0D",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1914.9,
+    -4540.1,
+    319.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.5
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitRiften01",
+   "baseFormId": "0x0010D3DB",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    2117.8,
+    -4710.7,
+    64.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "FrostSalts",
+   "baseFormId": "0x0003AD5F",
+   "cell": "0x00016BDC",
+   "cellName": "RiftenBlackBriarMeadery",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1823.0,
+    -4542.8,
+    462.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": 1.26,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingEnchantingWorkbench",
+   "baseFormId": "0x000BAD0D",
+   "cell": "0x00016A06",
+   "cellName": "SolitudeProudspireManor",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -567.3,
+    -1278.0,
+    -288.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitSm01",
+   "baseFormId": "0x001018E3",
+   "cell": "0x00016A06",
+   "cellName": "SolitudeProudspireManor",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    656.0,
+    -976.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSm",
+   "baseFormId": "0x001010B3",
+   "cell": "0x00016A06",
+   "cellName": "SolitudeProudspireManor",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    608.9,
+    -979.0,
+    -12.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingBlacksmithArmorWorkbench",
+   "baseFormId": "0x000D932F",
+   "cell": "0x000AD5A1",
+   "cellName": "DarkBrotherhoodSanctuary",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    461.8,
+    -1584.8,
+    -961.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.2
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "grindstone",
+   "base": "CraftingBlacksmithSharpeningWheel",
+   "baseFormId": "0x0006E9C2",
+   "cell": "0x000AD5A1",
+   "cellName": "DarkBrotherhoodSanctuary",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    338.6,
+    -1397.9,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.1
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "oreVein",
+   "base": "OreIngots",
+   "baseFormId": "0x05001248",
+   "cell": "0x000965B3",
+   "cellName": "WindhelmWarehouse",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    2480.0,
+    -1088.0,
+    64.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "grindstone",
+   "base": "CraftingBlacksmithSharpeningWheel",
+   "baseFormId": "0x0006E9C2",
+   "cell": "0x00015233",
+   "cellName": "Orotheim01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -1452.5,
+    531.5,
+    -12.8
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.4
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x00016A11",
+   "cellName": "SolitudeAngelinesAromatics",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -8.7,
+    -1288.0,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.1
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x00016A11",
+   "cellName": "SolitudeAngelinesAromatics",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -4.1,
+    -1262.4,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x000BA599",
+   "cellName": "BrokenOarGrotto01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    9469.3,
+    12585.4,
+    8372.8
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.8
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "smelter",
+   "base": "CraftingSmelterMarker1",
+   "baseFormId": "0x0009C6CE",
+   "cell": "0x000BA599",
+   "cellName": "BrokenOarGrotto01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    9259.6,
+    12745.5,
+    8375.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingBlacksmithArmorWorkbench",
+   "baseFormId": "0x000D932F",
+   "cell": "0x000BA599",
+   "cellName": "BrokenOarGrotto01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    9316.5,
+    12384.9,
+    8370.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00000D74",
+   "cellName": "0x00000D74",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -127067.7,
+    6789.3,
+    -7195.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.9
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00000D74",
+   "cellName": "0x00000D74",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    4203.3,
+    17575.2,
+    -4063.9
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.1
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "smelter",
+   "base": "CraftingSmelterMarker1",
+   "baseFormId": "0x0009C6CE",
+   "cell": "0x00000D74",
+   "cellName": "0x00000D74",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -145833.2,
+    -24754.7,
+    -832.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.7
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "grindstone",
+   "base": "CraftingBlacksmithSharpeningWheel",
+   "baseFormId": "0x0006E9C2",
+   "cell": "0x00000D74",
+   "cellName": "0x00000D74",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -70745.6,
+    -67990.7,
+    2808.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00000D74",
+   "cellName": "0x00000D74",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -70282.2,
+    -67908.3,
+    2793.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "grainMill",
+   "base": "GrainMill",
+   "baseFormId": "0x0009C6DF",
+   "cell": "0x00000D74",
+   "cellName": "0x00000D74",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -102257.6,
+    85764.7,
+    -11794.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbench",
+   "baseFormId": "0x000BAD0C",
+   "cell": "0x00000D74",
+   "cellName": "0x00000D74",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    156222.8,
+    9604.6,
+    -4721.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.2
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00000D74",
+   "cellName": "0x00000D74",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -112858.5,
+    113198.0,
+    -5408.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.6
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "tanningRack",
+   "base": "CraftingTanningRackMarker",
+   "baseFormId": "0x000727A1",
+   "cell": "0x00009144",
+   "cellName": "HaltedStreamCampExterior02",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    15477.5,
+    18770.9,
+    -4707.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "grainMill",
+   "base": "GrainMill",
+   "baseFormId": "0x0009C6DF",
+   "cell": "0x00009101",
+   "cellName": "LoreiusFarmExterior02",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    33223.6,
+    27153.3,
+    -6790.9
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x000090CC",
+   "cellName": "0x000090CC",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    123582.8,
+    29056.7,
+    -13985.1
+   ],
+   "rot": [
+    0.1,
+    6.2,
+    1.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x000090EB",
+   "cellName": "0x000090EB",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    124717.8,
+    28472.3,
+    -13916.5
+   ],
+   "rot": [
+    1.1,
+    0.9,
+    1.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "kiln",
+   "base": "KzlCraftingCharcoalKilnMarker",
+   "baseFormId": "0x0501547E",
+   "cell": "0x00009713",
+   "cellName": "Riverwood01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    18697.0,
+    -44266.0,
+    -99.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingEnchantingWorkbenchTabletop",
+   "baseFormId": "0x000D5501",
+   "cell": "0x00009B4F",
+   "cellName": "AnisesCabinExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    791.4,
+    -52726.4,
+    1759.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.5
+   ],
+   "scale": 0.6,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CookingSpitSm01",
+   "baseFormId": "0x001018E3",
+   "cell": "0x00009B4F",
+   "cellName": "AnisesCabinExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1037.9,
+    -52471.2,
+    1728.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.5
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingPotSm",
+   "baseFormId": "0x001010B3",
+   "cell": "0x00009B4F",
+   "cellName": "AnisesCabinExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    1064.4,
+    -52433.7,
+    1716.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "grainMill",
+   "base": "GrainMill",
+   "baseFormId": "0x0009C6DF",
+   "cell": "0x00009618",
+   "cellName": "ChillfurrowFarmExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    31438.9,
+    -10677.3,
+    -4129.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x00009618",
+   "cellName": "ChillfurrowFarmExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    31808.1,
+    -10927.7,
+    -4169.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x00009618",
+   "cellName": "ChillfurrowFarmExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    31881.3,
+    -10707.0,
+    -4177.9
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "cooking",
+   "base": "CraftingCookingFireSpit",
+   "baseFormId": "0x00068ADB",
+   "cell": "0x00009618",
+   "cellName": "ChillfurrowFarmExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    31192.6,
+    -10609.6,
+    -4146.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x00009656",
+   "cellName": "HonningbrewMeaderyExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    29253.1,
+    -18008.9,
+    -4359.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.3
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x00009656",
+   "cellName": "HonningbrewMeaderyExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    29337.2,
+    -17803.6,
+    -4355.8
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "kiln",
+   "base": "KzlCraftingCharcoalKilnMarker",
+   "baseFormId": "0x0501547E",
+   "cell": "0x00009781",
+   "cellName": "IvarsteadExterior04",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    75207.9,
+    -60300.4,
+    10539.0
+   ],
+   "rot": [
+    0.0,
+    -0.0,
+    5.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "tanningRack",
+   "base": "CraftingTanningRackMarker",
+   "baseFormId": "0x000727A1",
+   "cell": "0x000096BC",
+   "cellName": "DarkwaterCrossingExterior01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    122054.4,
+    -34059.4,
+    -9840.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x000096BC",
+   "cellName": "DarkwaterCrossingExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    122141.0,
+    -33878.9,
+    -9874.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x000096BC",
+   "cellName": "DarkwaterCrossingExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    122203.6,
+    -33691.6,
+    -9859.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "kiln",
+   "base": "KzlCraftingCharcoalKilnMarker",
+   "baseFormId": "0x0501547E",
+   "cell": "0x000096BC",
+   "cellName": "DarkwaterCrossingExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    120384.0,
+    -34368.0,
+    -9792.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "woodChop",
+   "base": "WoodChoppingBlock",
+   "baseFormId": "0x0007022E",
+   "cell": "0x000095E5",
+   "cellName": "0x000095E5",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    110907.5,
+    -6778.0,
+    -13365.8
+   ],
+   "rot": [
+    0.0,
+    -0.0,
+    2.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "kiln",
+   "base": "KzlCraftingCharcoalKilnMarker",
+   "baseFormId": "0x0501547E",
+   "cell": "0x000095E6",
+   "cellName": "MixwaterMillExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    109105.2,
+    -7514.8,
+    -13161.9
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.3
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "woodChop",
+   "base": "WoodChoppingBlock",
+   "baseFormId": "0x0007022E",
+   "cell": "0x000095E6",
+   "cellName": "MixwaterMillExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    110564.9,
+    -6962.2,
+    -13358.8
+   ],
+   "rot": [
+    0.0,
+    -0.0,
+    3.4
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x0000B4DC",
+   "cellName": "WindhelmBridge04",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    133039.7,
+    32060.0,
+    -13984.8
+   ],
+   "rot": [
+    6.1,
+    6.2,
+    1.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x0000B4DC",
+   "cellName": "WindhelmBridge04",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    133426.4,
+    32282.1,
+    -13979.1
+   ],
+   "rot": [
+    6.1,
+    6.1,
+    4.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingAlchemyWorkbenchTabletop",
+   "baseFormId": "0x000D54FF",
+   "cell": "0x0000B57B",
+   "cellName": "NarzulburExterior01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    157458.6,
+    11592.6,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.7
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "KzlCraftingAlchemyWorkbench",
+   "baseFormId": "0x05042E69",
+   "cell": "0x0000B57B",
+   "cellName": "NarzulburExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    156224.0,
+    9599.0,
+    -4729.8
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "kiln",
+   "base": "KzlCraftingCharcoalKilnMarker",
+   "baseFormId": "0x0501547E",
+   "cell": "0x0000B580",
+   "cellName": "Kynesgrove",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    137340.0,
+    11660.0,
+    -11904.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingBlacksmithArmorWorkbench",
+   "baseFormId": "0x000D932F",
+   "cell": "0x0000B59C",
+   "cellName": "NarzulburExterior02",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    158545.4,
+    5016.2,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.6
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x0000B59C",
+   "cellName": "NarzulburExterior02",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    158556.7,
+    4782.8,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.3
+   ],
+   "scale": 0.94,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "smelter",
+   "base": "CraftingSmelterMarker1",
+   "baseFormId": "0x0009C6CE",
+   "cell": "0x0000B59C",
+   "cellName": "NarzulburExterior02",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    158908.8,
+    5346.1,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.7
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "oreVein",
+   "base": "OreEbony",
+   "baseFormId": "0x0005ACDC",
+   "cell": "0x0000B59C",
+   "cellName": "NarzulburExterior02",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    158509.1,
+    5012.9,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.4
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x0000B59C",
+   "cellName": "NarzulburExterior02",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    158587.0,
+    4643.8,
+    -4334.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "smelter",
+   "base": "CraftingSmelterMarker1",
+   "baseFormId": "0x0009C6CE",
+   "cell": "0x0000B59C",
+   "cellName": "NarzulburExterior02",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    158949.8,
+    5316.8,
+    -4212.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.3
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "grainMill",
+   "base": "GrainMill",
+   "baseFormId": "0x0009C6DF",
+   "cell": "0x0000B4B8",
+   "cellName": "HlaaluFarmExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    146179.7,
+    33678.0,
+    -13662.9
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHive",
+   "baseFormId": "0x00025D94",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151161.1,
+    -98867.5,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.9
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHive",
+   "baseFormId": "0x00025D94",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151521.9,
+    -99412.0,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.1
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHive",
+   "baseFormId": "0x00025D94",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151075.6,
+    -98554.4,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.7
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHive",
+   "baseFormId": "0x00025D94",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151309.1,
+    -99136.9,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.1
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHiveDummy",
+   "baseFormId": "0x000A7C45",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151521.9,
+    -99412.0,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.1
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHiveDummy",
+   "baseFormId": "0x000A7C45",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151309.3,
+    -99137.1,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.9
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHiveDummy",
+   "baseFormId": "0x000A7C45",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151163.6,
+    -98866.3,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.9
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHiveDummy",
+   "baseFormId": "0x000A7C45",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151075.5,
+    -98553.4,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.9
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    151525.2,
+    -99412.0,
+    11069.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    151312.6,
+    -99128.2,
+    11077.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    6.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    151165.4,
+    -98864.0,
+    11085.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x0000BCF7",
+   "cellName": "GoldenglowEstateExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    151135.8,
+    -98528.2,
+    11103.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x0000BD5E",
+   "cellName": "LargashburExterior04",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    134802.9,
+    -112560.5,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.9
+   ],
+   "scale": 0.91,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHive",
+   "baseFormId": "0x00025D94",
+   "cell": "0x0000BCD6",
+   "cellName": "0x0000BCD6",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151209.3,
+    -98287.5,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.9
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHive",
+   "baseFormId": "0x00025D94",
+   "cell": "0x0000BCD6",
+   "cellName": "0x0000BCD6",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151516.0,
+    -98100.8,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.4
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHiveDummy",
+   "baseFormId": "0x000A7C45",
+   "cell": "0x0000BCD6",
+   "cellName": "0x0000BCD6",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151212.6,
+    -98286.3,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.9
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "TG02BeeHiveDummy",
+   "baseFormId": "0x000A7C45",
+   "cell": "0x0000BCD6",
+   "cellName": "0x0000BCD6",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    151513.4,
+    -98102.5,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.9
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x0000BCD6",
+   "cellName": "0x0000BCD6",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    151265.2,
+    -98267.3,
+    11105.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    5.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x0000BCD6",
+   "cellName": "0x0000BCD6",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    151550.6,
+    -98105.3,
+    11104.8
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "woodChop",
+   "base": "WoodChoppingBlock",
+   "baseFormId": "0x0007022E",
+   "cell": "0x0000BCDA",
+   "cellName": "HeartwoodMillExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    133339.1,
+    -95552.8,
+    10726.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.8
+   ],
+   "scale": 0.99,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "kiln",
+   "base": "KzlCraftingCharcoalKilnMarker",
+   "baseFormId": "0x0501547E",
+   "cell": "0x0000BCDA",
+   "cellName": "HeartwoodMillExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    132290.1,
+    -95620.1,
+    10753.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "smelter",
+   "base": "CraftingSmelterMarker1",
+   "baseFormId": "0x0009C6CE",
+   "cell": "0x00006F48",
+   "cellName": "MorKhazgurExterior03",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -154029.8,
+    81557.6,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.8
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00006F48",
+   "cellName": "MorKhazgurExterior03",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -152063.7,
+    80053.9,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.4
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00007660",
+   "cellName": "DushnikhYalExterior02",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -145334.3,
+    -24345.7,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.8
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "kiln",
+   "base": "KzlCraftingCharcoalKilnMarker",
+   "baseFormId": "0x0501547E",
+   "cell": "0x00009328",
+   "cellName": "DragonBridgeExterior01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -98571.5,
+    84868.9,
+    -11584.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00009329",
+   "cellName": "DragonBridgeExterior02",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -103164.6,
+    82655.6,
+    -12022.9
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "beehive",
+   "base": "KzlFloraBeehive",
+   "baseFormId": "0x05DBF8B3",
+   "cell": "0x00009597",
+   "cellName": "RoriksteadExterior03",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -82000.8,
+    6546.6,
+    -4515.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.4
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "grainMill",
+   "base": "GrainMill",
+   "baseFormId": "0x0009C6DF",
+   "cell": "0x000092BF",
+   "cellName": "KatlasFarmExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -74774.2,
+    96387.2,
+    -11470.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x000092DF",
+   "cellName": "0x000092DF",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -72278.8,
+    91518.0,
+    -13985.5
+   ],
+   "rot": [
+    6.1,
+    6.2,
+    0.8
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x000092DF",
+   "cellName": "0x000092DF",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -72057.8,
+    91709.5,
+    -13983.7
+   ],
+   "rot": [
+    6.1,
+    6.2,
+    4.1
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x000092FD",
+   "cellName": "POITundra25",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -60546.2,
+    89046.8,
+    -13517.5
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x000092FD",
+   "cellName": "POITundra25",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -58256.4,
+    87024.4,
+    -13853.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x0000931F",
+   "cellName": "0x0000931F",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -61527.9,
+    82672.5,
+    -13861.7
+   ],
+   "rot": [
+    0.2,
+    0.1,
+    2.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "KzlFurnitureSaltMine",
+   "baseFormId": "0x05DDE4EF",
+   "cell": "0x00009340",
+   "cellName": "0x00009340",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -65128.5,
+    80781.6,
+    -13977.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlacksmithForgeSTATIC",
+   "baseFormId": "0x00048748",
+   "cell": "0x000099FC",
+   "cellName": "SerpentsBluffRedoubtExterior02",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -97113.7,
+    -4940.5,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.2
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlacksmithForgeSTATIC",
+   "baseFormId": "0x00048748",
+   "cell": "0x00009A79",
+   "cellName": "FortSungardExterior04",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -68955.4,
+    -23562.9,
+    -30000.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.1
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingBlacksmithArmorWorkbench",
+   "baseFormId": "0x000D932F",
+   "cell": "0x00038382",
+   "cellName": "WindhelmCandlehearthHallExterior",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    131575.8,
+    36492.5,
+    -12274.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "tanningRack",
+   "base": "CraftingTanningRackMarker",
+   "baseFormId": "0x000727A1",
+   "cell": "0x00038382",
+   "cellName": "WindhelmCandlehearthHallExterior",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    132177.1,
+    35775.7,
+    -12270.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": 0.85,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "messageBoard",
+   "base": "kzolivarmessageboard",
+   "baseFormId": "0x0500593B",
+   "cell": "0x00038382",
+   "cellName": "WindhelmCandlehearthHallExterior",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    134008.0,
+    35888.0,
+    -12392.0
+   ],
+   "rot": [
+    0.0,
+    -0.0,
+    1.9
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "tanningRack",
+   "base": "CraftingTanningRackMarker",
+   "baseFormId": "0x000727A1",
+   "cell": "0x00042244",
+   "cellName": "RiftenCityWest",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    172003.4,
+    -96756.4,
+    11128.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForge",
+   "baseFormId": "0x000CAE0B",
+   "cell": "0x00042247",
+   "cellName": "RiftenOrigin",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    172349.5,
+    -97063.8,
+    11128.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.7
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "grindstone",
+   "base": "CraftingBlacksmithSharpeningWheel",
+   "baseFormId": "0x0006E9C2",
+   "cell": "0x00042247",
+   "cellName": "RiftenOrigin",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    172262.1,
+    -97286.9,
+    11130.2
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    4.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "workbench",
+   "base": "CraftingBlacksmithArmorWorkbench",
+   "baseFormId": "0x000D932F",
+   "cell": "0x00042247",
+   "cellName": "RiftenOrigin",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    172349.5,
+    -97350.0,
+    11128.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "messageBoard",
+   "base": "kzolivarmessageboard",
+   "baseFormId": "0x0500593B",
+   "cell": "0x00042247",
+   "cellName": "RiftenOrigin",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    173864.0,
+    -96008.0,
+    11128.0
+   ],
+   "rot": [
+    0.0,
+    -0.0,
+    4.4
+   ],
+   "scale": 0.9,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "messageBoard",
+   "base": "kzolivarmessageboard",
+   "baseFormId": "0x0500593B",
+   "cell": "0x0001A27A",
+   "cellName": "WhiterunPLainsDistrict03",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    22085.2,
+    -7408.1,
+    -3571.5
+   ],
+   "rot": [
+    0.0,
+    -0.0,
+    -3.0
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "forge",
+   "base": "CraftingBlackSmithForgeWR",
+   "baseFormId": "0x000BF9E1",
+   "cell": "0x0001A280",
+   "cellName": "0x0001A280",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    20256.5,
+    -8349.2,
+    -3622.3
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.6
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "smelter",
+   "base": "CraftingSmelterMarker1",
+   "baseFormId": "0x0009C6CE",
+   "cell": "0x0001A280",
+   "cellName": "0x0001A280",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    19924.9,
+    -8542.5,
+    -3567.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    2.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "woodChop",
+   "base": "ExecutionerChoppingBlock",
+   "baseFormId": "0x0002E8EB",
+   "cell": "0x00037EE6",
+   "cellName": "0x00037EE6",
+   "vanillaCell": true,
+   "added": false,
+   "pos": [
+    -64550.8,
+    103530.1,
+    -8311.6
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.2
+   ],
+   "scale": null,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "smelter",
+   "base": "CraftingSmelterMarker1",
+   "baseFormId": "0x0009C6CE",
+   "cell": "0x00037EE5",
+   "cellName": "SolitudeCastleDourDistrict01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -61120.0,
+    106816.0,
+    -7936.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "messageBoard",
+   "base": "kzolivarmessageboard",
+   "baseFormId": "0x0500593B",
+   "cell": "0x00037EE7",
+   "cellName": "SolitudeArch",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -61248.0,
+    105432.0,
+    -8392.0
+   ],
+   "rot": [
+    0.0,
+    -0.0,
+    5.6
+   ],
+   "scale": 0.9,
+   "initiallyDisabled": true
+  },
+  {
+   "category": "woodChop",
+   "base": "KzlExecutionerChoppingBlock",
+   "baseFormId": "0x05DF7B34",
+   "cell": "0x00037EE9",
+   "cellName": "SolitudeOrigin",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -64544.2,
+    103468.5,
+    -8311.7
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    1.2
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "FireSalts",
+   "baseFormId": "0x0003AD5E",
+   "cell": "0x00037EE9",
+   "cellName": "SolitudeOrigin",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -62716.0,
+    106457.2,
+    -8328.5
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "salt",
+   "base": "FrostSalts",
+   "baseFormId": "0x0003AD5F",
+   "cell": "0x00037EE9",
+   "cellName": "SolitudeOrigin",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    -62698.7,
+    106463.4,
+    -8328.5
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  },
+  {
+   "category": "kiln",
+   "base": "KzlCraftingCharcoalKilnMarker",
+   "baseFormId": "0x0501547E",
+   "cell": "0x02007BBF",
+   "cellName": "DLC1HunterWorldFort01",
+   "vanillaCell": true,
+   "added": true,
+   "pos": [
+    4697.6,
+    2410.3,
+    -3190.4
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    3.9
+   ],
+   "scale": null,
+   "initiallyDisabled": false
+  }
+ ],
+ "customRecords": {
+  "STAT": [
+   {
+    "formId": "0x05000001",
+    "edid": "RP_DweRmLgMid01_DetailedCeilingCollision",
+    "name": null
+   },
+   {
+    "formId": "0x05000002",
+    "edid": "RP_DesertRocksCliff05",
+    "name": null
+   },
+   {
+    "formId": "0x05000003",
+    "edid": "RP_DesertRocksCliff04",
+    "name": null
+   },
+   {
+    "formId": "0x05000004",
+    "edid": "RP_DesertRocksCliff02",
+    "name": null
+   },
+   {
+    "formId": "0x05000005",
+    "edid": "RP_DesertRocksCliff01",
+    "name": null
+   },
+   {
+    "formId": "0x05000006",
+    "edid": "RP_DesertRocksCliff03",
+    "name": null
+   },
+   {
+    "formId": "0x05000008",
+    "edid": "RP_DweVaultPlatformMid02Hole",
+    "name": null
+   },
+   {
+    "formId": "0x05000009",
+    "edid": "RP_DweVaultPlatformPipes01",
+    "name": null
+   },
+   {
+    "formId": "0x0500000A",
+    "edid": "RP_DweVaultPlatformPipesEnd01",
+    "name": null
+   },
+   {
+    "formId": "0x0500000B",
+    "edid": "RP_DweVaultPlatformTop01",
+    "name": null
+   },
+   {
+    "formId": "0x0500000C",
+    "edid": "RP_DweVaultBridgeShort01",
+    "name": null
+   },
+   {
+    "formId": "0x05000018",
+    "edid": "RP_DIntStairs01",
+    "name": null
+   },
+   {
+    "formId": "0x0500001D",
+    "edid": "RP_ImpChandellierCandle01NoChain",
+    "name": null
+   },
+   {
+    "formId": "0x0500001E",
+    "edid": "RP_ImpChandellierCandleOffNoChain",
+    "name": null
+   },
+   {
+    "formId": "0x0500001F",
+    "edid": "RP_DweRmLgWalltoLgHall01_DetailedCeilingCollision",
+    "name": null
+   },
+   {
+    "formId": "0x05000020",
+    "edid": "RP_DweRmLgWall01_DetailedCeilingCollision",
+    "name": null
+   },
+   {
+    "formId": "0x0500002A",
+    "edid": "RP_DesertRock10",
+    "name": null
+   },
+   {
+    "formId": "0x0500002B",
+    "edid": "RP_DesertRock09",
+    "name": null
+   },
+   {
+    "formId": "0x0500002C",
+    "edid": "RP_DesertRock08",
+    "name": null
+   },
+   {
+    "formId": "0x0500002D",
+    "edid": "RP_DesertRock07",
+    "name": null
+   },
+   {
+    "formId": "0x0500002E",
+    "edid": "RP_DesertRock06",
+    "name": null
+   },
+   {
+    "formId": "0x0500002F",
+    "edid": "RP_DesertRock05",
+    "name": null
+   },
+   {
+    "formId": "0x05000030",
+    "edid": "RP_DesertRock04",
+    "name": null
+   },
+   {
+    "formId": "0x05000031",
+    "edid": "RP_DesertRock03",
+    "name": null
+   },
+   {
+    "formId": "0x05000032",
+    "edid": "RP_DesertRock02",
+    "name": null
+   },
+   {
+    "formId": "0x05000033",
+    "edid": "RP_DesertRock01",
+    "name": null
+   },
+   {
+    "formId": "0x05000034",
+    "edid": "RP_DesertRocksPileS03",
+    "name": null
+   },
+   {
+    "formId": "0x05000035",
+    "edid": "RP_DesertRocksPileS02",
+    "name": null
+   },
+   {
+    "formId": "0x05000036",
+    "edid": "RP_DesertRocksPileS01",
+    "name": null
+   },
+   {
+    "formId": "0x05000037",
+    "edid": "RP_DesertRock11",
+    "name": null
+   },
+   {
+    "formId": "0x05000038",
+    "edid": "RP_RoadStraightLong01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000039",
+    "edid": "RP_RoadStraight02Down01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500003A",
+    "edid": "RP_RoadStraight02DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500003B",
+    "edid": "RP_RoadStraight01EndDesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500003D",
+    "edid": "RP_RoadSCurveRamp01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500003E",
+    "edid": "RP_RoadSCurveR01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500003F",
+    "edid": "RP_RoadCurveLong45RRamp01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000040",
+    "edid": "RP_RoadCurveLong45R01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000041",
+    "edid": "RP_RoadCurveLong45LRamp01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000042",
+    "edid": "RP_RoadCurve90R01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000043",
+    "edid": "RP_RoadChunkS04DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000044",
+    "edid": "RP_RoadChunkS03DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000045",
+    "edid": "RP_RoadStrToCurveRampR01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000046",
+    "edid": "RP_RoadStrToCurveRampL01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000047",
+    "edid": "RP_RoadStraightLongRamp02DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000048",
+    "edid": "RP_RoadChunkS02DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000049",
+    "edid": "RP_Road3way01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500004A",
+    "edid": "RP_RoadChunkL01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500004B",
+    "edid": "RP_RoadChunkL02DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500004C",
+    "edid": "RP_RoadChunkL03DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500004D",
+    "edid": "RP_RoadChunkM01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500004E",
+    "edid": "RP_RoadChunkM02DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500004F",
+    "edid": "RP_RoadChunkM03DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000050",
+    "edid": "RP_RoadChunkM04DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000051",
+    "edid": "RP_RoadChunkS01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000052",
+    "edid": "RP_RoadStraightLongRamp01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000055",
+    "edid": "RP_RockShelf01DesertLumpy02",
+    "name": null
+   },
+   {
+    "formId": "0x05000056",
+    "edid": "RP_CasSCPortalBase01NoCeiling",
+    "name": null
+   },
+   {
+    "formId": "0x05000057",
+    "edid": "RP_VampireCoffinHoriz01Static",
+    "name": null
+   },
+   {
+    "formId": "0x05000058",
+    "edid": "RP_DweAstrolabeArmillary01Glow",
+    "name": null
+   },
+   {
+    "formId": "0x05000059",
+    "edid": "RP_DweVaultRing01",
+    "name": null
+   },
+   {
+    "formId": "0x0500005A",
+    "edid": "RP_DweCenturionBust01_DetailedCollision",
+    "name": null
+   },
+   {
+    "formId": "0x0500005C",
+    "edid": "RP_MountainTrim03RDesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x0500005D",
+    "edid": "RP_MountainTrim02DesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x0500005E",
+    "edid": "RP_MountainTrim01DesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x0500005F",
+    "edid": "RP_MountainTrim01DesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x05000061",
+    "edid": "RP_MountainTrim01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000062",
+    "edid": "RP_MountainTrim02DesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x05000063",
+    "edid": "RP_MountainTrim02DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000064",
+    "edid": "RP_MountainTrim03RDesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x05000065",
+    "edid": "RP_MountainTrim03RDesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000075",
+    "edid": "RP_RockPileL01DesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x05000076",
+    "edid": "RP_RockPileL01Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x05000077",
+    "edid": "RP_RockPileL02Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x05000078",
+    "edid": "RP_RockPileL03Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x05000079",
+    "edid": "RP_RockPileL04DesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x0500007A",
+    "edid": "RP_RockPileL04Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x0500007B",
+    "edid": "RP_RockPileL01DesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x0500007C",
+    "edid": "RP_RockPileL04DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500007D",
+    "edid": "RP_RockPileL01Sand02",
+    "name": null
+   },
+   {
+    "formId": "0x0500007E",
+    "edid": "RP_RockPileL02Sand02",
+    "name": null
+   },
+   {
+    "formId": "0x0500007F",
+    "edid": "RP_RockPileL03Sand02",
+    "name": null
+   },
+   {
+    "formId": "0x05000080",
+    "edid": "RP_RockPileL04Sand02",
+    "name": null
+   },
+   {
+    "formId": "0x05000081",
+    "edid": "RP_RockPileM03Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x05000082",
+    "edid": "RP_RockPileM02Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x05000083",
+    "edid": "RP_RockPileM01Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x05000084",
+    "edid": "RP_RockPileM03SandWet01",
+    "name": null
+   },
+   {
+    "formId": "0x05000085",
+    "edid": "RP_RockPileM02WetSandWet01",
+    "name": null
+   },
+   {
+    "formId": "0x05000086",
+    "edid": "RP_RockPileM01WetSandWet01",
+    "name": null
+   },
+   {
+    "formId": "0x05000087",
+    "edid": "RP_RockPileL03WetSandWet01",
+    "name": null
+   },
+   {
+    "formId": "0x05000088",
+    "edid": "RP_RockPileL02WetSandWet01",
+    "name": null
+   },
+   {
+    "formId": "0x05000089",
+    "edid": "RP_RockPileL01SandWet01",
+    "name": null
+   },
+   {
+    "formId": "0x0500008A",
+    "edid": "RP_RockPileM01Sand02",
+    "name": null
+   },
+   {
+    "formId": "0x0500008B",
+    "edid": "RP_RockPileM02Sand02",
+    "name": null
+   },
+   {
+    "formId": "0x0500008C",
+    "edid": "RP_RockPileM03Sand02",
+    "name": null
+   },
+   {
+    "formId": "0x0500008D",
+    "edid": "RP_RockPileM01DesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x0500008E",
+    "edid": "RP_RockPileM01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500008F",
+    "edid": "RP_RockPileM02DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000090",
+    "edid": "RP_RockPileM02DesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x05000091",
+    "edid": "RP_RockPileM03DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000092",
+    "edid": "RP_RockPileM03DesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x0500009F",
+    "edid": "RP_ModularRug01",
+    "name": null
+   },
+   {
+    "formId": "0x050000A0",
+    "edid": "RP_Sand02DriftSm01",
+    "name": null
+   },
+   {
+    "formId": "0x050000A1",
+    "edid": "RP_Sand02DriftSm02",
+    "name": null
+   },
+   {
+    "formId": "0x050000A2",
+    "edid": "RP_Sand02DriftSm03",
+    "name": null
+   },
+   {
+    "formId": "0x050000A3",
+    "edid": "RP_Sand02DriftSm04",
+    "name": null
+   },
+   {
+    "formId": "0x050000A4",
+    "edid": "RP_RockShelf01Sand02",
+    "name": null
+   },
+   {
+    "formId": "0x050000A5",
+    "edid": "RP_RockShelf01Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x050000A6",
+    "edid": "RP_RockShelf01DesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x050000A7",
+    "edid": "RP_RockShelf01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x050000A8",
+    "edid": "RP_RockShelf01DesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x050000A9",
+    "edid": "RP_RockPileM03DesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x050000AA",
+    "edid": "RP_RockPileM02DesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x050000AB",
+    "edid": "RP_RockPileM01DesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x050000AC",
+    "edid": "RP_RockPileL04DesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x050000AE",
+    "edid": "RP_DweVaultPlatformTopCircularVents01",
+    "name": null
+   },
+   {
+    "formId": "0x050000AF",
+    "edid": "RP_DweVaultPedestal01",
+    "name": null
+   },
+   {
+    "formId": "0x050000B0",
+    "edid": "RP_DweVaultCircularVent01",
+    "name": null
+   },
+   {
+    "formId": "0x050000BB",
+    "edid": "RP_VolcanicFissure01VolcanicLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x050000C0",
+    "edid": "RP_RockPileL01VolcanicLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x050000C1",
+    "edid": "RP_RockPileL01VolcanicRugged01",
+    "name": null
+   },
+   {
+    "formId": "0x050000C2",
+    "edid": "RP_RockPileL02VolcanicLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x050000C3",
+    "edid": "RP_RockPileL02VolcanicRugged01",
+    "name": null
+   },
+   {
+    "formId": "0x050000D4",
+    "edid": "RP_DweVaultPlatformTop02SealSlot",
+    "name": null
+   },
+   {
+    "formId": "0x050000D5",
+    "edid": "RP_DweVaultLight01Static",
+    "name": null
+   },
+   {
+    "formId": "0x050000D7",
+    "edid": "RP_SERuinsHallBg1Way128U01",
+    "name": null
+   },
+   {
+    "formId": "0x050000D8",
+    "edid": "RP_SERuinsPtnWall01",
+    "name": null
+   },
+   {
+    "formId": "0x050000D9",
+    "edid": "RP_SPatioWall04",
+    "name": null
+   },
+   {
+    "formId": "0x050000DA",
+    "edid": "RP_SPatioWall04Snow",
+    "name": null
+   },
+   {
+    "formId": "0x050000DB",
+    "edid": "RP_SPatioWall04LeftOpen",
+    "name": null
+   },
+   {
+    "formId": "0x050000DC",
+    "edid": "RP_SPatioWall04LeftOpenSnow",
+    "name": null
+   },
+   {
+    "formId": "0x050000DD",
+    "edid": "RP_SPatioWall04RightOpen",
+    "name": null
+   },
+   {
+    "formId": "0x050000DE",
+    "edid": "RP_SPatioWall04RightOpenSnow",
+    "name": null
+   },
+   {
+    "formId": "0x050000DF",
+    "edid": "RP_SWellFreestanding01",
+    "name": null
+   },
+   {
+    "formId": "0x050000E2",
+    "edid": "RP_SWellFreeStanding01CoverStatic",
+    "name": null
+   },
+   {
+    "formId": "0x050000E3",
+    "edid": "RP_SPatioPillarShort01",
+    "name": null
+   },
+   {
+    "formId": "0x050000E4",
+    "edid": "RP_SWellFreeStanding01CoverStaticAlpha",
+    "name": null
+   },
+   {
+    "formId": "0x050000E7",
+    "edid": "RP_SPatioPillarTall01",
+    "name": null
+   },
+   {
+    "formId": "0x050000E8",
+    "edid": "RP_SPatioPillarShort01Snow",
+    "name": null
+   },
+   {
+    "formId": "0x050000E9",
+    "edid": "RP_SPatioPillarTall01Snow",
+    "name": null
+   },
+   {
+    "formId": "0x050000EA",
+    "edid": "RP_Pillow01Static",
+    "name": null
+   },
+   {
+    "formId": "0x050000EB",
+    "edid": "RP_Pillow02Static",
+    "name": null
+   },
+   {
+    "formId": "0x05000104",
+    "edid": "RP_Duckweed01Static",
+    "name": null
+   },
+   {
+    "formId": "0x05000105",
+    "edid": "RP_Duckweed02Static",
+    "name": null
+   },
+   {
+    "formId": "0x05000106",
+    "edid": "RP_Duckweed03Static",
+    "name": null
+   },
+   {
+    "formId": "0x05000107",
+    "edid": "RP_Duckweed04Static",
+    "name": null
+   },
+   {
+    "formId": "0x0500010B",
+    "edid": "RP_Road3way01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x0500010E",
+    "edid": "RP_TreeBaldCypressKnee01",
+    "name": null
+   },
+   {
+    "formId": "0x0500010F",
+    "edid": "RP_TreeBaldCypressKnee02",
+    "name": null
+   },
+   {
+    "formId": "0x05000110",
+    "edid": "RP_TreeBaldCypressKnee03",
+    "name": null
+   },
+   {
+    "formId": "0x05000111",
+    "edid": "RP_TreeBaldCypressKnee04",
+    "name": null
+   },
+   {
+    "formId": "0x0500011B",
+    "edid": "RP_ModularRug02",
+    "name": null
+   },
+   {
+    "formId": "0x05000120",
+    "edid": "RP_RoadChunkL01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000121",
+    "edid": "RP_RoadChunkL02MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000122",
+    "edid": "RP_RoadChunkL03MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000123",
+    "edid": "RP_RoadChunkM01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000124",
+    "edid": "RP_RoadChunkM02MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000125",
+    "edid": "RP_RoadChunkM03MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000126",
+    "edid": "RP_RoadChunkM04MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000127",
+    "edid": "RP_RoadChunkS01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000128",
+    "edid": "RP_RoadChunkS02MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000129",
+    "edid": "RP_RoadChunkS03MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x0500012A",
+    "edid": "RP_RoadChunkS04MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x0500012B",
+    "edid": "RP_RoadCurve90R01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x0500012C",
+    "edid": "RP_RoadCurveLong45LRamp01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x0500012D",
+    "edid": "RP_RoadCurveLong45R01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x0500012E",
+    "edid": "RP_RoadCurveLong45RRamp01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x0500012F",
+    "edid": "RP_RoadSCurveR01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000130",
+    "edid": "RP_RoadSCurveRamp01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000131",
+    "edid": "RP_RoadStraight01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000132",
+    "edid": "RP_RoadStraight01EndMarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000133",
+    "edid": "RP_RoadStraight02MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000134",
+    "edid": "RP_RoadStraight02Down01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000135",
+    "edid": "RP_RoadStraightLong01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000136",
+    "edid": "RP_RoadStraightLongRamp01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000137",
+    "edid": "RP_RoadStraightLongRamp02MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000138",
+    "edid": "RP_RoadStrToCurveRampL01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000139",
+    "edid": "RP_RoadStrToCurveRampR01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x0500013F",
+    "edid": "RP_Road3way01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000140",
+    "edid": "RP_RoadChunkL01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000141",
+    "edid": "RP_RoadChunkL02DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000142",
+    "edid": "RP_RoadChunkL03DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000143",
+    "edid": "RP_RoadChunkM01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000144",
+    "edid": "RP_RoadChunkM02DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000145",
+    "edid": "RP_RoadChunkM03DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000146",
+    "edid": "RP_RoadChunkM04DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000147",
+    "edid": "RP_RoadChunkS01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000148",
+    "edid": "RP_RoadChunkS02DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000149",
+    "edid": "RP_RoadChunkS03DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500014A",
+    "edid": "RP_RoadChunkS04DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500014B",
+    "edid": "RP_RoadCurve90R01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500014C",
+    "edid": "RP_RoadCurveLong45LRamp01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500014D",
+    "edid": "RP_RoadCurveLong45R01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500014E",
+    "edid": "RP_RoadCurveLong45RRamp01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500014F",
+    "edid": "RP_RoadSCurveR01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000150",
+    "edid": "RP_RoadSCurveRamp01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000151",
+    "edid": "RP_RoadStraight01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000152",
+    "edid": "RP_RoadStraight01EndDesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000153",
+    "edid": "RP_RoadStraight02DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000154",
+    "edid": "RP_RoadStraight02Down01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000155",
+    "edid": "RP_RoadStraightLong01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000156",
+    "edid": "RP_RoadStraightLongRamp01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000157",
+    "edid": "RP_RoadStraightLongRamp02DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000158",
+    "edid": "RP_RoadStrToCurveRampL01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000159",
+    "edid": "RP_RoadStrToCurveRampR01DesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500015A",
+    "edid": "RP_RockPileL03VolcanicLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500015C",
+    "edid": "RP_RockPileL03VolcanicRugged01",
+    "name": null
+   },
+   {
+    "formId": "0x0500015D",
+    "edid": "RP_RockPileL04VolcanicLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500015E",
+    "edid": "RP_RockPileL04VolcanicRugged01",
+    "name": null
+   },
+   {
+    "formId": "0x0500015F",
+    "edid": "RP_RockPileM01VolcanicLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000160",
+    "edid": "RP_RockPileM01VolcanicRugged01",
+    "name": null
+   },
+   {
+    "formId": "0x05000161",
+    "edid": "RP_RockPileM02VolcanicLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000162",
+    "edid": "RP_RockPileM02VolcanicRugged01",
+    "name": null
+   },
+   {
+    "formId": "0x05000163",
+    "edid": "RP_RockPileM03VolcanicLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000164",
+    "edid": "RP_RockPileM03VolcanicRugged01",
+    "name": null
+   },
+   {
+    "formId": "0x05000169",
+    "edid": "RP_FXAmbSandPile01",
+    "name": null
+   },
+   {
+    "formId": "0x0500016D",
+    "edid": "RP_ApoPlatBRamp01",
+    "name": null
+   },
+   {
+    "formId": "0x0500016E",
+    "edid": "RP_RubbleCart01",
+    "name": null
+   },
+   {
+    "formId": "0x05000D63",
+    "edid": "RP_DweVaultTracks01",
+    "name": null
+   },
+   {
+    "formId": "0x05000D64",
+    "edid": "RP_DweVaultBridgeLong01",
+    "name": null
+   },
+   {
+    "formId": "0x05000D6A",
+    "edid": "RP_DweVaultArch01",
+    "name": null
+   },
+   {
+    "formId": "0x05DB050D",
+    "edid": "RP_DweVaultPlatformMid01",
+    "name": null
+   },
+   {
+    "formId": "0x05DB050E",
+    "edid": "RP_RoadStraight01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05E6D870",
+    "edid": "kzl1stPersonhaybaleSword",
+    "name": null
+   },
+   {
+    "formId": "0x05E6D871",
+    "edid": "kzlmagicpillar",
+    "name": null
+   }
+  ],
+  "MSTT": [
+   {
+    "formId": "0x0500000D",
+    "edid": "RP_FXAmbSandFalling01",
+    "name": null
+   },
+   {
+    "formId": "0x05000097",
+    "edid": "RP_FXAmbSand01BlowingPlaneHeavy",
+    "name": null
+   },
+   {
+    "formId": "0x05000098",
+    "edid": "RP_FXAmbSand01BlowingSmInt",
+    "name": null
+   },
+   {
+    "formId": "0x05000099",
+    "edid": "RP_FXAmbSand01BlowingDriftTip",
+    "name": null
+   },
+   {
+    "formId": "0x0500009A",
+    "edid": "RP_FXAmbSand01BlowingLg",
+    "name": null
+   },
+   {
+    "formId": "0x0500009B",
+    "edid": "RP_FXAmbSand01BlowingPlane",
+    "name": null
+   },
+   {
+    "formId": "0x0500009C",
+    "edid": "RP_FXAmbSand01BlowingSkylight",
+    "name": null
+   },
+   {
+    "formId": "0x0500009D",
+    "edid": "RP_FXAmbSand01BlowingSm",
+    "name": null
+   },
+   {
+    "formId": "0x050000C9",
+    "edid": "RP_LilyPadGiant01",
+    "name": null
+   },
+   {
+    "formId": "0x050000CA",
+    "edid": "RP_LilyPadCluster01",
+    "name": null
+   },
+   {
+    "formId": "0x050000CB",
+    "edid": "RP_LilyPadCluster02",
+    "name": null
+   },
+   {
+    "formId": "0x050000CC",
+    "edid": "RP_LilyPadCluster03",
+    "name": null
+   },
+   {
+    "formId": "0x050000F0",
+    "edid": "RP_LilyPadCluster01Yellow",
+    "name": null
+   },
+   {
+    "formId": "0x050000F1",
+    "edid": "RP_LilyPadCluster01Pink",
+    "name": null
+   },
+   {
+    "formId": "0x050000F3",
+    "edid": "RP_LilyPadCluster01Indigo",
+    "name": null
+   },
+   {
+    "formId": "0x050000F4",
+    "edid": "RP_LilyPadCluster02Indigo",
+    "name": null
+   },
+   {
+    "formId": "0x050000F5",
+    "edid": "RP_LilyPadCluster03Indigo",
+    "name": null
+   },
+   {
+    "formId": "0x050000F6",
+    "edid": "RP_LilyPadCluster02Pink",
+    "name": null
+   },
+   {
+    "formId": "0x050000F7",
+    "edid": "RP_LilyPadCluster03Pink",
+    "name": null
+   },
+   {
+    "formId": "0x050000F8",
+    "edid": "RP_LilyPadCluster02Yellow",
+    "name": null
+   },
+   {
+    "formId": "0x050000F9",
+    "edid": "RP_LilyPadCluster03Yellow",
+    "name": null
+   },
+   {
+    "formId": "0x050000FA",
+    "edid": "RP_Duckweed01",
+    "name": null
+   },
+   {
+    "formId": "0x050000FB",
+    "edid": "RP_Duckweed02",
+    "name": null
+   },
+   {
+    "formId": "0x050000FF",
+    "edid": "RP_Duckweed03",
+    "name": null
+   },
+   {
+    "formId": "0x05000100",
+    "edid": "RP_Duckweed04",
+    "name": null
+   },
+   {
+    "formId": "0x05000165",
+    "edid": "RP_FXAmbSandFalling01Dark",
+    "name": null
+   },
+   {
+    "formId": "0x05000166",
+    "edid": "RP_FXAmbSandFalling02",
+    "name": null
+   },
+   {
+    "formId": "0x05000167",
+    "edid": "RP_FXAmbSandFalling02Dark",
+    "name": null
+   },
+   {
+    "formId": "0x05000168",
+    "edid": "RP_FXAmbSandPile01Animated",
+    "name": null
+   }
+  ],
+  "TREE": [
+   {
+    "formId": "0x0500000E",
+    "edid": "RP_DesertGrassCluster01",
+    "name": null
+   },
+   {
+    "formId": "0x0500000F",
+    "edid": "RP_IndianRiceGrass01",
+    "name": null
+   },
+   {
+    "formId": "0x05000010",
+    "edid": "RP_TreeSnowGum02",
+    "name": null
+   },
+   {
+    "formId": "0x05000011",
+    "edid": "RP_TreeSnowGum01",
+    "name": null
+   },
+   {
+    "formId": "0x05000012",
+    "edid": "RP_Boxwood01",
+    "name": null
+   },
+   {
+    "formId": "0x05000013",
+    "edid": "RP_TreeLatanPalm01",
+    "name": null
+   },
+   {
+    "formId": "0x05000014",
+    "edid": "RP_MugoPine01",
+    "name": null
+   },
+   {
+    "formId": "0x05000015",
+    "edid": "RP_TreeWeepingWillow01",
+    "name": null
+   },
+   {
+    "formId": "0x05000016",
+    "edid": "RP_IndianRiceGrass02",
+    "name": null
+   },
+   {
+    "formId": "0x0500001B",
+    "edid": "RP_TreeBaldCypress01",
+    "name": null
+   },
+   {
+    "formId": "0x0500001C",
+    "edid": "RP_TreeCoconutPalm01",
+    "name": null
+   },
+   {
+    "formId": "0x05000053",
+    "edid": "RP_Agave01",
+    "name": null
+   },
+   {
+    "formId": "0x05000054",
+    "edid": "RP_Agave02",
+    "name": null
+   },
+   {
+    "formId": "0x050000C4",
+    "edid": "RP_DesertGrassCluster03",
+    "name": null
+   },
+   {
+    "formId": "0x050000C5",
+    "edid": "RP_DesertGrassCluster02",
+    "name": null
+   },
+   {
+    "formId": "0x050000C6",
+    "edid": "RP_TreeBaldCypress02",
+    "name": null
+   },
+   {
+    "formId": "0x05000108",
+    "edid": "RP_TreeWhiteElephantPalm01",
+    "name": null
+   },
+   {
+    "formId": "0x05000109",
+    "edid": "RP_TreeWhiteElephantPalm02",
+    "name": null
+   },
+   {
+    "formId": "0x0500010C",
+    "edid": "RP_TreeMadagascarPalm01",
+    "name": null
+   },
+   {
+    "formId": "0x0500010D",
+    "edid": "RP_TreeMadagascarPalm02",
+    "name": null
+   },
+   {
+    "formId": "0x05000112",
+    "edid": "RP_TreeWeepingWillow02",
+    "name": null
+   }
+  ],
+  "TXST": [
+   {
+    "formId": "0x05000017",
+    "edid": "RP_LandscapeDesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x05000022",
+    "edid": "RP_LandscapeDesertCracked02",
+    "name": null
+   },
+   {
+    "formId": "0x05000023",
+    "edid": "RP_LandscapeDesertCracked01",
+    "name": null
+   },
+   {
+    "formId": "0x05000024",
+    "edid": "RP_LandscapeDesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x05000025",
+    "edid": "RP_LandscapeDesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500005B",
+    "edid": "RP_TextureSetRoad01DesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000060",
+    "edid": "RP_LandscapeDesertSlabTiled01",
+    "name": null
+   },
+   {
+    "formId": "0x0500006B",
+    "edid": "RP_LandscapeDesertSand01",
+    "name": null
+   },
+   {
+    "formId": "0x0500006C",
+    "edid": "RP_LandscapeDesertSand02",
+    "name": null
+   },
+   {
+    "formId": "0x0500006D",
+    "edid": "RP_LandscapeDesertSandWavy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500006E",
+    "edid": "RP_LandscapeDesertSandWet01",
+    "name": null
+   },
+   {
+    "formId": "0x05000073",
+    "edid": "RP_LandscapeDesertSandWetWavy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000094",
+    "edid": "RP_TextureSetChest01Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x05000095",
+    "edid": "RP_TextureSetRuinsChest01Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x0500009E",
+    "edid": "RP_TextureSetWoodPost02Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x050000AD",
+    "edid": "RP_TextureSetWoodWalkway01Sand01",
+    "name": null
+   },
+   {
+    "formId": "0x050000B1",
+    "edid": "RP_LandscapeDesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x050000B2",
+    "edid": "RP_LandscapeVolcanicCracked01",
+    "name": null
+   },
+   {
+    "formId": "0x050000B3",
+    "edid": "RP_LandscapeVolcanicLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x050000B4",
+    "edid": "RP_LandscapeVolcanicRugged01",
+    "name": null
+   },
+   {
+    "formId": "0x050000B5",
+    "edid": "RP_LandscapeVolcanicRugged02",
+    "name": null
+   },
+   {
+    "formId": "0x050000EE",
+    "edid": "RP_TextureSetLilyPads01Yellow",
+    "name": null
+   },
+   {
+    "formId": "0x050000EF",
+    "edid": "RP_TextureSetLilyPads01Pink",
+    "name": null
+   },
+   {
+    "formId": "0x050000F2",
+    "edid": "RP_TextureSetLilyPads01Indigo",
+    "name": null
+   },
+   {
+    "formId": "0x050000FC",
+    "edid": "RP_LandscapeMarshMud01",
+    "name": null
+   },
+   {
+    "formId": "0x050000FD",
+    "edid": "RP_LandscapeMarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x050000FE",
+    "edid": "RP_LandscapeMarshPuddles01",
+    "name": null
+   },
+   {
+    "formId": "0x0500010A",
+    "edid": "RP_TextureSetRoad01MarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x0500011C",
+    "edid": "RP_LandscapeGravel01",
+    "name": null
+   },
+   {
+    "formId": "0x0500011E",
+    "edid": "RP_TextureSetWoodWalkway01Weathered01",
+    "name": null
+   },
+   {
+    "formId": "0x0500011F",
+    "edid": "RP_TextureSetWoodPost02Weathered01",
+    "name": null
+   },
+   {
+    "formId": "0x0500013A",
+    "edid": "RP_LandscapeDesertCracked01Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500013B",
+    "edid": "RP_LandscapeDesertCracked02Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500015B",
+    "edid": "RP_LandscapeVolcanicRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x05DCF0A0",
+    "edid": "KzlTexture_FloraAppleTreeLeaves",
+    "name": null
+   },
+   {
+    "formId": "0x05DCF0A1",
+    "edid": "KzlTexture_FloraAppleTreeStem",
+    "name": null
+   },
+   {
+    "formId": "0x05DCF0CF",
+    "edid": "KzlTexture_FloraTomatoPlant",
+    "name": null
+   },
+   {
+    "formId": "0x05DCF0D0",
+    "edid": "KzlTexture_FloraTomatoStem",
+    "name": null
+   }
+  ],
+  "QUST": [
+   {
+    "formId": "0x05000019",
+    "edid": "RP_DynamicFerrySystem",
+    "name": null
+   },
+   {
+    "formId": "0x0500001A",
+    "edid": "RP_DynamicCarriageSystem",
+    "name": null
+   },
+   {
+    "formId": "0x05000021",
+    "edid": "RP_DefaultSpellTomeInjector",
+    "name": null
+   },
+   {
+    "formId": "0x0500016A",
+    "edid": "RP_AloeIntegration",
+    "name": null
+   },
+   {
+    "formId": "0x05006175",
+    "edid": "KzlQuest",
+    "name": null
+   },
+   {
+    "formId": "0x05E07409",
+    "edid": "KzlQuestMOTD",
+    "name": "Welcome to Keizaal Online"
+   }
+  ],
+  "LTEX": [
+   {
+    "formId": "0x05000026",
+    "edid": "RP_LDesertCracked01",
+    "name": null
+   },
+   {
+    "formId": "0x05000027",
+    "edid": "RP_LDesertLumpy01NoGrass",
+    "name": null
+   },
+   {
+    "formId": "0x05000028",
+    "edid": "RP_LDesertRocky01NoGrass",
+    "name": null
+   },
+   {
+    "formId": "0x05000029",
+    "edid": "RP_LDesertCracked02",
+    "name": null
+   },
+   {
+    "formId": "0x05000068",
+    "edid": "RP_LDesertRocky01",
+    "name": null
+   },
+   {
+    "formId": "0x05000069",
+    "edid": "RP_LDesertLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x0500006A",
+    "edid": "RP_LDesertRocks01",
+    "name": null
+   },
+   {
+    "formId": "0x0500006F",
+    "edid": "RP_LSand01",
+    "name": null
+   },
+   {
+    "formId": "0x05000070",
+    "edid": "RP_LSand02",
+    "name": null
+   },
+   {
+    "formId": "0x05000071",
+    "edid": "RP_LSandWet01",
+    "name": null
+   },
+   {
+    "formId": "0x05000072",
+    "edid": "RP_LSandWavy01",
+    "name": null
+   },
+   {
+    "formId": "0x05000074",
+    "edid": "RP_LSandWetWavy01",
+    "name": null
+   },
+   {
+    "formId": "0x050000B6",
+    "edid": "RP_LVolcanicCracked01",
+    "name": null
+   },
+   {
+    "formId": "0x050000B7",
+    "edid": "RP_LVolcanicLumpy01",
+    "name": null
+   },
+   {
+    "formId": "0x050000B8",
+    "edid": "RP_LVolcanicRugged01",
+    "name": null
+   },
+   {
+    "formId": "0x050000B9",
+    "edid": "RP_LVolcanicRugged02",
+    "name": null
+   },
+   {
+    "formId": "0x050000BA",
+    "edid": "RP_LDesertLumpy01Light",
+    "name": null
+   },
+   {
+    "formId": "0x05000101",
+    "edid": "RP_LMarshMud01",
+    "name": null
+   },
+   {
+    "formId": "0x05000102",
+    "edid": "RP_LMarshMud02",
+    "name": null
+   },
+   {
+    "formId": "0x05000103",
+    "edid": "RP_LMarshPuddles01",
+    "name": null
+   },
+   {
+    "formId": "0x0500011D",
+    "edid": "RP_LGravel01",
+    "name": null
+   },
+   {
+    "formId": "0x0500013C",
+    "edid": "RP_LDesertCracked01Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500013D",
+    "edid": "RP_LDesertCracked02Light",
+    "name": null
+   },
+   {
+    "formId": "0x0500013E",
+    "edid": "RP_LDesertLumpy01LightNoGrass",
+    "name": null
+   }
+  ],
+  "GRAS": [
+   {
+    "formId": "0x05000066",
+    "edid": "RP_MesaGrass01",
+    "name": null
+   },
+   {
+    "formId": "0x05000067",
+    "edid": "RP_MesaGrass02",
+    "name": null
+   }
+  ],
+  "CONT": [
+   {
+    "formId": "0x05000093",
+    "edid": "RP_TreasExplorerLootChestSand01",
+    "name": "Chest"
+   },
+   {
+    "formId": "0x05000096",
+    "edid": "RP_TreasBanditChestBossSand01",
+    "name": "Chest"
+   },
+   {
+    "formId": "0x05E53D86",
+    "edid": "KzlBookBoxSermon",
+    "name": "Book Box"
+   }
+  ],
+  "ACTI": [
+   {
+    "formId": "0x050000BC",
+    "edid": "RP_TrapCactusBall01",
+    "name": null
+   },
+   {
+    "formId": "0x050000BD",
+    "edid": "RP_TrapCactusGiantBarrel01",
+    "name": null
+   },
+   {
+    "formId": "0x050000BE",
+    "edid": "RP_TrapCactusSaguaro01",
+    "name": null
+   },
+   {
+    "formId": "0x050000BF",
+    "edid": "RP_TrapCactusGiantBarrel02",
+    "name": null
+   },
+   {
+    "formId": "0x050000C7",
+    "edid": "RP_TrapCactusSaguaro02",
+    "name": null
+   },
+   {
+    "formId": "0x050000C8",
+    "edid": "RP_TrapCactusSaguaro03",
+    "name": null
+   },
+   {
+    "formId": "0x050000CD",
+    "edid": "RP_DweButton01Fire",
+    "name": "Button"
+   },
+   {
+    "formId": "0x050000CE",
+    "edid": "RP_DweButton01Frost",
+    "name": "Button"
+   },
+   {
+    "formId": "0x050000CF",
+    "edid": "RP_DweButton01Shock",
+    "name": "Button"
+   },
+   {
+    "formId": "0x050000D3",
+    "edid": "RP_DweVaultPlatformTopSeal01",
+    "name": null
+   },
+   {
+    "formId": "0x050000D6",
+    "edid": "RP_DweVaultLight01",
+    "name": null
+   },
+   {
+    "formId": "0x05000170",
+    "edid": "RP_DweVaultStatusLight01",
+    "name": null
+   },
+   {
+    "formId": "0x0500593B",
+    "edid": "kzolivarmessageboard",
+    "name": "Message Board"
+   },
+   {
+    "formId": "0x0503DCF7",
+    "edid": "KzlDefaultInvisibleActivator",
+    "name": "Fast Travel"
+   }
+  ],
+  "INGR": [
+   {
+    "formId": "0x050000D0",
+    "edid": "RP_AloeVeraLeaves01",
+    "name": "Aloe Vera Leaves"
+   }
+  ],
+  "FLOR": [
+   {
+    "formId": "0x050000D1",
+    "edid": "RP_AloeVera01",
+    "name": "Aloe Vera"
+   },
+   {
+    "formId": "0x050000D2",
+    "edid": "RP_AloeVera02",
+    "name": "Aloe Vera"
+   },
+   {
+    "formId": "0x0500016B",
+    "edid": "RP_BYOHHouseIngrdAloeVera02",
+    "name": "Aloe Vera"
+   },
+   {
+    "formId": "0x05020831",
+    "edid": "KzlFloraHorkerMeat",
+    "name": "Horker Carcass"
+   },
+   {
+    "formId": "0x05020832",
+    "edid": "KzlFloraHorkerMeat2",
+    "name": "Horker Meat"
+   },
+   {
+    "formId": "0x05020853",
+    "edid": "KzlFloraCowMeat",
+    "name": "Cow"
+   },
+   {
+    "formId": "0x05020857",
+    "edid": "KzlFloraCowMeat2",
+    "name": "Beef"
+   },
+   {
+    "formId": "0x05DBF8B3",
+    "edid": "KzlFloraBeehive",
+    "name": "Beehive"
+   },
+   {
+    "formId": "0x05DBF8B6",
+    "edid": "KzlFloraMilkJug",
+    "name": "Milk Jug"
+   },
+   {
+    "formId": "0x05DCF0A2",
+    "edid": "KzlFloraAppleTree",
+    "name": "Apple Tree"
+   },
+   {
+    "formId": "0x05DCF0A6",
+    "edid": "KzlFloraCarrot",
+    "name": "Carrot"
+   },
+   {
+    "formId": "0x05DCF0BA",
+    "edid": "KzlFloraAppleTree02",
+    "name": "Apple Tree"
+   },
+   {
+    "formId": "0x05DCF0BC",
+    "edid": "KzlFloraDroppedApple",
+    "name": "Apple"
+   },
+   {
+    "formId": "0x05DCF0BD",
+    "edid": "KzlFloraDroppedApple02",
+    "name": "Apple"
+   },
+   {
+    "formId": "0x05DCF0DD",
+    "edid": "KzlFloraTomato",
+    "name": "Tomato"
+   },
+   {
+    "formId": "0x05DFD186",
+    "edid": "KzlFloraHorkerMeatPhys",
+    "name": "Horker Carcass"
+   },
+   {
+    "formId": "0x05DFD187",
+    "edid": "KzlFloraHorkerMeatPhys2",
+    "name": "Horker Meat"
+   },
+   {
+    "formId": "0x05DFD188",
+    "edid": "KzlFloraCowMeatPhys",
+    "name": "Cow"
+   },
+   {
+    "formId": "0x05DFD18A",
+    "edid": "KzlFloraCowMeatPhys2",
+    "name": "Beef"
+   },
+   {
+    "formId": "0x05DFD18E",
+    "edid": "KzlFloraMilkJugPhys",
+    "name": "Milk Jug"
+   },
+   {
+    "formId": "0x05DFD18F",
+    "edid": "KzlFloraTomatoPhys",
+    "name": "Tomato"
+   },
+   {
+    "formId": "0x05E3F83A",
+    "edid": "KzlFloraMoonSugar",
+    "name": "Moon Sugar"
+   }
+  ],
+  "DOOR": [
+   {
+    "formId": "0x050000E0",
+    "edid": "RP_SWellFreeStanding01CoverBarLoad",
+    "name": "Cover"
+   },
+   {
+    "formId": "0x050000E1",
+    "edid": "RP_SWellFreeStanding01CoverLoad",
+    "name": "Cover"
+   },
+   {
+    "formId": "0x050000E5",
+    "edid": "RP_SWellFreeStanding01CoverBarLoadAlpha",
+    "name": "Cover"
+   },
+   {
+    "formId": "0x050000E6",
+    "edid": "RP_SWellFreeStanding01CoverLoadAlpha",
+    "name": "Cover"
+   }
+  ],
+  "MISC": [
+   {
+    "formId": "0x050000EC",
+    "edid": "RP_Pillow01",
+    "name": "Pillow"
+   },
+   {
+    "formId": "0x050000ED",
+    "edid": "RP_Pillow02",
+    "name": "Pillow"
+   },
+   {
+    "formId": "0x05000113",
+    "edid": "RP_ModularBasket01",
+    "name": "Basket"
+   },
+   {
+    "formId": "0x05000114",
+    "edid": "RP_ModularBasket01Lid",
+    "name": "Basket Lid"
+   },
+   {
+    "formId": "0x05000115",
+    "edid": "RP_ModularBasket02",
+    "name": "Basket"
+   },
+   {
+    "formId": "0x05000116",
+    "edid": "RP_ModularBasket03",
+    "name": "Basket"
+   },
+   {
+    "formId": "0x05000117",
+    "edid": "RP_ModularBasket04",
+    "name": "Basket"
+   },
+   {
+    "formId": "0x05000118",
+    "edid": "RP_ModularJar01",
+    "name": "Jar"
+   },
+   {
+    "formId": "0x05000119",
+    "edid": "RP_ModularJar02",
+    "name": "Jar"
+   },
+   {
+    "formId": "0x0500011A",
+    "edid": "RP_ModularJar03",
+    "name": "Jar"
+   },
+   {
+    "formId": "0x0500016C",
+    "edid": "RP_BYOHHouseIngredientAloeVera02",
+    "name": "Aloe Vera Leaves (2)"
+   },
+   {
+    "formId": "0x05015481",
+    "edid": "KzlCharcoalTier1",
+    "name": "Poor Charcoal"
+   },
+   {
+    "formId": "0x05015482",
+    "edid": "KzlCharcoalTier2",
+    "name": "Charcoal"
+   },
+   {
+    "formId": "0x05015484",
+    "edid": "KzlCharcoalTier3",
+    "name": "Charcoal Briquette"
+   },
+   {
+    "formId": "0x05015485",
+    "edid": "KzlCharcoalTier4",
+    "name": "Coke"
+   }
+  ],
+  "MATT": [
+   {
+    "formId": "0x0500016F",
+    "edid": "RP_MaterialStairsHeavyMetal",
+    "name": null
+   }
+  ],
+  "GLOB": [
+   {
+    "formId": "0x05000D61",
+    "edid": "RP_DynamicAllowCarriageDriverChatterTime",
+    "name": null
+   },
+   {
+    "formId": "0x05000D62",
+    "edid": "RP_DynamicAllowFerryDriverChatterTime",
+    "name": null
+   }
+  ],
+  "CELL": [
+   {
+    "formId": "0x05001279",
+    "edid": "KzlWhiterunDragonsreachBasement",
+    "name": "Dragonsreach Dungeon"
+   },
+   {
+    "formId": "0x05001342",
+    "edid": "KzlHaltedStreamCampHouse",
+    "name": "Halted Stream Camp House"
+   },
+   {
+    "formId": "0x050067CB",
+    "edid": "KzlVoshuAgraHouse2",
+    "name": "The Communal Hall"
+   }
+  ],
+  "BOOK": [
+   {
+    "formId": "0x050068F8",
+    "edid": "kzlBookCirclets",
+    "name": "Circlet Schematics"
+   },
+   {
+    "formId": "0x0500B276",
+    "edid": "KzlMiningNovice",
+    "name": null
+   },
+   {
+    "formId": "0x0500B277",
+    "edid": "KzlMiningAdvanced",
+    "name": null
+   },
+   {
+    "formId": "0x0500B278",
+    "edid": "KzlMiningExpert",
+    "name": null
+   },
+   {
+    "formId": "0x0500B279",
+    "edid": "KzlMiningMaster",
+    "name": null
+   },
+   {
+    "formId": "0x0500B27A",
+    "edid": "KzlSmithingAdvanced",
+    "name": null
+   },
+   {
+    "formId": "0x0500B27B",
+    "edid": "KzlSmithingNovice",
+    "name": null
+   },
+   {
+    "formId": "0x0500B27C",
+    "edid": "KzlSmithingExpert",
+    "name": null
+   },
+   {
+    "formId": "0x0500B27D",
+    "edid": "KzlSmithingMaster",
+    "name": null
+   },
+   {
+    "formId": "0x05015489",
+    "edid": "KzlWoodcutterNovice",
+    "name": null
+   },
+   {
+    "formId": "0x0501548A",
+    "edid": "KzlWoodcutterAdvanced",
+    "name": null
+   },
+   {
+    "formId": "0x0501548B",
+    "edid": "KzlWoodcutterExpert",
+    "name": null
+   },
+   {
+    "formId": "0x0501548C",
+    "edid": "KzlWoodcutterMaster",
+    "name": null
+   },
+   {
+    "formId": "0x05025A49",
+    "edid": "kzlBookWrit_SafePassage",
+    "name": "Writ of Safe Passage"
+   },
+   {
+    "formId": "0x05025A4A",
+    "edid": "kzlBookWrit_DiplomaticPass",
+    "name": "Diplomatic Writ"
+   },
+   {
+    "formId": "0x05025A4C",
+    "edid": "kzlBookSkyforge",
+    "name": "Skyforge Steel Recipe"
+   },
+   {
+    "formId": "0x05025A4D",
+    "edid": "kzlBookNordHero",
+    "name": "Skyforge Steel Recipe"
+   },
+   {
+    "formId": "0x0503DD49",
+    "edid": "kzlBookHonningbrewMead",
+    "name": "Honningbrew Mead Recipe"
+   },
+   {
+    "formId": "0x0503DD4A",
+    "edid": "kzlBookBlackBriarMead",
+    "name": "Black Briar Mead Recipe"
+   },
+   {
+    "formId": "0x05047F6C",
+    "edid": "KzlAlchemyAdvanced",
+    "name": null
+   },
+   {
+    "formId": "0x05047F6D",
+    "edid": "KzlAlchemyExpert",
+    "name": null
+   },
+   {
+    "formId": "0x05047F6E",
+    "edid": "KzlAlchemyMaster",
+    "name": null
+   },
+   {
+    "formId": "0x0504D06F",
+    "edid": "kzlBookMintmaster",
+    "name": "Mintmaster's Writ"
+   },
+   {
+    "formId": "0x0505219C",
+    "edid": "kzlBookStrosRum",
+    "name": "Stros M'kai Rum Recipe"
+   },
+   {
+    "formId": "0x050521B3",
+    "edid": "kzlBookFirebrandWine",
+    "name": "Firebrand Wine Recipe"
+   },
+   {
+    "formId": "0x05DBF8BA",
+    "edid": "KzlBook_SpellmakingTier1Destruction",
+    "name": "Novice Spellmaking"
+   },
+   {
+    "formId": "0x05DBF8BB",
+    "edid": "KzlBookUGCGodKingSorcerer",
+    "name": "The God King Sorcerer"
+   },
+   {
+    "formId": "0x05DBF8C1",
+    "edid": "KzlBook_SpellmakingBlank",
+    "name": "Blank Spellbook"
+   },
+   {
+    "formId": "0x05DC4E14",
+    "edid": "KzlChestLootBook",
+    "name": null
+   },
+   {
+    "formId": "0x05DDE4DA",
+    "edid": "kzlBookXbow",
+    "name": "Crossbow Schematics"
+   },
+   {
+    "formId": "0x05DE8775",
+    "edid": "kzlBookMulledWine",
+    "name": "Mulled Wine Recipe"
+   },
+   {
+    "formId": "0x05DE8776",
+    "edid": "kzlBookAshfireMead",
+    "name": "Ashfire Mead Recipe"
+   },
+   {
+    "formId": "0x05DFD182",
+    "edid": "kzlBookCreepyNote",
+    "name": "Note"
+   },
+   {
+    "formId": "0x05DFD183",
+    "edid": "kzlBookFestivalRecipe",
+    "name": "Special Elixir Recipes"
+   },
+   {
+    "formId": "0x05E07408",
+    "edid": "KzlBookUGCDawnSmut",
+    "name": "We Ride at Dawn"
+   },
+   {
+    "formId": "0x05E44984",
+    "edid": "KzlSkoomaNote",
+    "name": "Delivery Instructions"
+   },
+   {
+    "formId": "0x05E53D81",
+    "edid": "KzlBookMaraSermon",
+    "name": "A Sermon of Mara"
+   },
+   {
+    "formId": "0x05E682E4",
+    "edid": "kzlBookSkyguardRecipe",
+    "name": "Skyguard's Forge Manual"
+   },
+   {
+    "formId": "0x05E6D873",
+    "edid": "kzlBookskeeverwhiskey",
+    "name": "Kha'Jay Recipe"
+   },
+   {
+    "formId": "0x05E729AE",
+    "edid": "kzlSpellTomeBardspell",
+    "name": "Spell Tome: Bardic Knowledge"
+   },
+   {
+    "formId": "0x05E81D82",
+    "edid": "KzlTailorAdvanced",
+    "name": null
+   },
+   {
+    "formId": "0x05E81D83",
+    "edid": "KzlTailorExpert",
+    "name": null
+   },
+   {
+    "formId": "0x05E81D84",
+    "edid": "KzlTailorMaster",
+    "name": null
+   },
+   {
+    "formId": "0x05E8BFFB",
+    "edid": "KzlCookingAdvanced",
+    "name": null
+   },
+   {
+    "formId": "0x05E8BFFC",
+    "edid": "KzlCookingExpert",
+    "name": null
+   },
+   {
+    "formId": "0x05E8BFFD",
+    "edid": "KzlCookingMaster",
+    "name": null
+   }
+  ],
+  "ALCH": [
+   {
+    "formId": "0x0500AB39",
+    "edid": "KzlPot_UGCBathwater",
+    "name": "Dibella's Holy Bathwater"
+   },
+   {
+    "formId": "0x050521AF",
+    "edid": "Kzl_FoodHardtack",
+    "name": "Hardtack Bread"
+   },
+   {
+    "formId": "0x05DFD181",
+    "edid": "KzlPot_UGCMagMilk",
+    "name": "Farmer's Magical Milk"
+   },
+   {
+    "formId": "0x05E3F837",
+    "edid": "KzlPot_FeatherFeet",
+    "name": "Feather Foot Tonic"
+   },
+   {
+    "formId": "0x05E58EF5",
+    "edid": "KzlPot_UGCStallion",
+    "name": "Stallion's Elixir"
+   },
+   {
+    "formId": "0x05E5E066",
+    "edid": "KzlFoodAppleDumpling",
+    "name": "Apple Dumpling"
+   },
+   {
+    "formId": "0x05E5E068",
+    "edid": "KzlFoodBraidedBread",
+    "name": "Braided Bread"
+   },
+   {
+    "formId": "0x05E5E06A",
+    "edid": "KzlFoodChickenDumpling",
+    "name": "Chicken Dumpling"
+   },
+   {
+    "formId": "0x05E5E06C",
+    "edid": "KzlFoodGarlicBread",
+    "name": "Garlic Bread"
+   },
+   {
+    "formId": "0x05E5E06E",
+    "edid": "KzlFoodJazbayCrostata",
+    "name": "Jazbay Crostata"
+   },
+   {
+    "formId": "0x05E5E070",
+    "edid": "KzlFoodJuniperCrostata",
+    "name": "Juniper Berry Crostata"
+   },
+   {
+    "formId": "0x05E5E072",
+    "edid": "KzlFoodLavenderDumpling",
+    "name": "Lavender Dumpling"
+   },
+   {
+    "formId": "0x05E5E074",
+    "edid": "KzlFoodPotatoBread",
+    "name": "Potato Bread"
+   },
+   {
+    "formId": "0x05E5E076",
+    "edid": "KzlFoodSnowberryCrostata",
+    "name": "Snowberry Crostata"
+   },
+   {
+    "formId": "0x05E5E078",
+    "edid": "KzlFoodApplePie",
+    "name": "Apple Pie"
+   },
+   {
+    "formId": "0x05E5E07A",
+    "edid": "KzlFoodBread",
+    "name": "Bread"
+   },
+   {
+    "formId": "0x05E5E07C",
+    "edid": "KzlFoodSweetroll",
+    "name": "Sweet Roll"
+   },
+   {
+    "formId": "0x05E5E07E",
+    "edid": "KzlSkooma",
+    "name": "Skooma"
+   },
+   {
+    "formId": "0x05E6D874",
+    "edid": "KzlSkeeverWhiskeyDrink",
+    "name": "Kha'Jay Whiskey"
+   }
+  ],
+  "COBJ": [
+   {
+    "formId": "0x0500AB40",
+    "edid": "KzlRecipePot_UGCStamina1",
+    "name": null
+   },
+   {
+    "formId": "0x05015480",
+    "edid": "KzlRecipeCharcoalTier1",
+    "name": null
+   },
+   {
+    "formId": "0x05015486",
+    "edid": "KzlRecipeCharcoalTier2",
+    "name": null
+   },
+   {
+    "formId": "0x05015487",
+    "edid": "KzlRecipeCharcoalTier3",
+    "name": null
+   },
+   {
+    "formId": "0x05015488",
+    "edid": "KzlRecipeCharcoalTier4",
+    "name": null
+   },
+   {
+    "formId": "0x0501548D",
+    "edid": "KzlRecipeWeaponPickaxe",
+    "name": null
+   },
+   {
+    "formId": "0x0501548E",
+    "edid": "KzlRecipeWeaponAxe",
+    "name": null
+   },
+   {
+    "formId": "0x05025A4E",
+    "edid": "KzlRecipeWeapon_CompanionsSword",
+    "name": null
+   },
+   {
+    "formId": "0x05025A4F",
+    "edid": "KzlRecipeWeapon_CompanionsAxe1h",
+    "name": null
+   },
+   {
+    "formId": "0x05025A50",
+    "edid": "KzlRecipeWeapon_CompanionsAxe2h",
+    "name": null
+   },
+   {
+    "formId": "0x05025A51",
+    "edid": "KzlRecipeWeapon_CompanionsSword2h",
+    "name": null
+   },
+   {
+    "formId": "0x05025A52",
+    "edid": "KzlRecipeWeapon_CompanionsDagger",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD4B",
+    "edid": "KzlRecipePot_HealHealthTier1",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD4C",
+    "edid": "KzlRecipePot_HealHealthTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD4D",
+    "edid": "KzlRecipePot_HealHealthTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD4E",
+    "edid": "KzlRecipePot_HealMagicTier1",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD4F",
+    "edid": "KzlRecipePot_HealMagicTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD50",
+    "edid": "KzlRecipePot_HealMagicTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD51",
+    "edid": "KzlRecipePot_HealStaminaTier1",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD52",
+    "edid": "KzlRecipePot_HealStaminaTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD53",
+    "edid": "KzlRecipePot_HealStaminaTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD54",
+    "edid": "KzlRecipePot_BuffMagicTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD55",
+    "edid": "KzlRecipePot_BuffMagicTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD56",
+    "edid": "KzlRecipePot_RegenMagicTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD57",
+    "edid": "KzlRecipePot_RegenMagicTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD58",
+    "edid": "KzlRecipePot_RegenStaminaTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD59",
+    "edid": "KzlRecipePot_RegenStaminaTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD5A",
+    "edid": "KzlRecipePot_BuffStaminaTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD5B",
+    "edid": "KzlRecipePot_BuffStaminaTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD5C",
+    "edid": "KzlRecipePot_DrinkWine",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD5D",
+    "edid": "KzlRecipePot_DrinkSkooma",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD5E",
+    "edid": "KzlRecipePot_DrinkAle",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD5F",
+    "edid": "KzlRecipePot_BuffDestructionTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD60",
+    "edid": "KzlRecipePot_BuffDestructionTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD61",
+    "edid": "KzlRecipePot_BuffOneHandedTier1",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD62",
+    "edid": "KzlRecipePot_BuffOneHandedTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD63",
+    "edid": "KzlRecipePot_BuffTwoHandedTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD64",
+    "edid": "KzlRecipePot_BuffTwoHandedTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD65",
+    "edid": "KzlRecipePot_BuffRestorationTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD66",
+    "edid": "KzlRecipePot_BuffRestorationTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD67",
+    "edid": "KzlRecipePot_BuffMagicResistTier2",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD68",
+    "edid": "KzlRecipePot_BuffMagicResistTier3",
+    "name": null
+   },
+   {
+    "formId": "0x0503DD69",
+    "edid": "KzlRecipePot_DrinkMead",
+    "name": null
+   },
+   {
+    "formId": "0x050521B1",
+    "edid": "KzlRecipeFood_Hardtack",
+    "name": null
+   },
+   {
+    "formId": "0x050521B2",
+    "edid": "KzlRecipePot_DrinkFirebrandWine",
+    "name": null
+   },
+   {
+    "formId": "0x050521B4",
+    "edid": "KzlRecipePot_DrinkStrosRum",
+    "name": null
+   },
+   {
+    "formId": "0x050521B5",
+    "edid": "KzlRecipePot_DrinkMeadHonningbrew",
+    "name": null
+   },
+   {
+    "formId": "0x05DBA774",
+    "edid": "KzlRecipeMiscMintedGold",
+    "name": null
+   },
+   {
+    "formId": "0x05DBF8BC",
+    "edid": "KzlRecipeFood_CheeseWheel",
+    "name": null
+   },
+   {
+    "formId": "0x05DBF8BD",
+    "edid": "KzlRecipeFood_CheeseWheelMold",
+    "name": null
+   },
+   {
+    "formId": "0x05DBF8BE",
+    "edid": "KzlRecipeFood_CheeseWedge",
+    "name": null
+   },
+   {
+    "formId": "0x05DBF8BF",
+    "edid": "KzlRecipeFood_CheeseWedgeMold",
+    "name": null
+   },
+   {
+    "formId": "0x05DBF8C2",
+    "edid": "KzlRecipeBook_SpellbookFlames",
+    "name": null
+   },
+   {
+    "formId": "0x05DBF8C3",
+    "edid": "KzlRecipeBook_SpellbookBlank",
+    "name": null
+   },
+   {
+    "formId": "0x05DBF8C4",
+    "edid": "KzlRecipeFood_Butter",
+    "name": null
+   },
+   {
+    "formId": "0x05DDE4D2",
+    "edid": "KzlRecipeFood_Honey",
+    "name": null
+   },
+   {
+    "formId": "0x05DDE4DB",
+    "edid": "KzlRecipeWeapon_Longbow",
+    "name": null
+   },
+   {
+    "formId": "0x05DDE4DC",
+    "edid": "KzlRecipeWeapon_Huntbow",
+    "name": null
+   },
+   {
+    "formId": "0x05DDE4DD",
+    "edid": "KzlRecipeWeapon_Xbow",
+    "name": null
+   },
+   {
+    "formId": "0x05DDE4EB",
+    "edid": "KzlRecipeIngr_Voidsalts",
+    "name": null
+   },
+   {
+    "formId": "0x05DDE4EC",
+    "edid": "KzlRecipeIngr_Firesalts",
+    "name": null
+   },
+   {
+    "formId": "0x05DDE4ED",
+    "edid": "KzlRecipeIngr_Frostsalts",
+    "name": null
+   },
+   {
+    "formId": "0x05DDE4EE",
+    "edid": "KzlRecipeWeapon_XbowBolts",
+    "name": null
+   },
+   {
+    "formId": "0x05DE8773",
+    "edid": "KzlRecipePot_DrinkMeadBlackBriar",
+    "name": null
+   },
+   {
+    "formId": "0x05DE8774",
+    "edid": "KzlRecipePot_DrinkMulledWine",
+    "name": null
+   },
+   {
+    "formId": "0x05DE8777",
+    "edid": "KzlRecipePot_DrinkMeadAshfire",
+    "name": null
+   },
+   {
+    "formId": "0x05DFD106",
+    "edid": "KzlRecipeFood_ChickenBreast",
+    "name": null
+   },
+   {
+    "formId": "0x05DFD107",
+    "edid": "KzlRecipeFood_Venison",
+    "name": null
+   },
+   {
+    "formId": "0x05DFD184",
+    "edid": "KzlRecipePot_UGCHeal1",
+    "name": null
+   },
+   {
+    "formId": "0x05DFD185",
+    "edid": "KzlRecipePot_UGCMagic1",
+    "name": null
+   },
+   {
+    "formId": "0x05E3F839",
+    "edid": "KzlRecipePot_TravelTier03",
+    "name": null
+   },
+   {
+    "formId": "0x05E631A0",
+    "edid": "KzlRecipeClothesRobesAdept",
+    "name": null
+   },
+   {
+    "formId": "0x05E631A2",
+    "edid": "KzlRecipeClothesRobesMageApprentice",
+    "name": null
+   },
+   {
+    "formId": "0x05E631A3",
+    "edid": "KzlRecipeClothesRobesMageExpert",
+    "name": null
+   },
+   {
+    "formId": "0x05E631A4",
+    "edid": "KzlRecipeClothesRobesMageMaster",
+    "name": null
+   },
+   {
+    "formId": "0x05E682E5",
+    "edid": "KzlRecipeWeapon_SkyguardSword",
+    "name": null
+   },
+   {
+    "formId": "0x05E682E6",
+    "edid": "KzlRecipeWeapon_SkyguardShield",
+    "name": null
+   },
+   {
+    "formId": "0x05E682E7",
+    "edid": "KzlRecipeWeapon_SkyguardBoots",
+    "name": null
+   },
+   {
+    "formId": "0x05E682E8",
+    "edid": "KzlRecipeWeapon_SkyguardGauntlets",
+    "name": null
+   },
+   {
+    "formId": "0x05E682E9",
+    "edid": "KzlRecipeWeapon_SkyguardHelmet",
+    "name": null
+   },
+   {
+    "formId": "0x05E682EA",
+    "edid": "KzlRecipeWeapon_SkyguardArmor",
+    "name": null
+   },
+   {
+    "formId": "0x05E682EB",
+    "edid": "KzlRecipePot_CureDisease",
+    "name": null
+   },
+   {
+    "formId": "0x05E682EC",
+    "edid": "KzlRecipeIngr_Amethyst",
+    "name": null
+   },
+   {
+    "formId": "0x05E6D872",
+    "edid": "KzlRecipePot_DrinkSkeeverWhiskey",
+    "name": null
+   }
+  ],
+  "FURN": [
+   {
+    "formId": "0x0501547E",
+    "edid": "KzlCraftingCharcoalKilnMarker",
+    "name": "Charcoal Kiln"
+   },
+   {
+    "formId": "0x0501EFC0",
+    "edid": "KzlSolitudeThrone",
+    "name": "Throne"
+   },
+   {
+    "formId": "0x05042E69",
+    "edid": "KzlCraftingAlchemyWorkbench",
+    "name": "Alchemy Lab"
+   },
+   {
+    "formId": "0x05DDE4EF",
+    "edid": "KzlFurnitureSaltMine",
+    "name": "Salt Quarry"
+   },
+   {
+    "formId": "0x05DF7B34",
+    "edid": "KzlExecutionerChoppingBlock",
+    "name": "Execution Block"
+   }
+  ],
+  "KYWD": [
+   {
+    "formId": "0x0501547F",
+    "edid": "KzlCraftingCharcoalKiln",
+    "name": null
+   },
+   {
+    "formId": "0x05042E6B",
+    "edid": "KzlCraftingAlchemy",
+    "name": null
+   }
+  ],
+  "WEAP": [
+   {
+    "formId": "0x0502083D",
+    "edid": "KzlWeapon_HammerImperial",
+    "name": "Marshal's Hammer"
+   },
+   {
+    "formId": "0x05E6D86F",
+    "edid": "KzlHaybaleWeapon",
+    "name": "Hay Bale"
+   }
+  ],
+  "ARMO": [
+   {
+    "formId": "0x05DDE4FB",
+    "edid": "KzlJewelry_GameMaster",
+    "name": "Gamemaster Ring"
+   },
+   {
+    "formId": "0x05E53D9F",
+    "edid": "KzlJesterHat",
+    "name": "Jester's Hat"
+   },
+   {
+    "formId": "0x05E53DA0",
+    "edid": "KzlJesterGloves",
+    "name": "Jester's Gloves"
+   },
+   {
+    "formId": "0x05E53DA3",
+    "edid": "KzlJesterBoots",
+    "name": "Jester's Boots"
+   },
+   {
+    "formId": "0x05E53DA4",
+    "edid": "KzlJesterClothes",
+    "name": "Jester's Clothes"
+   },
+   {
+    "formId": "0x05E63192",
+    "edid": "KzlCultistRobes",
+    "name": "Cultist Robes"
+   },
+   {
+    "formId": "0x05E63193",
+    "edid": "KzlAntlerHelm",
+    "name": "Ahzidal's Helm of Vision"
+   },
+   {
+    "formId": "0x05E63194",
+    "edid": "KzlSaviorsHide",
+    "name": "Savior's Hide"
+   },
+   {
+    "formId": "0x05E63195",
+    "edid": "KzlHelmOfYngol",
+    "name": "Helm of Yngol"
+   },
+   {
+    "formId": "0x05E63196",
+    "edid": "KzlShroudedBoots",
+    "name": "Ancient Shrouded Boots"
+   },
+   {
+    "formId": "0x05E63197",
+    "edid": "KzlShroudedGloves",
+    "name": "Ancient Shrouded Gloves"
+   },
+   {
+    "formId": "0x05E63198",
+    "edid": "KzlShroudedCowl",
+    "name": "Ancient Shrouded Cowl"
+   },
+   {
+    "formId": "0x05E63199",
+    "edid": "KzlShroudedArmor",
+    "name": "Ancient Shrouded Armor"
+   },
+   {
+    "formId": "0x05E6319A",
+    "edid": "KzlShroudedRobes",
+    "name": "Shrouded Robes"
+   },
+   {
+    "formId": "0x05E6319B",
+    "edid": "KzlShroudedShoes",
+    "name": "Shrouded Shoes"
+   },
+   {
+    "formId": "0x05E6319C",
+    "edid": "KzlShroudedHood",
+    "name": "Shrouded Hood"
+   },
+   {
+    "formId": "0x05E6319D",
+    "edid": "KzlShroudedHandwraps",
+    "name": "Shrouded Hand Wraps"
+   }
+  ],
+  "MGEF": [
+   {
+    "formId": "0x05E355C0",
+    "edid": "KzlRavageHealthPercent",
+    "name": "Ravage Max Health"
+   }
+  ],
+  "ENCH": [
+   {
+    "formId": "0x05E58EF7",
+    "edid": "KzlEnchBackpackAdventurer",
+    "name": "Adventurer's Backpack"
+   },
+   {
+    "formId": "0x05E58EF9",
+    "edid": "KzlEnchBackpackAdventurerBedroll",
+    "name": "Adventurer's Travel Pack"
+   },
+   {
+    "formId": "0x05E58EFB",
+    "edid": "KzlEnchBackpackMage",
+    "name": "Mage's Backpack"
+   },
+   {
+    "formId": "0x05E58EFD",
+    "edid": "KzlEnchBackpackMageBedroll",
+    "name": "Mage's Travel Pack"
+   },
+   {
+    "formId": "0x05E58EFF",
+    "edid": "KzlEnchBackpackThief",
+    "name": "Thief's Backpack"
+   },
+   {
+    "formId": "0x05E58F01",
+    "edid": "KzlEnchBackpackThiefBedroll",
+    "name": "Thief's Travel Pack"
+   },
+   {
+    "formId": "0x05E58F03",
+    "edid": "KzlEnchBackpackDarkLeather",
+    "name": "Dark Leather Backpack"
+   },
+   {
+    "formId": "0x05E58F05",
+    "edid": "KzlEnchBackpackDarkLeatherBedroll",
+    "name": "Dark Leather Travel Pack"
+   },
+   {
+    "formId": "0x05E58F07",
+    "edid": "KzlEnchBackpackFur",
+    "name": "Fur Backpack"
+   },
+   {
+    "formId": "0x05E58F09",
+    "edid": "KzlEnchBackpackFurBedroll",
+    "name": "Fur Travel Pack"
+   },
+   {
+    "formId": "0x05E58F0B",
+    "edid": "KzlEnchBackpackHunter",
+    "name": "Hunter's Backpack"
+   },
+   {
+    "formId": "0x05E58F0D",
+    "edid": "KzlEnchBackpackHunterBedroll",
+    "name": "Hunter's Travel Pack"
+   },
+   {
+    "formId": "0x05E58F0F",
+    "edid": "KzlEnchBackpackFineLeather",
+    "name": "Fine Leather Backpack"
+   },
+   {
+    "formId": "0x05E58F11",
+    "edid": "KzlEnchBackpackFineLeatherBedroll",
+    "name": "Fine Leather Travel Pack"
+   },
+   {
+    "formId": "0x05E58F13",
+    "edid": "KzlEnchBackpackLeather",
+    "name": "Leather Backpack"
+   },
+   {
+    "formId": "0x05E58F15",
+    "edid": "KzlEnchBackpackLeatherBedroll",
+    "name": "Leather Travel Pack"
+   },
+   {
+    "formId": "0x05E58F17",
+    "edid": "KzlEnchBackpack",
+    "name": "Backpack"
+   },
+   {
+    "formId": "0x05E58F19",
+    "edid": "KzlEnchBackpackBedroll",
+    "name": "Travel Pack"
+   }
+  ],
+  "SPEL": [
+   {
+    "formId": "0x05E7CC46",
+    "edid": "kzlDLC2ConjureBardInstruments",
+    "name": "Bardic Knowledge"
+   }
+  ]
+ },
+ "skillBooks": [
+  {
+   "formId": "0x0500B276",
+   "edid": "KzlMiningNovice"
+  },
+  {
+   "formId": "0x0500B277",
+   "edid": "KzlMiningAdvanced"
+  },
+  {
+   "formId": "0x0500B278",
+   "edid": "KzlMiningExpert"
+  },
+  {
+   "formId": "0x0500B279",
+   "edid": "KzlMiningMaster"
+  },
+  {
+   "formId": "0x0500B27A",
+   "edid": "KzlSmithingAdvanced"
+  },
+  {
+   "formId": "0x0500B27B",
+   "edid": "KzlSmithingNovice"
+  },
+  {
+   "formId": "0x0500B27C",
+   "edid": "KzlSmithingExpert"
+  },
+  {
+   "formId": "0x0500B27D",
+   "edid": "KzlSmithingMaster"
+  },
+  {
+   "formId": "0x05015489",
+   "edid": "KzlWoodcutterNovice"
+  },
+  {
+   "formId": "0x0501548A",
+   "edid": "KzlWoodcutterAdvanced"
+  },
+  {
+   "formId": "0x0501548B",
+   "edid": "KzlWoodcutterExpert"
+  },
+  {
+   "formId": "0x0501548C",
+   "edid": "KzlWoodcutterMaster"
+  },
+  {
+   "formId": "0x05047F6C",
+   "edid": "KzlAlchemyAdvanced"
+  },
+  {
+   "formId": "0x05047F6D",
+   "edid": "KzlAlchemyExpert"
+  },
+  {
+   "formId": "0x05047F6E",
+   "edid": "KzlAlchemyMaster"
+  },
+  {
+   "formId": "0x05E81D82",
+   "edid": "KzlTailorAdvanced"
+  },
+  {
+   "formId": "0x05E81D83",
+   "edid": "KzlTailorExpert"
+  },
+  {
+   "formId": "0x05E81D84",
+   "edid": "KzlTailorMaster"
+  },
+  {
+   "formId": "0x05E8BFFB",
+   "edid": "KzlCookingAdvanced"
+  },
+  {
+   "formId": "0x05E8BFFC",
+   "edid": "KzlCookingExpert"
+  },
+  {
+   "formId": "0x05E8BFFD",
+   "edid": "KzlCookingMaster"
+  }
+ ],
+ "recipes": [
+  {
+   "formId": "0x0500AB40",
+   "edid": "KzlRecipePot_UGCStamina1"
+  },
+  {
+   "formId": "0x05015480",
+   "edid": "KzlRecipeCharcoalTier1"
+  },
+  {
+   "formId": "0x05015486",
+   "edid": "KzlRecipeCharcoalTier2"
+  },
+  {
+   "formId": "0x05015487",
+   "edid": "KzlRecipeCharcoalTier3"
+  },
+  {
+   "formId": "0x05015488",
+   "edid": "KzlRecipeCharcoalTier4"
+  },
+  {
+   "formId": "0x0501548D",
+   "edid": "KzlRecipeWeaponPickaxe"
+  },
+  {
+   "formId": "0x0501548E",
+   "edid": "KzlRecipeWeaponAxe"
+  },
+  {
+   "formId": "0x05025A4E",
+   "edid": "KzlRecipeWeapon_CompanionsSword"
+  },
+  {
+   "formId": "0x05025A4F",
+   "edid": "KzlRecipeWeapon_CompanionsAxe1h"
+  },
+  {
+   "formId": "0x05025A50",
+   "edid": "KzlRecipeWeapon_CompanionsAxe2h"
+  },
+  {
+   "formId": "0x05025A51",
+   "edid": "KzlRecipeWeapon_CompanionsSword2h"
+  },
+  {
+   "formId": "0x05025A52",
+   "edid": "KzlRecipeWeapon_CompanionsDagger"
+  },
+  {
+   "formId": "0x0503DD4B",
+   "edid": "KzlRecipePot_HealHealthTier1"
+  },
+  {
+   "formId": "0x0503DD4C",
+   "edid": "KzlRecipePot_HealHealthTier2"
+  },
+  {
+   "formId": "0x0503DD4D",
+   "edid": "KzlRecipePot_HealHealthTier3"
+  },
+  {
+   "formId": "0x0503DD4E",
+   "edid": "KzlRecipePot_HealMagicTier1"
+  },
+  {
+   "formId": "0x0503DD4F",
+   "edid": "KzlRecipePot_HealMagicTier2"
+  },
+  {
+   "formId": "0x0503DD50",
+   "edid": "KzlRecipePot_HealMagicTier3"
+  },
+  {
+   "formId": "0x0503DD51",
+   "edid": "KzlRecipePot_HealStaminaTier1"
+  },
+  {
+   "formId": "0x0503DD52",
+   "edid": "KzlRecipePot_HealStaminaTier2"
+  },
+  {
+   "formId": "0x0503DD53",
+   "edid": "KzlRecipePot_HealStaminaTier3"
+  },
+  {
+   "formId": "0x0503DD54",
+   "edid": "KzlRecipePot_BuffMagicTier2"
+  },
+  {
+   "formId": "0x0503DD55",
+   "edid": "KzlRecipePot_BuffMagicTier3"
+  },
+  {
+   "formId": "0x0503DD56",
+   "edid": "KzlRecipePot_RegenMagicTier2"
+  },
+  {
+   "formId": "0x0503DD57",
+   "edid": "KzlRecipePot_RegenMagicTier3"
+  },
+  {
+   "formId": "0x0503DD58",
+   "edid": "KzlRecipePot_RegenStaminaTier3"
+  },
+  {
+   "formId": "0x0503DD59",
+   "edid": "KzlRecipePot_RegenStaminaTier2"
+  },
+  {
+   "formId": "0x0503DD5A",
+   "edid": "KzlRecipePot_BuffStaminaTier2"
+  },
+  {
+   "formId": "0x0503DD5B",
+   "edid": "KzlRecipePot_BuffStaminaTier3"
+  },
+  {
+   "formId": "0x0503DD5C",
+   "edid": "KzlRecipePot_DrinkWine"
+  },
+  {
+   "formId": "0x0503DD5D",
+   "edid": "KzlRecipePot_DrinkSkooma"
+  },
+  {
+   "formId": "0x0503DD5E",
+   "edid": "KzlRecipePot_DrinkAle"
+  },
+  {
+   "formId": "0x0503DD5F",
+   "edid": "KzlRecipePot_BuffDestructionTier2"
+  },
+  {
+   "formId": "0x0503DD60",
+   "edid": "KzlRecipePot_BuffDestructionTier3"
+  },
+  {
+   "formId": "0x0503DD61",
+   "edid": "KzlRecipePot_BuffOneHandedTier1"
+  },
+  {
+   "formId": "0x0503DD62",
+   "edid": "KzlRecipePot_BuffOneHandedTier2"
+  },
+  {
+   "formId": "0x0503DD63",
+   "edid": "KzlRecipePot_BuffTwoHandedTier2"
+  },
+  {
+   "formId": "0x0503DD64",
+   "edid": "KzlRecipePot_BuffTwoHandedTier3"
+  },
+  {
+   "formId": "0x0503DD65",
+   "edid": "KzlRecipePot_BuffRestorationTier2"
+  },
+  {
+   "formId": "0x0503DD66",
+   "edid": "KzlRecipePot_BuffRestorationTier3"
+  },
+  {
+   "formId": "0x0503DD67",
+   "edid": "KzlRecipePot_BuffMagicResistTier2"
+  },
+  {
+   "formId": "0x0503DD68",
+   "edid": "KzlRecipePot_BuffMagicResistTier3"
+  },
+  {
+   "formId": "0x0503DD69",
+   "edid": "KzlRecipePot_DrinkMead"
+  },
+  {
+   "formId": "0x050521B1",
+   "edid": "KzlRecipeFood_Hardtack"
+  },
+  {
+   "formId": "0x050521B2",
+   "edid": "KzlRecipePot_DrinkFirebrandWine"
+  },
+  {
+   "formId": "0x050521B4",
+   "edid": "KzlRecipePot_DrinkStrosRum"
+  },
+  {
+   "formId": "0x050521B5",
+   "edid": "KzlRecipePot_DrinkMeadHonningbrew"
+  },
+  {
+   "formId": "0x05DBA774",
+   "edid": "KzlRecipeMiscMintedGold"
+  },
+  {
+   "formId": "0x05DBF8BC",
+   "edid": "KzlRecipeFood_CheeseWheel"
+  },
+  {
+   "formId": "0x05DBF8BD",
+   "edid": "KzlRecipeFood_CheeseWheelMold"
+  },
+  {
+   "formId": "0x05DBF8BE",
+   "edid": "KzlRecipeFood_CheeseWedge"
+  },
+  {
+   "formId": "0x05DBF8BF",
+   "edid": "KzlRecipeFood_CheeseWedgeMold"
+  },
+  {
+   "formId": "0x05DBF8C2",
+   "edid": "KzlRecipeBook_SpellbookFlames"
+  },
+  {
+   "formId": "0x05DBF8C3",
+   "edid": "KzlRecipeBook_SpellbookBlank"
+  },
+  {
+   "formId": "0x05DBF8C4",
+   "edid": "KzlRecipeFood_Butter"
+  },
+  {
+   "formId": "0x05DDE4D2",
+   "edid": "KzlRecipeFood_Honey"
+  },
+  {
+   "formId": "0x05DDE4DB",
+   "edid": "KzlRecipeWeapon_Longbow"
+  },
+  {
+   "formId": "0x05DDE4DC",
+   "edid": "KzlRecipeWeapon_Huntbow"
+  },
+  {
+   "formId": "0x05DDE4DD",
+   "edid": "KzlRecipeWeapon_Xbow"
+  },
+  {
+   "formId": "0x05DDE4EB",
+   "edid": "KzlRecipeIngr_Voidsalts"
+  },
+  {
+   "formId": "0x05DDE4EC",
+   "edid": "KzlRecipeIngr_Firesalts"
+  },
+  {
+   "formId": "0x05DDE4ED",
+   "edid": "KzlRecipeIngr_Frostsalts"
+  },
+  {
+   "formId": "0x05DDE4EE",
+   "edid": "KzlRecipeWeapon_XbowBolts"
+  },
+  {
+   "formId": "0x05DE8773",
+   "edid": "KzlRecipePot_DrinkMeadBlackBriar"
+  },
+  {
+   "formId": "0x05DE8774",
+   "edid": "KzlRecipePot_DrinkMulledWine"
+  },
+  {
+   "formId": "0x05DE8777",
+   "edid": "KzlRecipePot_DrinkMeadAshfire"
+  },
+  {
+   "formId": "0x05DFD106",
+   "edid": "KzlRecipeFood_ChickenBreast"
+  },
+  {
+   "formId": "0x05DFD107",
+   "edid": "KzlRecipeFood_Venison"
+  },
+  {
+   "formId": "0x05DFD184",
+   "edid": "KzlRecipePot_UGCHeal1"
+  },
+  {
+   "formId": "0x05DFD185",
+   "edid": "KzlRecipePot_UGCMagic1"
+  },
+  {
+   "formId": "0x05E3F839",
+   "edid": "KzlRecipePot_TravelTier03"
+  },
+  {
+   "formId": "0x05E631A0",
+   "edid": "KzlRecipeClothesRobesAdept"
+  },
+  {
+   "formId": "0x05E631A2",
+   "edid": "KzlRecipeClothesRobesMageApprentice"
+  },
+  {
+   "formId": "0x05E631A3",
+   "edid": "KzlRecipeClothesRobesMageExpert"
+  },
+  {
+   "formId": "0x05E631A4",
+   "edid": "KzlRecipeClothesRobesMageMaster"
+  },
+  {
+   "formId": "0x05E682E5",
+   "edid": "KzlRecipeWeapon_SkyguardSword"
+  },
+  {
+   "formId": "0x05E682E6",
+   "edid": "KzlRecipeWeapon_SkyguardShield"
+  },
+  {
+   "formId": "0x05E682E7",
+   "edid": "KzlRecipeWeapon_SkyguardBoots"
+  },
+  {
+   "formId": "0x05E682E8",
+   "edid": "KzlRecipeWeapon_SkyguardGauntlets"
+  },
+  {
+   "formId": "0x05E682E9",
+   "edid": "KzlRecipeWeapon_SkyguardHelmet"
+  },
+  {
+   "formId": "0x05E682EA",
+   "edid": "KzlRecipeWeapon_SkyguardArmor"
+  },
+  {
+   "formId": "0x05E682EB",
+   "edid": "KzlRecipePot_CureDisease"
+  },
+  {
+   "formId": "0x05E682EC",
+   "edid": "KzlRecipeIngr_Amethyst"
+  },
+  {
+   "formId": "0x05E6D872",
+   "edid": "KzlRecipePot_DrinkSkeeverWhiskey"
+  }
+ ]
+}

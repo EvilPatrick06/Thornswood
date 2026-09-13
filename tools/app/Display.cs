@@ -1,0 +1,362 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+
+namespace Thornswood
+{
+    /// <summary>
+    /// Reads and writes the handful of SSE Display Tweaks settings worth having
+    /// in a launcher. Several ship commented out with a '#', so setting one has
+    /// to uncomment the existing line rather than append a duplicate the game
+    /// would ignore.
+    /// </summary>
+    static class Display
+    {
+        public static string IniPath
+        {
+            get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\SSEDisplayTweaks.ini"); }
+        }
+
+        public static bool Available { get { return File.Exists(IniPath); } }
+
+        public static string Get(string key)
+        {
+            try
+            {
+                if (!Available) return null;
+                var rx = new Regex("^\\s*" + Regex.Escape(key) + "\\s*=\\s*(.*?)\\s*$", RegexOptions.IgnoreCase);
+                foreach (string line in File.ReadAllLines(IniPath))
+                {
+                    string t = line.TrimStart();
+                    if (t.StartsWith("#") || t.StartsWith(";")) continue;   // commented out means "game default"
+                    Match m = rx.Match(line);
+                    if (m.Success) return m.Groups[1].Value;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public static bool GetBool(string key, bool fallback)
+        {
+            string v = Get(key);
+            if (v == null) return fallback;
+            return v.Trim().Equals("true", StringComparison.OrdinalIgnoreCase) || v.Trim() == "1";
+        }
+
+        public static int GetInt(string key, int fallback)
+        {
+            int n;
+            string v = Get(key);
+            if (v != null && int.TryParse(v.Trim(), out n)) return n;
+            return fallback;
+        }
+
+        public static bool Set(string key, string value)
+        {
+            try
+            {
+                if (!Available) return false;
+                var lines = new List<string>(File.ReadAllLines(IniPath));
+                var live = new Regex("^(\\s*)" + Regex.Escape(key) + "\\s*=", RegexOptions.IgnoreCase);
+                var dead = new Regex("^(\\s*)[#;]\\s*" + Regex.Escape(key) + "\\s*=", RegexOptions.IgnoreCase);
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    if (live.IsMatch(lines[i])) { lines[i] = key + "=" + value; WriteBack(lines); return true; }
+                }
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    if (dead.IsMatch(lines[i])) { lines[i] = key + "=" + value; WriteBack(lines); return true; }
+                }
+
+                // Not mentioned at all, so add it under [Render].
+                int render = lines.FindIndex(l => l.Trim().Equals("[Render]", StringComparison.OrdinalIgnoreCase));
+                if (render >= 0) lines.Insert(render + 1, key + "=" + value);
+                else lines.Add(key + "=" + value);
+                WriteBack(lines);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        static void WriteBack(List<string> lines)
+        {
+            File.WriteAllLines(IniPath, lines.ToArray());
+        }
+
+        // ---- the three display modes, expressed as the two flags the mod uses
+        public static string Mode
+        {
+            get
+            {
+                if (GetBool("Fullscreen", false)) return "Fullscreen";
+                if (GetBool("Borderless", true)) return "Borderless";
+                return "Windowed";
+            }
+        }
+
+        public static void SetMode(string mode)
+        {
+            if (mode == "Fullscreen") { Set("Fullscreen", "true"); Set("Borderless", "false"); }
+            else if (mode == "Windowed") { Set("Fullscreen", "false"); Set("Borderless", "false"); }
+            else { Set("Fullscreen", "false"); Set("Borderless", "true"); }
+        }
+
+        /// <summary>
+        /// Skyrim's own ini decides how big a window it asks for, and Display
+        /// Tweaks decides what it actually gets. Leave the two disagreeing and
+        /// you get the thing that looks like a broken install: a game window
+        /// that does not reach the bottom of the screen, with the desktop
+        /// showing underneath.
+        ///
+        /// Returns what it changed it to, or null when it was already right or
+        /// could not be read.
+        /// </summary>
+        public static string MatchScreen()
+        {
+            ScreenMode m = Detect();
+            if (m == null) return null;
+            string want = m.ToString();
+
+            bool moved = false;
+            if (Available && !string.Equals(Get("Resolution"), want, StringComparison.OrdinalIgnoreCase))
+                moved = Set("Resolution", want) || moved;
+
+            if (SetPrefsSize(m.Width, m.Height)) moved = true;
+            return moved ? want : null;
+        }
+
+        // ---- menu size -------------------------------------------------------
+        //
+        // Skyrim draws SkyUI at roughly one screen pixel per layout unit
+        // instead of scaling the menu to the height of the screen. The list
+        // panel is 530 units wide whether the screen is 1080 tall or 1600, so
+        // the bigger the monitor the smaller the inventory looks, the column
+        // of item names gets narrower, and the row of category icons along the
+        // top is squeezed into the same shrinking strip. Measured on a
+        // 2560x1600 screen the panel came out 558 pixels wide, 22 percent of
+        // the screen, against 29 percent for the same file at 1080p.
+        //
+        // So the fix is not a font setting, it is the layout numbers, and they
+        // have to follow whatever screen the person actually has.
+
+        public static string SkyUIConfig
+        {
+            get { return Path.Combine(Paths.Game, "Data\\Interface\\skyui\\config.txt"); }
+        }
+
+        static string SkyUIBase
+        {
+            get { return Path.Combine(Paths.Game, "Data\\Interface\\skyui\\config.shipped.txt"); }
+        }
+
+        const string ScaleMark = "; thornswood-menu-scale ";
+        const string ScaleRev = "r3";
+
+        // Everything that sets the size of the inventory list. Widths and text
+        // sizes only: colours, offsets and column proportions are fractions and
+        // must not move.
+        // Text and icons only. entryWidth is deliberately not here: the panel
+        // frame behind the list is drawn by the menu's own swf at a fixed size,
+        // so widening the layout pushed the type, weight and value columns out
+        // past the edge of the frame and left them floating on the screen.
+        static readonly string[] ScaleKeys = {
+            "vars.n_iconSize.value",
+            "defaults.entry.textFormat.size",
+            "defaults.label.textFormat.size"
+        };
+
+        /// <summary>
+        /// 1080p is the size SkyUI was drawn for, so that is 1. Anything taller
+        /// gets the same share of the screen it would have had there. Capped at
+        /// 1.8 because past that the list starts crowding the item card.
+        /// </summary>
+        public static double MenuScaleFor(int height)
+        {
+            // Held at 1. The size of the item menus is now carried by the menu
+            // itself: the panelContainer clip inside inventorylists.swf is
+            // placed at a 1.25 scale, which grows the panel border, the text
+            // and every icon together and in proportion, instead of stretching
+            // the layout inside a frame that never moved. Scaling the config
+            // on top of that would double up. The machinery stays so the file
+            // is still restored from the pristine copy on every launch.
+            return 1.0;
+        }
+
+        static string ScaleLine(string line, double k)
+        {
+            foreach (string key in ScaleKeys)
+            {
+                var rx = new Regex("^(\\s*" + Regex.Escape(key) + "\\s*=\\s*)(\\d+(?:\\.\\d+)?)(.*)$",
+                                   RegexOptions.IgnoreCase);
+                Match m = rx.Match(line);
+                if (!m.Success) continue;
+                double v;
+                if (!double.TryParse(m.Groups[2].Value, NumberStyles.Float,
+                                     CultureInfo.InvariantCulture, out v)) return line;
+                int scaled = (int)Math.Round(v * k);
+                if (scaled < 1) scaled = 1;
+                return m.Groups[1].Value + scaled.ToString(CultureInfo.InvariantCulture) + m.Groups[3].Value;
+            }
+            return line;
+        }
+
+        /// <summary>
+        /// Sizes the inventory to this screen. Returns the scale it wrote, or
+        /// null when nothing needed to change.
+        ///
+        /// The numbers are always worked out from a pristine copy kept beside
+        /// the live file, never from the live file itself. Scaling an already
+        /// scaled config compounds, and three launches of that puts the item
+        /// list off the side of the screen.
+        /// </summary>
+        public static string ScaleMenus()
+        {
+            try
+            {
+                ScreenMode m = Detect();
+                if (m == null) return null;
+
+                string live = SkyUIConfig;
+                if (!File.Exists(live)) return null;
+
+                string[] cur = File.ReadAllLines(live);
+                bool marked = cur.Length > 0 &&
+                              cur[0].StartsWith(ScaleMark, StringComparison.OrdinalIgnoreCase);
+
+                // No mark means this file came straight from an update, so it
+                // is the new pristine copy.
+                if (!marked) File.Copy(live, SkyUIBase, true);
+                else if (!File.Exists(SkyUIBase)) return null;
+
+                double k = MenuScaleFor(m.Height);
+                // The revision is part of the mark so that changing what gets
+                // scaled rewrites a file that is already at the right scale.
+                string want = ScaleMark + ScaleRev + " " + k.ToString("0.##", CultureInfo.InvariantCulture);
+                if (marked && cur[0].Trim() == want) return null;
+
+                string[] shipped = File.ReadAllLines(SkyUIBase);
+                var outLines = new List<string>(shipped.Length + 1);
+                outLines.Add(want);
+                foreach (string line in shipped) outLines.Add(ScaleLine(line, k));
+
+                File.WriteAllLines(live, outLines.ToArray());
+                return k.ToString("0.##", CultureInfo.InvariantCulture);
+            }
+            catch { return null; }
+        }
+
+        // ---- minimap corner ---------------------------------------------------
+        // The minimap's corner used to be worked out here from the screen
+        // shape. That was wrong twice over. The mod remaps X itself on a wide
+        // screen, so the shipped 1040 already is the top right corner at any
+        // aspect and a computed value pushed it off the edge. And Enforce
+        // writes the position from the person's own Settings choice on every
+        // launch, immediately after this ran, so whatever was computed here
+        // was overwritten a moment later anyway. Position belongs to Enforce.
+        // The open delay lives there too, as a rule, for the same reason: the
+        // mod rewrites this file when the game exits.
+
+        static string PrefsPath { get { return Path.Combine(Paths.MyGames, "SkyrimPrefs.ini"); } }
+
+        /// <summary>
+        /// iSize W and iSize H, written in place. The space in "iSize W" is
+        /// Bethesda's, not a typo, and a key written without it is ignored.
+        /// </summary>
+        static bool SetPrefsSize(int w, int h)
+        {
+            try
+            {
+                string file = PrefsPath;
+                if (!File.Exists(file)) return false;
+                var lines = new List<string>(File.ReadAllLines(file));
+                bool changed = false;
+                var want = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                want["iSize W"] = w.ToString();
+                want["iSize H"] = h.ToString();
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    string t = lines[i].TrimStart();
+                    if (t.StartsWith(";") || t.StartsWith("#")) continue;
+                    int eq = lines[i].IndexOf('=');
+                    if (eq <= 0) continue;
+                    string key = lines[i].Substring(0, eq).Trim();
+                    string val;
+                    if (!want.TryGetValue(key, out val)) continue;
+                    if (lines[i].Substring(eq + 1).Trim() == val) continue;
+                    lines[i] = key + "=" + val;
+                    changed = true;
+                }
+                if (changed) File.WriteAllLines(file, lines.ToArray());
+                return changed;
+            }
+            catch { return false; }
+        }
+
+        // ---- what the screen is actually set to -------------------------------
+        //
+        // Not SystemParameters, and not Screen.Bounds. Both of those report the
+        // size in device independent units, so a 3440x1440 monitor running at
+        // 150% comes back as 2293x960 and the game gets told to run at a
+        // resolution the screen does not have. EnumDisplaySettings asks the
+        // display driver what mode it is in and answers in real pixels, whatever
+        // the scaling is set to.
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        struct DEVMODE
+        {
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+            public short dmSpecVersion, dmDriverVersion, dmSize, dmDriverExtra;
+            public int dmFields;
+            public short dmOrientation, dmPaperSize, dmPaperLength, dmPaperWidth,
+                         dmScale, dmCopies, dmDefaultSource, dmPrintQuality;
+            public short dmColor, dmDuplex, dmYResolution, dmTTOption, dmCollate;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+            public short dmLogPixels;
+            public int dmBitsPerPel, dmPelsWidth, dmPelsHeight, dmDisplayFlags, dmDisplayFrequency;
+            public int dmICMMethod, dmICMIntent, dmMediaType, dmDitherType,
+                       dmReserved1, dmReserved2, dmPanningWidth, dmPanningHeight;
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Ansi)]
+        static extern bool EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
+
+        const int ENUM_CURRENT_SETTINGS = -1;
+
+        public class ScreenMode
+        {
+            public int Width, Height, Hz;
+            public override string ToString() { return Width + "x" + Height; }
+        }
+
+        /// <summary>The primary display's current mode, or null if it cannot be read.</summary>
+        public static ScreenMode Detect()
+        {
+            try
+            {
+                var dm = new DEVMODE();
+                dm.dmDeviceName = "";
+                dm.dmFormName = "";
+                dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+                if (!EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref dm)) return null;
+
+                // Anything outside this is a driver answering nonsense, and a
+                // nonsense resolution in the ini is worse than none at all.
+                if (dm.dmPelsWidth < 800 || dm.dmPelsHeight < 600) return null;
+                if (dm.dmPelsWidth > 16384 || dm.dmPelsHeight > 16384) return null;
+
+                return new ScreenMode {
+                    Width = dm.dmPelsWidth,
+                    Height = dm.dmPelsHeight,
+                    Hz = dm.dmDisplayFrequency
+                };
+            }
+            catch { return null; }
+        }
+    }
+}

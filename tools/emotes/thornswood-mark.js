@@ -1,0 +1,107 @@
+// ---------------------------------------------------------------------------
+// Thornswood: mark this spot.
+//
+// The arrival coordinates for the nine starting inns were written by hand, and
+// several of them are wrong. Morthal sits at 1824.1, -685.8 and Dawnstar at
+// 1824.3, -683.7: two different buildings, in two different holds, two units
+// apart. Numbers like that were never measured, and a person sent to one of
+// them arrives inside a wall.
+//
+// So they get measured instead. Stand where somebody should arrive, face the
+// way they should face, press the key. This writes the cell, the position and
+// the angle out of the running game, and Mark-Spot.ps1 turns the file into the
+// line the content table wants.
+//
+// Nothing here touches anything. It reads three values and appends a line.
+// ---------------------------------------------------------------------------
+
+(function () {
+'use strict';
+
+const sp = skyrimPlatform;
+
+const OUT = 'Data/Platform/thornswood-spots.txt';
+const INI = 'Data/SKSE/Plugins/Thornswood.ini';
+
+let markKey = 66;   // F8
+try {
+  const text = require('fs').readFileSync(INI, 'utf8');
+  const m = text.match(/^\s*MarkKey\s*=\s*(\d+)/m);
+  if (m) { markKey = Number(m[1]) || markKey; }
+} catch (e) { }
+
+function log() {
+  try { sp.printConsole('[mark] ' + Array.prototype.slice.call(arguments).join(' ')); } catch (e) { }
+}
+
+function guard(name, fn) {
+  return function () {
+    try { return fn.apply(null, arguments); }
+    catch (e) { log(name, 'threw:', e && e.stack ? e.stack : e); return undefined; }
+  };
+}
+
+function say(text) {
+  // On screen, because the console is not open while somebody is walking round
+  // an inn deciding where the door is.
+  try { sp.Debug.notification(text); } catch (e) { }
+  log(text);
+}
+
+sp.on('buttonEvent', guard('mark', (e) => {
+  if (!e.isDown || e.isUp || e.code !== markKey) { return; }
+
+  let pc = null;
+  try { pc = sp.Game.getPlayer(); } catch (e2) { pc = null; }
+  if (!pc) { return; }
+
+  let cell = null;
+  try { cell = pc.getParentCell(); } catch (e2) { cell = null; }
+  if (!cell) { say('Nothing to mark, no cell.'); return; }
+
+  let name = '';
+  let id = 0;
+  try { name = cell.getName() || ''; } catch (e2) { name = ''; }
+  try { id = cell.getFormID() || 0; } catch (e2) { id = 0; }
+
+  // The editor id is what the content table names cells by, and getName gives
+  // the one people see. Both go in: the id is what actually resolves, the name
+  // is what makes the file readable when you come back to it.
+  let editorId = '';
+  try { editorId = sp.Utility.getFormEditorID ? sp.Utility.getFormEditorID(id) : ''; } catch (e2) { editorId = ''; }
+  const label = (editorId || name || ('cell_' + id.toString(16))).replace(/\s+/g, '');
+
+  let x = 0, y = 0, z = 0, rot = 0;
+  try {
+    x = pc.getPositionX();
+    y = pc.getPositionY();
+    z = pc.getPositionZ();
+    rot = pc.getAngleZ();
+  } catch (e2) {
+    say('Could not read your position.');
+    return;
+  }
+
+  const round = (v) => Math.round(v * 10) / 10;
+  const line = [label, id.toString(16), round(x), round(y), round(z), round(rot)].join('\t');
+
+  try {
+    const fs = require('fs');
+    if (!fs.existsSync(OUT)) {
+      fs.writeFileSync(OUT,
+        '# Thornswood marked spots\n' +
+        '# cell\tformId\tx\ty\tz\tangleZ\n' +
+        '# The last mark of a cell wins, so walk back and press it again to correct one.\n');
+    }
+    fs.appendFileSync(OUT, line + '\n');
+  } catch (e2) {
+    say('Could not write the spot file.');
+    return;
+  }
+
+  say('Marked ' + label + ' at ' + round(x) + ', ' + round(y) + ', ' + round(z));
+}));
+
+log('loaded, mark key is scan code', markKey);
+
+})();

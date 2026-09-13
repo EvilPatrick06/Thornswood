@@ -1,0 +1,316 @@
+<#
+  Publish-Server.ps1
+
+  Run this ON YOUR LAPTOP. It packs the server, sends it to the VPS, installs it
+  there and checks it came up. One command instead of six, and no RDP session.
+
+
+  What it does, in order:
+    1. builds the payload zip from your local dist\server
+    2. stops the scheduled task on the VPS so files are not in use
+    3. copies the zip across
+    4. unpacks it there, checks every plugin in the load order is on disk,
+       registers the boot task and starts it
+    5. waits for the resources port to answer, from here
+
+  The world folder on the VPS is preserved across reinstalls by the installer,
+  so characters made on the server survive an update. -FreshWorld throws it away.
+
+  It also writes a line into the launcher's News page and pushes it.
+
+  A server change ships nothing. The gamemode runs on the VPS, so there is no
+  file for anybody to download and nothing for their launcher to notice, which
+  meant every trade kit, every starting town and every fix to creation went out
+  with nobody told, while a one line launcher tweak got a headline. Both show up
+  in the same place now.
+
+      .\tools\Publish-Server.ps1 "Bards start with instruments"
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Position = 0)][string]$Notes = '',
+    [string]$RepoDir,
+    [switch]$NoNews,
+    [switch]$NoPush,
+    [string]$VpsHost  = '192.135.112.23',
+    [string]$VpsUser  = 'Administrator',
+    [string]$Dist     = 'C:\Thornswood-Dev\skymp\build\dist\server',
+    [string]$Zip      = 'C:\Thornswood-Dev\thornswood-server.zip',
+    [string]$VpsRoot  = 'C:\Thornswood-Server',
+    [string]$TaskName = 'Thornswood Server',
+    [switch]$FreshWorld,
+    [switch]$SkipBuild,
+    [switch]$NoPause
+)
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+
+function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
+function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
+function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+
+$target = "$VpsUser@$VpsHost"
+
+# ---------------------------------------------------------------- tools ------
+foreach ($t in 'ssh', 'scp') {
+    if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
+        Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
+    }
+}
+
+# ------------------------------------------------------------- gamemode ------
+# The gamemode is edited in tools\ and packaged from dist\server. Those are two
+# different files, and for a whole evening every change went into the first one
+# while every publish shipped the second: the race menu fix, the launcher
+# choices, the removal of the books, none of it ever reached the server, and
+# nothing said so because both files existed and both looked right.
+#
+# Copied here rather than left to a separate script somebody has to remember.
+$gamemodeMoved = $false
+$gmSrc = Join-Path $Here 'gamemode.js'
+$gmDst = Join-Path $Dist 'gamemode.js'
+if ((Test-Path -LiteralPath $gmSrc) -and (Test-Path -LiteralPath $Dist)) {
+    $srcHash = (Get-FileHash -LiteralPath $gmSrc -Algorithm SHA256).Hash
+    $dstHash = if (Test-Path -LiteralPath $gmDst) {
+        (Get-FileHash -LiteralPath $gmDst -Algorithm SHA256).Hash
+    } else { '' }
+    if ($srcHash -ne $dstHash) {
+        Head 'Gamemode'
+        Copy-Item -LiteralPath $gmSrc -Destination $gmDst -Force
+        $gamemodeMoved = $true
+        Say ("copied tools\gamemode.js into the build ({0:N0} bytes)" -f (Get-Item -LiteralPath $gmDst).Length) 'Green'
+    }
+}
+
+# ---------------------------------------------------------------- build ------
+if (-not $SkipBuild) {
+    Head 'Packing the payload'
+    $export = Join-Path $Here 'Export-ServerPayload.ps1'
+    if (-not (Test-Path -LiteralPath $export)) { Die "not found: $export" }
+    # The same PowerShell that is running this, not whichever one 'powershell'
+    # resolves to. Handing the job to 5.1 from a 7 session changes how files
+    # get written underneath it, which is how the payload picked up a byte
+    # order mark that only ever showed up as a parse error on the VPS.
+    $ps = (Get-Process -Id $PID).Path
+    if (-not $ps) { $ps = 'powershell' }
+    & $ps -NoProfile -ExecutionPolicy Bypass -File $export -Dist $Dist -Zip $Zip -VpsRoot $VpsRoot
+    if ($LASTEXITCODE -ne 0) { Die "Export-ServerPayload.ps1 exited with $LASTEXITCODE" }
+}
+if (-not (Test-Path -LiteralPath $Zip)) { Die "not found: $Zip. Run without -SkipBuild." }
+Say ("payload {0:N1} MB" -f ((Get-Item -LiteralPath $Zip).Length / 1MB)) 'Green'
+
+# ---------------------------------------------------------------- installer --
+# Sent every time rather than trusting whatever copy is up there, so the VPS
+# never runs a version of the installer older than the payload it is unpacking.
+$installer = Join-Path $Here 'Install-ThornswoodServer.ps1'
+if (-not (Test-Path -LiteralPath $installer)) { Die "not found: $installer" }
+
+Head 'Stopping the server up there'
+# Not fatal: on a first install there is no task to stop.
+#
+# Sent base64 encoded rather than as a quoted string. The previous version wrote
+# \$_.Name, escaping with a backslash, which PowerShell does not use: the escape
+# character is a backtick. So the backslash stayed literal, $_ expanded to
+# nothing outside a pipeline, and the remote shell was asked to run a command
+# called \.Name, once per process on the box. A hundred red errors every publish,
+# none of them real, and real ones buried in the middle of them.
+#
+# EncodedCommand takes the script as one blob and nothing has to survive two
+# layers of quoting.
+$stopRemote = @'
+$ProgressPreference = 'SilentlyContinue'
+Stop-ScheduledTask -TaskName '@@TASK@@' -ErrorAction SilentlyContinue
+Get-CimInstance Win32_Process -EA SilentlyContinue |
+  Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*skymp5-server*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }
+'stopped'
+'@ -replace '@@TASK@@', $TaskName
+
+$stopEnc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($stopRemote))
+& ssh $target "powershell -NoProfile -EncodedCommand $stopEnc"
+
+Head 'Copying'
+Say 'this is the slow part, a few minutes on a first run' 'DarkGray'
+& scp $Zip "${target}:C:/thornswood-server.zip"
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+& scp $installer "${target}:C:/Install-ThornswoodServer.ps1"
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+Say 'copied' 'Green'
+
+Head 'Installing'
+$instArgs = "-Zip C:\thornswood-server.zip -Root '$VpsRoot' -TaskName '$TaskName' -StartNow"
+if ($FreshWorld) {
+    Say 'throwing away the world on the VPS as asked' 'Yellow'
+    & ssh $target "powershell -NoProfile -Command `"Remove-Item -LiteralPath '$VpsRoot\world' -Recurse -Force -ErrorAction SilentlyContinue; 'world cleared'`""
+}
+& ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs"
+if ($LASTEXITCODE -ne 0) { Die "the installer on the VPS exited with $LASTEXITCODE. Nothing local was changed." }
+
+# ---------------------------------------------------------------- verify -----
+# Game traffic is UDP and there is nothing to connect to, so the resources
+# folder on 3000 is what a probe from here can actually reach.
+Head 'Checking it answers'
+$up = $false
+for ($i = 0; $i -lt 30; $i++) {
+    try {
+        $c = New-Object Net.Sockets.TcpClient
+        $null = $c.BeginConnect($VpsHost, 3000, $null, $null).AsyncWaitHandle.WaitOne(1000)
+        $up = $c.Connected
+        $c.Close()
+    } catch { }
+    if ($up) { break }
+    Start-Sleep -Seconds 2
+}
+
+Write-Host ''
+if ($up) {
+    Say "Thornswood is up at ${VpsHost}:7777" 'Green'
+    Write-Host ''
+} else {
+    Say "The install finished but nothing is answering on ${VpsHost}:3000." 'Red'
+
+    # Rather than list what it might be, fetch what it actually said. The task
+    # redirects everything the server prints into this file for exactly this.
+    Head 'What the server printed up there'
+    & ssh $target "powershell -NoProfile -Command `"if (Test-Path '$VpsRoot\server.log') { Get-Content '$VpsRoot\server.log' -Tail 40 } else { 'server.log is not there, so node never started. Check that node is on the machine PATH up there.' }`""
+
+    Write-Host ''
+    Say 'If that log is empty or says nothing useful, the other candidate is the' 'Yellow'
+    Say 'firewall. The server can be up and still unreachable from here:' 'Yellow'
+    Say "    ssh $target `"powershell -NoProfile -Command Get-NetFirewallRule -DisplayName '*Thornswood*' ^| Format-Table DisplayName,Enabled,Direction`"" 'DarkGray'
+}
+
+# ------------------------------------------------------------------ news ----
+# The launcher reads version.json for its News page. Publish-Update writes to
+# it on every mod or launcher release; this did not, so anything that lives
+# only on the server went out silently.
+#
+# Said plainly in the entry, because it is the useful part: nobody downloads
+# anything for this. Somebody reading a headline about instruments should not
+# go looking for an update button that is not going to light up.
+if (-not $NoNews -and $up) {
+    if (-not $RepoDir) { $RepoDir = Split-Path -Parent $Here }
+    $VersionFile = Join-Path $RepoDir 'version.json'
+
+    if (-not (Test-Path -LiteralPath $VersionFile)) {
+        Say "no version.json in $RepoDir, so nothing was added to the News page" 'Yellow'
+    } else {
+        Head 'News'
+        try {
+            $doc = Get-Content -LiteralPath $VersionFile -Raw | ConvertFrom-Json
+
+            # What actually moved, worked out here rather than taken from the
+            # note, so an entry says something even when the note is empty.
+            $details = @()
+            foreach ($line in @($Notes -split "`r?`n")) {
+                $t = $line.Trim()
+                if ($t -match '^[-*\u2022]\s*(.+)$') { $details += $Matches[1].Trim() }
+            }
+
+            if ($gamemodeMoved) { $details += 'The gamemode was rebuilt: starting kits, creation and arrival points live in it' }
+
+            try {
+                $ss = Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json
+                if ($ss.loadOrder) { $details += ('Load order: {0} plugins server side' -f @($ss.loadOrder).Count) }
+            } catch { }
+
+            if ($FreshWorld) { $details += 'The world was thrown away, so every character on the server is gone' }
+            $details += 'Nothing to download for this one. It is on the server, so it is already live.'
+
+            # A headline and the rest, the same shape Publish-Update writes, so
+            # the News page does not have to know which of the two made an entry.
+            $noteLines = @($Notes -split "`r?`n")
+            $title = if ($noteLines[0].Trim()) { $noteLines[0].Trim() } else { 'Server updated' }
+            $bodyBits = @()
+            for ($i = 1; $i -lt $noteLines.Count; $i++) {
+                $line = $noteLines[$i].Trim()
+                if ($line -and $line -notmatch '^[-*\u2022]') { $bodyBits += $line }
+            }
+            $body = ($bodyBits -join ' ').Trim()
+            if (-not $body) { $body = "The server at ${VpsHost} was reinstalled and is answering." }
+
+            # 'kind' and 'stamp' are extra members the launcher never asked
+            # for. NewsItem is read with DataContractJsonSerializer, which
+            # ignores what it was not told about, so old launchers are safe.
+            # They are here so this script can recognise its own entries.
+            $named = [bool]$noteLines[0].Trim()
+            $entry = [pscustomobject]@{
+                date    = (Get-Date).ToString('d MMM yyyy')
+                title   = $title
+                body    = $body
+                details = @($details)
+                files   = @()
+                kind    = 'server'
+                stamp   = (Get-Date).ToString('o')
+                named   = $named
+            }
+
+            $newsList = @()
+            if ($doc.PSObject.Properties['news'] -and $doc.news) { $newsList = @($doc.news) }
+
+            # Publishing the server twice over one change is normal while
+            # something is being chased. That is one piece of news, not four.
+            #
+            # Three runs tonight put three entries at the top of a feed that
+            # holds twenty, and three real releases fell off the bottom to make
+            # room. An unnamed run is somebody pushing a fix, not an
+            # announcement, so it stands in until there is something to say and
+            # then gets written over rather than pushing history out.
+            $repeat = $false
+            $replaceTop = $false
+            if ($newsList.Count -gt 0) {
+                $top = $newsList[0]
+                $topTitle = if ($top.PSObject.Properties.Name -contains 'title') { [string]$top.title } else { '' }
+                $topBody  = if ($top.PSObject.Properties.Name -contains 'body')  { [string]$top.body }  else { '' }
+                $topKind  = if ($top.PSObject.Properties.Name -contains 'kind')  { [string]$top.kind }  else { '' }
+                $topNamed = $true
+                if ($top.PSObject.Properties.Name -contains 'named') { $topNamed = [bool]$top.named }
+
+                if ($topTitle -eq $entry.title -and $topBody -eq $entry.body) { $repeat = $true }
+                elseif ($topKind -eq 'server' -and -not $topNamed) { $replaceTop = $true }
+            }
+
+            if ($repeat) {
+                Say '  same note as last time, so no new entry' 'DarkGray'
+            } else {
+                if ($replaceTop) {
+                    Say '  the entry above it had no note, so this replaces it' 'DarkGray'
+                    $newsList = @($entry) + @($newsList | Select-Object -Skip 1)
+                } else {
+                    $newsList = @($entry) + $newsList
+                }
+                # Forty, not twenty. Twenty was one evening's worth.
+                if ($newsList.Count -gt 40) { $newsList = $newsList[0..39] }
+                if ($doc.PSObject.Properties.Name -contains 'news') { $doc.news = $newsList }
+                else { $doc | Add-Member -NotePropertyName news -NotePropertyValue $newsList }
+
+                # No byte order mark. The launcher's reader stops on one and
+                # reports an unexpected character, which takes out the update
+                # check for everybody at once, including their route to a fix.
+                [IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+                Say ("  added: {0}" -f $entry.title) 'Green'
+
+                if (-not $NoPush) {
+                    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+                    Push-Location $RepoDir
+                    try {
+                        # git writes progress to stderr, and Out-Host renders
+                        # anything on stderr as a red error even on success.
+                        function Relay { process { Write-Host ('  ' + $_.ToString()) -ForegroundColor DarkGray } }
+                        & git add version.json
+                        & git commit -m "Server: $($entry.title)" 2>&1 | Relay
+                        & git push 2>&1 | Relay
+                    } finally { Pop-Location; $ErrorActionPreference = $old }
+                }
+            }
+        } catch {
+            Say "  could not write the News entry: $($_.Exception.Message)" 'Yellow'
+            Say '  The server is up regardless. Nothing else was changed.' 'DarkGray'
+        }
+    }
+}
+
+Write-Host ''
+if (-not $NoPause) { [void](Read-Host 'Enter to close') }

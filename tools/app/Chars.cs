@@ -1,0 +1,560 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+
+namespace Thornswood
+{
+    // Two characters, and what actually keeps them apart is the profile id.
+    //
+    // Under SkyMP a character is not a save file. It is a change form held by
+    // the server, and which one you get is decided by gameData.profileId in
+    // skymp5-client-settings.txt: connect on profile 1 and the server hands
+    // back profile 1's body, inventory and face, whatever Skyrim's own menu
+    // says. That is why New Game never produced a new character.
+    //
+    // So a slot owns a profile id. Playing slot two writes that slot's id into
+    // the client settings before the game starts. Making a new character takes
+    // an id nobody has used, which the server has never seen, so it runs
+    // creation from the top. Nothing has to be deleted anywhere and nothing on
+    // the server has to be reachable for any of it, which matters because the
+    // server is not on this machine.
+    //
+    // The save folder still gets swapped per slot. SkyrimPlatform writes its
+    // own .ess as it works and there is no reason for two characters to share
+    // one pile of them.
+    //
+    // Skyrim has no command line that says "load this save", so the launcher
+    // cannot reach past the main menu on its own. What it can do is make the
+    // choice before the game starts: swap in one character's saves, then let
+    // Start On Save walk in and load the newest one. Starting fresh is the
+    // same trick with an empty folder, which leaves nothing to load and sends
+    // the game into character creation instead.
+    static class Chars
+    {
+        public const int Slots = 2;
+
+        public static string Home { get { return Path.Combine(Paths.ProfileDir, "Characters"); } }
+        public static string SlotDir(int slot) { return Path.Combine(Home, slot.ToString()); }
+        static string Bin { get { return Path.Combine(Home, "_deleted"); } }
+        static string ActiveFile { get { return Path.Combine(Home, "active.txt"); } }
+
+        // One line per slot:
+        //
+        //     slot  profileId  lastPlayedTicks  playedSeconds  trade  town
+        //
+        // Deliberately not JSON. The launcher's only serializer is the data
+        // contract one, which cannot round trip a shape it was not told about in
+        // advance, and this file has to survive being read by a version that
+        // adds a field. Everything past the first two is optional on the way in,
+        // so a file written before a field existed still reads.
+        //
+        // A dash stands for an empty trade or town. Space separated fields and
+        // empty strings do not mix.
+        static string ProfileFile { get { return Path.Combine(Home, "profiles.txt"); } }
+        static string StartIni
+        {
+            get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\po3_StartOnSave.ini"); }
+        }
+
+        public class Who
+        {
+            public int Slot;
+            public bool Empty = true;
+            public string Name = "";
+            public string Race = "";
+            public int Level;
+            public string Played = "";
+            public DateTime When;
+            public int Saves;
+            public int ProfileId;
+            public DateTime LastPlayed;
+            // Seconds this slot has actually been in the game, added up by
+            // the launcher across every session. Skyrim keeps its own figure
+            // but it is inside the save, and under SkyMP the character is on
+            // the server, so there is often no save here to read it out of.
+            public long PlaySeconds;
+            // What was picked in the launcher when this character was made.
+            // Gamemode keys, not labels. The server is the authority on this
+            // once somebody has played; this is what to show before then.
+            public string Trade = "";
+            public string Town = "";
+        }
+
+        // ------------------------------------------------------------ reading
+
+        // The header of a Skyrim save is a fixed run of fields before anything
+        // compressed starts, so the interesting parts can be read without
+        // unpacking the save itself.
+        static Who Header(string file, int slot)
+        {
+            var w = new Who();
+            w.Slot = slot;
+            using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var br = new BinaryReader(fs, Encoding.UTF8))
+            {
+                byte[] magic = br.ReadBytes(13);
+                if (Encoding.ASCII.GetString(magic) != "TESV_SAVEGAME") throw new Exception("not a Skyrim save");
+                br.ReadUInt32();              // header size
+                br.ReadUInt32();              // save format version
+                br.ReadUInt32();              // save number
+                w.Name  = Str(br);
+                w.Level = (int)br.ReadUInt32();
+                Str(br);                      // location, shown in game but not here
+                w.Played = Str(br);           // in game date, however the game chose to write it
+                w.Race  = Pretty(Str(br));
+            }
+            w.Empty = false;
+            w.When = File.GetLastWriteTime(file);
+            return w;
+        }
+
+        static string Str(BinaryReader br)
+        {
+            int n = br.ReadUInt16();
+            if (n <= 0 || n > 4096) return "";
+            return Encoding.UTF8.GetString(br.ReadBytes(n));
+        }
+
+        // Race ids read like NordRace or HighElfRace. Nobody says that out loud.
+        static string Pretty(string editorId)
+        {
+            if (string.IsNullOrEmpty(editorId)) return "";
+            string s = editorId;
+            if (s.EndsWith("Race", StringComparison.OrdinalIgnoreCase)) s = s.Substring(0, s.Length - 4);
+            var sb = new StringBuilder();
+            for (int i = 0; i < s.Length; i++)
+            {
+                if (i > 0 && char.IsUpper(s[i]) && !char.IsUpper(s[i - 1])) sb.Append(' ');
+                sb.Append(s[i]);
+            }
+            return sb.ToString();
+        }
+
+        // ------------------------------------------------------- profile ids
+
+        class Row
+        {
+            public int Slot;
+            public int Id;
+            public DateTime Played;
+            public long Seconds;
+            public string Trade = "";
+            public string Town = "";
+        }
+
+        static List<Row> Rows()
+        {
+            var l = new List<Row>();
+            try
+            {
+                if (!File.Exists(ProfileFile)) return l;
+                foreach (string line in File.ReadAllLines(ProfileFile))
+                {
+                    string[] p = line.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (p.Length < 2) continue;
+                    var r = new Row();
+                    if (!int.TryParse(p[0], out r.Slot)) continue;
+                    if (!int.TryParse(p[1], out r.Id)) continue;
+                    long ticks;
+                    if (p.Length > 2 && long.TryParse(p[2], out ticks))
+                    {
+                        try { r.Played = new DateTime(ticks); } catch { }
+                    }
+                    long secs;
+                    if (p.Length > 3 && long.TryParse(p[3], out secs) && secs >= 0) r.Seconds = secs;
+                    if (p.Length > 4 && p[4] != "-") r.Trade = p[4];
+                    if (p.Length > 5 && p[5] != "-") r.Town = p[5];
+                    l.Add(r);
+                }
+            }
+            catch { }
+            return l;
+        }
+
+        static void Save(List<Row> rows)
+        {
+            try
+            {
+                Directory.CreateDirectory(Home);
+                var sb = new StringBuilder();
+                foreach (Row r in rows)
+                {
+                    sb.AppendLine(r.Slot + " " + r.Id + " " + r.Played.Ticks + " " + r.Seconds +
+                                  " " + Dash(r.Trade) + " " + Dash(r.Town));
+                }
+                File.WriteAllText(ProfileFile, sb.ToString());
+            }
+            catch { }
+        }
+
+        static string Dash(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "-";
+            // Whitespace would split into two fields and shift everything after
+            // it. No gamemode key has any, but this file is also written by hand
+            // when somebody is poking at it.
+            return s.Replace(' ', '_');
+        }
+
+        static Row Find(List<Row> rows, int slot)
+        {
+            foreach (Row r in rows) if (r.Slot == slot) return r;
+            return null;
+        }
+
+        /// <summary>The profile id a slot plays as, or 0 when it has none yet.</summary>
+        public static int ProfileOf(int slot)
+        {
+            Row r = Find(Rows(), slot);
+            return r == null ? 0 : r.Id;
+        }
+
+        /// <summary>
+        /// An id the server has never seen, and nobody else's launcher will
+        /// ever pick either.
+        ///
+        /// This used to count: the highest id in this machine's own list, plus
+        /// one. Every launcher did exactly the same from exactly the same
+        /// starting point, so everybody's second character was profile 2 and
+        /// their third was profile 3. The server stores one character per
+        /// profile id, so two people on two different machines both connected
+        /// as profile 2 and both loaded the same character:
+        ///
+        ///     Connecting a user 1 with ip 216.82.9.54   -> 1 logged as 2
+        ///     Connecting a user 2 with ip 24.168.10.118 -> 2 logged as 2
+        ///     Loading character ff000000                (the same one, twice)
+        ///
+        /// Which also meant creation never ran for either of them: the server
+        /// found a character that already existed and quite correctly left it
+        /// alone. Months of "the trade menu never appears" was this.
+        ///
+        /// So the id is random over the whole positive range instead. With five
+        /// people and a handful of characters each, a collision is not worth
+        /// the arithmetic to describe. Ids are still never reused inside one
+        /// install, because a returning id would hand back a deleted character.
+        /// </summary>
+        static int NextProfileId()
+        {
+            var taken = new List<int>();
+            foreach (Row r in Rows()) taken.Add(r.Id);
+
+            var bytes = new byte[4];
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+            {
+                for (int attempt = 0; attempt < 64; attempt++)
+                {
+                    rng.GetBytes(bytes);
+                    long v = BitConverter.ToInt32(bytes, 0) & 0x7FFFFFFF;
+                    int id = (int)(1000 + (v % 2000000000L));
+                    if (!taken.Contains(id)) return id;
+                }
+            }
+
+            // Sixty-four collisions in a row does not happen, but returning
+            // something that might already be in use is worse than anything,
+            // so walk up from the highest rather than guess again.
+            int high = 1000;
+            foreach (int t in taken) if (t > high) high = t;
+            return high + 1;
+        }
+
+        static int Claim(int slot, bool fresh)
+        {
+            List<Row> rows = Rows();
+            Row r = Find(rows, slot);
+
+            if (r == null)
+            {
+                r = new Row();
+                r.Slot = slot;
+                // The first slot inherits profile 1, which is whoever has been
+                // playing up to now. Anything else starts somewhere new.
+                r.Id = (slot == 1 && !fresh) ? 1 : NextProfileId();
+                rows.Add(r);
+            }
+            else if (fresh)
+            {
+                r.Id = NextProfileId();
+            }
+
+            r.Played = DateTime.Now;
+            Save(rows);
+            return r.Id;
+        }
+
+        public static Who Read(int slot)
+        {
+            var w = new Who();
+            w.Slot = slot;
+
+            Row row = Find(Rows(), slot);
+            if (row != null)
+            {
+                w.ProfileId = row.Id;
+                w.LastPlayed = row.Played;
+                w.PlaySeconds = row.Seconds;
+                w.Trade = row.Trade;
+                w.Town = row.Town;
+                // A slot that has been played has a character on the server
+                // even when there is no save file here to read, which is the
+                // normal case after a fresh install or on somebody else's
+                // machine. Calling that an empty slot would quietly offer to
+                // make a second character over the top of it.
+                if (row.Played != DateTime.MinValue) w.Empty = false;
+            }
+
+            try
+            {
+                string dir = SlotDir(slot);
+                if (!Directory.Exists(dir)) return w;
+                string[] saves = Directory.GetFiles(dir, "*.ess");
+                w.Saves = saves.Length;
+                if (saves.Length == 0) return w;
+
+                string newest = saves[0];
+                DateTime best = File.GetLastWriteTime(newest);
+                for (int i = 1; i < saves.Length; i++)
+                {
+                    DateTime t = File.GetLastWriteTime(saves[i]);
+                    if (t > best) { best = t; newest = saves[i]; }
+                }
+                var got = Header(newest, slot);
+                got.Saves = saves.Length;
+                got.ProfileId = w.ProfileId;
+                got.LastPlayed = w.LastPlayed;
+                got.PlaySeconds = w.PlaySeconds;
+                got.Trade = w.Trade;
+                got.Town = w.Town;
+                return got;
+            }
+            catch { return w; }
+        }
+
+        public static List<Who> All()
+        {
+            var l = new List<Who>();
+            for (int i = 1; i <= Slots; i++) l.Add(Read(i));
+            return l;
+        }
+
+        /// <summary>
+        /// Add a finished session to a slot's total.
+        ///
+        /// Counted here rather than read out of the save, because under SkyMP
+        /// the character lives on the server and there is frequently no save on
+        /// this machine at all. Anything under a minute is dropped: a launch
+        /// that crashed on the way in is not play time, and the crash log folder
+        /// says there have been a few of those.
+        /// </summary>
+        public static void AddPlaytime(int slot, TimeSpan span)
+        {
+            if (slot <= 0) return;
+            long secs = (long)span.TotalSeconds;
+            if (secs < 60) return;
+            // A session longer than a day is a clock change or a launcher left
+            // open over a reboot, not somebody playing.
+            if (secs > 86400) return;
+
+            List<Row> rows = Rows();
+            Row r = Find(rows, slot);
+            if (r == null) return;
+            r.Seconds += secs;
+            r.Played = DateTime.Now;
+            Save(rows);
+        }
+
+        /// <summary>Remember what the launcher asked for when this character was made.</summary>
+        public static void SetChoice(int slot, string trade, string town)
+        {
+            List<Row> rows = Rows();
+            Row r = Find(rows, slot);
+            if (r == null) return;
+            r.Trade = trade ?? "";
+            r.Town = town ?? "";
+            Save(rows);
+        }
+
+        /// <summary>"3h 12m", or empty when nobody has played long enough to count.</summary>
+        public static string PlayedText(long seconds)
+        {
+            if (seconds < 60) return "";
+            long h = seconds / 3600;
+            long m = (seconds % 3600) / 60;
+            if (h > 0) return h + "h " + m + "m played";
+            return m + "m played";
+        }
+
+        public static int Active()
+        {
+            try { if (File.Exists(ActiveFile)) return int.Parse(File.ReadAllText(ActiveFile).Trim()); }
+            catch { }
+            return 0;
+        }
+
+        // ------------------------------------------------------------ moving
+
+        static bool IsLink(string p)
+        {
+            try
+            {
+                if (!Directory.Exists(p)) return false;
+                return (new DirectoryInfo(p).Attributes & FileAttributes.ReparsePoint) != 0;
+            }
+            catch { return false; }
+        }
+
+        static bool Link(string link, string target)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo("cmd.exe", "/c mklink /J \"" + link + "\" \"" + target + "\"");
+                psi.UseShellExecute = false;
+                psi.CreateNoWindow = true;
+                psi.RedirectStandardOutput = true;
+                psi.RedirectStandardError = true;
+                using (var pr = Process.Start(psi)) { pr.StandardOutput.ReadToEnd(); pr.StandardError.ReadToEnd(); pr.WaitForExit(); }
+            }
+            catch { }
+            return IsLink(link);
+        }
+
+        /// <summary>
+        /// First run on a build that already has saves in it. Those belong to
+        /// somebody, so they become character one rather than being stranded.
+        /// </summary>
+        public static void Adopt()
+        {
+            Directory.CreateDirectory(Home);
+            for (int i = 1; i <= Slots; i++) Directory.CreateDirectory(SlotDir(i));
+
+            string live = Files.SaveDir;
+            if (IsLink(live)) return;
+            if (!Directory.Exists(live)) return;
+
+            string[] existing = Directory.GetFiles(live, "*.ess");
+            if (existing.Length == 0) return;
+            if (Directory.GetFiles(SlotDir(1), "*.ess").Length > 0) return;
+
+            foreach (string f in Directory.GetFiles(live))
+            {
+                try { File.Move(f, Path.Combine(SlotDir(1), Path.GetFileName(f))); } catch { }
+            }
+        }
+
+        /// <summary>Point Skyrim's save folder at one character and tell Start On Save what to do.</summary>
+        public static void Use(int slot, bool fresh)
+        {
+            Directory.CreateDirectory(Home);
+            Directory.CreateDirectory(SlotDir(slot));
+
+            string live = Files.SaveDir;
+            Directory.CreateDirectory(Path.GetDirectoryName(live));
+
+            if (IsLink(live)) { try { Directory.Delete(live); } catch { } }
+            else if (Directory.Exists(live))
+            {
+                // A real folder here means saves that belong to nobody yet.
+                Adopt();
+                try { Directory.Delete(live, true); } catch { }
+            }
+
+            if (!Link(live, SlotDir(slot)))
+                throw new Exception("Could not point the save folder at character " + slot + ".");
+
+            // The part that actually decides who you are. Everything above this
+            // line only moves save files about.
+            int id = Claim(slot, fresh);
+            AutoJoin.SetProfileId(id);
+
+            try { File.WriteAllText(ActiveFile, slot.ToString()); } catch { }
+            WriteStartIni(fresh);
+        }
+
+        // Written fresh every launch, and what it writes is "do nothing".
+        //
+        // Start On Save used to be how the launcher reached past the main menu:
+        // point the save folder at one character, set bStartNewGame, and let it
+        // load the newest save or start a new game when there was none.
+        //
+        // Under SkyMP that job is already taken. When the server sends
+        // CreateActor for your own character the client calls
+        //
+        //     loadGameService.loadGame(pos, rot, worldOrCell, appearance, loadOrder)
+        //
+        // which walks you from the main menu to wherever the server says you
+        // are, with the body and the face the server holds. Nothing here has to
+        // press anything, and a character that lives on the server has nothing
+        // on this disk worth loading anyway.
+        //
+        // Leaving bStartNewGame true meant Start On Save pressed New Game at the
+        // main menu, Skyrim Unbound's alternate start began, and SkyMP's own
+        // load landed on top of a game that was still loading. Two loads through
+        // one BGSSaveLoadManager, about thirty seconds in, every single launch:
+        //
+        //   crash-2026-09-13-01-20-50   uptime 33s   po3_StartOnSave.dll frame 4
+        //   crash-2026-09-13-01-14-07   uptime 30s   po3_StartOnSave.dll frame 11
+        //   crash-2026-09-12-18-53-41   uptime 42s   inside the allocator's free
+        //
+        // It is also why creation flashed up for a moment and then teleported
+        // somebody who had not finished making a face: Unbound's start was being
+        // interrupted part way through.
+        //
+        // The mod stays installed, because the build ships it and Verify checks
+        // the file list. It is simply told to stand still.
+        static void WriteStartIni(bool fresh)
+        {
+            try
+            {
+                string dir = Path.GetDirectoryName(StartIni);
+                Directory.CreateDirectory(dir);
+                var sb = new StringBuilder();
+                sb.AppendLine("; Written by the Thornswood launcher every time you press Play.");
+                sb.AppendLine("; Editing it by hand will not stick.");
+                sb.AppendLine(";");
+                sb.AppendLine("; bStartNewGame is false on purpose. SkyMP loads you into the world");
+                sb.AppendLine("; itself once the server has made your character, and a second load");
+                sb.AppendLine("; running at the same time crashes the game about thirty seconds in.");
+                sb.AppendLine("[Settings]");
+                sb.AppendLine("sSaveFile =");
+                sb.AppendLine("sCharacterName =");
+                sb.AppendLine("iSaveType = 0");
+                sb.AppendLine("bStartNewGame = false");
+                sb.AppendLine("iSkipAutoLoadHotkey = 16");
+                sb.AppendLine("bDisableMissingContentWarning = true");
+                File.WriteAllText(StartIni, sb.ToString());
+            }
+            catch { }
+        }
+
+        /// <summary>Moves a character aside rather than destroying them.</summary>
+        public static string Delete(int slot)
+        {
+            string dir = SlotDir(slot);
+            if (!Directory.Exists(dir)) return null;
+
+            Directory.CreateDirectory(Bin);
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            string dest = Path.Combine(Bin, slot + "-" + stamp);
+
+            // If this character is the one currently linked, let go first.
+            string live = Files.SaveDir;
+            if (IsLink(live) && Active() == slot) { try { Directory.Delete(live); } catch { } }
+
+            Directory.Move(dir, dest);
+            Directory.CreateDirectory(dir);
+
+            // Forget the profile id too, or the slot would come back looking
+            // empty and then reconnect as the character that was just deleted.
+            // The id itself is retired rather than freed: NextProfileId only
+            // ever counts upwards.
+            List<Row> rows = Rows();
+            Row r = Find(rows, slot);
+            if (r != null) { rows.Remove(r); Save(rows); }
+
+            if (Active() == slot) { try { File.Delete(ActiveFile); } catch { } }
+            return dest;
+        }
+    }
+}

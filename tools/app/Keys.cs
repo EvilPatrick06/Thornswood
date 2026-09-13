@@ -1,0 +1,576 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text.RegularExpressions;
+
+namespace Thornswood
+{
+    /// <summary>
+    /// Every key this build binds that lives in a file, which turns out to be
+    /// most of them.
+    ///
+    /// The Controls page used to be a table typed out by hand, which drifted
+    /// the moment anything was rebound and then quietly lied. Now the page is
+    /// built from these, read out of the real files at the moment you look, so
+    /// it can only ever show what is actually set.
+    ///
+    /// Three families of key code, unfortunately. Skyrim Together and SKSE Menu
+    /// Framework use Windows virtual key codes; Trade Together, True Directional
+    /// Movement, SkyUI and Better Third Person Selection use DirectInput scan
+    /// codes, where the same letter is a different number; the minimap uses
+    /// DirectInput too but writes it as a decimal. Each binding says which it
+    /// speaks, and the translation happens by key name so a rebind cannot land
+    /// on the wrong letter.
+    /// </summary>
+    static class Keys
+    {
+        public enum Codes { VirtualKey, VirtualKeyHex, ByName, DirectInput, DirectInputDecimal, JsonName }
+
+        public class Binding
+        {
+            public string Id, Label, What, Group;
+            public string Value;        // as shown: "F2"
+            public Codes How;
+            public string File, Key;
+            public string Key2;         // a few settings carry a second copy
+            public bool Hex { get { return How == Codes.VirtualKeyHex; } }
+        }
+
+        static string TweaksIni { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\SkyrimTogetherTweaks.ini"); } }
+        static string MenuIni   { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\SKSEMenuFramework.ini"); } }
+        static string TradeIni  { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\TradeTogether.ini"); } }
+        static string MapIni    { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini"); } }
+        static string TdmIni    { get { return Path.Combine(Paths.Game, "Data\\MCM\\Config\\TrueDirectionalMovement\\settings.ini"); } }
+        static string SkyUiIni  { get { return Path.Combine(Paths.Game, "Data\\MCM\\Config\\SkyUI_SE\\settings.ini"); } }
+        static string BtpsIni   { get { return Path.Combine(Paths.Game, "Data\\MCM\\Config\\BetterThirdPersonSelection\\settings.ini"); } }
+        static string ThornIni  { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\Thornswood.ini"); } }
+        static string MpJson    { get { return Path.Combine(Paths.Game, "Data\\Platform\\Plugins\\skymp5-client-settings.txt"); } }
+
+        // Windows virtual key codes, for the two settings written as hex. Only
+        // keys that make sense as a menu toggle are here: a bind to a movement
+        // key would be a hard mistake to undo from inside the game.
+        static readonly Dictionary<string, int> ByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        static readonly Dictionary<int, string> ByCode = new Dictionary<int, string>();
+
+        static Keys()
+        {
+            for (int i = 1; i <= 12; i++) Add("F" + i, 0x70 + i - 1);
+            for (char c = 'A'; c <= 'Z'; c++) Add(c.ToString(), c);
+            for (char c = '0'; c <= '9'; c++) Add(c.ToString(), c);
+            Add("Insert", 0x2D); Add("Delete", 0x2E); Add("Home", 0x24); Add("End", 0x23);
+            Add("Page up", 0x21); Add("Page down", 0x22);
+            Add("Right Ctrl", 0xA3); Add("Right Shift", 0xA1); Add("Right Alt", 0xA5);
+            Add("Backspace", 0x08); Add("Tab", 0x09); Add("Caps Lock", 0x14);
+            Add("Num lock", 0x90); Add("Scroll lock", 0x91); Add("Pause", 0x13);
+            Add("`", 0xC0); Add("-", 0xBD); Add("=", 0xBB);
+            Add("[", 0xDB); Add("]", 0xDD); Add("\\", 0xDC);
+            Add(";", 0xBA); Add("'", 0xDE); Add(",", 0xBC); Add(".", 0xBE); Add("/", 0xBF);
+            BuildDik();
+        }
+
+        static void Add(string name, int code)
+        {
+            ByName[name] = code;
+            if (!ByCode.ContainsKey(code)) ByCode[code] = name;
+        }
+
+        // DirectInput scan codes. A different numbering to the one above, used
+        // by most of the mods here, and the reason a key cannot simply be
+        // copied from one setting to another.
+        static readonly Dictionary<string, int> DikByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        static readonly Dictionary<int, string> DikByCode = new Dictionary<int, string>();
+
+        static void Dik(string name, int code)
+        {
+            DikByName[name] = code;
+            if (!DikByCode.ContainsKey(code)) DikByCode[code] = name;
+        }
+
+        static void BuildDik()
+        {
+            string row1 = "QWERTYUIOP";
+            for (int i = 0; i < row1.Length; i++) Dik(row1[i].ToString(), 16 + i);
+            string row2 = "ASDFGHJKL";
+            for (int i = 0; i < row2.Length; i++) Dik(row2[i].ToString(), 30 + i);
+            string row3 = "ZXCVBNM";
+            for (int i = 0; i < row3.Length; i++) Dik(row3[i].ToString(), 44 + i);
+            for (int i = 1; i <= 9; i++) Dik(i.ToString(), 1 + i);
+            Dik("0", 11);
+            for (int i = 1; i <= 10; i++) Dik("F" + i, 58 + i);
+            Dik("F11", 87); Dik("F12", 88);
+
+            Dik("Esc", 1); Dik("-", 12); Dik("=", 13); Dik("Backspace", 14); Dik("Tab", 15);
+            Dik("[", 26); Dik("]", 27); Dik("Enter", 28); Dik("Left Ctrl", 29);
+            Dik(";", 39); Dik("'", 40); Dik("`", 41);
+            Dik("Left Shift", 42); Dik("\\", 43); Dik(",", 51); Dik(".", 52); Dik("/", 53);
+            Dik("Right Shift", 54);
+            Dik("Num *", 55); Dik("Left Alt", 56); Dik("Space", 57); Dik("Caps Lock", 58);
+            Dik("Num Lock", 69); Dik("Scroll Lock", 70);
+            Dik("Num 7", 71); Dik("Num 8", 72); Dik("Num 9", 73); Dik("Num -", 74);
+            Dik("Num 4", 75); Dik("Num 5", 76); Dik("Num 6", 77); Dik("Num +", 78);
+            Dik("Num 1", 79); Dik("Num 2", 80); Dik("Num 3", 81); Dik("Num 0", 82); Dik("Num .", 83);
+            Dik("Num Enter", 156); Dik("Right Ctrl", 157); Dik("Num /", 181);
+            Dik("Print Screen", 183); Dik("Right Alt", 184); Dik("Pause", 197);
+            Dik("Home", 199); Dik("Up", 200); Dik("Page up", 201); Dik("Left", 203);
+            Dik("Right", 205); Dik("End", 207); Dik("Down", 208); Dik("Page down", 209);
+            Dik("Insert", 210); Dik("Delete", 211);
+
+            // Mouse rides on the same numbering, offset past the keyboard.
+            Dik("Left mouse", 256); Dik("Right mouse", 257); Dik("Middle mouse", 258);
+            Dik("Mouse 4", 259); Dik("Mouse 5", 260);
+            Dik("Wheel up", 264); Dik("Wheel down", 265);
+        }
+
+        /// <summary>
+        /// The same key as a browser's KeyboardEvent.code, for the voice
+        /// window. It runs in a browser rather than in the game, so it speaks
+        /// neither DirectInput nor Windows virtual keys, and the launcher is
+        /// the only thing that knows what a binding is actually set to.
+        /// Translating by name rather than by number means a rebind cannot
+        /// land on a different letter than the one on the page.
+        /// </summary>
+        public static string JsCode(string id)
+        {
+            string name = null;
+            foreach (Binding b in All())
+            {
+                if (string.Equals(b.Id, id, StringComparison.Ordinal)) { name = b.Value; break; }
+            }
+            if (string.IsNullOrEmpty(name)) return null;
+            name = name.Trim();
+
+            if (name.Length == 1)
+            {
+                char c = char.ToUpperInvariant(name[0]);
+                if (c >= 'A' && c <= 'Z') return "Key" + c;
+                if (c >= '0' && c <= '9') return "Digit" + c;
+            }
+            switch (name.ToLowerInvariant())
+            {
+                case "space": return "Space";
+                case "tab": return "Tab";
+                case "escape": case "esc": return "Escape";
+                case "enter": case "return": return "Enter";
+                case "left shift": return "ShiftLeft";
+                case "right shift": return "ShiftRight";
+                case "left ctrl": case "left control": return "ControlLeft";
+                case "right ctrl": case "right control": return "ControlRight";
+                case "left alt": return "AltLeft";
+                case "right alt": return "AltRight";
+                case "caps lock": return "CapsLock";
+                case "backspace": return "Backspace";
+            }
+            if (name.Length >= 2 && (name[0] == 'F' || name[0] == 'f'))
+            {
+                int fn;
+                if (int.TryParse(name.Substring(1), out fn) && fn >= 1 && fn <= 12) return "F" + fn;
+            }
+            // Anything this does not know about is better left unbound in the
+            // voice window than guessed at: the window falls back to its own
+            // default and the Controls page still shows the truth.
+            return null;
+        }
+
+        public static string DikName(int code)
+        {
+            if (code < 0) return "not bound";
+            string n;
+            return DikByCode.TryGetValue(code, out n) ? n : ("code " + code);
+        }
+
+        public static bool DikKnown(int code) { return DikByCode.ContainsKey(code); }
+        public static int DikOf(string name) { int c; return DikByName.TryGetValue(name, out c) ? c : -1; }
+
+        public static bool Known(int code) { return ByCode.ContainsKey(code); }
+        public static string Name(int code) { string n; return ByCode.TryGetValue(code, out n) ? n : ""; }
+
+        static string ReadIni(string file, string key)
+        {
+            try
+            {
+                if (!File.Exists(file)) return null;
+                var rx = new Regex("^\\s*" + Regex.Escape(key) + "\\s*=\\s*(.*?)\\s*$", RegexOptions.IgnoreCase);
+                foreach (string line in File.ReadAllLines(file))
+                {
+                    string t = line.TrimStart();
+                    if (t.StartsWith(";") || t.StartsWith("#")) continue;
+                    Match m = rx.Match(line);
+                    if (m.Success) return m.Groups[1].Value;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>
+        /// Rewrites one key in place, leaving every comment and every other
+        /// line alone, and keeping the file's own spacing around the equals.
+        /// SkyUI writes iSearchKey=57 with no spaces and reads its own file
+        /// back strictly, so reformatting it is how a settings file gets
+        /// silently ignored.
+        /// </summary>
+        static bool WriteIni(string file, string key, string value)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(key)) return true;
+                if (!File.Exists(file)) return false;
+                var lines = new List<string>(File.ReadAllLines(file));
+                var rx = new Regex("^(\\s*)(" + Regex.Escape(key) + ")(\\s*=\\s*)", RegexOptions.IgnoreCase);
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    string t = lines[i].TrimStart();
+                    if (t.StartsWith(";") || t.StartsWith("#")) continue;
+                    Match m = rx.Match(lines[i]);
+                    if (!m.Success) continue;
+                    lines[i] = m.Groups[1].Value + m.Groups[2].Value + m.Groups[3].Value + value;
+                    File.WriteAllLines(file, lines.ToArray());
+                    return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// SkyMP keeps its own keys in skymp5-client-settings.txt, as names
+        /// rather than codes, under "keybinds". The block is optional: the
+        /// client falls back to its built in defaults when it is absent, which
+        /// is why a fresh install has no keybinds section at all and the voice
+        /// key still works. So a missing value is not an error here, it is the
+        /// default, and writing one creates the block.
+        /// </summary>
+        static string ReadJsonKey(string file, string key)
+        {
+            try
+            {
+                if (!File.Exists(file)) return null;
+                string t = File.ReadAllText(file);
+                var m = Regex.Match(t, "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"([^\"]*)\"");
+                return m.Success ? m.Groups[1].Value : null;
+            }
+            catch { return null; }
+        }
+
+        static bool WriteJsonKey(string file, string key, string value)
+        {
+            try
+            {
+                if (!File.Exists(file)) return false;
+                string t = File.ReadAllText(file);
+
+                if (Regex.IsMatch(t, "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"[^\"]*\""))
+                {
+                    t = Regex.Replace(t, "(\"" + Regex.Escape(key) + "\"\\s*:\\s*)\"[^\"]*\"",
+                                      "$1\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("$", "$$") + "\"");
+                }
+                else if (Regex.IsMatch(t, "\"keybinds\"\\s*:\\s*\\{"))
+                {
+                    t = Regex.Replace(t, "(\"keybinds\"\\s*:\\s*\\{)",
+                                      "$1\n    \"" + key + "\": \"" + value + "\",");
+                }
+                else
+                {
+                    // No block yet. Put one in right after the opening brace.
+                    int brace = t.IndexOf('{');
+                    if (brace < 0) return false;
+                    t = t.Substring(0, brace + 1) +
+                        "\n  \"keybinds\": {\n    \"" + key + "\": \"" + value + "\"\n  }," +
+                        t.Substring(brace + 1);
+                }
+
+                // No byte order mark. The client's JSON reader stops on one.
+                File.WriteAllText(file, t, new System.Text.UTF8Encoding(false));
+                return true;
+            }
+            catch { return false; }
+        }
+
+        static Binding Mp(string id, string group, string label, string what, string key, string fallback)
+        {
+            string got = ReadJsonKey(MpJson, key);
+            return new Binding {
+                Id = id, Group = group, Label = label, What = what,
+                How = Codes.JsonName, File = MpJson, Key = key,
+                Value = string.IsNullOrEmpty(got) ? fallback : got };
+        }
+
+        static Binding Vk(string id, string group, string label, string what, string file, string key, int fallback)
+        {
+            string raw = ReadIni(file, key);
+            return new Binding {
+                Id = id, Group = group, Label = label, What = what,
+                How = Codes.VirtualKeyHex, File = file, Key = key,
+                Value = Name(ParseCode(raw, fallback)) };
+        }
+
+        static Binding Dx(string id, string group, string label, string what, string file, string key, int fallback)
+        {
+            string raw = ReadIni(file, key);
+            return new Binding {
+                Id = id, Group = group, Label = label, What = what,
+                How = Codes.DirectInput, File = file, Key = key,
+                Value = DikName(ParseCode(raw, fallback)) };
+        }
+
+        static Binding Dxd(string id, string group, string label, string what, string file, string key, string key2, int fallback)
+        {
+            string raw = ReadIni(file, key);
+            return new Binding {
+                Id = id, Group = group, Label = label, What = what,
+                How = Codes.DirectInputDecimal, File = file, Key = key, Key2 = key2,
+                Value = DikName(ParseCode(raw, fallback)) };
+        }
+
+        public static List<Binding> All()
+        {
+            var l = new List<Binding>();
+
+            l.Add(Vk("ui", "Multiplayer", "The party menu",
+                     "Everyone connected, teleporting to them, chat, and connecting by hand if the automatic one ever misses.",
+                     TweaksIni, "uUiKeyCode", 0x71));
+
+            l.Add(Vk("debug", "Multiplayer", "The connection readout",
+                     "Latency and sync while you play. Worth a look when movement goes choppy.",
+                     TweaksIni, "uDebugMenuKeyCode", 0x72));
+
+            // Not F1, which is what this shipped as. skymp5-client binds F1
+            // to toggling the names above people's heads, and that binding is
+            // compiled in: it cannot be moved from here. Every press of F1 to
+            // open mod settings also turned everybody's name off, and the next
+            // press turned them back on, which reads as names flickering at
+            // random rather than as a key doing two things.
+            //
+            // The same client also holds F2 (hides the overlay, so the chat and
+            // the wheel with it) and F6 (takes its focus). Those are worth
+            // knowing about before binding anything near them.
+            string menu = ReadIni(MenuIni, "ToggleKey");
+            l.Add(new Binding {
+                Id = "menu", Group = "Settings", Label = "Mod settings",
+                What = "TrueHUD, Precision and the rest of the newer mods live here rather than in the old MCM.",
+                How = Codes.ByName, File = MenuIni, Key = "ToggleKey",
+                Value = string.IsNullOrEmpty(menu) ? "F4" : menu.Trim() });
+
+            l.Add(Dx("trade", "Trading", "Start a trade",
+                     "Offers a trade to whoever is under your crosshair. They have thirty seconds to take it.",
+                     TradeIni, "TradeKey", 20));
+            l.Add(Dx("tradeadd", "Trading", "Offer the selected item",
+                     "Inside a trade, moves the highlighted item into what you are offering.",
+                     TradeIni, "AddItemKey", 210));
+            l.Add(Dx("traderem", "Trading", "Take it back out",
+                     "Inside a trade, pulls the highlighted item back out of your offer.",
+                     TradeIni, "RemoveItemKey", 211));
+            l.Add(Dx("goldadd", "Trading", "Add gold",
+                     "Inside a trade, adds gold to your side of it.",
+                     TradeIni, "GoldAddKey", 78));
+            l.Add(Dx("goldrem", "Trading", "Remove gold",
+                     "Inside a trade, takes gold back off your side.",
+                     TradeIni, "GoldRemoveKey", 74));
+            l.Add(Dx("tradecancel", "Trading", "Cancel the trade",
+                     "Walks away from an open trade.",
+                     TradeIni, "CancelKey", 15));
+
+            l.Add(Dxd("map", "Minimap", "Show or hide the minimap",
+                      "Tap it to turn the corner map on and off. Hold it and the map goes into move and zoom mode, so you can drag it where you want it.",
+                      MapIni, "uMiniMap_controls_btn", "uMiniMap_controls_secondbtn", 38));
+            l.Add(Dxd("mapsettings", "Minimap", "Minimap settings",
+                      "Opens the minimap's own panel: scale, transparency, fog of war, which markers it draws, and the meters that sit under it.",
+                      MapIni, "uMenuManager_open_btn", "uMenuManager_open_secondbtn", 37));
+
+            l.Add(Dx("search", "Inventory", "Search",
+                     "Types into the search box at the top of any inventory, container or barter list.",
+                     SkyUiIni, "iSearchKey", 57));
+            l.Add(Dx("switchtab", "Inventory", "Switch column",
+                     "Jumps between the two halves of a container or a trade without reaching for the mouse.",
+                     SkyUiIni, "iSwitchTabKey", 56));
+            l.Add(Dx("equipmode", "Inventory", "Equip mode",
+                     "Held down, equips to the other hand instead of the usual one.",
+                     SkyUiIni, "iEquipModeKey", 42));
+            l.Add(Dx("favadd", "Favourites", "Add to a group",
+                     "In the favourites menu, puts the highlighted item into one of the eight groups.",
+                     SkyUiIni, "iFavoriteGroupAddKey", 33));
+            l.Add(Dx("favuse", "Favourites", "Equip a whole group",
+                     "In the favourites menu, equips everything in the highlighted group at once.",
+                     SkyUiIni, "iFavoriteGroupUseKey", 19));
+            l.Add(Dx("favicon", "Favourites", "Set a group's icon",
+                     "In the favourites menu, changes the icon shown against a group.",
+                     SkyUiIni, "iFavoriteSetIconKey", 56));
+            l.Add(Dx("favstate", "Favourites", "Change how a group equips",
+                     "In the favourites menu, switches an item between equip, unequip and toggle.",
+                     SkyUiIni, "iFavoriteEquipStateKey", 20));
+            l.Add(Dx("favfocus", "Favourites", "Move between items and groups",
+                     "In the favourites menu, moves the cursor between the item list and the group list.",
+                     SkyUiIni, "iFavoriteToggleFocusKey", 57));
+            l.Add(Dx("favhot1", "Favourites", "Group 1 in the world",
+                     "Out in the world, equips favourites group one without opening anything.",
+                     SkyUiIni, "iFavoriteGroupUseHotkey1", 59));
+            l.Add(Dx("favhot2", "Favourites", "Group 2 in the world",
+                     "Out in the world, equips favourites group two.",
+                     SkyUiIni, "iFavoriteGroupUseHotkey2", 60));
+            l.Add(Dx("favhot3", "Favourites", "Group 3 in the world",
+                     "Out in the world, equips favourites group three.",
+                     SkyUiIni, "iFavoriteGroupUseHotkey3", 61));
+            l.Add(Dx("favhot4", "Favourites", "Group 4 in the world",
+                     "Out in the world, equips favourites group four.",
+                     SkyUiIni, "iFavoriteGroupUseHotkey4", 62));
+
+            l.Add(Dx("lock", "Combat", "Lock on",
+                     "Holds the camera on whatever you are aiming at.",
+                     TdmIni, "uTargetLockKey", 258));
+            l.Add(Dx("lockleft", "Combat", "Switch target left",
+                     "Moves the lock to the next thing on your left. Unbound by default, the mouse wheel does it.",
+                     TdmIni, "uSwitchTargetLeftKey", -1));
+            l.Add(Dx("lockright", "Combat", "Switch target right",
+                     "Moves the lock to the next thing on your right. Unbound by default.",
+                     TdmIni, "uSwitchTargetRightKey", -1));
+            l.Add(Dx("lockbehind", "Combat", "Look past your target",
+                     "Swings the camera behind whatever you are locked on to. Unbound by default.",
+                     TdmIni, "uTargetLockBehindTargetKey", -1));
+
+            // Thornswood's own. These are read by the SkyrimPlatform plugins out
+            // of the same file, in the same DirectInput numbering, so a rebind
+            // here is a rebind in game with nothing to regenerate.
+            l.Add(Dx("emotewheel", "Thornswood", "The emote wheel",
+                     "Twelve gestures, and a second ring of working animations behind them. Everyone else sees what you play.",
+                     ThornIni, "WheelKey", 48));
+            l.Add(Dx("emotepage", "Thornswood", "The other ring",
+                     "With the wheel open, turns between the gestures and the working animations.",
+                     ThornIni, "PageKey", 15));
+            l.Add(Dx("emoteclose", "Thornswood", "Close the wheel",
+                     "Shuts the wheel without playing anything.",
+                     ThornIni, "CloseKey", 1));
+            l.Add(Dx("emotestop", "Thornswood", "Stand up",
+                     "Breaks you out of an idle that has no natural end. Works whether or not the wheel is open, because that is usually why you want it.",
+                     ThornIni, "StopKey", 49));
+
+            l.Add(Dx("chat", "Thornswood", "Talk in chat",
+                     "Hands the keyboard to the chat box and puts the cursor in it. Escape gives it back to the game. Nothing in Skyrim uses Enter while you are playing, which is why it is here.",
+                     ThornIni, "ChatKey", 28));
+
+            l.Add(Dx("chargenmenu", "Thornswood", "Open the creation menu",
+                     "During character creation, brings up the trade or town question by hand if it has not appeared on its own. Does nothing afterwards.",
+                     ThornIni, "MenuKey", 50));
+
+            l.Add(Dx("cyclehold", "Reaching things", "Cycle modifier",
+                     "Held down, the two keys below step through everything you could reach instead of the game picking for you.",
+                     BtpsIni, "iObjectCycleModifierKey", 42));
+            l.Add(Dx("cycleup", "Reaching things", "Next thing",
+                     "With the modifier held, moves the activate prompt to the next thing in range.",
+                     BtpsIni, "iCycleUpKey", 264));
+            l.Add(Dx("cycledown", "Reaching things", "Previous thing",
+                     "With the modifier held, moves the activate prompt back one.",
+                     BtpsIni, "iCycleDownKey", 265));
+
+            // ------------------------------------------------------- voice
+            // These live in Thornswood.ini beside the emote keys, in the same
+            // scan codes, so they rebind from this page like everything else.
+            // The plugin reads them and forwards the state into the page
+            // drawing the overlay. It has to work that way round: voice needs a
+            // browser and the game's own browser does not hold the keyboard
+            // while you are playing, so a key pressed in the game would never
+            // reach it. There is no second window any more, and nothing to
+            // alt-tab to.
+            l.Add(Dx("ptt", "Voice", "Hold to talk",
+                     "Everyone near you hears you while it is held. Voice is positional: the further away somebody is standing the quieter you are, and past thirty metres they hear nothing.",
+                     ThornIni, "PushToTalk", 47));
+            l.Add(Dx("voicemute", "Voice", "Mute the microphone",
+                     "Off and on outright, whatever the talk key is doing. For when somebody walks into the room.",
+                     ThornIni, "MuteKey", 21));
+
+            // No SkyMP client keys here, deliberately. Keizaal's build reads a
+            // "keybinds" block out of skymp5-client-settings.txt with voice,
+            // nicknames, an overlay and an animation menu in it. This build's
+            // client does not: the only things it reads out of that file are
+            // server-ip, server-port, server-master-key and profileId. Listing
+            // a talk key here would put a row on the Controls page for a
+            // feature that is not compiled in, with a Change button that writes
+            // a setting nothing reads. If voice is ever built into the client,
+            // this is where it goes.
+
+            // Anything whose file is not on this machine is not a key anybody
+            // can press, and listing it is worse than listing nothing: the
+            // minimap sat on this page for weeks after the mod came out of the
+            // build, with a Change button that wrote to a file that was not
+            // there. The page is generated from the real files, so it should
+            // be generated from the ones that exist.
+            var live = new List<Binding>();
+            foreach (Binding b in l)
+            {
+                if (string.IsNullOrEmpty(b.File)) { live.Add(b); continue; }
+                try { if (File.Exists(b.File)) live.Add(b); } catch { }
+            }
+            return live;
+        }
+
+        static int ParseCode(string raw, int fallback)
+        {
+            if (string.IsNullOrEmpty(raw)) return fallback;
+            raw = raw.Trim();
+            try
+            {
+                if (raw.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                    return Convert.ToInt32(raw.Substring(2), 16);
+                int n;
+                if (int.TryParse(raw, out n)) return n;
+                // The minimap writes its buttons as 38.000000.
+                double d;
+                if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out d))
+                    return (int)Math.Round(d);
+            }
+            catch { }
+            return fallback;
+        }
+
+        /// <summary>
+        /// Returns an empty string on success, or why it refused.
+        /// </summary>
+        public static string Set(Binding b, int virtualKey)
+        {
+            if (!Known(virtualKey))
+                return "That key cannot be used here. Try a function key, a letter, or something like Insert.";
+
+            string name = Name(virtualKey);
+
+            // The DirectInput settings speak a different numbering, so the key
+            // has to be translated by name rather than by number. A key the two
+            // tables do not share cannot be used for those.
+            int dik = -1;
+            bool isDik = b.How == Codes.DirectInput || b.How == Codes.DirectInputDecimal;
+            if (isDik)
+            {
+                dik = DikOf(name);
+                if (dik < 0) return name + " is not a key that mod can bind. Try a letter or a function key.";
+            }
+
+            // Two things on the same key leaves one of them unreachable with no
+            // way to tell which. Only within the same file and the same group,
+            // though: SkyUI deliberately reuses Space and Left Alt between the
+            // inventory and the favourites menu, and those never fire together.
+            foreach (Binding other in All())
+            {
+                if (other.Id == b.Id) continue;
+                if (!string.Equals(other.File, b.File, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!string.Equals(other.Group, b.Group, StringComparison.OrdinalIgnoreCase)) continue;
+                string mine = isDik ? DikName(dik) : name;
+                if (string.Equals(other.Value, mine, StringComparison.OrdinalIgnoreCase))
+                    return mine + " is already " + other.Label.ToLowerInvariant() + ".";
+            }
+
+            bool ok;
+            if (b.How == Codes.DirectInputDecimal)
+            {
+                string v = dik.ToString("0.000000", CultureInfo.InvariantCulture);
+                ok = WriteIni(b.File, b.Key, v);
+                if (ok && !string.IsNullOrEmpty(b.Key2)) WriteIni(b.File, b.Key2, v);
+            }
+            else if (b.How == Codes.DirectInput) ok = WriteIni(b.File, b.Key, dik.ToString());
+            else if (b.How == Codes.VirtualKeyHex) ok = WriteIni(b.File, b.Key, "0x" + virtualKey.ToString("X2"));
+            else if (b.How == Codes.JsonName) ok = WriteJsonKey(b.File, b.Key, name);
+            else ok = WriteIni(b.File, b.Key, name);
+
+            if (!ok) return "Could not write " + Path.GetFileName(b.File) + ".";
+            return "";
+        }
+    }
+}

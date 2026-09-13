@@ -1,0 +1,3466 @@
+{
+ "_note": "Humanoid animation events extracted from IDLE records (ENAM) in Skyrim.esm + Dragonborn.esm, filtered to animations under Actors\\Character\\Behaviors. Pass any `event` to Debug.SendAnimationEvent(player, event). Exit with IdleStop.",
+ "_counts": {
+  "idleRecordsTotal": 2696,
+  "humanoid": 709,
+  "distinctEvents": 576
+ },
+ "events": [
+  {
+   "event": "00NextClip",
+   "edid": "IdleStudy_exit",
+   "formId": "0x000977EE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackPowerStartBackLeftHand",
+   "edid": "LeftHandPowerAttackBack",
+   "formId": "0x000E3F3A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackPowerStartDualWield",
+   "edid": "DualWieldSpecialPowerAttack",
+   "formId": "0x0002E901",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackPowerStartForwardH2HLeftHand",
+   "edid": "H2HLeftHandPowerAttack",
+   "formId": "0x000E3F3B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackPowerStartForwardH2HRightHand",
+   "edid": "H2HRightHandPowerAttack",
+   "formId": "0x000E3F3D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackPowerStartH2HCombo",
+   "edid": "RightH2HComboPowerAttack",
+   "formId": "0x000C2063",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackPowerStartInPlaceLeftHand",
+   "edid": "LeftHandPowerAttack",
+   "formId": "0x0002E900",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackPowerStartLeft",
+   "edid": "PowerAttackLeft",
+   "formId": "0x00019B22",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackPowerStartLeftLeftHand",
+   "edid": "LeftHandPowerAttackLeft",
+   "formId": "0x000E3F39",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackPowerStartRightLeftHand",
+   "edid": "LeftHandPowerAttackRight",
+   "formId": "0x000E3F38",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackRelease",
+   "edid": "RightAttackRelease",
+   "formId": "0x0001455C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackReleaseL",
+   "edid": "LeftAttackRelease",
+   "formId": "0x01000983",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackStart",
+   "edid": "NormalAttack",
+   "formId": "0x00013215",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackStart_MC_1HMRight",
+   "edid": "AttackRightSide",
+   "formId": "0x01000981",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackStartDualWield",
+   "edid": "DualWieldPowerAttack",
+   "formId": "0x000BCF31",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "AttackStartH2HLeft",
+   "edid": "AttackLeftH2H",
+   "formId": "0x000870D5",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "AttackStartH2HRight",
+   "edid": "AttackRightH2H",
+   "formId": "0x000870D6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "attackStartLeftHand",
+   "edid": "LeftHandAttack",
+   "formId": "0x000BACC3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "bashFail",
+   "edid": "BashFail",
+   "formId": "0x000AF8BE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "bashPowerStart",
+   "edid": "PowerBash",
+   "formId": "0x000E8452",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "bashRelease",
+   "edid": "BashRelease",
+   "formId": "0x0009753C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "bashStart",
+   "edid": "BowBash",
+   "formId": "0x000A7032",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "bleedOutStart",
+   "edid": "BleedoutStart",
+   "formId": "0x00013ECC",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "bleedOutStop",
+   "edid": "BleedoutStop",
+   "formId": "0x00013ECE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "blockAnticipateStart",
+   "edid": "BlockAnticipate",
+   "formId": "0x000193D0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "blockHitStart",
+   "edid": "BlockHit",
+   "formId": "0x00013AF7",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "blockStart",
+   "edid": "BowZoom",
+   "formId": "0x000A7033",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "blockStop",
+   "edid": "StopBlocking",
+   "formId": "0x00013ACA",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "BoundStandingCut",
+   "edid": "BoundStandingCut",
+   "formId": "0x00109B6A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "BoundStandingCutNPC",
+   "edid": "BoundStandingCutNPC",
+   "formId": "0x00109B69",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "bowAttackStart",
+   "edid": "BowAttack",
+   "formId": "0x0005177C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "ChairDrinkingStart",
+   "edid": "ChairDrinkingStart",
+   "formId": "0x00065D07",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "ChairEatingSoupStart",
+   "edid": "ChairEatingSoupStart",
+   "formId": "0x00102EBF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "ChairEatingStart",
+   "edid": "ChairEatingStart",
+   "formId": "0x00065D06",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "ChairReadingIdles",
+   "edid": "IdleBookSitting_TurnManyPages",
+   "formId": "0x0003505D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "ChairReadingStart",
+   "edid": "IdleBookSitting_Reading",
+   "formId": "0x0003505C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "CombatReady_BreathExhaleShort",
+   "edid": "VoiceReleaseWeaponOut",
+   "formId": "0x00016980",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "DeathAnim",
+   "edid": "DeathAnimationStart",
+   "formId": "0x0008A916",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "DialogueNeutral",
+   "edid": "DialogueNeutralExpressive",
+   "formId": "0x000E5190",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "DragonMountEnter",
+   "edid": "DragonMount",
+   "formId": "0x02017717",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "DragonMountEnterInstant",
+   "edid": "DragonMountInstant",
+   "formId": "0x02017716",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "DragonMountExit",
+   "edid": "DragonDismount",
+   "formId": "0x02017718",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "DrunkStart",
+   "edid": "IdleDrunkStart",
+   "formId": "0x000CEFD0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "DrunkStop",
+   "edid": "IdleDrunkStop",
+   "formId": "0x000CEFD1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "ExecutionNextClip",
+   "edid": "00NextClip",
+   "formId": "0x0010EB3C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "FlinchStart",
+   "edid": "Flinch",
+   "formId": "0x0002F620",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "GetUpBegin",
+   "edid": "NPCGetUp",
+   "formId": "0x000FDC61",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "Ground_Dismount_Dragon",
+   "edid": "GroundDismountDragonNPC",
+   "formId": "0x0010A294",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "HorseEnter",
+   "edid": "Mount",
+   "formId": "0x000296E5",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "HorseEnterInstant",
+   "edid": "EnterHorseInstant",
+   "formId": "0x0005701D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "HorseExit",
+   "edid": "Dismount",
+   "formId": "0x000296E8",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "HorseExitSwim",
+   "edid": "DismountSwim",
+   "formId": "0x0010E3BC",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "Idle_1stPersonWoozyGetUpFromBed",
+   "edid": "Idle_1stPersonWoozyGetUpFromBed",
+   "formId": "0x000CF2C6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_left_longTrans",
+   "edid": "Idle_A_left_longTrans",
+   "formId": "0x0004FEFE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_leg_shift",
+   "edid": "idle_A_leg_shift",
+   "formId": "0x0005159F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_pull_pants",
+   "edid": "idle_A_pull_pants",
+   "formId": "0x0005159E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_scratch_back",
+   "edid": "idle_A_scratch_back",
+   "formId": "0x000515A0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_shakeout",
+   "edid": "idle_A_shakeout",
+   "formId": "0x000515A1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_shoulders",
+   "edid": "idle_A_shoulders",
+   "formId": "0x000F6916",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_shouldersVar1",
+   "edid": "idle_A_shouldersVar1",
+   "formId": "0x000515A3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_sigh_var1Trans",
+   "edid": "idle_A_sigh_var1Trans",
+   "formId": "0x0004FF00",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_sigh_var2Trans",
+   "edid": "idle_A_sigh_var2Trans",
+   "formId": "0x000F6915",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_soft_rightTrans",
+   "edid": "idle_A_soft_right_trans",
+   "formId": "0x0004FF01",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_swat_flies",
+   "edid": "idle_A_swat_flies",
+   "formId": "0x000515A4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idle_A_sway_fastTrans",
+   "edid": "idle_A_sway_fastTrans",
+   "formId": "0x0004FF02",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleActivatePickUp",
+   "edid": "IdleActivatePickUp",
+   "formId": "0x0008B5D2",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleAltarEnter",
+   "edid": "IdleAltarEnterLeft",
+   "formId": "0x000DCD23",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleAltarEnterInstant",
+   "edid": "IdleAltarEnterInstantLeft",
+   "formId": "0x000DCD21",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleApplaud2",
+   "edid": "IdleApplaud2",
+   "formId": "0x000D8730",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleApplaud3",
+   "edid": "IdleApplaud3",
+   "formId": "0x000D8731",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleApplaud4",
+   "edid": "IdleApplaud4",
+   "formId": "0x000D8732",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleApplaud5",
+   "edid": "IdleApplaud5",
+   "formId": "0x000D8733",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleApplaudSarcastic",
+   "edid": "IdleApplaudSarcastic",
+   "formId": "0x000E9312",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleAstridEnter",
+   "edid": "IdleAstrid",
+   "formId": "0x000EC25A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBarCounterEnter",
+   "edid": "IdleBarCounterEnter",
+   "formId": "0x000F6CCA",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBarCounterEnterInstant",
+   "edid": "IdleBarCounterEnterInstant",
+   "formId": "0x000F6CC9",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBarCounterWipe",
+   "edid": "BarCounterWipe",
+   "formId": "0x000F57C8",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleBarDrinkingStart",
+   "edid": "idleBarDrinkingStart",
+   "formId": "0x00097273",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedExitStart",
+   "edid": "ExitBed",
+   "formId": "0x000D7942",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedLeftEnterInstant",
+   "edid": "LeftBedEnterInstant",
+   "formId": "0x000D8C34",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedLeftEnterStart",
+   "edid": "LeftBedEnter",
+   "formId": "0x0002F793",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedQuickExitStart",
+   "edid": "BedQuickExit",
+   "formId": "0x000E4AE7",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedRightEnterInstant",
+   "edid": "RightBedEnterInstant",
+   "formId": "0x000D8C35",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedRightEnterStart",
+   "edid": "RightBedEnter",
+   "formId": "0x0002F794",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedRollFrontEnterInstant",
+   "edid": "FrontBedRollEnterInstant",
+   "formId": "0x000E4615",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedRollFrontEnterStart",
+   "edid": "FrontBedRollEnter",
+   "formId": "0x000E4619",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedRollLeftEnterInstant",
+   "edid": "LeftBedRollEnterInstant",
+   "formId": "0x000E4613",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedRollLeftEnterStart",
+   "edid": "LeftBedRollEnter",
+   "formId": "0x000E4617",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedRollRightEnterInstant",
+   "edid": "RightBedRollEnterInstant",
+   "formId": "0x000E4614",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBedRollRightEnterStart",
+   "edid": "RightBedRollEnter",
+   "formId": "0x000E4618",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBlackSmithEnterInstant",
+   "edid": "BlackSmithingInstant",
+   "formId": "0x00048C9A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBlackSmithingEnterStart",
+   "edid": "BlackSmithingEnter",
+   "formId": "0x00048A80",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBlessingKneelEnter",
+   "edid": "IdleBlessingKneelEnter",
+   "formId": "0x000F11EE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBlessingKneelEnterInstant",
+   "edid": "IdleBlessingKneelEnterInstant",
+   "formId": "0x000F11ED",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBlowHornImperial",
+   "edid": "IdleBlowHornImperial",
+   "formId": "0x000F6CCE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBlowHornStormcloak",
+   "edid": "IdleBlowHornStormcloak",
+   "formId": "0x000F6CCD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBook_OnePage",
+   "edid": "IdleBook_TurnOnePage",
+   "formId": "0x0002EE6A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBook_PageTurn",
+   "edid": "IdleBook_TurnManyPages",
+   "formId": "0x000BB053",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBook_Read",
+   "edid": "IdleBook_Reading",
+   "formId": "0x000BB052",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBook_ReadTG06",
+   "edid": "IdleBook_ReadTG06",
+   "formId": "0x0010DDBF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBoundKneesEnterInstant",
+   "edid": "IdleBoundKneesEnterInstant",
+   "formId": "0x000A19E3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBoyRitual",
+   "edid": "IdleBoyRitual",
+   "formId": "0x000B8F22",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleBracedPain",
+   "edid": "IdleBracedPain",
+   "formId": "0x000D8735",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCannibalFeedCrouching",
+   "edid": "IdleCannibalFeedCrouching",
+   "formId": "0x000FE09F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCannibalFeedStanding",
+   "edid": "IdleCannibalFeedStanding",
+   "formId": "0x000FE09E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartDriverExit",
+   "edid": "IdleCartDriverExit",
+   "formId": "0x0007592F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartDriverIdle",
+   "edid": "IdleCartDriverIdle",
+   "formId": "0x000B8C4E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartDriverSway",
+   "edid": "IdleCartDriverSway",
+   "formId": "0x00106AE9",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartExitInstant",
+   "edid": "IdleCartExitInstant",
+   "formId": "0x000EBE2F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerAExit",
+   "edid": "IdleCartPrisonerAExit",
+   "formId": "0x0001C0BF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerAIdle",
+   "edid": "IdleCartPrisonerAIdle",
+   "formId": "0x000B8C50",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerASway",
+   "edid": "IdleCartPrisonerASway",
+   "formId": "0x00106AE3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerBExit",
+   "edid": "IdleCartPrisonerBExit",
+   "formId": "0x0007592C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerBIdle",
+   "edid": "IdleCartPrisonerBIdle",
+   "formId": "0x000B8C51",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerBSway",
+   "edid": "IdleCartPrisonerBSway",
+   "formId": "0x00106AE4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerCExit",
+   "edid": "IdleCartPrisonerCExit",
+   "formId": "0x0007592D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerCIdle",
+   "edid": "IdleCartPrisonerCIdle",
+   "formId": "0x000B8C4F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerCSway",
+   "edid": "IdleCartPrisonerCSway",
+   "formId": "0x00106AE5",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerDExit",
+   "edid": "IdleCartPrisonerDExit",
+   "formId": "0x0007592E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerDIdle",
+   "edid": "IdleCartPrisonerDIdle",
+   "formId": "0x000B8C52",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartPrisonerDSway",
+   "edid": "IdleCartPrisonerDSway",
+   "formId": "0x00106AE6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartTravelDriverEnter",
+   "edid": "IdleCartTravelDriverEnter",
+   "formId": "0x00103448",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartTravelDriverEnterInstant",
+   "edid": "IdleCartTravelDriverEnterInstant",
+   "formId": "0x00103447",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartTravelPlayerEnter",
+   "edid": "IdleCartTravelPlayerEnter",
+   "formId": "0x0010344C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCartTravelPlayerEnterInstant",
+   "edid": "IdleCartTravelPlayerEnterInstant",
+   "formId": "0x0010344B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleChairArmsCrossedVar1",
+   "edid": "SittingChairArmsCrossedVar1",
+   "formId": "0x0006BA99",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleChairArmsCrossedVar2",
+   "edid": "SittingChairArmsCrossedVar2",
+   "formId": "0x0006BA9A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairCHILDEnterInstant",
+   "edid": "EnterChairCHILDInstant",
+   "formId": "0x001090B1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairCHILDFrontEnter",
+   "edid": "EnterChairCHILDFront",
+   "formId": "0x001090AD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairCHILDFrontExit",
+   "edid": "ExitChairCHILDFront",
+   "formId": "0x001090AE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairCHILDLeftEnter",
+   "edid": "EnterChairCHILDLeft",
+   "formId": "0x001090AB",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairCHILDLeftExit",
+   "edid": "ExitChairCHILDLeft",
+   "formId": "0x001090AF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairCHILDRightEnter",
+   "edid": "EnterChairCHILDRight",
+   "formId": "0x001090AC",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairCHILDRightExit",
+   "edid": "ExitChairCHILDRight",
+   "formId": "0x001090B0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairEnterInstant",
+   "edid": "EnterChairInstant",
+   "formId": "0x00031728",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairExitStart",
+   "edid": "IdleHadvarWriteLedgerExit",
+   "formId": "0x0010ACAE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairFrontEnter",
+   "edid": "EnterChairFront",
+   "formId": "0x0003B071",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairFrontExit",
+   "edid": "ExitChairFront",
+   "formId": "0x0006BDCE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairFrontQuickExit",
+   "edid": "ExitChairFrontQuick",
+   "formId": "0x000FB907",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairLeftEnter",
+   "edid": "EnterChairLeft",
+   "formId": "0x0003B06F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleChairLeftExit",
+   "edid": "ExitChairLeft",
+   "formId": "0x0006BDCC",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairLeftQuickExit",
+   "edid": "ExitChairLeftQuick",
+   "formId": "0x000FB908",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleChairLookDown",
+   "edid": "SittingChairLookDown",
+   "formId": "0x0006BA9B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairRightEnter",
+   "edid": "EnterChairRight",
+   "formId": "0x0003B070",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleChairRightExit",
+   "edid": "ExitChairRight",
+   "formId": "0x0006BDCD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairRightQuickExit",
+   "edid": "ExitChairRightQuick",
+   "formId": "0x000FB909",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleChairShoulderFlex",
+   "edid": "SittingChairShoulderFlex",
+   "formId": "0x0006BA98",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairVar1",
+   "edid": "SittingChairVar1",
+   "formId": "0x0006BA9E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleChairVar2",
+   "edid": "SittingChairVar2",
+   "formId": "0x0006BA9C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChairWrite",
+   "edid": "IdleChairWrite",
+   "formId": "0x00105D48",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChildLayOnFloor",
+   "edid": "DLC2_ChildLayOnFloorEnter",
+   "formId": "0x02031448",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChildLayOnFloorInstant",
+   "edid": "DLC2_ChildLayOnFloorEnterInstant",
+   "formId": "0x02031447",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChildSitOnKnees",
+   "edid": "DLC2_ChildSitOnKneesEnter",
+   "formId": "0x02031445",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChildSitOnKneesInstant",
+   "edid": "DLC2_ChildSitOnKneesEnterInstant",
+   "formId": "0x02031444",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChiselKneelingEnter",
+   "edid": "IdleChiselKneelingEnter",
+   "formId": "0x0202A6D0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChiselKneelingEnterInstant",
+   "edid": "IdleChiselKneelingEnterInstant",
+   "formId": "0x0202A6CF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChiselStandingEnter",
+   "edid": "IdleChiselStandingEnter",
+   "formId": "0x02029D2C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleChiselStandingEnterInstant",
+   "edid": "IdleChiselStandingEnterInstant",
+   "formId": "0x02029D2B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCiceroAgitated",
+   "edid": "IdleCiceroAgitated",
+   "formId": "0x00103655",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCiceroDance1",
+   "edid": "IdleCiceroDance1",
+   "formId": "0x000F7C8A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCiceroDance2",
+   "edid": "IdleCiceroDance2",
+   "formId": "0x000F7C8B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCiceroDance3",
+   "edid": "IdleCiceroDance3",
+   "formId": "0x00103653",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCiceroHappy",
+   "edid": "IdleCiceroHappy",
+   "formId": "0x00103654",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCivilWarCheer",
+   "edid": "IdleCivilWarCheer",
+   "formId": "0x000F7C8C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCleanSword",
+   "edid": "IdleCleanSword",
+   "formId": "0x0003EA33",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCO2Ceremony1Welcome",
+   "edid": "IdleCO2Ceremony1Welcome",
+   "formId": "0x000F4331",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCO2Ceremony2Blessing",
+   "edid": "IdleCO2Ceremony2Blessing",
+   "formId": "0x000F4332",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCO2Ceremony3Chest",
+   "edid": "IdleCO2Ceremony3Chest",
+   "formId": "0x000F4333",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCoffinEnter",
+   "edid": "IdleCoffinEnter",
+   "formId": "0x000F6CBB",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCoffinEnterInstant",
+   "edid": "IdleCoffinEnterInstantLeft",
+   "formId": "0x000FDC30",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCombatLookingAroundStart",
+   "edid": "CombatIdleLookingAround",
+   "formId": "0x000F50F3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCombatShieldStart",
+   "edid": "IdleCivilWarShieldCheer",
+   "formId": "0x001074F3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCombatSpecialStart",
+   "edid": "CombatIdleSpecial",
+   "formId": "0x000F50F0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCombatStart",
+   "edid": "CombatIdleStagger_Regular",
+   "formId": "0x0001BAB3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCombatStretchingStart",
+   "edid": "CombatIdleStretching",
+   "formId": "0x000F50F1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCombatWeaponCheckStart",
+   "edid": "CombatIdleWeaponCheck",
+   "formId": "0x000F50F2",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleComeThisWay",
+   "edid": "IdleComeThisWay",
+   "formId": "0x000F6CCF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCounterEnterInstant",
+   "edid": "IdleCounterEnterInstant",
+   "formId": "0x0006CF38",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCounterStart",
+   "edid": "IdleCounterStart",
+   "formId": "0x0006C9C9",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCowerEnter",
+   "edid": "IdleCowerEnter",
+   "formId": "0x000EF94C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCowerEnterInstant",
+   "edid": "IdleCowerEnterInstant",
+   "formId": "0x000EF94B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCowering",
+   "edid": "IdleCower",
+   "formId": "0x000FF9E4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCraftingCookingPotAddIngredient",
+   "edid": "IdleCraftingCookingPotAddIngredient",
+   "formId": "0x00103278",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCraftingCookingPotTalkA",
+   "edid": "IdleCraftingCookingPotTalkA",
+   "formId": "0x00103276",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleCraftingCookingPotTalkB",
+   "edid": "IdleCraftingCookingPotTalkB",
+   "formId": "0x00103277",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDA02BoethiahPostEnter",
+   "edid": "IdleDA02BoethiahPostEnter",
+   "formId": "0x000F3B63",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDA02BoethiahPostEnterInstant",
+   "edid": "IdleDA02BoethiahPostEnterInstant",
+   "formId": "0x000F3B61",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDialogueAngryStart",
+   "edid": "TalkingAngry",
+   "formId": "0x0005654C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDialogueExpressiveStart",
+   "edid": "TalkingExpressive",
+   "formId": "0x0002A060",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDialogueStart",
+   "edid": "Talking",
+   "formId": "0x00017E21",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleDisbelief01Exit",
+   "edid": "DLC2StornReaction1Stop",
+   "formId": "0x0203CF61",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleDisbelief01Start",
+   "edid": "DLC2StornReaction1Start",
+   "formId": "0x0203CF60",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleDisbelief02Exit",
+   "edid": "DLC2StornReaction2Stop",
+   "formId": "0x0203CF63",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleDisbelief02Start",
+   "edid": "DLC2StornReaction2Start",
+   "formId": "0x0203CF62",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDLC02BoatRide",
+   "edid": "IdleDLC02BoatRide",
+   "formId": "0x0203A63F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDLC02FallOnKnees",
+   "edid": "IdleDLC02FallOnKnees",
+   "formId": "0x02031A5B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDLC02MiraakDeath",
+   "edid": "IdleDLC02MiraakDeathStart",
+   "formId": "0x0203D2CE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDLC02MiraakDeathFinish",
+   "edid": "IdleDLC02MiraakDeathFinish",
+   "formId": "0x0203D2D0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDLC02TentacleWordBurnBegin",
+   "edid": "IdleDLC02TentacleWordBurnBegin",
+   "formId": "0x0203D025",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDLC02TentacleWordBurnEnd",
+   "edid": "IdleDLC02TentacleWordBurnEnd",
+   "formId": "0x0203AC78",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDLC2TentacleWarpBook",
+   "edid": "IdleDLC2TentacleWarpBook",
+   "formId": "0x020354DC",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDrink",
+   "edid": "IdleDrink",
+   "formId": "0x000FD68B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDrinkFromFountain",
+   "edid": "IdleDrinkFountain",
+   "formId": "0x00102012",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleDrinkingStandingStart",
+   "edid": "IdleDrinkingStandingStart",
+   "formId": "0x000640FC",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDrinkPotion",
+   "edid": "IdleDrinkPotion",
+   "formId": "0x000D33B0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDrumStart",
+   "edid": "IdleDrumStart",
+   "formId": "0x00096F8B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleDwemerExtractorEnter",
+   "edid": "IdleDwemerExtractor",
+   "formId": "0x000F3A95",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleEatingStandingStart",
+   "edid": "IdleEatingStandingStart",
+   "formId": "0x00064100",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleEatSoup",
+   "edid": "IdleEatSoup",
+   "formId": "0x00102EC1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleExamine",
+   "edid": "IdleExamine",
+   "formId": "0x00075C3D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleExecutionerAlduinReaction",
+   "edid": "IdleExecutionerAlduinReaction",
+   "formId": "0x00100F21",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleExecutionerAlduinReactionDeath",
+   "edid": "IdleExecutionerAlduinReactionDeath",
+   "formId": "0x00106AE7",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleExecutionerChop",
+   "edid": "IdleHeadChop",
+   "formId": "0x00074EC5",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleExecutionerChop_Player",
+   "edid": "IdleExecutionerChop_Player",
+   "formId": "0x000F95BE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleExecutionGuardIdle",
+   "edid": "IdleExecutionerGuardEnter",
+   "formId": "0x000F807C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleExecutionGuardIdleEnterInstant",
+   "edid": "IdleEsxecutionerGuardEnterInstant",
+   "formId": "0x000F807D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleFeedChicken",
+   "edid": "IdleFeedChickens",
+   "formId": "0x000F1225",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleFluteStart",
+   "edid": "IdleFluteStart",
+   "formId": "0x00096F8C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleForceDefaultState",
+   "edid": "ResetRoot",
+   "formId": "0x000E6538",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleFreaDisbelief2LoopStop",
+   "edid": "DLC2IdleFreaDisbelief2Stop",
+   "formId": "0x0203D2BE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleFreaDisbeliefLoopStop",
+   "edid": "DLC2FreaReactionStop",
+   "formId": "0x0203CF66",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleFreaReaction2Start",
+   "edid": "DLC2IdleFreaDisbelief2Start",
+   "formId": "0x0203D2BD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleFreaReactionStart",
+   "edid": "DLC2FreaDisbeliefStart",
+   "formId": "0x0203CF64",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleFreaSorrowExit",
+   "edid": "DLC2FreaSorrowExit",
+   "formId": "0x0203D2C2",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleFreaSorrowLoopEnter",
+   "edid": "DLC2FreaSorrowEnter",
+   "formId": "0x0203D2C0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleFreaSorrowLoopEnterInstant",
+   "edid": "DLC2FreaSorrowEnterInstant",
+   "formId": "0x0203D2C1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleFurnitureExit",
+   "edid": "IdleMQ203EsbernBookExit",
+   "formId": "0x000F6CC3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleFurnitureExitTriggered",
+   "edid": "IdleExecutionerGuardExit",
+   "formId": "0x000F807B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleGetAttention",
+   "edid": "IdleGetAttention",
+   "formId": "0x0006FF15",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleGive",
+   "edid": "IdleGive",
+   "formId": "0x000B5E20",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleGiveMQ105Horn",
+   "edid": "IdleGiveMQ105Horn",
+   "formId": "0x000C6FB4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleGrave_01",
+   "edid": "IdleBowHeadAtGrave_01",
+   "formId": "0x000977EF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleGrave_02",
+   "edid": "IdleBowHeadAtGrave_02",
+   "formId": "0x000977F0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleGreybeardMeditateEnter",
+   "edid": "IdleGreybeardMeditateEnter",
+   "formId": "0x000F6CBE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleGreybeardMeditateEnterInstant",
+   "edid": "IdleGreybeardMeditateEnterInstant",
+   "formId": "0x000F6CBD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleGreybeardWordTeach",
+   "edid": "IdleGreybeardWordTeach",
+   "formId": "0x000F6CCC",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleHandCut",
+   "edid": "IdleHandCut",
+   "formId": "0x000AF886",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleHandsBehindBack",
+   "edid": "IdleHandsBehindBack",
+   "formId": "0x000B240A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleHDRight",
+   "edid": "IdleHDRight",
+   "formId": "0x000E4241",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleHHRight",
+   "edid": "IdleHHRight",
+   "formId": "0x000DC8E8",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleHideREnter",
+   "edid": "HideREnter",
+   "formId": "0x00063F2C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleHideREnterInstant",
+   "edid": "HideREnterInstant",
+   "formId": "0x00063F2B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleHoe",
+   "edid": "IdleHoe",
+   "formId": "0x00075CB4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleJarlChairEnter",
+   "edid": "IdleJarlChairEnter",
+   "formId": "0x00106519",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleJarlChairEnterInstant",
+   "edid": "IdleJarlChairEnterInstant",
+   "formId": "0x00106518",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleKneeling",
+   "edid": "CheckCorpse",
+   "formId": "0x000FB90B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleKneelingEnter",
+   "edid": "IdleKneelingEnter",
+   "formId": "0x000E8E52",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleKneelingEnterInstant",
+   "edid": "IdleKneelingEnterInstant",
+   "formId": "0x000E8E51",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleLaugh",
+   "edid": "IdleLaugh",
+   "formId": "0x00075C5F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleLightSconce",
+   "edid": "IdleLightSconce",
+   "formId": "0x000A28C3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleLockPick",
+   "edid": "IdleLockPick",
+   "formId": "0x000BB051",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleLookFar",
+   "edid": "IdleLookFar",
+   "formId": "0x00075C62",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "idleLooseSweepingStart",
+   "edid": "IdleLooseSweepingStart",
+   "formId": "0x000640FE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleLounge",
+   "edid": "IdleShelfEnterInstant",
+   "formId": "0x000D7AFD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleLounge_Exit",
+   "edid": "IdleShelfExit",
+   "formId": "0x000D7AFE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleLuteStart",
+   "edid": "IdleLuteStart",
+   "formId": "0x00096F8D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleMagic_01",
+   "edid": "IdleMagic_01",
+   "formId": "0x00075CB8",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleMQ201Drink",
+   "edid": "IdleMQ201Drink",
+   "formId": "0x00103656",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleMQ201HoldingDrinkTray",
+   "edid": "IdleMQ201HoldingDrinkTray",
+   "formId": "0x00103657",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleMQ201ToastStart",
+   "edid": "IdleMQ201ToastStart",
+   "formId": "0x0010528A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleMQ203EsbernBookEnter",
+   "edid": "IdleMQ203EsbernBookEnter",
+   "formId": "0x000F6CC2",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleMQ203EsbernBookEnterInstant",
+   "edid": "IdleMQ203EsbernBookEnterInstant",
+   "formId": "0x000F6CC1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleMQ206FelldirRitualEnter",
+   "edid": "IdleMQ206FelldirRitualEnter",
+   "formId": "0x000FB9AE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleMQ206FelldirRitualEnterInstant",
+   "edid": "IdleMQ206FelldirRitualEnterInstant",
+   "formId": "0x000FB9AD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleMQ206FelldirShowScroll",
+   "edid": "IdleMQ206FelldirShowScroll",
+   "formId": "0x000F9AE7",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleMT_DoorBang",
+   "edid": "IdleMT_DoorBang",
+   "formId": "0x000ABEF2",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleNervous",
+   "edid": "IdleNervous",
+   "formId": "0x0010ACB1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleNocturnal_Exit",
+   "edid": "IdleNocturnalExit",
+   "formId": "0x00101A79",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleNocturnal_IdleA",
+   "edid": "IdleNocturnal_IdleA",
+   "formId": "0x000CAD80",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleNocturnal_IdleAMirror",
+   "edid": "IdleNocturnal_IdleAMirror",
+   "formId": "0x000CAD83",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleNocturnal_IdleB",
+   "edid": "IdleNocturnal_IdleB",
+   "formId": "0x000CAD85",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleNocturnal_LookLeft",
+   "edid": "IdleNocturnal_LookLeft",
+   "formId": "0x000CAD82",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleNocturnal_LookRight",
+   "edid": "IdleNocturnal_LookRight",
+   "formId": "0x000CAD81",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleNocturnal_Rise",
+   "edid": "IdleNocturnal_Rise",
+   "formId": "0x000CAD7F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleNocturnalEnter",
+   "edid": "IdleNocturnalEnterDUPLICATE000",
+   "formId": "0x00101A78",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleNoteRead",
+   "edid": "IdleNoteRead",
+   "formId": "0x00089975",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleOffsetCarryPotServe",
+   "edid": "IdleOffsetCarryPotServe",
+   "formId": "0x00101045",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePickaxeEnter",
+   "edid": "IdlePickaxeEnter",
+   "formId": "0x000A82C6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePickaxeEnterInstant",
+   "edid": "IdlePickaxeEnterInstant",
+   "formId": "0x000A82C7",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePickup_Ground",
+   "edid": "IdlePickup_Ground",
+   "formId": "0x00075C3E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePlayer",
+   "edid": "IdlePlayerStop",
+   "formId": "0x000E4243",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePointClose",
+   "edid": "IdlePointClose",
+   "formId": "0x000FFA0C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePointFar_01",
+   "edid": "IdlePointFar_01",
+   "formId": "0x000B8F1E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePointFar_02",
+   "edid": "IdlePointFar_02",
+   "formId": "0x000B8F1F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePray",
+   "edid": "IdlePray",
+   "formId": "0x0006F300",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePrayCrouchedEnter",
+   "edid": "IdleCrouchedPrayEnter",
+   "formId": "0x000F11E6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePrayCrouchedEnterInstant",
+   "edid": "IdleCrouchedPrayEnterInstant",
+   "formId": "0x000F11E5",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePresentSkeletonKey",
+   "edid": "IdlePresentSkeletonKey",
+   "formId": "0x000E7AD4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePrisonerBeat",
+   "edid": "IdlePrisonerBeat",
+   "formId": "0x00105D46",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlePullChain",
+   "edid": "IdlePullChainEnter",
+   "formId": "0x00106516",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleRailLeanEnter",
+   "edid": "RailLeanEnter",
+   "formId": "0x00070EA0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleRailLeanEnterInstant",
+   "edid": "RailLeanEnterInstant",
+   "formId": "0x00070EA2",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleRailLeanExit",
+   "edid": "RailLeanExit",
+   "formId": "0x00070E9F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleReadElderScroll",
+   "edid": "IdleReadElderScroll",
+   "formId": "0x000EC9D0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleReadElderScrollLonger",
+   "edid": "IdleReadElderScrollLonger",
+   "formId": "0x00101E52",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleRitualSkull1",
+   "edid": "IdleRitualSkull1",
+   "formId": "0x000F11E1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleRitualSkull2",
+   "edid": "IdleRitualSkull2",
+   "formId": "0x000F11E2",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleRitualSkull3",
+   "edid": "IdleRitualSkull3",
+   "formId": "0x000F11E3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleRitualStart",
+   "edid": "IdleRitualStart",
+   "formId": "0x000F1AA0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSalute",
+   "edid": "IdleSalute",
+   "formId": "0x000B240C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSearchChestEnter",
+   "edid": "IdleSearchChestEnter",
+   "formId": "0x000EFC6F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSearchChestEnterInstant",
+   "edid": "IdleSearchChestEnterInstant",
+   "formId": "0x000EFC6E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSearchingChest",
+   "edid": "IdleSearchingChest",
+   "formId": "0x0006FF14",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSearchingTable",
+   "edid": "IdleSearchingTable",
+   "formId": "0x0006FF0F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSearchTableEnter",
+   "edid": "IdleSearchTableEnter",
+   "formId": "0x000EFC6B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSearchTableEnterInstant",
+   "edid": "IdleSearchTableEnterInstant",
+   "formId": "0x000EFC6A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSell",
+   "edid": "IdleSell",
+   "formId": "0x00089974",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSharpeningWheelEnterInstant",
+   "edid": "IdleSharpeningWheelEnterInstant",
+   "formId": "0x0006E9C6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSharpeningWheelStart",
+   "edid": "IdleSharpeningWheelStart",
+   "formId": "0x0006E9C3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSilentBow",
+   "edid": "MQPhantomUnsummon",
+   "formId": "0x001038C0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSleepNod",
+   "edid": "IdleSleepNod",
+   "formId": "0x000977F1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSnapToAttention",
+   "edid": "IdleSnapToAttention",
+   "formId": "0x000B240B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSoupDeath",
+   "edid": "IdleSoupDeath",
+   "formId": "0x00102EC0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStaticPoseAStart",
+   "edid": "IdleStaticPoseA",
+   "formId": "0x000D8262",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStaticPoseBStart",
+   "edid": "IdleStaticPoseB",
+   "formId": "0x000D8F06",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStaticPoseCStart",
+   "edid": "IdleStaticPoseC",
+   "formId": "0x000D8F07",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStonePickUpEnter",
+   "edid": "IdleStonePickUpExit",
+   "formId": "0x02034EF4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStonePickUpEnterInstant",
+   "edid": "IdleStonePickUpEnterInstant",
+   "formId": "0x02034EF1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStonePutDownEnter",
+   "edid": "IdleStonePutDownEnter",
+   "formId": "0x02034EF3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStoolBackExit",
+   "edid": "IdleStoolExit",
+   "formId": "0x0004739B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStoolEnter",
+   "edid": "IdleStoolEnter",
+   "formId": "0x00074EC9",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStoolEnterInstant",
+   "edid": "IdleStoolEnterInstant",
+   "formId": "0x00074ECA",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStop",
+   "edid": "IdleStop_Loose",
+   "formId": "0x0010D9EE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStopInstant",
+   "edid": "IdleStopInstant",
+   "formId": "0x0007F8E4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleStudy",
+   "edid": "IdleStudy",
+   "formId": "0x000977ED",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleSurrender",
+   "edid": "IdleSurrender",
+   "formId": "0x00105D47",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleT02AscendFemale",
+   "edid": "IdleT02AscendFemale",
+   "formId": "0x000F3A99",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleT02AscendMale",
+   "edid": "IdleT02AscendMale",
+   "formId": "0x000F3A9A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTableBackExit",
+   "edid": "ExitChairBackQuick",
+   "formId": "0x000FB90A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTableDrinkAndMugEnter",
+   "edid": "IdleTableDrinkAndMugEnterLoose",
+   "formId": "0x00106272",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTableDrinkEnter",
+   "edid": "IdleTableDrinkEnterLoose",
+   "formId": "0x00106271",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTableLeanPoint",
+   "edid": "IdleTableLeanPoint",
+   "formId": "0x00105298",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTableMugEnter",
+   "edid": "IdleTableMugEnterLoose",
+   "formId": "0x00106273",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTablePassOutEnter",
+   "edid": "IdleTablePassOutEnterLoose",
+   "formId": "0x00106274",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTake",
+   "edid": "IdleTake",
+   "formId": "0x000B5E1F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTalkAndUseItem",
+   "edid": "TalkingWithItem",
+   "formId": "0x00101AB7",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTelvanniTowerFloatDown",
+   "edid": "IdleTelvanniTowerFloatDownEnter",
+   "formId": "0x0203A644",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTelvanniTowerFloatUp",
+   "edid": "IdleTelvanniTowerFloatUpEnter",
+   "formId": "0x02039CB6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG03UseMeadBarrel",
+   "edid": "IdleUseMeadBarrelEnter",
+   "formId": "0x00105293",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG03UseMeadBarrelEnterInstant",
+   "edid": "IdleUseMeadBarrelEnterInstant",
+   "formId": "0x00105952",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG06FlipPage",
+   "edid": "IdleTG06FlipPage",
+   "formId": "0x000FCC5B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG06TranslationEnter",
+   "edid": "IdleTG06TranslateEnter",
+   "formId": "0x000F6CC6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG06TranslationEnterInstant",
+   "edid": "IdleTG06TranslateEnterInstant",
+   "formId": "0x000F6CC5",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG08_Phase1",
+   "edid": "TG08_CeremonyEnter",
+   "formId": "0x000EDF3F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG08_Phase1_EnterInstant",
+   "edid": "TG08_CeremonyEnterInstant",
+   "formId": "0x000EDF3E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG08_Phase2",
+   "edid": "IdleTG08_Phase2",
+   "formId": "0x000EE538",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG08_Phase3",
+   "edid": "IdleTG08_Phase3",
+   "formId": "0x000EE539",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG08_Phase4",
+   "edid": "IdleTG08_Phase4",
+   "formId": "0x000EE53A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTG08_Phase5",
+   "edid": "IdleTG08_Phase5",
+   "formId": "0x000EE53B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTGFalmerStatueEnter",
+   "edid": "IdleTGFalmerStatueEnter",
+   "formId": "0x000DBE44",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleTGStatueEnterInstant",
+   "edid": "IdleTGFalmerStatueEnterInstant",
+   "formId": "0x000DBE43",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleUncontrollableCough",
+   "edid": "IdleUncontrollableCough",
+   "formId": "0x000D8736",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWalkingCameraEnd",
+   "edid": "IdleWalkingCameraEnd",
+   "formId": "0x0010C00D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWalkingCameraStart",
+   "edid": "IdleWalkingCameraStart",
+   "formId": "0x0010C00C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWalkThroughWallEnter",
+   "edid": "IdleWalkThroughWallEnter",
+   "formId": "0x000F11DE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWalkThroughWallEnterInstant",
+   "edid": "IdleWalkThroughWallEnterInstant",
+   "formId": "0x000F11DD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWallCornerPeekLEnter",
+   "edid": "IdleWallCornerPeekLEnter",
+   "formId": "0x00105296",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWallCornerPeekLEnterInstant",
+   "edid": "IdleWallCornerPeekLEnterInstant",
+   "formId": "0x00105295",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWallCornerPeekREnter",
+   "edid": "IdleWallCornerPeekREnter",
+   "formId": "0x0010529D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWallCornerPeekREnterInstant",
+   "edid": "IdleWallCornerPeekREnterInstant",
+   "formId": "0x0010529C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWallLeanEnterInstant",
+   "edid": "IdleWallLeanEnterInstant",
+   "formId": "0x0006D1AA",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWallLeanStart",
+   "edid": "EnterWallLean",
+   "formId": "0x00052FF8",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWallSoldierEnter",
+   "edid": "IdleSoldierWallEnter",
+   "formId": "0x000BFAFF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWallSoldierEnterInstant",
+   "edid": "IdleSoldierWallEnterInstant",
+   "formId": "0x000BFAFE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWarmArms",
+   "edid": "IdleWarmArms",
+   "formId": "0x00019793",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWarmHands",
+   "edid": "IdleWarmHands",
+   "formId": "0x0002E52A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWarmHandsCrouched",
+   "edid": "IdleWarmHandsCrouched",
+   "formId": "0x000E8643",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWarmHandsStanding",
+   "edid": "IdleWarmHandsStanding",
+   "formId": "0x000E8642",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWave",
+   "edid": "IdleWave",
+   "formId": "0x0003EA32",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWebEnterInstant",
+   "edid": "EnterWebInstant",
+   "formId": "0x00045D9B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWebExit",
+   "edid": "WebIdleExit",
+   "formId": "0x0004A592",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWebExitQuickTurn",
+   "edid": "WebIdleExitQuickTurn",
+   "formId": "0x000EB579",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWebThrashShort",
+   "edid": "IdleWebThrashShort",
+   "formId": "0x00106AE0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWebThrashShort2",
+   "edid": "IdleWebThrashShort2",
+   "formId": "0x00106AE1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWerewolfTransformation",
+   "edid": "IdleWerewolfTransformation",
+   "formId": "0x0002A59D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWipeBrow",
+   "edid": "IdleWipeBrow",
+   "formId": "0x000977EC",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWoodChopEnterInstant",
+   "edid": "IdleWoodChopEnterInstant",
+   "formId": "0x0006CF35",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWoodChopStart",
+   "edid": "IdleWoodChopStart",
+   "formId": "0x0006C1DF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWoodPickUpEnter",
+   "edid": "IdleWoodPickUpEnter",
+   "formId": "0x000BCD51",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdlewoodputdownEnter",
+   "edid": "IdlewoodputdownEnter",
+   "formId": "0x000BCD52",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWounded_01",
+   "edid": "IdleWounded_01",
+   "formId": "0x000B8F19",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWounded_02",
+   "edid": "IdleWounded_02",
+   "formId": "0x000B8F1A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWounded_03",
+   "edid": "IdleWounded_03",
+   "formId": "0x000B8F1B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteLedgerChargenEnter",
+   "edid": "IdleHadvarWriteLedgerEnter",
+   "formId": "0x0010ACAD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteLedgerEnter",
+   "edid": "IdleWriteLedgerEnter",
+   "formId": "0x000EB5C4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteLedgerEnterInstant",
+   "edid": "IdleHadvarWriteLedgerEnterInstant",
+   "formId": "0x0010ACAC",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteLedgerWrite",
+   "edid": "IdleWriteLedgerWrite",
+   "formId": "0x000EE3B6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteTableChairEnterInstant",
+   "edid": "IdleWriteTableChairEnterInstant",
+   "formId": "0x000EAA55",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteTableChairLeftEnter",
+   "edid": "IdleWriteTableChairEnterLeft",
+   "formId": "0x000EAA56",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteTableChairLeftExit",
+   "edid": "IdleWriteTableChairExitLeft",
+   "formId": "0x000EAA58",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteTableChairRightEnter",
+   "edid": "IdleWriteTableChairEnterRight",
+   "formId": "0x000EAA57",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteTableChairRightExit",
+   "edid": "IdleWriteTableChairExitRight",
+   "formId": "0x000EAA59",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteTableStandingEnter",
+   "edid": "IdleWriteTableStandingEnter",
+   "formId": "0x000EAA52",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "IdleWriteTableStandingEnterInstant",
+   "edid": "IdleWriteTableStandingEnterInstant",
+   "formId": "0x000EAA51",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "JumpDirectionalStart",
+   "edid": "JumpDirectionalStart",
+   "formId": "0x000884A3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "JumpFall",
+   "edid": "JumpFall",
+   "formId": "0x000A791D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "JumpLandDirectional",
+   "edid": "JumpLandDirectional",
+   "formId": "0x000A7912",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "JumpLandEnd",
+   "edid": "JumpSoftEnd",
+   "formId": "0x000A87BD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "JumpStandingStart",
+   "edid": "JumpStandingStart",
+   "formId": "0x000884A2",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "Lever_PlayerPush",
+   "edid": "IdleLeverPush_Player",
+   "formId": "0x00074960",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "LooseDialogueResponseNegative",
+   "edid": "LooseDialogueResponseNegative",
+   "formId": "0x00058B46",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "LooseDialogueResponsePositive",
+   "edid": "LooseDialogueResponsePositive",
+   "formId": "0x00058B45",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "Magic_Equip",
+   "edid": "AttackLeftEquipSpell",
+   "formId": "0x0007495F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "Magic_Solo_Equip",
+   "edid": "LeftMagicForceUnequip",
+   "formId": "0x0004E213",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MagicForceEquipLeft",
+   "edid": "LeftMagicForceEquip",
+   "formId": "0x00058DB5",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MagicForceEquipRight",
+   "edid": "OnlyRightHandChangesMagicOut",
+   "formId": "0x00058DB6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MagicWeap_ForceEquip",
+   "edid": "MagicWeaponForceEquip",
+   "formId": "0x000884FF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MC_shoutStart",
+   "edid": "MountedVoice",
+   "formId": "0x0202AF4B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MC_WeapOutRightReplaceForceEquip",
+   "edid": "MC_WeaponRightHandEquip",
+   "formId": "0x01000985",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MLh_Equipped_Event",
+   "edid": "InterruptLeft",
+   "formId": "0x00013463",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MLh_SpellAimedConcentrationStart",
+   "edid": "CastLeftConcentrationAimed",
+   "formId": "0x00013469",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MLh_SpellAimedStart",
+   "edid": "CastLeftFireForgetTargetActor",
+   "formId": "0x00027ED6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MLh_SpellReady_Event",
+   "edid": "ReadyLeft",
+   "formId": "0x00013464",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MLh_SpellRelease_Event",
+   "edid": "ReleaseLeft",
+   "formId": "0x00013465",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MLh_SpellTelekinesisStart",
+   "edid": "CastLeftTelekinesis",
+   "formId": "0x0007F401",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MLh_WardStart",
+   "edid": "CastLeftWard",
+   "formId": "0x0001CD81",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MotionDrivenDialogueAngry",
+   "edid": "DialogueAngryMotionDriven",
+   "formId": "0x0010DEA7",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MotionDrivenDialogueGeneric",
+   "edid": "DialogueGenericMotionDriven",
+   "formId": "0x0010DEB8",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MotionDrivenDialogueNextClip",
+   "edid": "DialogueNeutralShiftMotionDriven",
+   "formId": "0x0010E005",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MountedStaggerStart",
+   "edid": "MountedStaggerStart",
+   "formId": "0x000D77F0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MountedSwimStart",
+   "edid": "MountedSwimStart",
+   "formId": "0x000C2EE5",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MountedSwimStop",
+   "edid": "MountedSwimStop",
+   "formId": "0x000C2EE6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "moveStart",
+   "edid": "CharacterMoveStart",
+   "formId": "0x000959FA",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "moveStop",
+   "edid": "CharacterMoveStop",
+   "formId": "0x000959FB",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MRh_Equipped_Event",
+   "edid": "InterruptRight",
+   "formId": "0x00013460",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MRh_SpellAimedStart",
+   "edid": "CastRightFireForgetTargetActor",
+   "formId": "0x00048B2C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MRh_SpellReady_Event",
+   "edid": "ReadyRight",
+   "formId": "0x00042BEB",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MRh_SpellRelease_Event",
+   "edid": "MagicRightRelease",
+   "formId": "0x000205F6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MRh_SpellSelfStart",
+   "edid": "CastRightFireForgetSelf",
+   "formId": "0x0001407B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MRh_SpellTelekinesisStart",
+   "edid": "CastRightTelekinesis",
+   "formId": "0x0007F402",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MRh_WardStart",
+   "edid": "CastRightWard",
+   "formId": "0x0001AC70",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MS12BedDeath",
+   "edid": "MS12BedDeath",
+   "formId": "0x0010D686",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "MT_BreathExhaleShort",
+   "edid": "VoiceRelease",
+   "formId": "0x0005177E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "NPC_BumpFromFront",
+   "edid": "BumpedFromFront",
+   "formId": "0x0003DE4F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "NPC_TurnRight90",
+   "edid": "NPCTurnRight90End",
+   "formId": "0x0002F77A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "NPC_TurnToWalkRight90",
+   "edid": "NPCTurnToWalkRight90",
+   "formId": "0x0002EDE7",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "NPCshoutStart",
+   "edid": "NPCVoiceStart",
+   "formId": "0x0010E863",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "OffsetArmsCrossedStart",
+   "edid": "IdleOffsetArmsCrossedStart",
+   "formId": "0x000FF7F4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "OffsetBoundStandingPlayerInstant",
+   "edid": "OffsetBoundStandingPlayerInstant",
+   "formId": "0x00109837",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "OffsetBoundStandingStart",
+   "edid": "OffsetBoundStandingStart",
+   "formId": "0x000B600A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "OffsetCarryBasketStart",
+   "edid": "OffsetCarryBasketStart",
+   "formId": "0x0001841D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "OffsetCarryFlowerBasketPickStart",
+   "edid": "OffsetCarryFlowerBasketPickStart",
+   "formId": "0x0001E16C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "OffsetCarryMQ201DrinkR",
+   "edid": "OffsetCarryMQ201DrinkR",
+   "formId": "0x0010528B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "OffsetCarryMQ201DrinkTray",
+   "edid": "OffsetCarryMQ201DrinkTray",
+   "formId": "0x00107110",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "OffsetCarryPotStart",
+   "edid": "OffsetCarryPotStart",
+   "formId": "0x00101044",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "OffsetFlowerBasketStart",
+   "edid": "OffsetFlowerBasketStart",
+   "formId": "0x00019925",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "OffsetStop",
+   "edid": "OffsetStop",
+   "formId": "0x0008C0A0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_2HWKillMoveA",
+   "edid": "pa_2HWKillMoveDecapA",
+   "formId": "0x000F4690",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_ExtractWerewolfSpirit",
+   "edid": "pa_ExtractWerewolfSpirit",
+   "formId": "0x000F93F0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_HugA",
+   "edid": "pa_HugA",
+   "formId": "0x000F4699",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillingBlow",
+   "edid": "pa_1HMKillMoveBleedOutKill",
+   "formId": "0x000F469E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMBackStab",
+   "edid": "pa_1HMKillMoveBackStab",
+   "formId": "0x000F465A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMBearB",
+   "edid": "pa_1HMKillMoveBearB",
+   "formId": "0x000F465C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMDecap",
+   "edid": "KillMoveDecapSlash",
+   "formId": "0x000DEEE0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMDecapBleedOut",
+   "edid": "pa_1HMKillMoveDecapBleedOut",
+   "formId": "0x000F465D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMDecapKnife",
+   "edid": "pa_1HMKillMoveDecapKnife",
+   "formId": "0x000F465E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMDragonRodeoSlash",
+   "edid": "pa_1HMKillMoveDragonRodeoSlash",
+   "formId": "0x000F4660",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMDragonRodeoStabShort",
+   "edid": "pa_1HMKillMoveDragonRodeoStabShort",
+   "formId": "0x000F4661",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMFalmerA",
+   "edid": "pa_1HMKillMoveFalmerA",
+   "formId": "0x000F4666",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMFalmerB",
+   "edid": "pa_1HMKillMoveFalmerB",
+   "formId": "0x000F4667",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMFalmerC",
+   "edid": "pa_1HMKillMoveFalmerC",
+   "formId": "0x000F4668",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMGiantB",
+   "edid": "pa_1HMKillMoveGiantB",
+   "formId": "0x000F466A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMGiantBleedOutA",
+   "edid": "pa_1HMKillMoveGiantBleedOutA",
+   "formId": "0x000F466B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMHagravenA",
+   "edid": "pa_1HMKillMoveHagravenA",
+   "formId": "0x000F466C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMHagravenB",
+   "edid": "pa_1HMKillMoveHagravenB",
+   "formId": "0x000F466D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMSpiderSmashA",
+   "edid": "1HMKillMoveSpiderSmashA",
+   "formId": "0x000BD6DE",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMSpiderStabA",
+   "edid": "1HMKillMoveSpiderStabA",
+   "formId": "0x000BD6DD",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMSprigganA",
+   "edid": "pa_1HMKillMoveSprigganA",
+   "formId": "0x000F4671",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMSprigganB",
+   "edid": "pa_1HMKillMoveSprigganB",
+   "formId": "0x000F4672",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMSteamCenturionA",
+   "edid": "pa_1HMKillMoveSteamCenturionA",
+   "formId": "0x000F4673",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMSteamCenturionB",
+   "edid": "pa_1HMKillMoveSteamCenturionB",
+   "formId": "0x000F4674",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMTrollB",
+   "edid": "pa_1HMKillMoveTrollB",
+   "formId": "0x000F4676",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMWolfA",
+   "edid": "pa_1HMKillMoveWolfA",
+   "formId": "0x000F4677",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove1HMWolfB",
+   "edid": "pa_1HMKillMoveWolfB",
+   "formId": "0x000F4678",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMBearA",
+   "edid": "pa_2HMKillMoveBearA",
+   "formId": "0x000F467D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMBearB",
+   "edid": "pa_2HMKillMoveBearB",
+   "formId": "0x000F467E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMDecap",
+   "edid": "pa_2HMKillMoveDecapSlash",
+   "formId": "0x000F4680",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMDecapBleedOut",
+   "edid": "pa_2HMKillMoveDecapBleedOut",
+   "formId": "0x000F467F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMDragonSlash",
+   "edid": "pa_2HMKillMoveDragonSlash",
+   "formId": "0x000F4681",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMDraugrA",
+   "edid": "2HM_KillMoveDraugrA",
+   "formId": "0x000F62A6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMFalmerA",
+   "edid": "pa_2HMKillMoveFalmerA",
+   "formId": "0x000F4682",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMFalmerB",
+   "edid": "pa_2HMKillMoveFalmerB",
+   "formId": "0x000F4683",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMGiantA",
+   "edid": "pa_2HMKillMoveGiantA",
+   "formId": "0x000F4684",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMHagravenA",
+   "edid": "pa_2HMKillMoveHagravenA",
+   "formId": "0x000F4685",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMSabreCatA",
+   "edid": "pa_2HMKillMoveSabreCatA",
+   "formId": "0x000F467A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMSabreCatB",
+   "edid": "pa_2HMKillMoveSabreCatB",
+   "formId": "0x000F467B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMSpiderSlamA",
+   "edid": "pa_2HMKillMoveSpiderSlamA",
+   "formId": "0x000F467C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMSprigganA",
+   "edid": "pa_2HMKillMoveSprigganA",
+   "formId": "0x000F4686",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMStabA",
+   "edid": "pa_2HMKillMoveStabA",
+   "formId": "0x000F4687",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMSteamCenturionA",
+   "edid": "pa_2HMKillMoveSteamCenturionA",
+   "formId": "0x000F4688",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMTrollA",
+   "edid": "pa_2HMKillMoveTrollA",
+   "formId": "0x000F4689",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMTrollB",
+   "edid": "pa_2HMKillMoveTrollB",
+   "formId": "0x000F468A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMWolfA",
+   "edid": "pa_2HMKillMoveWolfA",
+   "formId": "0x000F468B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HMWolfB",
+   "edid": "pa_2HMKillMoveWolfB",
+   "formId": "0x000F468C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HWBearA",
+   "edid": "pa_2HWKillMoveBearA",
+   "formId": "0x000F4691",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HWDecapBleedOut",
+   "edid": "KillMove2HWDecapBleedOut",
+   "formId": "0x000E1727",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HWDragonRodeoSlash",
+   "edid": "pa_2HWKillMoveDragonRodeoSlash",
+   "formId": "0x000F4692",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HWDragonSlash",
+   "edid": "pa_2HWKillMoveDragonSlash",
+   "formId": "0x000F4693",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HWGiantA",
+   "edid": "pa_2HWKillMoveGiantA",
+   "formId": "0x000F4694",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HWSabreCatA",
+   "edid": "pa_2HWKillMoveSabreCat",
+   "formId": "0x000F4695",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HWSpiderSlamA",
+   "edid": "pa_2HWKillMoveSpiderSlamA",
+   "formId": "0x000F468E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HWSprigganA",
+   "edid": "pa_2HWKillMoveSprigganA",
+   "formId": "0x000F468F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HWTrollA",
+   "edid": "pa_2HWKillMoveTrollA",
+   "formId": "0x000F4696",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMove2HWWolfA",
+   "edid": "pa_2HWKillMoveWolfA",
+   "formId": "0x000F4697",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveBearA",
+   "edid": "pa_1HMKillMoveBearA",
+   "formId": "0x000F465B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveC",
+   "edid": "1HMKillMoveC",
+   "formId": "0x0002FF92",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveD",
+   "edid": "1HMKillMoveD",
+   "formId": "0x0005474A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveDLC02RipHeartOut",
+   "edid": "pa_KillMoveDLC02RipHeartOut",
+   "formId": "0x02024FCA",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveDraugr",
+   "edid": "pa_1HMKillMoveDraugrA",
+   "formId": "0x000F4662",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveDraugrB",
+   "edid": "pa_1HMKillMoveDraugrB",
+   "formId": "0x000F4663",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveDraugrShortA",
+   "edid": "pa_1HMKillMoveDraugrShortA",
+   "formId": "0x000F4664",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveDualWieldA",
+   "edid": "pa_1HMKillMoveDualWieldA",
+   "formId": "0x000F469F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveDWDecap",
+   "edid": "pa_KillMoveDualWieldDecap",
+   "formId": "0x000F46A0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveF",
+   "edid": "1HMKillMoveF",
+   "formId": "0x00055706",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveGiantA",
+   "edid": "pa_1HMKillMoveGiantA",
+   "formId": "0x000F4669",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveH2HComboA",
+   "edid": "pa_KillMoveH2HComboA",
+   "formId": "0x000F9958",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveH2HSlamA",
+   "edid": "pa_KillMoveH2HSlam",
+   "formId": "0x000F4698",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveJ",
+   "edid": "pa_1HMKillMoveShortJ",
+   "formId": "0x00108A45",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveSabreCat",
+   "edid": "pa_1HMKillMoveSabreCat",
+   "formId": "0x000F4670",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveSabreCatShortA",
+   "edid": "pa_1HMKillMoveSabreCatShortA",
+   "formId": "0x000F466E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveSabreCatShortB",
+   "edid": "pa_1HMKillMoveSabreCatShortB",
+   "formId": "0x000F466F",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveShortA",
+   "edid": "pa_1HMKillMoveShortA",
+   "formId": "0x000F469A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveShortB",
+   "edid": "pa_1HMKillMoveShortB",
+   "formId": "0x000F469B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveShortC",
+   "edid": "pa_1HMKillMoveShortC",
+   "formId": "0x000F469C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveShortD",
+   "edid": "pa_1HMKillMoveShortD",
+   "formId": "0x000F469D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveSneakBackA",
+   "edid": "pa_1HMSneakKillBackA",
+   "formId": "0x000F4679",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_KillMoveTrollA",
+   "edid": "pa_1HMKillMoveTrollA",
+   "formId": "0x000F4675",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_OffsetBoundStandingCut",
+   "edid": "pa_OffsetBoundStandingCut",
+   "formId": "0x0004C291",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "pa_WW_CutWrist",
+   "edid": "pa_WereWolf_CutWrist",
+   "formId": "0x0010194C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "Ragdoll",
+   "edid": "NPCKnockDown",
+   "formId": "0x000FDC62",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "recoilLargeStart",
+   "edid": "RecoilLarge",
+   "formId": "0x00013ED0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "recoilStart",
+   "edid": "Recoil",
+   "formId": "0x00013AF9",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "RitualSpellAimConcentrationStart",
+   "edid": "CastLeftRitualConcentrationAim",
+   "formId": "0x000D1112",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "RitualSpellOut",
+   "edid": "InterruptRightRitualSpell",
+   "formId": "0x00082536",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "RitualSpellStart",
+   "edid": "CastLeftRitualFireAndForgetSelf",
+   "formId": "0x000D1113",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "ShdEquip",
+   "edid": "shieldForceEquip",
+   "formId": "0x00000ECF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "shoutReleaseSlowTime",
+   "edid": "VoiceReleaseSlowTime",
+   "formId": "0x0004BA6B",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "ShoutSprintLongestStart",
+   "edid": "VoiceWhirlwindSprintLong",
+   "formId": "0x0007F833",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "ShoutSprintLongStart",
+   "edid": "VoiceWhirlwindSprintMedium",
+   "formId": "0x0007F832",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "ShoutSprintMediumStart",
+   "edid": "VoiceWhirlwindSprintShort",
+   "formId": "0x0007F831",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "shoutStart",
+   "edid": "VoiceStart",
+   "formId": "0x00013F40",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "shoutStop",
+   "edid": "VoiceInterruptRoot",
+   "formId": "0x00048AD4",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "SneakStart",
+   "edid": "SneakStart",
+   "formId": "0x0002F3F8",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "SneakStop",
+   "edid": "SneakStop",
+   "formId": "0x0002F3F9",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "SpectatorCheer",
+   "edid": "SpectatorCheer",
+   "formId": "0x00066374",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "SpectatorClap",
+   "edid": "SpectatorClap",
+   "formId": "0x00066375",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "SpectatorGawk",
+   "edid": "SpectatorGawk",
+   "formId": "0x00066376",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "SpectatorTalking",
+   "edid": "SpectatorTalkFailSafe",
+   "formId": "0x00066378",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "SprintStart",
+   "edid": "SprintStart",
+   "formId": "0x001050F3",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "SprintStop",
+   "edid": "SprintRootStop",
+   "formId": "0x0001321A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "StaffBashRelease",
+   "edid": "StaffBashRelease",
+   "formId": "0x00050CA8",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "StaggerPlayer",
+   "edid": "PlayerStagger",
+   "formId": "0x000F9928",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "staggerStart",
+   "edid": "LooseFullBodyStagger",
+   "formId": "0x0010E812",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "swimForceEquip",
+   "edid": "SwimmingForceEquip",
+   "formId": "0x000FF09A",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "SwimStart",
+   "edid": "JumpLandSwimming",
+   "formId": "0x0010E835",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "SwimStop",
+   "edid": "SwimStop",
+   "formId": "0x00052B8C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "TG05_GetUp",
+   "edid": "TG05_GetUp",
+   "formId": "0x000D17FA",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "TG05_KnockOut",
+   "edid": "TG05_KnockOut",
+   "formId": "0x000D17FB",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "TG05_StabPlayer",
+   "edid": "TG05_StabPlayer",
+   "formId": "0x000D17FC",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "torchEquip",
+   "edid": "torchForceEquip",
+   "formId": "0x00000ED0",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "torchForceEquip",
+   "edid": "TorchEquip",
+   "formId": "0x00037C56",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "torchUnequip",
+   "edid": "Removed",
+   "formId": "0x0002A9D5",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "turnLeft",
+   "edid": "CharacterTurnLeft",
+   "formId": "0x000959FF",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "turnRight",
+   "edid": "CharacterTurnRight",
+   "formId": "0x00095A00",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "turnStop",
+   "edid": "CharacterTurnStop",
+   "formId": "0x00095A01",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "UnequipNoAnim",
+   "edid": "MC_ForceSheathe",
+   "formId": "0x01000952",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "VampireFeedingBedLeft",
+   "edid": "IdleVampireBedLeft",
+   "formId": "0x000FF9E6",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "VampireFeedingBedRight",
+   "edid": "IdleVampireBedRight",
+   "formId": "0x000FF9E7",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "VampireFeedingBedRollLeft",
+   "edid": "IdleVampireBedrollLeft",
+   "formId": "0x00100710",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "VampireFeedingBedRollRight",
+   "edid": "IdleVampireBedrollRight",
+   "formId": "0x00100711",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "wardAbsorb",
+   "edid": "WardAbsorbed",
+   "formId": "0x00024B3C",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "WardBreak",
+   "edid": "WardBroken",
+   "formId": "0x00024B3D",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "WeapEquip",
+   "edid": "AttackLeftEquipWeapon",
+   "formId": "0x0007495E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "WeapOutLeftReplaceForceEquip",
+   "edid": "StaffMagicShieldTorchANDWeapEquip",
+   "formId": "0x0004E212",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "WeapOutRightReplaceForceEquip",
+   "edid": "BothHandsChange",
+   "formId": "0x00058DB1",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  },
+  {
+   "event": "WeapSoloEquip",
+   "edid": "LeftH2HEquip",
+   "formId": "0x000D520E",
+   "file": "Actors\\Character\\Behaviors\\0_Master.hkx"
+  }
+ ]
+}

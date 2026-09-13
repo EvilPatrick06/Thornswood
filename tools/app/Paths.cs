@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace SkyrimTogether
+namespace Thornswood
 {
     // Everything the launcher touches, resolved once from the exe location.
     static class Paths
@@ -36,7 +36,19 @@ namespace SkyrimTogether
                 "Skyrim Special Edition");
         }
 
-        public static string Str { get { return Path.Combine(Game, "Data\\SkyrimTogetherReborn\\SkyrimTogether.exe"); } }
+        // SkyMP has no client executable of its own. MpClientPlugin.dll is an
+        // SKSE plugin, so the game is started by the script extender's loader
+        // exactly as a single player session would be, and the multiplayer
+        // layer comes up inside it.
+        public static string Loader { get { return Path.Combine(Game, "skse64_loader.exe"); } }
+
+        // What to look for to decide the multiplayer layer is actually
+        // installed. Used by the status checks rather than by anything that
+        // launches.
+        public static string MpClient
+        {
+            get { return Path.Combine(Game, "Data\\SKSE\\Plugins\\MpClientPlugin.dll"); }
+        }
         public static string Exe { get { return Path.Combine(Game, "SkyrimSE.exe"); } }
     }
 }

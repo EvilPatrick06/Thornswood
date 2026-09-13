@@ -1,0 +1,62 @@
+{
+ "b276:Thornswood-Content.esp": {
+  "track": "mining",
+  "tier": 1
+ },
+ "b277:Thornswood-Content.esp": {
+  "track": "mining",
+  "tier": 2
+ },
+ "b278:Thornswood-Content.esp": {
+  "track": "mining",
+  "tier": 3
+ },
+ "b279:Thornswood-Content.esp": {
+  "track": "mining",
+  "tier": 4
+ },
+ "b27b:Thornswood-Content.esp": {
+  "track": "smithing",
+  "tier": 1
+ },
+ "b27a:Thornswood-Content.esp": {
+  "track": "smithing",
+  "tier": 2
+ },
+ "b27c:Thornswood-Content.esp": {
+  "track": "smithing",
+  "tier": 3
+ },
+ "b27d:Thornswood-Content.esp": {
+  "track": "smithing",
+  "tier": 4
+ },
+ "15489:Thornswood-Content.esp": {
+  "track": "woodcutter",
+  "tier": 1
+ },
+ "1548a:Thornswood-Content.esp": {
+  "track": "woodcutter",
+  "tier": 2
+ },
+ "1548b:Thornswood-Content.esp": {
+  "track": "woodcutter",
+  "tier": 3
+ },
+ "1548c:Thornswood-Content.esp": {
+  "track": "woodcutter",
+  "tier": 4
+ },
+ "47f6c:Thornswood-Content.esp": {
+  "track": "alchemy",
+  "tier": 2
+ },
+ "47f6d:Thornswood-Content.esp": {
+  "track": "alchemy",
+  "tier": 3
+ },
+ "47f6e:Thornswood-Content.esp": {
+  "track": "alchemy",
+  "tier": 4
+ }
+}

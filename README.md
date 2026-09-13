@@ -1,13 +1,19 @@
 # Skyrim Together
 
-Five player co-op Skyrim. One file, one install, and it does not touch the
-Skyrim you already have.
+Five player co-op Skyrim. One install, and it does not touch the Skyrim you
+already have.
 
 ## Download
 
-**[SkyrimTogether-Setup.exe](https://drive.google.com/drive/folders/1zESrSYy6s-kzUtCVF6g0RMrfCUvooTaT?usp=drive_link)** — about 11 GB
+[**Both files, from here**](https://drive.google.com/drive/folders/1zESrSYy6s-kzUtCVF6g0RMrfCUvooTaT?usp=drive_link) — put them in the same folder:
 
-Drive will say it can't scan a file that size for viruses. Download anyway.
+| | |
+| --- | --- |
+| `SkyrimTogether-Setup.exe` | tiny, this is what you run |
+| `SkyrimTogether-Setup.zip` | about 9 GB, everything else |
+
+Drive will say it can't scan the big one for viruses. Download anyway. **Don't
+unzip it** — the exe does that part.
 
 ## You need
 
@@ -17,8 +23,12 @@ Drive will say it can't scan a file that size for viruses. Download anyway.
 
 ## Install
 
-Run it. Windows says "Windows protected your PC" because it isn't signed →
-**More info** → **Run anyway**. Press Install and leave it alone.
+Run **SkyrimTogether-Setup.exe**, with the zip sitting next to it. Windows says
+"Windows protected your PC" because it isn't signed → **More info** → **Run
+anyway**. Press Install and leave it alone.
+
+It shows you which zip it found before you press anything, so if it says the zip
+is missing, the two files aren't in the same folder yet.
 
 It copies the base game out of your Steam folder into `C:\SkyrimTogether` and
 sets that copy up with the whole mod list already installed. **No Nexus

@@ -1,7 +1,7 @@
 <#
-  Install-SkyrimTogether.ps1
+  Setup-Thornswood.ps1
 
-  Builds a standalone Skyrim Together install at C:\SkyrimTogether.
+  Builds a standalone Thornswood install at C:\Thornswood.
 
   Your own Steam copy of Skyrim is only ever READ. Nothing in it is changed,
   renamed or deleted, so whatever you already play - Keizaal Online included -
@@ -9,11 +9,24 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root = 'C:\SkyrimTogether',
+    [string]$Root = 'C:\Thornswood',
     [string]$SteamGamePath,
     [switch]$SkipDowngrade,
     [switch]$MovePayload
 )
+
+
+# The launcher was SkyrimTogether.exe and is Thornswood.exe now. It replaces
+# itself in place when it updates rather than being reinstalled, so an install
+# made before the rename still carries the old name and both have to be looked
+# for, newest first.
+function Get-LauncherExe([string]$dir) {
+    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
+        $p = Join-Path $dir $n
+        if (Test-Path -LiteralPath $p) { return $p }
+    }
+    return (Join-Path $dir 'Thornswood.exe')
+}
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -81,16 +94,54 @@ $SteamGamePath = (Resolve-Path $SteamGamePath).Path
 Say "  $SteamGamePath" 'Green'
 Say '  This folder will be read from only.' 'DarkGray'
 
-foreach ($n in 'SkyrimSE', 'skse64_loader', 'SkyrimTogether') {
-    if (Get-Process -Name $n -EA SilentlyContinue) { Die "$n is running. Close it and run this again." }
+# Skyrim does not always let go. A crash, an Alt-F4, or one of the multiplayer
+# client's browser helpers leaves a process behind with no window on screen,
+# so telling someone to close a game they cannot see is a dead end. Close it
+# here instead. This runs standalone inside the payload, so it does not share
+# the repo's Close-Launcher.ps1 and carries its own copy.
+function Stop-AnySkyrim {
+    $found = @()
+    foreach ($n in 'SkyrimSE', 'skse64_loader', 'SkyrimTogether') {
+        foreach ($p in @(Get-Process -Name $n -ErrorAction SilentlyContinue)) { $found += $p }
+    }
+    if ($found.Count -eq 0) { return $true }
+
+    $names = ($found | ForEach-Object { $_.ProcessName } | Sort-Object -Unique) -join ', '
+    Say "  Skyrim is still open ($names). Closing it." 'Yellow'
+    foreach ($p in $found) { try { $null = $p.CloseMainWindow() } catch { } }
+    for ($i = 0; $i -lt 24; $i++) {
+        Start-Sleep -Milliseconds 250
+        if (-not ($found | Where-Object { -not $_.HasExited })) { break }
+    }
+    foreach ($p in $found) { try { if (-not $p.HasExited) { $p.Kill() } } catch { } }
+
+    # A killed process can sit in the table for a moment after it is gone, so
+    # this waits rather than giving up on the first look.
+    for ($i = 0; $i -lt 12; $i++) {
+        Start-Sleep -Milliseconds 250
+        $left = @()
+        foreach ($n in 'SkyrimSE', 'skse64_loader', 'SkyrimTogether') {
+            foreach ($p in @(Get-Process -Name $n -ErrorAction SilentlyContinue)) { $left += $p }
+        }
+        if ($left.Count -eq 0) { Say '  Closed.' 'Green'; return $true }
+    }
+    return $false
+}
+
+if (-not (Stop-AnySkyrim)) {
+    Die 'Skyrim would not close. Restart your PC, then run this again.'
 }
 
 # ------------------------------------------------------------- space
-$needGB = 22
+# The setup program unpacks onto this same drive so the final step is a move
+# rather than another copy, which makes the peak the unpacked mods plus the
+# copy of Skyrim, both at once.
+$needGB = 32
 $dl = (Split-Path -Qualifier $Root) -replace ':', ''
 $freeGB = [math]::Round((Get-PSDrive $dl).Free / 1GB, 1)
+Say "  Installing to $Root"
 Say "  $freeGB GB free on $dl`:"
-if ($freeGB -lt $needGB) { Die "You need about $needGB GB free on $dl`:. Free some space, or run this with -Root ""D:\SkyrimTogether""." }
+if ($freeGB -lt $needGB) { Die "You need about $needGB GB free on $dl`:. Close this, run the setup program again and pick a different drive." }
 
 # ------------------------------------------------------------- vanilla copy
 Head 'Copying the base game'
@@ -124,10 +175,14 @@ Say "  $bsaCount archives, 5 masters" 'Green'
 # ------------------------------------------------------------- downgrade
 function Get-ExeBytes { $p = Join-Path $GameDir 'SkyrimSE.exe'; if (Test-Path $p) { (Get-Item $p).Length } else { 0 } }
 
-if ((Get-ExeBytes) -ne $TARGET_EXE_BYTES -and -not $SkipDowngrade) {
-    Head 'Setting the copy to 1.6.1170'
-    Say '  Your Steam copy is a newer build. The server runs 1.6.1170, so this copy has to match.'
-    Say '  Steam downloads the older files under your own account. Your installed game is not touched.' 'DarkGray'
+# Steam hands over the 1.6.1170 files under the player's own account and writes
+# them into Steam's download folder, so the game they have installed is left
+# alone. It is the fix for a copy that is too new and for one that another mod
+# setup has patched, so it lives in a function and gets called for both.
+function Invoke-DepotRepair($reason) {
+    Head 'Getting clean 1.6.1170 files from Steam'
+    Say "  $reason"
+    Say '  Steam downloads them under your own account. Your installed game is not touched.' 'DarkGray'
 
     $content = Join-Path $steamRoot 'steamapps\content'
     function Resolve-Depot($id) {
@@ -162,10 +217,67 @@ if ((Get-ExeBytes) -ne $TARGET_EXE_BYTES -and -not $SkipDowngrade) {
         & robocopy $d $GameDir /E /R:1 /W:1 /MT:8 /NFL /NDL /NP /NJH /NJS | Out-Null
     }
 
+    Say '  Applied' 'Green'
+}
+
+if ((Get-ExeBytes) -ne $TARGET_EXE_BYTES -and -not $SkipDowngrade) {
+    Invoke-DepotRepair 'Your Steam copy is a newer build. The server runs 1.6.1170, so this copy has to match.'
     if ((Get-ExeBytes) -ne $TARGET_EXE_BYTES) { Die "The copy is still not 1.6.1170 (SkyrimSE.exe is $(Get-ExeBytes) bytes)." }
     Say '  1.6.1170' 'Green'
 } else {
     Say "  Already 1.6.1170" 'Green'
+}
+
+# ------------------------------------------------------------- tamper check
+# The size check above only proves the build number. Multiplayer setups like
+# Keizaal Online and Daedric Online install into the Steam folder, and a patched
+# loader of exactly the right size would sail straight past it and end up in
+# this copy. So the three files that get patched are matched by content against
+# the ones this package was built from.
+# Get-FileHash lives in a module that is not always on PSModulePath, and a
+# script started with -NoProfile can find itself without it. .NET is always
+# there, so the hashing goes straight to it.
+function Get-Sha256([string]$path) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $fs = [IO.File]::OpenRead($path)
+        try { return ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '').ToLower() }
+        finally { $fs.Close() }
+    }
+    finally { $sha.Dispose() }
+}
+
+$vanillaList = Join-Path $Here 'vanilla.json'
+if (Test-Path $vanillaList) {
+    Head 'Checking the files that came from Steam'
+    $want = Get-Content $vanillaList -Raw | ConvertFrom-Json
+
+    function Get-Mismatched($doc) {
+        $out = @()
+        foreach ($prop in $doc.PSObject.Properties) {
+            $f = Join-Path $GameDir $prop.Name
+            if (-not (Test-Path $f)) { continue }
+            if ((Get-Sha256 $f) -ne ([string]$prop.Value).ToLower()) { $out += $prop.Name }
+        }
+        return $out
+    }
+
+    $off = @(Get-Mismatched $want)
+    if ($off -contains 'SkyrimSE.exe' -and -not $SkipDowngrade) {
+        Invoke-DepotRepair 'Your Steam copy of Skyrim has been modified by another mod setup, so the game itself is being replaced with clean files.'
+        $off = @(Get-Mismatched $want)
+    }
+
+    if ($off -contains 'SkyrimSE.exe') {
+        Die 'SkyrimSE.exe does not match a clean 1.6.1170 build even after the depot download. Send Gavin a screenshot of this.'
+    }
+    if ($off.Count) {
+        Say ("  " + ($off -join ', ') + " differ from the ones this package was built with.") 'Yellow'
+        Say '  Those are Steam support files rather than game data, so this carries on.' 'DarkGray'
+        Say '  If the game refuses to start, run Steam, verify Skyrim, and install this again.' 'DarkGray'
+    } else {
+        Say '  Clean' 'Green'
+    }
 }
 
 # ------------------------------------------------------------- creation club
@@ -206,25 +318,44 @@ if (Test-Path $src) {
     Say "  Load order installed, $n plugins" 'Green'
 } else { Say '  No profile folder in the archive.' 'Yellow' }
 
-foreach ($f in 'SkyrimTogether.exe', 'config.json') {
+foreach ($f in 'Thornswood.exe', 'SkyrimTogether.exe', 'config.json') {
     $s = Join-Path $Here $f
     if (Test-Path $s) { Copy-Item $s $(if ($f -eq 'config.json') { $Root } else { $LaunchDir }) -Force }
 }
 
-$lexe = Join-Path $LaunchDir 'SkyrimTogether.exe'
+$lexe = Get-LauncherExe $LaunchDir
 if (Test-Path $lexe) {
     $ws = New-Object -ComObject WScript.Shell
     foreach ($dest in @([Environment]::GetFolderPath('Desktop'), $Root)) {
-        $sc = $ws.CreateShortcut((Join-Path $dest 'Skyrim Together.lnk'))
+        # The old name, tidied away so nobody ends up with two shortcuts to
+        # the same launcher after the rename.
+        $was = Join-Path $dest 'Skyrim Together.lnk'
+        if (Test-Path $was) { Remove-Item $was -Force -ErrorAction SilentlyContinue }
+
+        $sc = $ws.CreateShortcut((Join-Path $dest 'Thornswood.lnk'))
         $sc.TargetPath       = $lexe
         $sc.WorkingDirectory = $LaunchDir
         $sc.IconLocation     = ($lexe + ',0')
-        $sc.Description      = 'Skyrim Together'
+        $sc.Description      = 'Thornswood'
         $sc.Save()
     }
     Say '  Shortcut on your desktop' 'Green'
+
+# Windows keeps the bitmap it once drew for a shortcut and goes on showing it
+# long after the icon inside the exe changed. Asking Explorer to rebuild that
+# cache is the difference between a new icon and an argument about whether the
+# build worked.
+try {
+    $ie4 = Join-Path $env:SystemRoot 'System32\ie4uinit.exe'
+    if (Test-Path $ie4) {
+        & $ie4 -show 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { & $ie4 -ClearIconCache 2>&1 | Out-Null }
+        Say '  Icon cache asked to refresh' 'DarkGray'
+    }
+} catch { }
+
 } else {
-    Say '  SkyrimTogether.exe was not in the package.' 'Yellow'
+    Say '  Thornswood.exe was not in the package.' 'Yellow'
 }
 
 # ------------------------------------------------------------- verify
@@ -232,10 +363,10 @@ Head 'Checking'
 $checks = [ordered]@{
     'Game 1.6.1170'    = ((Get-ExeBytes) -eq $TARGET_EXE_BYTES)
     'Script Extender'  = (Test-Path (Join-Path $GameDir 'skse64_1_6_1170.dll'))
-    'Skyrim Together'  = (Test-Path (Join-Path $GameDir 'Data\SkyrimTogetherReborn\SkyrimTogether.exe'))
+    'Multiplayer'      = (Test-Path (Join-Path $GameDir 'Data\SkyrimTogetherReborn\SkyrimTogether.exe'))
     'Address library'  = (Test-Path (Join-Path $GameDir 'Data\SKSE\Plugins\versionlib-1-6-1170-0.bin'))
     'Load order'       = (Test-Path (Join-Path $pLocalAD 'plugins.txt'))
-    'Launcher'         = (Test-Path (Join-Path $LaunchDir 'SkyrimTogether.exe'))
+    'Launcher'         = (Test-Path (Get-LauncherExe $LaunchDir))
 }
 $bad = 0
 foreach ($k in $checks.Keys) {
@@ -248,7 +379,7 @@ if ($bad) {
 } else {
     Say 'Installed.' 'Green'
     Write-Host ''
-    Say 'Open "Skyrim Together" on your desktop and press PLAY.' 'White'
+    Say 'Open "Thornswood" on your desktop and press PLAY.' 'White'
     Say 'Make a character named after yourself, save once, then connect.' 'Gray'
     Write-Host ''
     Say 'Your Steam copy of Skyrim was not modified.' 'DarkGray'

@@ -1,0 +1,111 @@
+using System;
+using System.Net;
+
+namespace Thornswood
+{
+    /// <summary>
+    /// How many people are on the server right now.
+    ///
+    /// There is no way to ask a SkyMP server directly: its networking carries
+    /// no status packet, and the first thing it will discuss is a connection.
+    /// This used to read Skyrim Together's public server list, which is the
+    /// right answer for a build that is not this one: SkyMP never reports to
+    /// it, so the count sat at nothing forever and the Play page said so.
+    ///
+    /// The server does serve its own resources folder over HTTP, and the
+    /// gamemode writes the count into it. So the answer comes from the server
+    /// itself, over a port that is already open, with nothing new to install.
+    /// </summary>
+    static class Online
+    {
+        // The resources folder. Game traffic is UDP on its own port; this is
+        // the little HTTP server beside it.
+        const int ResourcePort = 3000;
+
+        public class Count
+        {
+            public bool Known;      // false when the server has not said yet
+            public int Now;
+            public int Max;
+        }
+
+        static Count cached;
+        static DateTime cachedAt = DateTime.MinValue;
+
+        /// <summary>
+        /// Blocking. Call it off the UI thread. The answer is cached for a few
+        /// seconds, because nobody needs this more often than that.
+        /// </summary>
+        public static Count Ask(Config cfg)
+        {
+            if (cached != null && (DateTime.UtcNow - cachedAt).TotalSeconds < 10) return cached;
+
+            var got = new Count();
+            got.Max = cfg.MaxOnline > 0 ? cfg.MaxOnline : 0;
+
+            try
+            {
+                if (!string.IsNullOrEmpty(cfg.ServerAddress))
+                {
+                    string url = "http://" + cfg.ServerAddress + ":" + ResourcePort + "/online.json";
+                    using (var wc = new WebClient())
+                    {
+                        wc.Headers["User-Agent"] = "ThornswoodLauncher/" + Updater.Version;
+                        // A server that is up but has not written the file yet
+                        // should not hold the page for thirty seconds.
+                        byte[] raw = Fetch(wc, url, 2500);
+                        if (raw != null)
+                        {
+                            int at = 0;
+                            if (raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF) at = 3;
+                            string text = System.Text.Encoding.UTF8.GetString(raw, at, raw.Length - at);
+                            var m = System.Text.RegularExpressions.Regex.Match(text, "\"now\"\\s*:\\s*(\\d+)");
+                            if (m.Success)
+                            {
+                                got.Known = true;
+                                got.Now = int.Parse(m.Groups[1].Value);
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            cached = got;
+            cachedAt = DateTime.UtcNow;
+            return got;
+        }
+
+        // WebClient has no timeout worth the name, and the default is long
+        // enough that a server which is merely slow looks like a hung launcher.
+        class Quick : WebClient
+        {
+            public int Ms = 2500;
+            protected override WebRequest GetWebRequest(Uri address)
+            {
+                var r = base.GetWebRequest(address);
+                if (r != null) { r.Timeout = Ms; }
+                return r;
+            }
+        }
+
+        static byte[] Fetch(WebClient _, string url, int ms)
+        {
+            using (var q = new Quick())
+            {
+                q.Ms = ms;
+                q.Headers["User-Agent"] = "ThornswoodLauncher/" + Updater.Version;
+                try { return q.DownloadData(url); } catch { return null; }
+            }
+        }
+
+        /// <summary>What to put on the Play page. Empty when there is nothing worth saying.</summary>
+        public static string Line(Count c)
+        {
+            if (c == null) return "";
+            if (c.Known) return c.Now + (c.Max > 0 ? " of " + c.Max : "") + " awake";
+            if (c.Max > 0) return "room for " + c.Max;
+            return "";
+        }
+    }
+}

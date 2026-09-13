@@ -1,0 +1,12 @@
+skse64 plugin preloader - d3dx9_42
+exe path: C:\Thornswood\Game\SkyrimSE.exe
+loaded into SkyrimSE.exe or SkyrimVR.exe, proxying SkyrimSE d3dx9_42 funcs and registering preload hook
+success
+hook triggered, loading dll plugins (meh's loader)
+failed to search dll plugin directory
+DLLPlugin loader finished
+hook triggered, loading skse plugins
+found plugin "EngineFixes" for preloading
+found plugin "SKSEMenuFramework" for preloading
+attempting to load found plugins
+attempting to load "C:\Thornswood\Game\Data\SKSE\Plugins\EngineFixes.dll"

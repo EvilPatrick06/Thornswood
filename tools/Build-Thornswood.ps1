@@ -1,16 +1,16 @@
 <#
-  Build-SkyrimTogether.ps1
-  Makes a standalone, self-contained copy of your modded Skyrim at C:\SkyrimTogether.
+  Build-Thornswood.ps1
+  Makes a standalone, self-contained copy of your modded Skyrim at C:\Thornswood.
   Steam's copy is only ever read from. Nothing in it is changed.
 
-  After this runs you play from C:\SkyrimTogether and never touch Steam again.
+  After this runs you play from C:\Thornswood and never touch Steam again.
   Vortex keeps managing the Steam folder as your authoring copy; re-run this
   script with -Sync any time you change mods there.
 #>
 [CmdletBinding()]
 param(
     [string]$Source,
-    [string]$Root = 'C:\SkyrimTogether',
+    [string]$Root = 'C:\Thornswood',
     [switch]$Sync,
     [switch]$Fresh
 )

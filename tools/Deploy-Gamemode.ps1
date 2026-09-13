@@ -1,0 +1,201 @@
+<#
+  Deploy-Gamemode.ps1
+
+  Puts gamemode.js into the built server and writes a server load order that
+  actually lines up with the client's.
+
+  The load order is the whole game here, so it is worth stating plainly.
+
+  SkyMP turns a form id into a plugin plus a local id with plain arithmetic,
+  fileIdx * 0x01000000 + shortFormId, where fileIdx is the position in
+  server-settings.json. The client does NOT translate: remoteIdToLocalId passes
+  anything below 0xff000000 straight to Game.getFormEx, and the client never
+  calls Game.getFormFromFile, the one API that resolves by plugin name and
+  handles light plugins. So the server's indices must equal the game's.
+
+  Skyrim gives an ESL-flagged plugin no normal index at all, so listing one
+  server-side shifts everything after it. Leaving them out is therefore exact,
+  not a compromise, and it matches what the client already believes: its own
+  loadOrderVerificationService enumerates with Game.getModCount, which skips
+  light plugins by construction.
+
+  A plugin that masters to a dropped one cannot load either, so those are pruned
+  too, repeatedly until the list is closed. On this setup that costs exactly one
+  plugin, MCMHelper.esp, which is menu glue the server has no use for.
+
+  A plugin is light if its extension is .esl or its TES4 header carries flag
+  0x200. The second case is the one that surprises people: TheNewGentleman.esp
+  was a plain .esp carrying both the ESM and ESL flags.
+
+  -FullLoadOrder disables all of this and lists everything. The server will
+  start, and form ids will be wrong for every plugin after the first ESL. It is
+  here for narrowing down a load failure, not for playing on.
+
+#>
+param(
+    [string]$Gamemode,
+    [string]$Dist     = 'C:\Thornswood-Dev\skymp\build\dist\server',
+    [string]$Data     = 'C:\Thornswood\Game\Data',
+    [string]$Plugins  = 'C:\Thornswood\Profile\Default\plugins.txt',
+    [string]$ServerName = 'Thornswood',
+    [int]   $Port     = 7777,
+    [switch]$MinimalLoadOrder,   # masters plus Thornswood-Content.esp only
+    [switch]$FullLoadOrder       # list everything, indices be damned. for bisecting
+)
+
+
+# Resolved from where this script is rather than from a fixed path under
+# Downloads. The repo folder gets renamed and moved, and a default that names it
+# turns every one of these into a broken command the first time it does.
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+if (-not $Gamemode) { $Gamemode = Join-Path $Here 'gamemode.js' }
+
+if (-not (Test-Path -LiteralPath $Gamemode)) { throw "not found: $Gamemode" }
+if (-not (Test-Path -LiteralPath $Dist))     { throw "server dist not found: $Dist" }
+
+Copy-Item -LiteralPath $Gamemode -Destination (Join-Path $Dist 'gamemode.js') -Force
+$kb = [math]::Round((Get-Item (Join-Path $Dist 'gamemode.js')).Length / 1KB)
+Write-Host "gamemode.js -> $Dist  ($kb KB)" -ForegroundColor Cyan
+
+function Read-PluginHeader([string]$path) {
+    $fs = [IO.File]::OpenRead($path)
+    $len = [Math]::Min(16384, $fs.Length)
+    $b = New-Object byte[] $len
+    [void]$fs.Read($b, 0, $len)
+    $fs.Close()
+
+    $light = ($path -match '\.esl$')
+    if ($len -ge 12 -and [Text.Encoding]::ASCII.GetString($b,0,4) -eq 'TES4') {
+        if (([BitConverter]::ToUInt32($b,8) -band 0x200) -ne 0) { $light = $true }
+    }
+
+    $masters = @()
+    for ($i = 0; $i -lt $b.Length - 6; $i++) {
+        if ($b[$i] -eq 0x4D -and $b[$i+1] -eq 0x41 -and $b[$i+2] -eq 0x53 -and $b[$i+3] -eq 0x54) {
+            $sz = [BitConverter]::ToUInt16($b, $i+4)
+            if ($sz -gt 0 -and $sz -lt 260 -and ($i+6+$sz) -le $b.Length) {
+                $str = [Text.Encoding]::GetEncoding(1252).GetString($b, $i+6, $sz).TrimEnd([char]0)
+                if ($str -match '\.es[pml]$') { $masters += $str }
+            }
+        }
+    }
+    [pscustomobject]@{ Light = $light; Masters = ($masters | Select-Object -Unique) }
+}
+
+# ---- build the load order --------------------------------------------------
+$wanted = if ($MinimalLoadOrder) {
+    'Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm','Thornswood-Content.esp'
+} else {
+    if (-not (Test-Path -LiteralPath $Plugins)) { throw "not found: $Plugins" }
+    $fromFile = Get-Content -LiteralPath $Plugins |
+                Where-Object { $_ -match '^\*' } |
+                ForEach-Object { $_.TrimStart('*').Trim() }
+    # plugins.txt omits the always-on masters; the server needs them spelled out
+    $implicit = 'Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm'
+    @($implicit | Where-Object { $fromFile -notcontains $_ }) + $fromFile
+}
+
+$info = @{}; $missing = @()
+foreach ($p in $wanted) {
+    $full = Join-Path $Data $p
+    if (Test-Path -LiteralPath $full) { $info[$p] = Read-PluginHeader $full } else { $missing += $p }
+}
+
+$drop = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+$pruned = @{}
+if (-not $FullLoadOrder) {
+    foreach ($p in $wanted) { if ($info[$p] -and $info[$p].Light) { [void]$drop.Add($p) } }
+    $lightCount = $drop.Count
+    do {
+        $again = $false
+        foreach ($p in $wanted) {
+            if (-not $info[$p] -or $drop.Contains($p)) { continue }
+            foreach ($m in $info[$p].Masters) {
+                if ($drop.Contains($m)) { [void]$drop.Add($p); $pruned[$p] = $m; $again = $true; break }
+            }
+        }
+    } while ($again)
+} else { $lightCount = 0 }
+
+$keep  = @($wanted | Where-Object { $info[$_] -and -not $drop.Contains($_) })
+$paths = @($keep | ForEach-Object { (Join-Path $Data $_) -replace '\\', '/' })
+
+# ---- rewrite server-settings.json -----------------------------------------
+$settingsPath = Join-Path $Dist 'server-settings.json'
+$s = if (Test-Path -LiteralPath $settingsPath) {
+        Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+     } else { [pscustomobject]@{} }
+
+$s | Add-Member -NotePropertyName loadOrder   -NotePropertyValue $paths      -Force
+$s | Add-Member -NotePropertyName name        -NotePropertyValue $ServerName -Force
+$s | Add-Member -NotePropertyName port        -NotePropertyValue $Port       -Force
+$s | Add-Member -NotePropertyName offlineMode -NotePropertyValue $true       -Force
+$s | Add-Member -NotePropertyName dataDir     -NotePropertyValue 'data'      -Force
+# Server-simulated NPCs. Off is SkyMP's default and it is the Skyrim Together
+# behaviour we are leaving behind: everyone gets their own private copy of every
+# bandit. On means one shared world. npcSettings stays empty, which is "no
+# per-NPC overrides", not "no NPCs".
+$s | Add-Member -NotePropertyName npcEnabled  -NotePropertyValue $true       -Force
+if (-not $s.PSObject.Properties.Name.Contains('npcSettings')) {
+    $s | Add-Member -NotePropertyName npcSettings -NotePropertyValue ([pscustomobject]@{}) -Force
+}
+# Where a brand new character first appears, which is also where the gamemode
+# runs character creation. Skyrim Unbound's own creation room is the right
+# answer on this setup: a new game already puts everybody there, so the client
+# and the server agree from the first frame instead of arguing about it. The
+# Whiterun gate this used to point at was the published SkyMP spawn, and it is
+# still the fallback, but it is outdoors and half a world away from where the
+# client actually starts.
+#
+# The form id is computed rather than written down. SkyMP resolves
+# fileIdx * 0x01000000 + shortFormId and fileIdx is this array's own index, so a
+# literal would rot the moment the load order moved.
+$hallPlugin = 'Skyrim Unbound.esp'
+$hallLocal  = 0x19BAD4                      # SkyrimUnboundRoom01
+$hallIdx = -1
+for ($i = 0; $i -lt $paths.Count; $i++) {
+    if ([IO.Path]::GetFileName($paths[$i]) -ieq $hallPlugin) { $hallIdx = $i; break }
+}
+if ($hallIdx -ge 0) {
+    $hallId = ($hallIdx * 0x01000000) + $hallLocal
+    $start = [pscustomobject]@{
+        pos = @(3755.7, -495.7, -207.7); worldOrCell = ('0x{0:X8}' -f $hallId); angleZ = 180
+    }
+    $startNote = "the Unbound creation room, $hallPlugin at index $hallIdx, form 0x{0:X8}" -f $hallId
+} else {
+    $start = [pscustomobject]@{
+        pos = @(22659, -8697, -3594); worldOrCell = '0x1a26f'; angleZ = 268
+    }
+    $startNote = "Whiterun's main gate; $hallPlugin is not in the load order"
+}
+$s | Add-Member -NotePropertyName startPoints -NotePropertyValue @($start) -Force
+
+# Set-Content -Encoding UTF8 writes a byte order mark under Windows PowerShell
+# 5.1 and does not under PowerShell 7, so the same line produces a different
+# file depending on which one happens to run it. A BOM is not JSON: node stops
+# on the first character with "Unexpected token", the server never starts, and
+# nothing about the message points at the file that was written three steps
+# earlier. WriteAllText with an explicit encoding is the same in both.
+[IO.File]::WriteAllText($settingsPath, ($s | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding($false)))
+
+Write-Host ("server-settings.json  {0} plugins, name '{1}', port {2}, NPCs server-side" -f $paths.Count, $ServerName, $Port) -ForegroundColor Cyan
+Write-Host ("  new characters start at {0}" -f $startNote) -ForegroundColor DarkGray
+
+if ($FullLoadOrder) {
+    Write-Host '  -FullLoadOrder: indices will NOT match the game. Diagnostic use only.' -ForegroundColor Yellow
+} elseif ($lightCount) {
+    Write-Host ("  {0} light plugin(s) left out so the indices match the game exactly" -f $lightCount) -ForegroundColor DarkGray
+    foreach ($k in ($pruned.Keys | Sort-Object)) {
+        Write-Host ("      also {0}, which masters to {1}" -f $k, $pruned[$k]) -ForegroundColor DarkGray
+    }
+}
+$tw = ($Data -replace '\\','/') + '/Thornswood-Content.esp'
+$i = [Array]::IndexOf($paths, $tw)
+if ($i -lt 0) {
+    Write-Host '  WARNING: Thornswood-Content.esp is not in the load order. The stations will not resolve.' -ForegroundColor Red
+} else {
+    Write-Host ("  Thornswood-Content.esp at index {0} (0x{1:X2})" -f $i, $i) -ForegroundColor DarkGray
+}
+
+Write-Host ''
