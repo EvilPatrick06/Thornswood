@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.147",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561862887",
-  "launcherSha256": "b667b94a78570358fb0393fe5492c95a5e083a5c518170594692b1c8b9d01ccc",
+  "launcherVersion": "1.0.148",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561870043",
+  "launcherSha256": "533b847b0b773c9782fa016ccb64da2b31fd15415bdd90d11e6a2281c1dba85a",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -719,9 +719,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561862886",
       "sha256": "ccc6bdfc521ae50e508088210b898ec5ee2548ea57b76b467f335b9708ee866d",
       "notes": "Each machine uses its own Windows microphone"
+    },
+    {
+      "id": "20260913-1422",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561870041",
+      "sha256": "9ff73d0f2fcb751c368d4fd61a63b2ee5ed801e3f17410692f3ca8c227cb3ae1",
+      "notes": "Restore brings back trade, town and playtime too"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Restore brings back trade, town and playtime too",
+      "body": "",
+      "details": [
+        "Launcher 1.0.148",
+        "Launcher rebuilt: Account.cs, CharSync.cs, Updater.cs",
+        "8 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Account.cs  (launcher)",
+        "tools\\app\\CharSync.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Each machine uses its own Windows microphone",
@@ -1550,34 +1579,6 @@
         "Data\\SkyUI_SE.esp",
         "Data\\SkyUI_SE.esp.bak",
         "tools\\app\\Creation.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)",
-        "tools\\ui.xaml  (launcher)"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Settings declutter; server address, update source and voice port now ship in the update",
-      "body": "",
-      "details": [
-        "Launcher 1.0.119",
-        "Launcher rebuilt: Config.cs, Shell.cs, ui.xaml, Updater.cs",
-        "10 files to download, 0.0 MB",
-        "The load order moved, so start a new character or expect the old save to complain"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\UI\\thornswood-emotes.html",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SkyUI_SE.esp",
-        "Data\\SkyUI_SE.esp.bak",
-        "plugins.txt  (load order)",
-        "tools\\app\\Config.cs  (launcher)",
         "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)",
         "tools\\ui.xaml  (launcher)"
