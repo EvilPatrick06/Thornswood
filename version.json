@@ -742,6 +742,20 @@
   "news": [
     {
       "date": "13 Sep 2026",
+      "title": "Server updated",
+      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
+      "details": [
+        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
+        "Load order: 61 plugins server side",
+        "Nothing to download for this one. It is on the server, so it is already live."
+      ],
+      "files": [],
+      "kind": "server",
+      "stamp": "2026-09-13T14:55:09.0907013-06:00",
+      "named": false
+    },
+    {
+      "date": "13 Sep 2026",
       "title": "Chat gives the keyboard back, and the profile id comes off the card",
       "body": "",
       "details": [
@@ -1564,26 +1578,6 @@
       "files": [
         "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
         "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Cursor stays in the race menu",
-      "body": "",
-      "details": [
-        "Launcher 1.0.125",
-        "Launcher rebuilt: Updater.cs",
-        "7 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
         "Data\\Platform\\Plugins\\thornswood-emotes.js",
         "Data\\SKSE\\Plugins\\CrashLogger.ini",
         "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
