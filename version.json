@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.132",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560891953",
-  "launcherSha256": "15d95f1ea3300d702bae5ff7ee48ed25382ee39e7dc872cc16b32ded1f916f32",
+  "launcherVersion": "1.0.133",
+  "launcherUrl": "",
+  "launcherSha256": "ef09dba1af40e4b542c87592373876399837b7a7b3947bdd11fa842d2dd5edab",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -646,6 +646,18 @@
   "news": [
     {
       "date": "13 Sep 2026",
+      "title": "Dice rolls, chat box cleaned up, everyone gets dressed",
+      "body": "",
+      "details": [
+        "Launcher 1.0.133",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
+    {
+      "date": "13 Sep 2026",
       "title": "Race menu no longer opens twice",
       "body": "The server at 192.135.112.23 was reinstalled and is answering.",
       "details": [
@@ -655,7 +667,7 @@
       ],
       "files": [],
       "kind": "server",
-      "stamp": "2026-09-13T02:45:13.7854930-06:00",
+      "stamp": "2026-09-13T02:45:13.785493-06:00",
       "named": true
     },
     {
