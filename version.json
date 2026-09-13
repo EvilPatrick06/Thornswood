@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.161",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561978361",
-  "launcherSha256": "6576d8c018975126e3f3f36b7d403be17e633100a8b5152f712a8527d227a290",
+  "launcherVersion": "1.0.162",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561986072",
+  "launcherSha256": "8166090287acec8eba96b974509959fc88224a9920da5a54df32b9af87a24cd1",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -791,9 +791,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561978362",
       "sha256": "dfce2a23c40274623adf9e1a8086c1c5cfc2a789daaff9eaf3f61800b0f81fe0",
       "notes": "Re-acquire the keyboard when DirectInput loses it"
+    },
+    {
+      "id": "20260913-1544",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561986071",
+      "sha256": "3859999f4a68eeab3dcbc724b76ed6821fbb964391e318d0d7b1ee75c12a8692",
+      "notes": "Fix the load race that disconnects you, and stop trusting the scaffolding save"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Fix the load race that disconnects you, and stop trusting the scaffolding save",
+      "body": "",
+      "details": [
+        "Launcher 1.0.162",
+        "Launcher rebuilt: Chars.cs, Updater.cs",
+        "8 files to download, 1.4 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Chars.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Re-acquire the keyboard when DirectInput loses it",
@@ -1623,18 +1651,6 @@
       "body": "",
       "details": [
         "Launcher 1.0.134",
-        "Launcher rebuilt: Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Dice rolls, chat box cleaned up, everyone gets dressed",
-      "body": "",
-      "details": [
-        "Launcher 1.0.133",
         "Launcher rebuilt: Updater.cs"
       ],
       "files": [
