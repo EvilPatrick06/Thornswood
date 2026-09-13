@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.106",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/560412446",
-  "launcherSha256": "5a69c860dea24080e9b6b5f73ab83315d227ba84fd79a81930361f9a39b60973",
+  "launcherVersion": "1.0.107",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/skyrim-together/releases/assets/560433326",
+  "launcherSha256": "5db8b4d690a44d87b8b127de1ae1880141be33514fce88c740bae7600f84da39",
   "serverAddress": "192.135.119.166",
   "serverPort": "25565",
   "message": "",
@@ -524,6 +524,42 @@
     }
   ],
   "news": [
+    {
+      "date": "12 Sep 2026",
+      "title": "Thornswood throughout, character slots pick a server profile, dead packs no longer lock Play",
+      "body": "",
+      "details": [
+        "Launcher 1.0.107",
+        "Launcher rebuilt: Art.cs, AutoJoin.cs, Chars.cs, Checks.cs, Config.cs, Diag.cs, and 19 more"
+      ],
+      "files": [
+        "tools\\app\\Art.cs  (launcher)",
+        "tools\\app\\AutoJoin.cs  (launcher)",
+        "tools\\app\\Chars.cs  (launcher)",
+        "tools\\app\\Checks.cs  (launcher)",
+        "tools\\app\\Config.cs  (launcher)",
+        "tools\\app\\Diag.cs  (launcher)",
+        "tools\\app\\Display.cs  (launcher)",
+        "tools\\app\\Enforce.cs  (launcher)",
+        "tools\\app\\Files.cs  (launcher)",
+        "tools\\app\\Help.cs  (launcher)",
+        "tools\\app\\Icons.cs  (launcher)",
+        "tools\\app\\Keys.cs  (launcher)",
+        "tools\\app\\Links.cs  (launcher)",
+        "tools\\app\\Online.cs  (launcher)",
+        "tools\\app\\Pages.cs  (launcher)",
+        "tools\\app\\Paths.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\SkyMp.cs  (launcher)",
+        "tools\\app\\Stats.cs  (launcher)",
+        "tools\\app\\Swap.cs  (launcher)",
+        "tools\\app\\Themes.cs  (launcher)",
+        "tools\\app\\Uninstall.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)",
+        "tools\\app\\Verify.cs  (launcher)",
+        "tools\\ui.xaml  (launcher)"
+      ]
+    },
     {
       "date": "12 Sep 2026",
       "title": "Character slots pick a server profile, SkyMP server control in Settings, uninstall, emote keys on the Controls page",
@@ -1211,34 +1247,6 @@
         "Data\\Scripts\\_RespawnScript.pex",
         "Data\\SKSE\\Plugins\\skee64.ini",
         "tools\\app\\Display.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Respawn back to the Temple of Kynareth, nearest hold was breaking death",
-      "body": "",
-      "details": [
-        "Launcher 1.0.84",
-        "Launcher rebuilt: Updater.cs",
-        "15 files to download, 0.6 MB"
-      ],
-      "files": [
-        "Data\\Interface\\inventorymenu.swf",
-        "Data\\Interface\\skyui\\config.shipped.txt",
-        "Data\\Interface\\skyui\\config.txt",
-        "Data\\Interface\\skyui\\inventorylists.swf",
-        "Data\\meshes\\furniture\\blacksmithforgemarkerwr.nif.off",
-        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets\\Hunter.json",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
