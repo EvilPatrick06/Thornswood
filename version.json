@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.124",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560713975",
-  "launcherSha256": "47f41c3fc9eca6eec4a6357506c53463c2e3d6a07c70abbdae79965e5caa8204",
+  "launcherVersion": "1.0.125",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560731641",
+  "launcherSha256": "58bbf75dfb9c76d34b631f3bd3b36a09d64ddb27207d6c50d6f16f87add15538",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -593,9 +593,35 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560713976",
       "sha256": "086a80694a7edcc6b6159a9ee923c965cae08e2e68246ea17fd8c60ffa851a29",
       "notes": "Overlay held shut during creation so the cursor works"
+    },
+    {
+      "id": "20260913-0045",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560731638",
+      "sha256": "2d783ba82f92af9789b067e87f44eb03d9b728a78dea65e90771ee7416df8289",
+      "notes": "Cursor stays in the race menu"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Cursor stays in the race menu",
+      "body": "",
+      "details": [
+        "Launcher 1.0.125",
+        "Launcher rebuilt: Updater.cs",
+        "7 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Overlay held shut during creation so the cursor works",
@@ -1271,27 +1297,6 @@
         "Data\\_removedST\\SKSE\\Plugins\\MorphSyncTogether\\Providers\\NordicWarmaiden.enabled",
         "Data\\_removedST\\SKSE\\Plugins\\MorphSyncTogether\\Providers\\OPubes.enabled",
         "... and 1,901 more files"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Respawn: wake at the nearest hold's temple or Hall of the Dead",
-      "body": "Bounty, violent bounty and guard hostility all cleared on death.",
-      "details": [
-        "Launcher 1.0.104",
-        "Launcher rebuilt: Updater.cs",
-        "8 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\_RespawnScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
-        "tools\\app\\Updater.cs  (launcher)"
       ]
     }
   ],
