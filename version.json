@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.152",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561917340",
-  "launcherSha256": "655db0c25d3a06a889c4b5ac04f0bea566f159e0821c26d762f0059e5cf08485",
+  "launcherVersion": "1.0.153",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561925244",
+  "launcherSha256": "079940ea72d23bb90cc58876df53c1e5b0c8c664f4b87f4b18848f9dfd54ae7b",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -743,9 +743,40 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561917341",
       "sha256": "fe37026040c278441d0ca130b739aa17df139e308789a5827cd553fdda89ae38",
       "notes": "Emote wheel in categories, playable bard instruments, no chat cursor, faster teleport"
+    },
+    {
+      "id": "20260913-1501",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561925245",
+      "sha256": "4e052e24db34c529508f9b090a01126a056f87c1cb76fc31dfc0dca0928065f3",
+      "notes": "Open the microphone away from the teleport, and never two at once"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Open the microphone away from the teleport, and never two at once",
+      "body": "",
+      "details": [
+        "Launcher 1.0.153",
+        "Launcher rebuilt: Updater.cs",
+        "12 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\UI\\thornswood-bridge.js",
+        "Data\\Platform\\UI\\thornswood-emotes.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Emote wheel in categories, playable bard instruments, no chat cursor, faster teleport",
@@ -1568,32 +1599,6 @@
         "tools\\app\\Creation.cs  (launcher)",
         "tools\\app\\Roster.cs  (launcher)",
         "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Text chat in the game, browser focus fixed, book menus retired",
-      "body": "",
-      "details": [
-        "Launcher 1.0.127",
-        "Launcher rebuilt: Updater.cs",
-        "13 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-chat.js",
-        "Data\\Platform\\UI\\thornswood-emotes.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
