@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.162",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561986072",
-  "launcherSha256": "8166090287acec8eba96b974509959fc88224a9920da5a54df32b9af87a24cd1",
+  "launcherVersion": "1.0.163",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562015867",
+  "launcherSha256": "e55354f65e462bbbf8d2156db0ae123bb731ab39dac91593994c78795e72c1e1",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -797,9 +797,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561986071",
       "sha256": "3859999f4a68eeab3dcbc724b76ed6821fbb964391e318d0d7b1ee75c12a8692",
       "notes": "Fix the load race that disconnects you, and stop trusting the scaffolding save"
+    },
+    {
+      "id": "20260913-1609",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562015865",
+      "sha256": "3cc3b5d660171e2bbdd6a191a13058dba970b793a5a2b94fc21cce4d5e9ff47c",
+      "notes": "Startup no longer drops the connection, key releases reach the game while the browser has focus, card shows where you actually were"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Startup no longer drops the connection, key releases reach the game while the browser has focus, card shows where you actually were",
+      "body": "",
+      "details": [
+        "Launcher 1.0.163",
+        "Launcher rebuilt: Roster.cs, Updater.cs",
+        "9 files to download, 16.3 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Roster.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Fix the load race that disconnects you, and stop trusting the scaffolding save",
@@ -1644,18 +1673,6 @@
       "kind": "server",
       "stamp": "2026-09-13T03:19:03.3147069-06:00",
       "named": true
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Launcher upload retry",
-      "body": "",
-      "details": [
-        "Launcher 1.0.134",
-        "Launcher rebuilt: Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
     }
   ],
   "serverPassword": "6622",
