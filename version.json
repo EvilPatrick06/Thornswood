@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.123",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560702090",
-  "launcherSha256": "7a5c3745a966eccc664f058495a3664a44832e8a56f6b7d364aad52b86091363",
+  "launcherVersion": "1.0.124",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560713975",
+  "launcherSha256": "47f41c3fc9eca6eec4a6357506c53463c2e3d6a07c70abbdae79965e5caa8204",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -587,9 +587,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560699471",
       "sha256": "e0aae5e9e974494990a248f145d0e90a3b2f889780767c0ab9732d75de325758",
       "notes": "Starter class and starter location; Raven Rock removed"
+    },
+    {
+      "id": "20260913-0030",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560713976",
+      "sha256": "086a80694a7edcc6b6159a9ee923c965cae08e2e68246ea17fd8c60ffa851a29",
+      "notes": "Overlay held shut during creation so the cursor works"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Overlay held shut during creation so the cursor works",
+      "body": "",
+      "details": [
+        "Launcher 1.0.124",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-chargen.js",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\UI\\thornswood-emotes.html",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Profile ids are unique per person; two people could share one character",
@@ -1251,27 +1279,6 @@
       "body": "Bounty, violent bounty and guard hostility all cleared on death.",
       "details": [
         "Launcher 1.0.104",
-        "Launcher rebuilt: Updater.cs",
-        "8 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\_RespawnScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "steam_appid.txt",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Respawn chain rebuilt: nearest Hall of the Dead per hold, Whiterun temple as fallback",
-      "body": "",
-      "details": [
-        "Launcher 1.0.103",
         "Launcher rebuilt: Updater.cs",
         "8 files to download, 0.0 MB"
       ],
