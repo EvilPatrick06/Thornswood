@@ -652,6 +652,20 @@
   "news": [
     {
       "date": "13 Sep 2026",
+      "title": "Shrines, nirnroot, /tp and /where, NPCs off",
+      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
+      "details": [
+        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
+        "Load order: 61 plugins server side",
+        "Nothing to download for this one. It is on the server, so it is already live."
+      ],
+      "files": [],
+      "kind": "server",
+      "stamp": "2026-09-13T04:05:30.3963058-06:00",
+      "named": true
+    },
+    {
+      "date": "13 Sep 2026",
       "title": "Chat moved and cleaned up, shrines and nirnroot work, emote wheel on G",
       "body": "",
       "details": [
