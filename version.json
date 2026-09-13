@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.127",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560776119",
-  "launcherSha256": "e66ecb42a42ab701593aa284aa3d9bb83a2403ae4000c7531d346c85be9efb77",
+  "launcherVersion": "1.0.128",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560795596",
+  "launcherSha256": "52291911b82690041365a5203ee6a4c56f92497906b67fe1ecaadeafba9cb541",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -611,9 +611,44 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560776118",
       "sha256": "dc38acd7df27c5143d580165564f67dd15fdf9a6b1ff2d09580bfd23f2e2ca1e",
       "notes": "Text chat in the game, browser focus fixed, book menus retired"
+    },
+    {
+      "id": "20260913-0133",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560795595",
+      "sha256": "154e5c987bda6123c14851584a6140e472ec954702d57f28da686852fe6ddc15",
+      "notes": "Fixed the startup crash, character cards, text chat"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Fixed the startup crash, character cards, text chat",
+      "body": "",
+      "details": [
+        "Launcher 1.0.128",
+        "Launcher rebuilt: Chars.cs, Creation.cs, Roster.cs, Shell.cs, Updater.cs",
+        "12 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\UI\\thornswood-bridge.js",
+        "Data\\Platform\\UI\\thornswood-chat.js",
+        "Data\\Platform\\UI\\thornswood-emotes.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Chars.cs  (launcher)",
+        "tools\\app\\Creation.cs  (launcher)",
+        "tools\\app\\Roster.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Text chat in the game, browser focus fixed, book menus retired",
@@ -1214,18 +1249,6 @@
         "Data\\_removedST\\SkyrimTogetherReborn\\cache\\AutofillStates\\2025.6.13.84507\\GF",
         "Data\\_removedST\\SkyrimTogetherReborn\\cache\\AutofillStates\\2025.6.13.84507\\GG",
         "... and 556 more files"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Repo renamed, update check survives it, scripts no longer hardcode the repo folder",
-      "body": "",
-      "details": [
-        "Launcher 1.0.107",
-        "Launcher rebuilt: Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Updater.cs  (launcher)"
       ]
     }
   ],
