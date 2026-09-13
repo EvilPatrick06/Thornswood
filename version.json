@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.126",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560758209",
-  "launcherSha256": "0d4bf5e076f8c2cc290cea2d0cb98b2690a6a54d4ed0b2f36809d8d0ea28173e",
+  "launcherVersion": "1.0.127",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560776119",
+  "launcherSha256": "e66ecb42a42ab701593aa284aa3d9bb83a2403ae4000c7531d346c85be9efb77",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -605,9 +605,41 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560758210",
       "sha256": "7fa7ce33f984a9ef7111dfb35a59a3a3ab84b1726f627b295403c6c8ac9b820d",
       "notes": "Browser no longer steals the keyboard and mouse, book menus retired"
+    },
+    {
+      "id": "20260913-0119",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560776118",
+      "sha256": "dc38acd7df27c5143d580165564f67dd15fdf9a6b1ff2d09580bfd23f2e2ca1e",
+      "notes": "Text chat in the game, browser focus fixed, book menus retired"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Text chat in the game, browser focus fixed, book menus retired",
+      "body": "",
+      "details": [
+        "Launcher 1.0.127",
+        "Launcher rebuilt: Updater.cs",
+        "13 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-chargen.js",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\UI\\thornswood-bridge.js",
+        "Data\\Platform\\UI\\thornswood-chat.js",
+        "Data\\Platform\\UI\\thornswood-emotes.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Browser no longer steals the keyboard and mouse, book menus retired",
@@ -1194,42 +1226,6 @@
       ],
       "files": [
         "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Thornswood throughout, character slots pick a server profile, dead packs no longer lock Play",
-      "body": "",
-      "details": [
-        "Launcher 1.0.107",
-        "Launcher rebuilt: Art.cs, AutoJoin.cs, Chars.cs, Checks.cs, Config.cs, Diag.cs, and 19 more"
-      ],
-      "files": [
-        "tools\\app\\Art.cs  (launcher)",
-        "tools\\app\\AutoJoin.cs  (launcher)",
-        "tools\\app\\Chars.cs  (launcher)",
-        "tools\\app\\Checks.cs  (launcher)",
-        "tools\\app\\Config.cs  (launcher)",
-        "tools\\app\\Diag.cs  (launcher)",
-        "tools\\app\\Display.cs  (launcher)",
-        "tools\\app\\Enforce.cs  (launcher)",
-        "tools\\app\\Files.cs  (launcher)",
-        "tools\\app\\Help.cs  (launcher)",
-        "tools\\app\\Icons.cs  (launcher)",
-        "tools\\app\\Keys.cs  (launcher)",
-        "tools\\app\\Links.cs  (launcher)",
-        "tools\\app\\Online.cs  (launcher)",
-        "tools\\app\\Pages.cs  (launcher)",
-        "tools\\app\\Paths.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\SkyMp.cs  (launcher)",
-        "tools\\app\\Stats.cs  (launcher)",
-        "tools\\app\\Swap.cs  (launcher)",
-        "tools\\app\\Themes.cs  (launcher)",
-        "tools\\app\\Uninstall.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)",
-        "tools\\app\\Verify.cs  (launcher)",
-        "tools\\ui.xaml  (launcher)"
       ]
     }
   ],
