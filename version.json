@@ -676,6 +676,20 @@
   "news": [
     {
       "date": "13 Sep 2026",
+      "title": "Save the movement baseline so the hall can actually be left",
+      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
+      "details": [
+        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
+        "Load order: 61 plugins server side",
+        "Nothing to download for this one. It is on the server, so it is already live."
+      ],
+      "files": [],
+      "kind": "server",
+      "stamp": "2026-09-13T12:39:13.7653995-06:00",
+      "named": true
+    },
+    {
+      "date": "13 Sep 2026",
       "title": "Leave the hall on movement, not just on the face",
       "body": "The server at 192.135.112.23 was reinstalled and is answering.",
       "details": [
