@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.165",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562060192",
-  "launcherSha256": "413b1c057e38f2ee289886f07439d2813e98524c72f1a59b31791094b195ef7b",
+  "launcherVersion": "1.0.166",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562146161",
+  "launcherSha256": "f82121e7bacb227fee8149f60c12aa4d79df8b89964339659db1b3b74a2003b6",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -815,9 +815,49 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562060193",
       "sha256": "f129e038e443c27c2b838543f7f208b4403f1a0c91a87e7d880c659e1bd5bbff",
       "notes": "Fixed the keyboard lock and the second save load, controls watchdog, card shows where you actually were"
+    },
+    {
+      "id": "20260913-1751",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562146162",
+      "sha256": "d3b237fd432633e49d95b2ebc8b5106d48236613433a5dd1323e569cf819e6b6",
+      "notes": "Scaffolding saves cleared every launch, kit no longer re-given, spawn no longer reloads over a live game"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Scaffolding saves cleared every launch, kit no longer re-given, spawn no longer reloads over a live game",
+      "body": "",
+      "details": [
+        "Launcher 1.0.166",
+        "Launcher rebuilt: Chars.cs, Diag.cs, Help.cs, Icons.cs, Keys.cs, Pages.cs, and 3 more",
+        "13 files to download, 16.4 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\UI\\thornswood-emotes.html",
+        "Data\\Platform\\UI\\thornswood-emotes.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Chars.cs  (launcher)",
+        "tools\\app\\Diag.cs  (launcher)",
+        "tools\\app\\Help.cs  (launcher)",
+        "tools\\app\\Icons.cs  (launcher)",
+        "tools\\app\\Keys.cs  (launcher)",
+        "tools\\app\\Pages.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)",
+        "tools\\ui.xaml  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Server updated",
@@ -1657,36 +1697,6 @@
       "files": [
         "- Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll.backup",
         "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Voice chat works, chat and emote wheel fixed",
-      "body": "",
-      "details": [
-        "Launcher 1.0.135",
-        "Launcher rebuilt: Shell.cs",
-        "17 files to download, 30.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
-        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll.backup",
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-chat.js",
-        "Data\\Platform\\UI\\thornswood-emotes.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Shell.cs  (launcher)"
       ]
     }
   ],
