@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.129",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560806700",
-  "launcherSha256": "0c49ffbbd6856bcf4c8480b88eeca66e128483123bcd6331e0fb5765ac2e0406",
+  "launcherVersion": "1.0.130",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560817889",
+  "launcherSha256": "86abcada91ea22b05d45b4693cbef04abe96da8a7aa59a3e836350ab9f3eb267",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -623,9 +623,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560806701",
       "sha256": "aa1d3b0cd596bdda8a2ba363c444eade2777d94da43d9d202c44f3fcfea034ac",
       "notes": "Creation timing, chat focus, character cards"
+    },
+    {
+      "id": "20260913-0149",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560817890",
+      "sha256": "42dfa4c4201f61e4c87a8fa7f88eec8ac712ecae3aa5cd88cd28f22fa53224ad",
+      "notes": "Creation timing, chat focus, load order manifest, character cards"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Creation timing, chat focus, load order manifest, character cards",
+      "body": "",
+      "details": [
+        "Launcher 1.0.130",
+        "Launcher rebuilt: AutoJoin.cs, Updater.cs",
+        "8 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\UI\\thornswood-bridge.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "tools\\app\\AutoJoin.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Creation timing, chat focus, character cards",
@@ -1159,30 +1187,6 @@
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "tools\\app\\AutoJoin.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "12 Sep 2026",
-      "title": "Help and Controls rewritten against what this build actually runs",
-      "body": "",
-      "details": [
-        "Launcher 1.0.109",
-        "Launcher rebuilt: Help.cs, Keys.cs, Pages.cs, Shell.cs, ui.xaml, Updater.cs",
-        "6 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "tools\\app\\Help.cs  (launcher)",
-        "tools\\app\\Keys.cs  (launcher)",
-        "tools\\app\\Pages.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)",
-        "tools\\ui.xaml  (launcher)"
       ]
     }
   ],
