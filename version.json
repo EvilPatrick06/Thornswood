@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.122",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560699472",
-  "launcherSha256": "afc876e5c3eded7ff4ffde29a084386722f37ac1bd3550280e6578606896c0a4",
+  "launcherVersion": "1.0.123",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560702090",
+  "launcherSha256": "7a5c3745a966eccc664f058495a3664a44832e8a56f6b7d364aad52b86091363",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -590,6 +590,19 @@
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Profile ids are unique per person; two people could share one character",
+      "body": "",
+      "details": [
+        "Launcher 1.0.123",
+        "Launcher rebuilt: Chars.cs, Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Chars.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Starter class and starter location; Raven Rock removed",
@@ -1271,20 +1284,6 @@
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
         "steam_appid.txt",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Respawn: clear combat and bounty before the teleport, fixes the Hall of the Dead crash",
-      "body": "",
-      "details": [
-        "Launcher 1.0.102",
-        "Launcher rebuilt: Updater.cs",
-        "1 file to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Scripts\\_RespawnScript.pex",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
