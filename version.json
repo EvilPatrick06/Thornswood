@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.135",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561591267",
-  "launcherSha256": "10ed7a056a869a6c389e7d24f815914d24019bacd52d52e7b695bdb1492454db",
+  "launcherVersion": "1.0.136",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561613866",
+  "launcherSha256": "dc3fa74e5ebe1e55ce4f3ca93bf76d79ff5e3e4fa3b2c7ace82267d5cf487f66",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -653,9 +653,28 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561591263",
       "sha256": "a1ec3d9dc2481337be165d9266cbe6409dd27f57d33ab90b85e0c4a9f92e3e08",
       "notes": "Voice chat works, chat and emote wheel fixed"
+    },
+    {
+      "id": "20260913-1120",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561613867",
+      "sha256": "d88674c1b8617ed37ae10b6b7eb1440d731f0f266ccd9ea47c8788b2849d27b3",
+      "notes": "Microphone works: CEF permission granted in SkyrimPlatform"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Microphone works: CEF permission granted in SkyrimPlatform",
+      "body": "",
+      "details": [
+        "Launcher 1.0.136",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "- Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll.backup",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Voice chat works, chat and emote wheel fixed",
