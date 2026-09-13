@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.142",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561820322",
-  "launcherSha256": "6550589ccbcd4880368cdc2cdb97ff1d2a380f69d882ca579949b54719633821",
+  "launcherVersion": "1.0.143",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561829481",
+  "launcherSha256": "29504b9048fc0130cf70de66d769611b393be6dfbc82a1c5374a460ff5e21ff8",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -695,9 +695,39 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561820323",
       "sha256": "ef44808a50beed28f7ceb2d137b0f5b5250759e1cb22cef33b44db2cafc9ed8c",
       "notes": "Voice indicator with whisper, local and yell. Emote wheel no longer closes itself"
+    },
+    {
+      "id": "20260913-1355",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561829484",
+      "sha256": "fd8d05d5f3a56b90042cb06b3b5c44111b9ed11d273f632aeee91c904e1ac481",
+      "notes": "Microphone waits for the world to finish loading before it opens"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Microphone waits for the world to finish loading before it opens",
+      "body": "",
+      "details": [
+        "Launcher 1.0.143",
+        "Launcher rebuilt: Updater.cs",
+        "11 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-emotes.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\UI\\thornswood-emotes.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Voice indicator with whisper, local and yell",
