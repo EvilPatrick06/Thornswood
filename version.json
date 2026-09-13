@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.160",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561976089",
-  "launcherSha256": "35d5a0d96cef212e57b2bd6d7e2d35549174eac95a9040112dcead1acd94c1b2",
+  "launcherVersion": "1.0.161",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561978361",
+  "launcherSha256": "6576d8c018975126e3f3f36b7d403be17e633100a8b5152f712a8527d227a290",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -784,6 +784,12 @@
       "id": "20260913-1535",
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561976086",
       "sha256": "187a2ec2e2a70753c26df2f4a3613922bd338351b49904b8f554b35470b5e0f8",
+      "notes": "Re-acquire the keyboard when DirectInput loses it"
+    },
+    {
+      "id": "20260913-1537",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/561978362",
+      "sha256": "dfce2a23c40274623adf9e1a8086c1c5cfc2a789daaff9eaf3f61800b0f81fe0",
       "notes": "Re-acquire the keyboard when DirectInput loses it"
     }
   ],
