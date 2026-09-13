@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.108",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560465614",
-  "launcherSha256": "7dbe86f3efafcca2380e86ab028428d8a89899c15f1b5beb7b09bf1742fb9e23",
+  "launcherVersion": "1.0.109",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560479787",
+  "launcherSha256": "f8ddd64e26e9c83934b3e60c706a47ed92866b76b197a361ebf28f95a8eed0ab",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -527,9 +527,39 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560465613",
       "sha256": "88ac7a8e5b4d51d0a0c1db87ac190c408e9ba9df9b18b4a60247f38a2e33e22b",
       "notes": "Controls page drops mods that are gone, SkyMP voice and client keys added, server status judged by the port"
+    },
+    {
+      "id": "20260912-2134",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/560479788",
+      "sha256": "45d0575002ad6744de1a5c6ba6bf23d0ced04bb9681cfd5c1fdc68308c8b0e73",
+      "notes": "Help and Controls rewritten against what this build actually runs"
     }
   ],
   "news": [
+    {
+      "date": "12 Sep 2026",
+      "title": "Help and Controls rewritten against what this build actually runs",
+      "body": "",
+      "details": [
+        "Launcher 1.0.109",
+        "Launcher rebuilt: Help.cs, Keys.cs, Pages.cs, Shell.cs, ui.xaml, Updater.cs",
+        "6 files to download, 0.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "tools\\app\\Help.cs  (launcher)",
+        "tools\\app\\Keys.cs  (launcher)",
+        "tools\\app\\Pages.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)",
+        "tools\\ui.xaml  (launcher)"
+      ]
+    },
     {
       "date": "12 Sep 2026",
       "title": "Controls page drops mods that are gone, SkyMP voice and client keys added, server status judged by the port",
@@ -1249,77 +1279,6 @@
         "tools\\app\\Enforce.cs  (launcher)",
         "tools\\app\\Help.cs  (launcher)",
         "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "11 Sep 2026",
-      "title": "Presets and Makeup out of RaceMenu, holds column removed from Unbound, emotes reachable, facegen morphing serialised",
-      "body": "",
-      "details": [
-        "Launcher 1.0.87",
-        "Launcher rebuilt: Updater.cs",
-        "58 files to download, 6.3 MB"
-      ],
-      "files": [
-        "attention.txt",
-        "bow1.txt",
-        "bow2.txt",
-        "bow3.txt",
-        "cheer.txt",
-        "cleansword.txt",
-        "cross.txt",
-        "cut.txt",
-        "dance1.txt",
-        "dance2.txt",
-        "dance3.txt",
-        "Data\\Interface\\racesex_menu.swf",
-        "Data\\Interface\\skyui\\config.txt",
-        "Data\\meshes\\actors\\character\\character assets\\femalebody_0.nif",
-        "Data\\meshes\\actors\\character\\character assets\\femalebody_1.nif",
-        "Data\\meshes\\actors\\character\\character assets\\malebody_0.nif",
-        "Data\\meshes\\actors\\character\\character assets\\malebody_1.nif",
-        "Data\\Scripts\\_RespawnOverhaulMCM.pex",
-        "Data\\Scripts\\_RespawnScript.pex",
-        "Data\\Scripts\\SkyrimUnboundMCMScript.pex",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\skee64.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\TheNewGentleman5.ini",
-        "Data\\SunHelm\\Config\\Default\\SunHelm.json",
-        "Data\\SunHelmSurvival.esp",
-        "def.txt",
-        "drink.txt",
-        "follow.txt",
-        "give.txt",
-        "horn1.txt",
-        "horn2.txt",
-        "ledger1.txt",
-        "ledger2.txt",
-        "pickup.txt",
-        "point.txt",
-        "readbook.txt",
-        "readnote.txt",
-        "ritual1.txt",
-        "ritual2.txt",
-        "ritual3.txt",
-        "salute.txt",
-        "scout.txt",
-        "search.txt",
-        "shield.txt",
-        "steam_appid.txt",
-        "study.txt",
-        "surrender.txt",
-        "table.txt",
-        "take.txt",
-        "think.txt",
-        "warm1.txt",
-        "warm2.txt",
-        "wave.txt",
-        "welcome.txt",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
