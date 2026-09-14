@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.189",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564239413",
-  "launcherSha256": "d8afb386f04240c93462b3cafd723d06d6955ae6473065695a6111b3a673d6dc",
+  "launcherVersion": "1.0.190",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564268123",
+  "launcherSha256": "6a51da5dc02e7af059cb4a1ee4ade1047bfca52f881959792fe37367de0e3392",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -947,9 +947,41 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564239414",
       "sha256": "908d1d2fcd55ac182e83a14b012e1b00d3120709d7ae95c7597a78fc60be4d39",
       "notes": "Voice renegotiates when the mic opens late, ICE candidates are no longer dropped, raw input bisect, world cleaner off"
+    },
+    {
+      "id": "20260914-1530",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564268124",
+      "sha256": "0616ec891c6fa6bfc0724a318619ca55557ea73dd4129bd0bee30651ccf68787",
+      "notes": "Voice runs in the launcher now, WebView2 bootstrapper, saves page gone"
     }
   ],
   "news": [
+    {
+      "date": "14 Sep 2026",
+      "title": "Voice runs in the launcher now, WebView2 bootstrapper, saves page gone",
+      "body": "",
+      "details": [
+        "Launcher 1.0.190",
+        "Launcher rebuilt: Shell.cs, Updater.cs, Voice.cs",
+        "11 files to download, 15.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)",
+        "tools\\app\\Voice.cs  (launcher)"
+      ]
+    },
     {
       "date": "14 Sep 2026",
       "title": "Voice renegotiates when the mic opens late, ICE candidates are no longer dropped, raw input bisect, world cleaner off",
@@ -1752,31 +1784,6 @@
         "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
         "Data\\Platform\\Plugins\\thornswood-emotes.js",
         "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-emotes.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Emote wheel in categories, playable bard instruments, no chat cursor, faster teleport",
-      "body": "",
-      "details": [
-        "Launcher 1.0.152",
-        "Launcher rebuilt: Updater.cs",
-        "12 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
         "Data\\Platform\\UI\\thornswood-bridge.js",
         "Data\\Platform\\UI\\thornswood-emotes.js",
         "Data\\Platform\\UI\\thornswood-voice.js",
