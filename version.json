@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.184",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562419627",
-  "launcherSha256": "c09fc9570adbffc52fd0773951c93b4b4b6afb417596f09081e3bfcaf1422063",
+  "launcherVersion": "1.0.185",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564135138",
+  "launcherSha256": "dcb64a65d56afe77f5a94f3050d8cd519deed915cbd41ad58828de439ab5fb4b",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -917,9 +917,35 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562419626",
       "sha256": "53afb0bc5aa91bd59d10922520087c5fb59c139fb7eb1f2d2a312cbfd75f36ce",
       "notes": "The game gets the character back when keys are arriving and nobody is moving"
+    },
+    {
+      "id": "20260914-1408",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564135140",
+      "sha256": "11d18b3fc6e68d678ce22841c618f101b6de3a491761bbeb531b841acf395764",
+      "notes": "The stuck detector can actually fire, and every activation says what happened to it"
     }
   ],
   "news": [
+    {
+      "date": "14 Sep 2026",
+      "title": "The stuck detector can actually fire, and every activation says what happened to it",
+      "body": "",
+      "details": [
+        "Launcher 1.0.185",
+        "Launcher rebuilt: Updater.cs",
+        "7 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "The game gets the character back when keys are arriving and nobody is moving",
@@ -1713,28 +1739,6 @@
       "kind": "server",
       "stamp": "2026-09-13T14:29:16.1039687-06:00",
       "named": false
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Take the weapon-drawn pin off after dressing, faster teleport",
-      "body": "",
-      "details": [
-        "Launcher 1.0.149",
-        "Launcher rebuilt: Updater.cs",
-        "9 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
     }
   ],
   "serverPassword": "6622",
