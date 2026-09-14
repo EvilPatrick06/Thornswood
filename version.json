@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.176",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562324167",
-  "launcherSha256": "87b40f22e0bd7cc2d6ebac7a2c30df1e7fca565862b13b108cb3bbeb088e4d21",
+  "launcherVersion": "1.0.177",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562330000",
+  "launcherSha256": "52a877cecaa7810e5ab2db91aa6c0caeb42d8b6842ec501c9d99ddc3c9b4f095",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -875,9 +875,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562324168",
       "sha256": "9f5370cbc6926c0106e3da20ed23042fa836ebc2c8283f616c057db5734763ef",
       "notes": "Keyboard stays with the game when voice opens, voice audio plays, handles and furniture work again, inventory stops being overwritten"
+    },
+    {
+      "id": "20260913-1951",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562329999",
+      "sha256": "4d2e2e3abdb2696797c60f561654c2b73129892d053dd1c845088813c97fb764",
+      "notes": "Keyboard stays with the game when voice opens, voice audio plays, handles and furniture work, spawning no longer strips and re-dresses you, looted gear stays equipped"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Keyboard stays with the game when voice opens, voice audio plays, handles and furniture work, spawning no longer strips and re-dresses you, looted gear stays equipped",
+      "body": "",
+      "details": [
+        "Launcher 1.0.177",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 1.4 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Keyboard stays with the game when voice opens, voice audio plays, handles and furniture work again, inventory stops being overwritten",
@@ -1662,23 +1690,6 @@
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "tools\\app\\CharSync.cs  (launcher)",
         "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Characters follow your Steam account, so a reinstall gets them back",
-      "body": "",
-      "details": [
-        "Launcher 1.0.144",
-        "Launcher rebuilt: Account.cs, Chars.cs, CharSync.cs, Shell.cs, Steam.cs, Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Account.cs  (launcher)",
-        "tools\\app\\Chars.cs  (launcher)",
-        "tools\\app\\CharSync.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Steam.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
