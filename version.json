@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.169",
+  "launcherVersion": "1.0.170",
   "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562206180",
-  "launcherSha256": "8a0a9c5b02b6c4110aef56379d7fee51fcb700f63034815e83deb56dc7d5d6b2",
+  "launcherSha256": "644b44b8ff1614b500a7056e5914df8523eb8f7e48b8844d13c11d153f3688f0",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -842,6 +842,18 @@
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Bards can play their instruments, voice ready in about eleven seconds instead of twenty",
+      "body": "",
+      "details": [
+        "Launcher 1.0.170",
+        "Launcher rebuilt: Updater.cs"
+      ],
+      "files": [
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Bards can play their instruments, voice ready about four seconds after loading in",
@@ -1711,20 +1723,6 @@
         "- Data\\_removedST\\SkyrimTogetherReborn\\cache\\AutofillStates\\2025.6.13.84507\\CI",
         "... and 1,078 more files"
       ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Save the movement baseline so the hall can actually be left",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
-        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": [],
-      "kind": "server",
-      "stamp": "2026-09-13T12:39:13.7653995-06:00",
-      "named": true
     }
   ],
   "serverPassword": "6622",
