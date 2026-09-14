@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.181",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562378748",
-  "launcherSha256": "8c7f3daffe098371c590df84c3d0e866a61e52c02b6bea10be33e49cedeac857",
+  "launcherVersion": "1.0.182",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562395562",
+  "launcherSha256": "0175d915ba4a9ba2409fa3e78d10f303654701085926838ed0d201b13fef6667",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -899,9 +899,35 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562378746",
       "sha256": "1f1d9c912056684da702ac9fb6ad03b1998f7a839cfc9920d17e617fa760947d",
       "notes": "Nobody gets the keyboard exclusively, and Play stays locked until the update check answers"
+    },
+    {
+      "id": "20260913-2032",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562395561",
+      "sha256": "36cdfe7b6b703c434dfad5fd15b850e7b7b8ed31952f37b8b4b9f925015b06c2",
+      "notes": "The hook checks the keyboard against Windows and puts it back itself"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "The hook checks the keyboard against Windows and puts it back itself",
+      "body": "",
+      "details": [
+        "Launcher 1.0.182",
+        "Launcher rebuilt: Updater.cs",
+        "7 files to download, 15.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Nobody gets the keyboard exclusively, and Play stays locked until the update check answers",
@@ -1688,33 +1714,6 @@
         "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Account.cs  (launcher)",
         "tools\\app\\CharSync.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Each machine uses its own Windows microphone",
-      "body": "",
-      "details": [
-        "Launcher 1.0.147",
-        "Launcher rebuilt: Config.cs, Mics.cs, Shell.cs, Updater.cs",
-        "11 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Config.cs  (launcher)",
-        "tools\\app\\Mics.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
