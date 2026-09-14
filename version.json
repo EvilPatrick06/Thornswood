@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.171",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562219011",
-  "launcherSha256": "2aefc4d2a8980fd408a223b1b96640d2d5727325c01aa0a610df33d39a8c5865",
+  "launcherVersion": "1.0.172",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562220724",
+  "launcherSha256": "db1757b4a9c621e7799ed305a60b911d43f5336746d388d343d362ac866d836f",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -845,9 +845,36 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562219012",
       "sha256": "2668cc78998c5243852ec87d4f3eb60d3a5276ab3d3fd570428e2b179f4b1796",
       "notes": "Inventory actually saves now"
+    },
+    {
+      "id": "20260913-1840",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562220723",
+      "sha256": "59f319768c5bb6dcb5f6f894c36323e979829d2417cbec6b0b67574a935df5c3",
+      "notes": "Inventory saves, controls watchdog actually works"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Inventory saves, controls watchdog actually works",
+      "body": "",
+      "details": [
+        "Launcher 1.0.172",
+        "Launcher rebuilt: Updater.cs",
+        "8 files to download, 1.4 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Inventory actually saves now",
@@ -1643,20 +1670,6 @@
         "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Server updated",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
-        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": [],
-      "kind": "server",
-      "stamp": "2026-09-13T13:05:00.704797-06:00",
-      "named": false
     }
   ],
   "serverPassword": "6622",
