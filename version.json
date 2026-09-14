@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.187",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564167468",
-  "launcherSha256": "8156423c523f45f2e0a340c00bd083834cc56ff538850f740631e1e35e15d7a3",
+  "launcherVersion": "1.0.188",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564176089",
+  "launcherSha256": "088e4772468a4b0a2827a79045eed651b357dbe5cc6155454b0b463ca45017ab",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -935,9 +935,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564167463",
       "sha256": "155ddfbd4cb0cb026e069629f53f1133e01afc7f37326119c2ba9008d4f3aeca",
       "notes": "Keys stay in the game window, chains and cage gates work, doors the server never answers open anyway"
+    },
+    {
+      "id": "20260914-1432",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564176090",
+      "sha256": "45a3501cbed1ddba4b1333fc57579528ef8fe3e0919bce3a5e28a12bd5732004",
+      "notes": "Skyrim has people in it again, the login box keeps the keyboard, keys stay in the game window, chains and cage gates work"
     }
   ],
   "news": [
+    {
+      "date": "14 Sep 2026",
+      "title": "Skyrim has people in it again, the login box keeps the keyboard, keys stay in the game window, chains and cage gates work",
+      "body": "",
+      "details": [
+        "Launcher 1.0.188",
+        "Launcher rebuilt: Updater.cs",
+        "10 files to download, 1.4 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CompassNavigationOverhaul.ini",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "14 Sep 2026",
       "title": "Keys stay in the game window, chains and cage gates work, doors the server never answers open anyway",
@@ -1742,18 +1771,6 @@
       "kind": "server",
       "stamp": "2026-09-13T14:55:09.0907013-06:00",
       "named": false
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Chat gives the keyboard back, and the profile id comes off the card",
-      "body": "",
-      "details": [
-        "Launcher 1.0.151",
-        "Launcher rebuilt: Updater.cs"
-      ],
-      "files": [
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
     }
   ],
   "serverPassword": "6622",
