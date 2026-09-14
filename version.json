@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.174",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562284267",
-  "launcherSha256": "a7bbfef86fa9508e991a8bd13ec882c2a2098b2b8b371404647ca6dd8d8021d6",
+  "launcherVersion": "1.0.175",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562299561",
+  "launcherSha256": "45a9830669404450d3716ae618d2deefa756c47f93c61c47fd8590d6f7c47267",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -863,9 +863,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562284265",
       "sha256": "0e8a63d9640e5f59e0fb23df7a50246a3f0531dd8e8427ed841b863c9f7247bf",
       "notes": "Overlays come back if the page reloads under them"
+    },
+    {
+      "id": "20260913-1932",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562299562",
+      "sha256": "f30f01c5d49d9d8b95ae4e512e248b4fece4403efd8e8e570b1febe17e0ddeea",
+      "notes": "No corner box"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "No corner box",
+      "body": "",
+      "details": [
+        "Launcher 1.0.175",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Overlays come back if the page reloads under them",
@@ -1653,24 +1681,6 @@
         "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
         "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Voice indicator with whisper, local and yell",
-      "body": "Emote wheel no longer closes itself",
-      "details": [
-        "Launcher 1.0.142",
-        "Launcher rebuilt: Updater.cs",
-        "5 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\Platform\\UI\\thornswood-emotes.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
         "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
