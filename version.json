@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.188",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564176089",
-  "launcherSha256": "088e4772468a4b0a2827a79045eed651b357dbe5cc6155454b0b463ca45017ab",
+  "launcherVersion": "1.0.189",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564239413",
+  "launcherSha256": "d8afb386f04240c93462b3cafd723d06d6955ae6473065695a6111b3a673d6dc",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -941,9 +941,40 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564176090",
       "sha256": "45a3501cbed1ddba4b1333fc57579528ef8fe3e0919bce3a5e28a12bd5732004",
       "notes": "Skyrim has people in it again, the login box keeps the keyboard, keys stay in the game window, chains and cage gates work"
+    },
+    {
+      "id": "20260914-1513",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564239414",
+      "sha256": "908d1d2fcd55ac182e83a14b012e1b00d3120709d7ae95c7597a78fc60be4d39",
+      "notes": "Voice renegotiates when the mic opens late, ICE candidates are no longer dropped, raw input bisect, world cleaner off"
     }
   ],
   "news": [
+    {
+      "date": "14 Sep 2026",
+      "title": "Voice renegotiates when the mic opens late, ICE candidates are no longer dropped, raw input bisect, world cleaner off",
+      "body": "",
+      "details": [
+        "Launcher 1.0.189",
+        "Launcher rebuilt: Updater.cs",
+        "12 files to download, 16.4 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CompassNavigationOverhaul.ini",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "14 Sep 2026",
       "title": "Skyrim has people in it again, the login box keeps the keyboard, keys stay in the game window, chains and cage gates work",
@@ -1757,20 +1788,6 @@
         "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Server updated",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
-        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": [],
-      "kind": "server",
-      "stamp": "2026-09-13T14:55:09.0907013-06:00",
-      "named": false
     }
   ],
   "serverPassword": "6622",
