@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.167",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562193068",
-  "launcherSha256": "1d63623c15bef7180b2b33f319b9651bccaf3e4a325b5a67fa7b01622d3aa282",
+  "launcherVersion": "1.0.168",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562200326",
+  "launcherSha256": "bda97e0bbf7981791b3aca6d030bfd0b743cab6828fa7c82c30c43deb58b9acc",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -827,9 +827,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562193067",
       "sha256": "a5ff3f4879a1580e8c72c6e7b33f9c81850e5938b073f385e79723715e2d48a6",
       "notes": "Voice ready in two seconds instead of sixteen"
+    },
+    {
+      "id": "20260913-1827",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562200325",
+      "sha256": "290e0b442ab94e0a4d5e472f993ac4e583e5df1e03799ddd795e0aa19b78331d",
+      "notes": "Voice ready about four seconds after loading in instead of twenty"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Voice ready about four seconds after loading in instead of twenty",
+      "body": "",
+      "details": [
+        "Launcher 1.0.168",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 15.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Voice ready in two seconds instead of sixteen",
@@ -1689,32 +1717,6 @@
         "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Launcher no longer passes a switch skse64_loader refuses",
-      "body": "",
-      "details": [
-        "Launcher 1.0.137",
-        "Launcher rebuilt: Shell.cs, Updater.cs",
-        "12 files to download, 15.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-emotes.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
