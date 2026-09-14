@@ -838,6 +838,20 @@
   "news": [
     {
       "date": "13 Sep 2026",
+      "title": "Server updated",
+      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
+      "details": [
+        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
+        "Load order: 61 plugins server side",
+        "Nothing to download for this one. It is on the server, so it is already live."
+      ],
+      "files": [],
+      "kind": "server",
+      "stamp": "2026-09-13T18:31:14.3465635-06:00",
+      "named": false
+    },
+    {
+      "date": "13 Sep 2026",
       "title": "Voice ready about four seconds after loading in instead of twenty",
       "body": "",
       "details": [
@@ -1698,27 +1712,6 @@
       "kind": "server",
       "stamp": "2026-09-13T12:30:12.2364857-06:00",
       "named": true
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Browser focus can no longer strand the keyboard in character creation",
-      "body": "",
-      "details": [
-        "Launcher 1.0.138",
-        "Launcher rebuilt: Updater.cs",
-        "8 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
     }
   ],
   "serverPassword": "6622",
