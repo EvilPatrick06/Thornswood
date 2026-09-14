@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.186",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564155016",
-  "launcherSha256": "08f84d59c88b8d606137f9c889ce72fa1d95e698066ced69b675aaea8ef24008",
+  "launcherVersion": "1.0.187",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564167468",
+  "launcherSha256": "8156423c523f45f2e0a340c00bd083834cc56ff538850f740631e1e35e15d7a3",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -929,9 +929,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564155015",
       "sha256": "3c758d53aa0457fbed062ab40dae70738454a417df139c7780f624f0894fc3f7",
       "notes": "Handles get a real activation, and the stuck detector stops firing on people using things"
+    },
+    {
+      "id": "20260914-1427",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564167463",
+      "sha256": "155ddfbd4cb0cb026e069629f53f1133e01afc7f37326119c2ba9008d4f3aeca",
+      "notes": "Keys stay in the game window, chains and cage gates work, doors the server never answers open anyway"
     }
   ],
   "news": [
+    {
+      "date": "14 Sep 2026",
+      "title": "Keys stay in the game window, chains and cage gates work, doors the server never answers open anyway",
+      "body": "",
+      "details": [
+        "Launcher 1.0.187",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 16.3 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "14 Sep 2026",
       "title": "Handles get a real activation, and the stuck detector stops firing on people using things",
@@ -1724,32 +1752,6 @@
         "Launcher rebuilt: Updater.cs"
       ],
       "files": [
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Chat gives the keyboard back, and three ways it cannot fail to",
-      "body": "",
-      "details": [
-        "Launcher 1.0.150",
-        "Launcher rebuilt: Shell.cs, Updater.cs",
-        "12 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-chargen.js",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
