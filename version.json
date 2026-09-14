@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.183",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562408954",
-  "launcherSha256": "c35d94c99a5d044d32274500645e707aa51caf4fc98abc42112c2e822ce95388",
+  "launcherVersion": "1.0.184",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562419627",
+  "launcherSha256": "c09fc9570adbffc52fd0773951c93b4b4b6afb417596f09081e3bfcaf1422063",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -911,9 +911,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562408953",
       "sha256": "9bb0348389693bb96f4a7b8acace94db5cace1246871f9f10a5cb4e394edd94c",
       "notes": "Nothing opens a menu on the keys people actually hold while playing"
+    },
+    {
+      "id": "20260913-2046",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562419626",
+      "sha256": "53afb0bc5aa91bd59d10922520087c5fb59c139fb7eb1f2d2a312cbfd75f36ce",
+      "notes": "The game gets the character back when keys are arriving and nobody is moving"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "The game gets the character back when keys are arriving and nobody is moving",
+      "body": "",
+      "details": [
+        "Launcher 1.0.184",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.json",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SKSEMenuFramework.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Nothing opens a menu on the keys people actually hold while playing",
@@ -1707,20 +1735,6 @@
         "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Server updated",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
-        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": [],
-      "kind": "server",
-      "stamp": "2026-09-13T14:27:30.1208975-06:00",
-      "named": false
     }
   ],
   "serverPassword": "6622",
