@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.178",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562331849",
-  "launcherSha256": "8a4594967ab9e4f604458a1d0f93269d3e5d87ce7d1926ed7eefd967b747a6f1",
+  "launcherVersion": "1.0.179",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562341467",
+  "launcherSha256": "2f4cfa53c3ee816706c7bb7465ba070281a9df90fb89dccbb831540ff7e0a2df",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -881,9 +881,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562329999",
       "sha256": "4d2e2e3abdb2696797c60f561654c2b73129892d053dd1c845088813c97fb764",
       "notes": "Keyboard stays with the game when voice opens, voice audio plays, handles and furniture work, spawning no longer strips and re-dresses you, looted gear stays equipped"
+    },
+    {
+      "id": "20260913-1959",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562341466",
+      "sha256": "0fc28a4e5947c57938b4b91927516dc6ad1de12ce0a993fce60134f5b345db18",
+      "notes": "Keyboard keeps working when voice opens, voice audio plays, handles and furniture work, spawning no longer strips and re-dresses you, looted gear stays equipped"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Keyboard keeps working when voice opens, voice audio plays, handles and furniture work, spawning no longer strips and re-dresses you, looted gear stays equipped",
+      "body": "",
+      "details": [
+        "Launcher 1.0.179",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 16.3 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Keyboard stays with the game when voice opens, voice audio plays, handles and furniture work, spawning no longer strips and re-dresses you, looted gear stays equipped",
@@ -1670,28 +1698,6 @@
       "kind": "server",
       "stamp": "2026-09-13T14:14:06.3960816-06:00",
       "named": false
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Wait for the server before handing out a profile id on a blank machine",
-      "body": "",
-      "details": [
-        "Launcher 1.0.145",
-        "Launcher rebuilt: CharSync.cs, Shell.cs, Updater.cs",
-        "7 files to download, 0.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "tools\\app\\CharSync.cs  (launcher)",
-        "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
     }
   ],
   "serverPassword": "6622",
