@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.182",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562395562",
-  "launcherSha256": "0175d915ba4a9ba2409fa3e78d10f303654701085926838ed0d201b13fef6667",
+  "launcherVersion": "1.0.183",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562408954",
+  "launcherSha256": "c35d94c99a5d044d32274500645e707aa51caf4fc98abc42112c2e822ce95388",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -905,9 +905,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562395561",
       "sha256": "36cdfe7b6b703c434dfad5fd15b850e7b7b8ed31952f37b8b4b9f925015b06c2",
       "notes": "The hook checks the keyboard against Windows and puts it back itself"
+    },
+    {
+      "id": "20260913-2039",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562408953",
+      "sha256": "9bb0348389693bb96f4a7b8acace94db5cace1246871f9f10a5cb4e394edd94c",
+      "notes": "Nothing opens a menu on the keys people actually hold while playing"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Nothing opens a menu on the keys people actually hold while playing",
+      "body": "",
+      "details": [
+        "Launcher 1.0.183",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 15.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.json",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SKSEMenuFramework.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "The hook checks the keyboard against Windows and puts it back itself",
@@ -1693,29 +1721,6 @@
       "kind": "server",
       "stamp": "2026-09-13T14:27:30.1208975-06:00",
       "named": false
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Restore brings back trade, town and playtime too",
-      "body": "",
-      "details": [
-        "Launcher 1.0.148",
-        "Launcher rebuilt: Account.cs, CharSync.cs, Updater.cs",
-        "8 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Account.cs  (launcher)",
-        "tools\\app\\CharSync.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
     }
   ],
   "serverPassword": "6622",
