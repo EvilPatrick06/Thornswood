@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.179",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562341467",
-  "launcherSha256": "2f4cfa53c3ee816706c7bb7465ba070281a9df90fb89dccbb831540ff7e0a2df",
+  "launcherVersion": "1.0.180",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562355730",
+  "launcherSha256": "ce998d85e39148e3caba30d9a4d4f5ab171428a6860df890e1b325c9d4c704e5",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -887,9 +887,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562341466",
       "sha256": "0fc28a4e5947c57938b4b91927516dc6ad1de12ce0a993fce60134f5b345db18",
       "notes": "Keyboard keeps working when voice opens, voice audio plays, handles and furniture work, spawning no longer strips and re-dresses you, looted gear stays equipped"
+    },
+    {
+      "id": "20260913-2008",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562355731",
+      "sha256": "18349c8293e22e4e13268f13f9e73ea114a82741c6a4d6989d7b6e19178312a8",
+      "notes": "skymp5-client no longer takes the keyboard for its own chat, and the input path is metered"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "skymp5-client no longer takes the keyboard for its own chat, and the input path is metered",
+      "body": "",
+      "details": [
+        "Launcher 1.0.180",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 16.3 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Keyboard keeps working when voice opens, voice audio plays, handles and furniture work, spawning no longer strips and re-dresses you, looted gear stays equipped",
@@ -1684,20 +1712,6 @@
         "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Server updated",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
-        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": [],
-      "kind": "server",
-      "stamp": "2026-09-13T14:14:06.3960816-06:00",
-      "named": false
     }
   ],
   "serverPassword": "6622",
