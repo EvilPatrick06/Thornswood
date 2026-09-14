@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.168",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562200326",
-  "launcherSha256": "bda97e0bbf7981791b3aca6d030bfd0b743cab6828fa7c82c30c43deb58b9acc",
+  "launcherVersion": "1.0.169",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562206180",
+  "launcherSha256": "8a0a9c5b02b6c4110aef56379d7fee51fcb700f63034815e83deb56dc7d5d6b2",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -833,9 +833,36 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562200325",
       "sha256": "290e0b442ab94e0a4d5e472f993ac4e583e5df1e03799ddd795e0aa19b78331d",
       "notes": "Voice ready about four seconds after loading in instead of twenty"
+    },
+    {
+      "id": "20260913-1831",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562206183",
+      "sha256": "1edb9669fc14efcaaf5ef754568638a68cdab0c5e09059127b49d3ebd03bf530",
+      "notes": "Bards can play their instruments, voice ready about four seconds after loading in"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Bards can play their instruments, voice ready about four seconds after loading in",
+      "body": "",
+      "details": [
+        "Launcher 1.0.169",
+        "Launcher rebuilt: Updater.cs",
+        "8 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Server updated",
@@ -1697,20 +1724,6 @@
       "files": [],
       "kind": "server",
       "stamp": "2026-09-13T12:39:13.7653995-06:00",
-      "named": true
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Leave the hall on movement, not just on the face",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
-        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": [],
-      "kind": "server",
-      "stamp": "2026-09-13T12:30:12.2364857-06:00",
       "named": true
     }
   ],
