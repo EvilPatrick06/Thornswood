@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.190",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564268123",
-  "launcherSha256": "6a51da5dc02e7af059cb4a1ee4ade1047bfca52f881959792fe37367de0e3392",
+  "launcherVersion": "1.0.191",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564282710",
+  "launcherSha256": "ef8bb8847e680f250d8b47db1e65a5c1832f19d4c91e42f2255b2ac745491856",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -953,9 +953,37 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564268124",
       "sha256": "0616ec891c6fa6bfc0724a318619ca55557ea73dd4129bd0bee30651ccf68787",
       "notes": "Voice runs in the launcher now, WebView2 bootstrapper, saves page gone"
+    },
+    {
+      "id": "20260914-1539",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564282713",
+      "sha256": "156adeabfc411f9d771d62378a453f00a52279c3d542a0e1f3b18e056cdc6fe8",
+      "notes": "Voice indicator reads the launcher, whisper and yell reach it too"
     }
   ],
   "news": [
+    {
+      "date": "14 Sep 2026",
+      "title": "Voice indicator reads the launcher, whisper and yell reach it too",
+      "body": "",
+      "details": [
+        "Launcher 1.0.191",
+        "Launcher rebuilt: Updater.cs",
+        "9 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "14 Sep 2026",
       "title": "Voice runs in the launcher now, WebView2 bootstrapper, saves page gone",
@@ -1768,31 +1796,6 @@
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Open the microphone away from the teleport, and never two at once",
-      "body": "",
-      "details": [
-        "Launcher 1.0.153",
-        "Launcher rebuilt: Updater.cs",
-        "12 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\Platform\\UI\\thornswood-bridge.js",
-        "Data\\Platform\\UI\\thornswood-emotes.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
