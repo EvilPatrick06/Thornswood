@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.172",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562220724",
-  "launcherSha256": "db1757b4a9c621e7799ed305a60b911d43f5336746d388d343d362ac866d836f",
+  "launcherVersion": "1.0.173",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562241660",
+  "launcherSha256": "e3fce2101c79c77ebf09350c9d652093bd93a66e1cad8b20a5e2de0a3776024c",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -851,9 +851,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562220723",
       "sha256": "59f319768c5bb6dcb5f6f894c36323e979829d2417cbec6b0b67574a935df5c3",
       "notes": "Inventory saves, controls watchdog actually works"
+    },
+    {
+      "id": "20260913-1855",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562241661",
+      "sha256": "a5a4b067d5cb02acf719bc302e93f933386b31d151c51631f7bc22eb8559d0bc",
+      "notes": "Back to the voice timing that works, inventory saves, controls watchdog fixed"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Back to the voice timing that works, inventory saves, controls watchdog fixed",
+      "body": "",
+      "details": [
+        "Launcher 1.0.173",
+        "Launcher rebuilt: Updater.cs",
+        "10 files to download, 15.0 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "Inventory saves, controls watchdog actually works",
@@ -1645,29 +1674,6 @@
         "- Data\\Scripts\\Source\\SkyrimTogetherUtils.psc",
         "- Data\\Scripts\\Source\\SkyrimTogetherVerifyLaunchScript.psc",
         "- Data\\SkyUI_SE.esp.bak",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Emotes play, faster teleport out of the hall, microphone on after creation",
-      "body": "",
-      "details": [
-        "Launcher 1.0.140",
-        "Launcher rebuilt: Updater.cs",
-        "10 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
