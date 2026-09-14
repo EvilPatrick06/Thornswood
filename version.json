@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.180",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562355730",
-  "launcherSha256": "ce998d85e39148e3caba30d9a4d4f5ab171428a6860df890e1b325c9d4c704e5",
+  "launcherVersion": "1.0.181",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562378748",
+  "launcherSha256": "8c7f3daffe098371c590df84c3d0e866a61e52c02b6bea10be33e49cedeac857",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -893,9 +893,38 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562355731",
       "sha256": "18349c8293e22e4e13268f13f9e73ea114a82741c6a4d6989d7b6e19178312a8",
       "notes": "skymp5-client no longer takes the keyboard for its own chat, and the input path is metered"
+    },
+    {
+      "id": "20260913-2023",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/562378746",
+      "sha256": "1f1d9c912056684da702ac9fb6ad03b1998f7a839cfc9920d17e617fa760947d",
+      "notes": "Nobody gets the keyboard exclusively, and Play stays locked until the update check answers"
     }
   ],
   "news": [
+    {
+      "date": "13 Sep 2026",
+      "title": "Nobody gets the keyboard exclusively, and Play stays locked until the update check answers",
+      "body": "",
+      "details": [
+        "Launcher 1.0.181",
+        "Launcher rebuilt: Shell.cs, Updater.cs",
+        "9 files to download, 16.3 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "13 Sep 2026",
       "title": "skymp5-client no longer takes the keyboard for its own chat, and the input path is metered",
@@ -1686,30 +1715,6 @@
         "tools\\app\\Config.cs  (launcher)",
         "tools\\app\\Mics.cs  (launcher)",
         "tools\\app\\Shell.cs  (launcher)",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Name the microphone, drop the ready stance before an emote, faster teleport",
-      "body": "",
-      "details": [
-        "Launcher 1.0.146",
-        "Launcher rebuilt: Updater.cs",
-        "11 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-emotes.js",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
