@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.191",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564282710",
-  "launcherSha256": "ef8bb8847e680f250d8b47db1e65a5c1832f19d4c91e42f2255b2ac745491856",
+  "launcherVersion": "1.0.192",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564488222",
+  "launcherSha256": "ada6d4ac79286d58d4891358ca91ac1814ef25a4810c36b8604ccc62b959d8f3",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -959,9 +959,41 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564282713",
       "sha256": "156adeabfc411f9d771d62378a453f00a52279c3d542a0e1f3b18e056cdc6fe8",
       "notes": "Voice indicator reads the launcher, whisper and yell reach it too"
+    },
+    {
+      "id": "20260914-1802",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564488230",
+      "sha256": "0338d33ad855f864d0d48a6f060dd09e19aaf9c1be5dc081a77bc263accc609d",
+      "notes": "NPCs server side, armour and spells stay on, locks work, restart warnings"
     }
   ],
   "news": [
+    {
+      "date": "14 Sep 2026",
+      "title": "NPCs server side, armour and spells stay on, locks work, restart warnings",
+      "body": "",
+      "details": [
+        "Launcher 1.0.192",
+        "Launcher rebuilt: Updater.cs, Voice.cs",
+        "12 files to download, 16.4 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)",
+        "tools\\app\\Voice.cs  (launcher)"
+      ]
+    },
     {
       "date": "14 Sep 2026",
       "title": "Voice indicator reads the launcher, whisper and yell reach it too",
@@ -1772,30 +1804,6 @@
         "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
         "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
         "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Fix the window proc hook behind the keyboard lockups",
-      "body": "",
-      "details": [
-        "Launcher 1.0.154",
-        "Launcher rebuilt: Shell.cs, Updater.cs",
-        "10 files to download, 15.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-voice.js",
-        "Data\\Platform\\UI\\thornswood-voice.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Shell.cs  (launcher)",
         "tools\\app\\Updater.cs  (launcher)"
       ]
     }
