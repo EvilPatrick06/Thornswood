@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.192",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564488222",
-  "launcherSha256": "ada6d4ac79286d58d4891358ca91ac1814ef25a4810c36b8604ccc62b959d8f3",
+  "launcherVersion": "1.0.193",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564523193",
+  "launcherSha256": "8e44e2c999c646d7657e3fffbf675c894399029fd551146614a65bb87862ebae",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -965,9 +965,42 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564488230",
       "sha256": "0338d33ad855f864d0d48a6f060dd09e19aaf9c1be5dc081a77bc263accc609d",
       "notes": "NPCs server side, armour and spells stay on, locks work, restart warnings"
+    },
+    {
+      "id": "20260914-1827",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564523197",
+      "sha256": "9781ce9f4c8d964d55c49805874d8e6cda2e062677a8cb14f72e680f60db6062",
+      "notes": "Launcher reopens after you close it"
     }
   ],
   "news": [
+    {
+      "date": "14 Sep 2026",
+      "title": "Launcher reopens after you close it",
+      "body": "",
+      "details": [
+        "Launcher 1.0.193",
+        "Launcher rebuilt: Shell.cs, Updater.cs, Voice.cs",
+        "12 files to download, 16.4 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Plugins\\skymp5-client.js",
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\Plugins\\thornswood-voice.js",
+        "Data\\Platform\\thornswood-loadorder.txt",
+        "Data\\Platform\\UI\\thornswood-voice.js",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)",
+        "tools\\app\\Voice.cs  (launcher)"
+      ]
+    },
     {
       "date": "14 Sep 2026",
       "title": "NPCs server side, armour and spells stay on, locks work, restart warnings",
@@ -1774,28 +1807,6 @@
         "8 files to download, 0.1 MB"
       ],
       "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Log the input pulse so the lockup can be identified",
-      "body": "",
-      "details": [
-        "Launcher 1.0.155",
-        "Launcher rebuilt: Updater.cs",
-        "9 files to download, 15.0 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
         "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
         "Data\\Platform\\Plugins\\thornswood-front.js",
         "Data\\SKSE\\Plugins\\CrashLogger.ini",
