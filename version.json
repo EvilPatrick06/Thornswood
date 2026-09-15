@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.194",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564529859",
-  "launcherSha256": "bd3397e8cd7b2751cba1603b64932bef3e60621b2a74027358c5bb05bde525c1",
+  "launcherVersion": "1.0.195",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564536224",
+  "launcherSha256": "ea785335645d8f55341b237985bd01403151018010bf80dedecc90645b1247f7",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -976,6 +976,12 @@
       "id": "20260914-1832",
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564529858",
       "sha256": "ceeac88c4fcee1bc8107bb89164b7cb3e9ee4f6e474eee826c0fd72e0f95f0c7",
+      "notes": "Field of view setting, and the launcher reopens after you close it"
+    },
+    {
+      "id": "20260914-1835",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564536217",
+      "sha256": "29cc7bf3de391a0bb8df25e6ea3fc31f734dbb2452131dcadf328a68cf6b2caf",
       "notes": "Field of view setting, and the launcher reopens after you close it"
     }
   ],
