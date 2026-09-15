@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.195",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564536224",
-  "launcherSha256": "ea785335645d8f55341b237985bd01403151018010bf80dedecc90645b1247f7",
+  "launcherVersion": "1.0.196",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564600009",
+  "launcherSha256": "caa21d704fc1a22530a19ffc3e4a8f5e4b095606ed3d50e7705d950eb79ed6b8",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -983,9 +983,36 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564536217",
       "sha256": "29cc7bf3de391a0bb8df25e6ea3fc31f734dbb2452131dcadf328a68cf6b2caf",
       "notes": "Field of view setting, and the launcher reopens after you close it"
+    },
+    {
+      "id": "20260914-1917",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564600010",
+      "sha256": "a09adbfbe41aae677ab69d5633381750dca73dd12c1dff19f7d4e72df888662e",
+      "notes": "Launcher reopens after you close it, field of view setting"
     }
   ],
   "news": [
+    {
+      "date": "14 Sep 2026",
+      "title": "Launcher reopens after you close it, field of view setting",
+      "body": "",
+      "details": [
+        "Launcher 1.0.196",
+        "Launcher rebuilt: Updater.cs",
+        "8 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\thornswood-loadorder.txt",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Updater.cs  (launcher)"
+      ]
+    },
     {
       "date": "14 Sep 2026",
       "title": "Field of view setting, and the launcher reopens after you close it",
@@ -1818,20 +1845,6 @@
         "Data\\SKSE\\Plugins\\Thornswood.ini",
         "tools\\app\\Updater.cs  (launcher)"
       ]
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Server updated",
-      "body": "The server at 192.135.112.23 was reinstalled and is answering.",
-      "details": [
-        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
-        "Load order: 61 plugins server side",
-        "Nothing to download for this one. It is on the server, so it is already live."
-      ],
-      "files": [],
-      "kind": "server",
-      "stamp": "2026-09-13T15:25:38.8271292-06:00",
-      "named": false
     }
   ],
   "serverPassword": "6622",
