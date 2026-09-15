@@ -1,7 +1,7 @@
 {
-  "launcherVersion": "1.0.193",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564523193",
-  "launcherSha256": "8e44e2c999c646d7657e3fffbf675c894399029fd551146614a65bb87862ebae",
+  "launcherVersion": "1.0.194",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564529859",
+  "launcherSha256": "bd3397e8cd7b2751cba1603b64932bef3e60621b2a74027358c5bb05bde525c1",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
@@ -971,9 +971,39 @@
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564523197",
       "sha256": "9781ce9f4c8d964d55c49805874d8e6cda2e062677a8cb14f72e680f60db6062",
       "notes": "Launcher reopens after you close it"
+    },
+    {
+      "id": "20260914-1832",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/564529858",
+      "sha256": "ceeac88c4fcee1bc8107bb89164b7cb3e9ee4f6e474eee826c0fd72e0f95f0c7",
+      "notes": "Field of view setting, and the launcher reopens after you close it"
     }
   ],
   "news": [
+    {
+      "date": "14 Sep 2026",
+      "title": "Field of view setting, and the launcher reopens after you close it",
+      "body": "",
+      "details": [
+        "Launcher 1.0.194",
+        "Launcher rebuilt: Display.cs, Shell.cs, ui.xaml, Updater.cs",
+        "8 files to download, 0.1 MB"
+      ],
+      "files": [
+        "Data\\Platform\\Plugins\\thornswood-front.js",
+        "Data\\Platform\\thornswood-loadorder.txt",
+        "Data\\SKSE\\Plugins\\CrashLogger.ini",
+        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
+        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
+        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
+        "Data\\SKSE\\Plugins\\Thornswood.ini",
+        "tools\\app\\Display.cs  (launcher)",
+        "tools\\app\\Shell.cs  (launcher)",
+        "tools\\app\\Updater.cs  (launcher)",
+        "tools\\ui.xaml  (launcher)"
+      ]
+    },
     {
       "date": "14 Sep 2026",
       "title": "Launcher reopens after you close it",
@@ -1796,27 +1826,6 @@
       "kind": "server",
       "stamp": "2026-09-13T15:25:38.8271292-06:00",
       "named": false
-    },
-    {
-      "date": "13 Sep 2026",
-      "title": "Name the menu that is open when the input dies",
-      "body": "",
-      "details": [
-        "Launcher 1.0.156",
-        "Launcher rebuilt: Updater.cs",
-        "8 files to download, 0.1 MB"
-      ],
-      "files": [
-        "Data\\Platform\\Plugins\\skymp5-client-settings.txt",
-        "Data\\Platform\\Plugins\\thornswood-front.js",
-        "Data\\SKSE\\Plugins\\CrashLogger.ini",
-        "Data\\SKSE\\Plugins\\MCMShortcutNG.ini",
-        "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
-        "Data\\SKSE\\Plugins\\po3_Tweaks.ini",
-        "Data\\SKSE\\Plugins\\SkyrimSoulsRE.ini",
-        "Data\\SKSE\\Plugins\\Thornswood.ini",
-        "tools\\app\\Updater.cs  (launcher)"
-      ]
     }
   ],
   "serverPassword": "6622",
