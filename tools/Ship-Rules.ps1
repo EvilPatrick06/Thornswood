@@ -57,6 +57,15 @@ $ShipMachineFiles = @(
     # exit. The two values this build cares about are held by the launcher's
     # Enforce table on every Play instead.
     'Data\SKSE\Plugins\OpenAnimationReplacer.ini',
+    # SkyrimPlatform.ini is four machine settings in one file and none of
+    # them belong to the build. It holds the log level, whether a console
+    # window opens and how big it is, the plugin folder list, and the
+    # BackendName line the launcher writes on every Play from what that
+    # machine has on disk. Publishing it hands one person's trace logging
+    # and console window to everybody, and pins them all to whichever
+    # browser backend the machine that built the pack happened to have.
+    # No pack has carried it yet, and that was luck rather than a rule.
+    'Data\SKSE\Plugins\SkyrimPlatform.ini',
     # The launcher and the voice plugin talk through these three.
     'Data\Platform\voice-port.txt',
     'Data\Platform\voice-status.txt',
