@@ -183,9 +183,19 @@ Write-Host ''
 Write-Host 'Stopping the server...'
 Remote @"
 Stop-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
-Get-CimInstance Win32_Process |
-  Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*skymp5-server*' } |
-  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
+# The process on this root's own port and nothing else. Matching every
+# node.exe running skymp5-server took the dev server down with the live one
+# and only started the live one back up. The port comes from the settings in
+# the root being deployed, the same way Deploy-DevGamemode picks its process.
+`$s = Get-Content ('$Root'.Replace('/', '\') + '\server-settings.json') -Raw | ConvertFrom-Json
+`$port = [int]`$s.port
+'stopping whatever holds UDP ' + `$port
+`$pids = @()
+`$pids += @(Get-NetUDPEndpoint -LocalPort `$port -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
+`$pids += @(Get-NetTCPConnection -LocalPort (`$port + 1) -State Listen -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
+foreach (`$id in (`$pids | Sort-Object -Unique)) {
+  if (`$id -gt 0) { Stop-Process -Id `$id -Force -EA SilentlyContinue; 'stopped pid ' + `$id }
+}
 Start-Sleep -Seconds 2
 'stopped'
 "@ | ForEach-Object { "  $_" }
@@ -211,9 +221,10 @@ Write-Host 'Starting...'
 Remote @"
 Start-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
 Start-Sleep -Seconds 6
-`$p = Get-CimInstance Win32_Process |
-  Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*skymp5-server*' }
-if (`$p) { 'server up, pid ' + `$p.ProcessId } else { 'SERVER IS NOT RUNNING' }
+`$s = Get-Content ('$Root'.Replace('/', '\') + '\server-settings.json') -Raw | ConvertFrom-Json
+`$port = [int]`$s.port
+`$up = Get-NetUDPEndpoint -LocalPort `$port -EA SilentlyContinue | Select-Object -First 1
+if (`$up) { 'server up on UDP ' + `$port + ', pid ' + `$up.OwningProcess } else { 'SERVER IS NOT LISTENING on UDP ' + `$port }
 if (Test-Path '$Root/server.log'.Replace('/','\')) {
   '--- server.log, last 25 ---'
   Get-Content ('$Root/server.log'.Replace('/','\')) -Tail 25
