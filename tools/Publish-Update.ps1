@@ -1003,7 +1003,10 @@ if ($log.Count -gt $Cap) {
 }
 
 $entry = [pscustomobject]@{
-    date    = (Get-Date).ToString('d MMM yyyy')
+    # Month first, with the time on it, the same shape the site shows under
+    # its download button. Entries written before this carry a bare date and
+    # the launcher converts those as it reads them.
+    date    = (Get-Date).ToString('M-d-yyyy h:mm tt')
     title   = $title
     body    = $body
     details = @($details)
