@@ -217,8 +217,21 @@
     // Back rather than close. On the emote list it steps up to the categories,
     // and only closes from there, so getting out of a category you opened by
     // mistake does not throw the whole wheel away.
-    if (k === 'Escape' || e.keyCode === 27) { e.preventDefault(); say('__back'); return; }
-    if (k === 'Tab' || e.keyCode === 9) { e.preventDefault(); say('__next'); return; }
+    /*
+      Swallowed here, decided by the plugin. Same rule as the close key below,
+      and for the same reason.
+
+      Both ends were acting on these. The page sent __back and the plugin also
+      ran back() off its own buttonEvent, so one press of Escape inside a
+      category stepped up to the categories and then closed the wheel. Tab
+      turned the ring twice. A digit on the category ring opened the category
+      and then played whatever emote sat at that index in it.
+
+      preventDefault still matters: it stops the key reaching the game
+      underneath. It is only the message that goes.
+    */
+    if (k === 'Escape' || e.keyCode === 27) { e.preventDefault(); return; }
+    if (k === 'Tab' || e.keyCode === 9) { e.preventDefault(); return; }
     /*
       The close key is swallowed here and decided by the plugin.
 
@@ -246,13 +259,13 @@
       return;
     }
 
-    // 1 to 9, then 0, matching the digit printed under each label.
+    // 1 to 9, then 0, matching the digit printed under each label. Swallowed
+    // so the game does not also get them, and left to the plugin to act on.
+    // A click on a wedge still sends __pick, which is the mouse and has no
+    // second handler anywhere.
     if (k >= '0' && k <= '9') {
       var at = k === '0' ? 9 : (k.charCodeAt(0) - 49);
-      if (items[at]) {
-        e.preventDefault();
-        say('__pick ' + at + ' ' + items[at].name);
-      }
+      if (items[at]) { e.preventDefault(); }
     }
   }, true);
 

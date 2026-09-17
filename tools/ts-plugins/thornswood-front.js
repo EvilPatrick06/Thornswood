@@ -232,7 +232,21 @@
     'MessageBoxMenu', 'Book Menu', 'Sleep/Wait Menu', 'Barter Menu', 'Training Menu',
   ];
 
-  function busyMenuOpen() {
+  /*
+    Asked at most four times a second, not thirty times a frame.
+
+    busyMenuOpen walks twenty menus and calls into the game for each one, and
+    three update handlers call it every frame, so the real cost was about sixty
+    native calls per frame for an answer that cannot change between two frames
+    in any way a person could act on. A menu opening a quarter of a second
+    later than it might have is not something anybody can see; sixty calls a
+    frame is.
+  */
+  const MENU_CACHE_MS = 250;
+  let menuCachedAt = 0;
+  let menuCached = '';
+
+  function busyMenuOpenNow() {
     let asked = false;
     for (const name of KEYBOARD_MENUS) {
       try {
@@ -244,6 +258,14 @@
     // rather than handing the keyboard over blind.
     if (!asked) { return gameMenuOpen() ? 'a menu' : ''; }
     return '';
+  }
+
+  function busyMenuOpen() {
+    const now = Date.now();
+    if (now - menuCachedAt < MENU_CACHE_MS) { return menuCached; }
+    menuCachedAt = now;
+    menuCached = busyMenuOpenNow();
+    return menuCached;
   }
 
   // Menus the game can raise while the browser holds the keyboard, which is
@@ -547,6 +569,25 @@
   const lastForced = {};
 
   /*
+    Bases the server answers for, so they are not activated twice.
+
+    Every ACTI below is re-activated with default processing off, because some
+    vanilla handle and lever scripts never start under SkyMP. The client
+    forwards that second activation too, so anything the server handles ran
+    twice per press: a quarry strike and then "the seam needs 20 more seconds".
+
+    The gamemode writes the list into the same folder this file already probes,
+    as runtime form ids. Until it arrives the set is empty, which is exactly
+    the behaviour this file had before, so a server that has not been deployed
+    yet changes nothing.
+  */
+  const serverBases = {};
+  let serverBasesAsked = 0;
+  /* target -> when its activation was last written down. See the log line
+     in the activate handler: one per press was one per door in the town. */
+  const lastLogged = {};
+
+  /*
    * Which browser backend is actually running.
    *
    * SkyrimPlatform has two: tilted, which is the original CEF stack living in
@@ -584,11 +625,23 @@
       if (b) { base = b.getFormID(); type = b.getType(); name = b.getName() || ''; }
     } catch (err) { }
     try { blocked = e.target.isActivationBlocked() ? 'yes' : 'no'; } catch (err) { }
-    say('activate: ' + (name || 'something') +
-        ' target ' + target.toString(16) +
-        ' base ' + base.toString(16) +
-        ' type ' + type +
-        ' blocked ' + blocked);
+    /*
+      Not a line per press.
+
+      This wrote a line, and appended it to a file, for every activation
+      anywhere in the loaded area, which in a town is every door an NPC opens
+      and every crate anybody walks past. The same target within two seconds
+      is the same person pressing the same thing, and is the case this was
+      written to watch, so it is still logged; the rest is not.
+    */
+    if (!lastLogged[target] || now - lastLogged[target] > 2000) {
+      lastLogged[target] = now;
+      say('activate: ' + (name || 'something') +
+          ' target ' + target.toString(16) +
+          ' base ' + base.toString(16) +
+          ' type ' + type +
+          ' blocked ' + blocked);
+    }
 
     /*
       Activators get one real activation, asked for explicitly.
@@ -686,6 +739,10 @@
 
     if (type !== 24) { return; }
 
+    // The server already answers for this one, and the client forwards the
+    // re-activation too, so asking again is what made every press count twice.
+    if (base && serverBases[base]) { return; }
+
     if (lastForced[target] && now - lastForced[target] < 2000) { return; }
     lastForced[target] = now;
 
@@ -779,7 +836,37 @@
   let controlsOffNow = [];
   let controlsSince = 0;
 
-  function readControls() {
+  /*
+    Two states where controls being off is the game doing its job.
+
+    Death, and sitting in anything. The watchdog turns every control back on
+    and takes the character off the AI after five seconds with no menu open,
+    and neither dying nor riding a carriage opens a menu, so it fought the
+    death camera and the respawn wait every time somebody was killed and it
+    stood people up out of chairs, beds and carriages.
+
+    Both answers are cheap and both are wrapped, because a build without one
+    of these natives must not take the watchdog down with it.
+  */
+  function notOurs() {
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { return ''; }
+    if (!pc) { return ''; }
+    try { if (pc.isDead()) { return 'dead'; } } catch (e) { }
+    try {
+      const f = pc.getFurnitureReference();
+      if (f) { return 'in furniture'; }
+    } catch (e) { }
+    return '';
+  }
+
+  /* Same reason as the menu cache above: nine native calls a frame for an
+     answer that only matters once it has held for five seconds. */
+  const CONTROLS_CACHE_MS = 250;
+  let controlsCachedAt = 0;
+  let controlsCached = [];
+
+  function readControlsNow() {
     const off = [];
     for (const pair of CONTROLS) {
       try {
@@ -791,10 +878,21 @@
     return off;
   }
 
+  function readControls() {
+    const now = Date.now();
+    if (now - controlsCachedAt < CONTROLS_CACHE_MS) { return controlsCached; }
+    controlsCachedAt = now;
+    controlsCached = readControlsNow();
+    return controlsCached;
+  }
+
   sp.on('update', guard('controls', () => {
     let pc = null;
     try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
     if (!pc || busyMenuOpen()) { controlsOffNow = []; controlsSince = 0; return; }
+    // Dying and sitting both switch controls off on purpose and open no menu.
+    const theirs = notOurs();
+    if (theirs) { controlsOffNow = []; controlsSince = 0; return; }
 
     const off = readControls();
     controlsOffNow = off;
@@ -896,6 +994,8 @@
       if (claims.chat) { why.push('typing in chat'); }
       const busyName = busyMenuOpen();
       if (busyName) { why.push(busyName + ' is open'); }
+      const why2 = notOurs();
+      if (why2) { why.push('they are ' + why2); }
       if (lastRescue && now - lastRescue < 15000) { why.push('rescued ' + (now - lastRescue) + 'ms ago'); }
       if (why.length) {
         say('not calling it stuck: ' + keys + ' keys, ' + moveKeys +
@@ -912,6 +1012,10 @@
     if (now - lastActivateAt < 3000) { return; }
     if (claims.chat) { return; }
     if (busyMenuOpen()) { return; }
+    // Somebody dead, or sitting in something, is not stuck. They are dead or
+    // sitting in something, and standing them up is the bug.
+    const notMine = notOurs();
+    if (notMine) { return; }
 
     const dx = pos[0] - was[0];
     const dy = pos[1] - was[1];
@@ -1228,6 +1332,10 @@
         so there is a game to be in.
       */
       try { globalThis.__thornswoodInWorld = true; } catch (e) { }
+      // Cleared again on the way out, below. Nothing in the shipped client
+      // bundle reads this today, so it costs nothing either way, but a flag
+      // that is only ever set true is a flag that lies the moment anything
+      // does start reading it.
 
       phase = 1; at = now;
       try {
@@ -1363,11 +1471,15 @@
     }
 
     checkServer(now);
+    askServerBases(now);
 
     // Five seconds between saying so and doing it, so the line is readable and
     // so a server that comes straight back up is not made into an outage.
     if (leaving && now - leaving > 5000) {
       leaving = now + 3600000;   // never twice
+      // No longer in the world, and said so before the quit rather than after,
+      // because after it there is no tick to say it in.
+      try { globalThis.__thornswoodInWorld = false; } catch (e) { }
       try {
         sp.Game.quitToMainMenu();
       } catch (e) {
@@ -1406,15 +1518,57 @@
   // throwing somebody out of Windhelm over a dropped packet is worse than the
   // thing being fixed.
   const PROBE_MS = 10000;
-  const PROBE_STRIKES = 4;
+  /*
+    Twelve, not four.
+
+    Four strikes is forty seconds, and a server deploy takes longer than that.
+    So did a restart people had been told to sit through: the countdown said
+    stay, the process went down for a minute, and everybody who did as they
+    were told was dropped to the main menu anyway. Two minutes is longer than
+    any restart this server has taken and still short enough that a real
+    outage is not a black screen forever.
+
+    And a countdown is not an outage at all. The gamemode writes "restarting"
+    into online.json while one is running, so the answer that arrives just
+    before the process stops says what is about to happen, and the strikes
+    that follow are ignored until it comes back.
+  */
+  const PROBE_STRIKES = 12;
+  /* How long a "restarting" seen in online.json keeps the probe patient.
+     Longer than any restart so far, and it only ever delays a quit. */
+  const RESTART_GRACE_MS = 600000;
 
   let probe = null;
   try { probe = HOST ? new sp.HttpClient('http://' + HOST + ':3000') : null; } catch (e) { probe = null; }
+
+  // Asked for once, and again every ten minutes in case the server was
+  // deployed while somebody was playing. Failure is silent and harmless.
+  function askServerBases(now) {
+    if (!probe) { return; }
+    if (serverBasesAsked && now - serverBasesAsked < 600000) { return; }
+    serverBasesAsked = now;
+    try {
+      probe.get('/server-bases.json', undefined, guard('bases', (res) => {
+        if (!res || res.status < 200 || res.status >= 300) { return; }
+        let list = [];
+        try { list = (JSON.parse(String(res.body || '{}')) || {}).bases || []; }
+        catch (e) { return; }
+        let n = 0;
+        for (const id of list) {
+          const num = Number(id);
+          if (num > 0 && !serverBases[num]) { serverBases[num] = true; n++; }
+        }
+        if (n) { log('the server answers for', n, 'more bases, not re-activating those'); }
+      }));
+    } catch (e) { }
+  }
 
   let strikes = 0;
   let probing = false;
   let lastProbe = 0;
   let leaving = 0;
+  /* When the server last said a countdown was running. See PROBE_STRIKES. */
+  let toldRestarting = 0;
 
   function checkServer(now) {
     if (!probe || probing || leaving) return;
@@ -1426,6 +1580,19 @@
         probing = false;
         const ok = res && res.status >= 200 && res.status < 500;
         if (ok) {
+          // The server said it is going down on purpose. Remember that, so
+          // the silence that follows is read as a restart and not an outage.
+          try {
+            const body = JSON.parse(String(res.body || '{}'));
+            if (body && body.restarting) {
+              if (!toldRestarting) {
+                log('the server says it is restarting, staying put');
+              }
+              toldRestarting = Date.now();
+            } else {
+              toldRestarting = 0;
+            }
+          } catch (e) { }
           if (strikes) { log('the server is answering again'); }
           strikes = 0;
           return;
@@ -1442,6 +1609,13 @@
 
   function onStrike() {
     if (leaving) return;
+    // Told to expect this. A restart is not an outage, and the whole point of
+    // warning people was so they would not be thrown out for it.
+    if (toldRestarting && Date.now() - toldRestarting < RESTART_GRACE_MS) {
+      log('the server did not answer,', strikes, 'of', PROBE_STRIKES +
+          ', but it said it was restarting, so waiting');
+      return;
+    }
     if (strikes < PROBE_STRIKES) {
       log('the server did not answer,', strikes, 'of', PROBE_STRIKES);
       return;

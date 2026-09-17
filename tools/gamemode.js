@@ -44,9 +44,14 @@ const WORLDSPACES = new Set(DATA.worldspaces);
   actionable, and every real finding had to be dug out from under it.
 
   So every line this file writes goes to the console as before, and also to
-  thornswood.log beside the server's data, which holds nothing else. Nothing
-  is filtered out of server.log: the engine's noise is still there for anybody
-  who wants it, it is just no longer the only place our own lines live.
+  thornswood.log, which holds nothing else. Nothing is filtered out of
+  server.log: the engine's noise is still there for anybody who wants it, it
+  is just no longer the only place our own lines live.
+
+  Beside server.log in the server's own folder, deliberately NOT under data.
+  The resources server hands out anything under data over plain HTTP to
+  anybody who asks, which is right for online.json and the plugin files and
+  wrong for a log of who was standing where.
 
   Opened lazily and given up on for good the first time a write fails, because
   a log that throws once a tick is worse than no log.
@@ -56,19 +61,9 @@ let logBroken = false;
 
 function logPath() {
   if (logFile !== null || logBroken) { return logFile; }
-  try {
-    const fsl = require('fs');
-    const pathl = require('path');
-    let dataDir = 'data';
-    try {
-      const cfg = JSON.parse(fsl.readFileSync('server-settings.json', 'utf8'));
-      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
-    } catch (e) { }
-    logFile = pathl.join(dataDir, 'thornswood.log');
-  } catch (e) {
-    logBroken = true;
-    logFile = null;
-  }
+  // The working directory is the server's own folder: it is where
+  // server-settings.json is read from and where server.log is written.
+  logFile = 'thornswood.log';
   return logFile;
 }
 
@@ -1814,6 +1809,52 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   return false;
 });
 
+/*
+  The bases this server answers for, published where the client can read them.
+
+  thornswood-front.js re-activates every ACTI it sees, because a handful of
+  vanilla handle and lever scripts never start under SkyMP. The client forwards
+  that second activation as well, so onActivate below ran twice for every press
+  on anything the server already handles: a quarry strike and then "the seam
+  needs 20 more seconds", a blessing removed and re-added.
+
+  The client cannot know which bases those are without being told, so it is
+  told. This goes into the same folder the client already fetches online.json
+  and the manifest from, as runtime form ids, which is exactly what the
+  client's getBaseObject().getFormID() hands back.
+*/
+(function publishServerBases() {
+  var ids = [];
+  var seen = {};
+  function add(desc) {
+    var id = idOf(desc);
+    // 0 means the plugin that owns it is not loaded, which is a different
+    // problem and not one this list should carry. Deduped because two keys
+    // resolving to one record would otherwise be sent twice.
+    if (id && !seen[id]) { seen[id] = true; ids.push(id); }
+  }
+  try {
+    add(STATIONS.saltQuarry);
+    add(STATIONS.charcoalKiln);
+    for (var shrine in SHRINES) { add(shrine); }
+    for (var crop in HARVESTS) { add(crop); }
+
+    var fsb = require('fs');
+    var pathb = require('path');
+    var dataDirB = 'data';
+    try {
+      var cfgB = JSON.parse(fsb.readFileSync('server-settings.json', 'utf8'));
+      if (cfgB && cfgB.dataDir) { dataDirB = String(cfgB.dataDir); }
+    } catch (e) { }
+    fsb.writeFileSync(pathb.join(dataDirB, 'server-bases.json'),
+                      JSON.stringify({ at: Date.now(), bases: ids }));
+    log('published', ids.length, 'server handled bases for the client');
+  } catch (e) {
+    log('could not publish the server handled bases, the client will keep ' +
+        're-activating them:', e);
+  }
+})();
+
 log('gamemode loaded:',
     Object.keys(DATA.cellToHold).length + ' cells mapped,',
     Object.keys(MANUALS).length + ' manuals,',
@@ -1950,7 +1991,23 @@ log('gamemode loaded:',
       var restarting = false;
       try {
         var r = globalThis.__thornswoodRestart;
-        restarting = !!(r && r.at && r.at > Date.now());
+        var nowR = Date.now();
+        /*
+          Counting down, or stopped counting down within the last three
+          minutes. Three is longer than the stop, copy and start in
+          Deploy-Server, and being wrong this way only ever delays a quit.
+          After the restart this process is fresh, the record is empty again,
+          and the next pass writes false.
+
+          Both halves are needed and neither is enough on its own. restartTick
+          runs every 1500 ms and this every 2000 ms, so for up to a tick after
+          the deadline passes the countdown is over and nothing has recorded
+          that yet: at is in the past and went is not set. Asking how long ago
+          at was, rather than whether it is still ahead, covers that gap, and
+          went covers the rest once the tick has zeroed at.
+        */
+        restarting = !!(r && ((r.at && nowR - r.at < 180000) ||
+                             (r.went && nowR - r.went < 180000)));
       } catch (e) { restarting = false; }
 
       // Only when something moves. This file sits in a folder the server
@@ -3218,6 +3275,19 @@ log('gamemode loaded:',
 
     if (left <= 0) {
       restart.at = 0;
+      /*
+        When it ran out, kept so the probe stays patient across the stop.
+
+        The countdown reaching zero is not the moment the server goes away.
+        Deploy-Server waits the countdown plus twenty seconds and then copies
+        files up before it starts anything, and in notice and update mode
+        clearTheServer does not disconnect anybody, so the server carries on
+        answering with restarting already false. The client would read one of
+        those answers, forget it had been warned, and quit to the menu when
+        the process finally stopped. Which is the exact thing the warning
+        exists to prevent.
+      */
+      restart.went = Date.now();
       restart.said = {};
       clearTheServer();
       return;
