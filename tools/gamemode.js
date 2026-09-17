@@ -2874,6 +2874,30 @@ log('gamemode loaded:',
       return;
     }
 
+    // A lockpick that broke in somebody's game.
+    //
+    // Not a human command. The plugin sends it, so it answers nothing, says
+    // nothing back, and is deliberately absent from the help text.
+    //
+    // The server owns the pack. Skyrim destroys the pick in the person's own
+    // game and the server never hears about it, so the next inventory re-apply
+    // hands it straight back. That is why picks were endless and why a lock
+    // could be worked forever. There is no message for this: all 34 types in
+    // the protocol were read and none of them say an item was destroyed, so
+    // the only route a fact has from a person's game to here is this queue.
+    //
+    // The profile id is the one the voice service stamped from the connection
+    // rather than a number in the text, so the worst a modified client can do
+    // with this is throw away its own lockpicks. It is capped anyway, and
+    // takeItem refuses when the pack does not hold that many.
+    if (word === '/tspicks') {
+      var picks = Math.max(1, Math.min(20, Number(parts[1]) || 1));
+      if (takeItem(actorId, 'a:Skyrim.esm', picks)) {
+        log('spent ' + picks + ' lockpick(s) for ' + actorId.toString(16));
+      }
+      return;
+    }
+
     if (word === '/where') {
       var pos = [0, 0, 0], ang = [0, 0, 0], cell = '';
       try {

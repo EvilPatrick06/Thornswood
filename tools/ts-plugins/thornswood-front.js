@@ -806,6 +806,65 @@
     }
   }));
 
+  /*
+    A lockpick that broke is reported to the server, because the server owns
+    the pack and Skyrim only destroyed it here.
+
+    Breaking a pick is a local event. The server's copy of the inventory still
+    holds it, and the re-apply a few seconds later hands it straight back, so
+    picks never ran out and a lock could be worked forever.
+
+    There is no message for this. All 34 message types in the protocol were
+    read and none of them say an item was destroyed. The only ones that shrink
+    a pack are put, take, drop, craft and a bow shot, and upstream solved the
+    same problem for arrows by adding a message type, which needs a client we
+    do not build. So this rides the one channel that already exists: the chat
+    overlay's socket to the voice service, which queues any line starting with
+    a slash for the gamemode to collect. It arrives a second or two late.
+
+    A destroyed item is the one with no destination. The shipped bundle reads
+    it the same way in its own drop handler, which is where the shape comes
+    from.
+  */
+  const LOCKPICK = 0xa;
+  const toServer = [];
+
+  function tellServer(line) {
+    if (line) { toServer.push(line); }
+    if (toServer.length > 20) { toServer.splice(0, toServer.length - 20); }
+    if (!T.ready) { return; }
+    while (toServer.length) {
+      const sent = T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' +
+                        JSON.stringify(toServer[0]) + ');}catch(e){}');
+      if (!sent) { return; }
+      toServer.shift();
+    }
+  }
+
+  sp.on('containerChanged', guard('picks', (e) => {
+    if (!e) { return; }
+
+    let base = 0;
+    try { base = e.baseObj ? e.baseObj.getFormID() : 0; } catch (err) { return; }
+    if (base !== LOCKPICK) { return; }
+
+    // Nothing received it, so it was destroyed rather than moved.
+    let gone = false;
+    try { gone = !e.newContainer || e.newContainer.getFormID() === 0; } catch (err) { gone = true; }
+    if (!gone) { return; }
+
+    // And it came off this person, not out of a chest somewhere.
+    let mine = 0;
+    try { mine = sp.Game.getPlayer().getFormID(); } catch (err) { return; }
+    let from = 0;
+    try { from = e.oldContainer ? e.oldContainer.getFormID() : 0; } catch (err) { return; }
+    if (!mine || from !== mine) { return; }
+
+    const n = Math.max(1, Math.min(20, Number(e.numItems) || 1));
+    say('lockpick broke x' + n + ', asking the server to spend it');
+    tellServer('/tspicks ' + n);
+  }));
+
   const CONSOLE_MENUS = ['Console Native UI Menu', 'Console'];
   let consoleSince = 0;
 
