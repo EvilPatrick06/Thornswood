@@ -189,10 +189,16 @@ function arrive(dest, hold, reason, slotOverride, via) {
  * site: { desc: worldOrCellDesc string, pos: [x,y,z] }
  */
 function resolveArrival(site) {
-  const low = site.desc.split(':')[0].toLowerCase();
-
   // 1. Solstheim, by worldspace. Must never reach a distance comparison.
-  if (low === DATA.solstheim) {
+  //
+  // Compared whole, not by the low bits. DATA.solstheim is 2000800, which is
+  // the runtime form id with the plugin's load order index on the front, and
+  // "low" is only the part before the colon in the descriptor, which for
+  // Solstheim is 800. Those two are never equal, so this branch had never
+  // fired once: an outdoor death anywhere on Solstheim fell through to the
+  // distance comparison below and respawned in Whiterun's temple, which is on
+  // another land mass.
+  if (site.desc.toLowerCase() === '800:dragonborn.esm') {
     return arrive('ravenrock', 'DLC2SolstheimLocation', 'own-ground', null, 'solstheim');
   }
 
@@ -483,6 +489,20 @@ const NUDGE_MS = 120000;   // two minutes; see the nudge below
  * against a thing that was never happening, paid for by everybody standing in
  * an empty room. */
 const MOVED_ENOUGH_MS = 500;
+
+/* How far counts as having moved, between two consecutive samples.
+ *
+ * The test used to be any difference at all between two pose samples, with no
+ * minimum, so the first report after the baseline counted: the ground snap
+ * that lands somebody on the floor of the hall, and the angle normalisation
+ * that follows a teleport, both move the numbers by a hair without anybody
+ * touching anything. That read as "on their feet" while the race menu was
+ * still up, and the teleport could fire under it.
+ *
+ * 32 units is about half a pace, and well under what a person turning on the
+ * spot with the mouse produces. 10 degrees is a glance. */
+const MOVED_UNITS = 32;
+const MOVED_DEGREES = 10;
 /* How long after a teleport before the kit is handed over, and how often it is
  * checked afterwards. Both deliberately unhurried: nobody is doing anything in
  * the first few seconds of arriving in an inn, and an item that turns up a
@@ -1123,7 +1143,17 @@ function chargenTick() {
         const pos = mp.get(actorId, 'pos') || [0, 0, 0];
         const ang = mp.get(actorId, 'angle') || [0, 0, 0];
         const here = [pos[0], pos[1], pos[2], ang[2]].join(',');
-        if (state.where && state.where !== here) { live = true; }
+        if (state.where && state.where !== here) {
+          // Far enough to be a person, not a settle. See MOVED_UNITS.
+          const was = String(state.where).split(',');
+          const dx = pos[0] - Number(was[0]);
+          const dy = pos[1] - Number(was[1]);
+          const dz = pos[2] - Number(was[2]);
+          let turned = Math.abs(ang[2] - Number(was[3]));
+          if (turned > 180) { turned = 360 - turned; }
+          const moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (moved >= MOVED_UNITS || turned >= MOVED_DEGREES) { live = true; }
+        }
         if (state.where !== here) {
           state.where = here;
           // Saved, not just assigned.
@@ -1408,6 +1438,21 @@ startChargenTimer();
  * body fell. The engine reads spawnPoint when the respawn timer expires.
  */
 mp.onDeath = guard('onDeath', function (actorId, killerId) {
+  /*
+    People only.
+
+    This fires for every MpActor the server owns, which is every bandit, wolf
+    and chicken anybody kills. Each one was having a temple spawnPoint written
+    onto it, which is meaningless at best and, if SkyMP ever honours it on an
+    NPC respawn, puts dead bandits back on their feet inside temples.
+
+    A profileId is what tells a person from the rest of Skyrim. Nothing else
+    on the server has one.
+  */
+  let pid = 0;
+  try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+  if (!pid) { return; }
+
   const site = {
     desc: mp.get(actorId, 'worldOrCellDesc'),
     pos: mp.get(actorId, 'pos'),
@@ -1681,7 +1726,12 @@ log('gamemode loaded:',
     req.end(body);
   }
 
-  setInterval(function () {
+  // Stored and cleared like the chargen timers, so a hot reload replaces
+  // this feed rather than adding a second one that never stops.
+  if (globalThis.__thornswoodVoiceFeed) {
+    try { clearInterval(globalThis.__thornswoodVoiceFeed); } catch (e) { }
+  }
+  globalThis.__thornswoodVoiceFeed = setInterval(function () {
     var who = [];
     try {
       var online = mp.get(0, 'onlinePlayers') || [];
@@ -1730,7 +1780,12 @@ log('gamemode loaded:',
     var onlineFile = path.join(dataDir, 'online.json');
     var lastWritten = -1;
 
-    setInterval(function () {
+    // Cleared on a hot reload, so reloading does not leave two writers
+    // racing each other over the same file.
+    if (globalThis.__thornswoodOnlineWriter) {
+      try { clearInterval(globalThis.__thornswoodOnlineWriter); } catch (e) { }
+    }
+    globalThis.__thornswoodOnlineWriter = setInterval(function () {
       var n = 0;
       try { n = (mp.get(0, 'onlinePlayers') || []).length; } catch (e) { return; }
       // Only when it moves. This file sits in a folder the server serves, and
@@ -1881,17 +1936,34 @@ log('gamemode loaded:',
       var rec = found && found.record;
       var fields = (rec && rec.fields) || [];
 
+      /*
+        EDID first, FULL only when it is really text.
+
+        Skyrim.esm and the DLCs are localized, which means a FULL field does
+        not hold a name at all: it holds a four byte index into the strings
+        file beside the plugin. Reading those bytes as characters wrote four
+        bytes of binary into characters.json as somebody's location, for every
+        vanilla cell in the game.
+
+        The editor id is always plain ASCII and always present, so it is the
+        one to trust. A FULL is taken only when every byte of it is printable
+        ASCII, which a real name in an unlocalized plugin is and a string index
+        almost never is.
+      */
       var edid = '';
+      var full = '';
       for (var i = 0; i < fields.length; i++) {
         var t = String(fields[i].type);
-        if (t === 'FULL') {
+        if (t === 'FULL' && !full) {
           var bytes = fields[i].data || [];
           var text = '';
+          var printable = bytes.length > 0;
           for (var b = 0; b < bytes.length; b++) {
             if (!bytes[b]) break;
+            if (bytes[b] < 32 || bytes[b] > 126) { printable = false; break; }
             text += String.fromCharCode(bytes[b]);
           }
-          if (text) { out = text; break; }
+          if (printable && text) { full = text; }
         } else if (t === 'EDID' && !edid) {
           var eb = fields[i].data || [];
           for (var e2 = 0; e2 < eb.length; e2++) {
@@ -1900,7 +1972,8 @@ log('gamemode loaded:',
           }
         }
       }
-      if (!out && edid) { out = spaced(edid); }
+      if (edid) { out = spaced(edid); }
+      else if (full) { out = full; }
     } catch (e) { out = ''; }
 
     places[desc] = out;
@@ -1915,7 +1988,12 @@ log('gamemode loaded:',
 
   var dirty = false;
 
-  setInterval(function () {
+  // Cleared on a hot reload. Three of these ran unstored, so every reload
+  // added another copy of each and none of them ever stopped.
+  if (globalThis.__thornswoodRoster) {
+    try { clearInterval(globalThis.__thornswoodRoster); } catch (e) { }
+  }
+  globalThis.__thornswoodRoster = setInterval(function () {
     var online = [];
     try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
 
@@ -2827,6 +2905,21 @@ log('gamemode loaded:',
   function arm(seconds, why, mode) {
     restart.at = Date.now() + Math.round(seconds * 1000);
     restart.said = {};
+    /*
+      Every mark at or above the time asked for is already said.
+
+      restartTick walks MARKS from the largest down and announces the first one
+      it has not said yet, one per tick. With said empty, "/restart 1" matched
+      600 on the first tick, 300 on the second, 120 on the third and 60 on the
+      fourth, so a one minute warning arrived as "10 minutes", "5 minutes",
+      "2 minutes" and "1 minute" on four consecutive ticks, in that order.
+
+      Marking them here means the countdown starts at the first one that is
+      actually in the future.
+    */
+    for (var mi = 0; mi < MARKS.length; mi++) {
+      if (MARKS[mi] >= seconds) { restart.said[MARKS[mi]] = true; }
+    }
     restart.why = why || 'an update';
     restart.mode = (mode === 'restart' || mode === 'notice') ? mode : 'update';
     broadcast(opening(Math.round(seconds / 60)));
