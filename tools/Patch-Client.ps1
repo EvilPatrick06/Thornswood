@@ -157,6 +157,77 @@ $blocks = @(
         )
     },
     @{
+
+        Name   = 'locked refs are not announced'
+
+        Marker = 'Thornswood: a locked door or chest is Skyrim''s until it opens.'
+
+        Old    = @(
+
+            '                    var openState = e.target.getOpenState();',
+
+            '                    if (openState === 2 || openState === 4) {',
+
+            '                        (0, _logging__WEBPACK_IMPORTED_MODULE_5__.logTrace)(this, "Ignoring activation of door because it''s already opening or closing");',
+
+            '                        return;',
+
+            '                    }'
+
+        )
+
+        New    = @(
+
+            '                    var openState = e.target.getOpenState();',
+
+            '                    if (openState === 2 || openState === 4) {',
+
+            '                        (0, _logging__WEBPACK_IMPORTED_MODULE_5__.logTrace)(this, "Ignoring activation of door because it''s already opening or closing");',
+
+            '                        return;',
+
+            '                    }',
+
+            '                    // Thornswood: a locked door or chest is Skyrim''s until it opens.',
+
+            '                    //',
+
+            '                    // dealWithRef leaves a locked reference unblocked on purpose, so',
+
+            '                    // Skyrim runs its own handling and the lockpicking mini game',
+
+            '                    // appears. This function did not know that and sent the activation',
+
+            '                    // up anyway, and the server has no lock state at all, so its door',
+
+            '                    // branch simply opened the door. Both happened on the one press:',
+
+            '                    // the mini game came up and the door swung open behind it, and a',
+
+            '                    // load door pulled the person through.',
+
+            '                    //',
+
+            '                    // While it is locked the server is told nothing. The moment it is',
+
+            '                    // not, this sends as it always did and the server owns it again.',
+
+            '                    try {',
+
+            '                        if (e.target.isLocked()) {',
+
+            '                            (0, _logging__WEBPACK_IMPORTED_MODULE_5__.logTrace)(this, ''Not announcing a locked reference; Skyrim has it until it is open'');',
+
+            '                            return;',
+
+            '                        }',
+
+            '                    } catch (_thornswoodLock) {}'
+
+        )
+
+    },
+    @{
         Name   = 'difficulty'
         Marker = 'Thornswood: Expert, not Legendary'
         Old    = @(
