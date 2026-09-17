@@ -192,7 +192,12 @@ Stop-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
 'stopping whatever holds UDP ' + `$port
 `$pids = @()
 `$pids += @(Get-NetUDPEndpoint -LocalPort `$port -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
-`$pids += @(Get-NetTCPConnection -LocalPort (`$port + 1) -State Listen -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
+# Only the UDP port. The line that also stopped whatever listened on the TCP
+# port one above it was copied from the dev script, where that port is the
+# server's own HTTP and belongs to the same process. On the live root it is
+# 7778, which is the voice service, a separate process that carries voice
+# chat, the launcher's character choices and the chat command queue the
+# lockpick fix rides on. Stopping the game server must never take that down.
 foreach (`$id in (`$pids | Sort-Object -Unique)) {
   if (`$id -gt 0) { Stop-Process -Id `$id -Force -EA SilentlyContinue; 'stopped pid ' + `$id }
 }
