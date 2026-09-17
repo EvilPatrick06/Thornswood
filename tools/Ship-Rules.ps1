@@ -109,6 +109,14 @@ function Test-ShipRuntime([string]$rel) {
 # word daedric, which is a vanilla material.
 function Test-ShipOtherServer([string]$rel) {
     if ($rel -match '^keizaal-backup-[^\\]*\\') { return $true }
+    # Where Keizaal's launcher parks the files it is moving out of the way,
+    # which on a machine that plays both is largely OURS. Djinn's had 67 files
+    # sitting in it on 17 Sep while the two launchers undid each other, and a
+    # release published from a machine in that state would have swept them into
+    # a pack and handed everybody a second copy of their own game files under
+    # another server's folder name. Never removed either, because taking it off
+    # a tester is Keizaal's business and not ours.
+    if ($rel -match '^Data\\_disabledByKzl($|\\)') { return $true }
     if ($rel -match '^DaedricData\\') { return $true }
     if ($rel -eq 'VERSION') { return $true }
     if ($rel -match '^Data\\Video\\Interface\\(startmenu|loadwaitspinner)\.swf$') { return $true }
