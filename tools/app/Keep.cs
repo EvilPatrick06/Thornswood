@@ -116,12 +116,41 @@ namespace Thornswood
             return false;
         }
 
-        /// <summary>Ours: in the core set, or carried by one of this build's own updates.</summary>
+        /// <summary>
+        /// Ours: in the core set, named the way this build names its own
+        /// plugins, or carried by one of this build's own updates.
+        ///
+        /// The name has to count, because the kept copy is not always there.
+        /// Core is the set as it stood at 1.1.34, and a plugin added since is
+        /// known only from the update that wrote it, so on a machine that got
+        /// the file from the installer rather than from an update there is no
+        /// copy under Profile\Keep and our own plugin reads as another
+        /// server's. Parking it takes the feature out of the session it shipped
+        /// for. Nobody else's plugin is called thornswood-anything.
+        /// </summary>
         public static bool IsOurs(string rel)
         {
             if (IsCore(rel)) return true;
+            if (OurPluginName(rel)) return true;
             try { return UnderPlatform(rel) && File.Exists(Path.Combine(Dir, rel)); }
             catch { return false; }
+        }
+
+        /// <summary>
+        /// A script sitting directly in the plugin folder under a name this
+        /// build owns. The dev build's plugins carry the same prefix, so this
+        /// stops the two builds parking each other's plugins as well, which is
+        /// the one thing it gives up: until now a plugin only the other build
+        /// had was parked for the session.
+        /// </summary>
+        static bool OurPluginName(string rel)
+        {
+            if (rel == null) return false;
+            if (!rel.StartsWith(PluginDir + "\\", StringComparison.OrdinalIgnoreCase)) return false;
+            string name = rel.Substring(PluginDir.Length + 1);
+            if (name.IndexOf('\\') >= 0) return false;
+            return name.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase) &&
+                   name.EndsWith(".js", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

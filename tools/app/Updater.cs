@@ -12,9 +12,25 @@ namespace Thornswood
     {
         public const string Version = "1.1.45";
 
+        // WebClient has no timeout worth the name, and the default is long
+        // enough that a GitHub which accepts the connection and then says
+        // nothing looks like a hung launcher. The same helper Online and
+        // Roster use. Timeout is the wait for an answer, not for the body, so
+        // a large asset still downloads for as long as it needs.
+        class Quick : WebClient
+        {
+            public int Ms = 10000;
+            protected override WebRequest GetWebRequest(Uri address)
+            {
+                var r = base.GetWebRequest(address);
+                if (r != null) { r.Timeout = Ms; }
+                return r;
+            }
+        }
+
         static WebClient Client(Config cfg, bool octet, string url)
         {
-            var wc = new WebClient();
+            var wc = new Quick();
             wc.Headers["User-Agent"] = "ThornswoodLauncher/" + Version;
             // The token only ever goes to GitHub's own API, never to whatever
             // host an asset URL happens to point at.
@@ -164,8 +180,25 @@ namespace Thornswood
                             last = new Exception("the repo or the branch could not be read, check UpdateRepo and that the token still has access");
                             continue;
                         }
-                        if (code == 401 || code == 403) throw new Exception("the access token was refused, it may have expired");
+                        if (code == 401) throw new Exception("the access token was refused, it may have expired");
+                        if (code == 403 || code == 429)
+                        {
+                            // GitHub answers a rate limit with 403 as well as
+                            // with 429, and an install with no token of its own
+                            // shares sixty calls an hour with everybody on its
+                            // address. Calling that a refused token sent people
+                            // looking for a credential they never set, on an
+                            // install that is meant to need none.
+                            string left = null;
+                            try { left = r.Headers["X-RateLimit-Remaining"]; } catch { }
+                            if (code == 429 || string.Equals(left, "0", StringComparison.Ordinal) ||
+                                string.IsNullOrEmpty(cfg.UpdateToken))
+                                throw new Exception("GitHub answered " + code + ": too many update checks have come from this connection for now. Nothing is wrong with your install and it clears by itself, usually within the hour.");
+                            throw new Exception("the access token was refused, it may have expired");
+                        }
                     }
+                    if (wex.Status == WebExceptionStatus.Timeout)
+                        throw new Exception("GitHub did not answer in time. The check runs again by itself.");
                     throw new Exception("could not reach GitHub");
                 }
             }
@@ -252,6 +285,62 @@ namespace Thornswood
             foreach (char c in id)
                 clean.Append(Array.IndexOf(Path.GetInvalidFileNameChars(), c) >= 0 ? '_' : c);
             return Path.Combine(Paths.PacksDir, clean.ToString() + ".files");
+        }
+
+        /// <summary>
+        /// Every path some other pack's file list still claims, in the shape
+        /// the lists hold them: a game\ prefix for a game path, nothing for a
+        /// Root one.
+        ///
+        /// Ownership is recorded per pack and not per file. When a later pack
+        /// writes over a file an earlier one created, the later list says "R|"
+        /// because the file was already there and the earlier one still says
+        /// "N|". Taking the earlier pack off then deleted the file the later
+        /// one is using, and what somebody saw was a build missing part of an
+        /// add-on they had not touched.
+        /// </summary>
+        static HashSet<string> ClaimedElsewhere(string mine)
+        {
+            var s = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string leaf = "";
+            try { leaf = Path.GetFileName(mine); } catch { }
+            try
+            {
+                if (!Directory.Exists(Paths.PacksDir)) return s;
+                foreach (string f in Directory.GetFiles(Paths.PacksDir, "*.files"))
+                {
+                    if (string.Equals(Path.GetFileName(f), leaf, StringComparison.OrdinalIgnoreCase)) continue;
+                    string[] all;
+                    try { all = File.ReadAllLines(f); }
+                    catch { continue; }
+                    foreach (string raw in all)
+                    {
+                        string line = raw.Trim();
+                        if (line.Length < 3 || line[1] != '|') continue;
+                        s.Add(line.Substring(2));
+                    }
+                }
+            }
+            catch { }
+            return s;
+        }
+
+        /// <summary>
+        /// Every path Vortex says it has deployed into the game folder. Under
+        /// a folder of Thornswood's own the record lives in the Steam copy the
+        /// folder was made from, never in the folder, because the refresh
+        /// leaves Vortex's own records behind. Empty when there is nothing to
+        /// read, which leaves the removal as it was.
+        /// </summary>
+        static HashSet<string> DeployedNow(Config cfg)
+        {
+            try
+            {
+                string src = OwnGame.Active ? OwnGame.Source(cfg) : Paths.Game;
+                if (string.IsNullOrEmpty(src)) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                return OwnGame.DeployedIn(src);
+            }
+            catch { return new HashSet<string>(StringComparer.OrdinalIgnoreCase); }
         }
 
         public static List<Pack> Pending(VersionDoc v)
@@ -360,6 +449,12 @@ namespace Thornswood
         /// </summary>
         public static void ApplyPack(Config cfg, Pack p, Action<string> log)
         {
+            // A retry runs the whole list again and everything before the pack
+            // that broke is already in. A second helping means another line in
+            // applied.txt and a file list written afresh in which every path
+            // reads as one this pack wrote over, which puts the pack's own
+            // files out of reach of its own Remove.
+            if (IsInstalled(p.id)) { log(p.id + " is already in."); return; }
             log("Downloading " + p.id + "...");
             string zip = Download(cfg, p.url, p.sha256, log);
             try { Install(zip, p, log); }
@@ -390,10 +485,19 @@ namespace Thornswood
                             {
                                 line = line.Trim();
                                 if (line.Length == 0 || line.StartsWith("#")) continue;
-                                string target = Path.Combine(Paths.Game, line.Replace('/', '\\'));
+                                string rel = line.Replace('/', '\\');
+                                string target;
+                                // Fenced after the path is resolved, not
+                                // before. Combine leaves the .. in a line like
+                                // ..\..\Profile\x where it is, so the path
+                                // still begins with the game folder as text,
+                                // passes the test, and Delete is what resolves
+                                // it, outside the game.
+                                try { target = Path.GetFullPath(Path.Combine(Paths.Game, rel)); }
+                                catch { continue; }
                                 if (!Inside(target, Paths.Game)) continue;
                                 try { if (File.Exists(target)) { File.Delete(target); log("removed " + line); } } catch { }
-                                removed.Add(line.Replace('/', '\\'));
+                                removed.Add(rel);
                             }
                         }
                     }
@@ -554,7 +658,7 @@ namespace Thornswood
         /// is exactly the job they already do: compare against the server list
         /// and re-download anything that does not match.
         /// </summary>
-        public static void RemovePack(Pack p, Action<string> log)
+        public static void RemovePack(Config cfg, Pack p, Action<string> log)
         {
             if (p == null || string.IsNullOrEmpty(p.id)) return;
 
@@ -571,9 +675,14 @@ namespace Thornswood
                 return;
             }
 
-            int gone = 0, kept = 0, stuck = 0;
+            int gone = 0, kept = 0, stuck = 0, shared = 0;
+            // Read once, not per line.
+            var claimed = ClaimedElsewhere(list);
+            var deployed = DeployedNow(cfg);
             // Folder to prune from, and the fence it must never climb past.
             var dirs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            // Game relative paths this pack is taking out, for Keep below.
+            var removed = new List<string>();
             foreach (string raw in File.ReadAllLines(list))
             {
                 string line = raw.Trim();
@@ -581,6 +690,17 @@ namespace Thornswood
                 bool mine = line[0] == 'N';
                 string rel = line.Substring(2);
                 if (!mine) { kept++; continue; }
+                // Something else has this file now: a pack that wrote over it
+                // afterwards, or Vortex, which may have deployed a mod carrying
+                // the same path since. Either way it is not this pack's to
+                // delete, whatever its own list says.
+                if (claimed.Contains(rel) ||
+                    (rel.StartsWith(GameMark, StringComparison.OrdinalIgnoreCase) &&
+                     deployed.Contains(rel.Substring(GameMark.Length))))
+                {
+                    shared++;
+                    continue;
+                }
 
                 // A game line resolves under the game folder, wherever that
                 // is. On an install with its own Game folder the old lists
@@ -607,6 +727,13 @@ namespace Thornswood
                         string d = Path.GetDirectoryName(full);
                         if (!dirs.ContainsKey(d)) dirs[d] = fence;
                     }
+                    // Taken from the resolved path rather than from the line,
+                    // so an old list that wrote a game path relative to Root
+                    // lands in the same place as a game\ one. Only a file that
+                    // is really out of the way is recorded: one that would not
+                    // delete is still in the game, so its kept copy stays.
+                    if (Inside(full, Paths.Game))
+                        removed.Add(full.Substring(Paths.Game.TrimEnd('\\', '/').Length).TrimStart('\\', '/'));
                 }
                 catch { stuck++; }
             }
@@ -633,11 +760,43 @@ namespace Thornswood
                 catch { }
             }
 
+            // The kept copies go with the files. Install put a copy of every
+            // Data\Platform file this pack wrote under Profile\Keep, and
+            // Keep.Restore puts those back before every Play, so without this
+            // the pack was in the game again at the next press of Play.
+            Keep.Forget(removed);
+
+            // On a folder of Thornswood's own the same file can still be in
+            // the Steam copy the folder is made from, because the pack went in
+            // while this was a collection install and the folder took its copy
+            // from there. Refresh brings anything the source has and the folder
+            // does not straight back over. Only the paths this pack created are
+            // touched, the ones deleted above.
+            int fromSteam = 0;
+            string src = "";
+            try { if (OwnGame.Active) src = OwnGame.Source(cfg); }
+            catch { }
+            if (!string.IsNullOrEmpty(src))
+            {
+                foreach (string r in removed)
+                {
+                    string at;
+                    try { at = Path.GetFullPath(Path.Combine(src, r)); }
+                    catch { continue; }
+                    if (!Inside(at, src)) continue;
+                    try { if (File.Exists(at)) { File.Delete(at); fromSteam++; } } catch { }
+                }
+            }
+
             try { File.Delete(list); } catch { }
             Unapply(p.id);
             Swap.RepairConfigs();
 
             string msg = p.Title + " removed, " + gone + " file" + (gone == 1 ? "" : "s") + " deleted.";
+            if (fromSteam > 0)
+                msg += "  " + fromSteam + " file" + (fromSteam == 1 ? "" : "s") +
+                       " also went from the Skyrim on Steam that Thornswood's own folder is made from, " +
+                       "or the next refresh would bring " + (fromSteam == 1 ? "it" : "them") + " back.";
             if (stuck > 0)
                 msg += "  " + stuck + " would not delete, usually because Skyrim is still open.";
             if (kept > 0)
@@ -645,6 +804,11 @@ namespace Thornswood
                        " here replaced part of the build and " + (kept == 1 ? "was" : "were") +
                        " left alone. Press Scan, then Fix, to put " +
                        (kept == 1 ? "it" : "those") + " back.";
+            if (shared > 0)
+                msg += "  " + shared + " file" + (shared == 1 ? "" : "s") +
+                       " here " + (shared == 1 ? "is" : "are") +
+                       " in use by another add-on or by the collection now and " +
+                       (shared == 1 ? "was" : "were") + " left in place.";
             log(msg);
         }
 
@@ -659,12 +823,47 @@ namespace Thornswood
             try { File.Delete(tmp); } catch { }
 
             string bat = Path.Combine(Path.GetTempPath(), "st-update.cmd");
-            File.WriteAllText(bat,
-                "@echo off\r\n" +
-                "ping 127.0.0.1 -n 3 >nul\r\n" +
-                "move /y \"" + neu + "\" \"" + exe + "\" >nul\r\n" +
-                "start \"\" \"" + exe + "\"\r\n" +
-                "del \"%~f0\"\r\n");
+            int me = System.Diagnostics.Process.GetCurrentProcess().Id;
+
+            // Waits for this launcher to actually be gone, then keeps trying
+            // the move.
+            //
+            // It used to sleep two seconds and move once. Closing runs
+            // Swap.Restore, Hold.Release, Keep.Unpark and SkyMp.Stop, which
+            // together take longer than that, so the move could hit an exe
+            // that was still running, fail silently, and start would reopen
+            // the old one. The next check then offered the same update again,
+            // and again. This is the tasklist wait Uninstall.Finish uses.
+            //
+            // cmd reads a .cmd file in the console's OEM code page, not the
+            // UTF-8 this is written in, so a path with any character outside
+            // ASCII would reach move and start as different bytes and the new
+            // launcher would never be put in place. chcp tells cmd how to read
+            // the rest of the file.
+            var bs = new StringBuilder();
+            bs.Append("@echo off\r\n");
+            bs.Append("chcp 65001 >nul\r\n");
+            bs.Append("setlocal\r\n");
+            bs.Append(":wait\r\n");
+            bs.Append("tasklist /fi \"PID eq " + me + "\" | find \"" + me + "\" >nul 2>&1\r\n");
+            // ping rather than timeout for the pause: timeout wants a console
+            // of its own and this script is started hidden.
+            bs.Append("if not errorlevel 1 ( ping 127.0.0.1 -n 2 >nul & goto wait )\r\n");
+            bs.Append("set /a tries=0\r\n");
+            bs.Append(":swap\r\n");
+            // Already gone means somebody else finished the job.
+            bs.Append("if not exist \"" + neu + "\" goto run\r\n");
+            bs.Append("move /y \"" + neu + "\" \"" + exe + "\" >nul 2>&1\r\n");
+            bs.Append("if not errorlevel 1 goto run\r\n");
+            // Windows can hold a file open for a moment after the process that
+            // had it has ended. About a minute of trying, then start whatever
+            // is there rather than leave somebody with no launcher at all.
+            bs.Append("set /a tries+=1\r\n");
+            bs.Append("if %tries% lss 30 ( ping 127.0.0.1 -n 2 >nul & goto swap )\r\n");
+            bs.Append(":run\r\n");
+            bs.Append("start \"\" \"" + exe + "\"\r\n");
+            bs.Append("del \"%~f0\"\r\n");
+            File.WriteAllText(bat, bs.ToString());
 
             var psi = new System.Diagnostics.ProcessStartInfo(bat);
             psi.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;

@@ -163,15 +163,48 @@ const LEVEL = {
    and a login box was the first thing anybody saw. */
 const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/support', '/join',
                       '/classes', '/roadmap', '/news', '/gallery',
-                      '/downloads', '/report'];
+                      '/downloads', '/report',
+                      // Known Issues and Help are for the person whose install
+                      // will not start or who cannot sign in, so they cannot
+                      // sit behind the sign in. They are known.md and help.md
+                      // in the data folder, read through /api/page like the
+                      // site pages. The hub's own pages moved to /hub/known
+                      // and /hub/help to make room.
+                      '/known', '/help'];
+const PUBLIC_DOCS = ['known', 'help'];
 /* The public pages are markdown on disk like everything else here, so the
    wording can be fixed from the site rather than by a deploy. */
 const SITE = path.join(DATA, 'site');
 
+/* What a link to each page says when it is pasted into Discord. Every address
+   used to unfurl with the same generic home text, so a link to the rules and a
+   link to the roadmap read identically in a channel. home.html carries the
+   same list for the browser tab; this is the one a crawler sees, because a
+   crawler does not run the page's script. */
+const BLURB = {
+  '/':          ['Thornswood', 'A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.'],
+  '/world':     ['The world', 'Fifty years after the Stormcloaks won. A free Skyrim, an Empire with an embassy and no soldiers, and the White Harbour Accord.'],
+  '/rules':     ['Rules', 'Nine rules, short on purpose. Nobody dies without agreeing to, play a person rather than a legend, and staff decide.'],
+  '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
+  '/support':   ['Supporting Thornswood', 'Free and always will be. Nothing here makes your character stronger.'],
+  '/credits':   ['Credits', 'Everyone whose work Thornswood is built on.'],
+  '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
+  '/known':     ['Known issues', 'Permanent limits of how a shared Skyrim works, each with the reason. Read this before reporting anything.'],
+  '/help':      ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
+  '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
+  '/roadmap':   ['Roadmap', 'What is being worked on and roughly in what order.'],
+  '/news':      ['Every release', 'What changed, newest first. The same list the launcher shows.'],
+  '/report':    ['Report a problem', 'Something broken, or an idea. No account needed.'],
+  '/gallery':   ['From the world', 'Pictures taken by people playing.']
+};
+const escAttr = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 const PAGES = {
   '/hub':         'home',
-  '/help':        'help',
-  '/known':       'known',
+  '/hub/help':    'help',
+  '/hub/known':   'known',
   '/roadmap':     'roadmap',
   '/suggestions': 'suggestions',
   '/news':        'news',
@@ -291,7 +324,14 @@ function listFiles() {
     // page hides it on that flag. Dropping it here put the old two file
     // instructions back on the downloads page and a 527 MB button next to
     // them that does nothing on its own.
-    out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden,
+    //
+    // A script is never something a visitor is offered. Why-Keizaal.ps1, a
+    // diagnostic for one machine, sat in this folder and so on the Downloads
+    // page as a file to take, naming a staff member and the game server's
+    // address. Anything with a script extension is hidden whatever
+    // files.json says about it.
+    const script = /[.](ps1|psm1|cmd|bat|py|sh)$/i.test(name);
+    out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,
       label: m.label || name, version: m.version || '', note: m.note || '' });
   }
   out.sort((a, b) => b.at - a.at);
@@ -701,6 +741,28 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const p = decodeURIComponent(url.pathname);
   const route = p.replace(/\/+$/, '').toLowerCase() || '/';
+  // HEAD is GET without a body. Every route below asks for GET by name, so a
+  // HEAD fell through to the 404 at the bottom, and an uptime monitor or a
+  // link checker that uses HEAD reported every address on the site as gone.
+  // Node drops the body of a HEAD answer on its own, so routing it as GET is
+  // the whole fix for the small answers. The streamed ones skip the read as
+  // well: a HEAD for the installer is a question about its size, not a
+  // download.
+  const head = req.method === 'HEAD';
+  if (head) req.method = 'GET';
+
+  /* Set once, here, rather than inside send(): the streamed answers below
+     write their own headers and never go through it. Node keeps a setHeader
+     value through a later writeHead, so one line covers every route.
+
+     Only on an answer that came in over the certificate. Caddy holds 443 and
+     the plain to secure redirect already works, so this is the part that stops
+     a browser trying the plain one again. On plain HTTP it means nothing and
+     is left off. */
+  if (secureHere(req)) {
+    try { res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains'); } catch (e) { }
+  }
+
   const w = await who(req);
 
   // ---------------------------------------------------------- member login
@@ -873,8 +935,28 @@ http.createServer(async (req, res) => {
       // /join, never /hub. Somebody clicking Apply wants to know how to apply,
       // and sending them to the admin panel is the worst possible answer.
       html = html.split('DISCORD_URL').join(cfg.discord.invite || '/join');
+      // The og tags a crawler reads are the ones in the file, so the page
+      // actually being served is written into them here. home.html rewrites
+      // the same tags for the browser tab.
+      const blurb = BLURB[route];
+      if (blurb) {
+        const title = blurb[0] === 'Thornswood' ? blurb[0] : blurb[0] + ' · Thornswood';
+        html = html.replace(
+          /(<meta property="og:title" id="ogTitle" content=")[^"]*(")/,
+          '$1' + escAttr(title) + '$2');
+        for (const re of [/(<meta property="og:description" id="ogDesc" content=")[^"]*(")/,
+                          /(<meta name="description" content=")[^"]*(")/]) {
+          html = html.replace(re, '$1' + escAttr(blurb[1]) + '$2');
+        }
+      }
       return send(res, 200, html, TYPES['.html']);
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
+  }
+
+  // Two addresses people type, or paste out of an old message. Both mean the
+  // Downloads page, and both answered 404.
+  if ((route === '/download' || route === '/install') && req.method === 'GET') {
+    return send(res, 301, '', 'text/plain', { Location: '/downloads' });
   }
 
   // Everything the front page needs and nothing that is anybody's business.
@@ -1010,8 +1092,11 @@ http.createServer(async (req, res) => {
 
   const pg = route.match(/^\/api\/page\/([a-z-]+)$/);
   if (pg && req.method === 'GET') {
-    const file = path.join(SITE, pg[1] + '.md');
-    if (!file.startsWith(SITE + path.sep) || !fs.existsSync(file)) {
+    // Known Issues and Help live in the data folder with the other documents
+    // (Help is edited in the hub), not under site. Same read, other folder.
+    const dir = PUBLIC_DOCS.indexOf(pg[1]) >= 0 ? DATA : SITE;
+    const file = path.join(dir, pg[1] + '.md');
+    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
       return sendJson(res, 404, { error: 'no such page' });
     }
     return sendJson(res, 200, { md: fs.readFileSync(file, 'utf8') });
@@ -1034,6 +1119,7 @@ http.createServer(async (req, res) => {
       'Cache-Control': 'public, max-age=86400',
       'X-Content-Type-Options': 'nosniff'
     });
+    if (head) return res.end();
     return fs.createReadStream(file).pipe(res);
   }
 
@@ -1065,6 +1151,7 @@ http.createServer(async (req, res) => {
       'Content-Length': st.size,
       'Content-Disposition': 'attachment; filename="' + path.basename(file) + '"'
     });
+    if (head) return res.end();
     return fs.createReadStream(file).pipe(res);
   }
 
@@ -1087,6 +1174,7 @@ http.createServer(async (req, res) => {
       'Content-Disposition': (inline ? 'inline' : 'attachment') +
         '; filename="' + path.basename(file) + '"'
     });
+    if (head) return res.end();
     return fs.createReadStream(file).pipe(res);
   }
 
@@ -1240,6 +1328,74 @@ http.createServer(async (req, res) => {
       out.people.push({ id: String(d), name: st.name || row.name || '', profiles });
     }
     return sendJson(res, 200, out);
+  }
+
+  /*
+    Does this ticket own this profile number?
+
+    The voice service asks, because /choose cannot be locked to the loopback:
+    every person's launcher posts their character creation choice to it from
+    their own machine. Without an answer here it took anybody's word for
+    anything, and a stranger could set your profession, your half and your
+    home town before you ever claimed them.
+
+    This route did not exist. voice-server.js has been posting here since it
+    was written, every call fell through to the sign in gate below and came
+    back 401, owns() reads anything that is not a 200 as "unchecked", and the
+    service stored the choice anyway and logged UNVERIFIED. So the check has
+    never once run, and the ticket the launcher sends to the voice port in
+    clear was being spent on nothing.
+
+    Claimed, not registered. A profile number that nobody has ever checked in
+    with belongs to whoever asks for it first, which is the launcher that just
+    made the character: refusing those would break character creation for
+    every new character, which is the one case this runs in. A number already
+    against somebody else's Discord account is theirs, and that is the case
+    worth refusing.
+  */
+  if (p === '/api/play/owns' && req.method === 'POST') {
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const t = readTicket(o.ticket);
+    if (!t) return sendJson(res, 200, { ok: false, why: 'ticket' });
+    const pid = Number(o.profileId) || 0;
+    if (pid <= 0) return sendJson(res, 200, { ok: false, why: 'profile' });
+
+    // Still has to be somebody who is allowed in at all. A ticket from an
+    // account that has been banned or has left owns nothing.
+    const st = await standingCached(t.d);
+    /*
+      Could not ask Discord is not the same answer as not allowed.
+
+      standing() leaves play false on any lookup that failed, and sets
+      lookupFailed to say why, because a 404 is the only failure that really
+      means "not in the server". Answering 200 with ok false here would turn a
+      Discord outage into every new character being refused their profession
+      and home town, and voice-server.js reads a non-200 as unchecked and
+      stores the choice anyway, which is exactly the behaviour a failed lookup
+      should get. /api/allowed a few routes down already does this.
+    */
+    if (st.lookupFailed) {
+      return sendJson(res, 503, { ok: false, why: 'could not ask Discord' });
+    }
+    if (!st.play || st.banned) return sendJson(res, 200, { ok: false, why: 'role' });
+
+    const linked = jsonFile(LINKED, {});
+    const mine = (linked[t.d] && Array.isArray(linked[t.d].profiles))
+      ? linked[t.d].profiles.map(Number) : [];
+    if (mine.indexOf(pid) >= 0) return sendJson(res, 200, { ok: true, why: 'theirs' });
+
+    for (const d of Object.keys(linked)) {
+      if (String(d) === String(t.d)) continue;
+      const theirs = (linked[d] && Array.isArray(linked[d].profiles))
+        ? linked[d].profiles.map(Number) : [];
+      if (theirs.indexOf(pid) >= 0) {
+        return sendJson(res, 200, { ok: false, why: 'somebody else' });
+      }
+    }
+    // Nobody has it. The launcher that just made the character is the one
+    // asking, and it checks in with this number a moment later anyway.
+    return sendJson(res, 200, { ok: true, why: 'unclaimed' });
   }
 
   // The same question without asking for the password, for the launcher to

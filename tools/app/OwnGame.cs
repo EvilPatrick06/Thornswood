@@ -480,6 +480,39 @@ namespace Thornswood
             }
         }
 
+        /// <summary>
+        /// Break a hard link before a write that replaces the whole file.
+        ///
+        /// Unshare above deliberately leaves the collection layout alone,
+        /// because there the game IS the Steam copy and nearly everything in
+        /// it belongs to Vortex. That is the right rule for a file this build
+        /// only touches. It is the wrong rule for a plugin that Fix is
+        /// replacing outright.
+        ///
+        /// Vortex deploys by hard link, so the plugin in the Steam copy and
+        /// the Nexus mod inside Vortex's staging folder are one file with two
+        /// names, and staging is shared by every Skyrim profile on the machine.
+        /// Writing through that link puts this build's copy of a plugin inside
+        /// another server's collection, where nothing says it came from here
+        /// and nobody would think to look. Somebody who plays Thornswood and
+        /// one other SkyMP server gets turned away by the other one, and the
+        /// only trace is a checksum that stopped matching.
+        ///
+        /// So this one always breaks the link, whatever the layout. The cost is
+        /// that Vortex's staging keeps the bytes it had, so a later Vortex
+        /// deploy can put them back here. Scan sees that the moment it runs and
+        /// Fix puts it right again, which is a loop somebody can see and get
+        /// out of. The other way round is silent and lands on somebody else.
+        /// </summary>
+        public static void Detach(string path)
+        {
+            try
+            {
+                if (File.Exists(path) && Links(path) > 1) File.Delete(path);
+            }
+            catch { }
+        }
+
         static int Links(string path)
         {
             using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))

@@ -18,6 +18,12 @@ namespace Thornswood
             try { Directory.Delete(p); } catch { }
         }
 
+        static bool IsEmpty(string p)
+        {
+            try { return Directory.GetFileSystemEntries(p).Length == 0; }
+            catch { return false; }
+        }
+
         static bool MakeLink(string link, string target)
         {
             string why;
@@ -40,6 +46,17 @@ namespace Thornswood
             {
                 string bak = win + ".st-backup";
                 if (IsLink(win)) { DropLink(win); did = true; }
+
+                // A redirect that fell over half way leaves a real empty folder
+                // here and the person's own folder still sitting in the backup.
+                // The move below will not put a folder back onto a name that
+                // already exists, so the empty one is cleared out of its way.
+                // Only when it is empty, because anything inside it is theirs.
+                if (Directory.Exists(win) && !IsLink(win) && Directory.Exists(bak) && IsEmpty(win))
+                {
+                    try { Directory.Delete(win); } catch { }
+                }
+
                 if (Directory.Exists(bak) && !Directory.Exists(win))
                 {
                     try { Directory.Move(bak, win); did = true; } catch { }

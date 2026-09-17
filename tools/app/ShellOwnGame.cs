@@ -219,8 +219,13 @@ namespace Thornswood
             {
                 string exe = Assembly.GetExecutingAssembly().Location;
                 string bat = Path.Combine(Path.GetTempPath(), "ts-restart-" + Process.GetCurrentProcess().Id + ".cmd");
+                // cmd reads a .cmd file in the console's OEM code page, not
+                // the UTF-8 this is written in, so a path with any character
+                // outside ASCII would reach start as different bytes and the
+                // launcher would close and never come back.
                 File.WriteAllText(bat,
                     "@echo off\r\n" +
+                    "chcp 65001 >nul\r\n" +
                     "ping 127.0.0.1 -n 3 >nul\r\n" +
                     "start \"\" \"" + exe + "\"\r\n" +
                     "del \"%~f0\"\r\n");

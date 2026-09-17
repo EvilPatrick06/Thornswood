@@ -1,7 +1,7 @@
 # Working in this repo
 
 Read this first, every session, whoever you are working with. It is the same
-for Gavin's machine and Djinn's. SECOND-DEVELOPER.md is the long form: what
+for Patrick's machine and Djinn's. SECOND-DEVELOPER.md is the long form: what
 the pieces are, how a release goes out, how a machine is set up.
 
 ## What this is
@@ -10,7 +10,7 @@ Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in closed
 playtest. This repo is the launcher (tools\app, C# 5, WPF, built with the
 .NET Framework 4 csc), the game plugins (tools\ts-plugins, Skyrim Platform
 JavaScript), the site (tools\docs-app, node), the Discord bot (tools\discord,
-Python) and every script that ships or runs it. Owner: Gavin (EvilPatrick06).
+Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
 Second developer: Djinn (Windows account Ken, Discord WiccanDjinn).
 
 ## Words
@@ -23,7 +23,7 @@ VPS) are named by location only; never printed, pasted, committed or logged.
 
 ## Settled design, not up for a quiet rewrite
 
-- Decided by Gavin and Djinn on 17 Sep, after the three launchers kept
+- Decided by Patrick and Djinn on 17 Sep, after the three launchers kept
   getting into each other's files: Thornswood runs from its own game folder
   (`Thornswood\Game`), built by the launcher from what Vortex has deployed
   into the Steam copy, the big files as hard links so the collection is not
@@ -48,19 +48,21 @@ VPS) are named by location only; never printed, pasted, committed or logged.
   server together, never a half.
 
 Anything that changes one of these is a few lines in #dev first: the
-problem, the approach, what it touches. Agreed between Gavin and Djinn
+problem, the approach, what it touches. Agreed between Patrick and Djinn
 before code; a Claude does not settle it for them.
 
 ## How work moves between the two machines
 
-- main is what ships. Only Gavin's machine ships main, and Ship.ps1 refuses
+- main is what ships. Only Patrick's machine ships main, and Ship.ps1 refuses
   a main release that is not on main or is behind origin. A main Ship
   commits and pushes the source when the release is out, so the other
   machine can `git pull` exactly what shipped.
 - Work happens on a branch: `git checkout -b djinn/what-it-is` (or
-  `gavin/...`). Small commits, plain messages saying what changed. Push the
+  `patrick/...`). Small commits, plain messages saying what changed. Push the
   branch and open a pull request (`gh pr create --fill`). The other person
   reads it; it is merged into main from GitHub, never pushed over main.
+  The branches opened before 17 Sep use a `gavin/` prefix; they are the same
+  person and were left alone rather than renamed under open pull requests.
 - `git pull` before starting anything. If a pull conflicts, resolve it on
   your branch (`git fetch`, `git rebase origin/main`), never on main. If a
   push is rejected, pull, do not force.
@@ -91,6 +93,7 @@ say so and ask.
 
 ## Where things are
 
+HANDOFF.md (the open work list and what is live, as of 17 Sep),
 SECOND-DEVELOPER.md (the long form), README.md, SETUP.md, tools\app\HOOKUP.md
 (launcher classes), tools\MOVING-THE-SERVER.md (the VPS), lore\ (the world),
 tools\docs-app\data\site\*.md (public pages), tools\Ship-Rules.ps1 (what

@@ -468,18 +468,24 @@ if (-not $DryRun -and -not $Dev) {
 # was set up, the script worked, and #news sat empty through every release.
 # It exits quietly on its own if no webhook is configured, so there is nothing
 # to guard here.
-if ($Dev) {
-    Head 'Telling the Discord'
-    Say '  dev release, not posted. The dev launcher picks it up on its own.' 'DarkGray'
-}
-elseif (-not $DryRun) {
+# A dev release goes to the dev updates channel and nowhere else. Not #news,
+# not the website (the news step above is skipped for dev), and not the main
+# launcher, which reads main's feed. The dev launcher's News tab gets it from
+# the dev feed, as it always did; this is so the people testing it are told
+# without anybody having to watch a version number.
+if (-not $DryRun) {
     $discordScript = Join-Path $Here 'Publish-Discord.ps1'
     if (Test-Path -LiteralPath $discordScript) {
         Head 'Telling the Discord'
-        try { & $discordScript }
+        try {
+            if ($Dev) { & $discordScript -Dev }
+            else      { & $discordScript }
+        }
         catch { Say "  could not post to Discord: $_" 'DarkGray' }
     } else {
-        Say '  Publish-Discord.ps1 is missing, #news was not told.' 'Yellow'
+        Say ('  Publish-Discord.ps1 is missing, ' +
+             $(if ($Dev) { 'the dev updates channel' } else { '#news' }) +
+             ' was not told.') 'Yellow'
     }
 }
 

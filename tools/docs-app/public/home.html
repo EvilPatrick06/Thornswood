@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Thornswood</title>
 <meta name="description" content="A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.">
+<!-- What a link to this site looks like when it is pasted into Discord. Without
+     these every address unfurled with the same generic home text, so a link to
+     the rules and a link to the roadmap read identically in a channel. The
+     router below rewrites them per page once it knows which page this is. -->
+<meta property="og:site_name" content="Thornswood">
+<meta property="og:type" content="website">
+<meta property="og:title" id="ogTitle" content="Thornswood">
+<meta property="og:description" id="ogDesc" content="A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.">
+<meta property="og:image" content="/presence.png">
+<meta name="theme-color" content="#0B0E0A">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/logo.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -533,12 +544,15 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
         <a href="/downloads">How to join</a>
         <a href="/downloads">Download</a>
         <a href="/classes">Professions</a>
+        <a href="/help">Help</a>
+        <a href="/known">Known issues</a>
         <a href="/report">Report a problem</a>
       </div>
       <div>
         <h4>Community</h4>
         <a href="DISCORD_URL" target="_blank" rel="noopener">Discord</a>
         <a href="/support" class="supportLink">Support Thornswood</a>
+        <a href="/support" id="footPatreon" hidden>Patreon</a>
         <a href="/roadmap">Roadmap</a>
         <a href="/news">Release notes</a>
       </div>
@@ -577,8 +591,54 @@ Array.prototype.forEach.call(nav.querySelectorAll('a'), function(a){ a.onclick =
   to a file rather than a deploy.
 */
 var PAGES = { '/world':1, '/rules':1, '/join':1, '/support':1, '/credits':1,
-              '/classes':1 };
+              '/classes':1, '/known':1, '/help':1 };
 var here = location.pathname.replace(/\/+$/, '').toLowerCase() || '/';
+
+/* What each address says when it is pasted into a channel. A crawler reads the
+   tags in the file rather than waiting for this, so the server fills them in
+   for the page it is serving; this is for the browser tab and for anything
+   that does run the script. */
+var BLURB = {
+  '/world':   ['The world', 'Fifty years after the Stormcloaks won. A free Skyrim, an Empire with an embassy and no soldiers, and the White Harbour Accord.'],
+  '/rules':   ['Rules', 'Nine rules, short on purpose. Nobody dies without agreeing to, play a person rather than a legend, and staff decide.'],
+  '/join':    ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
+  '/support': ['Supporting Thornswood', 'Free and always will be. Nothing here makes your character stronger.'],
+  '/credits': ['Credits', 'Everyone whose work Thornswood is built on.'],
+  '/classes': ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
+  '/known':   ['Known issues', 'Permanent limits of how a shared Skyrim works, each with the reason. Read this before reporting anything.'],
+  '/help':    ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
+  '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
+  '/roadmap': ['Roadmap', 'What is being worked on and roughly in what order.'],
+  '/news':    ['Every release', 'What changed, newest first. The same list the launcher shows.'],
+  '/report':  ['Report a problem', 'Something broken, or an idea. No account needed.'],
+  '/gallery': ['From the world', 'Pictures taken by people playing.']
+};
+(function () {
+  var b = BLURB[here];
+  if (!b) return;
+  var t = document.getElementById('ogTitle'), d = document.getElementById('ogDesc');
+  if (t) t.setAttribute('content', b[0] + ' \u00b7 Thornswood');
+  if (d) d.setAttribute('content', b[1]);
+  var md = document.querySelector('meta[name="description"]');
+  if (md) md.setAttribute('content', b[1]);
+})();
+
+/* The anchor in a fetched page. Called after the markdown is on the page,
+   because until then there is nothing with that id to scroll to. */
+function jumpToHash() {
+  var id = (location.hash || '').replace(/^#/, '');
+  if (!id) return;
+  var go = function () {
+    var el = document.getElementById(id) ||
+             document.querySelector('[name="' + id.replace(/"/g, '') + '"]');
+    if (el && el.scrollIntoView) el.scrollIntoView();
+  };
+  // Twice: once now, and once after the browser has laid the page out, because
+  // a long document reflows as the fonts land and the first position is wrong.
+  go();
+  if (window.requestAnimationFrame) requestAnimationFrame(function () { setTimeout(go, 60); });
+  else setTimeout(go, 60);
+}
 
 function show(html) {
   document.getElementById('landing').hidden = true;
@@ -593,7 +653,15 @@ function show(html) {
 if (PAGES[here]) {
   fetch('/api/page/' + here.slice(1))
     .then(function (r) { if (!r.ok) throw 0; return r.json(); })
-    .then(function (d) { show(marked.parse(d.md)); })
+    .then(function (d) {
+      show(marked.parse(d.md));
+      /* /world#accord is linked from the footer and from the world page
+         itself. The anchor it points at is inside the markdown, which is
+         fetched after the browser has already given up looking for it, so the
+         link landed at the top of a very long page every time. Scroll to it
+         once the body is actually on the page. */
+      jumpToHash();
+    })
     .catch(function () { show('<h1>Not here</h1><p>That page does not exist yet.</p>'); });
 } else if (here === '/roadmap') {
   fetch('/api/roadmap').then(function (r) { return r.json(); }).then(function (b) {
@@ -850,13 +918,16 @@ fetch('/api/public', { credentials:'same-origin' })
   .then(function(d){
     // Patreon, wherever it ends up living. Until there is one, Support is the
     // page that explains what it will and will not buy.
+    /* The nav link becomes Patreon, because that is where somebody who wants
+       to help is going. The footer keeps its own link to /support, because
+       that page is what says what a tier does and does not buy, and rewriting
+       every Support link to Patreon made it unreachable from anywhere on the
+       site. */
     if (d.patreon) {
-      Array.prototype.forEach.call(
-        document.querySelectorAll('#navSupport, .supportLink'), function (a) {
-          a.href = d.patreon; a.target = '_blank';
-        });
       var ns = document.getElementById('navSupport');
-      if (ns) ns.textContent = 'Patreon';
+      if (ns) { ns.href = d.patreon; ns.target = '_blank'; ns.rel = 'noopener'; ns.textContent = 'Patreon'; }
+      var fp = document.getElementById('footPatreon');
+      if (fp) { fp.href = d.patreon; fp.target = '_blank'; fp.rel = 'noopener'; fp.hidden = false; }
     }
 
     var dot = document.getElementById('dot'), t = document.getElementById('livetext');

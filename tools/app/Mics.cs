@@ -110,9 +110,9 @@ namespace Thornswood
 
             try
             {
-                string[] lines = File.ReadAllLines(ini);
+                var lines = new List<string>(File.ReadAllLines(ini));
                 bool done = false;
-                for (int i = 0; i < lines.Length; i++)
+                for (int i = 0; i < lines.Count; i++)
                 {
                     string t = lines[i].TrimStart();
                     int eq = t.IndexOf('=');
@@ -127,7 +127,29 @@ namespace Thornswood
                         lines[i] = "VoicePort = " + port;
                     }
                 }
-                File.WriteAllLines(ini, lines, new UTF8Encoding(false));
+                // No line to rewrite, so one is added rather than the name being
+                // dropped. The shipped template has never carried this key, so
+                // on every machine the name was read off Windows at Play and
+                // then written nowhere: the voice plugin found no
+                // MicrophoneName, passed an empty name to the page, and the page
+                // opened whatever Chromium calls the default, which is the
+                // device this class exists to get away from. It goes under
+                // [Voice] with the rest of the voice settings, or at the end of
+                // the file when there is no such section.
+                if (want.Length > 0 && !done)
+                {
+                    int at = -1;
+                    for (int i = 0; i < lines.Count; i++)
+                    {
+                        if (!lines[i].Trim().Equals("[Voice]", StringComparison.OrdinalIgnoreCase)) continue;
+                        at = i + 1;
+                        break;
+                    }
+                    if (at < 0) lines.Add("MicrophoneName = " + want);
+                    else lines.Insert(at, "MicrophoneName = " + want);
+                    done = true;
+                }
+                File.WriteAllLines(ini, lines.ToArray(), new UTF8Encoding(false));
                 return done ? want : "";
             }
             catch { return ""; }
