@@ -898,8 +898,11 @@ namespace Thornswood
                     "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (r != MessageBoxResult.Yes) return;
 
-                int n = Checks.CloseGame();
-                if (Checks.GameRunning()) { Log("Skyrim would not close. Restart your PC and try again."); return; }
+                Log("Closing Skyrim...");
+                int n = 0;
+                bool still = false;
+                Waiting(delegate { n = Checks.CloseGame(); still = Checks.GameRunning(); });
+                if (still) { Log("Skyrim would not close. Restart your PC and try again."); return; }
                 Log(n > 0 ? "Closed Skyrim." : "Skyrim was already gone.");
                 // The two second tick does the rest: puts the Windows folders
                 // back, records the session and turns Play on again.
@@ -1004,6 +1007,9 @@ namespace Thornswood
 
             win.Closing += delegate(object s, System.ComponentModel.CancelEventArgs e)
             {
+                // Not while Skyrim is being closed. Play or the update that
+                // asked for it carries on once it is gone, window or no window.
+                if (waitDepth > 0) { e.Cancel = true; Log("Wait for Skyrim to finish closing."); return; }
                 if (playing)
                 {
                     var r = MessageBox.Show(
@@ -1109,8 +1115,11 @@ namespace Thornswood
                 if (r != MessageBoxResult.Yes) { Log("Left the game where it was."); return false; }
             }
 
-            int n = Checks.CloseGame();
-            if (Checks.GameRunning())
+            Log("Closing Skyrim...");
+            int n = 0;
+            bool still = false;
+            Waiting(delegate { n = Checks.CloseGame(); still = Checks.GameRunning(); });
+            if (still)
             {
                 Log("Skyrim would not close. Restart your PC and try again.");
                 return false;
