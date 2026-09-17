@@ -464,6 +464,32 @@ namespace Thornswood
                 leave.Add(Paths.ProfileDir);
                 leave.Add(Paths.CfgFile);
             }
+            // The rest of what setup and updating left in the install folder.
+            //
+            // Finish already tries to remove the install folder itself when
+            // both boxes say delete, and it only works on an empty one so that
+            // anything a person put there by hand survives. It has never once
+            // succeeded, because these sit beside the folders above and nothing
+            // took them out: _dist alone was 1.5 GB of downloaded packs and the
+            // setup exe on the machine this was found on. So a full uninstall
+            // said it was done and left the folder there with most of a
+            // download still in it.
+            //
+            // _dist is pure leftovers; DropScratch's own note says nothing in
+            // there is ever read again once setup has run. tools is the handful
+            // of scripts shipped beside the launcher. The shortcut in the
+            // install folder is ours too, and separate from the Start menu one
+            // DropShortcuts handles.
+            //
+            // _quarantine is deliberately NOT here. It holds files taken out of
+            // somebody's game and set aside, another server's among them, and
+            // those are not ours to destroy on the way out. It keeps the folder
+            // from being empty, which is the right outcome: the folder staying
+            // is how anybody finds out it is still holding something.
+            leave.Add(Path.Combine(Paths.Root, "_dist"));
+            leave.Add(Path.Combine(Paths.Root, "tools"));
+            leave.Add(Path.Combine(Paths.Root, "Thornswood.lnk"));
+
             leave.Add(Paths.LauncherDir);
             return leave.ToArray();
         }
