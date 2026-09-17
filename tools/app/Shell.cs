@@ -1202,7 +1202,17 @@ namespace Thornswood
             // Guarded, because DrawStatus has always been safe to call before
             // the update card's own controls are resolved and this is the
             // first thing in it that touches them.
-            if (updateBar != null && btnInstallNow != null && ModsMissing())
+            //
+            // The wrong Skyrim build comes before the mods. The downgrade needs
+            // nothing from the collection, and Vortex deploying onto files the
+            // downgrade then copies over is the same work twice, so while the
+            // exe is wrong the collection card stays down and the downgrade
+            // card is the one thing on this page to press. The collection card
+            // comes up by itself once the build is right. A real update still
+            // outranks both, below, because an update can carry a new expected
+            // build and settle the question by itself.
+            bool wrongBuild = Downgrade.Needed(cfg);
+            if (updateBar != null && btnInstallNow != null && ModsMissing() && !wrongBuild)
             {
                 ShowCollectionBar();
             }
@@ -1217,7 +1227,6 @@ namespace Thornswood
             // Wrong Skyrim build: the one thing on this page with a button that
             // fixes it. Below the update bar in priority, because an update can
             // carry a new expected build and settle the question by itself.
-            bool wrongBuild = Downgrade.Needed(cfg);
             if (downgradeBar != null)
             {
                 bool updateUp = updateBar != null && updateBar.Visibility == Visibility.Visible;
@@ -1260,7 +1269,9 @@ namespace Thornswood
             else if (wrongBuild && !playing && !collectionBarUp)
             {
                 btnPlay.Content = Downgrade.Busy ? "DOWNGRADING..." : "DOWNGRADE FIRST";
-                btnPlay.ToolTip = "This Skyrim is not build 1.6.1170. The card above puts it right.";
+                btnPlay.ToolTip = ModsMissing()
+                    ? "This Skyrim is not build 1.6.1170. The card above puts it right; the mods come after that."
+                    : "This Skyrim is not build 1.6.1170. The card above puts it right.";
                 if (charPickerOpen)
                 {
                     charPickerOpen = false;
@@ -3558,6 +3569,12 @@ namespace Thornswood
                 {
                     updatePending = false;
                     updateAnswered = true;
+                    if (Downgrade.Needed(cfg))
+                    {
+                        DrawStatus();
+                        Log("The collection is not installed yet and Skyrim is on the wrong build. The downgrade comes first; the collection card follows it. Updates wait until both are done.");
+                        return;
+                    }
                     ShowCollectionBar();
                     DrawStatus();
                     Log("The collection is not installed yet. Updates wait until it is.");

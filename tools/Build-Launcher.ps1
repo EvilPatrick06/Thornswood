@@ -75,6 +75,11 @@ function Find-Ref([string]$name) {
 $needed = @(
     'System.dll', 'System.Core.dll', 'System.Drawing.dll',
     'System.Runtime.Serialization.dll',
+    # Config reads and writes its JSON through DataContractJsonSerializer,
+    # whose ReadObject and WriteObject also come in XmlReader and XmlWriter
+    # shapes. csc has to see System.Xml to pick the Stream one, and with
+    # /noconfig nothing adds it for us.
+    'System.Xml.dll',
     # DPAPI, for the server password and the Discord ticket on disk.
     'System.Security.dll',
     'System.IO.Compression.dll', 'System.IO.Compression.FileSystem.dll',
@@ -203,8 +208,15 @@ if (-not $hasInfo) {
 
 # ------------------------------------------------------------ compile
 Head 'Compiling'
+# /noconfig: csc otherwise reads its own csc.rsp and adds System, System.Core,
+# System.Drawing and a dozen more by name from the framework folder. On a
+# machine with the .NET reference assemblies installed (the GitHub runner, any
+# machine with Visual Studio) the list above found those same assemblies under
+# Reference Assemblies, and csc stopped with CS1703, one identity imported
+# twice. Everything the launcher needs is in $refs by hand, so csc.rsp has
+# nothing to add.
 $cscArgs = @(
-    '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
+    '/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
     "/out:$exe",
     "/win32icon:$((Resolve-Path $icon).Path)",
     "/resource:$((Resolve-Path $xaml).Path),ui.xaml"
@@ -259,7 +271,7 @@ if (Test-Path $stubSrc) {
     $stub = Join-Path $Here 'setup-stub.exe'
     $stubNew = Join-Path $Here 'setup-stub.new.exe'
     if (Test-Path $stubNew) { Remove-Item $stubNew -Force }
-    $stubArgs = @('/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
+    $stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
                   "/out:$stubNew", "/win32icon:$((Resolve-Path $icon).Path)")
     if (Test-Path $logoSml) { $stubArgs += "/resource:$((Resolve-Path $logoSml).Path),logo.png" }
     foreach ($r in $refs) { $stubArgs += "/reference:$r" }
