@@ -2498,7 +2498,7 @@ namespace Thornswood
             {
                 var empty = new TextBlock();
                 empty.Text = Updater.Enabled(cfg)
-                    ? "Nothing posted yet. Anything Gavin writes to the update feed turns up here."
+                    ? "Nothing posted yet. Anything Patrick writes to the update feed turns up here."
                     : "Updates are not set up on this copy, so there is no news feed to read.";
                 empty.Foreground = Res("Faint"); empty.FontSize = 12.5;
                 empty.TextWrapping = TextWrapping.Wrap;
@@ -2506,18 +2506,97 @@ namespace Thornswood
                 return;
             }
 
+            // What this build has that main does not.
+            //
+            // The dev feed is main's whole history with the dev notes on top,
+            // so the tab used to read as one long list with no seam in it. The
+            // seam is the useful part: it is the difference between the build
+            // in front of you and the build everybody plays, which is the list
+            // of what wants testing before this one becomes that one.
+            int ahead = 0;
+            for (int i = 0; i < items.Length; i++) { if (items[i].IsDev) ahead++; }
+
+            if (cfg.IsDev)
+            {
+                string mine = (pendingDoc != null) ? pendingDoc.launcherVersion : "";
+                string theirs = (pendingDoc != null) ? pendingDoc.mainVersion : "";
+
+                var head = new StackPanel();
+
+                var ht = new TextBlock();
+                ht.Text = string.IsNullOrEmpty(theirs)
+                    ? "This is the dev build."
+                    : "This is the dev build, on " + mine + ". Main is on " + theirs + ".";
+                ht.FontSize = 13.5; ht.FontWeight = FontWeights.SemiBold;
+                ht.Foreground = Res("Ink"); ht.TextWrapping = TextWrapping.Wrap;
+                head.Children.Add(ht);
+
+                var hb = new TextBlock();
+                if (ahead == 0)
+                {
+                    hb.Text = "Nothing below is dev only. Everything here has gone out on main as well, so there is nothing waiting to be tested.";
+                }
+                else
+                {
+                    hb.Text = (ahead == 1 ? "One note below is marked DEV. It is" : ahead + " notes below are marked DEV. They are")
+                            + " on this build and not on main yet, so that is what wants testing before dev goes over.";
+                }
+                hb.FontSize = 12; hb.Foreground = Res("Muted");
+                hb.TextWrapping = TextWrapping.Wrap; hb.LineHeight = 18;
+                hb.Margin = new Thickness(0, 6, 0, 0);
+                head.Children.Add(hb);
+
+                var hc = new Border();
+                hc.Background = Res("Card");
+                hc.BorderBrush = Res("Accent");
+                hc.BorderThickness = new Thickness(2, 0, 0, 0);
+                hc.Padding = new Thickness(16, 14, 16, 14);
+                hc.Margin = new Thickness(0, 0, 0, 24);
+                hc.Child = head;
+                newsList.Children.Add(hc);
+            }
+
             foreach (NewsItem n in items)
             {
                 var sp = new StackPanel();
 
-                if (!string.IsNullOrEmpty(n.date))
+                if (!string.IsNullOrEmpty(n.date) || n.IsDev)
                 {
-                    var d = new TextBlock();
-                    d.Text = n.date.ToUpperInvariant();
-                    d.FontSize = 9.5; d.FontWeight = FontWeights.SemiBold;
-                    d.Foreground = Res("Accent");
-                    d.Margin = new Thickness(0, 0, 0, 6);
-                    sp.Children.Add(d);
+                    var stamp = new StackPanel();
+                    stamp.Orientation = Orientation.Horizontal;
+                    stamp.Margin = new Thickness(0, 0, 0, 6);
+
+                    if (!string.IsNullOrEmpty(n.date))
+                    {
+                        var d = new TextBlock();
+                        d.Text = n.date.ToUpperInvariant();
+                        d.FontSize = 9.5; d.FontWeight = FontWeights.SemiBold;
+                        d.Foreground = Res("Accent");
+                        d.VerticalAlignment = VerticalAlignment.Center;
+                        stamp.Children.Add(d);
+                    }
+
+                    // Only a dev feed ever carries one of these, and inside a
+                    // dev feed only the notes main has not had yet.
+                    if (n.IsDev)
+                    {
+                        var ct = new TextBlock();
+                        ct.Text = "DEV";
+                        ct.FontSize = 8.5; ct.FontWeight = FontWeights.Bold;
+                        ct.Foreground = Res("Warn");
+
+                        var chip = new Border();
+                        chip.BorderBrush = Res("Warn");
+                        chip.BorderThickness = new Thickness(1);
+                        chip.CornerRadius = new CornerRadius(3);
+                        chip.Padding = new Thickness(5, 1, 5, 1);
+                        chip.Margin = new Thickness(string.IsNullOrEmpty(n.date) ? 0 : 8, 0, 0, 0);
+                        chip.VerticalAlignment = VerticalAlignment.Center;
+                        chip.Child = ct;
+                        stamp.Children.Add(chip);
+                    }
+
+                    sp.Children.Add(stamp);
                 }
 
                 var t = new TextBlock();

@@ -321,6 +321,24 @@ namespace Thornswood
         // Every file that moved in that release, so a release can be read
         // rather than taken on trust. Capped by the publisher.
         [DataMember] public string[] files = null;
+
+        // Which build this note came out on. Empty is main, the build
+        // everybody plays. "dev" is a dev release, and only the dev
+        // launcher ever sees one: its feed carries main's whole history
+        // with the dev notes sitting on top, so without this there is no
+        // way to look at the News tab and tell which is which.
+        //
+        // Written by the publisher on every dev release, over the whole
+        // list rather than only the new entry, by asking main's feed what
+        // it has. So it corrects itself: a note marked dev that reaches
+        // main loses the mark on the next dev release without anybody
+        // editing anything.
+        [DataMember] public string channel = "";
+
+        public bool IsDev
+        {
+            get { return channel == "dev"; }
+        }
     }
 
     [DataContract]
@@ -359,6 +377,13 @@ namespace Thornswood
         // The server compares plugin lists and nothing else, so a pack of
         // textures and meshes cannot put anybody out of step with it.
         [DataMember] public Pack[] optional = new Pack[0];
+        // What the main build was on when this feed was written. Only a dev
+        // feed carries it, and it is the other half of the answer to the
+        // question the News tab could not answer before: this build is on
+        // one number, main is on another, and these notes in between are the
+        // difference. Which is also the list of what wants testing before a
+        // dev release becomes a main one.
+        [DataMember] public string mainVersion = "";
         [DataMember] public NewsItem[] news = new NewsItem[0];
 
         public static VersionDoc Parse(byte[] raw)

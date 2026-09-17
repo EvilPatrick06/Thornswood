@@ -1007,6 +1007,7 @@ $entry = [pscustomobject]@{
     title   = $title
     body    = $body
     details = @($details)
+    channel = $(if ($Dev) { 'dev' } else { '' })
 }
 # Shipping twice in a row with the same note is a re-publish, not two pieces
 # of news. Only the first one is worth reading.
@@ -1028,6 +1029,68 @@ if ($repeat) {
     if ($news.Count -gt 40) { $news = $news[0..39] }
     Set-Prop $doc 'news' $news
     Say '  news entry added' 'Green'
+}
+
+# ------------------------------------------------------- dev or main
+# Which of these notes the dev build has and main does not.
+#
+# The dev feed is a copy of main's, so it carries main's whole news list
+# with the dev notes sitting on top of it. In the News tab that read as one
+# list with no seam, and the seam is the part worth having: it is the
+# difference between the dev build and the build everybody plays, which is
+# the list of what wants testing before the two are made the same.
+#
+# Worked out by asking main's feed what it has rather than by remembering
+# what was marked last time, so it corrects itself. A note that was dev only
+# and has since gone out on main loses its mark on the next dev release, and
+# nobody edits any JSON by hand. It also fixes the notes already in the feed
+# the first time this runs, which is the only way the ones published before
+# today ever get marked.
+if ($Dev) {
+    $mainVer = ''
+    $mainTitles = @{}
+    $mainJson = Join-Path (Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases') 'version.json'
+    if (Test-Path -LiteralPath $mainJson) {
+        try {
+            $mainDoc = Get-Content -LiteralPath $mainJson -Raw | ConvertFrom-Json
+            $mainVer = Val $mainDoc 'launcherVersion'
+            if ($mainDoc.PSObject.Properties['news'] -and $mainDoc.news) {
+                foreach ($m in @($mainDoc.news)) {
+                    $k = (Val $m 'title').Trim()
+                    if ($k) { $mainTitles[$k] = $true }
+                }
+            }
+        } catch {
+            Say "  could not read main's feed, so the dev marks were left alone: $($_.Exception.Message)" 'Yellow'
+            $mainTitles = $null
+        }
+    } else {
+        Say '  no main feed beside this one, so the dev marks were left alone' 'Yellow'
+        $mainTitles = $null
+    }
+
+    if ($null -ne $mainTitles) {
+        $marked = 0
+        foreach ($n in @($news)) {
+            $k = (Val $n 'title').Trim()
+            $want = if ($k -and $mainTitles.ContainsKey($k)) { '' } else { 'dev' }
+            Set-Prop $n 'channel' $want
+            if ($want -eq 'dev') { $marked++ }
+        }
+        Set-Prop $doc 'news' $news
+        Say ("  {0} note{1} marked dev, the ones main has not had" -f $marked, $(if ($marked -eq 1) { '' } else { 's' })) 'DarkGray'
+    }
+
+    Set-Prop $doc 'mainVersion' $mainVer
+    if ($mainVer) { Say "  main is on $mainVer, this one is on $launcherVersion" 'DarkGray' }
+} else {
+    # A main release is the build everybody plays, so nothing in its feed is
+    # dev only and nothing in it needs to know what main is on. Cleared
+    # rather than assumed, in case a note ever reaches here already marked.
+    foreach ($n in @($news)) {
+        if ($n.PSObject.Properties.Name -contains 'channel') { $n.channel = '' }
+    }
+    Set-Prop $doc 'mainVersion' ''
 }
 
 # Set-Content -Encoding UTF8 writes a byte order mark on Windows PowerShell,
