@@ -536,13 +536,33 @@ namespace Thornswood
                 sb.AppendLine("del /f /q \"" + full + "\" 2>nul");
             }
 
-            if (!keepSaves && deleteMods)
+            // An empty _quarantine is just a folder with a worrying name.
+            //
+            // Its contents are never deleted: they came out of somebody's game,
+            // another server's among them. But once whatever was in it has been
+            // put back or taken away, the folder itself is nothing. rmdir
+            // without /s refuses a folder with anything at all in it, so this
+            // takes the empty one and cannot touch the other.
+            sb.AppendLine("rmdir \"" + Path.Combine(Paths.Root, "_quarantine") + "\" 2>nul");
+
+            // Then the install folder, on the same rule and for the same
+            // reason. It used to be tried only when both boxes said delete,
+            // which missed the case where somebody kept nothing but the folder
+            // still had to go. rmdir refuses a folder that is not empty, so
+            // trying it always is safe: anything left keeps it, which is the
+            // point, and an install that really did remove everything no longer
+            // leaves an empty Thornswood behind.
+            sb.AppendLine("rmdir \"" + Paths.Root + "\" 2>nul");
+
+            // Last, say what survived and why. After the deletes, so it reports
+            // what is actually there rather than what was expected to be.
+            string note = null;
+            try { note = WriteFarewell(keepSaves, deleteMods); }
+            catch { }
+            if (note != null)
             {
-                // Only then is the install folder itself worth trying. It goes
-                // only if it is empty, so anything the user put in there by hand
-                // survives and tells them where it was. With the mods kept it
-                // is not empty by design, and rmdir would refuse anyway.
-                sb.AppendLine("rmdir \"" + Paths.Root + "\" 2>nul");
+                sb.AppendLine("powershell -NoProfile -ExecutionPolicy Bypass -File \"" + note + "\" >nul 2>&1");
+                sb.AppendLine("del /f /q \"" + note + "\" >nul 2>&1");
             }
 
             sb.AppendLine("del /f /q \"%~f0\" >nul 2>&1");
@@ -558,5 +578,63 @@ namespace Thornswood
             psi.WorkingDirectory = Path.GetTempPath();
             Process.Start(psi);
         }
+        /// <summary>
+        /// The note that comes up once everything has been deleted, listing what
+        /// is still in the install folder and why.
+        ///
+        /// Written as its own PowerShell file rather than squeezed into the cmd,
+        /// because the message has quotes and newlines in it and cmd's quoting
+        /// rules are how the last three bugs in this file happened.
+        ///
+        /// It runs after the deletes, so it reports what actually survived
+        /// rather than what was predicted. If the folder went, it says nothing
+        /// at all: a person whose uninstall left nothing behind does not need a
+        /// box telling them so.
+        /// </summary>
+        static string WriteFarewell(bool keepSaves, bool deleteMods)
+        {
+            var ps = new StringBuilder();
+            ps.AppendLine("$ErrorActionPreference = 'SilentlyContinue'");
+            ps.AppendLine("$root = " + PsQuote(Paths.Root));
+            ps.AppendLine("if (-not (Test-Path -LiteralPath $root)) { exit 0 }");
+            ps.AppendLine("$left = @(Get-ChildItem -LiteralPath $root -Force | Select-Object -First 40)");
+            ps.AppendLine("if (-not $left) { Remove-Item -LiteralPath $root -Force; exit 0 }");
+            ps.AppendLine();
+
+            // One reason per thing that can still be there. Anything not named
+            // here was not put there by Thornswood, which is itself the reason.
+            ps.AppendLine("$why = @{}");
+            ps.AppendLine("$why['_quarantine'] = 'files taken out of your game and set aside, another server''s among them. Not ours to delete.'");
+            if (!deleteMods)
+                ps.AppendLine("$why['Game'] = 'Thornswood''s copy of the game. You chose to keep it, so a reinstall can reuse it.'");
+            if (keepSaves)
+            {
+                ps.AppendLine("$why['Profile'] = 'your characters, saves and settings. You chose to keep them.'");
+                ps.AppendLine("$why['config.json'] = 'your settings. You chose to keep them.'");
+            }
+            ps.AppendLine();
+
+            ps.AppendLine("$lines = foreach ($e in $left) {");
+            ps.AppendLine("  $r = $why[$e.Name]");
+            ps.AppendLine("  if (-not $r) { $r = 'not Thornswood''s, so it was left alone.' }");
+            ps.AppendLine("  '  ' + $e.Name + '  -  ' + $r");
+            ps.AppendLine("}");
+            ps.AppendLine();
+
+            ps.AppendLine("$msg = \"Thornswood is uninstalled.`r`n`r`nThis was left at\" + \"`r`n`r`n    \" + $root + \"`r`n`r`n\" + ($lines -join \"`r`n\") + \"`r`n`r`nDelete that folder yourself once you are done with them.\"");
+            ps.AppendLine("Add-Type -AssemblyName System.Windows.Forms");
+            ps.AppendLine("[void][System.Windows.Forms.MessageBox]::Show($msg, 'Thornswood', 'OK', 'Information')");
+
+            string note = Path.Combine(Path.GetTempPath(), "thornswood-farewell.ps1");
+            File.WriteAllText(note, ps.ToString(), new UTF8Encoding(false));
+            return note;
+        }
+
+        /// <summary>A path as a PowerShell single quoted string.</summary>
+        static string PsQuote(string s)
+        {
+            return "'" + (s == null ? "" : s.Replace("'", "''")) + "'";
+        }
+
     }
 }
