@@ -739,6 +739,23 @@ if (PAGES[here]) {
   fetch('/api/public').then(function (r) { return r.json(); }).then(function (d) {
     var files = d.files || [];
 
+    // The stamp under the download button, read the way a clock is read.
+    //
+    // Publish-Installer writes it as a 24 hour time and it is shown to people,
+    // not to a machine. Reformatted here as well as at the writer, because the
+    // string already published sits in files.json on the server and would
+    // otherwise stay 22:06 until the next installer goes up. Anything that is
+    // not a plain date and time is left exactly as it is, since this field also
+    // carries real version numbers.
+    function clock(v) {
+      var m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/.exec(String(v || ''));
+      if (!m) return v;
+      var h = parseInt(m[2], 10);
+      var half = h < 12 ? 'AM' : 'PM';
+      h = h % 12; if (h === 0) { h = 12; }
+      return m[1] + ' ' + h + ':' + m[3] + ' ' + half;
+    }
+
     function human(b) {
       if (!b) return '';
       if (b >= 1073741824) return (b / 1073741824).toFixed(1) + ' GB';
@@ -789,7 +806,7 @@ if (PAGES[here]) {
              '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
              'Download the installer</a>' +
              '<p class="also faintly">' + esc(human(exe.size)) +
-             (exe.version ? ' · ' + esc(exe.version) : '') + '</p></div>';
+             (exe.version ? ' · ' + esc(clock(exe.version)) : '') + '</p></div>';
     } else {
       grab = '<div class="grab">' +
              '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
@@ -799,7 +816,7 @@ if (PAGES[here]) {
              esc(human(zip.size)) + '. Both into the same folder, then run the exe. ' +
              'Do not unzip anything yourself.</p>' +
              '<p class="also faintly">' + esc(human(exe.size)) + ' and ' +
-             esc(human(zip.size)) + (exe.version ? ' · ' + esc(exe.version) : '') +
+             esc(human(zip.size)) + (exe.version ? ' · ' + esc(clock(exe.version)) : '') +
              '</p></div>';
     }
 
