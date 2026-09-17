@@ -107,7 +107,10 @@ function Remote($script) {
     Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
     & scp @ssh $tmp "$User@${Vps}:$far" 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Vps" }
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $($far.Replace('/',''))" 2>&1
+    # The path goes across as it is. Windows PowerShell takes forward
+    # slashes, and converting them was how this shipped with the slashes
+    # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
+    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'" 2>&1
     & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
   }
   finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
