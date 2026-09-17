@@ -281,7 +281,9 @@ namespace Thornswood
                 }
 
                 // No byte order mark. The client's JSON reader stops on one.
-                File.WriteAllText(file, t, new System.Text.UTF8Encoding(false));
+                // Through Hold, because this file is held while the game runs.
+                string written = t;
+                Hold.Around(file, delegate { File.WriteAllText(file, written, new System.Text.UTF8Encoding(false)); });
                 return true;
             }
             catch { return false; }

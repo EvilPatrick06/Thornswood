@@ -454,30 +454,7 @@ namespace Thornswood
 
         // ------------------------------------------------------------ moving
 
-        static bool IsLink(string p)
-        {
-            try
-            {
-                if (!Directory.Exists(p)) return false;
-                return (new DirectoryInfo(p).Attributes & FileAttributes.ReparsePoint) != 0;
-            }
-            catch { return false; }
-        }
-
-        static bool Link(string link, string target)
-        {
-            try
-            {
-                var psi = new ProcessStartInfo("cmd.exe", "/c mklink /J \"" + link + "\" \"" + target + "\"");
-                psi.UseShellExecute = false;
-                psi.CreateNoWindow = true;
-                psi.RedirectStandardOutput = true;
-                psi.RedirectStandardError = true;
-                using (var pr = Process.Start(psi)) { pr.StandardOutput.ReadToEnd(); pr.StandardError.ReadToEnd(); pr.WaitForExit(); }
-            }
-            catch { }
-            return IsLink(link);
-        }
+        static bool IsLink(string p) { return Junction.IsLink(p); }
 
         /// <summary>
         /// First run on a build that already has saves in it. Those belong to
@@ -502,8 +479,18 @@ namespace Thornswood
             }
         }
 
-        /// <summary>Point Skyrim's save folder at one character and tell Start On Save what to do.</summary>
-        public static void Use(int slot, bool fresh)
+        /// <summary>
+        /// Point Skyrim's save folder at one character and tell Start On Save
+        /// what to do. Returns a line for the log when the folder could not be
+        /// pointed and the plain one is in use instead, otherwise null.
+        ///
+        /// This used to throw, and Play stopped, with one line in the log and
+        /// no reason (a tester on 1.1.36: "Could not point the save folder at
+        /// character 1."). Under SkyMP nothing on this disk decides who the
+        /// character is (see WriteStartIni), so a save folder that cannot be
+        /// redirected is not a reason to keep anybody out of the game.
+        /// </summary>
+        public static string Use(int slot, bool fresh)
         {
             Directory.CreateDirectory(Home);
             Directory.CreateDirectory(SlotDir(slot));
@@ -511,18 +498,46 @@ namespace Thornswood
             string live = Files.SaveDir;
             Directory.CreateDirectory(Path.GetDirectoryName(live));
 
-            if (IsLink(live)) { try { Directory.Delete(live); } catch { } }
+            string trouble = null;
+            if (IsLink(live))
+            {
+                try { Directory.Delete(live); }
+                catch (Exception ex) { trouble = "the old link would not come off: " + ex.Message; }
+            }
             else if (Directory.Exists(live))
             {
                 // A real folder here means saves that belong to nobody yet.
                 Adopt();
-                try { Directory.Delete(live, true); } catch { }
+                try { Directory.Delete(live, true); }
+                catch (Exception ex)
+                {
+                    // Something in it is open or protected. Set the whole folder
+                    // aside under a name that says what it is; nothing is lost.
+                    string aside = live + "-before-Thornswood-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                    try { Directory.Move(live, aside); }
+                    catch (Exception ex2)
+                    {
+                        trouble = "the Saves folder would not clear (" + ex.Message.TrimEnd('.') +
+                                  ") and would not move aside either (" + ex2.Message.TrimEnd('.') + ")";
+                    }
+                }
             }
 
-            if (!Link(live, SlotDir(slot)))
-                throw new Exception("Could not point the save folder at character " + slot + ".");
-
-            Scrub(SlotDir(slot));
+            string note = null;
+            string why = null;
+            bool linked = trouble == null && Junction.Create(live, SlotDir(slot), out why);
+            if (linked)
+            {
+                Scrub(SlotDir(slot));
+            }
+            else
+            {
+                try { Directory.CreateDirectory(live); } catch { }
+                Scrub(live);
+                note = "Could not point the save folder at character " + slot + ": " + (trouble ?? why) +
+                       ". Skyrim is using the ordinary Saves folder on this computer instead. Your character lives on the server, so nothing is lost." +
+                       (live.IndexOf("\\OneDrive", StringComparison.OrdinalIgnoreCase) >= 0 ? " (That folder is inside OneDrive.)" : "");
+            }
 
             // The part that actually decides who you are. Everything above this
             // line only moves save files about.
@@ -536,6 +551,7 @@ namespace Thornswood
             try { File.WriteAllText(ActiveFile, slot.ToString()); } catch { }
             WriteStartIni(fresh);
             WriteBrowserBackend();
+            return note;
         }
 
         /// <summary>

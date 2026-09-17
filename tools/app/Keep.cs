@@ -226,6 +226,34 @@ namespace Thornswood
             return n;
         }
 
+        /// <summary>
+        /// What Hold keeps open while the game runs: every kept file, relative
+        /// to the game folder. The kept list is the list of what is ours.
+        /// </summary>
+        public static List<string> Held() { return Kept(); }
+
+        /// <summary>
+        /// Where each parked plugin came from, so Hold can stand an empty file
+        /// there for the length of the session.
+        /// </summary>
+        public static List<string> ParkedHomes()
+        {
+            var homes = new List<string>();
+            try
+            {
+                if (!File.Exists(ParkList)) return homes;
+                foreach (string line in File.ReadAllLines(ParkList))
+                {
+                    int bar = line.IndexOf('|');
+                    if (bar < 1) continue;
+                    string home = line.Substring(bar + 1);
+                    if (!homes.Contains(home)) homes.Add(home);
+                }
+            }
+            catch { }
+            return homes;
+        }
+
         /// <summary>Every file kept, relative to the game folder.</summary>
         static List<string> Kept()
         {
@@ -347,6 +375,10 @@ namespace Thornswood
                     if (!File.Exists(parked)) continue;
                     try
                     {
+                        // Hold's empty stand-in, still there if the launcher
+                        // died before it could take it away. Not theirs, so
+                        // not worth keeping.
+                        try { if (File.Exists(home) && new FileInfo(home).Length == 0) File.Delete(home); } catch { }
                         if (File.Exists(home))
                         {
                             string bin = Path.Combine(Paths.Isolated,

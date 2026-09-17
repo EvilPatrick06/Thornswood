@@ -123,7 +123,8 @@ namespace Thornswood
                     return "Left the client settings alone: the edit would have broken the file, " +
                            "and a broken one stops SkyrimPlatform loading any plugin at all.";
 
-                File.WriteAllText(file, after, new UTF8Encoding(false));
+                string pointed = after;
+                Hold.Around(file, delegate { File.WriteAllText(file, pointed, new UTF8Encoding(false)); });
                 return "Pointed the game at " + host + ":" + port + ".";
             }
             catch (Exception ex)
@@ -212,7 +213,8 @@ namespace Thornswood
 
                 if (string.Equals(before, after, StringComparison.Ordinal)) return false;
                 if (!LooksLikeJson(after)) return false;
-                File.WriteAllText(file, after, new UTF8Encoding(false));
+                string changed = after;
+                Hold.Around(file, delegate { File.WriteAllText(file, changed, new UTF8Encoding(false)); });
                 return true;
             }
             catch { return false; }

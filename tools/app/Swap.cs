@@ -10,15 +10,7 @@ namespace Thornswood
     // session and put back afterwards.
     static class Swap
     {
-        static bool IsLink(string p)
-        {
-            try
-            {
-                if (!Directory.Exists(p)) return false;
-                return (new DirectoryInfo(p).Attributes & FileAttributes.ReparsePoint) != 0;
-            }
-            catch { return false; }
-        }
+        static bool IsLink(string p) { return Junction.IsLink(p); }
 
         static void DropLink(string p)
         {
@@ -28,17 +20,8 @@ namespace Thornswood
 
         static bool MakeLink(string link, string target)
         {
-            try
-            {
-                var psi = new ProcessStartInfo("cmd.exe", "/c mklink /J \"" + link + "\" \"" + target + "\"");
-                psi.UseShellExecute = false;
-                psi.CreateNoWindow = true;
-                psi.RedirectStandardOutput = true;
-                psi.RedirectStandardError = true;
-                using (var pr = Process.Start(psi)) { pr.StandardOutput.ReadToEnd(); pr.StandardError.ReadToEnd(); pr.WaitForExit(); }
-            }
-            catch { }
-            return IsLink(link);
+            string why;
+            return Junction.Create(link, target, out why);
         }
 
         static string[] Pairs(out string[] ours)

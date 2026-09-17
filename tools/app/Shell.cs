@@ -357,7 +357,7 @@ namespace Thornswood
             */
             var app = new Application();
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
-            app.Exit += delegate { Voice.Stop(); try { Presence.Stop(); } catch { } };
+            app.Exit += delegate { Voice.Stop(); try { Presence.Stop(); } catch { } try { Hold.Release(); } catch { } };
 
             // A fault on the launcher's own thread used to take the window
             // down with no line in the log, or leave it standing and deaf.
@@ -1010,6 +1010,7 @@ namespace Thornswood
                 }
                 if (timer != null) timer.Stop();
                 Swap.Restore();
+                try { Hold.Release(); } catch { }
                 if (!playing) { try { Keep.Unpark(); } catch { } }
                 if (cfg.StopServerOnExit && SkyMp.Stop()) Log("Stopped the server.");
             };
@@ -1026,6 +1027,7 @@ namespace Thornswood
                 if (Checks.GameRunning()) return;
                 playing = false;
                 try { Presence.Stop(); } catch { }
+                try { Hold.Release(); } catch { }
                 Keep.TakeNote();
                 Swap.Restore();
                 {
@@ -2940,6 +2942,13 @@ namespace Thornswood
                 if (kept != null) Log(kept);
                 Keep.LeaveNote();
 
+                // And held, read only, until the game closes. Another server's
+                // launcher opened mid-session rewrote them under the game once
+                // (16 Sep, 19:08); it cannot now. See Hold.
+                int holding = 0;
+                try { holding = Hold.Take(PresenceLog); } catch { }
+                if (holding > 0) Log("Holding " + holding + " of " + cfg.BuildName + "'s game files while the game runs, so nothing else can change them under it.");
+
                 Log("Pointing Skyrim settings and saves at this build.");
                 Swap.Apply();
                 playing = true;
@@ -3000,6 +3009,7 @@ namespace Thornswood
             {
                 Log("Failed to start: " + ex.Message);
                 Swap.Restore();
+                try { Hold.Release(); } catch { }
                 try { Keep.Unpark(); } catch { }
                 try { Presence.Stop(); } catch { }
                 Keep.TakeNote();
@@ -3137,7 +3147,11 @@ namespace Thornswood
             if (Chars.Blank() && !Chars.WaitForSync(7000))
                 Log("Still asking the server about your characters. Carrying on.");
 
-            try { Chars.Use(slot, fresh); }
+            try
+            {
+                string saveNote = Chars.Use(slot, fresh);
+                if (saveNote != null) Log(saveNote);
+            }
             catch (Exception ex) { Log(ex.Message); return; }
 
             // The Discord check above went out carrying whichever profile id

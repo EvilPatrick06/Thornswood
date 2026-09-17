@@ -177,7 +177,15 @@ person to do:
    moment the game closes. Their launcher finds its files where it left them.
 3. Nothing touches Vortex. Switching servers is pressing Play in whichever
    launcher you want.
-4. On a machine that ships, Publish-Update leaves the other servers' files
+4. While the game runs, the launcher holds its own files open read only
+   (Hold.cs): the kept files, the client settings, and an empty stand-in
+   where each parked plugin was. The game and Skyrim Platform can read them;
+   nothing can write, replace or delete them, so another launcher opened
+   mid-session cannot swap them under Skyrim Platform's hot reload (that is
+   what happened on 16 Sep at 19:08). Anything else written into Plugins or
+   UI during the session is named in the launcher log. Let go at game close,
+   before the parked plugins go back.
+5. On a machine that ships, Publish-Update leaves the other servers' files
    out of every pack and every removal list (`.bak` files and any plugin in
    `Data\Platform\Plugins` that is not `thornswood-*.js` or the patched
    `skymp5-client.js`), and if another launcher has written its own
