@@ -134,6 +134,12 @@ function Test-ShipOtherServer([string]$rel) {
     if ($rel -match '^Data\\Meshes\\weapons\\kzl\\') { return $true }
     if ($rel -match '^Data\\Scripts\\Kzl[^\\]*\.pex$') { return $true }
     if ((Split-Path $rel -Leaf) -like 'DaedricItemUseProbe*') { return $true }
+    # NirnLab UI Platform. SkyrimPlatform will not start on its own browser
+    # while this is in the game folder, and it is what brings CEFSubprocess.exe,
+    # the second program Windows Firewall asks about. Package-Thornswood has
+    # kept it out of the installer all along; nothing kept it out of a pack.
+    if ($rel -match '^Data\\NirnLabUIPlatform($|\\)') { return $true }
+    if ((Split-Path $rel -Leaf) -ieq 'NirnLabUIPlugin.dll') { return $true }
 
     if (-not $rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $false }
     $leaf = Split-Path $rel -Leaf
