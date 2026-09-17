@@ -2,14 +2,21 @@
 
 ## What you need
 
-A legitimate copy of **Skyrim Special Edition** on Steam.
+**Skyrim Special Edition** on Steam, on build **1.6.1170**. Steam moves the
+game past that build on its own, so most copies are newer. The launcher has a
+**Downgrade** button that asks Steam for the right build under your own
+account. Nothing comes from anywhere but Steam.
 
-That is the whole list. **Anniversary Edition is not required** and never will
-be. If you own it, nothing breaks. If you do not, nothing is missing.
+**Anniversary Edition is not required** and never will be. If you own it,
+nothing breaks. If you do not, nothing is missing.
 
-You do not need Vortex, Mod Organizer, SKSE, or any mod already installed.
-Thornswood brings its own copy of everything and never touches the Skyrim you
-already play.
+**Vortex**, with a free Nexus Mods account. The mods come from a collection on
+Nexus, and a collection is a Vortex thing: Mod Organizer cannot install it.
+
+Thornswood goes into the Skyrim you already have. It does not make a second
+copy of the game. Vortex keeps the mods in a profile of their own, so switching
+back to your usual profile and running Purge Mods leaves your own Skyrim the
+way it was.
 
 ## 1. Apply
 
@@ -34,31 +41,52 @@ and you will be asked when there is room.
 
 ## 2. Take the installer
 
-Two files, a small **exe** and a large **zip**. Put them in the same folder.
-Downloads is fine. Anywhere is fine. They have to be beside each other, because
-the exe reads the zip.
+One file, from the [Downloads](/downloads) page. Download it and run it.
 
-Then run the exe. **Do not unzip anything yourself.**
+It is small because the mods are not in it. It fetches Thornswood's own content
+while you watch, about half a gigabyte, and a connection that drops carries on
+where it stopped rather than starting again. It puts in the launcher, the
+script extender and Thornswood's own content, and nothing else.
 
-The first run copies about twenty gigabytes into place, so start it and go and
-do something else.
+## 3. Install the collection in Vortex
 
-## 3. Connect your Discord in the launcher
+Not optional. Without it you have a launcher and no mods, and the server turns
+you away when you press Play.
+
+The link is on the [Downloads](/downloads) page and on the launcher's Add-ons
+tab. Open it and Vortex takes it from there: it makes a profile for Thornswood,
+downloads every mod from its own author, and deploys them. Give it time.
+
+If the wrong profile is active in Vortex, the launcher says so before you press
+Play.
+
+## 4. Connect your Discord in the launcher
 
 Open Thornswood from the desktop shortcut and press **Connect Discord** on the
 main page. Your browser opens, you say yes, and it closes itself.
 
 You never do this again.
 
-## 4. Press Play
+## 5. Press Play
 
 Not Skyrim. Not Steam. Not SKSE. Always the Thornswood shortcut.
 
-The launcher checks for updates, patches anything that changed, and puts you
-into the world. There is no address to type and no password to remember.
+The launcher checks for updates and takes any that are waiting, because
+everybody has to be running the same files or nobody can connect. It also
+compares every plugin with the server's copy, byte for byte. If one differs it
+says so, and **Fix** downloads the server's copy of that plugin.
 
-If an update is waiting it takes that first. Everybody has to be running the
-same files or nobody can connect.
+With a new character it asks two things before the game starts: what you did
+before, which is a profession, one half of it and a class, and which town you
+wake up in. Those are the choices on the [Professions](/classes) page, and the
+launcher is the only place they are made.
+
+Then the game loads. You arrive in a quiet hall and the race menu opens, and
+that is where you make your face. When you are done you wake up at the inn in
+the town you chose, with the tools of your trade in your pack. The hall is only
+where the face gets made.
+
+There is no address to type and no password to remember.
 
 ---
 
@@ -70,10 +98,16 @@ world.
 
 ## If it goes wrong
 
-Check the known issues first. A lot of what looks like a bug is a limit of how
-a shared Skyrim works, and it is written down with the reason.
+Check the [known issues](/known) first. A lot of what looks like a bug is a
+limit of how a shared Skyrim works, and it is written down with the reason. The
+[help](/help) page has the usual fixes.
 
 If it is not there, say so in the Discord with what you were doing, what you
-expected, and what happened instead. Crash logs live at
-`C:\Thornswood\Profile\SKSE\CrashLogger\` and the launcher's own log at
-`C:\Thornswood\Profile\launcher.log`. Drag either straight into the channel.
+expected, and what happened instead, or use the [report](/report) page.
+
+The launcher's own log is at `C:\Thornswood\Profile\launcher.log`. Crash logs,
+if the game closed itself, are in the `SKSE` folder under
+`Documents\My Games\Skyrim Special Edition`. If Thornswood runs from a Skyrim
+folder of its own (the card in Settings), they are under
+`C:\Thornswood\Profile\MyGames\SKSE` instead. The launcher's Logs page lists
+both and opens them. Drag either straight into the channel.
