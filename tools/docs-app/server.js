@@ -701,6 +701,16 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const p = decodeURIComponent(url.pathname);
   const route = p.replace(/\/+$/, '').toLowerCase() || '/';
+  // HEAD is GET without a body. Every route below asks for GET by name, so a
+  // HEAD fell through to the 404 at the bottom, and an uptime monitor or a
+  // link checker that uses HEAD reported every address on the site as gone.
+  // Node drops the body of a HEAD answer on its own, so routing it as GET is
+  // the whole fix for the small answers. The streamed ones skip the read as
+  // well: a HEAD for the installer is a question about its size, not a
+  // download.
+  const head = req.method === 'HEAD';
+  if (head) req.method = 'GET';
+
   const w = await who(req);
 
   // ---------------------------------------------------------- member login
@@ -1034,6 +1044,7 @@ http.createServer(async (req, res) => {
       'Cache-Control': 'public, max-age=86400',
       'X-Content-Type-Options': 'nosniff'
     });
+    if (head) return res.end();
     return fs.createReadStream(file).pipe(res);
   }
 
@@ -1065,6 +1076,7 @@ http.createServer(async (req, res) => {
       'Content-Length': st.size,
       'Content-Disposition': 'attachment; filename="' + path.basename(file) + '"'
     });
+    if (head) return res.end();
     return fs.createReadStream(file).pipe(res);
   }
 
@@ -1087,6 +1099,7 @@ http.createServer(async (req, res) => {
       'Content-Disposition': (inline ? 'inline' : 'attachment') +
         '; filename="' + path.basename(file) + '"'
     });
+    if (head) return res.end();
     return fs.createReadStream(file).pipe(res);
   }
 
