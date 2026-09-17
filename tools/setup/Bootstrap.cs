@@ -576,10 +576,10 @@ namespace SkyrimTogetherSetup
                 foundBox.BorderBrush = (Brush)win.FindResource("Bad");
                 txtFound.Foreground = (Brush)win.FindResource("Bad");
                 // Not an error any more. There is nothing beside this program
-                // and nothing in it, so it gets the mods itself when Install is
+                // and nothing in it, so it fetches Thornswood's own files itself when Install is
                 // pressed. Saying so up front stops the wait being a surprise.
-                txtFound.Text = "Nothing to unpack yet. Press Install and it gets the mods " +
-                                "from thornswood.net first, about half a gigabyte.\n\n" +
+                txtFound.Text = "Nothing to unpack yet. Press Install and it gets Thornswood's own " +
+                                "files from thornswood.net first, about half a gigabyte. The mods themselves come from Vortex afterwards, not from here.\n\n" +
                                 "If it stops part way, run it again and it carries on from there.";
                 txtStat.Text = "";
                 return;
@@ -739,7 +739,7 @@ namespace SkyrimTogetherSetup
             }
             catch (Exception e)
             {
-                throw new Exception("Could not reach " + Site + " to get the mods. Check the " +
+                throw new Exception("Could not reach " + Site + " to get Thornswood's files. Check the " +
                                     "connection and run this again. (" + e.Message + ")");
             }
             if (url.Length == 0) throw new Exception("The site is not offering a download right now. Try again in a bit.");
@@ -749,10 +749,10 @@ namespace SkyrimTogetherSetup
             string target = Path.Combine(intoDir, name);
             long have = 0;
             try { if (File.Exists(target)) have = new FileInfo(target).Length; } catch { }
-            if (size > 0 && have == size) { Say("Already got the mods"); return target; }
+            if (size > 0 && have == size) { Say("Already got Thornswood's files"); return target; }
             if (size > 0 && have > size) { try { File.Delete(target); } catch { } have = 0; }
 
-            Say("Getting the mods");
+            Say("Getting Thornswood's own files");
             Progress(-1);
 
             var req = (HttpWebRequest)WebRequest.Create(url);
@@ -794,10 +794,10 @@ namespace SkyrimTogetherSetup
                         if (total > 0)
                         {
                             Progress((double)done / total);
-                            Say("Getting the mods   " + (done / 1048576) + " of " +
+                            Say("Getting Thornswood's own files   " + (done / 1048576) + " of " +
                                 (total / 1048576) + " MB" + rate);
                         }
-                        else Say("Getting the mods   " + (done / 1048576) + " MB" + rate);
+                        else Say("Getting Thornswood's own files   " + (done / 1048576) + " MB" + rate);
                     }
                     file.Flush();
                 }
@@ -870,7 +870,7 @@ namespace SkyrimTogetherSetup
             // It said Unpacking while it was downloading 549 MB, which is the
             // longest part and the one a person most wants named.
             txtBody.Text = FindPayload() == null
-                ? "Getting the mods, then unpacking. This takes a few minutes and the installer opens by itself when it is done."
+                ? "Getting Thornswood's own files, then unpacking. This takes a few minutes and the installer opens by itself when it is done."
                 : "Unpacking. This takes a few minutes and the installer opens by itself when it is done.";
             running = true;
             var t = new Thread(Work);
