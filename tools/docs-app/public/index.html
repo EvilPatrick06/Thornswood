@@ -465,7 +465,7 @@ var S = {
 };
 
 var ROUTES = {
-  '/hub':'home', '/help':'help', '/news':'news', '/known':'known', '/roadmap':'roadmap',
+  '/hub':'home', '/hub/help':'help', '/news':'news', '/hub/known':'known', '/roadmap':'roadmap',
   '/suggestions':'suggestions', '/testthese':'tests',
   '/uploads':'uploads', '/link':'link', '/linked':'linked',
   '/active':'active', '/patrick':'todo', '/archive':'archive', '/inbox':'inbox'
@@ -1454,7 +1454,7 @@ function drawReport() {
         '<span class="said" id="rsaid"></span>' +
       '</div>' +
     '</div>' +
-    '<p class="lede" style="margin-top:18px">Check <a href="/known">Known Issues</a> ' +
+    '<p class="lede" style="margin-top:18px">Check <a href="/hub/known">Known Issues</a> ' +
     'first. A lot of what looks broken is a limit of how the server works and is ' +
     'already written down there.</p>';
 
