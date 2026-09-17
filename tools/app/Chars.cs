@@ -628,6 +628,26 @@ namespace Thornswood
         //
         // The mod stays installed, because the build ships it and Verify checks
         // the file list. It is simply told to stand still.
+        //
+        // Standing still takes more than bStartNewGame false. Read from the
+        // mod's own source (powerof3/Start-On-Save, Hooks.cpp): when the load
+        // spinner first opens it builds the save list, and if that list is
+        // not empty and sSaveFile names nothing, it loads the newest save in
+        // it, full stop. bStartNewGame only decides what happens when the
+        // list is EMPTY. The list is empty on a machine whose slot folder
+        // holds nothing, which is most of them. It is not empty on a fresh
+        // install where Skyrim had been played before: Adopt moves that
+        // person's own saves into character one, the junction points Saves
+        // at that folder, and the newest of those saves was loaded at the
+        // main menu while SkyMP was loading its own. That is the install on
+        // 17 Sep whose slot showed a level 21 from single player and whose
+        // game closed after 0 minutes, and it is the thirty second crashes
+        // above with a different lever.
+        //
+        // The one filter the mod applies before loading is sCharacterName:
+        // the save's character has to carry that exact name. No save does
+        // carry the one below, so nothing qualifies and nothing is loaded,
+        // whatever is in the folder.
         static void WriteStartIni(bool fresh)
         {
             try
@@ -638,12 +658,17 @@ namespace Thornswood
                 sb.AppendLine("; Written by the Thornswood launcher every time you press Play.");
                 sb.AppendLine("; Editing it by hand will not stick.");
                 sb.AppendLine(";");
-                sb.AppendLine("; bStartNewGame is false on purpose. SkyMP loads you into the world");
-                sb.AppendLine("; itself once the server has made your character, and a second load");
-                sb.AppendLine("; running at the same time crashes the game about thirty seconds in.");
+                sb.AppendLine("; This file tells Start On Save to load nothing. SkyMP loads you into");
+                sb.AppendLine("; the world itself once the server has made your character, and a second");
+                sb.AppendLine("; load running at the same time crashes the game about thirty seconds in.");
+                sb.AppendLine(";");
+                sb.AppendLine("; bStartNewGame false is not enough for that: with sSaveFile blank the mod");
+                sb.AppendLine("; loads the newest save in the Saves folder whenever there is one. The");
+                sb.AppendLine("; character name below is the one filter it applies first. No save");
+                sb.AppendLine("; carries that name, so nothing qualifies.");
                 sb.AppendLine("[Settings]");
                 sb.AppendLine("sSaveFile =");
-                sb.AppendLine("sCharacterName =");
+                sb.AppendLine("sCharacterName = Thornswood-Nobody");
                 sb.AppendLine("iSaveType = 0");
                 sb.AppendLine("bStartNewGame = false");
                 sb.AppendLine("iSkipAutoLoadHotkey = 16");

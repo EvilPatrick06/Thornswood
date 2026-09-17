@@ -401,9 +401,20 @@ namespace Thornswood
             }
             if (!front) return false;
 
-            // A moment for the console page to finish drawing and put the
-            // keyboard on its command line, which it does on its own.
+            // A moment for the console page to finish drawing.
             Thread.Sleep(1200);
+            if (!ForegroundIsSteam()) return false;
+
+            // Then a click on the command line. Opening the console puts the
+            // keyboard there when the page is new, and not when the tab was
+            // already open: on 17 Sep the button brought Steam up, said it had
+            // typed, and the console showed the old line untouched, because
+            // select all, delete and the command had all gone to the page and
+            // not to its input. The command line sits along the bottom of the
+            // console page, above the status bar, and that is where this
+            // clicks, scaled for the monitor Steam is on.
+            ClickCommandLine(MainWindow());
+            Thread.Sleep(150);
             if (!ForegroundIsSteam()) return false;
 
             // Whatever is on the command line goes first. The retry used to
@@ -478,7 +489,43 @@ namespace Thornswood
             try { Process.Start(new ProcessStartInfo("steam://open/console") { UseShellExecute = true }); } catch { }
             Thread.Sleep(1500);
             IntPtr h = MainWindow();
-            if (h != IntPtr.Zero) BringToFront(h);
+            if (h == IntPtr.Zero) return;
+            BringToFront(h);
+            Thread.Sleep(300);
+            if (ForegroundIsSteam()) ClickCommandLine(h);
+        }
+
+        /// <summary>
+        /// One click on the console's command line.
+        ///
+        /// Measured on the current Steam client at 100 percent scaling: the
+        /// input's centre is 72 pixels above the bottom edge of the window,
+        /// with the status bar (Downloads, Friends and Chat) below it. Steam
+        /// draws itself at its monitor's scale, and this process sees window
+        /// coordinates at the system's, so the offset is scaled by the ratio
+        /// of the two. A Windows without GetDpiForWindow (before 10.0.1607)
+        /// gets the ratio 1, which is right whenever the two scales agree.
+        /// </summary>
+        static void ClickCommandLine(IntPtr h)
+        {
+            if (h == IntPtr.Zero) return;
+            RECT r;
+            if (!GetWindowRect(h, out r)) return;
+            double scale = 1.0;
+            try
+            {
+                uint steam = GetDpiForWindow(h);
+                uint system = GetDpiForSystem();
+                if (steam > 0 && system > 0) scale = steam / (double)system;
+            }
+            catch { }
+            int x = (r.Left + r.Right) / 2;
+            int y = r.Bottom - (int)Math.Round(72 * scale);
+            SetCursorPos(x, y);
+            Thread.Sleep(80);
+            Mouse(MOUSEEVENTF_LEFTDOWN);
+            Thread.Sleep(60);
+            Mouse(MOUSEEVENTF_LEFTUP);
         }
 
         static bool ForegroundIsSteam()
@@ -635,6 +682,8 @@ namespace Thornswood
         [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
         [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int cmd);
         [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+        [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr hWnd);
+        [DllImport("user32.dll")] static extern uint GetDpiForSystem();
         [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint n, INPUT[] inputs, int size);
 
         static void Type(string text)

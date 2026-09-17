@@ -9,6 +9,8 @@ namespace Thornswood
         public static string Root, Game, LauncherDir, ProfileDir, MyGames, LocalAD, Golden, Personal;
         // Where another server's files go when they are moved aside. Never deleted.
         public static string Isolated;
+        // Where a plugin goes, whole, before Fix writes the server's copy over it.
+        public static string Replaced;
         public static string StateFile, PlayedFile, CfgFile, AppliedFile, LogFile;
         // One file per installed optional pack, listing what it put on disk.
         public static string PacksDir;
@@ -55,6 +57,7 @@ namespace Thornswood
             Golden      = Path.Combine(ProfileDir, "Default");
             Personal    = Path.Combine(Root, "Your Mods");
             Isolated    = Path.Combine(ProfileDir, "Isolated");
+            Replaced    = Path.Combine(ProfileDir, "Replaced");
             StateFile   = Path.Combine(ProfileDir, "swap.json");
             PlayedFile  = Path.Combine(ProfileDir, "played.flag");
             AppliedFile = Path.Combine(ProfileDir, "applied.txt");

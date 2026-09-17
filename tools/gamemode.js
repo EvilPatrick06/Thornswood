@@ -2266,7 +2266,56 @@ log('gamemode loaded:',
     console.log('[thornswood] load order manifest published at /api/servers/' + KEY +
                 '/manifest.json, ' + mods.length + ' plugins' +
                 (dropped > 0 ? ' (' + dropped + ' archive entries left out)' : ''));
+    try { publishFiles(mods); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
     return true;
+  }
+
+  // The files themselves, beside the manifest, for the launcher's Fix.
+  //
+  // A plugin with the right name in the right place and the wrong bytes paints
+  // LOAD ORDER ERROR over somebody's screen for the whole session (17 Sep), and
+  // nothing on that machine can put the right bytes there: the collection gave
+  // it the build it had. This box has the exact files the manifest describes,
+  // so they are served under
+  //
+  //     /api/servers/thornswood/plugins/<file>
+  //
+  // as hard links into the plugins folder, so there is no second copy on disk
+  // (a copy when a link is refused). Relinked at every start, because a deploy
+  // may have replaced the file behind the link. The five Bethesda masters stay
+  // out: the client never compares their bytes and Steam owns them.
+  var STOREFRONT = { 'skyrim.esm': 1, 'update.esm': 1, 'dawnguard.esm': 1, 'hearthfires.esm': 1, 'dragonborn.esm': 1 };
+
+  function publishFiles(mods) {
+    var order = [];
+    try { order = JSON.parse(fs.readFileSync('server-settings.json', 'utf8')).loadOrder || []; } catch (e) { return; }
+    var byName = {};
+    for (var i = 0; i < order.length; i++) {
+      byName[path.basename(String(order[i])).toLowerCase()] = String(order[i]);
+    }
+    var PLUG = path.join(DIR, 'plugins');
+    try { fs.mkdirSync(PLUG, { recursive: true }); } catch (e) { }
+    var linked = 0, copied = 0, missing = 0, bytes = 0;
+    for (var j = 0; j < mods.length; j++) {
+      var name = mods[j].filename;
+      if (STOREFRONT[name.toLowerCase()]) continue;
+      var src = byName[name.toLowerCase()];
+      if (!src || !fs.existsSync(src)) { missing++; continue; }
+      var dst = path.join(PLUG, name);
+      try { fs.unlinkSync(dst); } catch (e) { }
+      try {
+        fs.linkSync(src, dst);
+        linked++;
+      } catch (e) {
+        try { fs.copyFileSync(src, dst); copied++; }
+        catch (e2) { missing++; console.log('[thornswood] could not publish ' + name + ': ' + e2.message); continue; }
+      }
+      bytes += Number(mods[j].size) || 0;
+    }
+    console.log('[thornswood] ' + (linked + copied) + ' plugin files published at /api/servers/' + KEY +
+                '/plugins/ for the launcher, ' + Math.round(bytes / 1048576) + ' MB' +
+                (copied ? ', ' + copied + ' copied rather than linked' : '') +
+                (missing ? ', ' + missing + ' not found on this box' : ''));
   }
 
   if (publish()) return;

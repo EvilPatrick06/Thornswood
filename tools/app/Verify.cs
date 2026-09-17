@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
 
 namespace Thornswood
 {
@@ -12,6 +15,12 @@ namespace Thornswood
         // install a mod, so offering the button for one of these is worse than
         // not offering it.
         public bool Absent;
+        // The file is there, enabled, in the right place, and its bytes are
+        // not the server's. Fix fetches the server's copy. Which file, and what
+        // the server says it should be, so Fix does not have to ask twice.
+        public string Plugin;
+        public long WantSize;
+        public int WantCrc;
         public Issue(string t, bool b) { Text = t; Blocking = b; }
         public Issue(string t, bool b, bool absent) { Text = t; Blocking = b; Absent = absent; }
     }
@@ -31,12 +40,15 @@ namespace Thornswood
             return l;
         }
 
+        public static List<Issue> Run() { return Run(null); }
+
         /// <summary>
         /// The shipped plugins.txt is what the server was built against, so it is
         /// the reference. Anything the live list adds, drops or reorders is what
-        /// gets a player refused at connect.
+        /// gets a person refused at connect. With a Config to hand it also asks
+        /// the server what each plugin's bytes should be; see Bytes.
         /// </summary>
-        public static List<Issue> Run()
+        public static List<Issue> Run(Config cfg)
         {
             var issues = new List<Issue>();
             string golden = Path.Combine(Paths.Golden, "plugins.txt");
@@ -136,7 +148,255 @@ namespace Thornswood
                 }
             }
 
+            // Bytes, not names. Everything above compares names, and a machine
+            // can pass every line of it and still be red in the game.
+            try { issues.AddRange(Bytes(cfg)); } catch { }
+
             return issues;
+        }
+
+        // ------------------------------------------------------------ bytes
+        //
+        // The game runs its own check once the world is up: for every plugin in
+        // the server's manifest, at the same position, the name has to match
+        // and so do the size and the crc32 of the file. One difference paints
+        // LOAD ORDER ERROR over the screen for the rest of the session, and
+        // every form in that plugin can point at something the server does not
+        // mean. This page said "Everything matches" to somebody in exactly
+        // that state on 17 Sep, because it only ever compared names: the
+        // collection had given his machine another build of one plugin, same
+        // name, same place in the order, other bytes.
+        //
+        // So the same comparison runs here, against the same manifest, and
+        // Fix fetches the server's copy of a plugin that differs. The five
+        // Bethesda masters and the Creation Club files are left out the way
+        // the game leaves them out: Steam owns those, and a person's Skyrim
+        // is not the launcher's to rewrite.
+        //
+        // A server that cannot be reached reports nothing. A check that could
+        // not run is not a problem with this machine, and Play should not be
+        // refused because the server is down for an update.
+
+        /// <summary>What the launcher writes as server-master-key; the manifest and the files live under it.</summary>
+        const string ServerKey = "thornswood";
+
+        static readonly HashSet<string> Storefront = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm",
+            "ccBGSSSE001-Fish.esm", "ccBGSSSE025-AdvDSGS.esm", "ccBGSSSE037-Curios.esl",
+            "ccQDRSSE001-SurvivalMode.esl", "_ResourcePack.esl"
+        };
+
+        [DataContract]
+        class ServerManifest
+        {
+            [DataMember] public ServerMod[] mods;
+        }
+
+        [DataContract]
+        class ServerMod
+        {
+            [DataMember] public string filename;
+            [DataMember] public long size;
+            [DataMember] public long crc32;   // the server writes it as a signed 32 bit number
+        }
+
+        /// <summary>True when the last Run got a manifest out of the server, so "Everything matches" can say what it covered.</summary>
+        public static bool BytesChecked;
+
+        static ServerMod[] manifestCache;
+        static DateTime manifestAt = DateTime.MinValue;
+        static string manifestFrom = "";
+
+        static string ServerBase(Config cfg)
+        {
+            return "http://" + cfg.ServerAddress + ":" + SkyMp.ResourcePortFor(cfg) + "/api/servers/" + ServerKey;
+        }
+
+        /// <summary>The server's manifest, kept for a minute so Play and Scan a second apart do not fetch it twice.</summary>
+        static ServerMod[] Manifest(Config cfg)
+        {
+            string url = ServerBase(cfg) + "/manifest.json";
+            if (manifestCache != null && manifestFrom == url && (DateTime.UtcNow - manifestAt).TotalSeconds < 60)
+                return manifestCache;
+            byte[] raw = Get(url, 4000);
+            if (raw == null) return null;
+            try
+            {
+                var ser = new DataContractJsonSerializer(typeof(ServerManifest));
+                ServerManifest doc;
+                using (var ms = new MemoryStream(raw)) doc = (ServerManifest)ser.ReadObject(ms);
+                if (doc == null || doc.mods == null || doc.mods.Length == 0) return null;
+                manifestCache = doc.mods;
+                manifestAt = DateTime.UtcNow;
+                manifestFrom = url;
+                return doc.mods;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Every plugin whose size or crc32 is not the server's, as blocking issues that carry what Fix needs.</summary>
+        public static List<Issue> Bytes(Config cfg)
+        {
+            var issues = new List<Issue>();
+            BytesChecked = false;
+            if (cfg == null || string.IsNullOrEmpty(cfg.ServerAddress)) return issues;
+            ServerMod[] mods = Manifest(cfg);
+            if (mods == null) return issues;
+            BytesChecked = true;
+
+            string data = Path.Combine(Paths.Game, "Data");
+            foreach (ServerMod m in mods)
+            {
+                if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename)) continue;
+                string p = Path.Combine(data, m.filename);
+                long size;
+                try
+                {
+                    if (!File.Exists(p)) continue;   // Run has already said it is not installed
+                    size = new FileInfo(p).Length;
+                }
+                catch { continue; }
+
+                bool same = size == m.size;
+                if (same)
+                {
+                    try { same = Crc32Of(p, size) == (int)m.crc32; }
+                    catch { continue; }   // open elsewhere; it is checked again next time
+                }
+                if (same) continue;
+
+                var i = new Issue(
+                    m.filename + " is not the same file the server has" +
+                    (size == m.size ? " (same size, other contents)" : " (yours is " + Fmt(size) + ", the server's is " + Fmt(m.size) + ")") +
+                    ". The game shows that as LOAD ORDER ERROR and anything in it can mean something else here than on the server. Fix fetches the server's copy.",
+                    true);
+                i.Plugin = m.filename;
+                i.WantSize = m.size;
+                i.WantCrc = (int)m.crc32;
+                issues.Add(i);
+            }
+            return issues;
+        }
+
+        static string Fmt(long bytes)
+        {
+            if (bytes >= 1048576) return (bytes / 1048576.0).ToString("0.0") + " MB";
+            if (bytes >= 1024) return (bytes / 1024.0).ToString("0.0") + " KB";
+            return bytes + " bytes";
+        }
+
+        // Standard CRC-32 (the zlib one), which is what the server's manifest
+        // carries, read back as the signed number the manifest prints. Cached
+        // by size and write time, because Run is called at Play and again when
+        // the game closes and there is no reason to read thirty megabytes twice.
+        static uint[] crcTable;
+        class CrcEntry { public long Size; public DateTime Written; public int Crc; }
+        static readonly Dictionary<string, CrcEntry> crcCache = new Dictionary<string, CrcEntry>(StringComparer.OrdinalIgnoreCase);
+
+        static int Crc32Of(string path, long size)
+        {
+            DateTime written = File.GetLastWriteTimeUtc(path);
+            CrcEntry hit;
+            lock (crcCache)
+            {
+                if (crcCache.TryGetValue(path, out hit) && hit.Size == size && hit.Written == written) return hit.Crc;
+            }
+            int crc;
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                crc = Crc32Of(fs);
+            lock (crcCache)
+            {
+                crcCache[path] = new CrcEntry { Size = size, Written = written, Crc = crc };
+            }
+            return crc;
+        }
+
+        static int Crc32Of(Stream s)
+        {
+            if (crcTable == null)
+            {
+                var t = new uint[256];
+                for (uint i = 0; i < 256; i++)
+                {
+                    uint c = i;
+                    for (int k = 0; k < 8; k++) c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+                    t[i] = c;
+                }
+                crcTable = t;
+            }
+            uint crc = 0xFFFFFFFFu;
+            var buf = new byte[1 << 16];
+            int n;
+            while ((n = s.Read(buf, 0, buf.Length)) > 0)
+                for (int i = 0; i < n; i++) crc = crcTable[(crc ^ buf[i]) & 0xFF] ^ (crc >> 8);
+            return (int)(crc ^ 0xFFFFFFFFu);
+        }
+
+        // WebClient has no timeout worth the name. This one does.
+        static byte[] Get(string url, int ms)
+        {
+            try
+            {
+                var req = (HttpWebRequest)WebRequest.Create(url);
+                req.Timeout = ms;
+                req.ReadWriteTimeout = ms;
+                req.UserAgent = "ThornswoodLauncher/" + Updater.Version;
+                using (var res = (HttpWebResponse)req.GetResponse())
+                using (var s = res.GetResponseStream())
+                using (var ms_ = new MemoryStream())
+                {
+                    s.CopyTo(ms_);
+                    return ms_.ToArray();
+                }
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// The server's copy of one plugin, written over the file that is here.
+        /// Written into the existing file rather than swapped for a new one, so
+        /// a hard link (Vortex's deployment, the launcher's own Game folder,
+        /// which share the file with the Steam copy) sees the same bytes
+        /// everywhere and Vortex has nothing to report. The old bytes are kept
+        /// whole under Profile\Replaced first. Nothing is written unless what
+        /// came down is exactly what the manifest describes.
+        /// </summary>
+        static bool FetchPlugin(Config cfg, Issue i, Action<string> say)
+        {
+            string dest = Path.Combine(Paths.Game, "Data", i.Plugin);
+            byte[] bytes = Get(ServerBase(cfg) + "/plugins/" + Uri.EscapeDataString(i.Plugin), 90000);
+            if (bytes == null)
+            {
+                say(i.Plugin + ": the server did not hand over its copy. It publishes the files at start, so a server older than this launcher, or one that is down, has none to give.");
+                return false;
+            }
+            int crc;
+            using (var ms = new MemoryStream(bytes)) crc = Crc32Of(ms);
+            if (bytes.LongLength != i.WantSize || crc != i.WantCrc)
+            {
+                say(i.Plugin + ": what the server handed over is not what its own manifest describes, so nothing was changed.");
+                return false;
+            }
+            try
+            {
+                Directory.CreateDirectory(Paths.Replaced);
+                File.Copy(dest, Path.Combine(Paths.Replaced, i.Plugin + "." + DateTime.Now.ToString("yyyyMMdd-HHmmss")), true);
+            }
+            catch { }
+            try
+            {
+                using (var fs = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None))
+                    fs.Write(bytes, 0, bytes.Length);
+            }
+            catch (Exception ex)
+            {
+                say(i.Plugin + " could not be written (" + ex.Message.TrimEnd('.') + "). Close Skyrim and Vortex and press Fix again.");
+                return false;
+            }
+            lock (crcCache) { crcCache.Remove(dest); }
+            say(i.Plugin + " is now the server's copy (" + Fmt(bytes.LongLength) + "). Yours is kept in Profile\\Replaced.");
+            return true;
         }
 
         /// <summary>
@@ -149,8 +409,11 @@ namespace Thornswood
         /// it deploys. The launcher says so rather than letting somebody fix the
         /// same thing twice and wonder why.
         /// </summary>
-        public static int Fix()
+        public static int Fix() { return Fix(null, null); }
+
+        public static int Fix(Config cfg, Action<string> say)
         {
+            if (say == null) say = delegate(string m) { };
             int n = 0;
             foreach (string f in new string[] { "plugins.txt", "loadorder.txt" })
             {
@@ -167,6 +430,13 @@ namespace Thornswood
             // because somebody who plays here may also play there.
             n += Checks.IsolateForeign(null);
             n += Checks.FlagLight(null);
+
+            // The server's copy of every plugin whose bytes are not its own.
+            if (cfg != null)
+            {
+                foreach (Issue i in Bytes(cfg))
+                    if (i.Plugin != null && FetchPlugin(cfg, i, say)) n++;
+            }
             return n;
         }
 

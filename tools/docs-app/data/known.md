@@ -12,7 +12,7 @@ Permanent limits of how this server works. None are bugs, none are changing. Not
 | Mod settings menus reset every session | Follows from no saves. There is no co-save to write to |
 | Most mod scripts never fire | All Papyrus events except OnUpdate are blocked. Records still work, scripted behaviour does not |
 | No levelling or skill gain | Skill experience is zeroed |
-| Difficulty locked to Legendary | Rewritten every 60 ticks |
+| Difficulty locked to Expert | The client writes it back every 60 updates, so the slider does nothing |
 | Fast travel off | Re-disabled within one frame if anything turns it on |
 | Game time follows the real clock | Written every 2 seconds, so anything scheduled by game hour drifts |
 | Killmoves and stagger do not show on other people | Those animation events are blanked |

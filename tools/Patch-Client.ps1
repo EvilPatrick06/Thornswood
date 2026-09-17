@@ -25,6 +25,13 @@
      this makes the offline path call it at once. The launcher picks the
      character before the game starts, so the in-game select was dead weight.
 
+  3. Difficulty. The bundle's DisableDifficultySelectionService writes
+     iDifficulty every sixty updates so nobody can turn it down mid game, and
+     the number it writes is 5, Legendary. Thornswood plays on Expert. The
+     pin stays, because a difficulty anybody can change is a difficulty
+     nobody shares; only the number changes (0 Novice, 1 Apprentice,
+     2 Adept, 3 Expert, 4 Master, 5 Legendary).
+
   2. Locks, activators and furniture. Upstream's dealWithRef unlocks every
      reference the server tracks and blocks activation on containers, doors,
      items, actors, activators and furniture. Locked plus blocked is unopenable
@@ -147,6 +154,20 @@ $blocks = @(
             '                    } else {',
             '                        self.blockActivation(false);',
             '                    }'
+        )
+    },
+    @{
+        Name   = 'difficulty'
+        Marker = 'Thornswood: Expert, not Legendary'
+        Old    = @(
+            '                    _this.difficulty = 5;'
+        )
+        New    = @(
+            '                    // Thornswood: Expert, not Legendary. Upstream pins iDifficulty every',
+            '                    // sixty updates so nobody turns it down mid game; the pin stays and',
+            '                    // the number is Expert (0 Novice, 1 Apprentice, 2 Adept, 3 Expert,',
+            '                    // 4 Master, 5 Legendary).',
+            '                    _this.difficulty = 3;'
         )
     }
 )

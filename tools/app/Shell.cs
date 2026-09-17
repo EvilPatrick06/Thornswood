@@ -960,8 +960,16 @@ namespace Thornswood
             btnScan.Click += delegate { RunScan(); };
             btnFix.Click += delegate
             {
-                int n = Verify.Fix();
-                Log("Put back " + n + " list files from the shipped originals. Restart the game for it to take effect.");
+                // Off the window's thread: a plugin fetched from the server is a
+                // few megabytes, and the window has to keep answering meanwhile.
+                var said = new List<string>();
+                int n = 0;
+                Waiting(delegate
+                {
+                    n = Verify.Fix(cfg, delegate(string m) { lock (said) said.Add(m); });
+                });
+                foreach (string m in said) Log(m);
+                Log("Fix put " + n + " thing" + (n == 1 ? "" : "s") + " right. Restart the game for it to take effect.");
                 RunScan(); BuildModList(); DrawStatus();
             };
             btnOpenMine.Click += delegate
@@ -1103,11 +1111,24 @@ namespace Thornswood
                 // Skyrim rewrites the plugin list every time it runs, and it has
                 // been known to drop entries. Better to say so the moment it
                 // happens than to let it turn up as a refused connect later.
-                int broke = 0;
-                try { foreach (Issue i in Verify.Run()) if (i.Blocking) broke++; } catch { }
-                if (broke > 0)
-                    Log("Skyrim changed your plugin list on the way out, " + broke +
-                        (broke == 1 ? " problem" : " problems") + ". Mods, then Fix.");
+                // Off the window's thread, because Run now asks the server for
+                // its manifest and the server is often mid restart at exactly
+                // this moment, after an update.
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    int broke = 0;
+                    try { foreach (Issue i in Verify.Run(cfg)) if (i.Blocking) broke++; } catch { }
+                    if (broke == 0) return;
+                    try
+                    {
+                        win.Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            Log("Skyrim changed your plugin list on the way out, " + broke +
+                                (broke == 1 ? " problem" : " problems") + ". Mods, then Fix.");
+                        }));
+                    }
+                    catch { }
+                });
 
                 DrawStatus();
                 win.WindowState = WindowState.Normal;
@@ -1443,7 +1464,8 @@ namespace Thornswood
         // ------------------------------------------------------------- mods
         static void RunScan()
         {
-            var issues = Verify.Run();
+            List<Issue> issues = null;
+            Waiting(delegate { issues = Verify.Run(cfg); });
             int blocking = 0;
             foreach (Issue i in issues) if (i.Blocking) blocking++;
 
@@ -1451,7 +1473,10 @@ namespace Thornswood
             {
                 dotVerify.Fill = Res("Ok");
                 txtVerifyTitle.Text = "Everything matches";
-                txtVerifyNote.Text = "Your plugin list is identical to the one the server expects." +
+                txtVerifyNote.Text = "Your plugin list is identical to the one the server expects" +
+                                     (Verify.BytesChecked
+                                        ? ", and every plugin in it is byte for byte the server's."
+                                        : ". The server could not be asked about the plugin bytes just now, so only the names were compared.") +
                                      "\n\nRead from " + Verify.LiveFile;
                 btnFix.IsEnabled = false;
             }
@@ -3081,7 +3106,9 @@ namespace Thornswood
                 // Checked again here, not just at startup, because the player's
                 // own mods folder and the plugin list can both change in between.
                 int blockers = 0, absent = 0;
-                foreach (Issue i in Verify.Run())
+                List<Issue> found = null;
+                Waiting(delegate { found = Verify.Run(cfg); });
+                foreach (Issue i in found)
                 {
                     if (!i.Blocking) continue;
                     blockers++;
