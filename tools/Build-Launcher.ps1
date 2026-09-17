@@ -5,11 +5,20 @@
   Uses csc.exe, which is part of the .NET Framework that ships inside Windows.
   Nothing to install. Your friends never compile anything - they get the
   finished exe in the bundle.
+
+  It builds into the DEV install by default, not the one you play on. Running
+  this by hand used to overwrite C:\Thornswood\Launcher, so a build nobody had
+  tried yet became the launcher in front of you, and on 17 Sep one did exactly
+  that and wrote a broken setting into the game folder on the next Play. A
+  build you ran to see whether it compiles should never be able to do that.
+
+  Ship.ps1 passes -Root itself, so a real release still builds where it should.
+  Pass -Root 'C:\Thornswood' if you genuinely mean the one you play on.
 #>
 [CmdletBinding()]
 param(
     [string]$Src,
-    [string]$Root = 'C:\Thornswood',
+    [string]$Root = 'C:\Thornswood-DevBuild',
     [switch]$NoPause
 )
 
@@ -28,6 +37,10 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 Head 'Thornswood - launcher build'
+Say ("  building into $Root") 'DarkGray'
+if ($Root.TrimEnd('\\') -ieq 'C:\Thornswood') {
+    Say '  this is the install you play on, not the dev one' 'Yellow'
+}
 
 # ------------------------------------------------------------ compiler
 $csc = @(
