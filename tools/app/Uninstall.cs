@@ -238,35 +238,15 @@ namespace Thornswood
             // Anything Vortex is deploying is the collection's, whatever our
             // own list says. A mod that happens to ship a file at a path we
             // also wrote would otherwise be taken out from under it.
-            var vortex = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            try
-            {
-                string vm = Path.Combine(into, "Data\\vortex.deployment.json");
-                if (File.Exists(vm))
-                {
-                    // Scanned over the whole file rather than line by line.
-                    // Vortex writes this pretty printed today and there is no
-                    // promise it always will, and a guard that quietly reads
-                    // one entry out of a minified file is worse than no guard,
-                    // because it looks like it is working.
-                    string all = File.ReadAllText(vm);
-                    int at = 0;
-                    while (true)
-                    {
-                        int i = all.IndexOf("\"relPath\"", at, StringComparison.OrdinalIgnoreCase);
-                        if (i < 0) break;
-                        at = i + 9;
-                        int a = all.IndexOf('"', at);
-                        if (a < 0) break;
-                        int b = all.IndexOf('"', a + 1);
-                        if (b < 0) break;
-                        at = b + 1;
-                        string rel = all.Substring(a + 1, b - a - 1).Replace("\\\\", "\\").TrimStart('\\');
-                        if (rel.Length > 0) vortex.Add("Data\\" + rel);
-                    }
-                }
-            }
-            catch { }
+            //
+            // Read through OwnGame, which knows both of Vortex's records: the
+            // one under Data and the one in the game's root. The root record is
+            // where the script extender's loader and its dlls are listed, so
+            // reading only the Data one counted those as ours and offered to
+            // delete files that belong to a mod.
+            System.Collections.Generic.HashSet<string> vortex;
+            try { vortex = OwnGame.DeployedIn(into); }
+            catch { vortex = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase); }
 
             string game;
             try { game = Path.GetFullPath(into).TrimEnd('\\') + "\\"; }
@@ -400,6 +380,18 @@ namespace Thornswood
             say("Closing the game...");
             Kill();
 
+            // Hold still has our files open, and Keep has other servers'
+            // plugins moved into Profile\Parked. Moved, not copied. With saves
+            // not kept, Profile is one of the folders this hands to the
+            // removal script, so uninstalling while the game was up took
+            // somebody else's plugin with it and left that launcher with
+            // nothing to put back. Both calls are safe whether or not the game
+            // ever ran, and neither throws.
+            Hold.Release();
+            int back = Keep.Unpark();
+            if (back > 0)
+                say(back + (back == 1 ? " plugin" : " plugins") + " from another server or build put back.");
+
             say("Putting the Windows Skyrim folders back...");
             Swap.Restore();
 
@@ -419,6 +411,24 @@ namespace Thornswood
                     }
                 }
                 catch (Exception ex) { if (ex.Message.StartsWith("Windows'")) throw; }
+            }
+
+            // A leftover backup folder means the person's own My Games or
+            // LocalAppData is still parked beside where Windows looks for it
+            // and Restore could not put it back. Taking this build away now
+            // would remove the launcher that knows about that folder and leave
+            // them with a name nothing reads. Better a failed uninstall.
+            foreach (string win in new[] { Paths.WinMyGames, Paths.WinLocalAD })
+            {
+                string bak = win + ".st-backup";
+                if (Directory.Exists(bak))
+                {
+                    throw new Exception(
+                        "Your own Skyrim folder is still set aside at:\n\n    " + bak +
+                        "\n\nNothing has been removed. Close Skyrim, press Restore on this page, and try again. " +
+                        "If it still will not go back, move what is in that folder into\n\n    " + win +
+                        "\n\nyourself, delete the empty one it came from, and run this again.");
+                }
             }
 
             say("Removing the shortcut...");
@@ -467,6 +477,13 @@ namespace Thornswood
         {
             var sb = new StringBuilder();
             sb.AppendLine("@echo off");
+            // cmd reads a .cmd file in the console's OEM code page, not in the
+            // one the file was written in. A user name or an install path with
+            // any character outside ASCII reached rmdir and del as different
+            // bytes, they matched nothing, and the uninstall said it was done
+            // having removed none of it. The script goes out as UTF-8 below,
+            // and this tells cmd to read it that way.
+            sb.AppendLine("chcp 65001 >nul");
             sb.AppendLine("setlocal");
             sb.AppendLine(":wait");
             sb.AppendLine("tasklist /fi \"PID eq " + Process.GetCurrentProcess().Id + "\" | find \"" +
@@ -505,7 +522,9 @@ namespace Thornswood
             sb.AppendLine("del /f /q \"%~f0\" >nul 2>&1");
 
             string script = Path.Combine(Path.GetTempPath(), "thornswood-uninstall.cmd");
-            File.WriteAllText(script, sb.ToString(), Encoding.Default);
+            // UTF-8 with no byte order mark, to match the chcp at the top. The
+            // machine's ANSI code page cannot hold every path this may name.
+            File.WriteAllText(script, sb.ToString(), new UTF8Encoding(false));
 
             var psi = new ProcessStartInfo("cmd.exe", "/c \"" + script + "\"");
             psi.CreateNoWindow = true;

@@ -516,7 +516,17 @@ namespace Thornswood
             catch { }
         }
 
+        // The last config the page was given, as host, port and profile.
+        static string lastConfig = "";
+
+        // A page that has just loaded knows nothing of what it was sent before,
+        // so that path asks for a config whatever this says.
         static void Configure(Action<string> log)
+        {
+            Configure(log, true);
+        }
+
+        static void Configure(Action<string> log, bool force)
         {
             long profile = ProfileId();
             string host = conf == null ? "" : conf.ServerAddress;
@@ -528,6 +538,20 @@ namespace Thornswood
                 Say("Voice: not configured yet (host '" + host + "', profile " + profile + ")");
                 return;
             }
+
+            // The page opens a socket for every config it is handed and the
+            // voice service keeps a peer for every socket. Pressing Play twice
+            // in one session on the same character is the same config again,
+            // and all the second one leaves behind is a ghost on the roster
+            // announcing where the last slot was standing. Only a config that
+            // changed something is worth sending.
+            string want = host + ":" + port + ":" + profile;
+            if (!force && want == lastConfig)
+            {
+                Say("Voice: already configured for " + host + ":" + port + " as profile " + profile);
+                return;
+            }
+            lastConfig = want;
 
             Post("{\"t\":\"config\",\"host\":\"" + host + "\",\"port\":\"" + port +
                  "\",\"profileId\":" + profile + ",\"name\":\"\"}");
@@ -547,10 +571,15 @@ namespace Thornswood
         /// Chars.Use calls this the moment the id changes. Safe to call before
         /// the page exists: Post does nothing without a view, and Configure
         /// says so and returns when the settings file has no id in it yet.
+        ///
+        /// A config the page already has is not sent twice. Every one it is
+        /// handed opens a socket, and the service keeps a peer per socket, so a
+        /// second Play on the same character used to leave a ghost peer behind
+        /// announcing the previous slot.
         /// </summary>
         public static void Reconfigure()
         {
-            try { Configure(null); } catch { }
+            try { Configure(null, false); } catch { }
         }
 
         static void OnPageMessage(string raw, Action<string> log)
@@ -691,6 +720,7 @@ namespace Thornswood
             {
                 string[] dirs = ChannelDirs();
                 string seen = null;
+                DateTime republished = DateTime.UtcNow;
 
                 // Clear anything left behind by the last session, or a key held
                 // down when the game was closed would be read back as held.
@@ -709,10 +739,18 @@ namespace Thornswood
                         // word out after pressing the key.
                         Thread.Sleep(100);
 
-                        // Republished on a tick as well as on change, because
-                        // the game may have started after the last change and
-                        // a file it never sees is no better than no file.
-                        lastStatusLine = "";
+                        // Republished on a slow tick as well as on change,
+                        // because the game may have started after the last
+                        // change and a file it never sees is no better than no
+                        // file. Two seconds, not every pass: clearing the
+                        // change check each time round a 100ms loop rewrote
+                        // both copies of voice-status.txt ten times a second
+                        // for the whole life of the launcher, game or no game.
+                        if ((DateTime.UtcNow - republished).TotalMilliseconds >= 2000)
+                        {
+                            republished = DateTime.UtcNow;
+                            lastStatusLine = "";
+                        }
                         PublishStatus();
 
                         // The game folder copy is read first: it is the one a

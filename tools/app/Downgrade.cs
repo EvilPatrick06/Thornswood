@@ -192,7 +192,12 @@ namespace Thornswood
                 string folder = Path.Combine(content, "depot_" + depot);
                 string cmd = "download_depot " + AppId + " " + depot + " " + manifest;
 
-                if (Directory.Exists(folder) && File.Exists(Path.Combine(folder, ".thornswood-complete")))
+                // The marker holds the manifest it was written for, and only
+                // that manifest counts as this build being down. A folder left
+                // by an attempt at another build is full of the wrong files,
+                // and skipping the depot on one of those copies them over the
+                // Steam copy as if they were 1.6.1170.
+                if (Directory.Exists(folder) && MarkerIs(folder, manifest))
                 {
                     log("Part " + (i + 1) + " of 3 (depot " + depot + ") is already downloaded.");
                     continue;
@@ -212,11 +217,19 @@ namespace Thornswood
 
                 // Steam makes the depot folder within seconds of taking the
                 // command. No folder after a while means it did not take.
+                //
+                // The folder and the log are kept apart from here on. A folder
+                // an aborted attempt left behind is there before Steam has been
+                // asked anything, which is enough to carry on watching but is
+                // no proof that this run's download ever started. Only the log
+                // is that proof, and the fallback below needs it.
                 DateTime askedAt = DateTime.Now;
                 bool started = false;
+                bool sawStart = false;
                 while ((DateTime.Now - askedAt).TotalSeconds < 45)
                 {
-                    if (Directory.Exists(folder) || LogSays(logFile, logStart, "depot_" + depot)) { started = true; break; }
+                    if (LogSays(logFile, logStart, "depot_" + depot)) sawStart = true;
+                    if (Directory.Exists(folder) || sawStart) { started = true; break; }
                     Thread.Sleep(1000);
                 }
                 if (!started && typed)
@@ -231,7 +244,8 @@ namespace Thornswood
                     askedAt = DateTime.Now;
                     while ((DateTime.Now - askedAt).TotalSeconds < 30)
                     {
-                        if (Directory.Exists(folder) || LogSays(logFile, logStart, "depot_" + depot)) { started = true; break; }
+                        if (LogSays(logFile, logStart, "depot_" + depot)) sawStart = true;
+                        if (Directory.Exists(folder) || sawStart) { started = true; break; }
                         Thread.Sleep(1000);
                     }
                     if (!started)
@@ -270,10 +284,22 @@ namespace Thornswood
                     // far. If a Steam build stops saying it, a full folder that
                     // has been still for a long while with nothing left in
                     // Steam's downloading folder is the next best proof.
+                    //
+                    // Only for a download this run started, though. A folder an
+                    // aborted run left half written is also full and still, and
+                    // taking that as done writes the marker and copies truncated
+                    // files over the Steam copy, after which every later attempt
+                    // skips the depot as already downloaded.
                     if (size > 0 && quiet > 20 && !Directory.Exists(downloading))
                     {
-                        log("Steam's log never said the download finished, but the folder has been complete and still for twenty minutes, so it is taken as done.");
-                        break;
+                        if (!sawStart && LogSays(logFile, logStart, "depot_" + depot)) sawStart = true;
+                        if (sawStart)
+                        {
+                            log("Steam's log never said the download finished, but the folder has been complete and still for twenty minutes, so it is taken as done.");
+                            break;
+                        }
+                        log("Steam never started this download, and " + folder + " is left over from an earlier attempt, so what is in it cannot be trusted. Delete that folder, then press the button again.");
+                        return false;
                     }
                     Thread.Sleep(2000);
                 }
@@ -650,6 +676,24 @@ namespace Thornswood
             }
             catch { }
             return false;
+        }
+
+        /// <summary>
+        /// True when this depot folder's completion marker was written for the
+        /// manifest being asked for now. The marker holds the manifest id, so a
+        /// folder from an attempt at another build reads as not downloaded and
+        /// is fetched again. An empty or unreadable marker is the same answer:
+        /// nothing in it says these are the files being asked for.
+        /// </summary>
+        static bool MarkerIs(string folder, string manifest)
+        {
+            try
+            {
+                string mark = Path.Combine(folder, ".thornswood-complete");
+                if (!File.Exists(mark)) return false;
+                return string.Equals(File.ReadAllText(mark).Trim(), manifest, StringComparison.Ordinal);
+            }
+            catch { return false; }
         }
 
         static long FolderSize(string folder)
