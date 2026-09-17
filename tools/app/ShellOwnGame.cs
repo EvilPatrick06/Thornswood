@@ -176,7 +176,17 @@ namespace Thornswood
                 // Saying no costs nothing. The rule is a block, this never
                 // needed the network, and the only consequence of refusing is
                 // that Windows asks once on the first launch instead.
-                if (fail == null)
+                // Only when a person started this.
+                //
+                // StartOwnGame is called three ways and loud tells them apart:
+                // true from Make it and from Bring it up to date, false from
+                // the refresh the launcher runs by itself at startup. Asking
+                // for administrator on that one would put a Windows prompt in
+                // front of somebody who has done nothing but open the launcher,
+                // which is the thing taking the button out was meant to avoid.
+                // A silent refresh stays silent; the rule waits for a build
+                // somebody asked for.
+                if (fail == null && loud)
                 {
                     try
                     {
