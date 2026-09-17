@@ -23,17 +23,23 @@ VPS) are named by location only; never printed, pasted, committed or logged.
 
 ## Settled design, not up for a quiet rewrite
 
-- The game is the Steam copy, with mods deployed by Vortex from the
-  collection. The launcher does not keep its own copy of Skyrim any more; it
-  used to, and moved away from that on purpose. No own Game folder, no hard
-  links, no per server game folders.
-- Three SkyMP launchers share Data\Platform. Thornswood handles that inside
-  the launcher: Keep puts its files back before Play and parks other servers'
+- Decided by Gavin and Djinn on 17 Sep, after the three launchers kept
+  getting into each other's files: Thornswood runs from its own game folder
+  (`Thornswood\Game`), built by the launcher from what Vortex has deployed
+  into the Steam copy, the big files as hard links so the collection is not
+  stored twice, and copies of everything another launcher rewrites in place
+  (settings, scripts, programs, the client folders, the master files and
+  whatever Keizaal is known to replace). Keizaal and Daedric get their own
+  folders the same way (`tools\New-GameFolder.ps1`). Until that branch
+  (`djinn/own-game-folder`) is on main, what ships is the Steam copy with
+  Vortex, and the two shapes must not be mixed in one release.
+- Whichever folder the game runs from, the launcher handles sharing on its
+  own: Keep puts its files back before Play and parks other servers'
   plugins; Hold keeps its files open read only while the game runs; the
   plugins idle unless the client points at our server and a fresh session
   note is there; Publish-Update keeps other servers' files out of packs
   (Ship-Rules.ps1). No wrapper scripts around the launcher, nothing moved by
-  hand in Data\Platform, nothing touches Vortex.
+  hand in Data\Platform, nothing touches Vortex's own files.
 - The SkyMP client bundle (skymp5-client.js) is not built here; the copy in
   the game folder is patched by Patch-Client.ps1 and shipped as is.
 - Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
@@ -41,8 +47,9 @@ VPS) are named by location only; never printed, pasted, committed or logged.
 - Every change goes out as one complete release: launcher, game files and
   server together, never a half.
 
-Anything that changes one of these is a proposal in #dev first, a few lines:
-the problem, the approach, what it touches. Agreed before code.
+Anything that changes one of these is a few lines in #dev first: the
+problem, the approach, what it touches. Agreed between Gavin and Djinn
+before code; a Claude does not settle it for them.
 
 ## How work moves between the two machines
 
@@ -63,6 +70,10 @@ the problem, the approach, what it touches. Agreed before code.
   dev Ship wins. A main Ship resets it.
 - One fix per pull request. A branch that changes eight things is eight
   reviews nobody has time for; split it.
+- Every pull request gets a build check on GitHub (.github/workflows/build.yml:
+  the scripts parse, the launcher compiles with the .NET Framework csc). Red
+  means the branch would stop Ship at the build step; fix that before asking
+  for a read.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #dev first; both machines touch those.
 

@@ -96,11 +96,11 @@ form.
   runs from any branch on either machine and puts that build on the dev
   server. There is one dev feed and the last dev Ship wins, so say in #dev
   when you take it. A main Ship resets dev to match main.
-- **Settled design is a proposal first.** The Steam copy with Vortex (no own
-  Game folder, no hard links, no per server folders), Keep and Hold for the
-  shared Data\Platform, the patched client bundle, C# 5 only, one complete
-  release at a time: changing any of these starts as a few lines in #dev,
-  agreed before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
+- **Settled design is a proposal first.** Where the game runs from (see the
+  three launchers section: the own game folder is the decided direction),
+  Keep and Hold for the shared Data\Platform, the patched client bundle,
+  C# 5 only, one complete release at a time: changing any of these starts
+  as a few lines in #dev, agreed between Gavin and Djinn before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
   `Updater.cs` or `Publish-Update.ps1` gets a line in #dev too; both
   machines touch them.
 - **The publisher pulls the feed** before `version.json` is edited, so a
@@ -217,6 +217,16 @@ person to do:
    `UI\index.html`, puts Thornswood's back from `tools\ts-ui\index.html`
    before scanning. So playing Keizaal or Daedric on your shipping machine
    cannot put their files into a Thornswood release.
+
+Where this is going: Gavin and Djinn decided on 17 Sep, after the servers
+kept getting into each other's files, that Thornswood will run from its own
+game folder (`Thornswood\Game`), built by the launcher from what Vortex has
+deployed into the Steam copy: hard links for the big files, copies of
+everything another launcher rewrites in place, and its own plugin list,
+settings and saves on every Play. Keizaal and Daedric get folders of their
+own the same way (`tools\New-GameFolder.ps1`). The work is on the branch
+`djinn/own-game-folder`; everything above describes what ships until it
+lands, and the points above still hold inside the own folder.
 
 No wrapper script is needed around the launcher for any of this. A script
 that parks files before Play and puts them back after is doing what Keep

@@ -411,7 +411,12 @@ if ($longest -gt 250) { Say "    $longestPath" 'DarkGray' }
 $ownGameDir = Join-Path $Root 'Game'
 $refProfile = if (Test-Path -LiteralPath $ownGameDir) { Join-Path $ProfileDir 'Default' } else { Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition' }
 Say "  load order from $refProfile" 'DarkGray'
-Copy-Item (Join-Path $refProfile '*') (Join-Path $stage 'profile') -Force -ErrorAction SilentlyContinue
+# Only the two lists. Other launchers leave .bak copies of them beside the
+# originals (Plugins.txt.keizaal-<date>.bak and the like); those are one
+# machine's history, and the 16 Sep installer carried three of them.
+Get-ChildItem -LiteralPath $refProfile -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -in 'plugins.txt', 'loadorder.txt' } |
+    Copy-Item -Destination (Join-Path $stage 'profile') -Force -ErrorAction SilentlyContinue
 $stagedPlug = Join-Path (Join-Path $stage 'profile') 'plugins.txt'
 if (-not (Test-Path -LiteralPath $stagedPlug)) {
     Say '  NO plugins.txt found, so this build ships without a reference load order.' 'Red'
