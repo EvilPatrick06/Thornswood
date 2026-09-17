@@ -34,9 +34,66 @@ const WORLDSPACES = new Set(DATA.worldspaces);
 // small helpers
 // ---------------------------------------------------------------------------
 
+/*
+  Thornswood's own lines, in a file of their own.
+
+  Of 6,617 lines in one day's server.log, 951 were "Script not found in the
+  script storage", 785 were "GetBaseActorValues Negative Magicka/Health/
+  Stamina" for eight NPC base forms, and 3,412 were "Skipping non-Sweet
+  scripts". That is 78 percent of the log, none of it ours and none of it
+  actionable, and every real finding had to be dug out from under it.
+
+  So every line this file writes goes to the console as before, and also to
+  thornswood.log beside the server's data, which holds nothing else. Nothing
+  is filtered out of server.log: the engine's noise is still there for anybody
+  who wants it, it is just no longer the only place our own lines live.
+
+  Opened lazily and given up on for good the first time a write fails, because
+  a log that throws once a tick is worse than no log.
+*/
+let logFile = null;
+let logBroken = false;
+
+function logPath() {
+  if (logFile !== null || logBroken) { return logFile; }
+  try {
+    const fsl = require('fs');
+    const pathl = require('path');
+    let dataDir = 'data';
+    try {
+      const cfg = JSON.parse(fsl.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+    } catch (e) { }
+    logFile = pathl.join(dataDir, 'thornswood.log');
+  } catch (e) {
+    logBroken = true;
+    logFile = null;
+  }
+  return logFile;
+}
+
+function stamp() {
+  const d = new Date();
+  const two = (n) => (n < 10 ? '0' + n : String(n));
+  return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) +
+         ' ' + two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds());
+}
+
 function log() {
   const args = Array.prototype.slice.call(arguments);
-  console.log('[thornswood] ' + args.join(' '));
+  const line = '[thornswood] ' + args.join(' ');
+  console.log(line);
+  if (logBroken) { return; }
+  const where = logPath();
+  if (!where) { return; }
+  try {
+    require('fs').appendFileSync(where, stamp() + ' ' + line + '\n');
+  } catch (e) {
+    // Once. A log that throws every tick is worse than no log.
+    logBroken = true;
+    console.log('[thornswood] could not write thornswood.log, carrying on ' +
+                'with the console only: ' + e);
+  }
 }
 
 /** Run fn, swallow and report anything it throws. Handlers must never escape. */
@@ -189,10 +246,16 @@ function arrive(dest, hold, reason, slotOverride, via) {
  * site: { desc: worldOrCellDesc string, pos: [x,y,z] }
  */
 function resolveArrival(site) {
-  const low = site.desc.split(':')[0].toLowerCase();
-
   // 1. Solstheim, by worldspace. Must never reach a distance comparison.
-  if (low === DATA.solstheim) {
+  //
+  // Compared whole, not by the low bits. DATA.solstheim is 2000800, which is
+  // the runtime form id with the plugin's load order index on the front, and
+  // "low" is only the part before the colon in the descriptor, which for
+  // Solstheim is 800. Those two are never equal, so this branch had never
+  // fired once: an outdoor death anywhere on Solstheim fell through to the
+  // distance comparison below and respawned in Whiterun's temple, which is on
+  // another land mass.
+  if (site.desc.toLowerCase() === '800:dragonborn.esm') {
     return arrive('ravenrock', 'DLC2SolstheimLocation', 'own-ground', null, 'solstheim');
   }
 
@@ -483,6 +546,20 @@ const NUDGE_MS = 120000;   // two minutes; see the nudge below
  * against a thing that was never happening, paid for by everybody standing in
  * an empty room. */
 const MOVED_ENOUGH_MS = 500;
+
+/* How far counts as having moved, between two consecutive samples.
+ *
+ * The test used to be any difference at all between two pose samples, with no
+ * minimum, so the first report after the baseline counted: the ground snap
+ * that lands somebody on the floor of the hall, and the angle normalisation
+ * that follows a teleport, both move the numbers by a hair without anybody
+ * touching anything. That read as "on their feet" while the race menu was
+ * still up, and the teleport could fire under it.
+ *
+ * 32 units is about half a pace, and well under what a person turning on the
+ * spot with the mouse produces. 10 degrees is a glance. */
+const MOVED_UNITS = 32;
+const MOVED_DEGREES = 10;
 /* How long after a teleport before the kit is handed over, and how often it is
  * checked afterwards. Both deliberately unhurried: nobody is doing anything in
  * the first few seconds of arriving in an inn, and an item that turns up a
@@ -694,12 +771,29 @@ function applyLauncherChoice(actorId, state, choice) {
   state.gearTries = 0;
   state.clean = 0;
   setChargen(actorId, state);
+  closeRaceMenu(actorId);
 
   log('chargen', actorId.toString(16), 'launcher choice applied:',
       cls.key + (state.half ? '/' + state.half : '') +
       (state.gathering ? ', ' + state.gathering : ''),
       'in', entry.key, '(' + arrival.cell + '), kit to follow');
   return true;
+}
+
+/**
+ * The race menu is finished with, whatever route got us here.
+ *
+ * Spawn opens it, and only the appearance arriving closes it. Somebody who
+ * left the hall on the movement path or on the give up path still has it set
+ * open, CreateActor sends that flag on every later login, and the client dutifully
+ * reopens the race menu on a character who has had a face for a week.
+ */
+function closeRaceMenu(actorId) {
+  try {
+    mp.setRaceMenuOpen(actorId, false);
+  } catch (e) {
+    log('chargen', actorId.toString(16), 'could not close the race menu:', e);
+  }
 }
 
 /**
@@ -905,6 +999,7 @@ function chooseDestination(actorId, state, desc) {
   state.destination = town;
   state.at = Date.now();
   setChargen(actorId, state);
+  closeRaceMenu(actorId);
   log('chargen', actorId.toString(16), 'destination =', town,
       '(' + arrival.cell + ') -> done');
 }
@@ -941,6 +1036,40 @@ function chargenTick() {
   for (const actorId of online) {
     if (!firstSeen.has(actorId)) {
       firstSeen.set(actorId, now);
+      /*
+        Somebody who arrives already dead still gets a temple.
+
+        spawnPoint is only ever written in onDeath, at the moment the body
+        falls, so a death that happened while the client was disconnected, or
+        during a kick window, leaves the character dead with whatever spawn
+        point they had before. The SkyMP server does respawn a dead actor when
+        it re-attaches, so they come back, and they come back at the default
+        point rather than at the nearest consecrated ground.
+
+        Written here, once, on the tick that first sees them. Nothing is moved
+        and nothing is resurrected: this only decides where the respawn the
+        server is already going to do puts them.
+      */
+      let dead = false;
+      try { dead = !!mp.get(actorId, 'isDead'); } catch (e) { dead = false; }
+      if (dead) {
+        try {
+          const where = {
+            desc: mp.get(actorId, 'worldOrCellDesc'),
+            pos: mp.get(actorId, 'pos'),
+          };
+          const back = resolveArrival(where);
+          if (back) {
+            mp.set(actorId, 'spawnPoint', {
+              cellOrWorldDesc: back.desc, pos: back.pos, rot: back.rot,
+            });
+            log('login', actorId.toString(16), 'came back dead in', where.desc,
+                '-> ' + back.cell + ' (' + back.slot + ')');
+          }
+        } catch (e) {
+          log('login', actorId.toString(16), 'could not set a spawn point:', e);
+        }
+      }
     }
     if (now - firstSeen.get(actorId) < SETTLE_MS) {
       continue;
@@ -988,6 +1117,7 @@ function chargenTick() {
             owns === 1 ? 'thing' : 'things,',
             'so creation is skipped for them');
         setChargen(actorId, { stage: 'done', at: now, legacy: true });
+        closeRaceMenu(actorId);
         // The choice is stale the moment it turns out to belong to somebody
         // who already exists. Dropping it here is what stops this character
         // looking new again on the next login, and the one after that.
@@ -1021,6 +1151,7 @@ function chargenTick() {
         log('chargen', actorId.toString(16), 'profile', pidWas,
             'already has a character, so creation is skipped for them');
         setChargen(actorId, { stage: 'done', at: now, legacy: true });
+        closeRaceMenu(actorId);
         continue;
       }
       beginAppearance(actorId);
@@ -1053,6 +1184,7 @@ function chargenTick() {
       if (arrivedAt && (now - arrivedAt) > ARRIVE_WINDOW_MS) {
         state.stage = 'done';
         setChargen(actorId, state);
+        closeRaceMenu(actorId);
         if (state.class === 'bard') { try { armBard(actorId); } catch (e) { } }
         log('chargen', actorId.toString(16), 'was still marked arriving from',
             Math.round((now - arrivedAt) / 60000) + ' minutes ago.',
@@ -1068,6 +1200,7 @@ function chargenTick() {
         log('chargen', actorId.toString(16), 'no kit for', state.class, '- nothing to hand over');
         state.stage = 'done';
         setChargen(actorId, state);
+        closeRaceMenu(actorId);
         continue;
       }
 
@@ -1087,6 +1220,7 @@ function chargenTick() {
       if ((state.clean || 0) >= 3 || state.gearTries > 12) {
         state.stage = 'done';
         setChargen(actorId, state);
+        closeRaceMenu(actorId);
         // Here rather than with the items, because the instruments have to be
         // in the pack before the ability to use them is worth anything, and
         // this is the one point that knows they are.
@@ -1100,6 +1234,38 @@ function chargenTick() {
     }
 
     if (state.stage === 'appearance') {
+      /*
+        A reconnect starts the wait again from nothing.
+
+        None of the fields below are cleared when somebody drops out of the
+        hall and comes back, so a character who walked about for a few seconds
+        and then quit returns with liveSince already set, where holding a
+        position from the last session, and askedAt already past. The very
+        first settled tick then reads that as somebody who has been on their
+        feet for as long as they were away, and teleports them to the inn
+        while their client is still loading the hall.
+
+        firstSeen is set the moment somebody comes online, so comparing it
+        against what the state remembers is what tells a reconnect from the
+        session that made it.
+      */
+      const cameOn = firstSeen.get(actorId) || 0;
+      if (state.seenAt !== cameOn) {
+        state.seenAt = cameOn;
+        delete state.liveSince;
+        delete state.where;
+        delete state.askedAt;
+        delete state.nudged;
+        delete state.waitedForChoice;
+        // Long enough for the arrival to settle before a baseline is taken,
+        // the same grace a fresh arrival gets.
+        state.askAt = now + 4000;
+        setChargen(actorId, state);
+        log('chargen', actorId.toString(16),
+            'came back mid creation, so the wait starts again');
+        continue;
+      }
+
       // The baseline, once whatever load screen we started has had time to
       // finish. No menu is opened here, deliberately. See below.
       if (!state.askedAt) {
@@ -1123,7 +1289,17 @@ function chargenTick() {
         const pos = mp.get(actorId, 'pos') || [0, 0, 0];
         const ang = mp.get(actorId, 'angle') || [0, 0, 0];
         const here = [pos[0], pos[1], pos[2], ang[2]].join(',');
-        if (state.where && state.where !== here) { live = true; }
+        if (state.where && state.where !== here) {
+          // Far enough to be a person, not a settle. See MOVED_UNITS.
+          const was = String(state.where).split(',');
+          const dx = pos[0] - Number(was[0]);
+          const dy = pos[1] - Number(was[1]);
+          const dz = pos[2] - Number(was[2]);
+          let turned = Math.abs(ang[2] - Number(was[3]));
+          if (turned > 180) { turned = 360 - turned; }
+          const moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (moved >= MOVED_UNITS || turned >= MOVED_DEGREES) { live = true; }
+        }
         if (state.where !== here) {
           state.where = here;
           // Saved, not just assigned.
@@ -1408,6 +1584,21 @@ startChargenTimer();
  * body fell. The engine reads spawnPoint when the respawn timer expires.
  */
 mp.onDeath = guard('onDeath', function (actorId, killerId) {
+  /*
+    People only.
+
+    This fires for every MpActor the server owns, which is every bandit, wolf
+    and chicken anybody kills. Each one was having a temple spawnPoint written
+    onto it, which is meaningless at best and, if SkyMP ever honours it on an
+    NPC respawn, puts dead bandits back on their feet inside temples.
+
+    A profileId is what tells a person from the rest of Skyrim. Nothing else
+    on the server has one.
+  */
+  let pid = 0;
+  try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+  if (!pid) { return; }
+
   const site = {
     desc: mp.get(actorId, 'worldOrCellDesc'),
     pos: mp.get(actorId, 'pos'),
@@ -1681,7 +1872,12 @@ log('gamemode loaded:',
     req.end(body);
   }
 
-  setInterval(function () {
+  // Stored and cleared like the chargen timers, so a hot reload replaces
+  // this feed rather than adding a second one that never stops.
+  if (globalThis.__thornswoodVoiceFeed) {
+    try { clearInterval(globalThis.__thornswoodVoiceFeed); } catch (e) { }
+  }
+  globalThis.__thornswoodVoiceFeed = setInterval(function () {
     var who = [];
     try {
       var online = mp.get(0, 'onlinePlayers') || [];
@@ -1730,15 +1926,43 @@ log('gamemode loaded:',
     var onlineFile = path.join(dataDir, 'online.json');
     var lastWritten = -1;
 
-    setInterval(function () {
+    // Cleared on a hot reload, so reloading does not leave two writers
+    // racing each other over the same file.
+    if (globalThis.__thornswoodOnlineWriter) {
+      try { clearInterval(globalThis.__thornswoodOnlineWriter); } catch (e) { }
+    }
+    var lastRestarting = false;
+
+    globalThis.__thornswoodOnlineWriter = setInterval(function () {
       var n = 0;
       try { n = (mp.get(0, 'onlinePlayers') || []).length; } catch (e) { return; }
-      // Only when it moves. This file sits in a folder the server serves, and
-      // rewriting it twice a second for no reason is churn nobody asked for.
-      if (n === lastWritten) return;
-      lastWritten = n;
+
+      /*
+        Whether a countdown is running, for the client's own probe.
+
+        thornswood-front.js watches this folder to decide the server is still
+        there, and quits to the main menu after a run of misses. A restart
+        people were told to sit through looks identical to the server being
+        gone, so everybody who did as they were told got thrown out anyway.
+        The countdown state lives on globalThis so this writer can see it from
+        another block.
+      */
+      var restarting = false;
       try {
-        fs.writeFileSync(onlineFile, JSON.stringify({ now: n, at: Date.now() }));
+        var r = globalThis.__thornswoodRestart;
+        restarting = !!(r && r.at && r.at > Date.now());
+      } catch (e) { restarting = false; }
+
+      // Only when something moves. This file sits in a folder the server
+      // serves, and rewriting it twice a second for no reason is churn nobody
+      // asked for.
+      if (n === lastWritten && restarting === lastRestarting) return;
+      lastWritten = n;
+      lastRestarting = restarting;
+      try {
+        fs.writeFileSync(onlineFile, JSON.stringify({
+          now: n, at: Date.now(), restarting: restarting
+        }));
       } catch (e) { }
     }, 2000);
 
@@ -1881,17 +2105,34 @@ log('gamemode loaded:',
       var rec = found && found.record;
       var fields = (rec && rec.fields) || [];
 
+      /*
+        EDID first, FULL only when it is really text.
+
+        Skyrim.esm and the DLCs are localized, which means a FULL field does
+        not hold a name at all: it holds a four byte index into the strings
+        file beside the plugin. Reading those bytes as characters wrote four
+        bytes of binary into characters.json as somebody's location, for every
+        vanilla cell in the game.
+
+        The editor id is always plain ASCII and always present, so it is the
+        one to trust. A FULL is taken only when every byte of it is printable
+        ASCII, which a real name in an unlocalized plugin is and a string index
+        almost never is.
+      */
       var edid = '';
+      var full = '';
       for (var i = 0; i < fields.length; i++) {
         var t = String(fields[i].type);
-        if (t === 'FULL') {
+        if (t === 'FULL' && !full) {
           var bytes = fields[i].data || [];
           var text = '';
+          var printable = bytes.length > 0;
           for (var b = 0; b < bytes.length; b++) {
             if (!bytes[b]) break;
+            if (bytes[b] < 32 || bytes[b] > 126) { printable = false; break; }
             text += String.fromCharCode(bytes[b]);
           }
-          if (text) { out = text; break; }
+          if (printable && text) { full = text; }
         } else if (t === 'EDID' && !edid) {
           var eb = fields[i].data || [];
           for (var e2 = 0; e2 < eb.length; e2++) {
@@ -1900,7 +2141,8 @@ log('gamemode loaded:',
           }
         }
       }
-      if (!out && edid) { out = spaced(edid); }
+      if (edid) { out = spaced(edid); }
+      else if (full) { out = full; }
     } catch (e) { out = ''; }
 
     places[desc] = out;
@@ -1915,7 +2157,12 @@ log('gamemode loaded:',
 
   var dirty = false;
 
-  setInterval(function () {
+  // Cleared on a hot reload. Three of these ran unstored, so every reload
+  // added another copy of each and none of them ever stopped.
+  if (globalThis.__thornswoodRoster) {
+    try { clearInterval(globalThis.__thornswoodRoster); } catch (e) { }
+  }
+  globalThis.__thornswoodRoster = setInterval(function () {
     var online = [];
     try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
 
@@ -2490,9 +2737,18 @@ log('gamemode loaded:',
 (function () {
   'use strict';
 
+  /*
+    A hot reload replaces this block rather than being turned away by it.
+
+    This used to return early when it had already run, which kept an in flight
+    countdown alive but meant every edit to a command sat in the file doing
+    nothing until somebody restarted the server. The countdown is the only
+    thing here worth keeping across a reload, so it lives on globalThis and
+    survives on its own, and the timer at the bottom clears the old one before
+    arming a new one. Everything else is functions, and replacing those is the
+    point of a reload.
+  */
   var g = globalThis;
-  if (g.__thornswoodCommands) { return; }
-  g.__thornswoodCommands = true;
 
   var VOICE_PORT = 7778;
 
@@ -2577,6 +2833,21 @@ log('gamemode loaded:',
     }
 
     if (word === '/tp' || word === '/goto') {
+      /*
+        Admin only, because the profile id this arrives under is a claim and
+        not a fact.
+
+        The chat page joins the voice socket with whatever profile id is in the
+        settings file on that machine, the voice service queues the line under
+        it, and handle() takes it at its word. So anybody who opens a socket to
+        the voice port with somebody else's id could move that person's
+        character across Skyrim. It stays until a login hands out a token the
+        page has to present.
+      */
+      if (!isAdmin(profileId)) {
+        toProfile(profileId, 'That one is not yours to run.');
+        return;
+      }
       var table = places();
       if (!arg) {
         toProfile(profileId, 'Where to: ' + Object.keys(table).sort().join(', '));
@@ -2600,29 +2871,25 @@ log('gamemode loaded:',
       return;
     }
 
+    /*
+      /restart is not a chat command any more.
+
+      The profile id a command arrives under is a claim the page makes about
+      itself, not something the server checked: the chat page joins the voice
+      socket with whatever id is in the settings file on that machine, and
+      handle() keyed isAdmin off that. So anybody who opened a socket to the
+      voice port carrying an admin's profile id could take the server down.
+
+      The file path is untouched and is how it is actually used: Ship.ps1 and
+      Request-Restart.ps1 drop restart.json over ssh, checkRequest below picks
+      it up, and the same countdown runs. That path needs the box, not a
+      number anybody can type.
+
+      It comes back as a chat command when a login hands each person a token
+      the page has to present.
+    */
     if (word === '/restart' || word === '/shutdown') {
-      if (!isAdmin(profileId)) {
-        toProfile(profileId, 'That one is not yours to run.');
-        return;
-      }
-      if (arg === 'cancel' || arg === 'stop') {
-        if (!restart.at) {
-          toProfile(profileId, 'Nothing was scheduled.');
-          return;
-        }
-        restart.at = 0;
-        restart.said = {};
-        broadcast('The restart is called off. Carry on.');
-        log('restart cancelled by', profileId);
-        return;
-      }
-      var mins = Number(arg);
-      if (!(mins > 0) || mins > 120) {
-        toProfile(profileId, 'Say /restart <minutes>, up to 120, or /restart cancel.');
-        return;
-      }
-      arm(mins * 60, parts.slice(2).join(' ') || 'an update', 'restart');
-      log('restart scheduled by', profileId, 'in', mins, 'minutes');
+      toProfile(profileId, 'Restarts are not run from chat. Use Request-Restart.ps1.');
       return;
     }
 
@@ -2695,8 +2962,8 @@ log('gamemode loaded:',
       toProfile(profileId,
         '/ooc <what you meant> talks out of character to whoever is near you. ' +
         '/where prints your cell, position and facing. ' +
-        '/tp <place> moves you. /roll is in the chat itself.' +
-        (isAdmin(profileId) ? ' /restart <minutes> [why] warns and clears the server.' : ''));
+        '/roll is in the chat itself.' +
+        (isAdmin(profileId) ? ' /tp <place> moves you.' : ''));
       return;
     }
 
@@ -2733,7 +3000,14 @@ log('gamemode loaded:',
     keeping any more, and the reconnect that follows is messier than a clean
     exit. mp.kick ends it on our terms.
   */
-  var restart = { at: 0, said: {}, why: '', mode: 'update' };
+  // On globalThis, so a hot reload in the middle of a countdown does not lose
+  // it and start announcing from ten minutes again. The online.json writer
+  // reads the same object to tell the client probe the server is on its way
+  // back rather than gone.
+  if (!g.__thornswoodRestart) {
+    g.__thornswoodRestart = { at: 0, said: {}, why: '', mode: 'update' };
+  }
+  var restart = g.__thornswoodRestart;
 
   // Marks at which the room is told again. Anything longer than the notice
   // given is skipped, so /restart 2 does not shout about ten minutes.
@@ -2827,6 +3101,21 @@ log('gamemode loaded:',
   function arm(seconds, why, mode) {
     restart.at = Date.now() + Math.round(seconds * 1000);
     restart.said = {};
+    /*
+      Every mark at or above the time asked for is already said.
+
+      restartTick walks MARKS from the largest down and announces the first one
+      it has not said yet, one per tick. With said empty, "/restart 1" matched
+      600 on the first tick, 300 on the second, 120 on the third and 60 on the
+      fourth, so a one minute warning arrived as "10 minutes", "5 minutes",
+      "2 minutes" and "1 minute" on four consecutive ticks, in that order.
+
+      Marking them here means the countdown starts at the first one that is
+      actually in the future.
+    */
+    for (var mi = 0; mi < MARKS.length; mi++) {
+      if (MARKS[mi] >= seconds) { restart.said[MARKS[mi]] = true; }
+    }
     restart.why = why || 'an update';
     restart.mode = (mode === 'restart' || mode === 'notice') ? mode : 'update';
     broadcast(opening(Math.round(seconds / 60)));
