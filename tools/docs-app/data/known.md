@@ -23,9 +23,16 @@ Permanent limits of how this server works. None are bugs, none are changing. Not
 |---|---|
 | SunHelm Survival | Polls on a timer, the one script type still running. Writes health, stamina, magicka and carry weight against a server that crops and corrects them |
 | SunHelm Diseases | Same, and depends on SunHelm |
-| Respawn - Death Overhaul | Sets you essential and runs its own death handler. Death cannot complete locally and the server owns respawn |
-| Tavern Games | Creates gold client side |
 | Immersive Armors, standard version | Distributes through a script with settings that do not persist. A script free version exists |
+
+## Taken out
+
+These were in the list and are not any more. They were added before it was clear they could not work here, and leaving them in meant the release notes advertised them while this page said they did nothing.
+
+| Mod | Why it went |
+|---|---|
+| Respawn - Death Overhaul | Sets you essential and runs its own death handler. Death cannot complete on your own machine and the server owns respawn, so it could only ever fight the server |
+| Tavern Games | Creates gold on your own machine, which the server does not accept. The games ran and the coin never arrived |
 
 ## What the server owns
 
@@ -33,8 +40,18 @@ Anything a mod changes in this list on your own machine is overwritten or ignore
 
 Position and cell. Health, magicka and stamina. Death and respawn, including where. Inventory contents. Equipment. Container contents and open state. Door open state. Harvested state of plants. Actor values.
 
+## Around Play
+
+| Behaviour | Reason |
+|---|---|
+| Nothing in the creation hall is a choice | Your profession, half, class and town are chosen in the launcher before Play, and the hall holds nothing to pick up or read |
+| Start On Save is in the mod list but never loads a save | The launcher points it at a character that does not exist. A single player save cannot be loaded under Thornswood, and loading one crashed the game on a fresh install |
+| Your face is made in the hall, not in the launcher | The race menu opens once the game has loaded. Everything else about a new character is decided in the launcher |
+
 ## The load order rule
 
-The server and every machine must carry the same plugins in the same order with the same files. The check compares position, file size and checksum. One machine out of step and everyone gets a red error at login.
+The server and every machine must carry the same plugins in the same order with the same bytes. The launcher compares every plugin's size and checksum with the server's list when it starts, and the game runs the same comparison at login. One machine out of step gets LOAD ORDER ERROR and cannot connect.
 
-This is why mods are added in batches rather than one at a time.
+If the launcher says a plugin differs, press **Fix**. It downloads the server's copy of that plugin and puts it in place, and **Scan** runs the comparison again. Nothing in your Vortex profile has to change for that.
+
+This is why mods are added in batches rather than one at a time: every addition moves the load order for everybody at once.

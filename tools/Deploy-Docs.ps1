@@ -20,6 +20,10 @@
     .\Deploy-Docs.ps1 -SeedDocs
                                flattens every document with the repo copy.
                                First install only. Takes a .bak of each first.
+    .\Deploy-Docs.ps1 -Docs help,known
+                               replaces just the named documents with the
+                               repo copy, .bak first. For a page rewritten
+                               here on purpose, when -SeedDocs is too much.
 
   The password crosses the wire in clear, because this is plain HTTP on an IP.
   Do not reuse one that matters. That improves the day a real domain and a
@@ -43,7 +47,11 @@ param(
   # Just the public pages under data\site. Those are not editable in the
   # browser, so pushing them overwrites nobody's work. This is what you want
   # nine times out of ten when the wording on the public site changed.
-  [switch]$Site
+  [switch]$Site,
+  # Named documents under data, by name with or without .md: help, known.
+  # Only those are replaced, each after a .bak of the live copy, so a page
+  # rewritten in the repo can go up without -SeedDocs flattening the rest.
+  [string[]]$Docs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -53,6 +61,16 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $App  = Join-Path $Here 'docs-app'
 
 if (-not (Test-Path -LiteralPath $App)) { throw "not found: $App" }
+
+# -Docs names have to be documents this repo actually has, or a typo would
+# quietly send nothing and report nothing.
+$docNames = @()
+foreach ($d in @($Docs)) {
+  if (-not $d) { continue }
+  $n = if ($d -match '[.](md|json)$') { $d } else { "$d.md" }
+  if (-not (Test-Path -LiteralPath (Join-Path $App "data/$n"))) { throw "no such document in the repo: data/$n" }
+  $docNames += $n
+}
 
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
@@ -107,7 +125,7 @@ Get-ChildItem (Join-Path $App 'data/site') -Filter *.md -EA SilentlyContinue | F
 # is missing goes, unless -SeedDocs says to overwrite the lot.
 Write-Host ''
 Write-Host 'Documents...'
-if ($SeedDocs -or $Boards) {
+if ($SeedDocs -or $Boards -or $docNames.Count) {
   # Every document on the VPS goes to .bak first. Both of these have thrown
   # away an evening of edits before now: -SeedDocs flattens the lot, -Boards
   # flattens board.json, and a board is the thing most likely to have been
@@ -126,7 +144,7 @@ $there = @((Remote "Get-ChildItem '$rootWin\data' -File -EA SilentlyContinue | F
 $sent = 0
 Get-ChildItem (Join-Path $App 'data') | Where-Object { $_.Extension -in '.md','.json' } |
   ForEach-Object {
-    $force = $SeedDocs -or ($Boards -and $_.Name -eq 'board.json')
+    $force = $SeedDocs -or ($Boards -and $_.Name -eq 'board.json') -or ($docNames -contains $_.Name)
     if ($force -or ($there -notcontains $_.Name)) {
       Push $_.FullName "$Root/data/$($_.Name)"
       Write-Host "  sent $($_.Name)"
@@ -141,6 +159,12 @@ if ($Boards -and -not $SeedDocs) {
   Write-Host '  -Boards replaced board.json with the repo copy.' -ForegroundColor Yellow
   Write-Host '  Anything typed into a board on the site since the last deploy is now' -ForegroundColor Yellow
   Write-Host '  only in board.json.bak on the VPS. Plain Deploy-Docs never does this.' -ForegroundColor Yellow
+}
+if ($docNames.Count -and -not $SeedDocs) {
+  Write-Host ''
+  Write-Host "  -Docs replaced $($docNames -join ', ') with the repo copy." -ForegroundColor Yellow
+  Write-Host '  Anything typed into those on the site since the last deploy is in the' -ForegroundColor Yellow
+  Write-Host '  .bak file beside each on the VPS. The other documents were not touched.' -ForegroundColor Yellow
 }
 if ($SeedDocs -and $sent) {
   Write-Host ''
