@@ -2,7 +2,10 @@
 
 Skyrim's own levelling is switched off here. Nothing you do raises a vanilla
 skill and no perk menu opens when you sleep. What replaced it is three choices
-made once, at the start, that decide what you are for.
+made once, in the launcher before your first Play with a new character, that
+decide what you are for. The town you wake up in is chosen there too. Your
+face is the one thing made in the game, in the hall you arrive in, and nothing
+else is decided there.
 
 **A profession.** What you make, or how you fight.
 **A sub profession.** Which half of that you actually do.

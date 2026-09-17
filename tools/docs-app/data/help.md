@@ -2,18 +2,28 @@
 
 ## Installing it the first time
 
-Thornswood does not touch your Steam copy of Skyrim. It installs its own copy
-in its own folder, with its own mods and its own launcher, and leaves whatever
-you already play alone.
+You need **Skyrim Special Edition** on Steam, on build **1.6.1170**, and
+**Vortex** with a free Nexus Mods account. Nothing else has to be installed
+first. Anniversary Edition is not required.
 
-From the [Downloads](/downloads) page take **both** files, the exe and the zip,
-into the same folder. Downloads works. Anywhere works. They just have to be
-beside each other, because the exe reads the zip.
+Thornswood goes into the Skyrim you already have. It does not make a second
+copy of the game. Vortex keeps the mods in a profile of their own, so switching
+back to your usual profile and running Purge Mods leaves your own Skyrim the
+way it was.
 
-Then run the exe. Do not unzip anything yourself.
-
-The first run copies about twenty gigabytes into place, so give it time and
-leave it alone while it works.
+1. From the [Downloads](/downloads) page take the installer. One file. Run it.
+   It fetches Thornswood's own content while you watch, about half a gigabyte,
+   and puts the launcher, the script extender and Thornswood's content into
+   your Skyrim.
+2. Open Thornswood from the desktop shortcut. If your Skyrim is newer than
+   1.6.1170, which most copies are, a card on the front page says so. Press
+   **Downgrade** and Steam downloads that build under your own account. It is
+   a few gigabytes, so give it a while.
+3. Install the collection in Vortex. The link is on the Downloads page and on
+   the launcher's Add-ons page. Not optional: without it you have a launcher
+   and no mods, and the server turns you away when you press Play.
+4. Press **Connect Discord** on the launcher's front page. Your browser opens,
+   you say yes, and it closes itself. You never do this again.
 
 ## Starting it after that
 
@@ -24,6 +34,22 @@ address to enter.
 
 If an update is waiting, the launcher takes it before it lets you play. That is
 on purpose: everybody has to be running the same files or nobody can connect.
+
+The launcher also compares every plugin with the server's copy, byte for byte,
+when it starts. If one differs it says so, and **Fix** downloads the server's
+copy of that plugin. See LOAD ORDER ERROR below.
+
+## Your first character
+
+Before the game starts, the launcher asks what you did before, which is a
+profession, one half of it and a class, and which town you wake up in. Those
+are the choices on the [Professions](/classes) page, and the launcher is the
+only place they are made.
+
+Then the game loads. You arrive in a quiet hall and the race menu opens, and
+that is where you make your face. When you are done you wake up at the inn in
+the town you chose, with the tools of your trade in your pack. The hall is only
+where the face gets made.
 
 ## Voice
 
@@ -43,16 +69,23 @@ has not handed your microphone to something else.
    reason.
 2. If it is not there, [report it](/report). One line about what happened is
    enough to start with.
-3. If you have a screenshot or a crash log, put it on the [Uploads](/uploads)
-   page and say so in the report.
+3. If you have a screenshot or a crash log, drag it into the Discord channel
+   with the report, or say in the report that you have one.
+
+## LOAD ORDER ERROR
+
+The game compares every plugin with the server's at login: the same names, in
+the same order, with the same bytes. If one differs you are turned away with
+that message.
+
+Close the game, and in the launcher press **Scan**. It names the plugin that
+differs. Press **Fix** and the launcher downloads the server's copy and puts
+it in place. Then press Play again. Nothing in Vortex has to change.
+
+If Scan says a plugin is missing rather than different, the collection is not
+fully installed or the wrong Vortex profile is active. The launcher says which.
 
 ## Where the logs are
-
-Crash logs, if the game closed itself:
-
-```
-C:\Thornswood\Profile\SKSE\CrashLogger\
-```
 
 The launcher's own log, for anything that went wrong before the game started:
 
@@ -60,8 +93,22 @@ The launcher's own log, for anything that went wrong before the game started:
 C:\Thornswood\Profile\launcher.log
 ```
 
-Drag either onto the [Uploads](/uploads) page. They are plain text and they are
-usually the difference between a fix and a guess.
+Crash logs, if the game closed itself, are in the SKSE folder under your
+documents:
+
+```
+Documents\My Games\Skyrim Special Edition\SKSE\
+```
+
+If Thornswood runs from a Skyrim folder of its own (the card in Settings), the
+crash logs are here instead:
+
+```
+C:\Thornswood\Profile\MyGames\SKSE\
+```
+
+The launcher's Logs page lists both and opens them. They are plain text and
+they are usually the difference between a fix and a guess.
 
 ## Things that are normal here
 
@@ -69,7 +116,12 @@ usually the difference between a fix and a guess.
 - Mod settings menus forget themselves every session, because there is no save
   to write them to.
 - NPCs stand still when nobody is near them.
-- No levelling, no fast travel, and the difficulty is fixed.
+- No levelling, no fast travel, and the difficulty is fixed at Expert.
+- Start On Save is in the mod list but never loads a save. The launcher points
+  it at a character that does not exist, on purpose: a single player save
+  cannot be loaded under Thornswood.
+- The creation hall is empty on purpose. Your trade and town come from the
+  launcher, and the hall is only where the face gets made.
 
 All of that is deliberate and explained on [Known Issues](/known).
 
