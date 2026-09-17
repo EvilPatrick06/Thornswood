@@ -390,8 +390,8 @@ namespace Thornswood
         {
             try
             {
-                if (!File.Exists(ClientBundle)) return "skymp5-client.js is missing, reinstall Thornswood";
-                if (!ClientPatched()) return "skymp5-client.js is not this build's, reinstall Thornswood";
+                if (!File.Exists(ClientBundle)) return "skymp5-client.js is missing, press Repair in Settings";
+                if (!ClientPatched()) return "skymp5-client.js is not this build's, press Repair in Settings";
             }
             catch { return "client bundle"; }
             return "client bundle";
