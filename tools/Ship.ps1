@@ -297,15 +297,61 @@ $pubArgs = @{ Notes = $Notes; Root = $Root; RepoDir = $RepoDir; ReleaseDir = $Re
 if ($MoveServer) { $pubArgs['MoveServer'] = $true }
 if (-not $ModsOnly) { $pubArgs['Launcher'] = $true }
 if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
+# A dry run has to leave nothing behind, and NoUpload plus NoPush is not that.
+#
+# Those two stop the release LEAVING the machine. They do not stop the
+# publisher writing version.json in the release clone or recording the release
+# in its baseline, and it does both. So a dry run quietly consumed the next
+# real release: the publisher had already written down that this source was
+# published, and the Ship that followed correctly reported nothing had changed
+# and shipped nothing. That happened twice on 17 Sep before anybody noticed,
+# and the second time it looked exactly like a broken release.
+#
+# The two files are put back afterwards rather than the publisher being taught
+# a third flag, because the publisher is the one script that must behave the
+# same on a real release whatever else changes here.
+$dryKeep = @()
 if ($DryRun) {
     $pubArgs['NoUpload'] = $true
     $pubArgs['NoPush'] = $true
     Say '  dry run, nothing will be uploaded or pushed' 'Yellow'
+
+    $stateName = if ($Dev) { 'published-dev.json' } else { 'published.json' }
+    foreach ($f in @(
+        (Join-Path $ReleaseDir 'version.json'),
+        (Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') $stateName)
+    )) {
+        if (Test-Path -LiteralPath $f) {
+            $tmp = [IO.Path]::GetTempFileName()
+            Copy-Item -LiteralPath $f -Destination $tmp -Force
+            $dryKeep += [pscustomobject]@{ Path = $f; Copy = $tmp }
+        } else {
+            $dryKeep += [pscustomobject]@{ Path = $f; Copy = '' }
+        }
+    }
 }
 
 $LASTEXITCODE = 0
 & (Join-Path $Here 'Publish-Update.ps1') @pubArgs
 $published = $LASTEXITCODE
+
+if ($DryRun) {
+    foreach ($k in $dryKeep) {
+        try {
+            if ($k.Copy) {
+                Copy-Item -LiteralPath $k.Copy -Destination $k.Path -Force
+                Remove-Item -LiteralPath $k.Copy -Force -EA SilentlyContinue
+            } elseif (Test-Path -LiteralPath $k.Path) {
+                # It did not exist before the dry run, so it must not after.
+                Remove-Item -LiteralPath $k.Path -Force
+            }
+        } catch {
+            Say ("  could not put " + $k.Path + " back: " + $_.Exception.Message) 'Red'
+            Say '  the next release may think it has already gone out. Check it.' 'Red'
+        }
+    }
+    Say '  dry run cleaned up: the feed and the baseline are as they were' 'DarkGray'
+}
 
 # Ground truth, because the exit code is not.
 #
