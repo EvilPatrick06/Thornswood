@@ -27,16 +27,10 @@
 
   3. Difficulty. The bundle's DisableDifficultySelectionService writes
      iDifficulty every sixty updates so nobody can turn it down mid game, and
-     the number it writes is 5, Legendary, which is what Thornswood plays on.
-     The pin stays, because a difficulty anybody can change is a difficulty
-     nobody shares (0 Novice, 1 Apprentice, 2 Adept, 3 Expert, 4 Master,
-     5 Legendary).
-
-     This used to patch the number down to 3, Expert. It does not any more,
-     so on a fresh bundle there is nothing to change and the block only marks
-     it. A bundle this repo patched before still says 3, and the second block
-     puts it back to 5, which is the one that matters: every copy in the wild
-     on 17 Sep is that shape.
+     the number it writes is 5, Legendary. Thornswood plays on Expert. The
+     pin stays, because a difficulty anybody can change is a difficulty
+     nobody shares; only the number changes (0 Novice, 1 Apprentice,
+     2 Adept, 3 Expert, 4 Master, 5 Legendary).
 
   2. Locks, activators and furniture. Upstream's dealWithRef unlocks every
      reference the server tracks and blocks activation on containers, doors,
@@ -163,52 +157,17 @@ $blocks = @(
         )
     },
     @{
-        # Two blocks, one marker, because a bundle reaches this in one of two
-        # shapes and both have to end up the same.
-        #
-        # A fresh bundle from upstream carries 5 already. A bundle this repo
-        # has patched before carries 3, from when Thornswood played on Expert.
-        # Whichever one is in front of it, the answer is Legendary, so both are
-        # Optional and the marker they share stops the second running after the
-        # first. The check after the loop refuses to write a bundle where
-        # neither landed, which is what a shape change upstream would look like.
-        Name     = 'difficulty'
-        Optional = $true
-        Marker   = 'Thornswood: Legendary, the number upstream already uses'
-        Old      = @(
+        Name   = 'difficulty'
+        Marker = 'Thornswood: Expert, not Legendary'
+        Old    = @(
             '                    _this.difficulty = 5;'
         )
-        New      = @(
-            '                    // Thornswood: Legendary, the number upstream already uses.',
-            '                    // DisableDifficultySelectionService pins iDifficulty every sixty',
-            '                    // updates so nobody can turn it down mid game. The pin stays,',
-            '                    // because a difficulty anybody can change is a difficulty nobody',
-            '                    // shares (0 Novice, 1 Apprentice, 2 Adept, 3 Expert, 4 Master,',
-            '                    // 5 Legendary).',
-            '                    _this.difficulty = 5;'
-        )
-    },
-    @{
-        # The same end state, reached from a bundle this repo already patched
-        # down to Expert. Every copy in the wild on 17 Sep is this shape.
-        Name     = 'difficulty from expert'
-        Optional = $true
-        Marker   = 'Thornswood: Legendary, the number upstream already uses'
-        Old      = @(
+        New    = @(
             '                    // Thornswood: Expert, not Legendary. Upstream pins iDifficulty every',
             '                    // sixty updates so nobody turns it down mid game; the pin stays and',
             '                    // the number is Expert (0 Novice, 1 Apprentice, 2 Adept, 3 Expert,',
             '                    // 4 Master, 5 Legendary).',
             '                    _this.difficulty = 3;'
-        )
-        New      = @(
-            '                    // Thornswood: Legendary, the number upstream already uses.',
-            '                    // DisableDifficultySelectionService pins iDifficulty every sixty',
-            '                    // updates so nobody can turn it down mid game. The pin stays,',
-            '                    // because a difficulty anybody can change is a difficulty nobody',
-            '                    // shares (0 Novice, 1 Apprentice, 2 Adept, 3 Expert, 4 Master,',
-            '                    // 5 Legendary).',
-            '                    _this.difficulty = 5;'
         )
     }
 )
@@ -216,19 +175,11 @@ $blocks = @(
 $out = $raw
 $applied = @()
 $already = @()
-$skipped = @()
 foreach ($b in $blocks) {
     if ($out.Contains($b.Marker)) { $already += $b.Name; continue }
     $old = ($b.Old -join $nl) + $nl
     $new = ($b.New -join $nl) + $nl
     $idx = $out.IndexOf($old, [StringComparison]::Ordinal)
-    if ($idx -lt 0 -and $b.Optional) {
-        # One of a set that share a marker, and a different one of them fits this
-        # bundle. The check after the loop is what refuses a bundle where none
-        # of them did.
-        $skipped += $b.Name
-        continue
-    }
     if ($idx -lt 0) {
         Write-Host ("Patch-Client: the {0} block is not where this expects it." -f $b.Name) -ForegroundColor Red
         Write-Host '  The client bundle has changed shape. Do not ship it until somebody looks:' -ForegroundColor Red
@@ -241,22 +192,6 @@ foreach ($b in $blocks) {
     }
     $out = $out.Substring(0, $idx) + $new + $out.Substring($idx + $old.Length)
     $applied += $b.Name
-}
-
-# Every marker has to be on the bundle now, whether this run put it there or a
-# previous one did. A block that is Optional can be skipped because a sibling
-# fits instead; a marker that is missing after all of them have had their turn
-# means the bundle is not a shape this knows, and shipping it unpatched is how
-# everybody ended up on the wrong difficulty on 17 Sep.
-$missing = @()
-foreach ($m in ($blocks | ForEach-Object { $_.Marker } | Select-Object -Unique)) {
-    if (-not $out.Contains($m)) { $missing += $m }
-}
-if ($missing.Count) {
-    Write-Host 'Patch-Client: the bundle came out without one of the changes on it.' -ForegroundColor Red
-    foreach ($m in $missing) { Write-Host ("  missing: {0}" -f $m) -ForegroundColor Red }
-    Write-Host '  The client bundle has changed shape. Do not ship it until somebody looks.' -ForegroundColor Red
-    exit 1
 }
 
 if ($applied.Count -eq 0) {
