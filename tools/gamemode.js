@@ -714,12 +714,29 @@ function applyLauncherChoice(actorId, state, choice) {
   state.gearTries = 0;
   state.clean = 0;
   setChargen(actorId, state);
+  closeRaceMenu(actorId);
 
   log('chargen', actorId.toString(16), 'launcher choice applied:',
       cls.key + (state.half ? '/' + state.half : '') +
       (state.gathering ? ', ' + state.gathering : ''),
       'in', entry.key, '(' + arrival.cell + '), kit to follow');
   return true;
+}
+
+/**
+ * The race menu is finished with, whatever route got us here.
+ *
+ * Spawn opens it, and only the appearance arriving closes it. Somebody who
+ * left the hall on the movement path or on the give up path still has it set
+ * open, CreateActor sends that flag on every later login, and the client dutifully
+ * reopens the race menu on a character who has had a face for a week.
+ */
+function closeRaceMenu(actorId) {
+  try {
+    mp.setRaceMenuOpen(actorId, false);
+  } catch (e) {
+    log('chargen', actorId.toString(16), 'could not close the race menu:', e);
+  }
 }
 
 /**
@@ -925,6 +942,7 @@ function chooseDestination(actorId, state, desc) {
   state.destination = town;
   state.at = Date.now();
   setChargen(actorId, state);
+  closeRaceMenu(actorId);
   log('chargen', actorId.toString(16), 'destination =', town,
       '(' + arrival.cell + ') -> done');
 }
@@ -1008,6 +1026,7 @@ function chargenTick() {
             owns === 1 ? 'thing' : 'things,',
             'so creation is skipped for them');
         setChargen(actorId, { stage: 'done', at: now, legacy: true });
+        closeRaceMenu(actorId);
         // The choice is stale the moment it turns out to belong to somebody
         // who already exists. Dropping it here is what stops this character
         // looking new again on the next login, and the one after that.
@@ -1041,6 +1060,7 @@ function chargenTick() {
         log('chargen', actorId.toString(16), 'profile', pidWas,
             'already has a character, so creation is skipped for them');
         setChargen(actorId, { stage: 'done', at: now, legacy: true });
+        closeRaceMenu(actorId);
         continue;
       }
       beginAppearance(actorId);
@@ -1073,6 +1093,7 @@ function chargenTick() {
       if (arrivedAt && (now - arrivedAt) > ARRIVE_WINDOW_MS) {
         state.stage = 'done';
         setChargen(actorId, state);
+        closeRaceMenu(actorId);
         if (state.class === 'bard') { try { armBard(actorId); } catch (e) { } }
         log('chargen', actorId.toString(16), 'was still marked arriving from',
             Math.round((now - arrivedAt) / 60000) + ' minutes ago.',
@@ -1088,6 +1109,7 @@ function chargenTick() {
         log('chargen', actorId.toString(16), 'no kit for', state.class, '- nothing to hand over');
         state.stage = 'done';
         setChargen(actorId, state);
+        closeRaceMenu(actorId);
         continue;
       }
 
@@ -1107,6 +1129,7 @@ function chargenTick() {
       if ((state.clean || 0) >= 3 || state.gearTries > 12) {
         state.stage = 'done';
         setChargen(actorId, state);
+        closeRaceMenu(actorId);
         // Here rather than with the items, because the instruments have to be
         // in the pack before the ability to use them is worth anything, and
         // this is the one point that knows they are.
@@ -1120,6 +1143,38 @@ function chargenTick() {
     }
 
     if (state.stage === 'appearance') {
+      /*
+        A reconnect starts the wait again from nothing.
+
+        None of the fields below are cleared when somebody drops out of the
+        hall and comes back, so a character who walked about for a few seconds
+        and then quit returns with liveSince already set, where holding a
+        position from the last session, and askedAt already past. The very
+        first settled tick then reads that as somebody who has been on their
+        feet for as long as they were away, and teleports them to the inn
+        while their client is still loading the hall.
+
+        firstSeen is set the moment somebody comes online, so comparing it
+        against what the state remembers is what tells a reconnect from the
+        session that made it.
+      */
+      const cameOn = firstSeen.get(actorId) || 0;
+      if (state.seenAt !== cameOn) {
+        state.seenAt = cameOn;
+        delete state.liveSince;
+        delete state.where;
+        delete state.askedAt;
+        delete state.nudged;
+        delete state.waitedForChoice;
+        // Long enough for the arrival to settle before a baseline is taken,
+        // the same grace a fresh arrival gets.
+        state.askAt = now + 4000;
+        setChargen(actorId, state);
+        log('chargen', actorId.toString(16),
+            'came back mid creation, so the wait starts again');
+        continue;
+      }
+
       // The baseline, once whatever load screen we started has had time to
       // finish. No menu is opened here, deliberately. See below.
       if (!state.askedAt) {
@@ -2655,6 +2710,21 @@ log('gamemode loaded:',
     }
 
     if (word === '/tp' || word === '/goto') {
+      /*
+        Admin only, because the profile id this arrives under is a claim and
+        not a fact.
+
+        The chat page joins the voice socket with whatever profile id is in the
+        settings file on that machine, the voice service queues the line under
+        it, and handle() takes it at its word. So anybody who opens a socket to
+        the voice port with somebody else's id could move that person's
+        character across Skyrim. It stays until a login hands out a token the
+        page has to present.
+      */
+      if (!isAdmin(profileId)) {
+        toProfile(profileId, 'That one is not yours to run.');
+        return;
+      }
       var table = places();
       if (!arg) {
         toProfile(profileId, 'Where to: ' + Object.keys(table).sort().join(', '));
@@ -2678,29 +2748,25 @@ log('gamemode loaded:',
       return;
     }
 
+    /*
+      /restart is not a chat command any more.
+
+      The profile id a command arrives under is a claim the page makes about
+      itself, not something the server checked: the chat page joins the voice
+      socket with whatever id is in the settings file on that machine, and
+      handle() keyed isAdmin off that. So anybody who opened a socket to the
+      voice port carrying an admin's profile id could take the server down.
+
+      The file path is untouched and is how it is actually used: Ship.ps1 and
+      Request-Restart.ps1 drop restart.json over ssh, checkRequest below picks
+      it up, and the same countdown runs. That path needs the box, not a
+      number anybody can type.
+
+      It comes back as a chat command when a login hands each person a token
+      the page has to present.
+    */
     if (word === '/restart' || word === '/shutdown') {
-      if (!isAdmin(profileId)) {
-        toProfile(profileId, 'That one is not yours to run.');
-        return;
-      }
-      if (arg === 'cancel' || arg === 'stop') {
-        if (!restart.at) {
-          toProfile(profileId, 'Nothing was scheduled.');
-          return;
-        }
-        restart.at = 0;
-        restart.said = {};
-        broadcast('The restart is called off. Carry on.');
-        log('restart cancelled by', profileId);
-        return;
-      }
-      var mins = Number(arg);
-      if (!(mins > 0) || mins > 120) {
-        toProfile(profileId, 'Say /restart <minutes>, up to 120, or /restart cancel.');
-        return;
-      }
-      arm(mins * 60, parts.slice(2).join(' ') || 'an update', 'restart');
-      log('restart scheduled by', profileId, 'in', mins, 'minutes');
+      toProfile(profileId, 'Restarts are not run from chat. Use Request-Restart.ps1.');
       return;
     }
 
@@ -2773,8 +2839,8 @@ log('gamemode loaded:',
       toProfile(profileId,
         '/ooc <what you meant> talks out of character to whoever is near you. ' +
         '/where prints your cell, position and facing. ' +
-        '/tp <place> moves you. /roll is in the chat itself.' +
-        (isAdmin(profileId) ? ' /restart <minutes> [why] warns and clears the server.' : ''));
+        '/roll is in the chat itself.' +
+        (isAdmin(profileId) ? ' /tp <place> moves you.' : ''));
       return;
     }
 
