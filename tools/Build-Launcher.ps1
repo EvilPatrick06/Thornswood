@@ -240,6 +240,17 @@ $voicePage = Join-Path $Here 'launcher\voice-host.html'
 if (-not (Test-Path -LiteralPath $voicePage)) { Die "Missing tools\launcher\voice-host.html" }
 $cscArgs += "/resource:$((Resolve-Path $voicePage).Path),voice-host.html"
 
+# The template Thornswood.ini, for a machine that has none. It is the file
+# Install-Emotes copies; the launcher writes it when it is missing
+# (ThornIni.Ensure), so the ini never has to travel in a pack, which is how
+# one machine's binds and field of view landed on everybody on 16 Sep.
+$iniTemplate = Join-Path $Here 'emotes\Thornswood.ini'
+if (Test-Path -LiteralPath $iniTemplate) {
+    $cscArgs += "/resource:$((Resolve-Path $iniTemplate).Path),Thornswood.ini"
+} else {
+    Say '  tools\emotes\Thornswood.ini is missing; a machine with no Thornswood.ini will play on the plugins'' own defaults' 'Yellow'
+}
+
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 foreach ($f in $cs)   { $cscArgs += $f.FullName }
 if ($infoApp) { $cscArgs += $infoApp }

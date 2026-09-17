@@ -48,6 +48,19 @@ namespace Thornswood
         static bool updatePending = true;
         static bool updateAnswered;
         static DateTime playStartedAt;
+
+        // An update published while the game runs. The check that runs every
+        // two minutes during play notices it; five minutes after it is first
+        // seen the game is closed so the launcher can install it, which is
+        // what the server's own five minute warning has been counting down
+        // to. The server's kick by itself did nothing: the client reconnects
+        // in three seconds and carries on running files the rest of the room
+        // has moved past, which is what happened to everybody on 1.1.40.
+        static DateTime updateSeenAt = DateTime.MinValue;
+        static bool checkingInPlay = false;
+        static bool closedForUpdate = false;
+        static bool installWhenSeen = false;
+        static int inPlayTicks = 0;
         static int modTab;   // 0 server plugins, 1 script extender, 2 your own, 3 add-ons
         static Border addonsCard;
         // Ids being installed or removed right now, so a second click on the
@@ -215,6 +228,8 @@ namespace Thornswood
             if (Swap.Restore()) Log("Cleaned up a redirect left behind by a crash.");
             Keep.TakeNote();
             try { string leak = Leaks.Clean(); if (leak != null) Log(leak); } catch { }
+            try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch { }
+            try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch { }
             {
                 int parked = Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");
@@ -1033,8 +1048,15 @@ namespace Thornswood
                 if (++pingTicks >= 15) { pingTicks = 0; StartPing(); }
 
                 if (!playing) return;
-                if (Checks.GameRunning()) return;
+                if (Checks.GameRunning())
+                {
+                    // Every sixtieth two second tick, so every two minutes.
+                    if (++inPlayTicks >= 60) { inPlayTicks = 0; CheckUpdatesInPlay(); }
+                    return;
+                }
                 playing = false;
+                inPlayTicks = 0;
+                updateSeenAt = DateTime.MinValue;
                 try { Presence.Stop(); } catch { }
                 try { Hold.Release(); } catch { }
                 Keep.TakeNote();
@@ -1073,6 +1095,14 @@ namespace Thornswood
                 DrawStatus();
                 win.WindowState = WindowState.Normal;
                 win.Activate();
+
+                if (closedForUpdate)
+                {
+                    closedForUpdate = false;
+                    installWhenSeen = true;
+                    Log("Fetching the update the game was closed for...");
+                    ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(true); });
+                }
             };
             timer.Start();
         }
@@ -3009,6 +3039,7 @@ namespace Thornswood
                 // has to be told a name, and the name cannot ship with the
                 // build because everybody owns a different microphone, so it
                 // is read off this machine and written into this machine's ini.
+                try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch { }
                 try
                 {
                     string mic = Mics.Apply(cfg);
@@ -3503,6 +3534,8 @@ namespace Thornswood
         static void OnVersionDoc(VersionDoc v, bool loud)
         {
             pendingDoc = v;
+            bool install = installWhenSeen;
+            installWhenSeen = false;
 
             bool moved = false;
             if (!string.IsNullOrEmpty(v.serverAddress) && v.serverAddress != cfg.ServerAddress) { cfg.ServerAddress = v.serverAddress; moved = true; }
@@ -3621,6 +3654,76 @@ namespace Thornswood
             updateBar.Visibility = Visibility.Visible;
             btnInstallNow.Visibility = Visibility.Visible;
             Log("Update available. Install it from the card above the Play button, or in Settings.");
+
+            // The game was just closed for this. With automatic updates on it
+            // goes in now, so the person is back in the world in a minute
+            // rather than looking at a card.
+            if (install && cfg.AutoUpdate)
+            {
+                Log("Installing it now.");
+                RunUpdate();
+            }
+        }
+
+        /// <summary>
+        /// The update check that runs while the game is up. It only decides
+        /// whether an update exists; the cards, the addresses and the rest of
+        /// what a version document brings wait for OnVersionDoc, after the
+        /// game is gone. First sight starts a five minute clock and says so in
+        /// the log; when it runs out the game is closed and the tick's closed
+        /// path takes it from there.
+        /// </summary>
+        static void CheckUpdatesInPlay()
+        {
+            if (checkingInPlay || !Updater.Enabled(cfg)) return;
+            checkingInPlay = true;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                bool due = false;
+                string what = "";
+                try
+                {
+                    VersionDoc v = Updater.Check(cfg);
+                    if (v != null)
+                    {
+                        List<Pack> packs = Updater.Pending(v);
+                        bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version)
+                                           && !string.IsNullOrEmpty(v.launcherUrl);
+                        due = packs.Count > 0 || newLauncher;
+                        var parts = new List<string>();
+                        if (newLauncher) parts.Add("launcher " + v.launcherVersion);
+                        if (packs.Count > 0) parts.Add(packs.Count + (packs.Count == 1 ? " mod update" : " mod updates"));
+                        what = string.Join(", ", parts.ToArray());
+                    }
+                }
+                catch { }
+                try
+                {
+                    win.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        checkingInPlay = false;
+                        if (!playing || !due) { updateSeenAt = DateTime.MinValue; return; }
+                        if (updateSeenAt == DateTime.MinValue)
+                        {
+                            updateSeenAt = DateTime.Now;
+                            Log("An update went out while you were playing (" + what + "). The server is telling everybody the same. In five minutes the game closes so the launcher can install it.");
+                            return;
+                        }
+                        if ((DateTime.Now - updateSeenAt).TotalMinutes < 5) return;
+                        if (!Checks.GameRunning()) return;
+                        closedForUpdate = true;
+                        Log("Closing the game for the update (" + what + ").");
+                        bool still = false;
+                        Waiting(delegate { Checks.CloseGame(); still = Checks.GameRunning(); });
+                        if (still)
+                        {
+                            closedForUpdate = false;
+                            Log("Skyrim would not close. Quit it yourself and the update goes in.");
+                        }
+                    }));
+                }
+                catch { checkingInPlay = false; }
+            });
         }
 
         /// <summary>

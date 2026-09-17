@@ -157,7 +157,7 @@ namespace Thornswood
                     // command line did not have the focus. Click it and try once
                     // more, then fall back to the clipboard.
                     log("Steam has not started the download. Trying the console's command line once more.");
-                    ClickConsoleLine();
+                    FocusConsole();
                     Thread.Sleep(400);
                     typed = TypeIntoConsole(cmd, log);
                     askedAt = DateTime.Now;
@@ -299,47 +299,92 @@ namespace Thornswood
         static bool TypeIntoConsole(string cmd, Action<string> log)
         {
             try { Process.Start(new ProcessStartInfo("steam://open/console") { UseShellExecute = true }); } catch { }
-            Thread.Sleep(2500);
 
+            // Steam's window can take a while to come up, longer still when the
+            // client was sitting in the tray, and the first request for the
+            // console is sometimes swallowed while it is busy. So: up to twenty
+            // seconds, and the console is asked for again halfway.
             bool front = false;
-            for (int i = 0; i < 8 && !front; i++)
+            bool reopened = false;
+            DateTime start = DateTime.Now;
+            while (!front && (DateTime.Now - start).TotalSeconds < 20)
             {
+                Thread.Sleep(500);
                 IntPtr h = MainWindow();
-                if (h != IntPtr.Zero)
-                {
-                    ShowWindow(h, SW_RESTORE);
-                    SetForegroundWindow(h);
-                }
+                if (h == IntPtr.Zero) continue;
+                BringToFront(h);
                 Thread.Sleep(400);
                 front = ForegroundIsSteam();
+                if (!front && !reopened && (DateTime.Now - start).TotalSeconds > 8)
+                {
+                    reopened = true;
+                    try { Process.Start(new ProcessStartInfo("steam://open/console") { UseShellExecute = true }); } catch { }
+                }
             }
             if (!front) return false;
 
-            Thread.Sleep(600);
+            // A moment for the console page to finish drawing and put the
+            // keyboard on its command line, which it does on its own.
+            Thread.Sleep(1200);
+            if (!ForegroundIsSteam()) return false;
             Type(cmd);
             Thread.Sleep(150);
             Key(VK_RETURN);
             return true;
         }
 
-        /// <summary>The console's command line sits along the bottom of the Steam window.</summary>
-        static void ClickConsoleLine()
+        /// <summary>
+        /// Puts Steam's window in front and makes sure it took.
+        ///
+        /// Windows only lets the foreground process hand the foreground on, and
+        /// this runs on a worker thread of a launcher that stopped being the
+        /// foreground process the moment Steam's window appeared. A plain
+        /// SetForegroundWindow is refused then, quietly. Attaching to Steam's
+        /// input thread for the call is the documented way through; a tap of
+        /// Alt is the other, because a key press from us counts as the person's
+        /// and the system lets the next SetForegroundWindow through after one.
+        /// </summary>
+        static void BringToFront(IntPtr h)
         {
+            try
+            {
+                ShowWindow(h, SW_RESTORE);
+                uint pid;
+                uint steamThread = GetWindowThreadProcessId(h, out pid);
+                uint me = GetCurrentThreadId();
+                bool attached = steamThread != 0 && steamThread != me && AttachThreadInput(me, steamThread, true);
+                try
+                {
+                    BringWindowToTop(h);
+                    SetForegroundWindow(h);
+                }
+                finally
+                {
+                    if (attached) AttachThreadInput(me, steamThread, false);
+                }
+                if (ForegroundIsSteam()) return;
+                Key(VK_MENU);
+                Thread.Sleep(50);
+                SetForegroundWindow(h);
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Puts the keyboard back on the console's command line for a retry.
+        /// This used to click 28 pixels up from the bottom edge of Steam's
+        /// window, where the command line was in the old client. In the
+        /// current client that is the status bar, Downloads and Friends and
+        /// Chat, so the click opened another page instead of focusing
+        /// anything. Opening the console again focuses its command line, and
+        /// nothing is clicked.
+        /// </summary>
+        static void FocusConsole()
+        {
+            try { Process.Start(new ProcessStartInfo("steam://open/console") { UseShellExecute = true }); } catch { }
+            Thread.Sleep(1500);
             IntPtr h = MainWindow();
-            if (h == IntPtr.Zero) return;
-            RECT r;
-            if (!GetWindowRect(h, out r)) return;
-            ShowWindow(h, SW_RESTORE);
-            SetForegroundWindow(h);
-            Thread.Sleep(300);
-            if (!ForegroundIsSteam()) return;
-            int x = (r.Left + r.Right) / 2;
-            int y = r.Bottom - 28;
-            SetCursorPos(x, y);
-            Thread.Sleep(80);
-            Mouse(MOUSEEVENTF_LEFTDOWN);
-            Thread.Sleep(60);
-            Mouse(MOUSEEVENTF_LEFTUP);
+            if (h != IntPtr.Zero) BringToFront(h);
         }
 
         static bool ForegroundIsSteam()
@@ -456,6 +501,7 @@ namespace Thornswood
 
         const int SW_RESTORE = 9;
         const ushort VK_RETURN = 0x0D;
+        const ushort VK_MENU = 0x12;
         const uint INPUT_MOUSE = 0, INPUT_KEYBOARD = 1;
         const uint KEYEVENTF_KEYUP = 0x0002, KEYEVENTF_UNICODE = 0x0004;
         const uint MOUSEEVENTF_LEFTDOWN = 0x0002, MOUSEEVENTF_LEFTUP = 0x0004;
@@ -487,6 +533,9 @@ namespace Thornswood
         [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
         [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr hWnd);
+        [DllImport("user32.dll")] static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+        [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
         [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int cmd);
         [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
         [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint n, INPUT[] inputs, int size);

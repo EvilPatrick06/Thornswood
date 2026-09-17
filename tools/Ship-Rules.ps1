@@ -65,6 +65,12 @@ $ShipMachineFiles = @(
     'Data\Platform\thornswood-session.txt',
     'Data\Platform\menu-music-duck.txt',
     'Data\SKSE\Plugins\po3_Tweaks.ini',
+    # One machine's key binds, microphone name and field of view. Every
+    # launcher writes it, and the three packs of 16 and 17 Sep carried the
+    # publishing machine's copy, which put its Fov=120 and its binds on
+    # everyone. A machine without one gets the template from the launcher
+    # (ThornIni.Ensure), so it never needs to travel.
+    'Data\SKSE\Plugins\Thornswood.ini',
     'Data\SKSE\Plugins\CrashLogger.ini'
 )
 
