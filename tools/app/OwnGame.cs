@@ -175,11 +175,41 @@ namespace Thornswood
         }
 
         /// <summary>True when Vortex has deployed since the folder was last made or refreshed.</summary>
+        /// <summary>
+        /// Which build of the rules in this file a folder was made under.
+        ///
+        /// Bump this whenever Foreign, MustCopy or anything else that decides
+        /// what goes in the folder changes. Every folder made under an older
+        /// number then refreshes itself the next time the launcher opens.
+        ///
+        /// 1: NirnLabUIPlatform is another server's and is left out. Before
+        ///    this the folder was given it, SkyrimPlatform would not start on
+        ///    the browser we ship while it was there, and CEFSubprocess.exe
+        ///    came with it for Windows Firewall to ask about.
+        /// </summary>
+        const int Rules = 1;
+
         public static bool NeedsRefresh(Config cfg)
         {
             if (!Active) return false;
             string src = Source(cfg);
             if (WhyNot(cfg, src) != null) return false;
+
+            // The rules changed under a folder that was already made.
+            //
+            // This used to ask one question: has Vortex deployed since. That
+            // misses the case where Vortex has not moved at all and it is this
+            // launcher that now wants something different from the same
+            // deployment. A folder built before a rule existed keeps whatever
+            // that rule was added to take out, for as long as Vortex sits
+            // still, which on a settled collection is forever. The person has
+            // no way to know: nothing on screen says their folder is built to
+            // rules nobody uses any more.
+            //
+            // A folder with no number in its record was made before any of
+            // this and reads as -1, so it refreshes once and then matches.
+            if (Recorded("rules") != Rules) return true;
+
             return DeploymentStamp(src) != Recorded("deployment");
         }
 
@@ -746,6 +776,7 @@ namespace Thornswood
             File.WriteAllLines(MadeFile, new string[] {
                 "source=" + src,
                 "deployment=" + DeploymentStamp(src),
+                "rules=" + Rules,
                 "at=" + DateTime.Now.ToString("o")
             });
         }
