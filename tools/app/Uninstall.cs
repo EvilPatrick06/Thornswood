@@ -434,6 +434,11 @@ namespace Thornswood
             say("Removing the shortcut...");
             DropShortcuts();
 
+            // And the entry in Windows Settings, Installed apps. Before the
+            // files go, so a half finished uninstall never leaves a listing
+            // whose uninstall button points at a launcher that is not there.
+            Register.Forget();
+
             say("Clearing the setup leftovers...");
             DropScratch(say);
 
