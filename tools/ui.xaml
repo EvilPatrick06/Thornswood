@@ -978,7 +978,7 @@
                   <StackPanel>
                     <StackPanel x:Name="PnlOwnGame">
                       <TextBlock Style="{StaticResource H2}" Text="Thornswood's own Skyrim folder"/>
-                      <TextBlock Style="{StaticResource Body}" Text="Runs Thornswood from a Skyrim folder of its own, made from what Vortex has deployed while the Thornswood profile is on. Keizaal, Daedric and any other Vortex profile can then use the Steam copy or folders of their own without reaching Thornswood, and switching profiles in Vortex no longer takes Thornswood's mods away. The big files are links to Vortex's copies, so the collection is not on the disk twice. When Vortex deploys a newer Thornswood collection, the launcher brings it in by itself the next time it starts."/>
+                      <TextBlock Style="{StaticResource Body}" Text="Runs Thornswood from a Skyrim folder of its own, made from what Vortex has deployed while the Thornswood profile is on. Keizaal, Daedric and any other Vortex profile can then use the Steam copy or folders of their own without reaching Thornswood, and switching profiles in Vortex no longer takes Thornswood's mods away. The big files are links to Vortex's copies, so the collection is not on the disk twice. When Vortex deploys a newer Thornswood collection, the launcher brings it in by itself the next time it starts. Windows asks for administrator once while this is set up, to write a firewall rule for the game's browser: Skyrim Platform draws the interface in a second program, and a rule is tied to a program's path, so moving the game into its own folder is what makes Windows ask about it. The rule is a block, because that program only ever talks to the game on this machine. Saying no is fine and only means Windows asks you about the browser on the first launch instead."/>
                       <TextBlock x:Name="TxtOwnGameState" Style="{StaticResource Small}" Margin="0,8,0,0"/>
                       <StackPanel Orientation="Horizontal" Margin="0,13,0,0">
                         <Button x:Name="BtnOwnGameMake" Style="{StaticResource Ghost}" Content="Make it" Margin="0,0,8,0"/>
@@ -987,12 +987,6 @@
 
                       <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
                     </StackPanel>
-
-                    <TextBlock Style="{StaticResource H2}" Text="The firewall prompt about the game's browser"/>
-                    <TextBlock Style="{StaticResource Body}" Text="Skyrim Platform does not draw the interface inside the game. It starts a second program to do it, and the first time that runs Windows stops everything to ask whether the network may reach skyrimplatformcef.exe.hidden, published by Unknown. The answer is no: it only ever talks to the game on this machine, and Windows does not filter that. This writes that no down as a rule so the question stops being asked. Windows will ask for administrator once, because only administrators may write firewall rules. Nothing is opened up by this and the game works the same either way."/>
-                    <Button x:Name="BtnFirewall" Style="{StaticResource Ghost}" Content="Stop Windows asking" HorizontalAlignment="Left" Margin="0,13,0,0"/>
-
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
 
                     <TextBlock Style="{StaticResource H2}" Text="Repair"/>
                     <TextBlock Style="{StaticResource Body}" Text="Puts this build's own files back: the settings and load order that shipped with it, the client and the overlays under Data, the mod settings this build pins, and the class preset names. Another server's launcher can replace any of those, and an install that has never taken an update has never had a spare copy of them. This is everything Play does on the way in, done on demand, and it is safe to press twice. Close Skyrim first."/>

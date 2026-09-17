@@ -18,7 +18,7 @@ namespace Thornswood
     {
         static bool ownGameBusy, ownGameStarted, restarting;
         static TextBlock txtOwnGameState;
-        static Button btnOwnGameMake, btnOwnGameRefresh, btnFirewall;
+        static Button btnOwnGameMake, btnOwnGameRefresh;
 
         static void WireOwnGame()
         {
@@ -30,45 +30,6 @@ namespace Thornswood
             if (btnOwnGameMake != null) btnOwnGameMake.Click += delegate { AskOwnGame(false); };
             if (btnOwnGameRefresh != null) btnOwnGameRefresh.Click += delegate { StartOwnGame(false, true); };
             if (panel != null) panel.IsVisibleChanged += delegate { if (panel.IsVisible) DrawOwnGame(); };
-
-            // The firewall question about the game's browser.
-            //
-            // A button rather than something the launcher does on its own,
-            // because writing a firewall rule needs administrator and a
-            // Windows prompt appearing unasked when somebody opens a launcher
-            // is worse than the thing it fixes. Pressed once per machine.
-            btnFirewall = F<Button>("BtnFirewall");
-            if (btnFirewall != null)
-            {
-                btnFirewall.Click += delegate
-                {
-                    btnFirewall.IsEnabled = false;
-                    if (Firewall.Present().Count == 0)
-                    {
-                        Log("There is no browser helper in this game folder, so Windows has nothing to ask about.");
-                        btnFirewall.IsEnabled = true;
-                        return;
-                    }
-
-                    Log("Writing the firewall rule. Windows will ask for administrator.");
-                    ThreadPool.QueueUserWorkItem(delegate
-                    {
-                        string said = null;
-                        try { said = Firewall.Ensure(delegate(string line) { Tell(line); }); }
-                        catch (Exception ex) { said = "Could not write the rule: " + ex.Message; }
-                        string final = said;
-                        try
-                        {
-                            win.Dispatcher.BeginInvoke((Action)delegate
-                            {
-                                if (!string.IsNullOrEmpty(final)) Log(final);
-                                btnFirewall.IsEnabled = true;
-                            });
-                        }
-                        catch { }
-                    });
-                };
-            }
 
             // Once the window is on screen, so a question has something to sit
             // in front of and the check does not hold up the first draw.
@@ -89,13 +50,6 @@ namespace Thornswood
             };
 
             DrawOwnGame();
-        }
-
-        /// <summary>A log line from a pool thread, put back on the window's.</summary>
-        static void Tell(string line)
-        {
-            try { win.Dispatcher.BeginInvoke((Action)delegate { Log(line); }); }
-            catch { }
         }
 
         static void OwnGameAtStart()
@@ -198,6 +152,43 @@ namespace Thornswood
                 };
                 try { said = make ? OwnGame.Make(c, say) : OwnGame.Refresh(c, say); }
                 catch (Exception ex) { fail = ex.Message; }
+
+                // The firewall rule for the game's browser, written here
+                // because here is where the reason for it happens.
+                //
+                // Skyrim Platform draws the interface in a second program, and
+                // a firewall rule is tied to a program's full path. Every other
+                // server runs from the Steam copy, so that path was decided
+                // once, long ago, and nobody is asked again. Giving Thornswood
+                // a folder of its own makes the same file a new program as far
+                // as Windows is concerned, and that is the entire reason anyone
+                // here sees the prompt. This folder is what moved it, so this
+                // is what should settle it.
+                //
+                // It asks for administrator, which is unavoidable: only
+                // administrators may write firewall rules. It is also why this
+                // is not a button of its own. A prompt inside a folder build
+                // somebody started, which already says it is setting the folder
+                // up, is a prompt with a reason attached. A lone button
+                // offering to quieten a security warning is not, however true
+                // the words beside it are.
+                //
+                // Saying no costs nothing. The rule is a block, this never
+                // needed the network, and the only consequence of refusing is
+                // that Windows asks once on the first launch instead.
+                if (fail == null)
+                {
+                    try
+                    {
+                        if (Firewall.Present().Count > 0)
+                        {
+                            say("Asking Windows to stop querying the game's browser. It will ask for administrator.");
+                            string fw = Firewall.Ensure(say);
+                            if (!string.IsNullOrEmpty(fw)) say(fw);
+                        }
+                    }
+                    catch { }
+                }
 
                 try
                 {
