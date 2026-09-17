@@ -1276,6 +1276,20 @@ http.createServer(async (req, res) => {
     // Still has to be somebody who is allowed in at all. A ticket from an
     // account that has been banned or has left owns nothing.
     const st = await standingCached(t.d);
+    /*
+      Could not ask Discord is not the same answer as not allowed.
+
+      standing() leaves play false on any lookup that failed, and sets
+      lookupFailed to say why, because a 404 is the only failure that really
+      means "not in the server". Answering 200 with ok false here would turn a
+      Discord outage into every new character being refused their profession
+      and home town, and voice-server.js reads a non-200 as unchecked and
+      stores the choice anyway, which is exactly the behaviour a failed lookup
+      should get. /api/allowed a few routes down already does this.
+    */
+    if (st.lookupFailed) {
+      return sendJson(res, 503, { ok: false, why: 'could not ask Discord' });
+    }
     if (!st.play || st.banned) return sendJson(res, 200, { ok: false, why: 'role' });
 
     const linked = jsonFile(LINKED, {});
