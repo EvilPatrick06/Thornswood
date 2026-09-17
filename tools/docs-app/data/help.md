@@ -123,7 +123,9 @@ they are usually the difference between a fix and a guess.
 - The creation hall is empty on purpose. Your trade and town come from the
   launcher, and the hall is only where the face gets made.
 
-All of that is deliberate and explained on [Known Issues](/known).
+All of that is deliberate. None of it is worth reporting. [Known Issues](/known)
+covers the rest of what a shared Skyrim cannot do, and which of it is going to
+change.
 
 ## Restart warnings
 

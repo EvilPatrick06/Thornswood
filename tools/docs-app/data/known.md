@@ -1,38 +1,39 @@
-# Known Issues, Not Being Fixed
+# Known Issues
 
-Permanent limits of how this server works. None are bugs, none are changing. Not worth reporting.
+What is limited or broken right now, and why. Worth reading before you report
+something, because a lot of what looks like a bug is how a shared Skyrim has
+to work.
 
-## Engine and architecture
+Not all of it is permanent. The first group follows from SkyMP itself and is
+not going to change. Everything after it is where things stand today, and some
+of that is being worked on.
+
+## Limits of a shared Skyrim
+
+These follow from the server owning the world instead of your own machine.
+They are not going to change.
 
 | Behaviour | Reason |
 |---|---|
 | NPCs stand still when nobody is nearby | SkyMP has no server side AI. An NPC is simulated by a nearby machine or not at all |
 | NPC behaviour differs between people near the same enemy | Hosting changes every 2 seconds, so whoever is simulating decides the outcome |
-| No saving, manual or auto | Switched off deliberately. Characters live on the server |
-| Mod settings menus reset every session | Follows from no saves. There is no co-save to write to |
+| Mod settings menus reset every session | Your character lives on the server rather than in a save file, so there is no co-save for a mod to write its settings into |
 | Most mod scripts never fire | All Papyrus events except OnUpdate are blocked. Records still work, scripted behaviour does not |
-| No levelling or skill gain | Skill experience is zeroed |
-| Difficulty locked to Expert | The client writes it back every 60 updates, so the slider does nothing |
-| Fast travel off | Re-disabled within one frame if anything turns it on |
-| Game time follows the real clock | Written every 2 seconds, so anything scheduled by game hour drifts |
 | Killmoves and stagger do not show on other people | Those animation events are blanked |
 
-## Mods that cannot work as installed
+## Mods that do not work as installed
 
-| Mod | Reason |
+These are in the collection and do nothing useful. Whether each one is
+replaced with a version that works here, or comes out of the list, is not
+settled yet.
+
+| Mod | What happens |
 |---|---|
 | SunHelm Survival | Polls on a timer, the one script type still running. Writes health, stamina, magicka and carry weight against a server that crops and corrects them |
 | SunHelm Diseases | Same, and depends on SunHelm |
+| Respawn - Death Overhaul | Sets you essential and runs its own death handler. Death cannot complete on your own machine and the server owns respawn, so it can only fight the server |
+| Tavern Games | Creates gold on your own machine, which the server does not accept. The games run and the coin never arrives |
 | Immersive Armors, standard version | Distributes through a script with settings that do not persist. A script free version exists |
-
-## Taken out
-
-These were in the list and are not any more. They were added before it was clear they could not work here, and leaving them in meant the release notes advertised them while this page said they did nothing.
-
-| Mod | Why it went |
-|---|---|
-| Respawn - Death Overhaul | Sets you essential and runs its own death handler. Death cannot complete on your own machine and the server owns respawn, so it could only ever fight the server |
-| Tavern Games | Creates gold on your own machine, which the server does not accept. The games ran and the coin never arrived |
 
 ## What the server owns
 
