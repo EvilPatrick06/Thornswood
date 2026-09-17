@@ -563,6 +563,20 @@ namespace Thornswood
             if (Regex.IsMatch(rel, @"^Data\\Meshes\\weapons\\kzl\\", I)) return true;
             if (Regex.IsMatch(rel, @"^Data\\Scripts\\Kzl[^\\]*\.pex$", I)) return true;
             if (leaf.StartsWith("DaedricItemUseProbe", StringComparison.OrdinalIgnoreCase)) return true;
+            // NirnLab UI Platform, another server's interface framework, and
+            // the one thing this folder must not be handed.
+            //
+            // SkyrimPlatform will not start on its own browser while NirnLab is
+            // in the folder. NirnLab puts its directory on the process PATH, its
+            // libcef.dll is loaded instead of the one in
+            // Data\Platform\Distribution, and SkyrimPlatform stops with "Your PATH
+            // environment variable contains incompatible entries" before the game
+            // draws anything. Measured on 17 Sep in a folder this class built.
+            //
+            // It is also what brings CEFSubprocess.exe, which is the second
+            // program Windows Firewall stops the game to ask about.
+            if (rel.StartsWith("Data\\NirnLabUIPlatform\\", StringComparison.OrdinalIgnoreCase)) return true;
+            if (leaf.Equals("NirnLabUIPlugin.dll", StringComparison.OrdinalIgnoreCase)) return true;
             // The client's per machine sign in data. It holds an access token.
             if (rel.StartsWith("Data\\Platform\\PluginsNoLoad\\", StringComparison.OrdinalIgnoreCase)) return true;
 
@@ -631,7 +645,7 @@ namespace Thornswood
         static bool MustCopy(string rel)
         {
             if (rel.IndexOf('\\') < 0) return true;
-            foreach (string d in new string[] { "Data\\Platform\\", "Data\\NirnLabUIPlatform\\", "Data\\SKSE\\", "Data\\MCM\\", "Data\\Video\\" })
+            foreach (string d in new string[] { "Data\\Platform\\", "Data\\SKSE\\", "Data\\MCM\\", "Data\\Video\\" })
                 if (rel.StartsWith(d, StringComparison.OrdinalIgnoreCase)) return true;
             foreach (string m in Masters)
                 if (rel.Equals(m, StringComparison.OrdinalIgnoreCase)) return true;
