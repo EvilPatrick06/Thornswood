@@ -328,9 +328,14 @@ namespace Thornswood
             {
                 r = new Row();
                 r.Slot = slot;
-                // The first slot inherits profile 1, which is whoever has been
-                // playing up to now. Anything else starts somewhere new.
-                r.Id = (slot == 1 && !fresh) ? 1 : NextProfileId();
+                // Always a new id. This used to hand slot one profile 1 when it
+                // had no row, meaning "whoever has been playing up to now", and
+                // that is how every fresh install with old single player saves
+                // logged in as one shared character (17 Sep): Adopt moved the
+                // saves into slot one, the card read them as a character and
+                // said Play, and Claim(1, false) returned 1. Nobody legitimate
+                // is on profile 1; it is the stale shared character.
+                r.Id = NextProfileId();
                 rows.Add(r);
             }
             else if (fresh)
@@ -380,6 +385,12 @@ namespace Thornswood
                     if (t > best) { best = t; newest = saves[i]; }
                 }
                 var got = Header(newest, slot);
+                // A save file alone is not a character. Under SkyMP the
+                // character lives on the server and the profiles.txt row is
+                // what says a slot has one. A slot with saves and no row is
+                // holding somebody's old single player saves, and calling
+                // that a character is what put Play over them.
+                if (row == null) got.Empty = true;
                 got.Saves = saves.Length;
                 got.ProfileId = w.ProfileId;
                 got.LastPlayed = w.LastPlayed;
@@ -462,21 +473,15 @@ namespace Thornswood
         /// </summary>
         public static void Adopt()
         {
+            // Only the slot folders are made here now. This used to move the
+            // saves in the real Saves folder into character one so they would
+            // not be stranded, which was right when a save was the character.
+            // Under SkyMP a save on this disk is nobody's character, and moving
+            // somebody's single player saves into slot one made the card read
+            // them as a Thornswood character (see Read and Claim). Use sets the
+            // real folder aside whole instead, and nothing is moved into a slot.
             Directory.CreateDirectory(Home);
             for (int i = 1; i <= Slots; i++) Directory.CreateDirectory(SlotDir(i));
-
-            string live = Files.SaveDir;
-            if (IsLink(live)) return;
-            if (!Directory.Exists(live)) return;
-
-            string[] existing = Directory.GetFiles(live, "*.ess");
-            if (existing.Length == 0) return;
-            if (Directory.GetFiles(SlotDir(1), "*.ess").Length > 0) return;
-
-            foreach (string f in Directory.GetFiles(live))
-            {
-                try { File.Move(f, Path.Combine(SlotDir(1), Path.GetFileName(f))); } catch { }
-            }
         }
 
         /// <summary>
@@ -499,6 +504,7 @@ namespace Thornswood
             Directory.CreateDirectory(Path.GetDirectoryName(live));
 
             string trouble = null;
+            string setAside = null;
             if (IsLink(live))
             {
                 try { Directory.Delete(live); }
@@ -506,19 +512,31 @@ namespace Thornswood
             }
             else if (Directory.Exists(live))
             {
-                // A real folder here means saves that belong to nobody yet.
-                Adopt();
-                try { Directory.Delete(live, true); }
-                catch (Exception ex)
+                // A real folder here is somebody's own Skyrim saves, and they
+                // are never deleted. This used to Adopt them into slot one and
+                // then Directory.Delete the folder recursively; Adopt declined
+                // whenever slot one already had a save, and the delete took the
+                // person's saves with it. A folder with anything in it is set
+                // aside whole, next to where it was, under a name that says
+                // what it is. Only an empty one is removed.
+                bool empty = false;
+                try { empty = Directory.GetFileSystemEntries(live).Length == 0; } catch { }
+                if (empty)
                 {
-                    // Something in it is open or protected. Set the whole folder
-                    // aside under a name that says what it is; nothing is lost.
+                    try { Directory.Delete(live); }
+                    catch (Exception ex) { trouble = "the empty Saves folder would not come off: " + ex.Message; }
+                }
+                else
+                {
                     string aside = live + "-before-Thornswood-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
-                    try { Directory.Move(live, aside); }
+                    try
+                    {
+                        Directory.Move(live, aside);
+                        setAside = "Your own Skyrim saves were set aside whole in " + aside + ". Nothing was deleted.";
+                    }
                     catch (Exception ex2)
                     {
-                        trouble = "the Saves folder would not clear (" + ex.Message.TrimEnd('.') +
-                                  ") and would not move aside either (" + ex2.Message.TrimEnd('.') + ")";
+                        trouble = "the Saves folder has files in it and would not move aside (" + ex2.Message.TrimEnd('.') + ")";
                     }
                 }
             }
@@ -551,6 +569,7 @@ namespace Thornswood
             try { File.WriteAllText(ActiveFile, slot.ToString()); } catch { }
             WriteStartIni(fresh);
             WriteBrowserBackend();
+            if (setAside != null) note = (note == null ? "" : note + " ") + setAside;
             return note;
         }
 

@@ -202,6 +202,7 @@ namespace Thornswood
                 try { if (File.Exists(logFile)) logStart = new FileInfo(logFile).Length; } catch { }
 
                 status("Part " + (i + 1) + " of 3: asking Steam for depot " + depot + "...");
+                log("Part " + (i + 1) + " of 3, depot " + depot + ": " + cmd);
                 bool typed = TypeIntoConsole(cmd, log);
                 if (!typed)
                 {
@@ -235,8 +236,15 @@ namespace Thornswood
                     }
                     if (!started)
                     {
+                        // Whatever Steam put in its own content log since the
+                        // command. A real refusal ("No connection", a manifest
+                        // error) shows here; nothing here means the command
+                        // never reached the console's command line at all.
+                        string tail = NewLog(logFile, logStart);
+                        if (tail.Length > 0) log("Steam's content log since the command:" + Environment.NewLine + tail);
+                        else log("Steam wrote nothing to its content log, so the command did not reach the console's command line. Steam's console has to be the window in front with its command line clicked.");
                         TryClipboard(cmd);
-                        log("Still nothing from Steam. The command is on your clipboard: click in the Steam console's command line, press Ctrl+V and Enter. This keeps watching for it.");
+                        log("The command is on your clipboard: click in the Steam console's command line, press Ctrl+V and Enter. This keeps watching for it.");
                     }
                 }
 
@@ -576,6 +584,26 @@ namespace Thornswood
 
         // ---------------------------------------------------------- watching
 
+        /// <summary>The last few lines Steam wrote to its content log since <paramref name="from"/>, for the launcher log when a depot will not start.</summary>
+        static string NewLog(string logFile, long from)
+        {
+            try
+            {
+                if (!File.Exists(logFile)) return "";
+                using (var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    if (fs.Length <= from) return "";
+                    fs.Seek(from, SeekOrigin.Begin);
+                    var buf = new byte[fs.Length - from];
+                    int n = fs.Read(buf, 0, buf.Length);
+                    string[] lines = Encoding.UTF8.GetString(buf, 0, n).Replace("\r", "").Trim().Split('\n');
+                    int take = Math.Min(lines.Length, 12);
+                    return string.Join(Environment.NewLine, lines, lines.Length - take, take).Trim();
+                }
+            }
+            catch { return ""; }
+        }
+
         static bool LogSays(string logFile, long from, string needle)
         {
             try
@@ -614,8 +642,9 @@ namespace Thornswood
                     string s = Encoding.UTF8.GetString(buf, 0, n);
                     foreach (string line in s.Split('\n'))
                     {
-                        if (line.IndexOf("Depot download complete", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                            line.IndexOf("depot_" + depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                        if (line.IndexOf("Depot download complete", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        if (line.IndexOf("depot_" + depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                        if (line.IndexOf(depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
                     }
                 }
             }

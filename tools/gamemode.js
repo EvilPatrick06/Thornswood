@@ -2774,6 +2774,23 @@ log('gamemode loaded:',
       return;
     }
 
+    // So does an update. The server stays up through a launcher update, and
+    // a kick with no process restart behind it leaves the kicked character's
+    // actor in a state where the reconnecting client is never sent the world:
+    // 17 Sep, one existing character, 13 reconnects after two such kicks,
+    // every one of them dead (no hits, no deaths, no hoster changes, "all the
+    // NPCs are gone"), while the same character reconnected fine after the
+    // 01:00 process restart and fresh characters always worked. The kick
+    // gained nothing anyway: the client reconnects on its own in three
+    // seconds, and since 1.1.41 the launcher closes the game itself five
+    // minutes after it sees the update. The 'restart' mode still kicks, a
+    // process restart follows it and that reconnect works.
+    if (restart.mode === 'update') {
+      broadcast(parting());
+      log('update: told', online.length, 'people, nobody disconnected; the launcher closes the game for the update');
+      return;
+    }
+
     var gone = 0;
     for (var i = 0; i < online.length; i++) {
       var actorId = online[i];
