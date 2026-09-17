@@ -226,6 +226,26 @@ function Test-ServerOwn([string]$rel) {
         if ($leaf -like 'DaedricItemUseProbe*') { return $true }
         if ($rel -match '^Data\\Platform\\UI\\[^\\]*daedric') { return $true }
     }
+    # NirnLab UI Platform, which is another server's interface framework and
+    # the one thing Thornswood's own folder must not be given.
+    #
+    # SkyrimPlatform will not start on its own tilted backend while NirnLab is
+    # in the folder. NirnLab puts its directory on the process PATH, its
+    # libcef.dll is then loaded instead of the one in
+    # Data\Platform\Distribution, and SkyrimPlatform stops with "Your PATH
+    # environment variable contains incompatible entries" before the game
+    # draws anything. Measured on 17 Sep in a folder this script had built.
+    #
+    # Leaving it out is also what stops CEFSubprocess.exe being here at all.
+    # That is the second program Windows Firewall asks about, and no server
+    # that draws its own interface in process ever asks anybody that.
+    #
+    # Nothing in the plugins this game loads asks for NirnLab.
+    # Package-Thornswood keeps it out of the installer and Clean-OtherServers
+    # calls it another roleplay server's. The copy in the Steam folder is not
+    # touched, because that one is Vortex's.
+    if ($rel -match '^Data\\NirnLabUIPlatform(\\|$)') { return $true }
+    if ($leaf -ieq 'NirnLabUIPlugin.dll') { return $true }
     # Another plugin beside the client that is not Thornswood's. Said out loud
     # below, because the folder alone cannot say which server it came from.
     if ($rel -match '^Data\\Platform\\Plugins\\[^\\]+\.js$' -and $leaf -notlike 'thornswood-*' -and $leaf -ine 'skymp5-client.js') { return $true }
@@ -253,7 +273,7 @@ foreach ($b in @(Get-ChildItem -LiteralPath $Source -Directory -Filter 'keizaal-
 $copyTypes = @('.ini','.json','.toml','.txt','.cfg','.xml','.yaml','.yml','.js','.html','.htm','.css','.dll','.exe','.asi','.bat','.cmd','.ps1','.count','.bak','.ess','.skse','.md','.csv','.jslot')
 function Test-MustCopy([string]$rel) {
     if ($rel -notmatch '\\') { return $true }
-    if ($rel -match '^Data\\(Platform|NirnLabUIPlatform|SKSE|MCM|Video)\\') { return $true }
+    if ($rel -match '^Data\\(Platform|SKSE|MCM|Video)\\') { return $true }
     if ($masters -contains $rel) { return $true }
     if ($replaced.Contains($rel)) { return $true }
     if ($rel -match '^keizaal-backup-') { return $true }
