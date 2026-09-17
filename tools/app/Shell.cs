@@ -3197,6 +3197,22 @@ namespace Thornswood
             }
             catch { }
 
+            // The dev build is a second install in a folder of its own, beside
+            // this one, with its own launcher and its own game folder. Nothing
+            // here removes it and nothing here can: every path this uninstall
+            // deletes has to sit under Root, and that fence is the reason a
+            // wrong entry in a list can never become rmdir pointed at somebody's
+            // game. So it is named instead of quietly left, because somebody who
+            // has just uninstalled Thornswood and still has a Thornswood
+            // launcher on their machine is owed the reason.
+            try
+            {
+                if (Directory.Exists(DevBuild.Root))
+                    stays.AppendLine("    the dev build at " + DevBuild.Root +
+                                     "   (its own launcher uninstalls it)");
+            }
+            catch { }
+
             stays.AppendLine("    Windows' own Skyrim settings and saves");
 
             var r1 = MessageBox.Show(
