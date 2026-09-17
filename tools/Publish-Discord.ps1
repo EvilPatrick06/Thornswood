@@ -9,10 +9,27 @@
 
     .\Publish-Discord.ps1
     .\Publish-Discord.ps1 -Quiet
+    .\Publish-Discord.ps1 -Dev
+    .\Publish-Discord.ps1 -DryRun
+
+  -DryRun prints what it would post and sends nothing. Running this script at
+  all is how a release that went out days ago gets announced a second time,
+  because it always posts whatever is newest in the feed and has no idea it
+  has posted it before. Anybody trying the script out, rather than shipping,
+  wants -DryRun.
 
   Called by Ship.ps1 at the end of every release, so it is usually not run on
   its own. If tools\discord\news-webhook.txt is not there it does nothing and
   says so quietly, so a machine without the Discord set up still ships fine.
+
+  -Dev is the dev build's release, and it is a different channel, a different
+  feed and a different webhook. It reads the dev release worktree
+  (Thornswood-Releases-dev) rather than the live one, and it posts through
+  tools\discord\dev-webhook.txt, which Set-DevNews.ps1 writes and which points
+  at the dev updates channel. Nothing about a dev release reaches #news, the
+  website or the main launcher: Ship.ps1 does not run Publish-News.ps1 on a
+  dev release, and a dev publish only ever writes the dev feed, which only the
+  dev launcher reads.
 
   Two things this used to get wrong, both visible in the channel:
 
@@ -29,6 +46,10 @@
 [CmdletBinding()]
 param(
   [string]$Webhook,
+  # The dev build's release, into the dev updates channel. See the note above.
+  [switch]$Dev,
+  # Print the post and send nothing.
+  [switch]$DryRun,
   # Where the LIVE version.json is. Same reason Publish-News.ps1 has this:
   # releases moved into their own public repo, and the copy still sitting in
   # this repo stopped being updated the day that happened. Reading the stale
@@ -63,13 +84,30 @@ function PropList($obj, $name) {
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 
+# A dev release is announced somewhere else entirely, through a webhook of its
+# own, so there is no way for one to arrive in #news by accident.
+$hookName = if ($Dev) { 'dev-webhook.txt' } else { 'news-webhook.txt' }
 if (-not $Webhook) {
-  $f = Join-Path $Here 'discord\news-webhook.txt'
+  $f = Join-Path $Here "discord\$hookName"
   if (Test-Path -LiteralPath $f) { $Webhook = (Get-Content $f -Raw).Trim() }
 }
 if (-not $Webhook) {
-  if (-not $Quiet) { Write-Host '  no Discord webhook set up, skipping' -ForegroundColor DarkGray }
+  if (-not $Quiet) {
+    if ($Dev) {
+      Write-Host '  no dev webhook set up, the dev updates channel was not told' -ForegroundColor DarkGray
+      Write-Host '  .\tools\Set-DevNews.ps1 points it at that channel' -ForegroundColor DarkGray
+    } else {
+      Write-Host '  no Discord webhook set up, skipping' -ForegroundColor DarkGray
+    }
+  }
   return
+}
+
+# The dev build follows its own release branch, checked out as a worktree
+# beside the live clone. Reading the live one here would announce main's last
+# release into the dev channel every time a dev build went out.
+if ($Dev -and -not $PSBoundParameters.ContainsKey('ReleaseDir')) {
+  $ReleaseDir = Join-Path (Split-Path -Parent $ReleaseDir) 'Thornswood-Releases-dev'
 }
 
 $repoV = Join-Path (Split-Path -Parent $Here) 'version.json'
@@ -94,6 +132,8 @@ $n = @(PropList $v 'news')[0]
 if (-not $n) { if (-not $Quiet) { Write-Host '  nothing to post' }; return }
 
 $logo = "$Site/logo.png"
+# Who the post is from. Said once, used in three places.
+$devName = if ($Dev) { 'Thornswood dev' } else { 'Thornswood' }
 
 # ------------------------------------------------------------------ cleaning
 # The same list Publish-News.ps1 strips on the way to the website. Lines that
@@ -175,7 +215,12 @@ if ($text.Length -le 3900) {
 
 # The else has to sit on the closing brace. PowerShell treats a newline in
 # front of it as the end of the statement and then fails on a stray else.
-$tail = if ($over) { "`n`n[Read the rest on the website]($Site/news)" } else { "`n`n[Every release]($Site/news)" }
+# The website's news page is main's list. A dev release is not on it and never
+# will be, so a dev post links to nothing rather than to somewhere wrong.
+$tail = if ($Dev) {
+  if ($over) { "`n`n(the rest is in the dev launcher's News tab)" } else { '' }
+} elseif ($over) { "`n`n[Read the rest on the website]($Site/news)" }
+  else { "`n`n[Every release]($Site/news)" }
 if ($second) { $second += $tail } else { $first += $tail }
 
 $count = @(PropList $n 'files').Count
@@ -183,17 +228,22 @@ $count = @(PropList $n 'files').Count
 # byte order mark is read as ANSI by Windows PowerShell and a middle dot typed
 # straight into the file comes out the other end as something else.
 $dot   = [string][char]0x00B7
-$foot  = 'launcher ' + (Prop $v 'launcherVersion')
+$foot  = $(if ($Dev) { 'dev build ' } else { 'launcher ' }) + (Prop $v 'launcherVersion')
 $date  = Prop $n 'date'
 if ($date)    { $foot += "  $dot  $date" }
 if ($count)   { $foot += "  $dot  $count file$(if ($count -ne 1) {'s'}) changed" }
 
 $title = Prop $n 'title'
+# Said in the title as well as the footer. The dev channel is the one place
+# the two builds' notes could ever be taken for each other.
+if ($Dev) { $title = 'Dev build: ' + $title }
 if ($title.Length -gt 250) { $title = $title.Substring(0, 247) + '...' }
 
 $last = @{
   description = $(if ($second) { $second } else { $first })
-  color       = 13214795          # the launcher's gold
+  # Gold for the release everybody gets, a colder blue for the dev build, so
+  # the two are never taken for each other at a glance.
+  color       = $(if ($Dev) { 5477574 } else { 13214795 })
   footer      = @{ text = $foot; icon_url = $logo }
   timestamp   = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 }
@@ -201,17 +251,17 @@ $last = @{
 if ($second) {
   $embeds = @(
     @{
-      author      = @{ name = 'Thornswood'; url = $Site; icon_url = $logo }
+      author      = @{ name = $devName; url = $Site; icon_url = $logo }
       title       = $title
       url         = "$Site/news"
       description = $first
-      color       = 13214795
+      color       = $(if ($Dev) { 5477574 } else { 13214795 })
       thumbnail   = @{ url = $logo }
     },
     $last
   )
 } else {
-  $last['author']    = @{ name = 'Thornswood'; url = $Site; icon_url = $logo }
+  $last['author']    = @{ name = $devName; url = $Site; icon_url = $logo }
   $last['title']     = $title
   $last['url']       = "$Site/news"
   $last['thumbnail'] = @{ url = $logo }
@@ -219,12 +269,26 @@ if ($second) {
 }
 
 $payload = @{
-  username   = 'Thornswood'
+  username   = $devName
   # Without this a webhook posts under the plain blue Discord mark, whatever
   # avatar the application itself has.
   avatar_url = $logo
   embeds     = $embeds
 } | ConvertTo-Json -Depth 8
+
+if ($DryRun) {
+  Write-Host ''
+  Write-Host "  would post to $(if ($Dev) { 'the dev updates channel' } else { '#news' }): $title" -ForegroundColor Yellow
+  Write-Host '  ---' -ForegroundColor DarkGray
+  foreach ($e in $embeds) {
+    ($e.description -split "`n") | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
+  }
+  Write-Host '  ---' -ForegroundColor DarkGray
+  Write-Host "  $foot" -ForegroundColor DarkGray
+  Write-Host ''
+  Write-Host '  -DryRun, so nothing was sent.' -ForegroundColor Yellow
+  return
+}
 
 try {
   Invoke-RestMethod -Uri $Webhook -Method Post -ContentType 'application/json' `
