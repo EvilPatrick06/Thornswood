@@ -269,9 +269,12 @@ async def on_member_join(member):
 
 
 # --------------------------------------------------------------- tickets --
+# 'Apply to play' is not here on purpose. Everybody in the world right now is
+# a playtester, so that is the one application to be in it, and when the doors
+# open there will be no application to play at all. Leaving both up asked
+# people to guess which one they wanted and half of them guessed wrong.
 KINDS = [
-    ('apply',       'Apply to play',        'The one everybody starts with. Gets you into the world.'),
-    ('playtest',    'Apply to playtest',    'Break it on purpose and write down how.'),
+    ('playtest',    'Apply to playtest',    'How you get in. Break it on purpose and write down how.'),
     ('jarl',        'Apply: Jarl',          'A seat in a hold. In character, and the first ones come out of these.'),
     ('gamemaster',  'Apply: Gamemaster',    'Run events, settle disputes, hold the line in character.'),
     ('loremaster',  'Apply: Loremaster',    'Keep the history straight and write the rest of it.'),
@@ -315,7 +318,7 @@ def _job(what, examples):
 # box to tick. What it is worth is the record: their own words, against their
 # Discord id, at a time, kept in the thread and in the site inbox.
 AGE_Q = ('Are you 18 or over?', 'Thornswood is an adult server. Yes or no.', False)
-AGE_KINDS = ('apply', 'playtest')
+AGE_KINDS = ('playtest',)
 
 _NO  = ('no', 'nope', 'nah', 'not ', 'under', 'minor')
 _YES = ('yes', 'yep', 'yeah', 'yup', 'y ', 'ye', 'i am', 'im ', "i'm ", 'sure',
@@ -350,17 +353,15 @@ def said_yes(text):
 
 
 QUESTIONS = {
-    'apply': [
+    # The one application to be in the world. It asks about testing because
+    # that is what being in it is right now, and about the person because a
+    # character still has somebody behind it.
+    'playtest': [
         AGE_Q,
         ('Who are you, outside the game?', 'Whatever you want to say. Nobody is checking papers.', False),
         ('Have you roleplayed before, and where?', 'No is a perfectly good answer.', True),
-        ('Who do you want to play?', 'A sentence about the character, not a biography.', True),
-    ],
-    'playtest': [
-        AGE_Q,
-        ('What have you tested before?', 'Other servers, mod lists, betas, your own builds.', False),
         ('How much time can you give it?', 'Hours a week, and which days.', True),
-        ('Describe a bug you have run into', 'What you did, what happened, what should have happened. Short.', True),
+        ('Who do you want to play?', 'A sentence about the character, not a biography.', True),
     ],
     # The only application here that is answered in character. The seats are
     # empty and the first people to hold them are picked out of these, so the
@@ -699,10 +700,11 @@ class TicketPicker(discord.ui.Select):
 
 
 PANEL = ('**Open a ticket**\n\n'
-         'Pick the one that fits. It asks three questions, then opens a thread '
+         'Pick the one that fits. It asks a few questions, then opens a thread '
          'only you and staff can see. Nothing here is public and nobody else in '
          'the server can read it.\n\n'
-         '**Apply to play** is the one everybody starts with. **Apply: Jarl** is '
+         '**Apply to playtest** is the one everybody starts with, and it is how '
+         'you get into the world. **Apply: Jarl** is '
          'answered in character: the seats are empty, and the first people to '
          'hold them are picked out of what is written there.\n\n'
          'The jobs below that are open to anybody already in, and they are jobs '

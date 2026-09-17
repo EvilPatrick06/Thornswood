@@ -321,16 +321,6 @@
             "by": ""
           },
           {
-            "id": "r39",
-            "done": false,
-            "cells": {
-              "c35": "No saving, manual or auto",
-              "c36": "Switched off deliberately. Characters live on the server"
-            },
-            "at": 0,
-            "by": ""
-          },
-          {
             "id": "r40",
             "done": false,
             "cells": {
@@ -346,46 +336,6 @@
             "cells": {
               "c35": "Most mod scripts never fire",
               "c36": "All Papyrus events except OnUpdate are blocked. Records still work, scripted behaviour does not"
-            },
-            "at": 0,
-            "by": ""
-          },
-          {
-            "id": "r42",
-            "done": false,
-            "cells": {
-              "c35": "No levelling or skill gain",
-              "c36": "Skill experience is zeroed"
-            },
-            "at": 0,
-            "by": ""
-          },
-          {
-            "id": "r43",
-            "done": false,
-            "cells": {
-              "c35": "Difficulty locked to Legendary",
-              "c36": "Rewritten every 60 ticks"
-            },
-            "at": 0,
-            "by": ""
-          },
-          {
-            "id": "r44",
-            "done": false,
-            "cells": {
-              "c35": "Fast travel off",
-              "c36": "Re-disabled within one frame if anything turns it on"
-            },
-            "at": 0,
-            "by": ""
-          },
-          {
-            "id": "r45",
-            "done": false,
-            "cells": {
-              "c35": "Game time follows the real clock",
-              "c36": "Written every 2 seconds, so anything scheduled by game hour drifts"
             },
             "at": 0,
             "by": ""
