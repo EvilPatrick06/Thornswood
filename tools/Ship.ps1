@@ -269,6 +269,59 @@ if (-not $ModsOnly) {
     }
 }
 
+# ------------------------------------------------------- the in game plugins
+# The plugins are source in this repo and files in the game folder, and Go.ps1
+# is the only thing that moves one to the other. Ship never did it, so a release
+# carried whichever copy happened to be sitting in the folder. On 17 Sep that
+# published a dev build with day old plugins from a machine where the source had
+# changed and nobody had run Go, and the publisher could not see it: to the
+# publisher the file simply had not changed.
+#
+# So it happens here, before anything is scanned, into the same folder the
+# client patch and the publisher use. SkipServer because this is a build step
+# and has no business talking to the VPS.
+$GameDir = Join-Path $Root 'Game'
+if (-not (Test-Path -LiteralPath (Join-Path $GameDir 'SkyrimSE.exe'))) { $GameDir = '' }
+
+Head 'The in game plugins'
+$goArgs = @{ SkipServer = $true }
+if ($GameDir) { $goArgs['Game'] = $GameDir } else { $goArgs['Vortex'] = $true }
+# Write-Host does not go down the pipeline, so Out-Null does not quiet it.
+# 6 is the information stream Write-Host actually uses. Nothing is lost:
+# Go.ps1 reports in colour and exits 0 either way, and the check below is
+# what decides whether this step passed.
+& (Join-Path $Here 'Go.ps1') @goArgs 6>$null | Out-Null
+
+# Go.ps1 reports trouble in yellow and still exits 0, so the files are checked
+# rather than the exit code. This is the guard that makes the step worth having:
+# a plugin that did not land stops the release instead of shipping stale.
+if ($GameDir) {
+    $plugSrc = Join-Path $Here 'ts-plugins'
+    $plugDst = Join-Path $GameDir 'Data\Platform\Plugins'
+    $stale = @()
+    $seen  = 0
+    foreach ($f in @(Get-ChildItem -LiteralPath $plugSrc -Filter '*.js' -File -EA SilentlyContinue)) {
+        $seen++
+        $dst = Join-Path $plugDst $f.Name
+        if (-not (Test-Path -LiteralPath $dst)) { $stale += ($f.Name + ' never arrived'); continue }
+        $a = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash
+        $b = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
+        if ($a -ne $b) { $stale += ($f.Name + ' in the game folder is not this source') }
+    }
+    if ($stale.Count) {
+        foreach ($line in $stale) { Say "  $line" 'Red' }
+        Unbump 'the in game plugins are not this source'
+        Die 'The plugins in the game folder are not the ones in this repo. Nothing was published.'
+    }
+    if ($seen -eq 0) {
+        Unbump 'there are no in game plugins to ship'
+        Die 'tools\ts-plugins has no .js in it. Nothing was published.'
+    }
+    Say "  $seen plugin(s) in the game folder match this source" 'Green'
+} else {
+    Say '  installed into the Steam copy; no own game folder to check them against' 'Yellow'
+}
+
 # ------------------------------------------------------------ client patch
 # The client bundle has to send the login this server answers, and the copy in
 # the game folder is the only source there is: nothing in the repo builds it.
@@ -281,8 +334,7 @@ $LASTEXITCODE = 0
 # of its own (OwnGame.cs) that is not the Steam copy, and patching the Steam copy
 # would publish an unpatched client out of the build's folder.
 $patchArgs = @{}
-$ownGameDir = Join-Path $Root 'Game'
-if (Test-Path -LiteralPath (Join-Path $ownGameDir 'SkyrimSE.exe')) { $patchArgs['Game'] = $ownGameDir }
+if ($GameDir) { $patchArgs['Game'] = $GameDir }
 & (Join-Path $Here 'Patch-Client.ps1') @patchArgs
 if ($LASTEXITCODE -ne 0) {
     Unbump 'the client patch did not apply'
