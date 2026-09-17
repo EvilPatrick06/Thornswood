@@ -75,13 +75,17 @@ foreach (`$d in @('$rootWin','$rootWin\public','$rootWin\data','$rootWin\files',
 
 Write-Host ''
 Write-Host 'Sending the site...'
-Push (Join-Path $App 'server.js')          "$Root/server.js"
-Push (Join-Path $App 'public/index.html')  "$Root/public/index.html"
-Push (Join-Path $App 'public/home.html')   "$Root/public/home.html"
-Push (Join-Path $App 'public/ridge.svg')   "$Root/public/ridge.svg"
-Push (Join-Path $App 'public/logo.png')    "$Root/public/logo.png"
-Push (Join-Path $App 'public/favicon.ico') "$Root/public/favicon.ico"
-Write-Host '  server.js, index.html, home.html, ridge.svg, logo.png, favicon.ico'
+Push (Join-Path $App 'server.js') "$Root/server.js"
+Write-Host '  server.js'
+# Everything in public\, by listing the folder rather than by a list kept here.
+# robots.txt was added and did not go up, because this was six named files and
+# a seventh is invisible to it.
+$sentPublic = @()
+Get-ChildItem (Join-Path $App 'public') -File -EA SilentlyContinue | ForEach-Object {
+  Push $_.FullName "$Root/public/$($_.Name)"
+  $sentPublic += $_.Name
+}
+Write-Host ('  ' + ($sentPublic -join ', '))
 
 # The public pages are markdown like everything else, so they can be edited
 # from the site rather than redeployed. Same rule: only the missing ones go.
