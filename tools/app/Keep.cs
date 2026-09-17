@@ -304,6 +304,7 @@ namespace Thornswood
                         continue;
                     }
                     Directory.CreateDirectory(Path.GetDirectoryName(live));
+                    OwnGame.Unshare(live);
                     File.Copy(kept, live, true);
                     back.Add(Path.GetFileName(rel));
                 }

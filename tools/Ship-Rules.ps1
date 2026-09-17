@@ -17,6 +17,8 @@
       Test-ShipRuntime $rel        written by the game or a tool at runtime; never shipped, listed as removed when it goes
       Test-ShipMachine $rel        one machine's own; never shipped, never removed
       Test-ShipOtherServer $rel    another server's or somebody's sign in; never shipped, never removed
+      Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
+      Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
 
   Paths are relative to the game folder, with backslashes.
 #>
@@ -78,6 +80,10 @@ function Test-ShipRuntime([string]$rel) {
     foreach ($d in $ShipRuntimeDirs) {
         if ($rel.StartsWith($d, 'OrdinalIgnoreCase')) { return $true }
     }
+    # The Claude desktop app has dropped its folder deeper than the game root
+    # as well: Data\Platform\Claude outputs held three scripts on 16 Sep, one
+    # of them written after that machine's baseline.
+    if ($rel -match '(^|\\)Claude outputs\\') { return $true }
     return $false
 }
 
@@ -93,7 +99,25 @@ function Test-ShipRuntime([string]$rel) {
 # master issued it and has no place in a pack or an installer, and it is not
 # ours to delete off a machine either: on a machine that plays Keizaal it is
 # that person's own login.
+#
+# Outside Data\Platform too. Keizaal's launcher writes its plugins, meshes,
+# textures, scripts, a VERSION marker, a backup folder and its own menu files
+# straight into the game; Daedric's keeps a DaedricData folder and a client
+# dll. On 16 Sep every one of these was in a shipping machine's baseline as if
+# it were Thornswood's. OwnGame.Foreign in the launcher leaves the same files
+# out of Thornswood's own game folder; change the two together. Never the bare
+# word daedric, which is a vanilla material.
 function Test-ShipOtherServer([string]$rel) {
+    if ($rel -match '^keizaal-backup-[^\\]*\\') { return $true }
+    if ($rel -match '^DaedricData\\') { return $true }
+    if ($rel -eq 'VERSION') { return $true }
+    if ($rel -match '^Data\\Video\\Interface\\(startmenu|loadwaitspinner)\.swf$') { return $true }
+    if ($rel -match '^Data\\(Keizaal|Kzl)[^\\]*\.(esp|esm|esl|bsa)$') { return $true }
+    if ($rel -match '^Data\\(Meshes|Textures)\\(Keizaal|kzlcustommeshs)\\') { return $true }
+    if ($rel -match '^Data\\Meshes\\weapons\\kzl\\') { return $true }
+    if ($rel -match '^Data\\Scripts\\Kzl[^\\]*\.pex$') { return $true }
+    if ((Split-Path $rel -Leaf) -like 'DaedricItemUseProbe*') { return $true }
+
     if (-not $rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $false }
     $leaf = Split-Path $rel -Leaf
     if ($rel.StartsWith('Data\Platform\PluginsNoLoad\', 'OrdinalIgnoreCase')) { return $true }
@@ -134,4 +158,42 @@ function Test-ShipMachine([string]$rel) {
     if ($leaf -eq '__folder_managed_by_vortex') { return $true }
     if ($leaf -like '*.vortex_backup') { return $true }
     return $false
+}
+
+# Thornswood's own game folder (Root\Game, made by the launcher out of what
+# Vortex deployed into the Steam copy, OwnGame.cs). Most of it is the
+# collection, linked in, and it carries no Vortex record of its own, because
+# those describe the Steam copy and are left there. The launcher's record,
+# Profile\OwnGame\files.txt, has one line per file brought in:
+# kind|origin|size|ticks|path, with origin V for what Vortex deployed. Those
+# are the collection's files and stay out of packs and installers, the same way
+# the Vortex record keeps them out when the game is the Steam copy.
+#
+# Returns the set of paths, or $null when this build has no such record (the
+# game is the Steam copy, or Root\Game came from an installer before 1.1).
+function Get-ShipOwnGameCollection([string]$ProfileDir) {
+    $record = Join-Path $ProfileDir 'OwnGame\files.txt'
+    if (-not (Test-Path -LiteralPath $record)) { return $null }
+    $set = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($line in [IO.File]::ReadLines($record)) {
+        $p = $line.Split([char[]]'|', 5)
+        if ($p.Count -eq 5 -and $p[1] -eq 'V') { [void]$set.Add($p[4]) }
+    }
+    return ,$set
+}
+
+# Where this build's reference plugins.txt and loadorder.txt are read from.
+#   no Root\Game         the Steam copy: Vortex writes them into AppData
+#   an own folder        Profile\OwnGame: the Vortex profile's lists as of the
+#                        folder's last update, which is the collection's order
+#   an older Root\Game   Profile\Default. AppData is only this build's while
+#                        the game runs, so reading it with the game closed
+#                        shipped the ordinary Skyrim's list.
+function Get-ShipLoadOrderDir([string]$Root, [string]$ProfileDir) {
+    if (-not (Test-Path -LiteralPath (Join-Path $Root 'Game'))) {
+        return (Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition')
+    }
+    $own = Join-Path $ProfileDir 'OwnGame'
+    if (Test-Path -LiteralPath (Join-Path $own 'plugins.txt')) { return $own }
+    return (Join-Path $ProfileDir 'Default')
 }

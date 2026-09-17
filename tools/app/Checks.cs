@@ -197,6 +197,10 @@ namespace Thornswood
                 string p = Path.Combine(data, name);
                 try
                 {
+                    // In Thornswood's own folder the plugin is a link to Vortex's
+                    // copy, which every other server's folder may link too.
+                    // Flagging it there would flag it for all of them.
+                    OwnGame.Separate(p);
                     try { File.SetAttributes(p, FileAttributes.Normal); } catch { }
                     using (var fs = new FileStream(p, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
                     {
@@ -399,9 +403,8 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// True only while Skyrim itself is up. The launcher's own exe has
-        /// carried the same name as the multiplayer client at times, so a bare
-        /// name match makes it find itself and never let go of the session.
+        /// True only while Skyrim itself is up, or something it left behind in
+        /// this build's folder is still holding files open.
         /// </summary>
         public static bool GameRunning()
         {
@@ -412,28 +415,45 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The in game browser's helpers. Each one is started by Skyrim and
+        /// usually dies with it, but after a crash they stay behind with no
+        /// window, holding Data\Platform and Data\NirnLabUIPlatform open. Task
+        /// Manager's Processes tab files them under background processes with
+        /// no Skyrim name on them, so they are one way "Skyrim is running" can
+        /// be true with nothing on screen that looks like Skyrim (reported on
+        /// 16 Sep). Counted only when they run out of this build's folder.
+        /// </summary>
+        static readonly string[] Helpers = { "CEFSubprocess", "SkyrimPlatformCEF" };
+
+        /// <summary>
         /// Everything currently running that counts as the game. The caller owns
         /// what comes back and should pass it to Release when finished.
+        ///
+        /// The launcher's own name is not on the list any more. It was there
+        /// from the Skyrim Together days, when the multiplayer client was an exe
+        /// of that name; SkyMP has no client exe. Left on, another copy of this
+        /// launcher (the dev build beside the main one) counted as a running
+        /// game, which blocked updates and deleting characters, and Clear then
+        /// tried to close that launcher.
         /// </summary>
         public static List<Process> GameProcesses()
         {
             var l = new List<Process>();
             int mine = Process.GetCurrentProcess().Id;
-            string self = "";
-            try { self = System.Reflection.Assembly.GetExecutingAssembly().Location; } catch { }
 
-            // Thornswood and SkyrimTogether are both this launcher: installs
-            // made before the rename keep the old file name, because the
-            // launcher replaces itself in place rather than being reinstalled.
-            string[] names = { "SkyrimSE", "Thornswood", "SkyrimTogether", "skse64_loader" };
+            var names = new List<string> { "SkyrimSE", "skse64_loader" };
+            names.AddRange(Helpers);
             foreach (string n in names)
             {
+                bool helper = Array.IndexOf(Helpers, n) >= 0;
                 Process[] found;
                 try { found = Process.GetProcessesByName(n); } catch { continue; }
                 foreach (Process p in found)
                 {
-                    bool ours = p.Id == mine ||
-                                ((n == "Thornswood" || n == "SkyrimTogether") && IsThisLauncher(p, self));
+                    bool skip = p.Id == mine;
+                    // A helper only counts when it provably runs from this
+                    // build. One from another folder is another server's.
+                    if (!skip && helper && Where(p) != true) skip = true;
                     // SkyrimSE.exe is what every Skyrim install on the machine
                     // is called. Matching the name alone meant another modlist's
                     // game counted as this one: Play stayed blocked while it was
@@ -446,8 +466,8 @@ namespace Thornswood
                     // are exactly the ones that need closing: one of them left
                     // holding the profile folder is what makes the next launch
                     // fail with access denied.
-                    if (!ours && Where(p) == false) ours = true;
-                    if (ours) { try { p.Dispose(); } catch { } }
+                    if (!skip && Where(p) == false) skip = true;
+                    if (skip) { try { p.Dispose(); } catch { } }
                     else l.Add(p);
                 }
             }
@@ -526,6 +546,46 @@ namespace Thornswood
                 if (!GameRunning()) break;
             }
             return count;
+        }
+
+        /// <summary>
+        /// What is still running and why it might not go, as a sentence for a
+        /// person to act on. "Skyrim would not close. Restart your PC" named
+        /// nothing, and with no Skyrim window anywhere nobody could tell what
+        /// the launcher was looking at. Empty when nothing is running.
+        /// </summary>
+        public static string StuckReport()
+        {
+            List<Process> ps = GameProcesses();
+            if (ps.Count == 0) { Release(ps); return ""; }
+            var names = new List<string>();
+            foreach (Process p in ps)
+            {
+                try { names.Add(p.ProcessName + ".exe (process " + p.Id + ")"); } catch { }
+            }
+            Release(ps);
+
+            // Windows writes a crash report for a game that hung, and the game
+            // cannot be ended until that report is finished. With a big mod
+            // list the report is a memory dump of several gigabytes.
+            bool reporting = false;
+            foreach (string n in new string[] { "WerFault", "WerFaultSecure" })
+            {
+                try
+                {
+                    Process[] w = Process.GetProcessesByName(n);
+                    if (w.Length > 0) reporting = true;
+                    foreach (Process x in w) { try { x.Dispose(); } catch { } }
+                }
+                catch { }
+            }
+
+            string said = "Still running: " + string.Join(", ", names.ToArray()) + ".";
+            if (reporting)
+                said += " Windows is still writing a crash report for it, and it cannot be ended until that finishes. That usually takes a few minutes.";
+            else
+                said += " Windows would not let the launcher end it. In Task Manager, open the Details tab, end it there, and try again. If it will not end there either, restart the PC.";
+            return said;
         }
 
         /// <summary>
@@ -628,49 +688,6 @@ namespace Thornswood
                     if (foreign) return true;
                 }
             }
-            return false;
-        }
-
-        static bool IsThisLauncher(Process p, string self)
-        {
-            string path = null;
-            try { path = p.MainModule.FileName; } catch { }
-
-            // A path we cannot read belongs to a process running at a higher
-            // level than us, which the game never is. Another copy of this
-            // launcher is the likelier answer, and the game shows up as
-            // SkyrimSE regardless, so nothing is missed by skipping it.
-            if (string.IsNullOrEmpty(path)) return true;
-
-            if (!string.IsNullOrEmpty(self) && string.Equals(path, self, StringComparison.OrdinalIgnoreCase)) return true;
-
-            // Any Thornswood launcher at all, not only this install's. The dev
-            // build lives in its own root beside the main one, so the folder
-            // test below said "not mine" and it was counted as the game: Play
-            // stayed blocked and Clear went after it. The game is never called
-            // Thornswood.exe or SkyrimTogether.exe, so the name and a parent
-            // folder called Launcher settle it whatever the root.
-            try
-            {
-                string leaf = Path.GetFileName(path);
-                string parent = Path.GetFileName(Path.GetDirectoryName(path).TrimEnd('\\'));
-                if ((string.Equals(leaf, "Thornswood.exe", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(leaf, "SkyrimTogether.exe", StringComparison.OrdinalIgnoreCase)) &&
-                    string.Equals(parent, "Launcher", StringComparison.OrdinalIgnoreCase)) return true;
-            }
-            catch { }
-            // Matched by folder rather than by file name. The launcher has been
-            // called SkyrimTogether.exe and is called Thornswood.exe now, and an
-            // install made before the rename still carries the old name, so a
-            // literal here would quietly stop recognising somebody's launcher.
-            try
-            {
-                string dir = Path.GetDirectoryName(path);
-                if (!string.IsNullOrEmpty(dir) &&
-                    string.Equals(dir.TrimEnd('\\'), Paths.LauncherDir.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            catch { }
             return false;
         }
     }

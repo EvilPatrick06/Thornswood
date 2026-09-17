@@ -304,7 +304,15 @@ namespace Thornswood
                 if (named > 0) Log("Put " + named + " class name" + (named == 1 ? "" : "s") + " back to the right spelling.");
             }
             catch { }
-            ClearStuckGame(false);
+            // Off the window's thread. Ending a stuck game waits on it, and at
+            // this point the window has not even been shown yet.
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string said = null;
+                try { said = ClearLeftovers(); } catch { }
+                if (string.IsNullOrEmpty(said)) return;
+                try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); DrawStatus(); }); } catch { }
+            });
 
             // The installer unpacks into Thornswood-setup at the root of the
             // drive and nothing has ever deleted it, so a folder of leftovers
@@ -390,6 +398,7 @@ namespace Thornswood
                 try { File.AppendAllText(Paths.LogFile, fault.Exception.ToString() + Environment.NewLine); } catch { }
                 fault.Handled = true;
             };
+            StartStallWatch();
             app.Run(win);
         }
 
@@ -646,6 +655,7 @@ namespace Thornswood
 
         static void Log(string m)
         {
+            lastLogged = m;
             txtStatus.Text = m;
             try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + m + Environment.NewLine); }
             catch { }
@@ -914,10 +924,15 @@ namespace Thornswood
                 if (r != MessageBoxResult.Yes) return;
 
                 Log("Closing Skyrim...");
-                int n = 0;
-                bool still = false;
-                Waiting(delegate { n = Checks.CloseGame(); still = Checks.GameRunning(); });
-                if (still) { Log("Skyrim would not close. Restart your PC and try again."); return; }
+                int n;
+                string still = CloseGameWaiting(out n);
+                if (still.Length > 0)
+                {
+                    Log("Skyrim would not close. " + still);
+                    MessageBox.Show("Skyrim would not close.\n\n" + still, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    DrawStatus();
+                    return;
+                }
                 Log(n > 0 ? "Closed Skyrim." : "Skyrim was already gone.");
                 // The two second tick does the rest: puts the Windows folders
                 // back, records the session and turns Play on again.
@@ -980,6 +995,7 @@ namespace Thornswood
             btnAllControls.Click += delegate { ShowPage(PageControls); };
 
             WirePages();
+            WireOwnGame();
             btnFolder.Click += delegate { Open(Paths.Root); };
             btnOpenLog.Click += delegate
             {
@@ -1145,17 +1161,57 @@ namespace Thornswood
                 if (r != MessageBoxResult.Yes) { Log("Left the game where it was."); return false; }
             }
 
-            Log("Closing Skyrim...");
-            int n = 0;
-            bool still = false;
-            Waiting(delegate { n = Checks.CloseGame(); still = Checks.GameRunning(); });
-            if (still)
+            Log("Closing what is left of Skyrim...");
+            int n;
+            string still = CloseGameWaiting(out n);
+            if (still.Length > 0)
             {
-                Log("Skyrim would not close. Restart your PC and try again.");
+                Log("Skyrim would not close. " + still);
+                if (askIfVisible)
+                    MessageBox.Show("Skyrim would not close, so this has to wait.\n\n" + still,
+                                    "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
             if (n > 0) Log("Closed " + n + " Skyrim process" + (n == 1 ? "" : "es") + " that was still open.");
             return true;
+        }
+
+        /// <summary>
+        /// Ends the game and whatever it left behind, with the window still
+        /// drawing while it waits (Waiting). Returns what is still running
+        /// afterwards, as a sentence, or "" when everything went.
+        /// </summary>
+        static string CloseGameWaiting(out int closed)
+        {
+            int n = 0;
+            string still = "";
+            stallDoing = "closing Skyrim";
+            try
+            {
+                Waiting(delegate
+                {
+                    n = Checks.CloseGame();
+                    still = Checks.StuckReport();
+                });
+            }
+            finally { stallDoing = null; }
+            closed = n;
+            return still ?? "";
+        }
+
+        /// <summary>
+        /// At startup, from a pool thread: a game with no window left over from a
+        /// crash is ended quietly, because there is nothing on screen to lose. A
+        /// game somebody is looking at is left alone. Returns a line for the log,
+        /// or null when there was nothing to do.
+        /// </summary>
+        static string ClearLeftovers()
+        {
+            if (!Checks.GameRunning() || Checks.GameVisible()) return null;
+            int n = Checks.CloseGame();
+            string still = Checks.StuckReport();
+            if (still.Length > 0) return "Something Skyrim left behind would not close. " + still;
+            return n > 0 ? "Closed " + n + " Skyrim process" + (n == 1 ? "" : "es") + " left over from the last session." : null;
         }
 
         static void Open(string path)
@@ -1261,10 +1317,10 @@ namespace Thornswood
             {
                 bool updateUp = updateBar != null && updateBar.Visibility == Visibility.Visible;
                 downgradeBar.Visibility = (wrongBuild && !updateUp && !playing) ? Visibility.Visible : Visibility.Collapsed;
-                if (btnDowngrade != null) btnDowngrade.IsEnabled = !Downgrade.Busy;
+                if (btnDowngrade != null) btnDowngrade.IsEnabled = !Downgrade.Busy && !ownGameBusy;
             }
 
-            btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp;
+            btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy;
             // Only worth offering while there is something to quit, and it is
             // the one control on this page that stays live during a session.
             if (btnQuitGame != null)
@@ -1274,7 +1330,19 @@ namespace Thornswood
             // sets updatePending false, so the old order fell through to the
             // last branch and put PLAY back on a button that could not play:
             // the bar said install the mods and the button said go.
-            if (collectionBarUp && !playing)
+            // The game folder itself is being made or brought up to date, so
+            // there is nothing complete to start yet.
+            if (ownGameBusy && !playing)
+            {
+                btnPlay.Content = "PREPARING THE GAME FOLDER";
+                btnPlay.ToolTip = "Thornswood's own Skyrim folder is being brought up to date from Vortex. Play comes back when it is done.";
+                if (charPickerOpen)
+                {
+                    charPickerOpen = false;
+                    charBar.Visibility = Visibility.Collapsed;
+                }
+            }
+            else if (collectionBarUp && !playing)
             {
                 btnPlay.Content = "INSTALL THE MODS FIRST";
                 btnPlay.ToolTip = "Open the collection from the card above, then come back.";
@@ -1409,7 +1477,17 @@ namespace Thornswood
                 txtVerifyNote.Text = sb.ToString();
                 btnFix.IsEnabled = blocking > 0 && absent == 0;
             }
-            Log("Scan finished. " + issues.Count + " issue" + (issues.Count == 1 ? "" : "s") + " found.");
+            // The count alone read the same after every press: 182, 182, 182.
+            // When most of them are mods that are simply not in the game folder,
+            // pressing Scan again or Fix changes nothing, and that is the line
+            // worth reading.
+            int missing = 0;
+            foreach (Issue i in issues) if (i.Absent) missing++;
+            Log("Scan finished. " + issues.Count + " issue" + (issues.Count == 1 ? "" : "s") + " found." +
+                (missing > 0
+                    ? " " + missing + " of them are mods that are not in the game folder at all, which Scan and Fix cannot change." +
+                      (Paths.Collection ? " Vortex most likely has another profile deployed." : "")
+                    : ""));
         }
 
         static void BuildModList()
@@ -3307,7 +3385,17 @@ namespace Thornswood
 
         static void ForgetChar(int slot, Chars.Who who)
         {
-            if (Checks.GameRunning()) { Log("Close Skyrim first."); return; }
+            // Said in a box, not only in the log. A line at the bottom of the
+            // window was the whole answer, so pressing Delete looked like
+            // pressing nothing: ten presses in the log on 16 Sep.
+            if (playing || Checks.GameRunning())
+            {
+                string still = Checks.StuckReport();
+                Log("Close Skyrim before deleting a character. " + still);
+                MessageBox.Show("Close Skyrim before deleting a character. Its saves are in use while the game runs.\n\n" + still,
+                                "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
             string name = string.IsNullOrEmpty(who.Name) ? "this character" : who.Name;
             var answer = MessageBox.Show(
@@ -3831,6 +3919,7 @@ namespace Thornswood
         static void RunUpdate()
         {
             if (playing) { Log("Quit the game first."); return; }
+            if (ownGameBusy) { Log("Thornswood's own Skyrim folder is still being prepared. The update can go in when that is done."); return; }
             // An update writes into the build. A game still holding files open
             // down there turns that into a half written install.
             if (!ClearStuckGame(true)) return;

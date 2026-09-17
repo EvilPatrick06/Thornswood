@@ -147,6 +147,11 @@ namespace Thornswood
         // at something other than what the monitor is set to.
         [DataMember] public bool LockResolution = false;
 
+        // The Skyrim folder Vortex deploys into, which Thornswood's own folder is
+        // made from (see OwnGame). Blank means the Steam copy. Set it when Vortex
+        // has been moved to a folder of its own so the Steam copy can stay clean.
+        [DataMember] public string VortexGame = "";
+
         // These two default to ON, which a plain bool cannot express here: the
         // serializer skips field initialisers, and false and absent look the
         // same afterwards. So an older config.json, which has neither key,
@@ -211,6 +216,7 @@ namespace Thornswood
             if (string.IsNullOrEmpty(SiteUrl)) SiteUrl = "https://thornswood.net";
             if (PresenceImage == null) PresenceImage = "https://thornswood.net/presence.png";
             if (string.IsNullOrEmpty(MiniMapSpot)) MiniMapSpot = "Bottom left";
+            if (VortexGame == null) VortexGame = "";
         }
 
         public static Config Load(string path)

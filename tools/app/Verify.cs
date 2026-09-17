@@ -191,6 +191,7 @@ namespace Thornswood
                 try
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(full));
+                    OwnGame.Unshare(full);
                     File.Copy(src, full, true);
                     n++;
                 }

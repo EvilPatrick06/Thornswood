@@ -260,7 +260,22 @@ if ($optionalPrefixes.Count) {
 # left out only when Vortex is actually providing it, so the installer shrinks
 # as the collection fills in and can never drop a file nobody can get back.
 $vortexFiles = $null
-if (-not $NoVortex) {
+# Built out of Thornswood's own game folder (Root\Game made by the launcher,
+# OwnGame.cs): the Vortex record in the Steam copy says what Vortex has
+# deployed there now, which may be another server's profile. The launcher's
+# own record says what in this folder is the collection.
+$ownCollection = $null
+if ([string]::Equals($GameDir.TrimEnd('\'), (Join-Path $Root 'Game').TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) {
+    $ownCollection = Get-ShipOwnGameCollection $ProfileDir
+}
+if ($null -ne $ownCollection) {
+    if ($ownCollection.Count -eq 0) {
+        Die "The launcher's record of what came from Vortex (Profile\OwnGame\files.txt) lists nothing, so this installer would carry every mod file. In the launcher, Settings, Maintenance, bring the folder up to date from Vortex, then package again."
+    }
+    $vortexFiles = $ownCollection
+    Say ("  built from Thornswood's own game folder; the collection provides {0:n0} file(s), which are left out" -f $vortexFiles.Count) 'Green'
+}
+elseif (-not $NoVortex) {
     if (Test-Path -LiteralPath $VortexManifest) {
         try {
             $raw = (Get-Content -LiteralPath $VortexManifest -Raw) -replace '^\uFEFF', ''
@@ -407,9 +422,10 @@ if ($longest -gt 250) { Say "    $longestPath" 'DarkGray' }
 #
 # Shipping the empty one is what put "this build shipped without a reference
 # plugin list" in the launcher's Mods tab and left the manifest claiming zero
-# plugins.
-$ownGameDir = Join-Path $Root 'Game'
-$refProfile = if (Test-Path -LiteralPath $ownGameDir) { Join-Path $ProfileDir 'Default' } else { Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition' }
+# plugins. A Game folder the launcher made out of Vortex's deployment reads
+# the Vortex profile's lists kept in Profile\OwnGame. Get-ShipLoadOrderDir
+# (Ship-Rules.ps1) decides, the same for the packs.
+$refProfile = Get-ShipLoadOrderDir $Root $ProfileDir
 Say "  load order from $refProfile" 'DarkGray'
 # Only the two lists. Other launchers leave .bak copies of them beside the
 # originals (Plugins.txt.keizaal-<date>.bak and the like); those are one
