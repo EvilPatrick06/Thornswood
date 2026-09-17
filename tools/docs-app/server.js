@@ -168,6 +168,31 @@ const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/support', '/join',
    wording can be fixed from the site rather than by a deploy. */
 const SITE = path.join(DATA, 'site');
 
+/* What a link to each page says when it is pasted into Discord. Every address
+   used to unfurl with the same generic home text, so a link to the rules and a
+   link to the roadmap read identically in a channel. home.html carries the
+   same list for the browser tab; this is the one a crawler sees, because a
+   crawler does not run the page's script. */
+const BLURB = {
+  '/':          ['Thornswood', 'A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.'],
+  '/world':     ['The world', 'Fifty years after the Stormcloaks won. A free Skyrim, an Empire with an embassy and no soldiers, and the White Harbour Accord.'],
+  '/rules':     ['Rules', 'Nine rules, short on purpose. Nobody dies without agreeing to, play a person rather than a legend, and staff decide.'],
+  '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
+  '/support':   ['Supporting Thornswood', 'Free and always will be. Nothing here makes your character stronger.'],
+  '/credits':   ['Credits', 'Everyone whose work Thornswood is built on.'],
+  '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
+  '/known':     ['Known issues', 'Permanent limits of how a shared Skyrim works, each with the reason. Read this before reporting anything.'],
+  '/help':      ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
+  '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
+  '/roadmap':   ['Roadmap', 'What is being worked on and roughly in what order.'],
+  '/news':      ['Every release', 'What changed, newest first. The same list the launcher shows.'],
+  '/report':    ['Report a problem', 'Something broken, or an idea. No account needed.'],
+  '/gallery':   ['From the world', 'Pictures taken by people playing.']
+};
+const escAttr = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 const PAGES = {
   '/hub':         'home',
   '/help':        'help',
@@ -711,6 +736,18 @@ http.createServer(async (req, res) => {
   const head = req.method === 'HEAD';
   if (head) req.method = 'GET';
 
+  /* Set once, here, rather than inside send(): the streamed answers below
+     write their own headers and never go through it. Node keeps a setHeader
+     value through a later writeHead, so one line covers every route.
+
+     Only on an answer that came in over the certificate. Caddy holds 443 and
+     the plain to secure redirect already works, so this is the part that stops
+     a browser trying the plain one again. On plain HTTP it means nothing and
+     is left off. */
+  if (secureHere(req)) {
+    try { res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains'); } catch (e) { }
+  }
+
   const w = await who(req);
 
   // ---------------------------------------------------------- member login
@@ -883,8 +920,28 @@ http.createServer(async (req, res) => {
       // /join, never /hub. Somebody clicking Apply wants to know how to apply,
       // and sending them to the admin panel is the worst possible answer.
       html = html.split('DISCORD_URL').join(cfg.discord.invite || '/join');
+      // The og tags a crawler reads are the ones in the file, so the page
+      // actually being served is written into them here. home.html rewrites
+      // the same tags for the browser tab.
+      const blurb = BLURB[route];
+      if (blurb) {
+        const title = blurb[0] === 'Thornswood' ? blurb[0] : blurb[0] + ' · Thornswood';
+        html = html.replace(
+          /(<meta property="og:title" id="ogTitle" content=")[^"]*(")/,
+          '$1' + escAttr(title) + '$2');
+        for (const re of [/(<meta property="og:description" id="ogDesc" content=")[^"]*(")/,
+                          /(<meta name="description" content=")[^"]*(")/]) {
+          html = html.replace(re, '$1' + escAttr(blurb[1]) + '$2');
+        }
+      }
       return send(res, 200, html, TYPES['.html']);
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
+  }
+
+  // Two addresses people type, or paste out of an old message. Both mean the
+  // Downloads page, and both answered 404.
+  if ((route === '/download' || route === '/install') && req.method === 'GET') {
+    return send(res, 301, '', 'text/plain', { Location: '/downloads' });
   }
 
   // Everything the front page needs and nothing that is anybody's business.
