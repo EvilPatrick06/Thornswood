@@ -1991,7 +1991,23 @@ log('gamemode loaded:',
       var restarting = false;
       try {
         var r = globalThis.__thornswoodRestart;
-        restarting = !!(r && r.at && r.at > Date.now());
+        var nowR = Date.now();
+        /*
+          Counting down, or stopped counting down within the last three
+          minutes. Three is longer than the stop, copy and start in
+          Deploy-Server, and being wrong this way only ever delays a quit.
+          After the restart this process is fresh, the record is empty again,
+          and the next pass writes false.
+
+          Both halves are needed and neither is enough on its own. restartTick
+          runs every 1500 ms and this every 2000 ms, so for up to a tick after
+          the deadline passes the countdown is over and nothing has recorded
+          that yet: at is in the past and went is not set. Asking how long ago
+          at was, rather than whether it is still ahead, covers that gap, and
+          went covers the rest once the tick has zeroed at.
+        */
+        restarting = !!(r && ((r.at && nowR - r.at < 180000) ||
+                             (r.went && nowR - r.went < 180000)));
       } catch (e) { restarting = false; }
 
       // Only when something moves. This file sits in a folder the server
@@ -3259,6 +3275,19 @@ log('gamemode loaded:',
 
     if (left <= 0) {
       restart.at = 0;
+      /*
+        When it ran out, kept so the probe stays patient across the stop.
+
+        The countdown reaching zero is not the moment the server goes away.
+        Deploy-Server waits the countdown plus twenty seconds and then copies
+        files up before it starts anything, and in notice and update mode
+        clearTheServer does not disconnect anybody, so the server carries on
+        answering with restarting already false. The client would read one of
+        those answers, forget it had been warned, and quit to the menu when
+        the process finally stopped. Which is the exact thing the warning
+        exists to prevent.
+      */
+      restart.went = Date.now();
       restart.said = {};
       clearTheServer();
       return;
