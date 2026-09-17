@@ -280,16 +280,35 @@ anything listed in a `keizaal-backup-*` folder. The launcher's own writes into
 the game folder go through `OwnGame.Unshare` or `OwnGame.Separate` first.
 
 **Left out of every folder:** other servers' files (the same list as
-`Test-OtherServer` in `Publish-Update.ps1`; change both together),
-`Data\Platform\PluginsNoLoad` (sign-in data with an access token in it),
-Vortex's records and markers, logs, and `Claude outputs`.
+`Test-ShipOtherServer` in `tools\Ship-Rules.ps1`; `OwnGame.Foreign` in the
+launcher, change both together), `Data\Platform\PluginsNoLoad` (sign-in data
+with an access token in it), Vortex's records and markers, logs, and
+`Claude outputs`.
 
 **Records.** `Profile\OwnGame\files.txt` lists each file brought in, whether it
-was linked or copied and whether Vortex deployed it. Publish-Update reads that
-list to keep the collection out of packs, exactly as it reads
-`vortex.deployment.json` on a collection install, and refuses to publish if the
-list is empty. Ship patches the client in `<Root>\Game` when it exists. The
-other servers' records are in `%LOCALAPPDATA%\Thornswood\GameFolders`.
+was linked or copied and whether Vortex deployed it. Ship-Rules.ps1 reads that
+list (`Get-ShipOwnGameCollection`) so Publish-Update and Package-Thornswood keep
+the collection out of packs and the installer, exactly as they read
+`vortex.deployment.json` when the game is the Steam copy, and both refuse to go
+on if the list is empty. `Profile\OwnGame\plugins.txt` and `loadorder.txt` are
+the Vortex profile's lists as of the folder's last update, and are the
+reference load order a release carries (`Get-ShipLoadOrderDir`). Ship patches
+the client in `<Root>\Game` when it exists. The other servers' records are in
+`%LOCALAPPDATA%\Thornswood\GameFolders`.
+
+**The Skyrim build.** Steam updates the Steam copy by itself. With Thornswood's
+own folder, the Downgrade button works on the Steam copy the folder is made
+from, never on the folder's copies, and the folder is then brought up to date
+from it. Until the Steam copy is back on 1.6.1170 the folder is not made or
+refreshed, so Thornswood keeps playing on the build it has, and the card above
+Play says the Steam copy is on the wrong build. Files a mod replaces are left as
+the mod has them. The sign in file the 16 Sep installer carried is removed from
+the Steam copy as well as from the folder (`Leaks.cs`).
+
+**Testing it on the dev channel.** The dev build runs from
+`<Root>-DevBuild`, which has no Game folder, so it starts on the Steam copy.
+Its own Settings, Maintenance has "Make it", which builds
+`<Root>-DevBuild\Game` the same way.
 
 Skyrim reads its plugin list from one Windows folder per user. Thornswood swaps
 it per session; Keizaal and Daedric read whatever Vortex's active profile wrote,
