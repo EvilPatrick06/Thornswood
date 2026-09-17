@@ -1814,6 +1814,52 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   return false;
 });
 
+/*
+  The bases this server answers for, published where the client can read them.
+
+  thornswood-front.js re-activates every ACTI it sees, because a handful of
+  vanilla handle and lever scripts never start under SkyMP. The client forwards
+  that second activation as well, so onActivate below ran twice for every press
+  on anything the server already handles: a quarry strike and then "the seam
+  needs 20 more seconds", a blessing removed and re-added.
+
+  The client cannot know which bases those are without being told, so it is
+  told. This goes into the same folder the client already fetches online.json
+  and the manifest from, as runtime form ids, which is exactly what the
+  client's getBaseObject().getFormID() hands back.
+*/
+(function publishServerBases() {
+  var ids = [];
+  var seen = {};
+  function add(desc) {
+    var id = idOf(desc);
+    // 0 means the plugin that owns it is not loaded, which is a different
+    // problem and not one this list should carry. Deduped because two keys
+    // resolving to one record would otherwise be sent twice.
+    if (id && !seen[id]) { seen[id] = true; ids.push(id); }
+  }
+  try {
+    add(STATIONS.saltQuarry);
+    add(STATIONS.charcoalKiln);
+    for (var shrine in SHRINES) { add(shrine); }
+    for (var crop in HARVESTS) { add(crop); }
+
+    var fsb = require('fs');
+    var pathb = require('path');
+    var dataDirB = 'data';
+    try {
+      var cfgB = JSON.parse(fsb.readFileSync('server-settings.json', 'utf8'));
+      if (cfgB && cfgB.dataDir) { dataDirB = String(cfgB.dataDir); }
+    } catch (e) { }
+    fsb.writeFileSync(pathb.join(dataDirB, 'server-bases.json'),
+                      JSON.stringify({ at: Date.now(), bases: ids }));
+    log('published', ids.length, 'server handled bases for the client');
+  } catch (e) {
+    log('could not publish the server handled bases, the client will keep ' +
+        're-activating them:', e);
+  }
+})();
+
 log('gamemode loaded:',
     Object.keys(DATA.cellToHold).length + ' cells mapped,',
     Object.keys(MANUALS).length + ' manuals,',
