@@ -291,7 +291,14 @@ function listFiles() {
     // page hides it on that flag. Dropping it here put the old two file
     // instructions back on the downloads page and a 527 MB button next to
     // them that does nothing on its own.
-    out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden,
+    //
+    // A script is never something a visitor is offered. Why-Keizaal.ps1, a
+    // diagnostic for one machine, sat in this folder and so on the Downloads
+    // page as a file to take, naming a staff member and the game server's
+    // address. Anything with a script extension is hidden whatever
+    // files.json says about it.
+    const script = /[.](ps1|psm1|cmd|bat|py|sh)$/i.test(name);
+    out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,
       label: m.label || name, version: m.version || '', note: m.note || '' });
   }
   out.sort((a, b) => b.at - a.at);
