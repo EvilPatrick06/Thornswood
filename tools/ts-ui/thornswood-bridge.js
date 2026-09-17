@@ -190,6 +190,7 @@
     }
     window.thornswoodTyping = true;
     openedAt = Date.now();
+    lastKey = Date.now();
     try { el.focus(); } catch (e) { }
     tell('typing-on');
     startBeat();
@@ -223,18 +224,63 @@
     e.preventDefault();
   }, true);
 
-  // Bubble phase, so the chat's own enter handler has already sent the line by
-  // the time this runs.
+  /*
+   * Capture phase, with the blur deferred.
+   *
+   * This was on the bubble phase, so that the chat's own enter handler had
+   * already sent the line before the box closed. That is the right ordering
+   * and the wrong mechanism: a handler on the input is free to call
+   * stopPropagation, and the chat's does, so the event never bubbled back up
+   * to the document and the box was never closed. Focus stayed claimed, and
+   * with focus up the game gets no input at all, so the whole screen locks:
+   *
+   *     [front] focus claimed by chat (holding: chat)
+   *     [front] chat state: widgets=yes box=yes typing=yes lines=1
+   *
+   * and nothing after it, forever.
+   *
+   * Capture runs from the document down to the target, so it happens before
+   * anything on the input can stop it, and nothing can prevent it. Ordering is
+   * kept by not blurring here: setTimeout(0) runs after the whole synchronous
+   * dispatch, so the chat has already sent the line by the time the box shuts.
+   */
   document.addEventListener('keydown', function (e) {
     if (!window.thornswoodTyping) return;
     var k = e.key;
-    if (k === 'Escape' || e.keyCode === 27) { blurInput(); return; }
+    if (k === 'Escape' || e.keyCode === 27) { setTimeout(blurInput, 0); return; }
     if ((k === 'Enter' || e.keyCode === 13) && !e.shiftKey) {
       // Not the one that opened the box. See the note on openedAt.
       if (Date.now() - openedAt < 400) { return; }
       setTimeout(blurInput, 0);
     }
-  }, false);
+  }, true);
+
+  /*
+   * And a way out that needs no key at all.
+   *
+   * Everything above assumes keystrokes reach this page. While the box is open
+   * the game is starved of input by design, so if that assumption is ever
+   * wrong the person is not inconvenienced, they are stuck: no movement, no
+   * menus, no way to close what they opened.
+   *
+   * So the box gives itself up after a while of nobody typing into it. Twenty
+   * seconds is far longer than any gap in the middle of writing a line and far
+   * shorter than the time it takes to decide the game has crashed.
+   */
+  var IDLE_MS = 20000;
+  var lastKey = 0;
+
+  document.addEventListener('keydown', function () {
+    if (window.thornswoodTyping) { lastKey = Date.now(); }
+  }, true);
+
+  setInterval(function () {
+    if (!window.thornswoodTyping) { return; }
+    if (!lastKey) { lastKey = Date.now(); return; }
+    if (Date.now() - lastKey < IDLE_MS) { return; }
+    tell('typing-idle');
+    blurInput();
+  }, 2000);
 
   // ---------------------------------------------------------------- chat ---
   var WIDGET = {
@@ -377,7 +423,28 @@
     // The resize arrow, top right of the message list. It drags the box
     // bigger, which is a thing nobody asked for and a thing that puts a
     // cursor on screen in the middle of playing.
-    '#chat .chat-corner,#chat .react-resizable-handle{display:none !important}'
+    '#chat .chat-corner,#chat .react-resizable-handle{display:none !important}',
+
+    /* No scrollbar, and no scrolling.
+     *
+     * The message list is a fixed window onto the last few lines and it
+     * already follows the newest one. A scrollbar on it is a control that only
+     * works with a mouse, and reaching for the mouse while playing means
+     * taking the keyboard off the game. The old lines are not lost, there is
+     * just no way to drag back to them, which is the right trade for a chat
+     * you read over your shoulder. */
+    '#chat .chat-messages,#chat .chat-body,#chat ul,#chat ol{' +
+      'overflow:hidden !important;scrollbar-width:none !important}',
+    '#chat ::-webkit-scrollbar{width:0 !important;height:0 !important;display:none !important}',
+
+    /* And no mouse cursor anywhere on this page.
+     *
+     * The browser draws its own pointer over the game, and because the chat
+     * input is text it draws an I-beam: a blinking bar sitting in the middle
+     * of the floor with nothing to do with the game. The game draws whatever
+     * pointer it wants when it wants one. This page never needs to draw one,
+     * because everything it offers has a key. */
+    'html,body,#chat,#chat *{cursor:none !important}'
   ].join('\n');
   (document.head || document.documentElement).appendChild(css);
 

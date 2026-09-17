@@ -23,7 +23,18 @@ namespace Thornswood
     {
         // The resources folder the server also serves. Game traffic is UDP and
         // there is nothing to connect to, so this is what a probe can reach.
-        public const int ResourcePort = 3000;
+        /// <summary>
+        /// The port the server serves its resources folder on: 3000 when the
+        /// game is on the default 7777, otherwise the game port plus one. The
+        /// same rule the server uses and AutoJoin writes into the client, so
+        /// the dev server on 7787 is asked on 7788.
+        /// </summary>
+        public static int ResourcePortFor(Config cfg)
+        {
+            int port;
+            if (cfg == null || !int.TryParse(cfg.ServerPort, out port) || port <= 0) port = 7777;
+            return port == 7777 ? 3000 : port + 1;
+        }
 
         public static string PidFile
         {
@@ -68,7 +79,7 @@ namespace Thornswood
             {
                 using (var c = new TcpClient())
                 {
-                    IAsyncResult ar = c.BeginConnect(ip, ResourcePort, null, null);
+                    IAsyncResult ar = c.BeginConnect(ip, ResourcePortFor(cfg), null, null);
                     if (!ar.AsyncWaitHandle.WaitOne(700)) return false;
                     c.EndConnect(ar);
                     return c.Connected;

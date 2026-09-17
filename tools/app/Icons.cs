@@ -119,7 +119,9 @@ namespace Thornswood
         {
             public string Dir;
             public bool MayRename;      // false where the file name is load bearing
-            public Place(string d, bool r) { Dir = d; MayRename = r; }
+            public bool MakeIfMissing;  // a place the build wants a shortcut in, put back when it is gone
+            public Place(string d, bool r) : this(d, r, r) { }
+            public Place(string d, bool r, bool m) { Dir = d; MayRename = r; MakeIfMissing = m; }
         }
 
         /// <summary>
@@ -139,7 +141,13 @@ namespace Thornswood
             {
                 string app = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
                 l.Add(new Place(Path.Combine(app, "Microsoft\\Internet Explorer\\Quick Launch\\User Pinned\\TaskBar"), false));
-                l.Add(new Place(Path.Combine(app, "Microsoft\\Windows\\Start Menu\\Programs"), false));
+                // The Start menu gets one made for it if it has none. Typing
+                // "Thornswood" into Start should find the launcher, and tools
+                // that only know a program by its Start menu entry (screen
+                // sharing and remote control among them) cannot see it
+                // otherwise. Still never renamed: a Start menu tile can be
+                // pinned, and a pin dies with the file it points at.
+                l.Add(new Place(Path.Combine(app, "Microsoft\\Windows\\Start Menu\\Programs"), false, true));
             }
             catch { }
             return l;
@@ -250,9 +258,10 @@ namespace Thornswood
                         }
                     }
 
-                    // A desktop that has lost its shortcut gets it back. Only
-                    // the two places the build put one in the first place.
-                    if (!found && spot.MayRename && File.Exists(exe))
+                    // A desktop that has lost its shortcut gets it back, and
+                    // the Start menu gets one it never had. Only the places
+                    // the build wants one in; never the taskbar pins.
+                    if (!found && spot.MakeIfMissing && File.Exists(exe))
                         if (Make(shellType, shell, Path.Combine(place, Name), exe, want)) changed++;
                 }
             }
@@ -319,8 +328,19 @@ namespace Thornswood
             return said;
         }
 
-        const string Name  = "Thornswood.lnk";
-        const string Label = "Thornswood";
+        /// <summary>Set by the shell from the config: "Thornswood" or "Thornswood Dev".</summary>
+        public static string BuildName = "Thornswood";
+        static string Name  { get { return BuildName + ".lnk"; } }
+        static string Label { get { return BuildName == "Thornswood" ? "ThornsWood" : BuildName; } }
+
+        /// <summary>Where a shortcut of that name would be: the desktop and the Start menu.</summary>
+        public static List<string> ShortcutPaths(string buildName)
+        {
+            var l = new List<string>();
+            try { l.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), buildName + ".lnk")); } catch { }
+            try { l.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft\\Windows\\Start Menu\\Programs\\" + buildName + ".lnk")); } catch { }
+            return l;
+        }
 
         static string Full(string p)
         {

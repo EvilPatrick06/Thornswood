@@ -80,7 +80,7 @@ namespace Thornswood
         {
             if (srvRows == null) return;
 
-            txtSrvAddress.Text = "Thornswood";
+            txtSrvAddress.Text = "ThornsWood";
 
             // The voice card lives on this page now, so it is re-tested
             // whenever the page is opened rather than only at startup.

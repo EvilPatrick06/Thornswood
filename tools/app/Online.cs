@@ -20,8 +20,6 @@ namespace Thornswood
     {
         // The resources folder. Game traffic is UDP on its own port; this is
         // the little HTTP server beside it.
-        const int ResourcePort = 3000;
-
         public class Count
         {
             public bool Known;      // false when the server has not said yet
@@ -47,7 +45,7 @@ namespace Thornswood
             {
                 if (!string.IsNullOrEmpty(cfg.ServerAddress))
                 {
-                    string url = "http://" + cfg.ServerAddress + ":" + ResourcePort + "/online.json";
+                    string url = "http://" + cfg.ServerAddress + ":" + SkyMp.ResourcePortFor(cfg) + "/online.json";
                     using (var wc = new WebClient())
                     {
                         wc.Headers["User-Agent"] = "ThornswoodLauncher/" + Updater.Version;

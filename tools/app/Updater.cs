@@ -10,7 +10,7 @@ namespace Thornswood
 {
     static class Updater
     {
-        public const string Version = "1.0.140";
+        public const string Version = "1.1.36";
 
         static WebClient Client(Config cfg, bool octet, string url)
         {
@@ -29,17 +29,19 @@ namespace Thornswood
 
         public static bool Enabled(Config cfg)
         {
-            // A private repo answers 404 rather than 403 when the request is not
-            // authenticated, so without a token there is nothing worth asking.
+            // No token needed. Releases live in a public repository of their own
+            // now, holding version.json and the assets and nothing else, because
+            // the alternative was shipping a credential to every machine that
+            // installs the game so it could read a private one. UpdateToken is
+            // still honoured if somebody sets one, which is what keeps a private
+            // source working for whoever is developing against it.
             return !string.IsNullOrEmpty(cfg.UpdateRepo)
-                   && cfg.UpdateRepo.Contains("/")
-                   && !string.IsNullOrEmpty(cfg.UpdateToken);
+                   && cfg.UpdateRepo.Contains("/");
         }
 
         public static string WhyDisabled(Config cfg)
         {
             if (string.IsNullOrEmpty(cfg.UpdateRepo) || !cfg.UpdateRepo.Contains("/")) return "no update source set";
-            if (string.IsNullOrEmpty(cfg.UpdateToken)) return cfg.UpdateRepo + "  (needs an access token)";
             return cfg.UpdateRepo;
         }
 
@@ -193,6 +195,65 @@ namespace Thornswood
             try { File.AppendAllText(Paths.AppliedFile, id + Environment.NewLine); } catch { }
         }
 
+        /// <summary>
+        /// Take a pack back out of applied.txt.
+        ///
+        /// The file was append only, which was fine while every pack was a
+        /// required update that only ever went on. An optional pack can come
+        /// off again, and a line that cannot be removed means the launcher
+        /// would go on believing it was installed forever.
+        /// </summary>
+        static void Unapply(string id)
+        {
+            try
+            {
+                if (!File.Exists(Paths.AppliedFile)) return;
+                var keep = new List<string>();
+                foreach (string l in File.ReadAllLines(Paths.AppliedFile))
+                {
+                    string t = l.Trim();
+                    if (t.Length == 0) continue;
+                    if (string.Equals(t, id, StringComparison.OrdinalIgnoreCase)) continue;
+                    keep.Add(t);
+                }
+                File.WriteAllLines(Paths.AppliedFile, keep.ToArray());
+            }
+            catch { }
+        }
+
+        /// <summary>True if this pack is on disk right now.</summary>
+        public static bool IsInstalled(string id)
+        {
+            return !string.IsNullOrEmpty(id) && Applied().Contains(id);
+        }
+
+
+        /// <summary>
+        /// Is this path really inside that folder?
+        ///
+        /// A plain StartsWith is not enough, and it matters most in the one
+        /// place that deletes things. "C:\Thornswood2\anything" starts with
+        /// "C:\Thornswood", so a pack whose file list contained ..\Thornswood2
+        /// would pass a prefix test and be treated as ours. Comparing against
+        /// the folder plus its separator is the whole fix.
+        /// </summary>
+        static bool Inside(string full, string folder)
+        {
+            if (string.IsNullOrEmpty(full) || string.IsNullOrEmpty(folder)) return false;
+            string fence = folder.TrimEnd(Path.DirectorySeparatorChar,
+                                          Path.AltDirectorySeparatorChar)
+                         + Path.DirectorySeparatorChar;
+            return full.StartsWith(fence, StringComparison.OrdinalIgnoreCase);
+        }
+
+        static string PackListFile(string id)
+        {
+            var clean = new StringBuilder();
+            foreach (char c in id)
+                clean.Append(Array.IndexOf(Path.GetInvalidFileNameChars(), c) >= 0 ? '_' : c);
+            return Path.Combine(Paths.PacksDir, clean.ToString() + ".files");
+        }
+
         public static List<Pack> Pending(VersionDoc v)
         {
             var done = Applied();
@@ -215,35 +276,108 @@ namespace Thornswood
             }
         }
 
+        /// <summary>
+        /// Where an update is allowed to come from. version.json is a file we
+        /// write, but it is also a file somebody else could write if they ever
+        /// got at the repository, and the thing on the other end of this url
+        /// gets executed on somebody's machine. So the url is checked against
+        /// this list before a single byte is fetched.
+        /// </summary>
+        static readonly string[] AllowedHosts =
+        {
+            "github.com",
+            "objects.githubusercontent.com",
+            "release-assets.githubusercontent.com",
+            "api.github.com",
+            "thornswood.net"
+        };
+
+        static void CheckUrl(string url)
+        {
+            Uri u;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out u))
+                throw new Exception("The update feed gave an address that is not an address. Nothing was downloaded.");
+            if (u.Scheme != Uri.UriSchemeHttps)
+                throw new Exception("The update feed asked for a download over plain http. Refused.");
+            string h = u.Host.ToLowerInvariant();
+            bool ok = false;
+            foreach (string a in AllowedHosts)
+                if (h == a || h.EndsWith("." + a, StringComparison.Ordinal)) { ok = true; break; }
+            if (!ok)
+                throw new Exception("The update feed pointed at " + u.Host + ", which is not where Thornswood updates come from. Refused.");
+        }
+
         static string Download(Config cfg, string url, string expectSha, Action<string> log)
         {
+            CheckUrl(url);
+
+            // An update with no checksum used to be accepted quietly, which
+            // meant one blank field in version.json was enough to run anything
+            // on every machine. There is no such thing as an optional check on
+            // a file that is about to be executed.
+            if (string.IsNullOrEmpty(expectSha))
+                throw new Exception("That update arrived without a checksum, so it has not been downloaded. This is a publishing mistake, not something wrong with your install.");
+
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
             string tmp = Path.Combine(Path.GetTempPath(), "st-" + Guid.NewGuid().ToString("N") + ".bin");
             using (var wc = Client(cfg, true, url)) wc.DownloadFile(url, tmp);
-            if (!string.IsNullOrEmpty(expectSha))
+
+            string got = Sha256(tmp);
+            if (!string.Equals(got, expectSha, StringComparison.OrdinalIgnoreCase))
             {
-                string got = Sha256(tmp);
-                if (!string.Equals(got, expectSha, StringComparison.OrdinalIgnoreCase))
-                {
-                    try { File.Delete(tmp); } catch { }
-                    throw new Exception("Checksum did not match. Download rejected.");
-                }
-                log("Checksum verified.");
+                try { File.Delete(tmp); } catch { }
+                throw new Exception("Checksum did not match. Download rejected.");
             }
+            log("Checksum verified.");
             return tmp;
         }
 
         /// <summary>
+        /// First line of every file list written since the fence below was
+        /// fixed. A list without it was written by a launcher that could not
+        /// put anything into a Steam copy of the game, and Requeue reads that
+        /// as "apply this pack again".
+        /// </summary>
+        const string ListHeader = "# fence=game";
+
+        /// <summary>Prefix on a list line whose path is under the game folder
+        /// rather than under Root. Root relative lines carry no prefix.</summary>
+        const string GameMark = "game\\";
+
+        /// <summary>
         /// A pack is a zip holding game/ and profile/ trees, plus an optional
         /// delete.txt listing paths under Game to remove.
+        ///
+        /// Two fences, one per tree. The check used to be Inside(full, Root)
+        /// for every entry, which is right for the profile tree and was right
+        /// for the game tree while the game was Root\Game. On a collection
+        /// install the game is the Steam copy, which is nowhere near Root, so
+        /// every game\ entry failed the test and was skipped in silence. The
+        /// pack was then marked applied and logged as "applied, 2 files": the
+        /// two profile files, and not one file of the actual update. Every
+        /// pack published for the collection build did this on every machine
+        /// until 1.1.32.
         /// </summary>
         public static void ApplyPack(Config cfg, Pack p, Action<string> log)
         {
             log("Downloading " + p.id + "...");
             string zip = Download(cfg, p.url, p.sha256, log);
-            try
+            try { Install(zip, p, log); }
+            finally { try { File.Delete(zip); } catch { } }
+        }
+
+        /// <summary>The part of ApplyPack after the download: unpack the zip
+        /// into place and record what it did. Separate so it can be exercised
+        /// on a zip that never came from the feed.</summary>
+        public static void Install(string zip, Pack p, Action<string> log)
+        {
             {
                 int files = 0;
+                var wrote = new List<string>();
+                wrote.Add(ListHeader);
+                var newInGame = new List<string>();
+                var gameWritten = new List<string>();
+                var removed = new List<string>();
                 using (var ar = ZipFile.OpenRead(zip))
                 {
                     var del = ar.GetEntry("delete.txt");
@@ -257,8 +391,9 @@ namespace Thornswood
                                 line = line.Trim();
                                 if (line.Length == 0 || line.StartsWith("#")) continue;
                                 string target = Path.Combine(Paths.Game, line.Replace('/', '\\'));
-                                if (!target.StartsWith(Paths.Game, StringComparison.OrdinalIgnoreCase)) continue;
+                                if (!Inside(target, Paths.Game)) continue;
                                 try { if (File.Exists(target)) { File.Delete(target); log("removed " + line); } } catch { }
+                                removed.Add(line.Replace('/', '\\'));
                             }
                         }
                     }
@@ -268,9 +403,13 @@ namespace Thornswood
                         if (string.IsNullOrEmpty(e.Name)) continue;           // directory entry
                         string rel = e.FullName.Replace('/', '\\');
                         string dest = null;
+                        bool inGame = false;
 
                         if (rel.StartsWith("game\\", StringComparison.OrdinalIgnoreCase))
+                        {
                             dest = Path.Combine(Paths.Game, rel.Substring(5));
+                            inGame = true;
+                        }
                         else if (rel.StartsWith("profile\\", StringComparison.OrdinalIgnoreCase))
                             dest = Path.Combine(Paths.Golden, Path.GetFileName(rel));
                         else if (rel.Equals("delete.txt", StringComparison.OrdinalIgnoreCase))
@@ -278,10 +417,25 @@ namespace Thornswood
                         else
                             continue;
 
+                        // The fence is the folder the entry is meant for. A
+                        // game entry has to land under the game, wherever the
+                        // game is; a profile entry has to land under Root.
                         string full = Path.GetFullPath(dest);
-                        if (!full.StartsWith(Paths.Root, StringComparison.OrdinalIgnoreCase)) continue;
+                        string fence = inGame ? Paths.Game : Paths.Root;
+                        if (!Inside(full, fence)) continue;
                         Directory.CreateDirectory(Path.GetDirectoryName(full));
+
+                        // Whether this file was already here decides whether
+                        // taking the pack off again may delete it. A pack that
+                        // creates a file owns it. A pack that writes over one
+                        // that came with the build does not, and deleting that
+                        // on removal would leave a hole in the core.
+                        bool existed = File.Exists(full);
                         e.ExtractToFile(full, true);
+                        string under = full.Substring(fence.TrimEnd('\\', '/').Length).TrimStart('\\', '/');
+                        wrote.Add((existed ? "R|" : "N|") + (inGame ? GameMark : "") + under);
+                        if (inGame && !existed) newInGame.Add(under);
+                        if (inGame) gameWritten.Add(under);
                         files++;
                     }
                 }
@@ -289,10 +443,206 @@ namespace Thornswood
                 // Settings that shipped with the pack become the new baseline
                 // and are pushed into the live profile too.
                 Swap.RepairConfigs();
+                try
+                {
+                    Directory.CreateDirectory(Paths.PacksDir);
+                    File.WriteAllLines(PackListFile(p.id), wrote.ToArray());
+                }
+                catch { }
+                NoteInstalledIntoGame(newInGame);
+                // The copies this pack just wrote are the ones to put back if
+                // another server's launcher changes them. See Keep.
+                int kept = Keep.Remember(gameWritten);
+                if (kept > 0) log("Kept " + kept + " of " + Keep.Build() + "'s own game " + (kept == 1 ? "file" : "files") + " to put back if another server or build changes " + (kept == 1 ? "it." : "them."));
+                // A file this pack took out must not come back at the next Play.
+                Keep.Forget(removed);
                 MarkApplied(p.id);
                 log(p.id + " applied, " + files + " files.");
             }
-            finally { try { File.Delete(zip); } catch { } }
+        }
+
+        /// <summary>
+        /// Files a pack has just created inside the Steam copy join the list
+        /// the uninstaller works from, so taking Thornswood out later takes
+        /// them out too. The installer writes that list at install time and
+        /// knows nothing about what arrived afterwards. Paths in it are
+        /// relative to the game folder, one per line, which is what the
+        /// uninstaller reads. Nothing is done on an install that has a game
+        /// folder of its own, because that whole folder goes at uninstall.
+        /// </summary>
+        static void NoteInstalledIntoGame(List<string> rels)
+        {
+            if (!Paths.Collection || rels == null || rels.Count == 0) return;
+            try
+            {
+                string list = Path.Combine(Paths.ProfileDir, "installed-into-game.txt");
+                var have = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (File.Exists(list))
+                    foreach (string l in File.ReadAllLines(list))
+                        if (l.Trim().Length > 0) have.Add(l.Trim());
+                var add = new List<string>();
+                foreach (string r in rels)
+                    if (!have.Contains(r)) { have.Add(r); add.Add(r); }
+                if (add.Count == 0) return;
+                Directory.CreateDirectory(Paths.ProfileDir);
+                File.AppendAllText(list, string.Join(Environment.NewLine, add.ToArray()) + Environment.NewLine);
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Puts back into the queue every pack that a launcher before 1.1.32
+        /// "applied" to a collection install. Returns how many.
+        ///
+        /// Such a pack left a file list with no header line and nothing but
+        /// the two profile files in it, because the old fence skipped the
+        /// whole game tree. The installer's own seeding of applied.txt leaves
+        /// no file list at all, and those packs really are in the build, so
+        /// they are left alone. A list written by this launcher starts with
+        /// ListHeader and is trusted whatever it contains.
+        ///
+        /// Content based rather than a run-once flag on purpose: the update
+        /// flow applies the packs with the launcher that is running and only
+        /// then replaces the launcher, so the very update that carries this
+        /// fix is applied once by the old code first. Its list has no header,
+        /// so the new launcher sees it here on its first check and does it
+        /// properly. Safe to call on every check; it only ever finds
+        /// something once.
+        /// </summary>
+        public static int Requeue()
+        {
+            if (!Paths.Collection) return 0;
+            int n = 0;
+            try
+            {
+                if (!Directory.Exists(Paths.PacksDir)) return 0;
+                foreach (string id in Applied())
+                {
+                    string list = PackListFile(id);
+                    if (!File.Exists(list)) continue;
+                    bool headed = false;
+                    try
+                    {
+                        foreach (string l in File.ReadAllLines(list))
+                        {
+                            if (l.Trim().Length == 0) continue;
+                            headed = l.Trim().Equals(ListHeader, StringComparison.Ordinal);
+                            break;
+                        }
+                    }
+                    catch { continue; }
+                    if (headed) continue;
+                    Unapply(id);
+                    try { File.Delete(list); } catch { }
+                    n++;
+                }
+            }
+            catch { }
+            return n;
+        }
+
+        /// <summary>
+        /// Takes an optional pack back off.
+        ///
+        /// Only files the pack created are deleted. Anything it wrote over was
+        /// part of the build before the pack arrived, and the zip did not keep
+        /// a copy of what was there, so those are left alone and counted. The
+        /// Scan and Fix buttons on the same page put those back, because that
+        /// is exactly the job they already do: compare against the server list
+        /// and re-download anything that does not match.
+        /// </summary>
+        public static void RemovePack(Pack p, Action<string> log)
+        {
+            if (p == null || string.IsNullOrEmpty(p.id)) return;
+
+            string list = PackListFile(p.id);
+            if (!File.Exists(list))
+            {
+                // Installed by a launcher old enough not to have kept a list.
+                // Forgetting it is still better than claiming it is on when
+                // there is no way to act on that.
+                Unapply(p.id);
+                log(p.Title + " has no file list, so nothing could be deleted. " +
+                    "It is no longer listed as installed. Press Scan then Fix to " +
+                    "put the build back the way the server expects it.");
+                return;
+            }
+
+            int gone = 0, kept = 0, stuck = 0;
+            // Folder to prune from, and the fence it must never climb past.
+            var dirs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string raw in File.ReadAllLines(list))
+            {
+                string line = raw.Trim();
+                if (line.Length < 3 || line[1] != '|') continue;
+                bool mine = line[0] == 'N';
+                string rel = line.Substring(2);
+                if (!mine) { kept++; continue; }
+
+                // A game line resolves under the game folder, wherever that
+                // is. On an install with its own Game folder the old lists
+                // read "Game\Data\...", relative to Root, which resolves to
+                // the same file either way.
+                string fence = Paths.Root;
+                if (rel.StartsWith(GameMark, StringComparison.OrdinalIgnoreCase))
+                {
+                    fence = Paths.Game;
+                    rel = rel.Substring(GameMark.Length);
+                }
+
+                string full;
+                try { full = Path.GetFullPath(Path.Combine(fence, rel)); }
+                catch { continue; }
+                if (!Inside(full, fence)) continue;
+
+                try
+                {
+                    if (File.Exists(full))
+                    {
+                        File.Delete(full);
+                        gone++;
+                        string d = Path.GetDirectoryName(full);
+                        if (!dirs.ContainsKey(d)) dirs[d] = fence;
+                    }
+                }
+                catch { stuck++; }
+            }
+
+            // Folders the pack brought with it and nothing else is using.
+            var order = new List<string>(dirs.Keys);
+            order.Sort();
+            order.Reverse();                      // deepest first
+            foreach (string d in order)
+            {
+                string fence = dirs[d];
+                try
+                {
+                    string at = d;
+                    while (at.Length > fence.Length &&
+                           Inside(at, fence) &&
+                           Directory.Exists(at) &&
+                           Directory.GetFileSystemEntries(at).Length == 0)
+                    {
+                        Directory.Delete(at);
+                        at = Path.GetDirectoryName(at);
+                    }
+                }
+                catch { }
+            }
+
+            try { File.Delete(list); } catch { }
+            Unapply(p.id);
+            Swap.RepairConfigs();
+
+            string msg = p.Title + " removed, " + gone + " file" + (gone == 1 ? "" : "s") + " deleted.";
+            if (stuck > 0)
+                msg += "  " + stuck + " would not delete, usually because Skyrim is still open.";
+            if (kept > 0)
+                msg += "  " + kept + " file" + (kept == 1 ? "" : "s") +
+                       " here replaced part of the build and " + (kept == 1 ? "was" : "were") +
+                       " left alone. Press Scan, then Fix, to put " +
+                       (kept == 1 ? "it" : "those") + " back.";
+            log(msg);
         }
 
         /// <summary>Replaces the running exe and restarts, via a short detached script.</summary>

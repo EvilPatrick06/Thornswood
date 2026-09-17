@@ -1,0 +1,238 @@
+<#
+  Deploy-Docs.ps1
+
+  Puts the Thornswood docs site on the VPS and keeps it running.
+
+  The site is a small node server holding six markdown documents and whatever
+  is in its files folder. Gavin and his friends edit the documents in the
+  browser, Claude edits the same files over ssh, and the installer is published
+  into it by Publish-Installer.ps1.
+
+  Run once to install, and again whenever the site itself changes. The
+  documents are NOT overwritten by a redeploy: only the app is. Anything typed
+  into the site survives.
+
+    .\Deploy-Docs.ps1          the app only, documents untouched
+    .\Deploy-Docs.ps1 -Site    also the public pages, which nobody edits in
+                               the browser, so this is safe
+    .\Deploy-Docs.ps1 -Boards  also board.json, which DOES overwrite anything
+                               typed into a board on the site
+    .\Deploy-Docs.ps1 -SeedDocs
+                               flattens every document with the repo copy.
+                               First install only. Takes a .bak of each first.
+
+  The password crosses the wire in clear, because this is plain HTTP on an IP.
+  Do not reuse one that matters. That improves the day a real domain and a
+  certificate go on it.
+#>
+[CmdletBinding()]
+param(
+  [string]$Vps      = '192.135.112.23',
+  [string]$User     = 'Administrator',
+  [string]$Root     = 'C:/Thornswood-Docs',
+  [string]$Task     = 'Thornswood Docs',
+  [int]$Port        = 3001,
+  [string]$Password,
+  # Flattens EVERY document on the VPS with the repo copy, including the ones
+  # people have been typing into on the site. It is for a first install and for
+  # nothing else. It now takes a backup and says what it stood on.
+  [switch]$SeedDocs,
+  # Just the boards. -SeedDocs would also flatten every markdown document up
+  # there, which is too big a hammer when only the runbook moved.
+  [switch]$Boards,
+  # Just the public pages under data\site. Those are not editable in the
+  # browser, so pushing them overwrites nobody's work. This is what you want
+  # nine times out of ten when the wording on the public site changed.
+  [switch]$Site
+)
+
+$ErrorActionPreference = 'Stop'
+$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$App  = Join-Path $Here 'docs-app'
+
+if (-not (Test-Path -LiteralPath $App)) { throw "not found: $App" }
+
+function Remote($script) {
+  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+  & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+}
+
+function Push($local, $remote) {
+  & scp @ssh $local "$User@${Vps}:$remote"
+  if ($LASTEXITCODE -ne 0) { throw "scp failed: $local" }
+}
+
+Write-Host 'Making room...'
+$rootWin = $Root.Replace('/','\')
+Remote @"
+foreach (`$d in @('$rootWin','$rootWin\public','$rootWin\data','$rootWin\files','$rootWin\uploads')) {
+  if (-not (Test-Path `$d)) { New-Item -ItemType Directory -Path `$d -Force | Out-Null }
+}
+'ready'
+"@ | ForEach-Object { "  $_" }
+
+Write-Host ''
+Write-Host 'Sending the site...'
+Push (Join-Path $App 'server.js')          "$Root/server.js"
+Push (Join-Path $App 'public/index.html')  "$Root/public/index.html"
+Push (Join-Path $App 'public/home.html')   "$Root/public/home.html"
+Push (Join-Path $App 'public/ridge.svg')   "$Root/public/ridge.svg"
+Push (Join-Path $App 'public/logo.png')    "$Root/public/logo.png"
+Push (Join-Path $App 'public/favicon.ico') "$Root/public/favicon.ico"
+Write-Host '  server.js, index.html, home.html, ridge.svg, logo.png, favicon.ico'
+
+# The public pages are markdown like everything else, so they can be edited
+# from the site rather than redeployed. Same rule: only the missing ones go.
+Remote "if (-not (Test-Path '$rootWin\data\site')) { New-Item -ItemType Directory -Path '$rootWin\data\site' -Force | Out-Null }" | Out-Null
+$siteThere = @((Remote "Get-ChildItem '$rootWin\data\site' -File -EA SilentlyContinue | ForEach-Object Name") |
+               ForEach-Object { $_.Trim() } | Where-Object { $_ })
+Get-ChildItem (Join-Path $App 'data/site') -Filter *.md -EA SilentlyContinue | ForEach-Object {
+  if ($SeedDocs -or $Site -or ($siteThere -notcontains $_.Name)) {
+    Push $_.FullName "$Root/data/site/$($_.Name)"
+    Write-Host "  sent site/$($_.Name)"
+  }
+}
+
+# Documents are only sent on the first install, or when asked for outright.
+# A redeploy that quietly overwrote them would throw away whatever anybody had
+# typed since, which is the whole point of the site.
+# File by file, because a new document added later still has to arrive while
+# the ones people have been typing in are left exactly as they are. Only what
+# is missing goes, unless -SeedDocs says to overwrite the lot.
+Write-Host ''
+Write-Host 'Documents...'
+if ($SeedDocs -or $Boards) {
+  # Every document on the VPS goes to .bak first. Both of these have thrown
+  # away an evening of edits before now: -SeedDocs flattens the lot, -Boards
+  # flattens board.json, and a board is the thing most likely to have been
+  # typed into five minutes ago.
+  Remote @"
+`$n = 0
+foreach (`$f in Get-ChildItem '$rootWin\data' -File -Include *.md,*.json -EA SilentlyContinue) {
+  Copy-Item `$f.FullName (`$f.FullName + '.bak') -Force -EA SilentlyContinue
+  `$n++
+}
+'backed up ' + `$n + ' document(s) to .bak before overwriting'
+"@ | ForEach-Object { "  $_" }
+}
+$there = @((Remote "Get-ChildItem '$rootWin\data' -File -EA SilentlyContinue | ForEach-Object Name") |
+           ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$sent = 0
+Get-ChildItem (Join-Path $App 'data') | Where-Object { $_.Extension -in '.md','.json' } |
+  ForEach-Object {
+    $force = $SeedDocs -or ($Boards -and $_.Name -eq 'board.json')
+    if ($force -or ($there -notcontains $_.Name)) {
+      Push $_.FullName "$Root/data/$($_.Name)"
+      Write-Host "  sent $($_.Name)"
+      $sent++
+    }
+  }
+if (-not $sent) {
+  Write-Host '  all present, nothing overwritten (use -SeedDocs to replace them)'
+}
+if ($Boards -and -not $SeedDocs) {
+  Write-Host ''
+  Write-Host '  -Boards replaced board.json with the repo copy.' -ForegroundColor Yellow
+  Write-Host '  Anything typed into a board on the site since the last deploy is now' -ForegroundColor Yellow
+  Write-Host '  only in board.json.bak on the VPS. Plain Deploy-Docs never does this.' -ForegroundColor Yellow
+}
+if ($SeedDocs -and $sent) {
+  Write-Host ''
+  Write-Host "  -SeedDocs overwrote $sent document(s) with the repo copy." -ForegroundColor Yellow
+  Write-Host '  Anything typed into the site since the last deploy is now in the .bak' -ForegroundColor Yellow
+  Write-Host '  file beside it on the VPS. Use -Site next time if you only meant the' -ForegroundColor Yellow
+  Write-Host '  public pages, or -Boards if you only meant the runbook.' -ForegroundColor Yellow
+}
+
+if ($Password) {
+  Write-Host ''
+  Write-Host 'Setting the password...'
+  # Through base64 so quoting survives ssh, cmd and PowerShell, and so it is
+  # not sitting in a command line on either machine.
+  $json = (@{ password = $Password } | ConvertTo-Json -Compress)
+  $b64  = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+  Remote @"
+[IO.File]::WriteAllBytes('$rootWin\config.json', [Convert]::FromBase64String('$b64'))
+'set'
+"@ | ForEach-Object { "  $_" }
+}
+
+Write-Host ''
+Write-Host 'Opening the port and starting it...'
+Remote @"
+`$ErrorActionPreference = 'Continue'
+
+# Once Setup-Domain has run, the site answers on loopback only and Caddy holds
+# 80 and 443. Opening 3001 again would put a plain HTTP way straight past the
+# certificate, so a redeploy after that must not do it, and tears the rule back
+# down if a previous run left one.
+`$local = [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_LOCAL','Machine')
+if (`$local -eq '1') {
+  Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue |
+    Remove-NetFirewallRule -EA SilentlyContinue
+  'behind the certificate, $Port left shut'
+}
+elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
+  New-NetFirewallRule -DisplayName '$Task' -Direction Inbound -Protocol TCP ``
+    -LocalPort $Port -Action Allow | Out-Null
+  'firewall opened on $Port'
+} else { 'firewall rule already there' }
+
+Get-CimInstance Win32_Process |
+  Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*Thornswood-Docs*' } |
+  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
+# Older installs ran it as plain 'server.js', which no command line filter can
+# see, so whatever is holding the port goes too.
+Get-NetTCPConnection -LocalPort $Port -State Listen -EA SilentlyContinue |
+  ForEach-Object { Stop-Process -Id `$_.OwningProcess -Force -EA SilentlyContinue }
+Start-Sleep -Seconds 1
+
+`$node = (Get-Command node -EA SilentlyContinue).Source
+if (-not `$node) { 'NODE NOT FOUND ON THIS MACHINE'; return }
+
+# server.js goes in by its full path rather than by name. The path is what puts
+# 'Thornswood-Docs' on the command line, and the command line is the only way
+# to tell this node from any other one later.
+`$a = New-ScheduledTaskAction -Execute `$node -Argument '$rootWin\server.js' -WorkingDirectory '$rootWin'
+if (-not (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue)) {
+  `$t = New-ScheduledTaskTrigger -AtStartup
+  `$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ``
+        -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+  Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$t -Settings `$s ``
+    -RunLevel Highest -User 'SYSTEM' | Out-Null
+  'scheduled task created'
+} else {
+  Set-ScheduledTask -TaskName '$Task' -Action `$a | Out-Null
+  'scheduled task updated'
+}
+
+Start-ScheduledTask -TaskName '$Task'
+Start-Sleep -Seconds 4
+
+# The port is the real answer. A process list can miss it, a listening socket
+# cannot.
+`$listen = Get-NetTCPConnection -LocalPort $Port -State Listen -EA SilentlyContinue
+if (`$listen) {
+  'docs up, pid ' + (`$listen | Select-Object -First 1).OwningProcess
+} else {
+  'DOCS DID NOT START. Running it by hand to see why:'
+  `$o = Join-Path `$env:TEMP 'tw-docs-out.txt'
+  `$e = Join-Path `$env:TEMP 'tw-docs-err.txt'
+  Remove-Item `$o,`$e -Force -EA SilentlyContinue
+  `$h = Start-Process -FilePath `$node -ArgumentList 'server.js' -WorkingDirectory '$rootWin' ``
+        -RedirectStandardOutput `$o -RedirectStandardError `$e -PassThru -NoNewWindow
+  Start-Sleep -Seconds 4
+  if (`$h -and -not `$h.HasExited) {
+    'it runs fine by hand, so the scheduled task is what is wrong'
+    Stop-Process -Id `$h.Id -Force -EA SilentlyContinue
+  }
+  Get-Content `$o,`$e -EA SilentlyContinue | Select-Object -First 25
+  (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue | Get-ScheduledTaskInfo).LastTaskResult |
+    ForEach-Object { 'task last result: ' + `$_ }
+}
+"@ | ForEach-Object { "  $_" }
+
+Write-Host ''
+Write-Host "  http://${Vps}:$Port" -ForegroundColor Green

@@ -13,6 +13,28 @@ namespace Thornswood
         // SkyMP's default. 25565 was Skyrim Together's, on the old box.
         [DataMember] public string ServerPort = "7777";
 
+        /*
+          The Nexus collection that installs the mods.
+
+          The installer stopped carrying them: anything the collection provides
+          is left out of it, which is what took it from fourteen gigabytes to
+          something somebody will actually finish downloading. That trade only
+          works if the launcher sends people to the collection, so a build with
+          this empty and an installer built against a collection is a build
+          nobody can play.
+
+          It comes down with the update check like the server address does, so
+          it can be set once and everybody has it.
+        */
+        [DataMember] public string CollectionUrl = Collection;
+
+        // The one we ship with. The update check overwrites it, but a
+        // launcher that has never reached the site still has to be able to
+        // send somebody to the collection, because that is exactly the
+        // state somebody installing for the first time is in.
+        public const string Collection =
+            "https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a";
+
         // Where a server on this machine lives, when the address above is this
         // machine. Blank means look in the usual two places.
         [DataMember] public string ServerFolder = "";
@@ -21,6 +43,19 @@ namespace Thornswood
         // audio goes straight between people; this is only where the browser
         // window connects for positions and signalling.
         [DataMember] public string VoicePort = "7778";
+
+        /*
+          Which microphone to record from, by name, or empty for whatever
+          Windows is set to.
+
+          It lives here rather than in Thornswood.ini because the ini is a mod
+          file: an update replaces it wholesale, so anything set in it by hand
+          is gone the next time the build changes. The launcher copies this
+          into the ini at every launch, which also means somebody who never
+          touches it still gets their own machine's default written in rather
+          than whoever built the release.
+        */
+        [DataMember] public string MicrophoneName = "";
 
         [DataMember(Name = "VoiceAuto")] public bool? VoiceAutoSetting = true;
 
@@ -31,7 +66,7 @@ namespace Thornswood
         }
         // How many the server seats. Shipped with the build so the Play page
         // can say something useful even when the server does not announce itself.
-        [DataMember] public int MaxOnline = 5;
+        [DataMember] public int MaxOnline = 25;
 
         // Skyrim Together took a password on its join screen and the launcher
         // typed it in for people. SkyMP has no such screen: the client reads an
@@ -54,6 +89,41 @@ namespace Thornswood
         [DataMember] public string UpdateBranch = "main";
 
         [DataMember] public string Theme = "Forge";
+
+        /*
+          Which build this install follows. Empty is the main build, the one
+          everybody plays on. "dev" is the second launcher, installed beside
+          the main one from its Settings page, that reads version.json off
+          the dev branch and joins the dev server. New work lands there
+          first and gets broken there, so the main build stays playable
+          while it is being tested.
+        */
+        [DataMember] public string Channel = "";
+
+        public bool IsDev
+        {
+            get { return string.Equals(Channel, "dev", StringComparison.OrdinalIgnoreCase); }
+        }
+
+        /// <summary>What this build is called in titles, shortcuts and Discord.</summary>
+        public string BuildName
+        {
+            get { return IsDev ? "Thornswood Dev" : "Thornswood"; }
+        }
+
+        // The Thornswood application on Discord, the same one the sign in
+        // goes through. The presence card ("Playing Thornswood") is set under
+        // it, so it carries that application's name and art. Application ids
+        // are public, this is not a secret.
+        [DataMember] public string DiscordAppId = "1549251507361292418";
+
+        // Where the Download button on the presence card goes, and the root
+        // the Discord button is built from (SiteUrl + /discord).
+        [DataMember] public string SiteUrl = "https://thornswood.net";
+
+        // The picture on the presence card. A public https image; Discord
+        // fetches it itself. Empty turns the picture off.
+        [DataMember] public string PresenceImage = "https://thornswood.net/presence.png";
 
         // Set the first time the launcher matches the game to this screen, so
         // it never does it again and never argues with a choice made since.
@@ -115,6 +185,7 @@ namespace Thornswood
             if (string.IsNullOrEmpty(ServerAddress)) ServerAddress = "192.135.112.23";
             if (string.IsNullOrEmpty(ServerPort)) ServerPort = "7777";
             if (ServerFolder == null) ServerFolder = "";
+            if (string.IsNullOrEmpty(CollectionUrl)) CollectionUrl = Collection;
             if (string.IsNullOrEmpty(VoicePort)) VoicePort = "7778";
 
             // The old build ran Skyrim Together Reborn on 25565, on a different
@@ -127,10 +198,18 @@ namespace Thornswood
             if (ServerAddress == "192.135.119.166") ServerAddress = "192.135.112.23";
             if (ServerPassword == null) ServerPassword = "";
             if (ExpectedExeBytes <= 0) ExpectedExeBytes = 37157144;
-            if (UpdateRepo == null) UpdateRepo = "";
+            // The releases repo is public now, so there is a right answer here
+            // and no reason to make a fresh install go looking for it. A blank
+            // one used to mean a launcher that could never update itself and
+            // never said why.
+            if (string.IsNullOrEmpty(UpdateRepo)) UpdateRepo = "EvilPatrick06/Thornswood-Releases";
             if (UpdateToken == null) UpdateToken = "";
             if (string.IsNullOrEmpty(UpdateBranch)) UpdateBranch = "main";
             if (string.IsNullOrEmpty(Theme)) Theme = "Forge";
+            if (Channel == null) Channel = "";
+            if (string.IsNullOrEmpty(DiscordAppId)) DiscordAppId = "1549251507361292418";
+            if (string.IsNullOrEmpty(SiteUrl)) SiteUrl = "https://thornswood.net";
+            if (PresenceImage == null) PresenceImage = "https://thornswood.net/presence.png";
             if (string.IsNullOrEmpty(MiniMapSpot)) MiniMapSpot = "Bottom left";
         }
 
@@ -149,7 +228,18 @@ namespace Thornswood
                     {
                         var ser = new DataContractJsonSerializer(typeof(Config));
                         var c = (Config)ser.ReadObject(ms);
-                        if (c != null) return c;
+                        if (c != null)
+                        {
+                            // On the disk these two are DPAPI blobs. Everywhere
+                            // else in the launcher they are ordinary strings, so
+                            // they get turned back here and nowhere else.
+                            // Anything written before this existed is plain text
+                            // and comes back through unchanged, then gets
+                            // encrypted by the next Save.
+                            c.ServerPassword = Secrets.Unprotect(c.ServerPassword);
+                            c.UpdateToken    = Secrets.Unprotect(c.UpdateToken);
+                            return c;
+                        }
                     }
                 }
             }
@@ -159,15 +249,27 @@ namespace Thornswood
 
         public void Save(string path)
         {
+            // Swap the two secrets for their encrypted form, write, swap back.
+            // Doing it here rather than in the fields means nothing else in the
+            // launcher has to know this is happening.
+            string pw = ServerPassword, tk = UpdateToken;
             try
             {
+                ServerPassword = Secrets.Protect(pw);
+                UpdateToken    = Secrets.Protect(tk);
                 using (var ms = new MemoryStream())
                 {
                     new DataContractJsonSerializer(typeof(Config)).WriteObject(ms, this);
                     File.WriteAllBytes(path, ms.ToArray());
                 }
+                Secrets.LockDown(path);
             }
             catch { }
+            finally
+            {
+                ServerPassword = pw;
+                UpdateToken    = tk;
+            }
         }
     }
 
@@ -178,6 +280,26 @@ namespace Thornswood
         [DataMember] public string url = "";
         [DataMember] public string sha256 = "";
         [DataMember] public string notes = "";
+
+        // Only the optional packs use these two. A required update pack is
+        // applied without anybody being asked, so it has nothing to show and
+        // no download size worth warning about. An optional one sits on a page
+        // with a button next to it and needs both.
+        [DataMember] public string name = "";
+        [DataMember] public long bytes;
+
+        public string Title { get { return string.IsNullOrEmpty(name) ? id : name; } }
+
+        public string Size
+        {
+            get
+            {
+                if (bytes <= 0) return "";
+                if (bytes >= 1073741824L) return (bytes / 1073741824.0).ToString("0.0") + " GB";
+                if (bytes >= 1048576L) return (bytes / 1048576.0).ToString("0") + " MB";
+                return (bytes / 1024.0).ToString("0") + " KB";
+            }
+        }
     }
 
     [DataContract]
@@ -202,6 +324,7 @@ namespace Thornswood
         [DataMember] public string launcherUrl = "";
         [DataMember] public string launcherSha256 = "";
         [DataMember] public string serverAddress = "";
+        [DataMember] public string collectionUrl = "";
         [DataMember] public string serverPort = "";
         [DataMember] public int maxOnline;
         [DataMember] public string serverPassword = "";
@@ -217,9 +340,19 @@ namespace Thornswood
         // finds its way home.
         [DataMember] public string updateRepo = "";
         [DataMember] public string voicePort = "";
+        [DataMember] public string discordAppId = "";
+        [DataMember] public string siteUrl = "";
+        [DataMember] public string presenceImage = "";
 
         [DataMember] public string message = "";
         [DataMember] public Pack[] packs = new Pack[0];
+
+        // Packs nobody has to have. These are never applied on their own: they
+        // sit on the Mods page with an Install button, and they are safe only
+        // because the publisher refuses to build one that contains a plugin.
+        // The server compares plugin lists and nothing else, so a pack of
+        // textures and meshes cannot put anybody out of step with it.
+        [DataMember] public Pack[] optional = new Pack[0];
         [DataMember] public NewsItem[] news = new NewsItem[0];
 
         public static VersionDoc Parse(byte[] raw)

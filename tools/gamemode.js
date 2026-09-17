@@ -441,7 +441,7 @@ const CHARGEN_PROPERTY = 'thornswoodChargen';
  * The work in a tick is a couple of property reads for at most five people, so
  * the rate was never about cost. One second.
  */
-const CHARGEN_TICK_MS = 1000;
+const CHARGEN_TICK_MS = 500;
 
 /**
  * How long to leave a client completely alone after it turns up online.
@@ -468,8 +468,21 @@ const NUDGE_MS = 120000;   // two minutes; see the nudge below
  * fallback any more, it is the only way anybody leaves the hall, so every
  * second of it is a second spent standing in an empty room waiting for nothing.
  * Four: still far more movement than a stray camera nudge produces, and it
- * comes off the end of a wait that already has the settle in front of it. */
-const MOVED_ENOUGH_MS = 4000;
+ * comes off the end of a wait that already has the settle in front of it.
+ *
+ * Down again to two. The settle in front of it is measured from when somebody
+ * comes online, not from when creation ends, and creation takes far longer
+ * than the settle does, so by the time this matters the settle is long spent
+ * and this wait is the entire delay anybody actually feels. At a one second
+ * tick, two seconds is still two separate confirmations that a person is on
+ * their feet rather than nudging a camera.
+ *
+ * And down again to one. The check it gates is not "did the camera twitch", it
+ * is "is this person's position or facing different from the last sample",
+ * which a menu does not produce at all. A second confirmation was insurance
+ * against a thing that was never happening, paid for by everybody standing in
+ * an empty room. */
+const MOVED_ENOUGH_MS = 500;
 /* How long after a teleport before the kit is handed over, and how often it is
  * checked afterwards. Both deliberately unhurried: nobody is doing anything in
  * the first few seconds of arriving in an inn, and an item that turns up a
@@ -477,6 +490,26 @@ const MOVED_ENOUGH_MS = 4000;
  * shirt. */
 const GEAR_DELAY_MS = 5000;
 const GEAR_RECHECK_MS = 4000;
+
+/*
+  How long arriving is allowed to mean anything.
+
+  Arriving is a moment: somebody lands in their starting town and their kit is
+  topped up over the next few passes until it reads back complete. It is not a
+  state anybody should still be in tomorrow, and until now it could be, because
+  it is written into the change form and it only ends when three passes in a row
+  find nothing missing.
+
+  A session that ends before that, a crash, a lockup, closing the game, leaves
+  the mark set. The next login walks straight back into the top up, and the top
+  up compares against STARTING quantities, so it replaces everything that has
+  been eaten, drunk, sold, dropped or handed to somebody else since. The whole
+  kit, back in the pack, and the client equipping it over what was already worn.
+
+  Ten minutes is far longer than an arrival takes and far shorter than a gap
+  between sessions, so the mark closes itself and nobody's pack is touched.
+*/
+const ARRIVE_WINDOW_MS = 10 * 60 * 1000;
 
 /* How long to wait for a choice from the launcher before falling back to the
  * books. Long enough that a slow post never loses the race. */
@@ -493,7 +526,10 @@ const DEFAULT_TOWN = 'whiterun';
  * over a nose is not. */
 const GIVEUP_MS = 300000;
 
-const firstSeen = new Map();   // actorId -> when it first appeared online
+const firstSeen = new Map();
+
+// Bards already handed the ability to play, this run of the server.
+const armed = new Set();   // actorId -> when it first appeared online
 
 /* Skyrim Unbound's own character generation room, which is where a new game
  * already puts everybody, and the marker it stands them on. Falling back to the
@@ -505,7 +541,7 @@ const HALL = {
   rot: [0, 0, 180],
 };
 
-const CHARGEN = {"welcome":"e80000:Thornswood-Content.esp","shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"classes":{"e80010:Thornswood-Content.esp":{"key":"warrior","gear":[["12e49:Skyrim.esm",1],["12e4b:Skyrim.esm",1],["12e46:Skyrim.esm",1],["12e4d:Skyrim.esm",1],["12eb7:Skyrim.esm",1],["12eb6:Skyrim.esm",1],["3eadd:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80011:Thornswood-Content.esp":{"key":"hunter","gear":[["13911:Skyrim.esm",1],["13910:Skyrim.esm",1],["13912:Skyrim.esm",1],["13913:Skyrim.esm",1],["13985:Skyrim.esm",1],["1397d:Skyrim.esm",60],["1397e:Skyrim.esm",1],["3eae5:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80012:Thornswood-Content.esp":{"key":"mage","gear":[["10710a:Skyrim.esm",1],["d1921:Skyrim.esm",1],["9cd51:Skyrim.esm",1],["9e2af:Skyrim.esm",1],["2e4e2:Skyrim.esm",2],["3eae0:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80013:Thornswood-Content.esp":{"key":"smith","gear":[["5b69f:Skyrim.esm",1],["5b69e:Skyrim.esm",1],["5ace4:Skyrim.esm",5],["5ace5:Skyrim.esm",2],["800e4:Skyrim.esm",10],["f:Skyrim.esm",100]]},"e80014:Thornswood-Content.esp":{"key":"miner","gear":[["80697:Skyrim.esm",1],["80699:Skyrim.esm",1],["e3c16:Skyrim.esm",1],["1d4ec:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80015:Thornswood-Content.esp":{"key":"woodworker","gear":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1],["2f2f4:Skyrim.esm",1],["1d4ec:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80016:Thornswood-Content.esp":{"key":"alchemist","gear":[["bacf3:Skyrim.esm",1],["bacd7:Skyrim.esm",1],["1397e:Skyrim.esm",1],["45c28:Skyrim.esm",3],["59b86:Skyrim.esm",2],["134aa:Skyrim.esm",3],["34d31:Skyrim.esm",3],["5076e:Skyrim.esm",3],["516c8:Skyrim.esm",2],["ae723:Skyrim.esm",1],["f:Skyrim.esm",75]]},"e80017:Thornswood-Content.esp":{"key":"bard","gear":[["5b6a1:Skyrim.esm",1],["5b6a0:Skyrim.esm",1],["1397e:Skyrim.esm",1],["dabab:Skyrim.esm",1],["daba7:Skyrim.esm",1],["daba9:Skyrim.esm",1],["65c97:Skyrim.esm",2],["64b31:Skyrim.esm",2],["f:Skyrim.esm",200]]},"e80018:Thornswood-Content.esp":{"key":"cook","gear":[["1bc82:Skyrim.esm",1],["1bca7:Skyrim.esm",1],["18801:Skyrim.esm",1],["721e8:Skyrim.esm",3],["e8947:Skyrim.esm",3],["722bd:Skyrim.esm",2],["64b43:Skyrim.esm",2],["f4314:Skyrim.esm",2],["64b41:Skyrim.esm",4],["64b3f:Skyrim.esm",3],["64b40:Skyrim.esm",3],["669a5:Skyrim.esm",3],["1397e:Skyrim.esm",1],["f:Skyrim.esm",75]]},"e80019:Thornswood-Content.esp":{"key":"enchanter","gear":[["10710a:Skyrim.esm",1],["d1921:Skyrim.esm",1],["2e4e2:Skyrim.esm",3],["2e4e4:Skyrim.esm",2],["2e4e6:Skyrim.esm",1],["1397e:Skyrim.esm",1],["3eae0:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001a:Thornswood-Content.esp":{"key":"farmer","gear":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1],["4b0ba:Skyrim.esm",5],["64b41:Skyrim.esm",4],["64b3f:Skyrim.esm",3],["64b40:Skyrim.esm",3],["669a5:Skyrim.esm",2],["1397e:Skyrim.esm",1],["2f2f4:Skyrim.esm",1],["f:Skyrim.esm",75]]},"e8001b:Thornswood-Content.esp":{"key":"fisher","gear":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1],["207e2:FishingInSkyrim.esp",1],["d68:FishingInSkyrim.esp",1],["25eb7:FishingInSkyrim.esp",1],["65c9f:Skyrim.esm",3],["64b3b:Skyrim.esm",2],["1397e:Skyrim.esm",1],["65c97:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001c:Thornswood-Content.esp":{"key":"merchant","gear":[["86991:Skyrim.esm",1],["86993:Skyrim.esm",1],["878bb:Skyrim.esm",1],["1397e:Skyrim.esm",1],["3eadd:Skyrim.esm",2],["3eae0:Skyrim.esm",1],["64b31:Skyrim.esm",3],["65c97:Skyrim.esm",3],["f:Skyrim.esm",400]]},"e8001d:Thornswood-Content.esp":{"key":"priest","gear":[["bacf3:Skyrim.esm",1],["bacd7:Skyrim.esm",1],["9e2af:Skyrim.esm",1],["cc848:Skyrim.esm",1],["c891b:Skyrim.esm",1],["ae723:Skyrim.esm",2],["3eadd:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001e:Thornswood-Content.esp":{"key":"scholar","gear":[["10710a:Skyrim.esm",1],["d1921:Skyrim.esm",1],["9e2a8:Skyrim.esm",1],["9cd53:Skyrim.esm",1],["1d4ec:Skyrim.esm",2],["3eae0:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001f:Thornswood-Content.esp":{"key":"thief","gear":[["3619e:Skyrim.esm",1],["13920:Skyrim.esm",1],["13921:Skyrim.esm",1],["1397e:Skyrim.esm",1],["a:Skyrim.esm",15],["3eae5:Skyrim.esm",2],["f:Skyrim.esm",75]]}},"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-18.0,-1152.0,120.2],"rot":[0,0,90.0]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,68.0],"rot":[0,0,45.0]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-178.0,-1504.0,128.0],"rot":[0,0,90.0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[881.0,-3660.5,158.3],"rot":[0,0,180.0]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16.0],"rot":[0,0,180.0]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[673.1,-620.3,0.0],"rot":[0,0,180.0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1824.1,-685.8,0.5],"rot":[0,0,180.0]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1824.3,-683.7,0.0],"rot":[0,0,180.0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[2528.6,-524.4,0.5],"rot":[0,0,180.0]}}},"tradeMenus":["e80050:Thornswood-Content.esp","e80051:Thornswood-Content.esp"],"townMenus":["e80052:Thornswood-Content.esp","e80053:Thornswood-Content.esp"],"tradePages":[["e80010:Thornswood-Content.esp","e80011:Thornswood-Content.esp","e80012:Thornswood-Content.esp","e80013:Thornswood-Content.esp","e80014:Thornswood-Content.esp","e80015:Thornswood-Content.esp","e80016:Thornswood-Content.esp","e80017:Thornswood-Content.esp"],["e80018:Thornswood-Content.esp","e80019:Thornswood-Content.esp","e8001a:Thornswood-Content.esp","e8001b:Thornswood-Content.esp","e8001c:Thornswood-Content.esp","e8001d:Thornswood-Content.esp","e8001e:Thornswood-Content.esp","e8001f:Thornswood-Content.esp"]],"townPages":[["e80030:Thornswood-Content.esp","e80031:Thornswood-Content.esp","e80032:Thornswood-Content.esp","e80033:Thornswood-Content.esp","e80034:Thornswood-Content.esp"],["e80035:Thornswood-Content.esp","e80036:Thornswood-Content.esp","e80037:Thornswood-Content.esp","e80038:Thornswood-Content.esp"]]};
+const CHARGEN = {"welcome":"e80000:Thornswood-Content.esp","shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"classes":{"e80010:Thornswood-Content.esp":{"key":"warrior","gear":[["12e49:Skyrim.esm",1],["12e4b:Skyrim.esm",1],["12e46:Skyrim.esm",1],["12e4d:Skyrim.esm",1],["12eb7:Skyrim.esm",1],["12eb6:Skyrim.esm",1],["3eadd:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80011:Thornswood-Content.esp":{"key":"hunter","gear":[["13911:Skyrim.esm",1],["13910:Skyrim.esm",1],["13912:Skyrim.esm",1],["13913:Skyrim.esm",1],["13985:Skyrim.esm",1],["1397d:Skyrim.esm",60],["1397e:Skyrim.esm",1],["3eae5:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80012:Thornswood-Content.esp":{"key":"mage","gear":[["10710a:Skyrim.esm",1],["d1921:Skyrim.esm",1],["9cd51:Skyrim.esm",1],["9e2af:Skyrim.esm",1],["2e4e2:Skyrim.esm",2],["3eae0:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80013:Thornswood-Content.esp":{"key":"smith","gear":[["5b69f:Skyrim.esm",1],["5b69e:Skyrim.esm",1],["5ace4:Skyrim.esm",5],["5ace5:Skyrim.esm",2],["800e4:Skyrim.esm",10],["f:Skyrim.esm",100]]},"e80014:Thornswood-Content.esp":{"key":"miner","gear":[["80697:Skyrim.esm",1],["80699:Skyrim.esm",1],["e3c16:Skyrim.esm",1],["1d4ec:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80015:Thornswood-Content.esp":{"key":"woodworker","gear":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1],["2f2f4:Skyrim.esm",1],["1d4ec:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80016:Thornswood-Content.esp":{"key":"alchemist","gear":[["bacf3:Skyrim.esm",1],["bacd7:Skyrim.esm",1],["1397e:Skyrim.esm",1],["45c28:Skyrim.esm",3],["59b86:Skyrim.esm",2],["134aa:Skyrim.esm",3],["34d31:Skyrim.esm",3],["5076e:Skyrim.esm",3],["516c8:Skyrim.esm",2],["ae723:Skyrim.esm",1],["f:Skyrim.esm",75]]},"e80017:Thornswood-Content.esp":{"key":"bard","gear":[["5b6a1:Skyrim.esm",1],["5b6a0:Skyrim.esm",1],["1397e:Skyrim.esm",1],["1d9b:PlayFluteLuteDrum.esp",1],["287f:PlayFluteLuteDrum.esp",1],["d62:PlayFluteLuteDrum.esp",1],["65c97:Skyrim.esm",2],["64b31:Skyrim.esm",2],["f:Skyrim.esm",200]]},"e80018:Thornswood-Content.esp":{"key":"cook","gear":[["1bc82:Skyrim.esm",1],["1bca7:Skyrim.esm",1],["18801:Skyrim.esm",1],["721e8:Skyrim.esm",3],["e8947:Skyrim.esm",3],["722bd:Skyrim.esm",2],["64b43:Skyrim.esm",2],["f4314:Skyrim.esm",2],["64b41:Skyrim.esm",4],["64b3f:Skyrim.esm",3],["64b40:Skyrim.esm",3],["669a5:Skyrim.esm",3],["1397e:Skyrim.esm",1],["f:Skyrim.esm",75]]},"e80019:Thornswood-Content.esp":{"key":"enchanter","gear":[["10710a:Skyrim.esm",1],["d1921:Skyrim.esm",1],["2e4e2:Skyrim.esm",3],["2e4e4:Skyrim.esm",2],["2e4e6:Skyrim.esm",1],["1397e:Skyrim.esm",1],["3eae0:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001a:Thornswood-Content.esp":{"key":"farmer","gear":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1],["4b0ba:Skyrim.esm",5],["64b41:Skyrim.esm",4],["64b3f:Skyrim.esm",3],["64b40:Skyrim.esm",3],["669a5:Skyrim.esm",2],["1397e:Skyrim.esm",1],["2f2f4:Skyrim.esm",1],["f:Skyrim.esm",75]]},"e8001b:Thornswood-Content.esp":{"key":"fisher","gear":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1],["207e2:FishingInSkyrim.esp",1],["d68:FishingInSkyrim.esp",1],["25eb7:FishingInSkyrim.esp",1],["65c9f:Skyrim.esm",3],["64b3b:Skyrim.esm",2],["1397e:Skyrim.esm",1],["65c97:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001c:Thornswood-Content.esp":{"key":"merchant","gear":[["86991:Skyrim.esm",1],["86993:Skyrim.esm",1],["878bb:Skyrim.esm",1],["1397e:Skyrim.esm",1],["3eadd:Skyrim.esm",2],["3eae0:Skyrim.esm",1],["64b31:Skyrim.esm",3],["65c97:Skyrim.esm",3],["f:Skyrim.esm",400]]},"e8001d:Thornswood-Content.esp":{"key":"priest","gear":[["bacf3:Skyrim.esm",1],["bacd7:Skyrim.esm",1],["9e2af:Skyrim.esm",1],["cc848:Skyrim.esm",1],["c891b:Skyrim.esm",1],["ae723:Skyrim.esm",2],["3eadd:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001e:Thornswood-Content.esp":{"key":"scholar","gear":[["10710a:Skyrim.esm",1],["d1921:Skyrim.esm",1],["9e2a8:Skyrim.esm",1],["9cd53:Skyrim.esm",1],["1d4ec:Skyrim.esm",2],["3eae0:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001f:Thornswood-Content.esp":{"key":"thief","gear":[["3619e:Skyrim.esm",1],["13920:Skyrim.esm",1],["13921:Skyrim.esm",1],["1397e:Skyrim.esm",1],["a:Skyrim.esm",15],["3eae5:Skyrim.esm",2],["f:Skyrim.esm",75]]}},"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-18.0,-1152.0,120.2],"rot":[0,0,90.0]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,68.0],"rot":[0,0,45.0]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-178.0,-1504.0,128.0],"rot":[0,0,90.0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[881.0,-3660.5,158.3],"rot":[0,0,180.0]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16.0],"rot":[0,0,180.0]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[673.1,-620.3,0.0],"rot":[0,0,180.0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1824.1,-685.8,0.5],"rot":[0,0,180.0]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1824.3,-683.7,0.0],"rot":[0,0,180.0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[2528.6,-524.4,0.5],"rot":[0,0,180.0]}}},"tradeMenus":["e80050:Thornswood-Content.esp","e80051:Thornswood-Content.esp"],"townMenus":["e80052:Thornswood-Content.esp","e80053:Thornswood-Content.esp"],"tradePages":[["e80010:Thornswood-Content.esp","e80011:Thornswood-Content.esp","e80012:Thornswood-Content.esp","e80013:Thornswood-Content.esp","e80014:Thornswood-Content.esp","e80015:Thornswood-Content.esp","e80016:Thornswood-Content.esp","e80017:Thornswood-Content.esp"],["e80018:Thornswood-Content.esp","e80019:Thornswood-Content.esp","e8001a:Thornswood-Content.esp","e8001b:Thornswood-Content.esp","e8001c:Thornswood-Content.esp","e8001d:Thornswood-Content.esp","e8001e:Thornswood-Content.esp","e8001f:Thornswood-Content.esp"]],"townPages":[["e80030:Thornswood-Content.esp","e80031:Thornswood-Content.esp","e80032:Thornswood-Content.esp","e80033:Thornswood-Content.esp","e80034:Thornswood-Content.esp"],["e80035:Thornswood-Content.esp","e80036:Thornswood-Content.esp","e80037:Thornswood-Content.esp","e80038:Thornswood-Content.esp"]]};
 
 const WELCOME_BOOK = CHARGEN.welcome;
 
@@ -636,6 +672,21 @@ function applyLauncherChoice(actorId, state, choice) {
 
   state.stage = 'arriving';
   state.class = cls.key;
+  /* The three the launcher now sends. Only 'class' keys a starter kit, because
+   * the kits are form ids in the content and there is one per profession.
+   *
+   *   class       the profession, and the kit
+   *   half        which side of it. One key, or two joined by + for a mage's
+   *               two schools. Decides what they are able to MAKE, which is
+   *               server side and has nothing to do with what they carry.
+   *   gathering   hunter, fisher, miner, farmer or gatherer. Owns a verb
+   *               nobody else has. Carries no kit on purpose: a miner buys a
+   *               pickaxe like anybody else would have to.
+   *
+   * Stored on the character here so the crafting and gathering checks have
+   * them the moment they are written, rather than waiting for a second trip. */
+  state.half = String(choice.half || '');
+  state.gathering = String(choice.cls || '');
   state.destination = entry.key;
   state.fromLauncher = true;
   state.at = Date.now();
@@ -645,7 +696,9 @@ function applyLauncherChoice(actorId, state, choice) {
   setChargen(actorId, state);
 
   log('chargen', actorId.toString(16), 'launcher choice applied:',
-      cls.key, 'in', entry.key, '(' + arrival.cell + '), kit to follow');
+      cls.key + (state.half ? '/' + state.half : '') +
+      (state.gathering ? ', ' + state.gathering : ''),
+      'in', entry.key, '(' + arrival.cell + '), kit to follow');
   return true;
 }
 
@@ -902,10 +955,51 @@ function chargenTick() {
     }
 
     if (!state) {
-      // A choice waiting from the launcher is proof this character was made
-      // seconds ago, and it beats anything the face suggests.
       let pidNew = 0;
       try { pidNew = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pidNew = 0; }
+
+      /*
+        Somebody who already exists, decided by what they own.
+
+        The check below this used to come first, on the stated grounds that a
+        choice waiting from the launcher is proof the character was made
+        seconds ago. It is not. The launcher posts a choice whenever it has a
+        trade and a town recorded for a slot, and it has those for every
+        character it has ever made, so a character who has been played for
+        hours arrives here looking brand new. What follows is creation run a
+        second time on somebody who already finished it: another full starter
+        kit tipped into a pack that already had one, every piece of it equipped
+        over what they were already wearing, and a trip back to the town they
+        started in.
+
+        A pack with things in it is proof in the other direction and it cannot
+        be wrong, because nothing hands anybody anything before this point.
+        Nobody arrives owning something unless they have played.
+      */
+      let owns = 0;
+      try {
+        const inv = mp.get(actorId, 'inventory');
+        owns = (inv && inv.entries) ? inv.entries.length : 0;
+      } catch (e) { owns = 0; }
+
+      if (appearance && owns > 0) {
+        log('chargen', actorId.toString(16), 'profile', pidNew,
+            'already has a character carrying', owns,
+            owns === 1 ? 'thing' : 'things,',
+            'so creation is skipped for them');
+        setChargen(actorId, { stage: 'done', at: now, legacy: true });
+        // The choice is stale the moment it turns out to belong to somebody
+        // who already exists. Dropping it here is what stops this character
+        // looking new again on the next login, and the one after that.
+        if (pidNew && launcherChoices[String(pidNew)]) {
+          claimChoice(pidNew);
+          log('chargen', actorId.toString(16),
+              'dropped the stale launcher choice for profile', pidNew);
+        }
+        continue;
+      }
+
+      // Genuinely new: a choice is waiting and there is nothing to lose.
       if (pidNew && launcherChoices[String(pidNew)]) {
         log('chargen', actorId.toString(16), 'profile', pidNew,
             'is new, the launcher has a choice waiting for them');
@@ -933,9 +1027,39 @@ function chargenTick() {
       continue;
     }
 
+    /*
+      A bard who finished creation before any of this existed.
+
+      The ability that turns holding an instrument into playing one was only
+      ever handed out at the moment a kit was confirmed. That is once, ever, and
+      only for somebody created after it was written. Every bard who finished
+      before it, and every bard whose session ended before the kit read back
+      complete, has been carrying three instruments and no way to use them.
+
+      AddSpell on a spell an actor already has does nothing, so this costs a
+      call per bard per session and nothing else.
+    */
+    if (state.class === 'bard' && !armed.has(actorId)) {
+      armed.add(actorId);
+      try { armBard(actorId); } catch (e) { }
+    }
+
     // Landed, or landing. The kit goes in here rather than alongside the
     // teleport, and then it is checked. Three clean passes and we stop looking.
     if (state.stage === 'arriving') {
+      // Left over from a session that ended before the kit read back complete.
+      // Close it, and do not touch what they are carrying.
+      const arrivedAt = Number(state.at) || 0;
+      if (arrivedAt && (now - arrivedAt) > ARRIVE_WINDOW_MS) {
+        state.stage = 'done';
+        setChargen(actorId, state);
+        if (state.class === 'bard') { try { armBard(actorId); } catch (e) { } }
+        log('chargen', actorId.toString(16), 'was still marked arriving from',
+            Math.round((now - arrivedAt) / 60000) + ' minutes ago.',
+            'Closing it without touching their pack.');
+        continue;
+      }
+
       if (now < (state.gearAt || 0)) { continue; }
 
       const classDesc = CLASS_BY_KEY[state.class];
@@ -963,6 +1087,10 @@ function chargenTick() {
       if ((state.clean || 0) >= 3 || state.gearTries > 12) {
         state.stage = 'done';
         setChargen(actorId, state);
+        // Here rather than with the items, because the instruments have to be
+        // in the pack before the ability to use them is worth anything, and
+        // this is the one point that knows they are.
+        if (state.class === 'bard') { try { armBard(actorId); } catch (e) { } }
         log('chargen', actorId.toString(16), 'kit confirmed:', state.class, 'in', state.destination);
         continue;
       }
@@ -1408,6 +1536,35 @@ function spellOn(actorId, spellDesc, on) {
   }
 }
 
+/*
+ * The bard's instruments, and why they needed two fixes rather than one.
+ *
+ * The kit used to hand out Skyrim's own lute, drum and flute: 0xDABAB, 0xDABA7
+ * and 0xDABA9. Those are MISC records. Vanilla has no way to hold one, so they
+ * cannot be equipped and Use does nothing, which is exactly what a bard found
+ * when they looked in their pack.
+ *
+ * PlayFluteLuteDrum.esp, which is already in the load order, does not override
+ * those. It adds three WEAP records of its own, FluteWeapon, LuteWeapon and
+ * DrumWeapon, and those are the ones you can actually hold. The kit now hands
+ * out those instead.
+ *
+ * It also ships PlayInstrumentSpell, the ability that turns holding one into
+ * playing one, and that ability is handed out by a start-game-enabled quest.
+ * A quest is exactly the kind of thing not to rely on here: the character is a
+ * change form the server hands back rather than a game somebody started, so
+ * whether that quest ever ran for them is not something this can know. Adding
+ * it directly costs nothing when it is already there, because AddSpell on a
+ * spell an actor already has does nothing at all.
+ */
+const INSTRUMENT_SPELL = '9456:PlayFluteLuteDrum.esp';
+
+function armBard(actorId) {
+  if (spellOn(actorId, INSTRUMENT_SPELL, true)) {
+    log('bard', actorId.toString(16), 'can play their instruments');
+  }
+}
+
 /** One blessing at a time, the way the shrines themselves work. */
 function bless(actorId, baseDesc) {
   const shrine = SHRINES[baseDesc];
@@ -1697,6 +1854,59 @@ log('gamemode loaded:',
     return name;
   }
 
+  /*
+   * Where somebody is, in words.
+   *
+   * worldOrCellDesc is a form descriptor, "16789:Skyrim.esm", which is the
+   * right thing to store and the wrong thing to show anybody. The cell record
+   * usually carries a FULL name written for players, so that is asked for
+   * first: "Candlehearth Hall", "Whiterun". Falling back to the editor id and
+   * spacing it out gives something readable rather than nothing, and a cell
+   * with neither is left alone rather than guessed at.
+   *
+   * Cached because a cell's name never changes and this runs every four
+   * seconds for everybody online.
+   */
+  var places = {};
+
+  function placeName(desc) {
+    desc = String(desc || '');
+    if (!desc) return '';
+    if (places[desc] !== undefined) return places[desc];
+
+    var out = '';
+    try {
+      var id = mp.getIdFromDesc(desc);
+      var found = id ? mp.lookupEspmRecordById(id) : null;
+      var rec = found && found.record;
+      var fields = (rec && rec.fields) || [];
+
+      var edid = '';
+      for (var i = 0; i < fields.length; i++) {
+        var t = String(fields[i].type);
+        if (t === 'FULL') {
+          var bytes = fields[i].data || [];
+          var text = '';
+          for (var b = 0; b < bytes.length; b++) {
+            if (!bytes[b]) break;
+            text += String.fromCharCode(bytes[b]);
+          }
+          if (text) { out = text; break; }
+        } else if (t === 'EDID' && !edid) {
+          var eb = fields[i].data || [];
+          for (var e2 = 0; e2 < eb.length; e2++) {
+            if (!eb[e2]) break;
+            edid += String.fromCharCode(eb[e2]);
+          }
+        }
+      }
+      if (!out && edid) { out = spaced(edid); }
+    } catch (e) { out = ''; }
+
+    places[desc] = out;
+    return out;
+  }
+
   function write() {
     try {
       fs.writeFileSync(FILE, JSON.stringify({ at: Date.now(), who: book }));
@@ -1719,12 +1929,20 @@ log('gamemode loaded:',
         var state = null;
         try { state = chargenOf(id); } catch (e) { state = null; }
 
+        var where = '';
+        try { where = placeName(mp.get(id, 'worldOrCellDesc')); } catch (e) { where = ''; }
+
         var row = {
           name: String((look && look.name) || ''),
           race: look ? raceName(look.raceId) : '',
           female: !!(look && look.isFemale),
           trade: String((state && state.class) || ''),
           town: String((state && state.destination) || ''),
+          // Where they were standing the last time the server looked. Kept on
+          // the row rather than thrown away when they log out, because the
+          // only person who ever reads this is looking at a launcher with the
+          // game shut, and "last seen in" is the whole point of it.
+          where: where,
           at: Date.now()
         };
 
@@ -1735,7 +1953,7 @@ log('gamemode loaded:',
         // is churn nobody asked for.
         if (!was || was.name !== row.name || was.race !== row.race ||
             was.female !== row.female || was.trade !== row.trade ||
-            was.town !== row.town) {
+            was.town !== row.town || was.where !== row.where) {
           book[String(pid)] = row;
           dirty = true;
         }
@@ -1748,6 +1966,221 @@ log('gamemode loaded:',
   console.log('[thornswood] character roster published at ' + FILE);
 })();
 // ==== end thornswood character roster ====
+
+// ==== thornswood door ====
+// ---------------------------------------------------------------- the door ---
+//
+// The server has had no access control of any kind. Anyone who knows the
+// address connects, and the address is about to be on a public website.
+//
+// This watches who turns up and compares them against an allow list. It starts
+// in WATCH mode and kicks nobody, because it was written without a way to test
+// it against a live server, and a door that wrongly turns everybody away is a
+// worse outage than the hole it closes. Run it for a day, read the log, and
+// only then set "enforce": true.
+//
+// The allow list lives at <dataDir>/allowed.json:
+//
+//     { "enforce": false, "profiles": [123, 456], "note": "..." }
+//
+// enforce   false logs and lets everyone in. true kicks anybody not listed.
+// profiles  the profileId of each person allowed in. The launcher shows a
+//           person's profile id on the Diagnostics page.
+//
+// No file means the door is off entirely and this costs one failed stat per
+// thirty seconds.
+(function () {
+  var fs = null, path = null;
+  try { fs = require('fs'); path = require('path'); } catch (e) { return; }
+  if (!fs || !path) return;
+
+  var dataDir = 'data';
+  try {
+    var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+    if (cfg && cfg.dataDir) dataDir = String(cfg.dataDir);
+  } catch (e) { }
+
+  var FILE = path.join(dataDir, 'allowed.json');
+  var LOG  = path.join(dataDir, 'door.log');
+
+  var list = null;       // null means no file, door off
+  var readAt = 0;
+
+  function load() {
+    var now = Date.now();
+    if (now - readAt < 30000) return list;
+    readAt = now;
+    try {
+      var doc = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^﻿/, ''));
+      var ids = {};
+      if (Array.isArray(doc.profiles)) {
+        for (var i = 0; i < doc.profiles.length; i++) {
+          var n = Number(doc.profiles[i]);
+          if (n) ids[n] = true;
+        }
+      }
+      list = { enforce: doc.enforce === true, ids: ids, count: Object.keys(ids).length };
+    } catch (e) {
+      list = null;
+    }
+    return list;
+  }
+
+  function note(line) {
+    var stamp = new Date().toISOString();
+    console.log('[thornswood door] ' + line);
+    try { fs.appendFileSync(LOG, stamp + '  ' + line + '\n'); } catch (e) { }
+  }
+
+  // Everybody this pass has already decided about, so a person is judged once
+  // per visit rather than every two seconds for as long as they are standing
+  // there.
+  var judged = {};
+
+  function tick() {
+    var conf = load();
+    if (!conf) return;                       // no allowed.json, door is off
+
+    var online;
+    try { online = mp.get(0, 'onlinePlayers'); } catch (e) { return; }
+    if (!Array.isArray(online)) return;
+
+    var here = {};
+    for (var i = 0; i < online.length; i++) here[online[i]] = true;
+    for (var k in judged) { if (!here[k]) delete judged[k]; }
+
+    for (var j = 0; j < online.length; j++) {
+      var actorId = online[j];
+      if (judged[actorId]) continue;
+      judged[actorId] = true;
+
+      var pid = 0;
+      try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+
+      var ok = pid && conf.ids[pid];
+      if (ok) {
+        note('let in profile ' + pid + ' (actor ' + actorId.toString(16) + ')');
+        continue;
+      }
+
+      if (!conf.enforce) {
+        note('WOULD TURN AWAY profile ' + (pid || 'unknown') +
+             ' (actor ' + actorId.toString(16) + '). Watching only, they stayed. ' +
+             conf.count + ' profiles on the list.');
+        continue;
+      }
+
+      var userId = -1;
+      try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
+      if (userId < 0) {
+        note('turning away profile ' + (pid || 'unknown') +
+             ' but could not find their connection, so they stayed');
+        continue;
+      }
+      try {
+        mp.kick(userId);
+        note('turned away profile ' + (pid || 'unknown') + ' (actor ' + actorId.toString(16) + ')');
+      } catch (e) {
+        note('could not turn away profile ' + (pid || 'unknown') + ': ' + e);
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ refresh ---
+  //
+  // The list comes from the site, which is the only thing that knows Discord
+  // roles. <dataDir>/door.json holds where to ask and the key to ask with:
+  //
+  //     { "site": "https://thornswood.net", "key": "<the bot key>" }
+  //
+  // No file means no refreshing, and the door uses whatever allowed.json
+  // already says. "enforce" is never touched by this: turning the door on is a
+  // decision, not something a web request gets to make.
+  function refresh() {
+    var conf;
+    try {
+      conf = JSON.parse(fs.readFileSync(path.join(dataDir, 'door.json'), 'utf8')
+                          .replace(/^\uFEFF/, ''));
+    } catch (e) { return; }
+    if (!conf || !conf.site || !conf.key) return;
+
+    var https;
+    try { https = require('https'); } catch (e) { return; }
+
+    var url = String(conf.site).replace(/\/+$/, '') +
+              '/api/allowed?key=' + encodeURIComponent(String(conf.key));
+    var req;
+    try {
+      req = https.get(url, function (resp) {
+        var buf = '';
+        resp.on('data', function (d) { buf += d; });
+        resp.on('end', function () {
+          var doc;
+          try { doc = JSON.parse(buf); } catch (e) {
+            note('the site sent something that is not a list: ' + buf.slice(0, 120));
+            return;
+          }
+          if (resp.statusCode !== 200) {
+            note('the site refused the list, ' + resp.statusCode +
+                 (doc && doc.error ? ' (' + doc.error + ')' : ''));
+            return;
+          }
+          // Keeping the old list is the safe failure. Writing a short one built
+          // while Discord was unreachable would turn away everybody missing
+          // from it.
+          if (doc.lookupFailed) {
+            note('the site could not reach Discord, keeping the list as it was');
+            return;
+          }
+          if (!Array.isArray(doc.profiles)) return;
+
+          var enforce = false;
+          try {
+            var had = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^\uFEFF/, ''));
+            enforce = had.enforce === true;
+          } catch (e) { }
+
+          try {
+            fs.writeFileSync(FILE, JSON.stringify({
+              enforce: enforce,
+              profiles: doc.profiles,
+              people: doc.people || [],
+              at: new Date().toISOString(),
+              note: 'Written by the gamemode from the site. Set enforce true to turn the door on.'
+            }, null, 2));
+            readAt = 0;                       // make the next tick re-read it
+            note('list refreshed from the site, ' + doc.profiles.length + ' profiles');
+          } catch (e) {
+            note('could not write ' + FILE + ': ' + e);
+          }
+        });
+      });
+      req.setTimeout(10000, function () { try { req.destroy(); } catch (e) { } });
+      req.on('error', function (e) { note('could not reach the site: ' + e.message); });
+    } catch (e) { note('refresh failed: ' + e); }
+  }
+
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  if (g.__thornswoodDoorRefresh) { try { clearInterval(g.__thornswoodDoorRefresh); } catch (e) { } }
+  g.__thornswoodDoorRefresh = setInterval(function () {
+    try { refresh(); } catch (e) { note('refresh threw: ' + e); }
+  }, 300000);
+  try { refresh(); } catch (e) { }
+
+  if (g.__thornswoodDoorTimer) { try { clearInterval(g.__thornswoodDoorTimer); } catch (e) { } }
+  g.__thornswoodDoorTimer = setInterval(function () {
+    try { tick(); } catch (e) { note('tick failed: ' + e); }
+  }, 2000);
+
+  var first = load();
+  if (first) {
+    console.log('[thornswood door] ' + (first.enforce ? 'ENFORCING' : 'watching only') +
+                ', ' + first.count + ' profiles allowed');
+  } else {
+    console.log('[thornswood door] no ' + FILE + ', the door is off and anybody can connect');
+  }
+})();
+// ==== end thornswood door ====
 
 // ==== thornswood server manifest ====
 // -------------------------------------------------------------- manifest ---
@@ -2020,6 +2453,10 @@ log('gamemode loaded:',
   }
 
   /** A line in the chat, to one person. */
+  // How far out of character talk carries. About the length of a longhouse,
+  // which is roughly the group a scene has in it.
+  var OOC_RANGE = 4000;
+
   function toProfile(profileId, text) {
     post('/say', { profileId: profileId, text: text });
   }
@@ -2105,10 +2542,103 @@ log('gamemode loaded:',
       return;
     }
 
+    if (word === '/restart' || word === '/shutdown') {
+      if (!isAdmin(profileId)) {
+        toProfile(profileId, 'That one is not yours to run.');
+        return;
+      }
+      if (arg === 'cancel' || arg === 'stop') {
+        if (!restart.at) {
+          toProfile(profileId, 'Nothing was scheduled.');
+          return;
+        }
+        restart.at = 0;
+        restart.said = {};
+        broadcast('The restart is called off. Carry on.');
+        log('restart cancelled by', profileId);
+        return;
+      }
+      var mins = Number(arg);
+      if (!(mins > 0) || mins > 120) {
+        toProfile(profileId, 'Say /restart <minutes>, up to 120, or /restart cancel.');
+        return;
+      }
+      arm(mins * 60, parts.slice(2).join(' ') || 'an update', 'restart');
+      log('restart scheduled by', profileId, 'in', mins, 'minutes');
+      return;
+    }
+
+    // ------------------------------------------------------------- ooc ---
+    //
+    // Brackets worked, but only if everybody remembered them, and a line of
+    // out of character talk typed without them lands in the middle of a scene
+    // as though somebody's character said it.
+    //
+    // This is deliberately LOCAL. Out of character talk belongs to the scene
+    // it interrupts, not to everybody in Skyrim, and a server wide one would
+    // be a second general chat inside the game.
+    if (word === '/ooc' || word === '/o') {
+      var said = parts.slice(1).join(' ').trim();
+      if (!said) {
+        toProfile(profileId, 'Say /ooc and then whatever you meant to say.');
+        return;
+      }
+      if (said.length > 300) { said = said.slice(0, 300); }
+
+      var myPos = [0, 0, 0], myCell = '';
+      try {
+        myPos = mp.get(actorId, 'pos') || [0, 0, 0];
+        myCell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      } catch (e) { }
+
+      var who = '';
+      try {
+        var ap = mp.get(actorId, 'appearance');
+        who = String((ap && ap.name) || '');
+      } catch (e) { }
+      if (!who) { who = 'Somebody'; }
+
+      var line = '(( ' + who + ': ' + said + ' ))';
+
+      var near = [];
+      try { near = mp.get(0, 'onlinePlayers') || []; } catch (e) { near = []; }
+
+      var heard = 0;
+      for (var oi = 0; oi < near.length; oi++) {
+        var oid = near[oi], opid = 0;
+        try { opid = Number(mp.get(oid, 'profileId')) || 0; } catch (e) { continue; }
+        if (!opid) { continue; }
+
+        if (oid !== actorId) {
+          var oCell = '', oPos = [0, 0, 0];
+          try {
+            oCell = String(mp.get(oid, 'worldOrCellDesc') || '');
+            oPos = mp.get(oid, 'pos') || [0, 0, 0];
+          } catch (e) { continue; }
+          // Same room first. Two people at the same coordinates in different
+          // cells are not in earshot of each other.
+          if (oCell !== myCell) { continue; }
+          var dx = oPos[0] - myPos[0], dy = oPos[1] - myPos[1], dz = oPos[2] - myPos[2];
+          if ((dx * dx + dy * dy + dz * dz) > (OOC_RANGE * OOC_RANGE)) { continue; }
+        }
+
+        toProfile(opid, line);
+        heard++;
+      }
+
+      if (heard <= 1) {
+        toProfile(profileId, 'Nobody near enough to hear that.');
+      }
+      log('command: /ooc', actorId.toString(16), 'heard by', heard);
+      return;
+    }
+
     if (word === '/help' || word === '/commands') {
       toProfile(profileId,
+        '/ooc <what you meant> talks out of character to whoever is near you. ' +
         '/where prints your cell, position and facing. ' +
-        '/tp <place> moves you. /roll is in the chat itself.');
+        '/tp <place> moves you. /roll is in the chat itself.' +
+        (isAdmin(profileId) ? ' /restart <minutes> [why] warns and clears the server.' : ''));
       return;
     }
 
@@ -2127,7 +2657,219 @@ log('gamemode loaded:',
     // server at all, which means the voice service in front of it is not
     // holding slash lines back, which means the copy running up there is old.
     toProfile(profileId, 'No command called ' + word + '. ' +
-              'There is /where, /tp <place> and /help.');
+              'There is /ooc, /where, /tp <place> and /help.');
+  }
+
+  /*
+    Restarts, announced rather than sprung.
+
+    Publishing an update means the server comes down, and up to now that landed
+    on whoever was playing as a disconnect with no warning: mid dungeon, mid
+    fight, with whatever the server had not yet written still unwritten. This
+    gives the room notice, repeats it as the time gets shorter, and then puts
+    everybody out deliberately so nobody is holding an open session when the
+    process dies.
+
+    Kicking at the end is the point, not a courtesy. A client still connected
+    when the server stops sits there believing it is in a world nobody is
+    keeping any more, and the reconnect that follows is messier than a clean
+    exit. mp.kick ends it on our terms.
+  */
+  var restart = { at: 0, said: {}, why: '', mode: 'update' };
+
+  // Marks at which the room is told again. Anything longer than the notice
+  // given is skipped, so /restart 2 does not shout about ten minutes.
+  var MARKS = [600, 300, 120, 60, 30, 10];
+
+  function admins() {
+    try {
+      var cfg = mp.getServerSettings() || {};
+      var list = cfg.thornswoodAdmins;
+      if (Array.isArray(list) && list.length) { return list.map(Number); }
+    } catch (e) { }
+    return [816507994];
+  }
+
+  function isAdmin(profileId) {
+    return admins().indexOf(Number(profileId)) !== -1;
+  }
+
+  /** Everybody connected, by profile, so the message goes through the chat. */
+  function broadcast(text) {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    for (var i = 0; i < online.length; i++) {
+      var pid = 0;
+      try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+      if (pid) { toProfile(pid, text); }
+    }
+  }
+
+  function clearTheServer() {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+
+    // A notice ends with a word, not a disconnect.
+    if (restart.mode === 'notice') {
+      broadcast(parting());
+      log('notice: told', online.length, 'people, nobody disconnected');
+      return;
+    }
+
+    var gone = 0;
+    for (var i = 0; i < online.length; i++) {
+      var actorId = online[i];
+      try {
+        var pid = Number(mp.get(actorId, 'profileId')) || 0;
+        if (pid) { toProfile(pid, parting()); }
+      } catch (e) { }
+      try {
+        var userId = mp.getUserByActor(actorId);
+        if (userId !== undefined && userId !== null && userId >= 0) {
+          mp.kick(userId);
+          gone++;
+        }
+      } catch (e) { log('could not kick', actorId, e); }
+    }
+    log('restart: cleared the server,', gone, 'disconnected');
+  }
+
+  /*
+    Arming from one place, because there are two ways in.
+
+    Typing /restart only works if he is standing in the world, and the moment
+    that matters most is the one right after Ship.ps1 has published, when he is
+    at a terminal and not in the game at all. So the server also watches for a
+    file, and the ship script drops that file over ssh. Same countdown either
+    way.
+
+    mode decides the wording, not the behaviour. An update needs everybody to
+    quit so their launcher can patch; a restart means the server itself is
+    going down. Both end in the same kick, because a client left connected to a
+    server that has stopped, or running files the rest of the room has moved
+    past, is the thing this exists to prevent.
+  */
+  function arm(seconds, why, mode) {
+    restart.at = Date.now() + Math.round(seconds * 1000);
+    restart.said = {};
+    restart.why = why || 'an update';
+    restart.mode = (mode === 'restart' || mode === 'notice') ? mode : 'update';
+    broadcast(opening(Math.round(seconds / 60)));
+  }
+
+  function opening(mins) {
+    var when = mins >= 1
+      ? mins + (mins === 1 ? ' minute' : ' minutes')
+      : 'under a minute';
+    /*
+      Three modes, and only two of them end with anybody put out.
+
+      notice is the common one and the reason this exists. Pushing a server
+      build stops and starts the process, which from a chair looks like a
+      freeze and then everything carries on: the client holds its session and
+      picks back up, so throwing people out for it is a bigger interruption
+      than the thing being warned about. They just want to know why the world
+      went still for a moment, and not to be mid swing when it does.
+    */
+    if (restart.mode === 'notice') {
+      return 'Pushing a server update in ' + when + '. Expect a freeze of a ' +
+             'few seconds when it lands. You do not need to log out, but do ' +
+             'not be mid fight.';
+    }
+    if (restart.mode === 'restart') {
+      return 'The server is going down in ' + when + ' for ' + restart.why +
+             '. Get somewhere safe and log out before then.';
+    }
+    return 'An update is out. Everyone has ' + when + ' to finish up, then you ' +
+           'will be put back to the launcher to install it. ' +
+           'Get somewhere safe.';
+  }
+
+  function reminder(when) {
+    if (restart.mode === 'notice') {
+      return 'Server update in ' + when + '. Brief freeze, nothing to do.';
+    }
+    if (restart.mode === 'restart') {
+      return 'Server going down in ' + when + '. Log out somewhere safe.';
+    }
+    return when + ' until the update. Finish up and get somewhere safe.';
+  }
+
+  function parting() {
+    if (restart.mode === 'notice') {
+      return 'Going in now. Hold tight.';
+    }
+    if (restart.mode === 'restart') {
+      return 'Going down now. See you in a few minutes.';
+    }
+    return 'Update time. Let the launcher patch, then come straight back.';
+  }
+
+  /*
+    The drop box. Ship.ps1 writes it over ssh, we act on it and delete it, so a
+    file left behind by a crash cannot fire a second time on the next boot.
+  */
+  var REQUEST = 'data/restart.json';
+
+  function checkRequest() {
+    var fs;
+    try { fs = require('fs'); } catch (e) { return; }
+    var raw;
+    try {
+      if (!fs.existsSync(REQUEST)) { return; }
+      raw = fs.readFileSync(REQUEST, 'utf8');
+    } catch (e) { return; }
+
+    try { fs.unlinkSync(REQUEST); } catch (e) { }
+
+    var req;
+    try { req = JSON.parse(raw); } catch (e) {
+      log('restart request was not readable:', raw);
+      return;
+    }
+    if (!req) { return; }
+
+    if (req.cancel) {
+      if (restart.at) {
+        restart.at = 0;
+        restart.said = {};
+        broadcast('That is called off. Carry on.');
+        log('restart request: cancelled');
+      }
+      return;
+    }
+
+    var secs = Number(req.seconds);
+    if (!(secs > 0)) { secs = 300; }
+    if (secs > 7200) { secs = 7200; }
+
+    arm(secs, String(req.why || 'an update'), String(req.mode || 'update'));
+    log('restart request:', secs, 'seconds,', restart.mode, ',', restart.why);
+  }
+
+  function restartTick() {
+    checkRequest();
+    if (!restart.at) { return; }
+    var left = Math.round((restart.at - Date.now()) / 1000);
+
+    if (left <= 0) {
+      restart.at = 0;
+      restart.said = {};
+      clearTheServer();
+      return;
+    }
+
+    for (var i = 0; i < MARKS.length; i++) {
+      var m = MARKS[i];
+      if (left <= m && !restart.said[m]) {
+        restart.said[m] = true;
+        var when = m >= 60
+          ? (m / 60) + (m === 60 ? ' minute' : ' minutes')
+          : m + ' seconds';
+        broadcast(reminder(when));
+        break;
+      }
+    }
   }
 
   function poll() {
@@ -2155,8 +2897,9 @@ log('gamemode loaded:',
   if (g.__thornswoodCommandTimer) { clearInterval(g.__thornswoodCommandTimer); }
   g.__thornswoodCommandTimer = setInterval(function () {
     try { poll(); } catch (e) { }
+    try { restartTick(); } catch (e) { log('restart tick threw:', e); }
   }, 1500);
 
-  console.log('[thornswood] chat commands running: /where, /tp, /help');
+  console.log('[thornswood] chat commands running: /ooc, /where, /tp, /help, /restart');
 })();
 // ==== end thornswood chat commands ====

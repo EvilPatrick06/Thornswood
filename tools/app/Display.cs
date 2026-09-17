@@ -13,6 +13,101 @@ namespace Thornswood
     /// to uncomment the existing line rather than append a duplicate the game
     /// would ignore.
     /// </summary>
+    /// <summary>
+    /// Field of view, kept in Thornswood.ini rather than with the rest of the
+    /// display settings.
+    ///
+    /// Two reasons it is not in SSEDisplayTweaks.ini with its neighbours. That
+    /// file belongs to a mod which may not be in the build, and everything on
+    /// this page goes dead when it is missing, whereas the field of view has
+    /// nothing to do with it. And the game plugin has to read this at runtime:
+    /// Skyrim rewrites its own fDefaultWorldFOV on loads, menus and anything
+    /// that swaps the camera, so a number in an ini the game reads once does
+    /// not hold. Thornswood.ini is the file the plugins already read, so the
+    /// launcher writes one place and the game picks it up from there.
+    /// </summary>
+    static class Fov
+    {
+        /// <summary>
+        /// What Skyrim uses when nobody has said otherwise.
+        ///
+        /// fDefaultWorldFOV is not written into Skyrim.ini or SkyrimPrefs.ini
+        /// in this build, so the game is running its own built in number. The
+        /// box rests on it, and a value equal to it removes the setting rather
+        /// than storing it, so the game plugin has nothing to read and does not
+        /// register an update handler at all. Setting the field of view to the
+        /// number it already is should cost nothing, not cost a call a second.
+        /// </summary>
+        public const int Default = 65;
+
+        public const int Min = 60;
+        public const int Max = 140;
+
+        static string IniPath
+        {
+            get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\Thornswood.ini"); }
+        }
+
+        /// <summary>The set value, or Skyrim's own default when nothing is set.</summary>
+        public static int Get()
+        {
+            try
+            {
+                // No file means nothing has been set, which means the game is
+                // using its own default. This returned 0, and the settings page
+                // prints whatever comes back, so a fresh install showed a field
+                // of view of 0. A collection install has no Thornswood.ini until
+                // something writes one, so every one of them started that way.
+                if (!File.Exists(IniPath)) return Default;
+                var rx = new Regex(@"^\s*Fov\s*=\s*(\d+)\s*$", RegexOptions.IgnoreCase);
+                foreach (string line in File.ReadAllLines(IniPath))
+                {
+                    string t = line.TrimStart();
+                    if (t.StartsWith("#") || t.StartsWith(";")) continue;
+                    Match m = rx.Match(line);
+                    if (m.Success)
+                    {
+                        int n;
+                        if (int.TryParse(m.Groups[1].Value, out n)) return n;
+                    }
+                }
+            }
+            catch { }
+            return Default;
+        }
+
+        /// <summary>
+        /// The default, or anything out of range, removes the line and hands
+        /// the field of view back to the game untouched.
+        /// </summary>
+        public static bool Set(int fov)
+        {
+            try
+            {
+                // Same reason: with no file there was nothing to edit and this
+                // returned false, so somebody on a fresh install could not set
+                // a field of view at all. Make one rather than refusing.
+                if (!File.Exists(IniPath))
+                {
+                    if (fov <= 0 || fov == Default) return true;   // nothing to record
+                    try { Directory.CreateDirectory(Path.GetDirectoryName(IniPath)); } catch { }
+                    File.WriteAllLines(IniPath, new string[] { "Fov=" + fov });
+                    return true;
+                }
+                var lines = new List<string>(File.ReadAllLines(IniPath));
+                var rx = new Regex(@"^\s*Fov\s*=", RegexOptions.IgnoreCase);
+
+                for (int i = lines.Count - 1; i >= 0; i--)
+                    if (rx.IsMatch(lines[i])) lines.RemoveAt(i);
+
+                if (fov > 0 && fov != Default) lines.Add("Fov=" + fov);
+                File.WriteAllLines(IniPath, lines);
+                return true;
+            }
+            catch { return false; }
+        }
+    }
+
     static class Display
     {
         public static string IniPath
@@ -261,7 +356,7 @@ namespace Thornswood
         // The open delay lives there too, as a rule, for the same reason: the
         // mod rewrites this file when the game exits.
 
-        static string PrefsPath { get { return Path.Combine(Paths.MyGames, "SkyrimPrefs.ini"); } }
+        static string PrefsPath { get { return Path.Combine(Paths.LiveMyGames, "SkyrimPrefs.ini"); } }
 
         /// <summary>
         /// iSize W and iSize H, written in place. The space in "iSize W" is

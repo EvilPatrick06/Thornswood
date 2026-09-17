@@ -30,8 +30,36 @@ param(
   [string] $Game   = 'C:\Thornswood\Game',
   [string] $Vps    = '192.135.112.23',
   [string] $User   = 'Administrator',
-  [switch] $SkipServer
+  [switch] $SkipServer,
+  # Install into the Skyrim that Steam owns and Vortex deploys the collection
+  # into, rather than into the launcher's own copy. Found the same way the
+  # launcher finds it, so there is no path to type and no path to get wrong.
+  [switch] $Vortex
 )
+
+if ($Vortex) {
+  $roots = @()
+  foreach ($k in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam')) {
+    try { $sp = (Get-ItemProperty -Path $k -EA Stop).SteamPath; if ($sp) { $roots += ($sp -replace '/', '\') } } catch { }
+  }
+  foreach ($r in @($roots)) {
+    $vdf = Join-Path $r 'config\libraryfolders.vdf'
+    if (Test-Path -LiteralPath $vdf) {
+      foreach ($line in Get-Content -LiteralPath $vdf) {
+        if ($line -match '^\s*"path"\s+"(.+)"\s*$') { $roots += ($Matches[1] -replace '\\\\', '\') }
+      }
+    }
+  }
+  $found = ''
+  foreach ($r in $roots) {
+    $g = Join-Path $r 'steamapps\common\Skyrim Special Edition'
+    if (Test-Path -LiteralPath (Join-Path $g 'SkyrimSE.exe')) { $found = $g; break }
+  }
+  if (-not $found) { throw 'Could not find the Steam copy of Skyrim. Pass -Game with its folder instead.' }
+  $Game = $found
+  Write-Host ''
+  Write-Host "  installing into the Steam copy: $Game" -ForegroundColor Cyan
+}
 
 Set-StrictMode -Off
 $ErrorActionPreference = 'Continue'
@@ -104,8 +132,17 @@ if (Test-Path -LiteralPath $probe) {
 # Anything in the plugins folder that is not a plugin makes SkyrimPlatform
 # reload every plugin, repeatedly, which presents as a black screen with a dead
 # keyboard rather than as an error.
-foreach ($s in (Get-ChildItem -LiteralPath $plugins -File |
-                Where-Object { $_.Extension -ne '.js' -and $_.Name -ne 'skymp5-client-settings.txt' })) {
+#
+# And anything that IS a plugin but is not ours runs on every machine that
+# installs the collection. A Steam copy that had another roleplay server
+# installed on it first still had that server's overlay sitting in here, which
+# is how somebody ends up with two fronts fighting over the browser. So the
+# list is what belongs, not what looks wrong.
+$keep = @('skymp5-client.js', 'skymp5-activity.js', 'skymp5-client-settings.txt')
+foreach ($f in (Get-ChildItem -LiteralPath $plSrc -File -Filter *.js -EA SilentlyContinue)) { $keep += $f.Name }
+
+foreach ($s in (Get-ChildItem -LiteralPath $plugins -File)) {
+  if ($keep -contains $s.Name) { continue }
   Bad "removing stray file from the plugins folder: $($s.Name)"
   Remove-Item -LiteralPath $s.FullName -Force
 }

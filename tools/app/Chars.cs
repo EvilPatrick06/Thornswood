@@ -31,7 +31,9 @@ namespace Thornswood
     // Start On Save walk in and load the newest one. Starting fresh is the
     // same trick with an empty folder, which leaves nothing to load and sends
     // the game into character creation instead.
-    static class Chars
+    // partial only so that Sync lives in CharSync.cs, which keeps the file
+    // that holds everything else out of the blast radius.
+    static partial class Chars
     {
         public const int Slots = 2;
 
@@ -84,13 +86,36 @@ namespace Thornswood
 
         // ------------------------------------------------------------ reading
 
-        // The header of a Skyrim save is a fixed run of fields before anything
-        // compressed starts, so the interesting parts can be read without
-        // unpacking the save itself.
+        /*
+          The header of a Skyrim save is a fixed run of fields before anything
+          compressed starts, so the interesting parts can be read without
+          unpacking the save itself.
+
+          Except that on this build they are not the character's. Every save in
+          these folders is written by SkyrimPlatform as scaffolding, named
+          TESMODPLATFORM-<guid>.ess, and its header is filled in with the
+          defaults SkyMP ships rather than anything about the person playing:
+
+              name     CF EB E5 ED ED E8 EA   "Пленник" in Windows-1251,
+                                              Russian for Prisoner
+              level    1
+              location "Солстейм", Solstheim
+
+          Read as UTF-8 that name comes out as seven replacement characters,
+          which is how a card that said "Patrick" started saying ???????: the
+          moment a save existed, this header was preferred over the server,
+          and the server is the only thing here that actually knows.
+
+          So a synthetic save contributes nothing but its timestamp. The race
+          is kept because NordRace in that header did match, and it is the one
+          field SkyMP writes from the real character.
+        */
         static Who Header(string file, int slot)
         {
             var w = new Who();
             w.Slot = slot;
+            bool synthetic = System.IO.Path.GetFileName(file)
+                .StartsWith("TESMODPLATFORM", StringComparison.OrdinalIgnoreCase);
             using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var br = new BinaryReader(fs, Encoding.UTF8))
             {
@@ -99,22 +124,56 @@ namespace Thornswood
                 br.ReadUInt32();              // header size
                 br.ReadUInt32();              // save format version
                 br.ReadUInt32();              // save number
-                w.Name  = Str(br);
-                w.Level = (int)br.ReadUInt32();
+                string name = Str(br);
+                int level = (int)br.ReadUInt32();
                 Str(br);                      // location, shown in game but not here
-                w.Played = Str(br);           // in game date, however the game chose to write it
-                w.Race  = Pretty(Str(br));
+                string played = Str(br);      // in game date, however the game chose to write it
+                string race = Pretty(Str(br));
+
+                if (!synthetic)
+                {
+                    w.Name = name;
+                    w.Level = level;
+                    w.Played = played;
+                }
+                w.Race = race;
             }
             w.Empty = false;
             w.When = File.GetLastWriteTime(file);
             return w;
         }
 
+        /*
+          Strings in a save header are length prefixed bytes with no encoding
+          recorded anywhere, and they are not always UTF-8. SkyMP's scaffolding
+          saves carry Windows-1251, so decoding everything as UTF-8 turned a
+          name into a row of replacement characters rather than failing in any
+          way that could be noticed.
+
+          Strict UTF-8 first, so anything genuinely UTF-8 is read correctly.
+          Windows-1252 second, because it maps every byte to something and can
+          therefore never produce a replacement character. Better a name that
+          is transliterated oddly than one that is seven black diamonds.
+        */
+        static readonly Encoding StrictUtf8 = new UTF8Encoding(false, true);
+        static Encoding fallback;
+
         static string Str(BinaryReader br)
         {
             int n = br.ReadUInt16();
             if (n <= 0 || n > 4096) return "";
-            return Encoding.UTF8.GetString(br.ReadBytes(n));
+            byte[] raw = br.ReadBytes(n);
+
+            try { return StrictUtf8.GetString(raw); }
+            catch (DecoderFallbackException) { }
+
+            if (fallback == null)
+            {
+                try { fallback = Encoding.GetEncoding(1252); }
+                catch { fallback = Encoding.Default; }
+            }
+            try { return fallback.GetString(raw); }
+            catch { return ""; }
         }
 
         // Race ids read like NordRace or HighElfRace. Nobody says that out loud.
@@ -463,13 +522,63 @@ namespace Thornswood
             if (!Link(live, SlotDir(slot)))
                 throw new Exception("Could not point the save folder at character " + slot + ".");
 
+            Scrub(SlotDir(slot));
+
             // The part that actually decides who you are. Everything above this
             // line only moves save files about.
             int id = Claim(slot, fresh);
             AutoJoin.SetProfileId(id);
 
+            // Voice read the old id out of the settings file at startup and has
+            // been using it ever since. The line above just changed it.
+            Voice.Reconfigure();
+
             try { File.WriteAllText(ActiveFile, slot.ToString()); } catch { }
             WriteStartIni(fresh);
+            WriteBrowserBackend();
+        }
+
+        /// <summary>
+        /// Throw away SkyrimPlatform's scaffolding saves.
+        ///
+        /// When SkyMP spawns somebody by loading a save it does not use one of
+        /// theirs. It writes one on the spot, TESMODPLATFORM-&lt;guid&gt;.ess, fills
+        /// the header with placeholder text and loads that. The file is a
+        /// stepping stone and it is finished with the moment the load completes.
+        ///
+        /// It is also left lying in the save folder, four and a half megabytes
+        /// of it per spawn, and it is now the newest file in there. Anything
+        /// that reaches for "the most recent save" finds it, and it is not a
+        /// save: it is a shell with no world behind it. Loading one gets you a
+        /// black screen if you are lucky and a null pointer thirty seconds into
+        /// startup if you are not, which is the crash sitting in
+        /// crash-2026-09-13-17-45-02.log with po3_StartOnSave's hook on the
+        /// stack and rcx at zero.
+        ///
+        /// This machine's save folder had nothing else left in it. Two
+        /// scaffolding files and no real save, each one written by the spawn
+        /// before it and loaded by the launch after it.
+        ///
+        /// So they go, every launch, before the game can see them. Nothing is
+        /// lost: a character on this server lives in the server's world file,
+        /// and these were never anybody's.
+        /// </summary>
+        static void Scrub(string dir)
+        {
+            try
+            {
+                if (!Directory.Exists(dir)) return;
+                foreach (string f in Directory.GetFiles(dir, "TESMODPLATFORM-*.ess"))
+                {
+                    try { File.Delete(f); } catch { }
+                }
+                // The .skse companion Skyrim writes beside each save.
+                foreach (string f in Directory.GetFiles(dir, "TESMODPLATFORM-*.skse"))
+                {
+                    try { File.Delete(f); } catch { }
+                }
+            }
+            catch { }
         }
 
         // Written fresh every launch, and what it writes is "do nothing".
@@ -524,6 +633,83 @@ namespace Thornswood
                 sb.AppendLine("iSkipAutoLoadHotkey = 16");
                 sb.AppendLine("bDisableMissingContentWarning = true");
                 File.WriteAllText(StartIni, sb.ToString());
+            }
+            catch { }
+        }
+
+        static string PlatformIni
+        {
+            get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\SkyrimPlatform.ini"); }
+        }
+
+        /// <summary>
+        /// Which in game browser SkyrimPlatform uses, decided by what is on
+        /// disk rather than by a value nobody can see.
+        ///
+        /// There are two backends. nirnlab is the NirnLab UI Platform SKSE
+        /// plugin. tilted is the CEF stack built into SkyrimPlatform, and it
+        /// is the only one this build actually ships: its runtime lives in
+        /// Data\Platform\Distribution and goes out inside the installer.
+        ///
+        /// NirnLab is in neither the installer nor the collection. Machines
+        /// that have it got it from somewhere else entirely. Asking for
+        /// nirnlab on a machine without it produces no browser at all, which
+        /// means no chat, no character creation and no way into the world,
+        /// while the launcher sits there reporting that everything checks
+        /// out. That is not a failure anybody can diagnose from the outside.
+        ///
+        /// So the choice is written on every Play from what is present.
+        /// Nobody holding NirnLab is moved off it, and nobody without it is
+        /// left with a game that cannot draw its own interface.
+        ///
+        /// The file is edited, never rewritten. It also carries the log level,
+        /// the console window geometry and the plugin folder list, none of
+        /// which are ours to invent.
+        /// </summary>
+        static void WriteBrowserBackend()
+        {
+            try
+            {
+                if (!File.Exists(PlatformIni)) return;
+
+                // One file, and it is not in SKSE\Plugins.
+                //
+                // NirnLab is not loaded by the script extender. SkyrimPlatform
+                // loads it itself, which is why skse64.log shows SkyrimPlatform
+                // registering a listener called NirnLabUIPlatform and no plugin
+                // of that name in its own scan. Nexus 125447 deploys exactly
+                // Data\NirnLabUIPlatform\NirnLabUIPlatform.dll and nothing into
+                // SKSE\Plugins, so testing for a NirnLabUIPlugin.dll there is
+                // testing for a file that never exists and pins everybody to
+                // tilted no matter what they have installed.
+                bool nirnlab = File.Exists(Path.Combine(
+                    Paths.Game, "Data\\NirnLabUIPlatform\\NirnLabUIPlatform.dll"));
+                string want = nirnlab ? "nirnlab" : "tilted";
+
+                string text = File.ReadAllText(PlatformIni);
+                var rx = new System.Text.RegularExpressions.Regex(
+                    @"(?im)^[ \t]*BackendName[ \t]*=.*$");
+
+                string next;
+                if (rx.IsMatch(text))
+                {
+                    next = rx.Replace(text, "BackendName = " + want);
+                }
+                else
+                {
+                    // No [Browser] section at all, which is how a stock
+                    // SkyrimPlatform.ini arrives. Adding one is the whole fix.
+                    next = text.TrimEnd() + Environment.NewLine + Environment.NewLine +
+                           "[Browser]" + Environment.NewLine +
+                           "BackendName = " + want + Environment.NewLine;
+                }
+
+                if (next == text) return;
+
+                // The file arrives with a byte order mark and SkyrimPlatform
+                // reads it happily, so keep one rather than quietly changing
+                // the encoding of a file this launcher does not own.
+                File.WriteAllText(PlatformIni, next, new UTF8Encoding(true));
             }
             catch { }
         }

@@ -1,0 +1,548 @@
+{
+  "at": "2026-09-15T01:39:50",
+  "enabledPlugins": 99,
+  "bsa": [
+    {
+      "file": "Hothtrooper44_ArmorCompilation.bsa",
+      "bytes": 1177490824,
+      "plugin": "Hothtrooper44_ArmorCompilation.esp"
+    },
+    {
+      "file": "Hothtrooper44_Armor_Ecksstra.bsa",
+      "bytes": 385438598,
+      "plugin": "Hothtrooper44_Armor_Ecksstra.esp"
+    },
+    {
+      "file": "CommonClothes - Textures.bsa",
+      "bytes": 146128290,
+      "plugin": "CommonClothes.esp"
+    },
+    {
+      "file": "CommonClothes.bsa",
+      "bytes": 128946330,
+      "plugin": "CommonClothes.esp"
+    },
+    {
+      "file": "Cathedral Weathers - Textures.bsa",
+      "bytes": 110037959,
+      "plugin": "Cathedral Weathers.esp"
+    },
+    {
+      "file": "WindhelmSSE.bsa",
+      "bytes": 108943178,
+      "plugin": "WindhelmSSE.esp"
+    },
+    {
+      "file": "AnotherOakwood.bsa",
+      "bytes": 95125847,
+      "plugin": "AnotherOakwood.esp"
+    },
+    {
+      "file": "North Keep.bsa",
+      "bytes": 47146179,
+      "plugin": "North Keep.esp"
+    },
+    {
+      "file": "Apocalypse - Magic of Skyrim - Textures.bsa",
+      "bytes": 38322241,
+      "plugin": "Apocalypse - Magic of Skyrim.esp"
+    },
+    {
+      "file": "Triumvirate - Mage Archetypes - Textures.bsa",
+      "bytes": 36927932,
+      "plugin": "Triumvirate - Mage Archetypes.esp"
+    },
+    {
+      "file": "MoreCraftableEquipment.bsa",
+      "bytes": 36307011,
+      "plugin": "MoreCraftableEquipment.esp"
+    },
+    {
+      "file": "WindhelmSSE - Textures.bsa",
+      "bytes": 30238723,
+      "plugin": "WindhelmSSE.esp"
+    },
+    {
+      "file": "Triumvirate - Mage Archetypes.bsa",
+      "bytes": 29258317,
+      "plugin": "Triumvirate - Mage Archetypes.esp"
+    },
+    {
+      "file": "SkyrimSewers - Textures.bsa",
+      "bytes": 26643962,
+      "plugin": "SkyrimSewers.esp"
+    },
+    {
+      "file": "Apocalypse - Magic of Skyrim.bsa",
+      "bytes": 22657410,
+      "plugin": "Apocalypse - Magic of Skyrim.esp"
+    },
+    {
+      "file": "Odin - Skyrim Magic Overhaul - Textures.bsa",
+      "bytes": 19344692,
+      "plugin": "Odin - Skyrim Magic Overhaul.esp"
+    },
+    {
+      "file": "Odin - Skyrim Magic Overhaul.bsa",
+      "bytes": 16856280,
+      "plugin": "Odin - Skyrim Magic Overhaul.esp"
+    },
+    {
+      "file": "Gourmet.bsa",
+      "bytes": 16734152,
+      "plugin": "Gourmet.esp"
+    },
+    {
+      "file": "RaceMenu.bsa",
+      "bytes": 16592056,
+      "plugin": "RaceMenu.esp"
+    },
+    {
+      "file": "ZIA_Complete Pack - Textures.bsa",
+      "bytes": 13186409,
+      "plugin": "ZIA_Complete Pack.esp"
+    },
+    {
+      "file": "SkyrimSewers.bsa",
+      "bytes": 13094263,
+      "plugin": "SkyrimSewers.esp"
+    },
+    {
+      "file": "JK's Whiterun's Outskirts.bsa",
+      "bytes": 9908774,
+      "plugin": "JK's Whiterun's Outskirts.esp"
+    },
+    {
+      "file": "OarsRest.bsa",
+      "bytes": 9799595,
+      "plugin": "OarsRest.esp"
+    },
+    {
+      "file": "Cathedral Weathers.bsa",
+      "bytes": 9028039,
+      "plugin": "Cathedral Weathers.esp"
+    },
+    {
+      "file": "TavernGames - Textures.bsa",
+      "bytes": 6654713,
+      "plugin": "TavernGames.esp"
+    },
+    {
+      "file": "SunHelmSurvival.bsa",
+      "bytes": 6529124,
+      "plugin": "SunHelmSurvival.esp"
+    },
+    {
+      "file": "MarketplaceTextures.bsa",
+      "bytes": 2938167,
+      "plugin": ""
+    },
+    {
+      "file": "SkyUI_SE.bsa",
+      "bytes": 2929972,
+      "plugin": "SkyUI_SE.esp"
+    },
+    {
+      "file": "TavernGames.bsa",
+      "bytes": 2353512,
+      "plugin": "TavernGames.esp"
+    },
+    {
+      "file": "ZIA_Complete Pack.bsa",
+      "bytes": 1988166,
+      "plugin": "ZIA_Complete Pack.esp"
+    },
+    {
+      "file": "Guard Dialogue Overhaul.bsa",
+      "bytes": 1528589,
+      "plugin": "Guard Dialogue Overhaul.esp"
+    },
+    {
+      "file": "atlas map markers.bsa",
+      "bytes": 588328,
+      "plugin": "atlas map markers.esp"
+    },
+    {
+      "file": "UIExtensions.bsa",
+      "bytes": 477909,
+      "plugin": "UIExtensions.esp"
+    },
+    {
+      "file": "SkyHUD.bsa",
+      "bytes": 473310,
+      "plugin": "SkyHUD.esp"
+    },
+    {
+      "file": "AHZmoreHUD.bsa",
+      "bytes": 420923,
+      "plugin": "AHZmoreHUD.esp"
+    },
+    {
+      "file": "AHZmoreHUDInventory.bsa",
+      "bytes": 42784,
+      "plugin": "AHZmoreHUDInventory.esl"
+    },
+    {
+      "file": "atlas map markers - textures.bsa",
+      "bytes": 41757,
+      "plugin": "atlas map markers.esp"
+    },
+    {
+      "file": "chfshVariousActions.bsa",
+      "bytes": 28374,
+      "plugin": "chfshVariousActions.esp"
+    },
+    {
+      "file": "MCMHelper.bsa",
+      "bytes": 23265,
+      "plugin": "MCMHelper.esp"
+    },
+    {
+      "file": "SurvivalControlPanel.bsa",
+      "bytes": 18667,
+      "plugin": "SurvivalControlPanel.esp"
+    },
+    {
+      "file": "BetterContainerControls.bsa",
+      "bytes": 4936,
+      "plugin": "BetterContainerControls.esp"
+    }
+  ],
+  "loose": [
+    {
+      "path": "Data\\textures\\",
+      "bytes": 13737170477,
+      "files": 5703,
+      "depth": 1
+    },
+    {
+      "path": "Data\\textures\\0CCE\\",
+      "bytes": 92277928,
+      "files": 19,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\74_w\\",
+      "bytes": 104182231,
+      "files": 129,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\actors\\",
+      "bytes": 2122223348,
+      "files": 1341,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\amb variants\\",
+      "bytes": 802542704,
+      "files": 209,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\architecture\\",
+      "bytes": 967817288,
+      "files": 606,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\armor\\",
+      "bytes": 858649130,
+      "files": 188,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\Armor_Replacer\\",
+      "bytes": 1606908724,
+      "files": 655,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\clothes\\",
+      "bytes": 560834020,
+      "files": 128,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\clutter\\",
+      "bytes": 335698240,
+      "files": 152,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\dlc01\\",
+      "bytes": 51036320,
+      "files": 40,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\dlc02\\",
+      "bytes": 154501584,
+      "files": 81,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\dungeons\\",
+      "bytes": 447471672,
+      "files": 222,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\effects\\",
+      "bytes": 236196672,
+      "files": 29,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\elleh\\",
+      "bytes": 41979448,
+      "files": 23,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\Elysium Estate\\",
+      "bytes": 67219568,
+      "files": 211,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\EmbersHD\\",
+      "bytes": 427982204,
+      "files": 58,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\evgnnsmp\\",
+      "bytes": 242432176,
+      "files": 102,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\impactdecals\\",
+      "bytes": 42994420,
+      "files": 17,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\insanity\\",
+      "bytes": 93683760,
+      "files": 62,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\Interface\\",
+      "bytes": 22369988,
+      "files": 3,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\knighterrant\\",
+      "bytes": 32551784,
+      "files": 15,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\landscape\\",
+      "bytes": 529988996,
+      "files": 139,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\MCE\\",
+      "bytes": 240475796,
+      "files": 14,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\nordwar\\",
+      "bytes": 1771620196,
+      "files": 334,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\oaristys\\",
+      "bytes": 69044928,
+      "files": 91,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\p3dr0\\",
+      "bytes": 25167447,
+      "files": 9,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\rogue nord armor\\",
+      "bytes": 72705208,
+      "files": 23,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\sandaron\\",
+      "bytes": 24468928,
+      "files": 14,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\smim\\",
+      "bytes": 29188656,
+      "files": 24,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\terrain\\",
+      "bytes": 69734336,
+      "files": 30,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\tesak1243\\",
+      "bytes": 20972832,
+      "files": 10,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\urw\\",
+      "bytes": 22243731,
+      "files": 27,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\water\\",
+      "bytes": 257589824,
+      "files": 36,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\weapons\\",
+      "bytes": 1059868711,
+      "files": 521,
+      "depth": 2
+    },
+    {
+      "path": "Data\\textures\\wulfharth\\",
+      "bytes": 120417856,
+      "files": 45,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\",
+      "bytes": 2893751438,
+      "files": 10512,
+      "depth": 1
+    },
+    {
+      "path": "Data\\meshes\\actors\\",
+      "bytes": 419290566,
+      "files": 2321,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\architecture\\",
+      "bytes": 51163529,
+      "files": 189,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\armor\\",
+      "bytes": 718126268,
+      "files": 1484,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\Armor_Replacer\\",
+      "bytes": 272961017,
+      "files": 1236,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\clothes\\",
+      "bytes": 348210676,
+      "files": 895,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\dlc01\\",
+      "bytes": 132727155,
+      "files": 312,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\dlc02\\",
+      "bytes": 165035846,
+      "files": 479,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\evgnnSMP\\",
+      "bytes": 44476020,
+      "files": 141,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\MCE\\",
+      "bytes": 61990440,
+      "files": 88,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\nordwar\\",
+      "bytes": 170120441,
+      "files": 815,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\weapons\\",
+      "bytes": 52111024,
+      "files": 426,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\YAbyss\\",
+      "bytes": 102589613,
+      "files": 416,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\YHat\\",
+      "bytes": 83010810,
+      "files": 170,
+      "depth": 2
+    },
+    {
+      "path": "Data\\meshes\\YScale\\",
+      "bytes": 54134246,
+      "files": 71,
+      "depth": 2
+    },
+    {
+      "path": "Data\\sound\\",
+      "bytes": 1213713974,
+      "files": 12000,
+      "depth": 1
+    },
+    {
+      "path": "Data\\sound\\fx\\",
+      "bytes": 1195797770,
+      "files": 11638,
+      "depth": 2
+    },
+    {
+      "path": "Data\\Shaders\\",
+      "bytes": 1920,
+      "files": 20,
+      "depth": 1
+    },
+    {
+      "path": "Data\\interface\\",
+      "bytes": 11507880,
+      "files": 485,
+      "depth": 1
+    }
+  ],
+  "root": [
+    "@{path=.sentry-native\\; bytes=330; files=6}@{path=Creations\\; bytes=0; files=0}@{path=Mods\\; bytes=0; files=0}@{path=Skyrim\\; bytes=3498; files=1}@{path=attention.txt; bytes=32; files=1}@{path=bink2w64.dll; bytes=391360; files=1}@{path=bow1.txt; bytes=29; files=1}@{path=bow2.txt; bytes=37; files=1}@{path=bow3.txt; bytes=37; files=1}@{path=cheer.txt; bytes=33; files=1}@{path=cleansword.txt; bytes=30; files=1}@{path=cross.txt; bytes=42; files=1}@{path=cut.txt; bytes=27; files=1}@{path=d3dx9_42.dll; bytes=88576; files=1}@{path=d3dx9_42.log; bytes=714; files=1}@{path=dance1.txt; bytes=32; files=1}@{path=dance2.txt; bytes=32; files=1}@{path=dance3.txt; bytes=32; files=1}@{path=def.txt; bytes=48; files=1}@{path=drink.txt; bytes=25; files=1}@{path=follow.txt; bytes=31; files=1}@{path=give.txt; bytes=24; files=1}@{path=High.ini; bytes=906; files=1}@{path=horn1.txt; bytes=36; files=1}@{path=horn2.txt; bytes=38; files=1}@{path=imgui.ini; bytes=66; files=1}@{path=installscript.vdf; bytes=648; files=1}@{path=ledger1.txt; bytes=36; files=1}@{path=ledger2.txt; bytes=36; files=1}@{path=Low.ini; bytes=898; files=1}@{path=Medium.ini; bytes=898; files=1}@{path=pickup.txt; bytes=33; files=1}@{path=point.txt; bytes=31; files=1}@{path=readbook.txt; bytes=32; files=1}@{path=readnote.txt; bytes=28; files=1}@{path=ritual1.txt; bytes=32; files=1}@{path=ritual2.txt; bytes=32; files=1}@{path=ritual3.txt; bytes=32; files=1}@{path=salute.txt; bytes=26; files=1}@{path=scout.txt; bytes=27; files=1}@{path=search.txt; bytes=30; files=1}@{path=shield.txt; bytes=39; files=1}@{path=skse64_1_6_1170.dll; bytes=1173504; files=1}@{path=skse64_loader.exe; bytes=225792; files=1}@{path=skse64_readme.txt; bytes=6854; files=1}@{path=skse64_whatsnew.txt; bytes=23143; files=1}@{path=Skyrim_Default.ini; bytes=1859; files=1}@{path=Skyrim.ccc; bytes=2035; files=1}@{path=SkyrimSE.exe; bytes=37157144; files=1}@{path=SkyrimSELauncher.exe; bytes=4713472; files=1}@{path=steam_api64.dll; bytes=298384; files=1}@{path=steam_appid.txt; bytes=6; files=1}@{path=study.txt; bytes=25; files=1}@{path=surrender.txt; bytes=29; files=1}@{path=table.txt; bytes=27; files=1}@{path=take.txt; bytes=24; files=1}@{path=think.txt; bytes=45; files=1}@{path=Ultra.ini; bytes=911; files=1}@{path=warm1.txt; bytes=31; files=1}@{path=warm2.txt; bytes=37; files=1}@{path=wave.txt; bytes=24; files=1}@{path=welcome.txt; bytes=42; files=1}"
+  ],
+  "looseTotal": 17856145689,
+  "bsaModTotal": 2571199557
+}

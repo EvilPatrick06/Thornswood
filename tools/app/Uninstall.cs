@@ -16,8 +16,12 @@ namespace Thornswood
     /// backup is left orphaned under a name nothing looks for. So Swap.Restore
     /// runs first, every time, and nothing else happens until it has.
     ///
-    /// Nothing here touches the Skyrim you own on Steam. This build keeps its
-    /// own copy of the game under Root, which is the whole reason it exists.
+    /// Nothing here touches the Skyrim you own on Steam. An install made
+    /// before 1.1 keeps its own copy of the game under Root and that copy is
+    /// what goes. Under the collection there is no such copy: the mods are
+    /// Vortex's, deployed into the Steam game as hardlinks, and Purge Mods in
+    /// Vortex is what removes them. Either way the last step here only ever
+    /// deletes paths under Root, and that is checked rather than assumed.
     ///
     /// The launcher cannot delete the folder it is running from, so the last
     /// step hands a small script to cmd, which waits for this process to exit
@@ -43,9 +47,14 @@ namespace Thornswood
             }
             catch { return "The install folder could not be read."; }
 
-            bool looksRight = Directory.Exists(Paths.Game) || Directory.Exists(Paths.ProfileDir);
+            // Under the collection Paths.Game is the Steam copy of Skyrim,
+            // which exists on every machine that can run any of this, so it
+            // proves nothing about Root and must not be what this check looks
+            // at. Profile and Launcher are ours either way.
+            bool looksRight = Directory.Exists(Paths.ProfileDir) || Directory.Exists(Paths.LauncherDir)
+                              || (!Paths.Collection && Directory.Exists(Paths.Game));
             if (!looksRight)
-                return "That folder does not contain a Game or Profile folder, so it is not this build.";
+                return "That folder does not contain a Launcher or Profile folder, so it is not this build.";
 
             // Somebody pointing Root at their Steam library would be the one
             // mistake worth refusing outright.
@@ -55,6 +64,139 @@ namespace Thornswood
                 return "That is inside your Steam folder. This will not remove it.";
 
             return null;
+        }
+
+        /// <summary>
+        /// The scratch folder the setup program unpacks into, which nothing
+        /// has ever deleted.
+        ///
+        /// The installer makes Thornswood-setup at the root of whichever drive
+        /// the install is going to, unzips the whole payload into it, and runs
+        /// Setup.bat out of it. Setup moves the mods from there into the game,
+        /// so the big part empties, but the folder, the scripts and a copy of
+        /// the launcher stay behind for good. It is not under Root, so the
+        /// fence in Finish correctly refuses to touch it, and it has been
+        /// sitting on every machine that has ever run this. That is most of
+        /// the difference somebody sees when they uninstall and the disk does
+        /// not go back to where it was.
+        ///
+        /// Found by looking rather than remembered, because an install can be
+        /// moved and the scratch stays on the drive it was made on.
+        /// </summary>
+        public static string[] Scratch()
+        {
+            var found = new System.Collections.Generic.List<string>();
+            var seen  = new System.Collections.Generic.List<string>();
+            var roots = new System.Collections.Generic.List<string>();
+
+            try { roots.Add(Path.GetPathRoot(Paths.Root)); } catch { }
+            try { roots.Add(Path.GetTempPath()); } catch { }
+            try
+            {
+                foreach (DriveInfo d in DriveInfo.GetDrives())
+                {
+                    try { if (d.DriveType == DriveType.Fixed && d.IsReady) roots.Add(d.RootDirectory.FullName); }
+                    catch { }
+                }
+            }
+            catch { }
+
+            foreach (string r in roots)
+            {
+                if (string.IsNullOrEmpty(r)) continue;
+                string full;
+                try { full = Path.GetFullPath(Path.Combine(r, "Thornswood-setup")); }
+                catch { continue; }
+
+                // Belt and braces before a recursive delete: whatever the path
+                // in front of it turned out to be, the last element has to be
+                // exactly that name.
+                if (!string.Equals(Path.GetFileName(full.TrimEnd('\\')), "Thornswood-setup",
+                                   StringComparison.OrdinalIgnoreCase)) continue;
+                string key = full.ToLowerInvariant();
+                if (seen.Contains(key)) continue;
+                seen.Add(key);
+                if (Directory.Exists(full)) found.Add(full);
+            }
+            return found.ToArray();
+        }
+
+        /// <summary>
+        /// Removes them, and says how much that got back. Safe to call on a
+        /// working install at any time: once setup has run, nothing in there
+        /// is ever read again.
+        /// </summary>
+        /// <summary>
+        /// A recursive delete that stops at junctions instead of walking
+        /// through them.
+        ///
+        /// Directory.Delete(path, true) on .NET Framework follows a reparse
+        /// point and deletes what is on the far side of it. This build makes
+        /// junctions at Windows' own Skyrim folders pointing into Profile, so
+        /// one junction anywhere under a folder being cleared is the whole
+        /// install, or somebody's saves, going with it. Measure already refuses
+        /// to walk them for exactly this reason and a delete is the half where
+        /// it actually costs something.
+        ///
+        /// A junction found here has the link removed and its target left
+        /// alone, which is what deleting a shortcut should mean.
+        /// </summary>
+        static void DeleteTree(string dir)
+        {
+            foreach (string sub in Directory.GetDirectories(dir))
+            {
+                bool link = false;
+                try { link = (new DirectoryInfo(sub).Attributes & FileAttributes.ReparsePoint) != 0; }
+                catch { link = true; }   // unreadable is treated as do not enter
+
+                if (link) { try { Directory.Delete(sub, false); } catch { } }
+                else DeleteTree(sub);
+            }
+            foreach (string f in Directory.GetFiles(dir))
+            {
+                try { File.SetAttributes(f, FileAttributes.Normal); } catch { }
+                try { File.Delete(f); } catch { }
+            }
+            Directory.Delete(dir, false);
+        }
+
+        /// <summary>
+        /// Removes them, and says how much that got back. Safe to call on a
+        /// working install at any time: once setup has run, nothing in there
+        /// is ever read again.
+        /// </summary>
+        public static long DropScratch(Action<string> say)
+        {
+            long freed = 0;
+            foreach (string dir in Scratch())
+            {
+                // Never step into one that is itself a link to somewhere else.
+                try
+                {
+                    if ((new DirectoryInfo(dir).Attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        try { Directory.Delete(dir, false); } catch { }
+                        continue;
+                    }
+                }
+                catch { continue; }
+
+                int n = 0;
+                long bytes = Measure(dir, ref n);
+                try
+                {
+                    DeleteTree(dir);
+                    freed += bytes;
+                    if (say != null) say("Removed the setup leftovers in " + dir + ".");
+                }
+                catch (Exception ex)
+                {
+                    if (say != null)
+                        say("Could not remove " + dir + ": " + ex.Message +
+                            "  Nothing uses that folder, so it is safe to delete by hand.");
+                }
+            }
+            return freed;
         }
 
         public static long Measure(string dir, ref int files)
@@ -72,6 +214,135 @@ namespace Thornswood
             }
             catch { }
             return total;
+        }
+
+        /// <summary>
+        /// The files a collection install put into the person's own Skyrim, and
+        /// how many bytes they come to.
+        ///
+        /// Setup-Thornswood.ps1 writes the list at install time. Nothing is
+        /// guessed from what happens to be in the game folder, because most of
+        /// what is in there belongs to Bethesda or to Vortex, and the one thing
+        /// this must never do is delete either.
+        /// </summary>
+        public static string[] OurGameFiles(out long bytes, out int count)
+        {
+            bytes = 0; count = 0;
+            var outp = new System.Collections.Generic.List<string>();
+            if (!Paths.Collection) return outp.ToArray();
+
+            string list = Path.Combine(Paths.ProfileDir, "installed-into-game.txt");
+            if (!File.Exists(list)) return outp.ToArray();
+
+            // Anything Vortex is deploying is the collection's, whatever our
+            // own list says. A mod that happens to ship a file at a path we
+            // also wrote would otherwise be taken out from under it.
+            var vortex = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                string vm = Path.Combine(Paths.Game, "Data\\vortex.deployment.json");
+                if (File.Exists(vm))
+                {
+                    // Scanned over the whole file rather than line by line.
+                    // Vortex writes this pretty printed today and there is no
+                    // promise it always will, and a guard that quietly reads
+                    // one entry out of a minified file is worse than no guard,
+                    // because it looks like it is working.
+                    string all = File.ReadAllText(vm);
+                    int at = 0;
+                    while (true)
+                    {
+                        int i = all.IndexOf("\"relPath\"", at, StringComparison.OrdinalIgnoreCase);
+                        if (i < 0) break;
+                        at = i + 9;
+                        int a = all.IndexOf('"', at);
+                        if (a < 0) break;
+                        int b = all.IndexOf('"', a + 1);
+                        if (b < 0) break;
+                        at = b + 1;
+                        string rel = all.Substring(a + 1, b - a - 1).Replace("\\\\", "\\").TrimStart('\\');
+                        if (rel.Length > 0) vortex.Add("Data\\" + rel);
+                    }
+                }
+            }
+            catch { }
+
+            string game;
+            try { game = Path.GetFullPath(Paths.Game).TrimEnd('\\') + "\\"; }
+            catch { return outp.ToArray(); }
+
+            foreach (string raw in File.ReadAllLines(list))
+            {
+                string rel = (raw ?? "").Trim();
+                if (rel.Length == 0) continue;
+                if (vortex.Contains(rel)) continue;
+
+                string full;
+                try { full = Path.GetFullPath(Path.Combine(Paths.Game, rel)); }
+                catch { continue; }
+                // A relative path with .. in it would escape the game folder.
+                if (!full.StartsWith(game, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!File.Exists(full)) continue;
+
+                try { bytes += new FileInfo(full).Length; } catch { }
+                count++;
+                outp.Add(full);
+            }
+            return outp.ToArray();
+        }
+
+        /// <summary>
+        /// Deletes those files and then any folder under the game that our own
+        /// removal left empty. Runs in process rather than in the handover
+        /// script, because the script's last fence refuses anything outside
+        /// Root and that fence is worth keeping exactly as it is.
+        /// </summary>
+        static int RemoveOurGameFiles(Action<string> say)
+        {
+            long bytes; int count;
+            string[] ours = OurGameFiles(out bytes, out count);
+            if (ours.Length == 0) return 0;
+
+            say("Taking Thornswood's files back out of your Skyrim...");
+            var dirs = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            int gone = 0;
+            foreach (string f in ours)
+            {
+                try
+                {
+                    string d = Path.GetDirectoryName(f);
+                    File.SetAttributes(f, FileAttributes.Normal);
+                    File.Delete(f);
+                    gone++;
+                    if (!string.IsNullOrEmpty(d)) dirs.Add(d);
+                }
+                catch { }
+            }
+
+            // Deepest first, so a folder that only held other empty folders goes
+            // too. Never recursive, never forced: a directory with anything left
+            // in it stays, which is what keeps this away from Vortex's files.
+            string game;
+            try { game = Path.GetFullPath(Paths.Game).TrimEnd('\\') + "\\"; }
+            catch { return gone; }
+            var ordered = new System.Collections.Generic.List<string>(dirs);
+            ordered.Sort(delegate(string a, string b) { return b.Length.CompareTo(a.Length); });
+            foreach (string d in ordered)
+            {
+                string cur = d;
+                while (!string.IsNullOrEmpty(cur) &&
+                       cur.StartsWith(game, StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        if (Directory.GetFileSystemEntries(cur).Length != 0) break;
+                        Directory.Delete(cur, false);
+                        cur = Path.GetDirectoryName(cur);
+                    }
+                    catch { break; }
+                }
+            }
+            return gone;
         }
 
         static void Kill()
@@ -103,7 +374,7 @@ namespace Thornswood
         /// what is left for the handover script, or an empty array if nothing
         /// is.
         /// </summary>
-        public static string[] Begin(bool keepSaves, Action<string> say)
+        public static string[] Begin(bool keepSaves, bool deleteMods, Action<string> say)
         {
             say("Closing the game...");
             Kill();
@@ -132,8 +403,28 @@ namespace Thornswood
             say("Removing the shortcut...");
             DropShortcuts();
 
+            say("Clearing the setup leftovers...");
+            DropScratch(say);
+
             var leave = new System.Collections.Generic.List<string>();
-            leave.Add(Paths.Game);
+
+            // The Game folder is only ours to delete in an install that built
+            // one. Under the collection Paths.Game is the Skyrim the person
+            // owns on Steam, and the mods in it are Vortex's hardlinks. Adding
+            // it here would hand rmdir /s /q their entire game, so it is not
+            // added, whatever the box said. Purge Mods in Vortex is what takes
+            // the mods out, and the launcher says so on the uninstall page.
+            if (deleteMods && !Paths.Collection) leave.Add(Paths.Game);
+
+            // A collection install has no Game folder of ours, but it did write
+            // our own content into the person's Steam copy. That comes back out
+            // here, from the list the installer left, and nothing else in that
+            // folder is touched.
+            if (deleteMods && Paths.Collection)
+            {
+                int gone = RemoveOurGameFiles(say);
+                if (gone > 0) say(gone.ToString("n0") + " files removed from your Skyrim.");
+            }
             leave.Add(Paths.Personal);
             if (!keepSaves)
             {
@@ -149,7 +440,7 @@ namespace Thornswood
         /// its own folder can go, so this waits on the process id rather than
         /// guessing at a delay.
         /// </summary>
-        public static void Finish(string[] targets, bool keepSaves)
+        public static void Finish(string[] targets, bool keepSaves, bool deleteMods)
         {
             var sb = new StringBuilder();
             sb.AppendLine("@echo off");
@@ -159,18 +450,32 @@ namespace Thornswood
                           Process.GetCurrentProcess().Id + "\" >nul 2>&1");
             sb.AppendLine("if not errorlevel 1 ( timeout /t 1 /nobreak >nul & goto wait )");
 
+            // Last fence. Everything this script deletes has to live under
+            // Root. Every caller already gets that right; this is here so that
+            // one wrong path in a list somewhere can never turn into rmdir /s
+            // /q pointed at somebody's game or their documents.
+            string root;
+            try { root = Path.GetFullPath(Paths.Root).TrimEnd('\\') + "\\"; }
+            catch { return; }
+            if (root.Length < 4) return;
+
             foreach (string t in targets)
             {
                 if (string.IsNullOrEmpty(t)) continue;
-                sb.AppendLine("rmdir /s /q \"" + t + "\" 2>nul");
-                sb.AppendLine("del /f /q \"" + t + "\" 2>nul");
+                string full;
+                try { full = Path.GetFullPath(t); }
+                catch { continue; }
+                if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) continue;
+                sb.AppendLine("rmdir /s /q \"" + full + "\" 2>nul");
+                sb.AppendLine("del /f /q \"" + full + "\" 2>nul");
             }
 
-            if (!keepSaves)
+            if (!keepSaves && deleteMods)
             {
                 // Only then is the install folder itself worth trying. It goes
                 // only if it is empty, so anything the user put in there by hand
-                // survives and tells them where it was.
+                // survives and tells them where it was. With the mods kept it
+                // is not empty by design, and rmdir would refuse anyway.
                 sb.AppendLine("rmdir \"" + Paths.Root + "\" 2>nul");
             }
 

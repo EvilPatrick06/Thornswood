@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Thornswood</title>
+<meta name="description" content="A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/logo.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Spectral:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap">
+<style>
+/*
+  The public front. Nothing here is behind a password, because a server nobody
+  can read about is a server nobody joins.
+
+  Colour comes from the emblem: a cold night ground, iron, and the one warm
+  thing in it. Everything gold is load bearing. If it glows, it is a way in.
+*/
+:root{
+  --night:#0B0E0A;      /* the ground, colder and darker than the app */
+  --stone:#14180F;
+  --iron:#1D2318;
+  --edge:#2B3323;
+  --edge2:#3D4733;
+  --page:#E4E7DA;       /* not white. nothing here is white */
+  --quiet:#96A084;
+  --faint:#616B53;
+  --gold:#C9A24B;
+  --gold-hot:#E4BE66;
+  --ember:#B4512C;
+  --serif:Spectral,Georgia,"Times New Roman",serif;
+  --carve:Cinzel,Spectral,Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--night);color:var(--page);
+  font:400 17px/1.7 var(--serif);overflow-x:hidden;
+  -webkit-font-smoothing:antialiased}
+img{max-width:100%;height:auto;display:block}
+a{color:var(--gold);text-decoration:none}
+a:hover{color:var(--gold-hot)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+
+.wrap{width:min(1160px,100% - 48px);margin-inline:auto}
+@media(max-width:560px){ .wrap{width:min(1160px,100% - 32px)} }
+
+/* ------------------------------------------------------------------ nav -- */
+header{position:sticky;top:0;z-index:40;
+  padding-top:env(safe-area-inset-top,0px);
+  background:rgba(11,14,10,.82);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--edge)}
+header .bar{display:flex;align-items:center;gap:26px;height:64px}
+.mark{display:flex;align-items:center;gap:11px;font:600 19px/1 var(--carve);
+  letter-spacing:.11em;text-transform:uppercase;color:var(--page);white-space:nowrap}
+.mark img{width:28px;height:28px;border-radius:6px}
+nav.top{display:flex;gap:24px;margin-left:auto;align-items:center}
+nav.top a{font:400 14px/1 var(--sans);letter-spacing:.07em;text-transform:uppercase;
+  color:var(--quiet)}
+nav.top a:hover{color:var(--page)}
+.enter{padding:9px 17px;border:1px solid var(--gold);border-radius:2px;
+  color:var(--gold);font:600 13px/1 var(--sans);letter-spacing:.11em;
+  text-transform:uppercase}
+.enter:hover{background:var(--gold);color:var(--night)}
+.burger{display:none;margin-left:auto;background:none;border:1px solid var(--edge2);
+  color:var(--page);width:40px;height:38px;border-radius:2px;font-size:17px;cursor:pointer}
+@media(max-width:900px){
+  nav.top{position:fixed;inset:calc(64px + env(safe-area-inset-top,0px)) 0 auto 0;
+    flex-direction:column;align-items:stretch;gap:0;background:var(--stone);
+    border-bottom:1px solid var(--edge);margin:0;padding:6px 0 14px}
+  nav.top[hidden]{display:none}
+  nav.top a{padding:14px 24px;font-size:15px}
+  nav.top .enter{margin:10px 24px 0;text-align:center}
+  .burger{display:block}
+}
+
+/* --------------------------------------------------------------- notice -- */
+/* Above the fold and above the hero, because "you cannot just join" is the
+   single most useful thing to know before reading any of the rest. */
+.notice{background:linear-gradient(90deg,rgba(180,81,44,.20),rgba(180,81,44,.09));
+  border-bottom:1px solid rgba(201,162,75,.30);font:400 14.5px/1.55 var(--sans);
+  color:var(--page)}
+.notice .wrap{padding:13px 0}
+.notice b{color:var(--gold-hot);font-weight:600}
+.notice a{margin-left:8px;white-space:nowrap;border-bottom:1px solid rgba(201,162,75,.4)}
+@media(max-width:560px){ .notice{font-size:13.5px} }
+
+/* ----------------------------------------------------------------- hero -- */
+/*
+  The hero is a drawn landscape, not a photograph and not an empty field. Every
+  other server puts a screenshot here; we have none worth using yet and a fake
+  one would be worse than none. This is midpoint-displacement ridgelines, an
+  aurora, and a hundred and fifty stars, generated once and served as a file.
+  It weighs fifteen kilobytes and it is sharp on any screen.
+*/
+.hero{position:relative;min-height:min(84vh,780px);display:grid;align-items:center;
+  padding:84px 0 96px;text-align:center;overflow:hidden;isolation:isolate}
+.hero .art{position:absolute;inset:0;z-index:-2;width:100%;height:100%;
+  object-fit:cover;object-position:50% 100%}
+/* Grain over the whole thing, because a flat gradient reads as a web page and
+   a grained one reads as a place. */
+.hero::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.42;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.06'/></svg>")}
+.hero > *{position:relative;z-index:1}
+@media(max-width:640px){ .hero{min-height:auto;padding:72px 0 88px} }
+@media(prefers-reduced-motion:no-preference){
+  .hero .art{animation:drift 60s ease-in-out infinite alternate}
+  @keyframes drift{ from{transform:scale(1.04) translateY(0)} to{transform:scale(1.09) translateY(-14px)} }
+}
+.crest{width:104px;height:104px;margin:0 auto 26px;border-radius:22px;
+  box-shadow:0 0 0 1px var(--edge2), 0 22px 60px -18px rgba(0,0,0,.9)}
+h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
+  text-transform:uppercase;margin:0;text-wrap:balance;
+  background:linear-gradient(180deg,#F0E6CE 12%,var(--gold) 92%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.era{margin:20px auto 0;font:400 13px/1 var(--sans);letter-spacing:.34em;
+  text-transform:uppercase;color:var(--faint)}
+.pitch{max-width:30ch;margin:26px auto 0;font:300 clamp(19px,2.3vw,25px)/1.5 var(--serif);
+  color:var(--page);text-wrap:balance}
+.pitch em{font-style:italic;color:var(--gold)}
+.acts{display:flex;gap:13px;justify-content:center;flex-wrap:wrap;margin-top:38px}
+.btn{display:inline-block;padding:15px 34px;border-radius:2px;
+  font:600 13px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;
+  border:1px solid transparent;cursor:pointer}
+.btn.first{background:var(--gold);color:#120F07;
+  box-shadow:0 14px 36px -14px rgba(201,162,75,.6)}
+.btn.first:hover{background:var(--gold-hot);color:#120F07}
+.btn.ghost{border-color:var(--edge2);color:var(--page)}
+.btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
+.live{margin-top:30px;font:400 13px/1 var(--sans);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--quiet);display:flex;gap:9px;
+  align-items:center;justify-content:center}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.dot.on{background:#79B05F;box-shadow:0 0 0 4px rgba(121,176,95,.16)}
+
+/* -------------------------------------------------------------- figures -- */
+.figures{border-top:1px solid var(--edge);border-bottom:1px solid var(--edge);
+  background:var(--stone)}
+.figures .wrap{display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
+.figures .fig{padding:30px 22px;text-align:center;border-left:1px solid var(--edge)}
+.figures .fig:first-child{border-left:0}
+.figures b{display:block;font:600 27px/1.1 var(--carve);letter-spacing:.04em;color:var(--gold)}
+.figures span{display:block;margin-top:7px;font:400 12px/1.4 var(--sans);
+  letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+@media(max-width:640px){
+  .figures .wrap{grid-template-columns:1fr}
+  .figures .fig{border-left:0;border-top:1px solid var(--edge);padding:22px}
+  .figures .fig:first-child{border-top:0}
+  .figures b{font-size:22px}
+}
+
+/* ---------------------------------------------------------------- bands -- */
+section{padding:86px 0;border-top:1px solid var(--edge)}
+.eyebrow{font:400 12px/1 var(--sans);letter-spacing:.28em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:18px}
+h2{font:600 clamp(28px,4.2vw,42px)/1.15 var(--carve);letter-spacing:.035em;
+  margin:0 0 18px;text-wrap:balance}
+h3{font:600 20px/1.3 var(--carve);letter-spacing:.03em;margin:0 0 9px;color:var(--page)}
+.lede{max-width:62ch;color:var(--quiet);font-size:18px}
+.lede strong{color:var(--page);font-weight:400}
+
+.three{display:grid;gap:40px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  margin-top:52px}
+.three .num{font:400 12px/1 var(--mono);letter-spacing:.2em;color:var(--faint);
+  margin-bottom:14px}
+.three p{margin:0;color:var(--quiet);font-size:16px}
+
+.split{display:grid;gap:60px;grid-template-columns:1fr 1fr;align-items:start}
+@media(max-width:860px){ .split{grid-template-columns:1fr;gap:40px} }
+
+blockquote.chron{margin:0;padding:26px 30px;border-left:2px solid var(--gold);
+  background:linear-gradient(90deg,rgba(201,162,75,.07),transparent 80%);
+  font:300 italic 19px/1.65 var(--serif);color:var(--page)}
+blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
+  letter-spacing:.2em;text-transform:uppercase;color:var(--faint);font-style:normal}
+
+.feats{display:grid;gap:1px;background:var(--edge);border:1px solid var(--edge);
+  grid-template-columns:repeat(auto-fit,minmax(288px,1fr));margin-top:52px}
+.feat{background:var(--stone);padding:30px 28px 28px;transition:background .16s}
+.feat:hover{background:var(--iron)}
+.feat .glyph{width:26px;height:26px;margin-bottom:16px;color:var(--gold)}
+.feat p{margin:0;color:var(--quiet);font-size:15.5px;line-height:1.65}
+
+.steps{counter-reset:s;margin-top:48px;border-top:1px solid var(--edge)}
+/* 34px of top margin was right when this sat on its own above the steps.
+   Inside one it only has to clear the paragraph it follows. */
+.grab{margin:18px 0 2px}
+.grab .btn{margin:0}
+.grab .also{margin:16px 0 0;max-width:56ch;font:400 15px/1.65 var(--serif,var(--carve));
+  color:var(--page)}
+.grab .also a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--edge2)}
+.grab .also a:hover{border-bottom-color:var(--gold)}
+.grab .faintly{margin-top:6px;font-size:13px;color:var(--faint)}
+.step{counter-increment:s;display:grid;grid-template-columns:70px 1fr;gap:26px;
+  padding:30px 0;border-bottom:1px solid var(--edge);align-items:start}
+.step::before{content:counter(s,decimal-leading-zero);
+  font:400 26px/1 var(--carve);color:var(--gold);letter-spacing:.04em}
+.step p{margin:7px 0 0;color:var(--quiet);font-size:16px}
+@media(max-width:560px){ .step{grid-template-columns:44px 1fr;gap:16px} }
+
+/* -------------------------------------------------------------- report -- */
+.form{display:grid;gap:18px;max-width:640px;margin-top:26px}
+.form label{display:block;font:600 13px/1.5 var(--sans);letter-spacing:.04em;
+  text-transform:uppercase;color:var(--quiet)}
+.form .hint{display:block;font:400 13.5px/1.6 var(--serif);text-transform:none;
+  letter-spacing:0;color:var(--faint);margin:3px 0 8px}
+.form input[type=text],.form textarea{width:100%;box-sizing:border-box;
+  padding:12px 14px;background:var(--stone);color:var(--page);
+  border:1px solid var(--edge2);border-radius:2px;
+  font:15px/1.6 var(--serif);transition:border-color .12s,background .12s}
+.form input[type=text]:hover,.form textarea:hover{border-color:var(--faint)}
+.form input[type=text]:focus,.form textarea:focus{outline:none;
+  border-color:var(--gold);background:var(--iron)}
+.form textarea{min-height:160px;resize:vertical}
+.form .check{display:flex;gap:10px;align-items:center;text-transform:none;
+  letter-spacing:0;font:400 15px/1.6 var(--serif);color:var(--page)}
+.form .check input{width:16px;height:16px;accent-color:var(--gold)}
+.said{font:400 15px/1.6 var(--serif);color:var(--gold)}
+
+.gallery{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  margin-top:44px}
+.shot{aspect-ratio:16/10;background:var(--iron);border:1px solid var(--edge);
+  display:grid;place-items:center;color:var(--faint);
+  font:400 12px/1.5 var(--sans);letter-spacing:.14em;text-transform:uppercase;
+  text-align:center;padding:16px}
+.shot img{width:100%;height:100%;object-fit:cover}
+
+.release{display:flex;gap:22px;align-items:baseline;flex-wrap:wrap;
+  padding:22px 0;border-bottom:1px solid var(--edge)}
+.release .when{font:400 12px/1 var(--mono);letter-spacing:.1em;color:var(--faint);
+  flex:0 0 108px}
+.release .what{flex:1;min-width:230px}
+
+.call{text-align:center;padding:104px 0;border-top:1px solid var(--edge);
+  background:radial-gradient(60% 100% at 50% 100%, rgba(201,162,75,.09), transparent 70%)}
+.call h2{margin-bottom:14px}
+.call .lede{margin:0 auto 34px}
+
+/* ----------------------------------------------------------- read page -- */
+.page{padding:64px 0 96px}
+.page .wrap{width:min(760px,100% - 48px)}
+.page h1{font:600 clamp(34px,5vw,52px)/1.12 var(--carve);letter-spacing:.035em;
+  margin:0 0 30px;text-wrap:balance;
+  background:linear-gradient(180deg,#F0E6CE 18%,var(--gold) 96%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.page h2{font:600 clamp(23px,3vw,31px)/1.22 var(--carve);letter-spacing:.03em;
+  margin:58px 0 16px;padding-bottom:12px;border-bottom:1px solid var(--edge)}
+.page h3{font:600 18px/1.35 var(--carve);letter-spacing:.03em;margin:34px 0 10px;
+  color:var(--gold)}
+.page p,.page li{color:#CFD6C3;font-size:17.5px}
+.page strong{color:var(--page);font-weight:600}
+.page em{color:var(--gold)}
+.page ul,.page ol{padding-left:24px}
+.page li{margin:7px 0}
+.page hr{border:0;border-top:1px solid var(--edge);margin:56px 0}
+.page blockquote{margin:26px 0;padding:4px 0 4px 26px;border-left:2px solid var(--gold);
+  color:var(--quiet);font-style:italic}
+.page code{font:14px var(--mono);background:var(--iron);padding:2px 6px;border-radius:3px;
+  color:var(--gold)}
+.page pre{background:#070A06;border:1px solid var(--edge);padding:18px 20px;
+  overflow-x:auto;border-radius:3px}
+.page pre code{background:none;padding:0;color:#CFE0BE;font-size:13.5px;line-height:1.7}
+.page table{width:100%;border-collapse:collapse;margin:22px 0;display:block;overflow-x:auto}
+.page th{text-align:left;padding:11px 14px;background:var(--iron);color:var(--gold);
+  font:600 13px var(--sans);letter-spacing:.06em;text-transform:uppercase;
+  border-bottom:1px solid var(--edge);white-space:nowrap}
+.page td{padding:11px 14px;border-bottom:1px solid var(--edge);vertical-align:top;
+  color:#CFD6C3;font-size:16px}
+.page a{border-bottom:1px solid rgba(201,162,75,.35)}
+
+/* roadmap and releases */
+.lane{margin:44px 0}
+.lane h2{margin-top:0}
+.card-row{display:grid;gap:1px;background:var(--edge);border:1px solid var(--edge)}
+.card-row .r{background:var(--stone);padding:20px 22px;display:grid;gap:5px}
+.card-row .r b{font:600 17px/1.35 var(--serif);color:var(--page);font-weight:600}
+.card-row .r span{color:var(--quiet);font-size:15.5px}
+.rel{border-bottom:1px solid var(--edge);padding:26px 0}
+.rel .when{font:400 12px/1 var(--mono);letter-spacing:.1em;color:var(--faint)}
+.rel h3{margin:9px 0 8px;font-size:21px;color:var(--page)}
+.rel ul{margin:8px 0 0;color:var(--quiet);font-size:15px}
+
+footer{border-top:1px solid var(--edge);padding:52px 0 64px;
+  padding-bottom:calc(64px + env(safe-area-inset-bottom,0px));color:var(--faint);
+  font:400 14px/1.9 var(--sans)}
+footer .cols{display:grid;gap:36px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+footer h4{font:600 11px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--quiet);margin:0 0 14px}
+footer a{color:var(--faint);display:block}
+footer a:hover{color:var(--gold)}
+footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
+  font-size:12.5px;line-height:1.8}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <a class="mark" href="/"><img src="/logo.png" alt="">Thornswood</a>
+    <button class="burger" id="burger" aria-label="Menu" aria-expanded="false">&#9776;</button>
+    <nav class="top" id="nav">
+      <a href="/downloads">Download</a>
+      <a href="/rules">Rules</a>
+      <a href="/classes">Professions</a>
+      <a href="/roadmap">Roadmap</a>
+      <a href="/news">News</a>
+      <a href="/support" id="navSupport">Support</a>
+      <a href="DISCORD_URL" target="_blank" rel="noopener">Discord</a>
+      <a class="enter" href="/hub">Admin login</a>
+    </nav>
+  </div>
+</header>
+
+<div class="notice">
+  <div class="wrap">
+    <b>Closed playtest.</b> Thornswood is not open to everybody yet. Applications
+    are open in the Discord and we are taking people in small numbers.
+    <a href="DISCORD_URL" target="_blank" rel="noopener">Apply &rarr;</a>
+  </div>
+</div>
+
+<div id="landing">
+<div class="hero">
+  <img class="art" src="/ridge.svg" alt="">
+  <div class="wrap">
+    <img class="crest" src="/logo.png" alt="">
+    <h1>Thornswood</h1>
+    <div class="era">Fourth Era &middot; Year 252</div>
+    <p class="pitch">Skyrim, fifty years after the war. Free, cold, and
+      <em>still full of people</em>.</p>
+    <div class="acts">
+      <a class="btn first" href="/downloads">Apply to playtest</a>
+      <a class="btn ghost" href="#world">Read the world</a>
+    </div>
+    <div class="live" id="live"><span class="dot" id="dot"></span><span id="livetext">Checking the server</span></div>
+  </div>
+</div>
+
+<div class="figures">
+  <div class="wrap">
+    <div class="fig" id="figOnlineWrap" hidden><b id="figOnline">0</b><span>in the world now</span></div>
+    <div class="fig"><b>4E 252</b><span>fifty years after the war</span></div>
+    <div class="fig"><b>Free</b><span>and always will be</span></div>
+  </div>
+</div>
+
+<section id="what">
+  <div class="wrap">
+    <div class="eyebrow">What this is</div>
+    <h2>A world that is not empty at three in the morning</h2>
+    <p class="lede">Every other server like this strips the people out
+      completely. The towns go quiet, the shops close, and what is left is a
+      very large field you only enjoy on the nights twenty others happen to be
+      in it. Vanilla Skyrim has the opposite problem: so many faces that none
+      of them matter.
+      <strong>Thornswood keeps a chosen few.</strong> Enough that a hold feels
+      lived in when two of you are online, few enough that you are still the
+      reason anything happens.</p>
+
+    <div class="three">
+      <div>
+        <div class="num">01</div>
+        <h3>Fewer, and worth talking to</h3>
+        <p>Most of the crowd goes. What stays is what a town actually needs:
+          the innkeeper, the smith, the shopkeeper, the guards on the wall. You
+          can buy from them, rob them, and be chased for it.</p>
+      </div>
+      <div>
+        <div class="num">02</div>
+        <h3>No paperwork once you are in</h3>
+        <p>Getting in is an application while we are playtesting. After that
+          there is no character sheet to have approved, no lore exam, and no
+          waiting on somebody to bless your backstory.</p>
+      </div>
+      <div>
+        <div class="num">03</div>
+        <h3>The server owns the world</h3>
+        <p>Your character, your gold, your house and every chest in Skyrim live
+          on the server. Nothing is on your machine to lose, and nothing anyone
+          edits on theirs changes what you see.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="world">
+  <div class="wrap split">
+    <div>
+      <div class="eyebrow">The World</div>
+      <h2>Fifty years of a free Skyrim</h2>
+      <p class="lede">The Stormcloaks won. The Legion marched out in the first
+        thaw of 4E 203 and the Moot put a crown on Ulfric's head. He held it for
+        twenty-six years and died in bed, which surprised him as much as anyone.
+        <br><br>
+        The Thalmor were thrown out in 209 and have been illegal ever since.
+        That has not stopped them being here. The Empire came back in 221 the
+        way empires do when they cannot come back with soldiers, and there is
+        an embassy in Solitude flying a flag that used to fly over all of this.
+        <br><br>
+        There is a High King of Skyrim and nothing above him. Each hold keeps
+        its own Jarl, its own court, and its own opinion of everyone else's.</p>
+      <p style="margin-top:28px"><a href="/world">The full history and the Accord &rarr;</a></p>
+    </div>
+    <div>
+      <blockquote class="chron">The terms were short. Skyrim would govern
+        Skyrim. Imperial soldiers would leave by the first thaw. The Empire kept
+        its claim on paper and nothing else, which is what a claim is worth
+        without soldiers standing on it.
+        <cite>A Free Skyrim, Windhelm, 4E 252</cite></blockquote>
+      <div style="margin-top:26px;padding:24px 26px;border:1px solid var(--edge);background:var(--stone)">
+        <h3 style="font-size:17px">You can play</h3>
+        <p style="color:var(--quiet);font-size:15.5px;margin:0">
+          A Nord of any hold. An Imperial citizen or embassy staff, legal and
+          watched. A Thalmor remnant, hunted by everyone including the Empire.
+          A Jarl, a steward, a housecarl, a guard, a priest, a smith, a thief.
+          <br><br>
+          <span style="color:var(--faint)">Not the Dragonborn. Not the Listener.
+          Not the last of anything important. Those slots belong to the world.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="life">
+  <div class="wrap">
+    <div class="eyebrow">What you do</div>
+    <h2>A place to live in, not a lobby</h2>
+    <p class="lede">All of it server side, so it is the same world for everyone
+      and none of it can be edited away on somebody's own machine.</p>
+
+    <div class="feats">
+      <div class="feat">
+        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3a4 4 0 0 1 4 4v4a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4Z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <h3>Voice that carries</h3>
+        <p>Proximity voice in the launcher, not a separate call. Whisper to the
+          person beside you, shout down the length of a hall, and hear the room
+          the way your character would.</p>
+      </div>
+      <div class="feat">
+        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="4" y="10" width="16" height="11" rx="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg>
+        <h3>Real locks and real keys</h3>
+        <p>A house is locked because there is a lock on it. The key is a thing
+          you carry, hand over, have copied by a smith, or lose to a
+          pickpocket. Anybody can try the lock. Most people should not.</p>
+      </div>
+      <div class="feat">
+        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v13H4z"/><path d="M7 9h7M7 12.5h10M7 16h5"/></svg>
+        <h3>Notice boards in every hold</h3>
+        <p>Pay coin to pin up work, warnings, rumours, a shop opening or a
+          reward for a name. Anyone can read them. Guards can tear them down,
+          and sometimes do.</p>
+      </div>
+      <div class="feat">
+        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3v18M5 8l7-5 7 5M5 8v8l7 5 7-5V8"/></svg>
+        <h3>Nobody can do everything</h3>
+        <p>You pick a profession, one half of it, and a class. An Edgewright
+          cannot make armour. Only a hunter can loot an animal, only a miner can
+          mine. So the leather in your armour came off somebody, and they
+          remember. <a href="/classes">Professions and classes</a>.</p>
+      </div>
+      <div class="feat">
+        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 20h18M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg>
+        <h3>Property worth owning</h3>
+        <p>Go to the hold's steward, pay for the plot, then build it, furnish it
+          and defend it. Land inside a hold means a steward you speak with, not a menu you buy from.</p>
+      </div>
+      <div class="feat">
+        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3 4 7v6c0 4.4 3.4 7.4 8 8 4.6-.6 8-3.6 8-8V7l-8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
+        <h3>Law with people behind it</h3>
+        <p>Every guard is somebody. Bounties, cells and courts are run by the
+          people holding the keys, so getting caught is not a fine and a loading
+          screen. Somebody has to decide what happens to you.</p>
+      </div>
+      <div class="feat">
+        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="8" r="3.4"/><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M18 3.5l1 2 2 .6-1.5 1.5.3 2.1-1.8-1-1.8 1 .3-2.1L15 6.1l2-.6Z"/></svg>
+        <h3>People with their own work</h3>
+        <p>The ones who stayed are getting jobs, routines and errands of their
+          own, so a quiet hold still has something happening in it and somebody
+          to ask.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="gallerySection" hidden>
+  <div class="wrap">
+    <div class="eyebrow">From the world</div>
+    <h2>What has happened here so far</h2>
+    <p class="lede">Every picture on this page was taken by somebody playing.
+      Send yours in and it goes up.</p>
+    <div class="gallery" id="gallery"></div>
+  </div>
+</section>
+
+<section id="news">
+  <div class="wrap">
+    <div class="eyebrow">Lately</div>
+    <h2>What changed</h2>
+    <div id="releases" style="margin-top:34px"></div>
+    <p style="margin-top:26px"><a href="/news">Every release &rarr;</a></p>
+  </div>
+</section>
+
+</div><!-- /landing -->
+
+<div class="page" id="page" hidden><div class="wrap" id="pagebody"></div></div>
+
+<div class="call">
+  <div class="wrap">
+    <h2>The road is open</h2>
+    <p class="lede">Bring a name and a reason to be walking it.</p>
+    <a class="btn first" href="DISCORD_URL" target="_blank" rel="noopener">Apply in the Discord</a>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h4>The World</h4>
+        <a href="/world">History</a>
+        <a href="/roadmap">Roadmap</a>
+        <a href="/world#accord">The White Harbour Accord</a>
+        <a href="/rules">Rules</a>
+      </div>
+      <div>
+        <h4>Playing</h4>
+        <a href="/downloads">How to join</a>
+        <a href="/downloads">Download</a>
+        <a href="/classes">Professions</a>
+        <a href="/report">Report a problem</a>
+      </div>
+      <div>
+        <h4>Community</h4>
+        <a href="DISCORD_URL" target="_blank" rel="noopener">Discord</a>
+        <a href="/support" class="supportLink">Support Thornswood</a>
+        <a href="/roadmap">Roadmap</a>
+        <a href="/news">Release notes</a>
+      </div>
+      <div>
+        <h4>Behind it</h4>
+        <a href="/hub">Admin login</a>
+        <a href="/news">Release notes</a>
+        <a href="/credits">Credits</a>
+      </div>
+    </div>
+    <div class="base">
+      Thornswood is a free fan project. It is not affiliated with or endorsed by
+      Bethesda Softworks. The Elder Scrolls and Skyrim are their trademarks.<br>
+      Built on SkyMP, SKSE and Skyrim Platform, and on the work of every mod
+      author in the list. You need your own copy of the game.
+    </div>
+  </div>
+</footer>
+
+<script>
+var burger = document.getElementById('burger'), nav = document.getElementById('nav');
+function narrow(){ return window.matchMedia('(max-width:900px)').matches; }
+function shut(){ if (narrow()) { nav.hidden = true; burger.setAttribute('aria-expanded','false'); } else { nav.hidden = false; } }
+shut();
+window.addEventListener('resize', shut);
+burger.onclick = function(){
+  nav.hidden = !nav.hidden;
+  burger.setAttribute('aria-expanded', String(!nav.hidden));
+};
+Array.prototype.forEach.call(nav.querySelectorAll('a'), function(a){ a.onclick = shut; });
+
+/*
+  A small router. Every section is a real address because a link to the roadmap
+  should open the roadmap, not the front page with instructions to scroll.
+  The written pages are markdown on the server, so fixing a sentence is an edit
+  to a file rather than a deploy.
+*/
+var PAGES = { '/world':1, '/rules':1, '/join':1, '/support':1, '/credits':1,
+              '/classes':1 };
+var here = location.pathname.replace(/\/+$/, '').toLowerCase() || '/';
+
+function show(html) {
+  document.getElementById('landing').hidden = true;
+  var page = document.getElementById('page');
+  page.hidden = false;
+  document.getElementById('pagebody').innerHTML = html;
+  document.title = (document.querySelector('#pagebody h1') || {}).textContent
+    ? document.querySelector('#pagebody h1').textContent + ' \u00b7 Thornswood'
+    : 'Thornswood';
+}
+
+if (PAGES[here]) {
+  fetch('/api/page/' + here.slice(1))
+    .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+    .then(function (d) { show(marked.parse(d.md)); })
+    .catch(function () { show('<h1>Not here</h1><p>That page does not exist yet.</p>'); });
+} else if (here === '/roadmap') {
+  fetch('/api/roadmap').then(function (r) { return r.json(); }).then(function (b) {
+    var out = '<h1>Roadmap</h1>';
+    if (b.intro) out += marked.parse(b.intro);
+    // Finished work is not a roadmap. The Done column stays on the board in
+    // the hub so the record is kept, it just does not belong on the public
+    // page, where the only question anybody has is what is coming next.
+    var live = (b.sections || []).filter(function (sec) {
+      return !/^\s*done\s*$/i.test(sec.name || '');
+    });
+    live.forEach(function (sec) {
+      var cols = sec.columns || [], rows = sec.rows || [];
+      if (!rows.length) return;
+      out += '<div class="lane"><h2>' + esc(sec.name) + '</h2><div class="card-row">';
+      rows.forEach(function (r) {
+        var c = r.cells || {};
+        var title = cols[0] ? (c[cols[0].id] || '') : '';
+        var rest = cols.slice(1).map(function (col) { return c[col.id]; })
+                       .filter(Boolean).join(' \u00b7 ');
+        out += '<div class="r"><b>' + esc(title) + '</b>' +
+               (rest ? '<span>' + esc(rest) + '</span>' : '') + '</div>';
+      });
+      out += '</div></div>';
+    });
+    if (!live.some(function (s) { return (s.rows || []).length; })) {
+      out += '<p>Nothing on it yet.</p>';
+    }
+    show(out);
+  }).catch(function () { show('<h1>Roadmap</h1><p>Could not load it.</p>'); });
+} else if (here === '/news') {
+  fetch('/api/releases').then(function (r) { return r.json(); }).then(function (d) {
+    var out = '<h1>Every release</h1>';
+    if (d.launcher) out += '<p>Launcher <b>' + esc(d.launcher) + '</b> is current.</p>';
+    if (!(d.news || []).length) out += '<p>Nothing shipped yet.</p>';
+    (d.news || []).forEach(function (n) {
+      /* An entry whose details were written as one line came through as a
+         string, .map threw on it, and because the catch below sits on the same
+         chain as this render, the page said it could not load when it had
+         loaded fine. Take a list or a line. */
+      var det = Array.isArray(n.details) ? n.details : (n.details ? [n.details] : []);
+      out += '<div class="rel"><div class="when">' + esc(n.date || '') + '</div>' +
+             '<h3>' + esc(n.title || '') + '</h3>' +
+             (n.body ? '<p>' + esc(n.body) + '</p>' : '') +
+             (det.length
+               ? '<ul>' + det.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') +
+                 (n.files ? '<li>' + n.files + ' files changed</li>' : '') + '</ul>'
+               : '') +
+             '</div>';
+    });
+    show(out);
+  }).catch(function () { show('<h1>Every release</h1><p>Could not load it.</p>'); });
+} else if (here === '/gallery') {
+  fetch('/api/public').then(function (r) { return r.json(); }).then(function (d) {
+    var shots = d.gallery || [];
+    var out = '<h1>From the world</h1><p>Every picture here was taken by ' +
+      'somebody playing. Send yours in and it goes up.</p>';
+    if (!shots.length) {
+      out += '<p style="color:var(--faint)">Nothing here yet. The first ' +
+             'pictures come from the first week.</p>';
+    } else {
+      out += '<div class="gallery">' + shots.map(function (g) {
+        return '<div class="shot"><img src="' + esc(g.url) + '" alt="' +
+               esc(g.by || '') + '" loading="lazy"></div>';
+      }).join('') + '</div>';
+    }
+    show(out);
+  }).catch(function () { show('<h1>From the world</h1><p>Could not load it.</p>'); });
+
+} else if (here === '/downloads') {
+  /* This is the How to join section off the front page. It lived there and on
+     this page in two different shapes, which meant two places to keep right
+     and a front page that would not end. It is one place now, and this is the
+     page the front page points at. */
+  fetch('/api/public').then(function (r) { return r.json(); }).then(function (d) {
+    var files = d.files || [];
+
+    function human(b) {
+      if (!b) return '';
+      if (b >= 1073741824) return (b / 1073741824).toFixed(1) + ' GB';
+      if (b >= 1048576)    return Math.round(b / 1048576) + ' MB';
+      return Math.max(1, Math.round(b / 1024)) + ' KB';
+    }
+    // hidden is the payload: on the site because the installer fetches it,
+    // never on this page, because clicking it gets you 700 MB that does
+    // nothing on its own.
+    function pick(ext) {
+      for (var i = 0; i < files.length; i++) {
+        if (files[i].hidden) continue;
+        if ((files[i].name || '').toLowerCase().slice(-ext.length) === ext) return files[i];
+      }
+      return null;
+    }
+    var exe = pick('.exe'), zip = pick('.zip');
+    // The payload lives inside the exe when the build was made that way, and
+    // beside it when it was not. A stub on its own is under a megabyte, so the
+    // size says which one this is without the page being told.
+    var single = exe && exe.size > 67108864;
+
+    var out = '<h1>Download</h1>';
+    if (d.launcher) out += '<p>Launcher <strong>' + esc(d.launcher) + '</strong> is current.</p>';
+
+    out += '<p class="lede">You need a legitimate copy of <strong>Skyrim Special ' +
+           'Edition</strong> on Steam, on build <strong>1.6.1170</strong>, and ' +
+           '<strong>Vortex</strong> with a free Nexus Mods account, which is how the ' +
+           'mods get to you.</p>' +
+           '<p class="lede"><strong>We are in closed playtesting</strong>, so the first ' +
+           'step is an application rather than a download. We are taking people in small ' +
+           'numbers because a bug found by four people is a bug we can fix, and the same ' +
+           'bug found by two hundred is a bad week for everybody.</p>';
+
+    // The button belongs under the step that tells you to take it, not above
+    // the list where it is the first thing you meet and the instructions are
+    // something you scroll past afterwards.
+    var grab = '';
+    if (!exe) {
+      grab = '<p style="color:var(--faint)">' + (zip
+               ? 'The setup program is missing from the site, so this will not run yet. ' +
+                 'Only the payload is up.'
+               : 'Nothing uploaded yet.') + '</p>';
+    } else if (single || !zip || zip.hidden) {
+      grab = '<div class="grab">' +
+             '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
+             'Download the installer</a>' +
+             '<p class="also faintly">' + esc(human(exe.size)) +
+             (exe.version ? ' · ' + esc(exe.version) : '') + '</p></div>';
+    } else {
+      grab = '<div class="grab">' +
+             '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
+             'Download the installer</a>' +
+             '<p class="also">and its payload, <a href="/file/' +
+             encodeURIComponent(zip.name) + '">' + esc(zip.name) + '</a>, ' +
+             esc(human(zip.size)) + '. Both into the same folder, then run the exe. ' +
+             'Do not unzip anything yourself.</p>' +
+             '<p class="also faintly">' + esc(human(exe.size)) + ' and ' +
+             esc(human(zip.size)) + (exe.version ? ' · ' + esc(exe.version) : '') +
+             '</p></div>';
+    }
+
+    out += '<h2>Apply first, then four steps</h2>' +
+           '<div class="steps">' +
+           '<div class="step"><div><h3>Come into the Discord and apply</h3>' +
+             '<p>Open a ticket saying who you are and why you want in. It is a few ' +
+             'lines, not an essay, and somebody answers. If you are accepted your ' +
+             'Discord account is what lets you through, so there is nothing else to ' +
+             'sign up for.</p></div></div>' +
+           '<div class="step"><div><h3>Take the installer</h3>' +
+             '<p>One file. Download it and run it. It is small because the mods are ' +
+             'not in it, and it fetches what it needs while you watch, so a ' +
+             'connection that drops does not mean starting again. It puts in the ' +
+             'launcher, the script extender and Thornswood&rsquo;s own content, and it ' +
+             'goes into the Skyrim you already have rather than making a second copy ' +
+             'of it.</p>' + grab + '</div></div>' +
+           '<div class="step"><div><h3>Install the collection in Vortex</h3>' +
+             '<p>Not optional. Without it you have a launcher and no mods, and the ' +
+             'server turns you away when you press Play. The mods come from a ' +
+             'collection on Nexus, so every one of them arrives from its own author ' +
+             'rather than from a copy of ours, and a mod update stops meaning a ' +
+             'reinstall. Vortex keeps them in a profile of their own, so switching ' +
+             'back to your usual profile and running Purge Mods leaves you where you ' +
+             'started.</p>' +
+             // The step said install the collection and never said where. The
+             // address comes from version.json by way of the news feed, so there
+             // is one copy of it and it cannot go stale here.
+             (d.collection
+               ? '<div class="grab"><a class="btn first" href="' + esc(d.collection) +
+                 '" target="_blank" rel="noopener">Open the collection</a>' +
+                 '<p class="also faintly">Opens on Nexus. Vortex takes it from ' +
+                 'there.</p></div>'
+               : '') +
+             '</div></div>' +
+           '<div class="step"><div><h3>Connect your Discord in the launcher</h3>' +
+             '<p>One click. Your browser opens, you say yes, and it closes itself. ' +
+             'You never do it again.</p></div></div>' +
+           '<div class="step"><div><h3>Press Play</h3>' +
+             '<p>No address to type, no password to remember. The launcher patches ' +
+             'anything that changed and puts you in the world.</p></div></div>' +
+           '</div>';
+
+    out += '<p class="lede" style="margin-top:34px">The installer is open to anybody. ' +
+           'The world is not: the launcher asks Discord who you are every time it ' +
+           'starts, so downloading it before you have been accepted just means you are ' +
+           'ready when you are.</p>' +
+           '<div class="acts" style="justify-content:flex-start;margin-top:26px">' +
+           '<a class="btn first" href="' + esc(d.invite || '/join') + '" target="_blank" ' +
+           'rel="noopener">Apply in the Discord</a>' +
+           '<a class="btn ghost" href="/join">The long version</a></div>';
+
+    show(out);
+  }).catch(function () { show('<h1>Download</h1><p>Could not load it.</p>'); });
+
+} else if (here === '/report') {
+  /* Open to anybody. Somebody whose install will not start cannot sign in to
+     say so, and telling them to ask in Discord first is how a bug becomes
+     nobody bothering. */
+  show('<h1>Report a problem</h1>' +
+    '<p>Something broken, or an idea. Either one lands in front of whoever is ' +
+    'fixing things. You do not need an account and nothing here is public.</p>' +
+    '<form id="rep" class="form">' +
+    '<div><label for="rTitle">What happened</label>' +
+      '<span class="hint">One line. The rest goes below.</span>' +
+      '<input id="rTitle" type="text" maxlength="200" required></div>' +
+    '<div><label for="rDetail">Anything else</label>' +
+      '<span class="hint">What you were doing, what you expected, where it was.</span>' +
+      '<textarea id="rDetail" maxlength="8000"></textarea></div>' +
+    '<div><label for="rBy">Your Discord name</label>' +
+      '<span class="hint">So somebody can come back to you. Optional.</span>' +
+      '<input id="rBy" type="text" maxlength="40"></div>' +
+    '<label class="check"><input type="checkbox" id="rIdea"> ' +
+      'This is an idea, not a fault</label>' +
+    '<div><button class="btn first" type="submit">Send it</button></div>' +
+    '<p id="rSaid" class="said" hidden></p>' +
+    '</form>');
+  var form = document.getElementById('rep');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var said = document.getElementById('rSaid');
+    var btn = form.querySelector('button');
+    btn.disabled = true;
+    fetch('/api/report', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title:  document.getElementById('rTitle').value,
+        detail: document.getElementById('rDetail').value,
+        by:     document.getElementById('rBy').value,
+        kind:   document.getElementById('rIdea').checked ? 'idea' : 'bug'
+      })
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        said.hidden = false;
+        if (res.ok) {
+          form.querySelectorAll('input, textarea').forEach(function (i) {
+            if (i.type === 'checkbox') { i.checked = false; } else { i.value = ''; }
+          });
+          said.textContent = 'Sent. Somebody will read it.';
+        } else {
+          said.textContent = res.j.error || 'That did not send. Try again in a minute.';
+        }
+        btn.disabled = false;
+      }).catch(function () {
+        said.hidden = false;
+        said.textContent = 'That did not send. Try again in a minute.';
+        btn.disabled = false;
+      });
+  });
+}
+
+/* The three live things on the front page, all of them honest about being
+   empty rather than filled with something invented. */
+fetch('/api/public', { credentials:'same-origin' })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    // Patreon, wherever it ends up living. Until there is one, Support is the
+    // page that explains what it will and will not buy.
+    if (d.patreon) {
+      Array.prototype.forEach.call(
+        document.querySelectorAll('#navSupport, .supportLink'), function (a) {
+          a.href = d.patreon; a.target = '_blank';
+        });
+      var ns = document.getElementById('navSupport');
+      if (ns) ns.textContent = 'Patreon';
+    }
+
+    var dot = document.getElementById('dot'), t = document.getElementById('livetext');
+    if (dot && t) {
+      if (d.status && d.status.up) {
+        dot.className = 'dot on';
+        var n = d.status.online || 0;
+        t.textContent = n === 0 ? 'The world is open'
+          : (n === 1 ? '1 person in the world' : n + ' people in the world');
+        var f = document.getElementById('figOnline');
+        var w = document.getElementById('figOnlineWrap');
+        // Only worth a tile of its own once there is somebody in it.
+        if (f && w && n > 0) { f.textContent = String(n); w.hidden = false; }
+      } else {
+        t.textContent = 'Server offline';
+      }
+    }
+
+    var rel = document.getElementById('releases');
+    if (!rel) return;
+    (d.news || []).slice(0, 4).forEach(function(n){
+      var el = document.createElement('div');
+      el.className = 'release';
+      el.innerHTML = '<div class="when">' + esc(n.date || '') + '</div>' +
+                     '<div class="what">' + esc(n.title || '') + '</div>';
+      rel.appendChild(el);
+    });
+    if (!(d.news || []).length) {
+      rel.innerHTML = '<p class="lede">Nothing shipped yet.</p>';
+    }
+
+    // The band stays off the page until there is something in it. Four empty
+    // boxes saying nothing is here yet is worse than no band at all.
+    var g = document.getElementById('gallery');
+    var band = document.getElementById('gallerySection');
+    var shots = d.gallery || [];
+    if (g && band && shots.length) {
+      band.hidden = false;
+      shots.slice(0, 8).forEach(function(s){
+        g.insertAdjacentHTML('beforeend',
+          '<div class="shot"><img src="' + esc(s.url) + '" alt="' + esc(s.by || '') + '" loading="lazy"></div>');
+      });
+    }
+  })
+  .catch(function(){
+    var t = document.getElementById('livetext');
+    if (t) t.textContent = '';
+  });
+
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+</script>
+</body>
+</html>

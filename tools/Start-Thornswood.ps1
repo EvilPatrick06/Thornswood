@@ -172,6 +172,12 @@ try {
     $loader = Join-Path $Game 'skse64_loader.exe'
     if (-not (Test-Path -LiteralPath $loader)) { throw "not found: $loader" }
     Write-Host 'starting Skyrim' -ForegroundColor Green
+    # The plugins only wake up for a session the launcher started. This script
+    # starts the game itself, so it leaves the same note the launcher would.
+    try {
+        $ms = [long]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+        [IO.File]::WriteAllText((Join-Path $Game 'Data\Platform\thornswood-session.txt'), "$ms Start-Thornswood", (New-Object Text.UTF8Encoding($false)))
+    } catch { }
     $proc = Start-Process -FilePath $loader -WorkingDirectory $Game -PassThru
 
     if ($NoWait) {

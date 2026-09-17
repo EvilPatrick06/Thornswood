@@ -103,6 +103,13 @@ namespace Thornswood
 
         public static void Apply()
         {
+            // Under the collection, Vortex owns this. A Vortex profile with
+            // local saves and local game settings turned on redirects the same
+            // two folders, and two things junctioning one folder is how saves
+            // end up somewhere neither of them looks. So the launcher stands
+            // down and leaves the folders alone.
+            if (Paths.Collection) return;
+
             Directory.CreateDirectory(Paths.MyGames);
             Directory.CreateDirectory(Paths.LocalAD);
             Directory.CreateDirectory(Path.Combine(Paths.MyGames, "Saves"));
@@ -146,6 +153,16 @@ namespace Thornswood
         public static int RepairConfigs(bool overwriteSettings)
         {
             int n = 0;
+
+            // Under the collection none of this is the launcher's to write.
+            // The plugin list belongs to the active Vortex profile, and
+            // putting the shipped one over it would undo the install somebody
+            // just did and leave Vortex and the game disagreeing about what is
+            // loaded. The ini files are the profile's too. A mismatch here is
+            // fixed in Vortex, not by copying files over the top of it, which
+            // is what the launcher says when it finds one.
+            if (Paths.Collection) return 0;
+
             if (!Directory.Exists(Paths.Golden)) return 0;
             foreach (string f in Directory.GetFiles(Paths.Golden))
             {

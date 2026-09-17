@@ -1,0 +1,347 @@
+<#
+  Set-DiscordLogin.ps1
+
+  Points the site at your Discord, which is what decides who gets in anywhere.
+
+  There are three things it holds, and they do different jobs:
+
+    Client id and secret   sign people in. Proves who somebody is.
+    Bot token and guild id look them up in your server. Proves they are IN it,
+                           and what roles they have there.
+    Invite link            where to send somebody who is not.
+
+  Without the bot token the site can still sign people in, but it cannot see
+  roles, so it falls back to the hand written admin list and lets everybody
+  else in as an ordinary member. With it, Discord roles decide everything:
+
+    Owner, Dev                         admin on the site
+    Moderator, Gamemaster, Loremaster,
+      Content Creator, Playtester,
+      Member                           allowed into the game
+    Banned                             turned away everywhere
+
+  Jarl of <hold> and Citizen of <hold> are in world and grant nothing. Somebody
+  playing a Jarl still needs Member to get through the door.
+
+  Which roles mean what lives in config.json on the VPS under "access", so it
+  can be changed there without touching this.
+
+  First time:
+
+    .\Set-DiscordLogin.ps1 -ClientId 123... -GuildId 456... -Invite https://discord.gg/xxxx
+
+  It asks for the client secret and the bot token at a prompt rather than
+  taking them on the command line, so neither ends up in your history.
+
+  Later, to change one thing, pass just that thing. Anything you leave out is
+  left as it is:
+
+    .\Set-DiscordLogin.ps1 -Invite https://discord.gg/yyyy -NoSecrets
+
+  The fallback admin list, for when Discord itself is having a bad day. Pass
+  every id, not just the new one:
+
+    .\Set-DiscordLogin.ps1 -Admin 615236910243119104 -NoSecrets
+
+  Where to find each:
+    Client id and secret  https://discord.com/developers/applications, OAuth2
+    Bot token             same application, Bot, Reset Token
+    Guild id              Discord, right click your server, Copy Server ID
+                          (needs Developer Mode on in Discord's settings)
+    Invite                Discord, Invite People, Edit invite link, never expire
+#>
+[CmdletBinding()]
+param(
+  [string]$ClientId,
+  [string]$GuildId,
+  [string]$Invite,
+  # Prompts for the link instead of taking it on the command line. Exists
+  # because an example link in a command block gets pasted verbatim, every
+  # time, and no amount of angle brackets stops it.
+  [switch]$NewInvite,
+  [string[]]$Admin,
+  # The Patreon page, once there is one. Puts a real link in the nav and the
+  # footer instead of sending people to the Support page.
+  [string]$Patreon,
+  # Prompts for it, same reason as -NewInvite. Press enter on an empty line to
+  # clear it and put the Support page back in the nav.
+  [switch]$NewPatreon,
+  [switch]$NoSecrets,
+  [string]$Vps  = '192.135.112.23',
+  [string]$User = 'Administrator',
+  [string]$Root = 'C:/Thornswood-Docs',
+  [string]$Task = 'Thornswood Docs'
+)
+
+$ErrorActionPreference = 'Stop'
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
+$rootWin = $Root.Replace('/','\')
+
+function Remote($script) {
+  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+  & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+}
+
+function AskSecret($what) {
+  $ss = Read-Host $what -AsSecureString
+  if (-not $ss -or $ss.Length -eq 0) { return '' }
+  [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+    [Runtime.InteropServices.Marshal]::SecureStringToBSTR($ss))
+}
+
+if ($NewPatreon) {
+  Write-Host ''
+  Write-Host '  Your Patreon page address, the one people visit.' -ForegroundColor DarkGray
+  Write-Host '  Press enter on an empty line to clear it and go back to /support.' -ForegroundColor DarkGray
+  Write-Host ''
+  $typed = (Read-Host '  Paste it here').Trim()
+  $Patreon = if ($typed) { $typed } else { 'none' }
+  $NoSecrets = $true
+}
+
+if ($NewInvite) {
+  Write-Host ''
+  Write-Host '  Discord, right click the server, Invite People, Edit invite link.' -ForegroundColor DarkGray
+  Write-Host '  Expire after: Never. Max uses: No limit. Then copy the link.' -ForegroundColor DarkGray
+  Write-Host ''
+  $Invite = (Read-Host '  Paste it here').Trim()
+  if (-not $Invite) { Write-Host '  Nothing pasted, nothing sent.' -ForegroundColor Yellow; exit 1 }
+  $NoSecrets = $true
+}
+
+# A bot token is three parts with dots between them, and the first part is the
+# application's own id written in base64. A client secret is one run of 32
+# characters with no dot anywhere in it. They get pasted into each other's box
+# constantly, because both are long and both are hidden while you type them,
+# and the only thing you see afterwards is a 401 that does not say which of the
+# two was wrong. So the shape gets checked here, before anything leaves this
+# machine. Nothing secret is printed either way.
+function AppIdIn($v) {
+  $parts = "$v" -split '\.'
+  if (@($parts).Count -ne 3) { return '' }
+  $t = $parts[0].Replace('-','+').Replace('_','/')
+  switch ($t.Length % 4) { 2 { $t += '==' } 3 { $t += '=' } }
+  try { $id = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($t)) } catch { return '' }
+  if ($id -match '^[0-9]{17,20}$') { return $id }
+  return ''
+}
+function Reject($lines) {
+  Write-Host ''
+  foreach ($l in $lines) { Write-Host "  $l" -ForegroundColor Red }
+  Write-Host ''
+  Write-Host '  Client secret  https://discord.com/developers/applications, your app,' -ForegroundColor DarkGray
+  Write-Host '                 OAuth2 in the left menu, Reset Secret, then Copy.' -ForegroundColor DarkGray
+  Write-Host '  Bot token      same app, Bot in the left menu, Reset Token, then Copy.' -ForegroundColor DarkGray
+  Write-Host '                 Discord shows a token once. Copy it before you leave.' -ForegroundColor DarkGray
+  Write-Host ''
+  Write-Host '  Nothing was sent. Run it again.' -ForegroundColor Yellow
+  exit 1
+}
+
+$clientSecret = ''
+$botToken     = ''
+if (-not $NoSecrets) {
+  Write-Host ''
+  Write-Host '  Leave either blank to keep whatever is already up there.' -ForegroundColor DarkGray
+  $clientSecret = AskSecret 'Discord client secret'
+  $botToken     = AskSecret 'Discord bot token'
+
+  if ($clientSecret) {
+    if (AppIdIn $clientSecret) {
+      Reject @('That is a BOT TOKEN in the client secret box.',
+               'It is ' + $clientSecret.Length + ' characters and has dots in it.',
+               'A client secret is 32 characters and has no dots.')
+    }
+    if ($clientSecret.Length -lt 25 -or $clientSecret.Length -gt 45) {
+      Reject @('That client secret is ' + $clientSecret.Length + ' characters.',
+               'A Discord client secret is 32.')
+    }
+  }
+
+  if ($botToken) {
+    $app = AppIdIn $botToken
+    if (-not $app) {
+      $n = ($botToken -split '\.').Count
+      Reject @('That is not a bot token.',
+               'It is ' + $botToken.Length + ' characters in ' + $n + ' part(s).',
+               'A bot token is three parts with dots between them.')
+    }
+    if ($ClientId -and $app -ne $ClientId) {
+      Reject @('That bot token belongs to application ' + $app + '.',
+               'You are pointing the site at application ' + $ClientId + '.',
+               'Those have to be the same application.')
+    }
+  }
+}
+
+# Every id Discord hands out is a snowflake: 17 to 20 digits and nothing else.
+# This exists because a placeholder got pasted in verbatim once, the script
+# happily wrote the words YOUR_CLIENT_ID to the VPS, and the read back said
+# "set" because "set" only ever meant "not empty".
+function CheckId($what, $v) {
+  if ($v -notmatch '^[0-9]{17,20}$') {
+    Write-Host ''
+    Write-Host "  $what has to be a Discord id: 17 to 20 digits." -ForegroundColor Red
+    Write-Host "  You gave: $v" -ForegroundColor Red
+    Write-Host ''
+    Write-Host '  Client id   https://discord.com/developers/applications, your app, OAuth2' -ForegroundColor DarkGray
+    Write-Host '  Guild id    right click the server, Copy Server ID (Developer Mode on)' -ForegroundColor DarkGray
+    Write-Host '  Admin id    right click yourself, Copy User ID' -ForegroundColor DarkGray
+    Write-Host ''
+    Write-Host '  Nothing was sent. Run it again with the real one.' -ForegroundColor Yellow
+    exit 1
+  }
+}
+if ($ClientId) { CheckId 'The client id' $ClientId }
+if ($GuildId)  { CheckId 'The guild id'  $GuildId }
+foreach ($a in @($Admin)) { if ($a) { CheckId 'An admin id' $a } }
+if ($Invite) {
+  if ($Invite -notmatch '^https://(discord\.gg/|discord\.com/invite/)') {
+    Write-Host ''
+    Write-Host '  That does not look like a Discord invite.' -ForegroundColor Red
+    Write-Host '  It should start https://discord.gg/ or https://discord.com/invite/' -ForegroundColor DarkGray
+    Write-Host '  Nothing was sent.' -ForegroundColor Yellow
+    exit 1
+  }
+  # The code after the slash on a real invite is 7 to 12 of Discord's own
+  # characters. xxxx and yyyy are what a copied example looks like.
+  $code = ($Invite -split '/')[-1]
+  # A real code is mixed case and digits. ALLCAPS is what an example looks
+  # like, and so is any of these words.
+  if ($code -cmatch '^[A-Z]+$' -or
+      $code -match '^(x+|y+|z+|abc.*|code|invite|link|here|yours?|real.*|.*code|.*here)$' -or
+      $code.Length -lt 6) {
+    Write-Host ''
+    Write-Host "  That invite code looks like a placeholder: $code" -ForegroundColor Red
+    Write-Host '  Discord, right click the server, Invite People, Edit invite link,' -ForegroundColor DarkGray
+    Write-Host '  expire after Never, max uses No limit, then copy the real link.' -ForegroundColor DarkGray
+    Write-Host '  Nothing was sent.' -ForegroundColor Yellow
+    exit 1
+  }
+}
+
+if ($Patreon -and $Patreon -ne 'none') {
+  if ($Patreon -notmatch '^https://(www\.)?patreon\.com/.+') {
+    Write-Host ''
+    Write-Host '  That is not a Patreon page address.' -ForegroundColor Red
+    Write-Host '  It should start https://www.patreon.com/ and then your page name.' -ForegroundColor DarkGray
+    Write-Host '  Nothing was sent.' -ForegroundColor Yellow
+    exit 1
+  }
+  $slug = ($Patreon.TrimEnd('/') -split '/')[-1]
+  if ($slug -match '^(your.*|my.*|page|name|example|creator|.*page|.*name)$') {
+    Write-Host ''
+    Write-Host "  That page name looks like a placeholder: $slug" -ForegroundColor Red
+    Write-Host '  Use the real one, or run .\Set-DiscordLogin.ps1 -NewPatreon and paste it.' -ForegroundColor DarkGray
+    Write-Host '  Nothing was sent.' -ForegroundColor Yellow
+    exit 1
+  }
+}
+
+$d = @{}
+if ($ClientId)     { $d.clientId = $ClientId }
+if ($clientSecret) { $d.clientSecret = $clientSecret }
+if ($botToken)     { $d.botToken = $botToken }
+if ($GuildId)      { $d.guildId = $GuildId }
+if ($Invite)       { $d.invite = $Invite }
+
+$payload = @{
+  discord = $d
+  patreon = "$Patreon"
+  admins  = @(if ($Admin) { $Admin | ForEach-Object { "$_" } })
+} | ConvertTo-Json -Depth 4 -Compress
+
+# Base64 so neither secret is ever a word on a command line on either machine.
+$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
+$clientSecret = $null; $botToken = $null; $payload = $null
+
+Write-Host ''
+Write-Host 'Writing it to the VPS...'
+Remote @"
+`$ErrorActionPreference = 'Stop'
+`$f = '$rootWin\config.json'
+`$cfg = @{}
+if (Test-Path `$f) {
+  try { (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
+        ForEach-Object { `$cfg[`$_.Name] = `$_.Value } } catch { }
+}
+`$patch = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64')) | ConvertFrom-Json
+
+`$d = @{}
+if (`$cfg.discord) { `$cfg.discord.PSObject.Properties | ForEach-Object { `$d[`$_.Name] = `$_.Value } }
+`$patch.discord.PSObject.Properties | ForEach-Object { if (`$_.Value) { `$d[`$_.Name] = `$_.Value } }
+`$cfg['discord'] = `$d
+if (`$patch.admins -and @(`$patch.admins).Count) { `$cfg['admins'] = @(`$patch.admins) }
+if (`$patch.patreon -eq 'none') { `$cfg['patreon'] = '' }
+elseif (`$patch.patreon)         { `$cfg['patreon'] = `$patch.patreon }
+if (-not `$cfg['admins']) { `$cfg['admins'] = @() }
+if (-not `$cfg['access']) {
+  `$cfg['access'] = @{
+    admin  = @('Owner','Dev')
+    play   = @('Owner','Dev','Moderator','Gamemaster','Loremaster','Content Creator','Playtester')
+    banned = @('Banned')
+  }
+}
+
+# Set-Content -Encoding UTF8 on Windows PowerShell writes a byte order mark.
+# Node's JSON.parse chokes on it, the site's try/catch swallows the error, and
+# the whole file is silently ignored while every check here still says 'set'.
+# So write the bytes ourselves, with no mark on the front.
+[IO.File]::WriteAllText(`$f, (`$cfg | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
+
+# Read it back off the disk. What was in memory a second ago proves nothing.
+`$bytes = [IO.File]::ReadAllBytes(`$f)
+if (`$bytes.Length -ge 3 -and `$bytes[0] -eq 239 -and `$bytes[1] -eq 187 -and `$bytes[2] -eq 191) {
+  'BYTE ORDER MARK STILL ON THE FILE. The site cannot read it. Tell Claude.'
+}
+`$back = [Text.Encoding]::UTF8.GetString(`$bytes) | ConvertFrom-Json
+
+'on the disk now, ' + `$bytes.Length + ' bytes:'
+'  client id     ' + `$(if (`$back.discord.clientId)     { `$back.discord.clientId } else { 'MISSING' })
+function AppIdIn(`$v) {
+  `$parts = "`$v" -split '\.'
+  if (@(`$parts).Count -ne 3) { return '' }
+  `$t = `$parts[0].Replace('-','+').Replace('_','/')
+  switch (`$t.Length % 4) { 2 { `$t += '==' } 3 { `$t += '=' } }
+  try { `$id = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(`$t)) } catch { return '' }
+  if (`$id -match '^[0-9]{17,20}`$') { return `$id }
+  return ''
+}
+function SecretLooks(`$v) {
+  if (-not `$v) { return 'MISSING' }
+  if (AppIdIn `$v) { return 'THIS IS A BOT TOKEN, NOT A CLIENT SECRET' }
+  if ("`$v".Length -lt 25 -or "`$v".Length -gt 45) {
+    return 'set, but it is ' + "`$v".Length + ' characters and a client secret is 32' }
+  return 'set'
+}
+function TokenLooks(`$v, `$cid) {
+  if (-not `$v) { return 'not set, roles will not be read' }
+  `$app = AppIdIn `$v
+  if (-not `$app) { return 'NOT A BOT TOKEN, it has no application id in it' }
+  if (`$cid -and `$app -ne `$cid) { return 'set, but it belongs to application ' + `$app + ', NOT ' + `$cid }
+  return 'set, and it belongs to this application'
+}
+'  client secret ' + (SecretLooks `$back.discord.clientSecret)
+'  bot token     ' + (TokenLooks `$back.discord.botToken `$back.discord.clientId)
+'  guild id      ' + `$(if (`$back.discord.guildId)      { `$back.discord.guildId } else { 'not set, roles will not be read' })
+'  invite        ' + `$(if (`$back.discord.invite)       { `$back.discord.invite } else { 'not set' })
+'  fallback admins ' + (@(`$back.admins) -join ', ')
+'  patreon       ' + `$(if (`$back.patreon) { `$back.patreon } else { 'not set' })
+'  lets into the game: ' + (@(`$back.access.play) -join ', ')
+
+Get-CimInstance Win32_Process |
+  Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*Thornswood-Docs*' } |
+  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
+Start-Sleep -Seconds 1
+Start-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
+Start-Sleep -Seconds 3
+if (Get-NetTCPConnection -LocalPort 3001 -State Listen -EA SilentlyContinue) { 'site restarted' }
+else { 'SITE DID NOT COME BACK' }
+"@ | ForEach-Object { "  $_" }
+
+Write-Host ''
+Write-Host '  The redirect in the Discord application must be exactly this:' -ForegroundColor DarkGray
+Write-Host '    https://thornswood.net/auth/discord/callback' -ForegroundColor Green
+Write-Host ''
+Write-Host '  The bot has to be IN the server for roles to be readable.' -ForegroundColor DarkGray
+Write-Host '  Setup-Discord.ps1 puts it there.' -ForegroundColor DarkGray

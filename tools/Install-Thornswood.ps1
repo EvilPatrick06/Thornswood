@@ -88,7 +88,7 @@ if ($SkipBody) { $Skip += 'body' }
 # ---------------------------------------------------------------- the steps --
 $steps = @(
     @{
-        Key = 'content'; Name = 'Thornswood content plugin'
+        Key = 'content'; Name = 'ThornsWood content plugin'
         Script = 'Install-ThornswoodContent.ps1'
         Args = @{}
         Wants = @('Thornswood-Content.esp')

@@ -26,6 +26,53 @@
 (function () {
   'use strict';
 
+  // ------------------------------------------------------------ whose game ----
+  // Skyrim Platform loads every plugin in Data/Platform/Plugins, whichever server
+  // skymp5-client is about to join. Somebody who also plays Keizaal Online starts
+  // it from this same Skyrim, so on 2026-09-16 Thornswood's voice indicator sat
+  // on top of Keizaal's menu. Whichever launcher ran last wrote
+  // skymp5-client-settings.txt, and its server-ip says whose game this is. Not
+  // ours: this file does nothing at all. Unreadable: carry on, as before.
+  //
+  // Ours is the address in Thornswood.ini's ServerAddress line when there is
+  // one, so a server move is an ini edit, and the fixed address below when
+  // there is not.
+  if (!thornswoodGame()) { return; }
+  function thornswoodGame() {
+    const ours = ['192.135.112.23'];
+    let ip = '';
+    try {
+      const fs = require('fs');
+      try {
+        const m = fs.readFileSync('Data/SKSE/Plugins/Thornswood.ini', 'utf8')
+          .match(/^\s*ServerAddress\s*=\s*([^\s;]+)/m);
+        if (m) { ours.push(m[1]); }
+      } catch (e) { }
+      let raw = fs.readFileSync('Data/Platform/Plugins/skymp5-client-settings.txt', 'utf8');
+      if (raw.charCodeAt(0) === 0xFEFF) { raw = raw.slice(1); }
+      ip = String((JSON.parse(raw) || {})['server-ip'] || '').trim();
+    } catch (e) { return true; }
+    if (ip && ours.indexOf(ip) < 0) {
+      try { skyrimPlatform.printConsole('[thornswood] the client points at ' + ip + ', not this server. Plugin idle.'); } catch (e) { }
+      return false;
+    }
+    // The client can point at us and this still not be our session: another
+    // server's launcher that never rewrites the client settings leaves our
+    // address in them. So the launcher leaves a note when it starts the game
+    // and takes it away when the game closes. No fresh note, not our session.
+    try {
+      const note = String(require('fs').readFileSync('Data/Platform/thornswood-session.txt', 'utf8')).trim();
+      const first = note.split(/\s+/)[0];
+      let when = Number(first);           // unix milliseconds from the launcher
+      if (!isFinite(when) || when < 1e12) { when = Date.parse(first); }
+      if (isFinite(when) && Math.abs(Date.now() - when) < 24 * 3600 * 1000) { return true; }
+      try { skyrimPlatform.printConsole('[thornswood] the launcher\'s session note is stale, so this is another server\'s session. Plugin idle.'); } catch (e) { }
+    } catch (e) {
+      try { skyrimPlatform.printConsole('[thornswood] the launcher left no session note, so this is another server\'s session. Plugin idle.'); } catch (e2) { }
+    }
+    return false;
+  }
+
   const sp = skyrimPlatform;
 
   const T = (globalThis.Thornswood = globalThis.Thornswood || {});
@@ -69,17 +116,33 @@
   T.log = log;
 
   /**
-   * A line in the corner of the screen.
+   * A line in the log.
    *
-   * Because a log file somebody has to go and find is a round trip, and three
-   * of those have now been spent on one key. If enter does nothing, the reason
-   * should be on screen at the moment it does nothing.
+   * This used to also put every line in the corner of the screen, on the
+   * reasoning that a log somebody has to go and find is a round trip and if
+   * enter does nothing the reason should be on screen at that moment. That was
+   * true while one key was being chased and false the rest of the time, and
+   * the rest of the time is what people actually play in. A pulse every five
+   * seconds counting keystrokes is not something anybody should be reading
+   * over their own game, next to notifications from their actual mods.
+   *
+   * So the log takes everything and the screen takes nothing, unless somebody
+   * deliberately calls the one below.
    */
   function say(text) {
-    try { sp.Debug.notification('Thornswood: ' + text); } catch (e) { }
     log(text);
   }
   T.say = say;
+
+  /**
+   * A line in the corner of the screen, for the handful of things a person
+   * needs to be told rather than a log needs to record.
+   */
+  function note(text) {
+    try { sp.Debug.notification('ThornsWood: ' + text); } catch (e) { }
+    log(text);
+  }
+  T.note = note;
 
   T.js = function (src) {
     try { sp.browser.executeJavaScript(src); return true; }
@@ -197,18 +260,61 @@
     return '';
   }
 
+  // Focus that is up while nothing here claimed it, and since when.
+  let strayFocusSince = 0;
+
+  /**
+   * Put the focus flag where the claims say it should be.
+   *
+   * The line that used to be here said: if nothing wants focus and the race
+   * menu is open, leave it alone. That was to protect the cursor, because
+   * setFocused(false) also sends a hide to the game's own CursorMenu. What it
+   * actually built was a trap with no way out.
+   *
+   * Something raised focus during character creation. While focus is up
+   * DirectInput is withheld from the game, so escape, enter and every other
+   * key did nothing, and the one thing that could have put it back refused to,
+   * for as long as the race menu was open, which was forever because you
+   * cannot finish a race menu you cannot press a key in. Your log shows it
+   * exactly: one line saying keys work, and then nothing ever again.
+   *
+   * So the guard is now a pause rather than a veto. A second of grace, which
+   * covers the flicker it was written for, and then the keyboard comes back
+   * whatever is on screen. A cursor that blinks is a cosmetic problem. A
+   * keyboard that never returns is somebody closing the game through the task
+   * manager.
+   */
   function applyFocus() {
+    let up;
+    try { up = !!sp.browser.isFocused(); } catch (e) { return; }
     const want = anyClaim();
-    try {
-      if (sp.browser.isFocused() === want) return;
-      if (!want && raceMenuOpen()) return;
-      sp.browser.setFocused(want);
-    } catch (e) { }
+
+    if (up === want) { strayFocusSince = 0; return; }
+
+    if (!want) {
+      if (!strayFocusSince) { strayFocusSince = Date.now(); }
+      const waited = Date.now() - strayFocusSince;
+      if (raceMenuOpen() && waited < 1200) { return; }
+      if (waited >= 1200) {
+        say('something took the keyboard and nothing here asked for it, taking it back');
+      }
+    }
+
+    try { sp.browser.setFocused(want); } catch (e) { }
+    strayFocusSince = 0;
   }
 
   T.claimFocus = function (who, on) {
     if (!!claims[who] === !!on) return;
     claims[who] = !!on;
+    // Logged every time, because a claim that goes up and does not come down is
+    // indistinguishable from the game freezing: focus withholds DirectInput,
+    // so the keyboard stops reaching the game AND stops reaching every plugin
+    // that would otherwise notice something was wrong. When somebody says a
+    // key locked everything up, this line is the only place the answer lives.
+    say('focus ' + (on ? 'claimed by ' : 'released by ') + who +
+        ' (holding: ' + (Object.keys(claims).filter(function (k) { return claims[k]; })
+                          .join(', ') || 'nobody') + ')');
     applyFocus();
   };
   T.hasFocus = function (who) { return !!claims[who]; };
@@ -217,12 +323,22 @@
   // Asked for, not taken.
   //
   // The keyboard is only handed over once the page has said it has a box to
-  // type into, and it is handed back on a message from the page rather than on
-  // a key. Both halves of that are forced by the same fact: raising focus
-  // withholds DirectInput from the game, and SkyrimPlatform's buttonEvent is
-  // built out of the game's own input, so the instant focus goes up this
-  // handler stops being called. A plugin cannot wait for the escape key that
-  // would undo what it just did.
+  // type into, and it is handed back on a message from the page.
+  //
+  // This used to say that a plugin cannot watch for the key that would undo
+  // what it just did, because raising focus withholds DirectInput and
+  // buttonEvent is built from the game's own input. That is half right and the
+  // wrong half mattered. DInputHook::GetDeviceData reads the keyboard, calls
+  // ProcessKeyboardData, which is what feeds buttonEvent, and only THEN checks
+  // ChromeFocus and zeroes the length:
+  //
+  //     if (hr == DI_OK) { ProcessKeyboardData(rawData); ... }
+  //     if (DInputHook::ChromeFocus()) { *outDataLen = 0; return result; }
+  //
+  // So the game is starved and the plugins are not. Escape below is reachable
+  // the whole time focus is up, and the cap further down does not need any key
+  // at all. Both exist because everything that routes through the page is one
+  // stopPropagation away from leaving somebody frozen.
   //
   // Which is exactly what went wrong. Enter raised focus whether or not
   // anything had drawn a chat box, and when there was no box there was nothing
@@ -230,6 +346,7 @@
   // back out.
   let asked = 0;        // when we last asked the page to take the keyboard
   let beat = 0;         // when the page last said it still has it
+  let heldSince = 0;    // when the keyboard was handed over, for the hard cap
   let boxReady = false; // the page has said, once, that it has a chat box
 
   function wantTyping(on) {
@@ -247,6 +364,7 @@
       // page stops answering, and typing-fail takes it back at once.
       if (boxReady) {
         beat = Date.now();
+        heldSince = Date.now();
         T.claimFocus('chat', true);
         T.js('try{if(window.thornswoodChat){window.thornswoodChat.focusInput();window.thornswoodChat.state();}else{window.skyrimPlatform.sendMessage("thornswood-front","the page has no chat object, so there is nothing to type into");}}catch(e){try{window.skyrimPlatform.sendMessage("thornswood-front","focusInput threw "+e);}catch(e2){}}');
         return;
@@ -258,6 +376,7 @@
       return;
     }
     asked = 0;
+    heldSince = 0;
     if (!claims.chat) return;
     T.js('try{window.thornswoodChat&&window.thornswoodChat.blurInput();}catch(e){}');
     // Not waiting for the answer. If the page is in a state where it cannot
@@ -273,8 +392,760 @@
   // given key events at all and nothing below it can possibly work.
   let sawAnyKey = false;
 
+  /*
+   * A pulse, so a lock can be told apart from the two things it looks like.
+   *
+   * When the keyboard dies the moment the microphone opens, there are two
+   * completely different worlds and no way to tell them apart from the chair:
+   *
+   *   keys still arriving here  the game is being starved on purpose, which
+   *                             means something has raised browser focus and
+   *                             DInputHook is zeroing the game's read while
+   *                             still feeding plugins.
+   *   keys stop here too        DirectInput itself is gone, which is the game
+   *                             losing the device rather than anybody taking
+   *                             it, and nothing in this build can cause that
+   *                             by raising a flag.
+   *
+   * Every fix so far has been aimed at the first world on the assumption it
+   * was that one. This says which it is. Five seconds is often enough to see
+   * the gap and rare enough to read.
+   */
+  let keysSeen = 0;
+
+  /*
+   * The last twenty key presses, so the thing that opens the console has to
+   * say which key it is on.
+   *
+   * The console opening is the lock. Two config changes aimed at the two mods
+   * whose hotkeys collide with keys held while playing did not stop it, which
+   * means the opener is a third thing and guessing at mod lists one at a time
+   * is not converging. Every key press passes through this file already, so
+   * the cheapest possible answer is to remember the recent ones and print them
+   * the moment the console appears. Whatever scan code is sitting at the end
+   * of that list is the hotkey, and the hotkey names the mod.
+   *
+   * Twenty entries of two numbers. It costs nothing and it is only ever read
+   * on the one event that matters.
+   */
+  const recentKeys = [];
+
+  function rememberKey(code) {
+    recentKeys.push([code, Date.now()]);
+    if (recentKeys.length > 20) { recentKeys.shift(); }
+  }
+
+  function recentKeysText() {
+    if (!recentKeys.length) { return 'nothing at all'; }
+    const now = Date.now();
+    const parts = [];
+    for (let i = 0; i < recentKeys.length; i++) {
+      parts.push(recentKeys[i][0] + ' (' + (now - recentKeys[i][1]) + 'ms ago)');
+    }
+    return parts.join(', ');
+  }
+  let lastPulse = 0;
+
+  /*
+   * The console opens by itself, and while it is open the game ignores you.
+   *
+   * That is the whole lockup. The pulse caught it:
+   *
+   *     input: 173 keys in 5s, browser focus no, menu yes [Console Native UI Menu]
+   *
+   * 173 keys means the keyboard is fine and the plugin is getting every press.
+   * The game is not, because a menu has the input, and the menu is the
+   * console. Stuck running follows from the same thing: the last movement the
+   * game saw is the last one it will ever see, so the character keeps going.
+   *
+   * Nobody opened it. It appears on its own, and so far only ever within a
+   * second or two of the browser opening a capture device, which is why this
+   * looked like a microphone problem for most of a day.
+   *
+   * Shut it. TESModPlatform.CloseMenu queues a hide for a menu by name, and it
+   * is bound in the VM even though the generated type declarations predate it,
+   * which is why this goes through the proxy rather than a typed call.
+   *
+   * Deliberately not conditional on anything. There is no legitimate way for
+   * this menu to be open on this build: the console is not how anybody plays
+   * here, and a console somebody opened on purpose being shut is a smaller
+   * problem than a console nobody opened taking the keyboard.
+   */
+  /*
+   * The client switching itself to single player, said out loud.
+   *
+   * skymp5-client used to do that whenever a loadGame event arrived that it did
+   * not believe it caused: message box, connection closed, syncing stopped.
+   * Both halves were invisible from here. The modal took the keyboard, and the
+   * disconnect is why the character carried on running with nothing correcting
+   * them.
+   *
+   * It fired on every launch, because Skyrim has no command line for loading a
+   * save and this build uses po3_StartOnSave to walk into the right character.
+   * That load is real and SkyMP did not cause it, so the guard was right about
+   * the facts and wrong about what they meant.
+   *
+   * The disconnect is patched out in skymp5-client.js and the count is kept
+   * here instead, because how often this happens is worth knowing even now
+   * that it costs nothing.
+   */
+  let saidSingle = 0;
+  let saidMove = 0;
+
+  sp.on('update', guard('singleplayer', () => {
+    let n = 0;
+    try { n = Number(globalThis.__thornswoodUncausedLoad) || 0; } catch (e) { return; }
+    if (n <= saidSingle) { return; }
+    saidSingle = n;
+    say('a save was loaded that SkyMP did not cause (' + n + ' so far). ' +
+        'still connected; this used to disconnect and lock the keyboard.');
+  }));
+
+  /*
+   * Which of the two spawn paths put the character in the world.
+   *
+   * skymp5-client has two and they race on one flag. One moves the character
+   * with moveRefrToPosition. The other writes a save on the spot and loads it,
+   * which on this build means reverting the save po3_StartOnSave just finished
+   * loading and never coming back out of it. That is the infinite loading
+   * screen, and the second path is now told to stand down whenever there is
+   * already a game to be in.
+   *
+   * Worth a line in the log either way. If this stops appearing, the spawn went
+   * back through the load and the loading screen is the next thing to expect.
+   */
+  sp.on('update', guard('spawnpath', () => {
+    let n = 0;
+    try { n = Number(globalThis.__thornswoodSpawnedByMove) || 0; } catch (e) { return; }
+    if (n <= saidMove) { return; }
+    saidMove = n;
+    say('spawn: the save reload stood down, moving the character instead (' +
+        n + ' so far)');
+  }));
+
+  /*
+   * Every activation, said out loud.
+   *
+   * Handles, levers and cages do nothing when pressed, and taking the
+   * activation block off activators did not change it, which makes sense now:
+   * dealWithRef only ever runs on refs the server already knows about, and a
+   * lever in a dungeon is not one of those. So it was never blocked by us and
+   * something else is eating it.
+   *
+   * There are only three things it can be and this tells them apart in one
+   * press. No line at all means the game never registered an activation, so
+   * the press is being lost before anything here sees it. A line with blocked
+   * yes means something set blockActivation on that ref and it is still set. A
+   * line with blocked no, followed by nothing happening on screen, means the
+   * activation ran and the Papyrus script behind it did not, which is a
+   * different problem in a different place.
+   */
+  // Set while we are re-activating something, so our own call does not come
+  // back through this handler and recurse.
+  let reActivating = false;
+  let lastActivateAt = 0;
+  const lastForced = {};
+
+  /*
+   * Which browser backend is actually running.
+   *
+   * SkyrimPlatform has two: tilted, which is the original CEF stack living in
+   * src/tilted and is where DInputHook, ChromeFocus and every input bug chased
+   * in this file comes from, and nirnlab, which replaces it with the NirnLab UI
+   * Platform SKSE plugin. BrowserApi.cpp picks between them from
+   * SkyrimPlatform.ini, and "auto" is NOT a choice: it logs "Auto mode not
+   * implemented yet" and falls back to tilted, which upstream's own source
+   * calls legacy.
+   *
+   * Worth one line at startup, because the difference decides whether
+   * BrowserApiTilted::SetFocused exists at all, and that function is the only
+   * writer of the flag that zeroes every keyboard read.
+   */
+  try {
+    const b = sp.browser.getBackend();
+    say('browser backend: ' + ((b && b.name) || 'unknown'));
+  } catch (e) {
+    say('browser backend: could not ask (' + e + ')');
+  }
+
+  sp.on('activate', guard('activate', (e) => {
+    // Declared here, once, for the whole handler. It used to be declared
+    // further down, after the door block, and a const is not usable
+    // before its line: every door press threw "Cannot access 'now'
+    // before initialization" and the door rescue below never ran.
+    const now = Date.now();
+    lastActivateAt = now;
+    if (reActivating) { return; }
+
+    let target = 0, base = 0, type = -1, blocked = 'unknown', name = '';
+    try { target = e.target ? e.target.getFormID() : 0; } catch (err) { }
+    try {
+      const b = e.target ? e.target.getBaseObject() : null;
+      if (b) { base = b.getFormID(); type = b.getType(); name = b.getName() || ''; }
+    } catch (err) { }
+    try { blocked = e.target.isActivationBlocked() ? 'yes' : 'no'; } catch (err) { }
+    say('activate: ' + (name || 'something') +
+        ' target ' + target.toString(16) +
+        ' base ' + base.toString(16) +
+        ' type ' + type +
+        ' blocked ' + blocked);
+
+    /*
+      Activators get one real activation, asked for explicitly.
+
+      The log settled what was happening and ruled out everything cheap. The
+      event fires, the ref is not blocked, and the handle still does nothing,
+      and no handle or lever script appears anywhere in the Papyrus log. So the
+      game registers the press and the script behind it never starts.
+
+      This asks for the activation again with abDefaultProcessingOnly FALSE,
+      which is the argument that says run the attached script rather than only
+      the built in behaviour. If something upstream is consuming the press
+      before the script sees it, this is the press the script gets.
+
+      Only ACTI, because that is what a handle, a lever, a chain and a cage bar
+      are. Doors and containers are left alone: their state is shared and the
+      server owns it, and this would open them twice. Once every two seconds
+      per ref, so holding the key down does not toggle a lever back and forth.
+
+      If a handle starts working, that was it. If a handle now works twice, the
+      script was running all along and the problem is what it is linked to. Both
+      are answers.
+    */
+    /*
+      A door the server never answers gets activated anyway, eventually.
+
+      Cage Gate came back "type 29 blocked yes". Doors are the one thing still
+      blocked on purpose, because their open state is shared and the server is
+      supposed to be the one that opens them: press, the block holds, an Activate
+      goes up, the server replies, the client activates. That works for a door
+      somebody walks through. It cannot work for a cage gate, because what opens
+      a cage gate is a chain running a Papyrus script, and the server has no
+      scripts, so the reply never comes and the press is simply lost.
+
+      So the server gets first refusal, and then this asks. A second and a half
+      later, if the ref is still there, still within reach, and still in the
+      same open state it was in, nothing answered and the door is activated
+      properly. A load door is gone from under this long before then, and the
+      distance check is the second guard against acting on one.
+    */
+    if (type === 29) {
+      /*
+        The rescue below is OFF, and it has to stay off until it can tell a
+        press from an echo.
+
+        The activate event does not only fire for the person's own press. It
+        also fires when the server answers that press and the client
+        activates the door on its behalf, and for whatever the game activates
+        on its own while a cell loads. This code cannot tell those apart, so
+        on 2026-09-16, the first day it actually ran (a misplaced const had
+        thrown on its first line until then), it saw the server's own
+        activation of the inn door as an unanswered press, waited a second
+        and a half, and activated the door itself. That door is a load door,
+        so the person was sent through it, which fired activate again, and
+        they were pulled through the same door every three seconds for as
+        long as they stood within reach of it: "loads in, loads in again,
+        then keeps flashing".
+
+        Cage gates stay unsolved for now. A rescue for them needs a signal
+        that only a real key press produces, not the activate event.
+      */
+      return;
+      const id = target;
+      let openWas = -1;
+      try { openWas = e.target.getOpenState(); } catch (err) { return; }
+      if (lastForced[id] && now - lastForced[id] < 3000) { return; }
+      lastForced[id] = now;
+
+      sp.Utility.wait(1.5).then(guard('doorrescue', () => {
+        const refr = sp.ObjectReference.from(sp.Game.getFormEx(id));
+        if (!refr) { return; }
+        let openNow = -1;
+        try { openNow = refr.getOpenState(); } catch (err) { return; }
+        if (openNow !== openWas) { return; }
+
+        const pc = sp.Game.getPlayer();
+        if (!pc) { return; }
+        const dx = refr.getPositionX() - pc.getPositionX();
+        const dy = refr.getPositionY() - pc.getPositionY();
+        const dz = refr.getPositionZ() - pc.getPositionZ();
+        if (Math.sqrt(dx * dx + dy * dy + dz * dz) > 400) { return; }
+
+        try {
+          reActivating = true;
+          try { refr.activate(pc, false); } finally { reActivating = false; }
+          say('  nothing answered for ' + (name || 'that door') +
+              ', activated it here instead');
+        } catch (err) {
+          reActivating = false;
+          say('  rescuing ' + (name || 'that door') + ' threw: ' + err);
+        }
+      }));
+      return;
+    }
+
+    if (type !== 24) { return; }
+
+    if (lastForced[target] && now - lastForced[target] < 2000) { return; }
+    lastForced[target] = now;
+
+    try {
+      const pc = sp.Game.getPlayer();
+      if (!pc) { return; }
+      reActivating = true;
+      try {
+        e.target.activate(pc, false);
+        say('  asked ' + (name || 'it') + ' to run its own script');
+      } finally {
+        reActivating = false;
+      }
+    } catch (err) {
+      reActivating = false;
+      say('  re-activating ' + (name || 'it') + ' threw: ' + err);
+    }
+  }));
+
+  const CONSOLE_MENUS = ['Console Native UI Menu', 'Console'];
+  let consoleSince = 0;
+
+  function shutConsole(which) {
+    // Printed before the close, so it is in the log even if closing throws.
+    say('the ' + which + ' is open. Keys just before it, newest last: ' +
+        recentKeysText());
+    try {
+      sp.TESModPlatform.closeMenu(which);
+      say('the ' + which + ' opened on its own and has been shut');
+      return true;
+    } catch (e) {
+      say('the ' + which + ' opened on its own and closeMenu threw: ' + e);
+      return false;
+    }
+  }
+
+  sp.on('update', guard('console', () => {
+    let open = '';
+    for (const name of CONSOLE_MENUS) {
+      try { if (sp.Ui.isMenuOpen(name)) { open = name; break; } } catch (e) { }
+    }
+    if (!open) { consoleSince = 0; return; }
+
+    // A moment's grace, so a console opened and closed inside one frame is not
+    // chased, and so the log records how long it was actually up.
+    const now = Date.now();
+    if (!consoleSince) { consoleSince = now; return; }
+    if (now - consoleSince < 400) { return; }
+
+    consoleSince = 0;
+    shutConsole(open);
+  }));
+
+  /*
+   * Whether the game is letting the character be driven at all.
+   *
+   * This is the last way the game can ignore the keyboard, and the only one
+   * left standing. The pulse has now shown a lock with keys arriving here at
+   * six hundred every five seconds, no menu open, and browser focus off. So
+   * the keys are reaching the process, nothing is holding them, and the game
+   * is deciding to do nothing with them.
+   *
+   * Skyrim has exactly one switch for that. EnablePlayerControls and its
+   * opposite take eight flags, and with movement and looking off the character
+   * stands there ignoring you while everything else in the process carries on
+   * normally. Its cousin SetPlayerAIDriven hands the character to the AI, which
+   * is the same silence plus the character walking off on its own, which is the
+   * other half of what has been reported for days.
+   *
+   * Both are switched on by somebody and switched back off by the same
+   * somebody, so anything that throws, disconnects or is simply never told to
+   * finish leaves them stuck. There is no getter for AI driven and no way to
+   * ask who did it, so this does not try to find out. It waits five seconds,
+   * says which ones are off, and turns them back on.
+   *
+   * Five seconds because a real one is momentary. Menus are excluded outright:
+   * the game switches controls off for its own menus and race creation, and
+   * those turn themselves back on.
+   */
+  const CONTROLS = [
+    ['movement', 'isMovementControlsEnabled'],
+    ['fighting', 'isFightingControlsEnabled'],
+    ['camera', 'isCamSwitchControlsEnabled'],
+    ['looking', 'isLookingControlsEnabled'],
+    ['sneaking', 'isSneakingControlsEnabled'],
+    ['menus', 'isMenuControlsEnabled'],
+    ['activate', 'isActivateControlsEnabled'],
+    ['journal', 'isJournalControlsEnabled']
+  ];
+
+  let controlsOffNow = [];
+  let controlsSince = 0;
+
+  function readControls() {
+    const off = [];
+    for (const pair of CONTROLS) {
+      try {
+        const fn = sp.Game[pair[1]];
+        if (typeof fn !== 'function') { continue; }
+        if (!fn.call(sp.Game)) { off.push(pair[0]); }
+      } catch (e) { }
+    }
+    return off;
+  }
+
+  sp.on('update', guard('controls', () => {
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc || busyMenuOpen()) { controlsOffNow = []; controlsSince = 0; return; }
+
+    const off = readControls();
+    controlsOffNow = off;
+    if (!off.length) { controlsSince = 0; return; }
+
+    const now = Date.now();
+    if (!controlsSince) { controlsSince = now; return; }
+    if (now - controlsSince < 5000) { return; }
+    controlsSince = 0;
+
+    try {
+      // Nine, not eight. Special Edition added abFastTravel to the end of both
+      // EnablePlayerControls and DisablePlayerControls, and the binding counts
+      // them. Passing eight threw every single time this ran, so the watchdog
+      // has been reporting the problem and never once fixing it.
+      sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, true);
+      try { sp.Game.setPlayerAIDriven(false); } catch (e) { }
+      say('the game had controls switched off with no menu open (' +
+          off.join(', ') + '). turned them back on.');
+    } catch (e) {
+      say('tried to turn controls back on and it threw: ' + e);
+    }
+  }));
+
+  /*
+   * Keys arriving and the character not moving. The lock, finally stated as
+   * something that can be measured.
+   *
+   * Every check in this file has now come back clean during a lock: keys reach
+   * the plugin at four hundred every five seconds, no menu is open, the browser
+   * does not have focus, all eight control flags read enabled, and DirectInput
+   * reports a healthy device on every read. The console turning up is not the
+   * cause either; the log shows it appearing AFTER two pulses of four hundred
+   * keys, which is somebody mashing an unresponsive game and eventually hitting
+   * the console key themselves.
+   *
+   * What is left is SetPlayerAIDriven. It hands the character to the AI, and
+   * while it is on the character ignores every key with all eight control flags
+   * still reading enabled, because they are enabled: they are just not what is
+   * driving anybody. It is the one state in this whole search with NO getter,
+   * which is exactly why it has survived every check written so far. Anything
+   * that turns it on and then throws, disconnects, or is never told to finish
+   * leaves it on.
+   *
+   * So this measures the symptom instead of the state. Somebody pressing forty
+   * keys in five seconds while standing perfectly still, with no menu open and
+   * not typing in chat, is not playing: they are stuck. That is the moment to
+   * switch the controls back on and take the character off the AI, both of
+   * which are harmless when nothing was wrong.
+   *
+   * Cart rides are the one legitimate AI driven moment on this server, and they
+   * survive: forty key presses in five seconds is mashing, not the occasional
+   * press of somebody sitting still watching the scenery.
+   */
+  let stuckKeys = 0;
+  let stuckMoveKeys = 0;
+  let stuckAt = 0;
+  let stuckPos = null;
+  let lastRescue = 0;
+
+  sp.on('update', guard('stuck', () => {
+    const now = Date.now();
+    if (!stuckAt) { stuckAt = now; stuckKeys = 0; return; }
+    if (now - stuckAt < 5000) { return; }
+
+    const keys = stuckKeys;
+    const moveKeys = stuckMoveKeys;
+    stuckKeys = 0;
+    stuckMoveKeys = 0;
+    stuckAt = now;
+
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+
+    const was = stuckPos;
+    let pos = null;
+    try {
+      pos = pc ? [pc.getPositionX(), pc.getPositionY(), pc.getPositionZ()] : null;
+    } catch (e) { pos = null; }
+    stuckPos = pos;
+
+    if (!pc || !pos || !was) { return; }
+
+    const dx0 = pos[0] - was[0];
+    const dy0 = pos[1] - was[1];
+    const dz0 = pos[2] - was[2];
+    const movedNow = Math.sqrt(dx0 * dx0 + dy0 * dy0 + dz0 * dz0);
+
+    /*
+      Say why this did not fire, every time it nearly did.
+      A run where somebody reports being stuck and this file says nothing at
+      all is a wasted run. If the conditions are wrong they can only be fixed
+      by seeing which one said no.
+    */
+    if (keys >= 40 && movedNow <= 8) {
+      const why = [];
+      if (moveKeys < 2) { why.push('only ' + moveKeys + ' movement keys'); }
+      if (now - lastActivateAt < 3000) { why.push('activated something ' + (now - lastActivateAt) + 'ms ago'); }
+      if (claims.chat) { why.push('typing in chat'); }
+      const busyName = busyMenuOpen();
+      if (busyName) { why.push(busyName + ' is open'); }
+      if (lastRescue && now - lastRescue < 15000) { why.push('rescued ' + (now - lastRescue) + 'ms ago'); }
+      if (why.length) {
+        say('not calling it stuck: ' + keys + ' keys, ' + moveKeys +
+            ' movement, moved ' + movedNow.toFixed(1) + ' units, but ' +
+            why.join(' and '));
+      }
+    }
+
+    if (keys < 40) { return; }
+    // Somebody trying to walk, not somebody standing at something pressing E.
+    if (moveKeys < 2) { return; }
+    // And not somebody mid interaction: an activation in the last three
+    // seconds means the game is doing something, whatever it looks like.
+    if (now - lastActivateAt < 3000) { return; }
+    if (claims.chat) { return; }
+    if (busyMenuOpen()) { return; }
+
+    const dx = pos[0] - was[0];
+    const dy = pos[1] - was[1];
+    const dz = pos[2] - was[2];
+    const moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (moved > 8) { return; }
+
+    // Not more than once every fifteen seconds, so a genuine stuck moment does
+    // not turn into something that fights the game every frame.
+    if (lastRescue && now - lastRescue < 15000) { return; }
+    lastRescue = now;
+
+    say('stuck: ' + keys + ' keys in 5s (' + moveKeys +
+        ' of them movement) and the character moved ' +
+        moved.toFixed(1) + ' units. controls ' +
+        (controlsOffNow.length ? 'off [' + controlsOffNow.join(', ') + ']' : 'on') +
+        ', browser focus ' + (function () {
+          try { return sp.browser.isFocused() ? 'yes' : 'no'; } catch (e) { return 'unknown'; }
+        })() +
+        '. Switching controls on and taking the character back off the AI.');
+
+    try {
+      sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, true);
+    } catch (e) {
+      say('enablePlayerControls threw: ' + e);
+    }
+    try {
+      sp.Game.setPlayerAIDriven(false);
+    } catch (e) {
+      say('setPlayerAIDriven threw: ' + e);
+    }
+  }));
+
+  /*
+   * Guards that never stop trying to kill you.
+   *
+   * A bounty is not what makes a guard murderous. Arrest dialogue, the pay a
+   * fine or go to jail choice, is what a guard offers somebody with a bounty.
+   * What turns that off is the crime faction's player enemy flag, which is set
+   * when you resist arrest or fight back, and from then on they attack on
+   * sight and never speak to you again.
+   *
+   * In a single player game that flag is cleared by dying, because dying means
+   * loading a save made before any of it happened. Nobody here ever loads a
+   * save. So the flag is set once, survives death, survives respawn, survives
+   * logging out, and the hold is hostile forever.
+   *
+   * So it is cleared by hand on respawn. The bounty is deliberately left
+   * alone: the crime happened and should still cost something. What comes back
+   * is the guard's willingness to arrest instead of swing, which is what dying
+   * is supposed to buy.
+   *
+   * Every hold they might belong to is covered rather than just the current
+   * one, because the guards chasing you across a border belong to the hold you
+   * offended, not the one you died in.
+   */
+  let wasDead = false;
+
+  function calmTheGuards() {
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { return; }
+    if (!pc) return;
+
+    let cleared = 0;
+    const seen = {};
+
+    function forgive(faction) {
+      if (!faction) return;
+      try {
+        const id = faction.getFormID();
+        if (seen[id]) return;
+        seen[id] = true;
+        faction.setPlayerEnemy(false);
+        cleared++;
+      } catch (e) { }
+    }
+
+    // Stop whatever is in progress first, or they simply re-enter combat and
+    // set it again a second later.
+    try { pc.stopCombatAlarm(); } catch (e) { }
+    try { pc.stopCombat(); } catch (e) { }
+
+    try { forgive(pc.getCrimeFaction()); } catch (e) { }
+
+    /*
+      Whoever is actually nearby, because the faction that matters is the one
+      whose guards are swinging, not the one whose land this is. There is no
+      way to list actors, so this samples: findRandomActor a few dozen times
+      covers everything in range long before it runs out of tries.
+    */
+    try {
+      const x = pc.getPositionX(), y = pc.getPositionY(), z = pc.getPositionZ();
+      for (let i = 0; i < 40; i++) {
+        const ac = sp.Game.findRandomActor(x, y, z, 8192);
+        if (!ac || ac.getFormID() === 0x14) continue;
+        try { ac.stopCombatAlarm(); } catch (e) { }
+        try { ac.stopCombat(); } catch (e) { }
+        try { forgive(ac.getCrimeFaction()); } catch (e) { }
+      }
+    } catch (e) { }
+
+    say('died and came back: cleared the resisted arrest flag on ' + cleared +
+        (cleared === 1 ? ' crime faction' : ' crime factions') +
+        '. Bounties are untouched, so guards will offer the fine again.');
+  }
+
+  sp.on('update', guard('guards', () => {
+    let dead = false;
+    try {
+      const pc = sp.Game.getPlayer();
+      if (!pc) return;
+      dead = !!pc.isDead();
+    } catch (e) { return; }
+
+    if (dead) { wasDead = true; return; }
+    if (!wasDead) { return; }
+
+    // Alive again after being dead. Once, on the edge.
+    wasDead = false;
+    calmTheGuards();
+  }));
+
+  sp.on('update', guard('pulse', () => {
+    const now = Date.now();
+    if (!lastPulse) { lastPulse = now; return; }
+    if (now - lastPulse < 5000) { return; }
+    lastPulse = now;
+
+    let focused = 'unknown';
+    try { focused = sp.browser.isFocused() ? 'yes' : 'no'; } catch (e) { }
+    let menu = 'unknown';
+    try { menu = sp.Utility.isInMenuMode() ? 'yes' : 'no'; } catch (e) { }
+
+    // Which menu, when there is one.
+    //
+    // isInMenuMode says a menu is open and says nothing about what. The last
+    // run showed it turning on at the exact moment the keyboard died, which
+    // rules out everything focus related and makes the name of that menu the
+    // whole question: a menu the game opened deliberately is a different bug
+    // from a menu that is an artefact of the window losing foreground.
+    let names = '';
+    if (menu === 'yes') {
+      const probe = [
+        'Console', 'Console Native UI Menu', 'Loading Menu', 'Main Menu',
+        'MessageBoxMenu', 'Dialogue Menu', 'RaceSex Menu', 'InventoryMenu',
+        'MagicMenu', 'MapMenu', 'StatsMenu', 'ContainerMenu', 'Journal Menu',
+        'Sleep/Wait Menu', 'Crafting Menu', 'Book Menu', 'Lockpicking Menu',
+        'Barter Menu', 'FavoritesMenu', 'TweenMenu', 'Fader Menu',
+        'LoadWaitSpinner', 'Training Menu', 'GiftMenu', 'Quantity Menu',
+        'Tutorial Menu', 'Credits Menu', 'TitleSequence Menu'
+      ];
+      const open = [];
+      for (const n of probe) {
+        try { if (sp.Ui.isMenuOpen(n)) { open.push(n); } } catch (e) { }
+      }
+      names = open.length ? (' [' + open.join(', ') + ']') : ' [none of the usual ones]';
+    }
+
+    const controls = controlsOffNow.length
+      ? ', controls off [' + controlsOffNow.join(', ') + ']'
+      : ', controls on';
+
+    /*
+      Which window Windows is sending the keys to.
+     
+      This is the last thing the pulse could not see, and it is the difference
+      between a bug and somebody alt tabbing. Both look identical from in here:
+      no menu, no browser focus, controls on, and either no keys arriving at all
+      or keys arriving that the game does nothing with. DirectInput hands the
+      keyboard back the instant the window stops being the foreground one, so
+      the game goes deaf either way.
+     
+      So it is asked outright, and the answer is named in the log. The game
+      being behind one of our own windows is a bug and gets fixed below. The
+      game being behind Discord is a person who alt tabbed and gets left alone.
+    */
+    let fg = null;
+    try {
+      if (sp.win32 && typeof sp.win32.foregroundWindow === 'function') {
+        fg = sp.win32.foregroundWindow();
+      }
+    } catch (e) { fg = null; }
+
+    let where = '';
+    if (fg && !fg.isGame) {
+      const who = fg.ourProcess
+        ? 'one of our own windows'
+        : ((fg.exe || 'another app') + ', not ours');
+      const named = fg.title || fg.className || '';
+      where = ', keyboard is going to ' + who + (named ? ' (' + named + ')' : '');
+    }
+
+    say('input: ' + keysSeen + ' keys in 5s, browser focus ' + focused +
+        ', menu ' + menu + names + controls + where);
+    keysSeen = 0;
+
+    /*
+      This reports and does nothing else, deliberately.
+
+      It used to call SetForegroundWindow on the game whenever the foreground
+      was one of our own windows, on the reasoning that Windows would refuse
+      the call in the only case where it would be unwelcome. That was a guess
+      dressed up as a safeguard, and it was shipped on a session where the game
+      was already freezing. A frozen game holding the cursor clip is bad enough
+      on its own; a five second timer repeatedly shoving that window back in
+      front took a stuck game and made the whole desktop unusable, mouse
+      included.
+
+      Nothing here acts on the keyboard again until the log has actually named
+      what takes it. Diagnosing first and acting second is the order that
+      should have been used the first time.
+    */
+  }));
+
   sp.on('buttonEvent', guard('keys', (e) => {
+    keysSeen++;
+    // Before the isDown guard, not after it.
+    //
+    // The threshold on this was sized against the pulse's number, which counts
+    // every button event including the repeats a held key produces each frame.
+    // Counting only key downs here made those two numbers mean different
+    // things: the ring shows twenty key downs across twenty five seconds while
+    // the pulse was reporting three hundred in five, so forty was never once
+    // reached and the detector could not fire.
+    stuckKeys++;
     if (!e.isDown || e.isUp) return;
+
+    rememberKey(e.code);
+    // 17 30 31 32 are W A S D. Somebody standing at a handle pressing E is not
+    // stuck, they are using something, and that is what the one and only
+    // firing of this detector actually caught.
+    if (e.code === 17 || e.code === 30 || e.code === 31 || e.code === 32) {
+      stuckMoveKeys++;
+    }
 
     if (!sawAnyKey) {
       sawAnyKey = true;
@@ -345,6 +1216,19 @@
       let pc = null;
       try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
       if (gameMenuOpen() || !pc) return;
+
+      /*
+        Left where anything without a virtual machine can read it.
+
+        skymp5-client decides whether to spawn somebody by reloading a save or
+        by moving them, and it decides from a tick handler, where every call
+        into the game throws. So it cannot ask the game anything. This runs in
+        update, where the calls work, and the answer to the only question it
+        needs is already settled right here: there is a character and no menu,
+        so there is a game to be in.
+      */
+      try { globalThis.__thornswoodInWorld = true; } catch (e) { }
+
       phase = 1; at = now;
       try {
         sp.browser.loadUrl(UI_URL);
@@ -358,15 +1242,33 @@
       return;
     }
 
-    // From here on the browser exists, so the focus flag is watched whatever
-    // phase the page is in. Without this there is a window of a few seconds
-    // between the world loading and the overlays being in during which
-    // skymp5-client's Enter binding could raise focus and nothing would lower
-    // it, which is the lockout all over again on a shorter fuse.
-    applyFocus();
+    /*
+      The focus arbiter waits until our own overlays are in.
 
-    // Give the page time to parse before asking it to fetch anything.
-    if (phase === 1 && now - at > 2500) {
+      It used to start the moment the browser existed, to cover the few seconds
+      between the world loading and the overlays going in, because skymp5-client
+      bound Enter to raise focus and nothing lowered it. That binding is gone
+      now, and running early costs something real instead.
+
+      The login widget is skymp5-client's page in this same browser, and it
+      needs focus to be typed into. Nothing here claims focus on its behalf, so
+      the arbiter saw focus up with no claim and took it back after a second,
+      every second. From the outside that is a login box that accepts a few
+      characters and then goes dead with the game already holding the keyboard,
+      which is the freeze at character creation that has to be alt tabbed out
+      of.
+
+      Phase two is our overlays being in, which is after login, in the world,
+      and is the first moment anything here has any business deciding who gets
+      the keyboard.
+    */
+    if (phase >= 2) {
+      applyFocus();
+    }
+
+    // Give the page time to parse before asking it to fetch anything. It is a
+    // file on the same disk, so this is a pause, not a download.
+    if (phase === 1 && now - at > 1200) {
       phase = 2; at = now;
       sentName = myName() || 'Traveller';
       T.js('window.THORNSWOOD=' + JSON.stringify({
@@ -377,7 +1279,7 @@
       return;
     }
 
-    if (phase === 2 && now - at > 1500) {
+    if (phase === 2 && now - at > 600) {
       phase = 3; at = now;
       T.ready = true;
       T.js('try{window.thornswoodChat&&window.thornswoodChat.show();}catch(e){}');
@@ -443,6 +1345,21 @@
       beat = 0;
       T.claimFocus('chat', false);
       log('the chat box went quiet, taking the keyboard back');
+    }
+
+    // The third, and the only one that does not trust the page at all.
+    //
+    // The heartbeat above catches a page that died. It cannot catch a page that
+    // is perfectly healthy and simply never closes the box, which is what a
+    // swallowed keystroke looks like: the beat keeps coming, typing=yes
+    // forever, and the person cannot move. Holding the keyboard is capped
+    // outright. Two minutes is far longer than anybody spends writing one line
+    // and far shorter than giving up on the game.
+    if (claims.chat && heldSince && now - heldSince > 120000) {
+      heldSince = 0;
+      T.js('try{window.thornswoodChat&&window.thornswoodChat.blurInput();}catch(e){}');
+      T.claimFocus('chat', false);
+      log('the chat box has held the keyboard for two minutes, taking it back');
     }
 
     checkServer(now);
@@ -540,6 +1457,10 @@
     const what = String(a[1]);
 
     if (what === 'typing') { beat = Date.now(); return; }
+    if (what === 'typing-idle') {
+      log('nobody typed for a while, the box is giving the keyboard back');
+      return;
+    }
 
     if (what === 'typing-on') {
       asked = 0;
@@ -568,8 +1489,148 @@
       return;
     }
 
+    /*
+      The page can be reloaded out from under us, and on some machines it is.
+     
+      The bridge announces itself once per page load. Seeing it again after the
+      overlays have gone in does not mean the bridge restarted, it means the
+      page did, and everything our scripts built went with it: the chat box, the
+      microphone indicator, the wheel. The scripts themselves are gone too.
+     
+      Nothing noticed, because by then this file has reached its last phase and
+      stops injecting. One machine's log is the whole story:
+     
+          overlays injected
+          thornswood-voice.js is in
+          ready
+          bridge is up            <- the page went away here
+     
+      followed by a session of "the page has no chat box" and a voice log that
+      never gets past being told to open a microphone. Same files as everybody
+      else, same build, and nothing on screen, because the browser was showing
+      a page our overlays had already been removed from.
+     
+      Whoever reloads it, the answer from here is the same: go back and put them
+      in again. Injection already refuses to add a script twice, so a spurious
+      one costs nothing.
+    */
+    if (what === 'bridge is up') {
+      if (phase >= 2) {
+        say('the page reloaded after the overlays went in, putting them back');
+        phase = 1;
+        at = Date.now();
+        boxReady = false;
+        T.ready = false;
+        try { T.claimFocus('chat', false); } catch (e) { }
+      }
+      return;
+    }
+
     log(what);
   }));
+
+  /*
+    Write the game's real load order to disk, once, on the first update.
+
+    The server compares its own list against this one POSITIONALLY, by name and
+    size and crc32, and refuses the session on any disagreement. Working out
+    what the game actually loaded from plugins.txt is guesswork: Skyrim puts
+    masters first, then light plugins, then the rest, and plugins.txt records
+    none of that ordering. Game.getModName walks the real thing in the real
+    order, so it is the only honest source for what the server's loadOrder has
+    to be set to.
+
+    One file, written once per session, so the two lists can be reconciled from
+    ground truth instead of from a best guess.
+  */
+  let dumpedOrder = false;
+  sp.on('update', guard('loadorder', () => {
+    if (dumpedOrder) { return; }
+    dumpedOrder = true;
+    try {
+      const names = [];
+      const n = sp.Game.getModCount();
+      for (let i = 0; i < n; i++) {
+        const name = sp.Game.getModName(i);
+        if (name) { names.push(name); }
+      }
+      const fs = require('fs');
+      fs.writeFileSync('Data/Platform/thornswood-loadorder.txt',
+                       names.join('\n') + '\n');
+      say('wrote the real load order, ' + names.length + ' plugins, to ' +
+          'Data/Platform/thornswood-loadorder.txt');
+    } catch (e) {
+      log('could not write the load order:', e);
+    }
+  }));
+
+  /*
+    Field of view, from the launcher.
+
+    Skyrim's own fDefaultWorldFOV is not enough here. The game rewrites it at
+    various points, mods fight over it, and a value in an ini only lands when
+    the game reads that ini. Setting it at runtime and putting it back whenever
+    the camera changes is the only version that holds, which is why the working
+    RP servers carry a service to do exactly this.
+
+    Read from Thornswood.ini, the same file the voice keys come from, so the
+    launcher writes one place and everything reads it. Absent or nonsense
+    leaves the game alone entirely rather than forcing a default on anybody.
+  */
+  const FOV_INI = 'Data/SKSE/Plugins/Thornswood.ini';
+  const FOV_MIN = 60;
+  const FOV_MAX = 140;
+  // Skyrim's own. A setting equal to this is the same as no setting, and the
+  // launcher does not write it at all, but checking here as well means a file
+  // edited by hand costs nothing either.
+  const FOV_DEFAULT = 65;
+
+  let wantedFov = 0;
+  try {
+    const fsf = require('fs');
+    const text = fsf.readFileSync(FOV_INI, 'utf8');
+    const m = text.match(/^\s*Fov\s*=\s*(\d+(?:\.\d+)?)\s*$/m);
+    if (m) {
+      const v = Number(m[1]);
+      if (v === FOV_DEFAULT) {
+        log('fov is set to Skyrim\'s own ' + FOV_DEFAULT + ', leaving the camera alone');
+      } else if (v >= FOV_MIN && v <= FOV_MAX) {
+        wantedFov = v;
+      } else {
+        log('fov ' + v + ' is outside ' + FOV_MIN + ' to ' + FOV_MAX + ', ignoring it');
+      }
+    }
+  } catch (e) { }
+
+  function applyFov() {
+    if (!wantedFov) { return; }
+    try {
+      if (typeof sp.Game.setCameraFOV === 'function') {
+        sp.Game.setCameraFOV(wantedFov, wantedFov);
+      } else if (typeof sp.setCameraFOV === 'function') {
+        sp.setCameraFOV(wantedFov, wantedFov);
+      } else {
+        log('this build has no setCameraFOV, leaving the field of view alone');
+        wantedFov = 0;
+      }
+    } catch (e) { }
+  }
+
+  if (wantedFov) {
+    let fovAt = 0;
+    sp.on('update', guard('fov', () => {
+      // Cheap, and it has to be repeated: loading, a menu, mounting a horse
+      // and anything that swaps the camera all put it back to the game's own
+      // number. Once a second is under the noise floor and is not noticeable
+      // when something else has just reset it.
+      const now = Date.now();
+      if (now - fovAt < 1000) { return; }
+      fovAt = now;
+      applyFov();
+    }));
+    try { sp.on('cameraStateChanged', guard('fovcam', () => { applyFov(); })); } catch (e) { }
+    say('field of view set to ' + wantedFov);
+  }
 
   log('loaded. browser:', typeof sp.browser, 'chat key', CHAT_KEY);
 })();

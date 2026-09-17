@@ -24,8 +24,6 @@ namespace Thornswood
     /// </summary>
     static class Roster
     {
-        const int ResourcePort = 3000;
-
         public class Row
         {
             public string Name = "";
@@ -33,6 +31,12 @@ namespace Thornswood
             public bool Female;
             public string Trade = "";     // the gamemode key, eg "smith"
             public string Town = "";      // the gamemode key, eg "riften"
+
+            // Where they were standing when the server last looked, already in
+            // words: "Candlehearth Hall", not a form id. Written by the
+            // gamemode while somebody is online and left on the row after they
+            // log out, which is the only time anybody reads it.
+            public string Where = "";
         }
 
         static Dictionary<int, Row> cache = new Dictionary<int, Row>();
@@ -79,7 +83,7 @@ namespace Thornswood
             string text = null;
             try
             {
-                string url = "http://" + cfg.ServerAddress + ":" + ResourcePort + "/characters.json";
+                string url = "http://" + cfg.ServerAddress + ":" + SkyMp.ResourcePortFor(cfg) + "/characters.json";
                 using (var q = new Quick())
                 {
                     q.Ms = 2500;
@@ -116,6 +120,7 @@ namespace Thornswood
                     row.Race = Str(body, "race");
                     row.Trade = Str(body, "trade");
                     row.Town = Str(body, "town");
+                    row.Where = Str(body, "where");
                     row.Female = Regex.IsMatch(body, "\"female\"\\s*:\\s*true");
                     got[pid] = row;
                 }
@@ -168,7 +173,10 @@ namespace Thornswood
             }
         }
 
-        /// <summary>"Nord woman, smith in Riften", as much of it as is known.</summary>
+        /// <summary>
+        /// "Nord woman,  smith,  last seen in The Bee and Barb", as much of it
+        /// as is known.
+        /// </summary>
         public static string Describe(Row r)
         {
             if (r == null) return "";
@@ -181,9 +189,20 @@ namespace Thornswood
 
             string trade = Creation.LabelOf(Creation.Trades, r.Trade);
             string town = Creation.LabelOf(Creation.Towns, r.Town);
-            if (trade.Length > 0 && town.Length > 0) bits.Add(trade + " in " + town);
+            bool somewhere = !string.IsNullOrEmpty(r.Where);
+
+            // The town somebody started in stops being worth saying the moment
+            // there is a real place to report instead. "Bard in Markarth, last
+            // seen in The Bee and Barb" names two towns and means one, and it
+            // leads with the one that stopped being true the first time they
+            // walked out of it.
+            if (trade.Length > 0 && town.Length > 0 && !somewhere) bits.Add(trade + " in " + town);
             else if (trade.Length > 0) bits.Add(trade);
-            else if (town.Length > 0) bits.Add("started in " + town);
+            else if (town.Length > 0 && !somewhere) bits.Add("started in " + town);
+
+            // Last, because it is the one thing here that changes. Everything
+            // before it is who the character is; this is where you left them.
+            if (somewhere) bits.Add("last seen in " + r.Where);
 
             return string.Join(",  ", bits.ToArray());
         }

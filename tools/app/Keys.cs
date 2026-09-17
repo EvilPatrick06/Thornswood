@@ -431,24 +431,24 @@ namespace Thornswood
             // Thornswood's own. These are read by the SkyrimPlatform plugins out
             // of the same file, in the same DirectInput numbering, so a rebind
             // here is a rebind in game with nothing to regenerate.
-            l.Add(Dx("emotewheel", "Thornswood", "The emote wheel",
+            l.Add(Dx("emotewheel", "ThornsWood", "The emote wheel",
                      "Twelve gestures, and a second ring of working animations behind them. Everyone else sees what you play.",
                      ThornIni, "WheelKey", 48));
-            l.Add(Dx("emotepage", "Thornswood", "The other ring",
+            l.Add(Dx("emotepage", "ThornsWood", "The other ring",
                      "With the wheel open, turns between the gestures and the working animations.",
                      ThornIni, "PageKey", 15));
-            l.Add(Dx("emoteclose", "Thornswood", "Close the wheel",
+            l.Add(Dx("emoteclose", "ThornsWood", "Close the wheel",
                      "Shuts the wheel without playing anything.",
                      ThornIni, "CloseKey", 1));
-            l.Add(Dx("emotestop", "Thornswood", "Stand up",
+            l.Add(Dx("emotestop", "ThornsWood", "Stand up",
                      "Breaks you out of an idle that has no natural end. Works whether or not the wheel is open, because that is usually why you want it.",
                      ThornIni, "StopKey", 49));
 
-            l.Add(Dx("chat", "Thornswood", "Talk in chat",
+            l.Add(Dx("chat", "ThornsWood", "Talk in chat",
                      "Hands the keyboard to the chat box and puts the cursor in it. Escape gives it back to the game. Nothing in Skyrim uses Enter while you are playing, which is why it is here.",
                      ThornIni, "ChatKey", 28));
 
-            l.Add(Dx("chargenmenu", "Thornswood", "Open the creation menu",
+            l.Add(Dx("chargenmenu", "ThornsWood", "Open the creation menu",
                      "During character creation, brings up the trade or town question by hand if it has not appeared on its own. Does nothing afterwards.",
                      ThornIni, "MenuKey", 50));
 

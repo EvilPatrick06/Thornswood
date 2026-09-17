@@ -1,7 +1,23 @@
 # Never commit build output or credentials.
 config.json
+server-secret.txt
 *.7z
 *.zip
 *.exe
 _dist/
 published.json
+
+# Copies of the server's own logs, pulled down by tools\Get-Logs.ps1 to be
+# read. They belong to whichever run made them, not to the repo.
+logs/
+*.log
+
+# Scratch that has been committed by accident before.
+tools/thornswood-probe.js
+
+# The Discord webhook is a credential: anyone holding the URL can post as the
+# bot. Publish-Discord reads it from here on the machine that ships.
+tools/discord/news-webhook.txt
+
+# Scratch beside the repo, and the local patch runs that made 1.1.35.
+_to_delete/

@@ -27,7 +27,13 @@ namespace Thornswood
         class Rule
         {
             public string File, Key, Value, Why;
+            // The [Section] the key lives under, for files where the key may
+            // not exist yet and has to be added rather than replaced. Null
+            // means replace only, which is right for a file that always
+            // carries the key.
+            public string Section;
             public Rule(string f, string k, string v, string why) { File = f; Key = k; Value = v; Why = why; }
+            public Rule(string f, string section, string k, string v, string why) { File = f; Section = section; Key = k; Value = v; Why = why; }
         }
 
         static string P(string name) { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\" + name); }
@@ -43,6 +49,17 @@ namespace Thornswood
             l.Add(new Rule(P("SkyrimSoulsRE.ini"), "bFavoritesMenu", "false", "the favourites menu crash"));
             l.Add(new Rule(P("SkyrimSoulsRE.ini"), "bTweenMenu",     "false", "the Tab menu locking up"));
 
+            // Open Animation Replacer draws two things over the main menu and
+            // nothing else in this build does: a banner across the top saying
+            // which key opens its menu, and a progress bar while it loads
+            // animations. The menu is only the Thornswood backdrop now, so
+            // both go. The key itself still works. OAR writes this file back
+            // with its own values on the way out, which is exactly the case
+            // this class exists for, and on a machine that has never run it
+            // the file is not there yet, so the [UI] section is written in.
+            l.Add(new Rule(P("OpenAnimationReplacer.ini"), "UI", "bShowWelcomeBanner", "false", "the animation replacer banner over the main menu"));
+            l.Add(new Rule(P("OpenAnimationReplacer.ini"), "UI", "bEnableAnimationQueueProgressBar", "false", "the animation loading bar over the main menu"));
+
             return l;
         }
 
@@ -55,12 +72,66 @@ namespace Thornswood
         {
             int changed = 0;
             foreach (Rule r in Rules())
-                if (Set(r.File, r.Key, r.Value)) changed++;
+            {
+                if (r.Section == null) { if (Set(r.File, r.Key, r.Value)) changed++; }
+                else if (SetOrAdd(r.File, r.Section, r.Key, r.Value)) changed++;
+            }
 
             return changed;
         }
 
         static bool Set(string file, string key, string value) { return SetNth(file, key, value, 1); }
+
+        /// <summary>
+        /// Like Set, but for a key that may not be in the file yet. Replaces
+        /// the first live occurrence when there is one; otherwise adds the
+        /// line under [section], creating the section at the end of the file,
+        /// and the file itself, when they are missing. Returns true only when
+        /// something actually changed.
+        /// </summary>
+        static bool SetOrAdd(string file, string section, string key, string value)
+        {
+            try
+            {
+                if (File.Exists(file))
+                {
+                    if (SetNth(file, key, value, 1)) return true;
+                    // Nothing changed: either the key is already right, or it
+                    // is not there at all. Tell those two apart.
+                    var rx = new Regex("^\\s*" + Regex.Escape(key) + "\\s*=", RegexOptions.IgnoreCase);
+                    foreach (string line in File.ReadAllLines(file))
+                    {
+                        string t = line.TrimStart();
+                        if (t.StartsWith(";") || t.StartsWith("#")) continue;
+                        if (rx.IsMatch(line)) return false;
+                    }
+                }
+
+                var lines = new List<string>();
+                if (File.Exists(file)) lines.AddRange(File.ReadAllLines(file));
+
+                // Find the section header; insert right after it, or append a
+                // new section when the file has none.
+                int at = -1;
+                for (int i = 0; i < lines.Count; i++)
+                    if (string.Equals(lines[i].Trim(), "[" + section + "]", StringComparison.OrdinalIgnoreCase)) { at = i; break; }
+                if (at < 0)
+                {
+                    if (lines.Count > 0 && lines[lines.Count - 1].Trim().Length > 0) lines.Add("");
+                    lines.Add("[" + section + "]");
+                    lines.Add(key + " = " + value);
+                }
+                else
+                {
+                    lines.Insert(at + 1, key + " = " + value);
+                }
+                Directory.CreateDirectory(Path.GetDirectoryName(file));
+                File.WriteAllLines(file, lines.ToArray());
+                return true;
+            }
+            catch { }
+            return false;
+        }
 
         /// <summary>
         /// Replaces the nth live occurrence of a key. These files repeat the

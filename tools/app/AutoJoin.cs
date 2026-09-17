@@ -144,7 +144,56 @@ namespace Thornswood
             return gamePort == 7777 ? 3000 : gamePort + 1;
         }
 
-        /// <summary>Which character slot the client asks the server for.</summary>
+        /// <summary>
+        /// Which character slot the client is currently set to, or 0.
+        ///
+        /// Read back out of the settings file rather than remembered in a
+        /// field, so there is one answer and it is the one the game will
+        /// actually use. The server's door identifies people by this number,
+        /// so a stale copy here would lock the wrong person out.
+        /// </summary>
+        public static int GetProfileId()
+        {
+            try
+            {
+                string file = SettingsFile;
+                if (!File.Exists(file)) return 0;
+                var m = Regex.Match(File.ReadAllText(file),
+                                    "\"profileId\"\\s*:\\s*(-?[0-9]+)");
+                if (!m.Success) return 0;
+                int n;
+                if (!int.TryParse(m.Groups[1].Value, out n)) return 0;
+                return n > 0 ? n : 0;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// Which character slot the client asks the server for.
+        ///
+        /// It has to go INSIDE gameData. That is not a tidiness point, it is
+        /// the whole difference between walking into the world and staring at
+        /// a login box.
+        ///
+        /// authService.ts decides on one line:
+        ///
+        ///     const settingsGameData = this.sp.settings["skymp5-client"]["gameData"];
+        ///     const isOfflineMode = Number.isInteger(settingsGameData?.profileId);
+        ///
+        /// An integer there and the client emits authAttempt with the local
+        /// profile and joins. Anything else and it takes the remote path: it
+        /// shows the AUTHORIZATION panel over the main menu, reads a token out
+        /// of PluginsNoLoad\auth-data-no-load.js that this launcher has never
+        /// written, fails to resolve it against the master, and sits there
+        /// saying ID: UNDEFINED. The log line for it is
+        /// "No offline mode detectted in settings, regular auth needed",
+        /// spelling and all.
+        ///
+        /// This was writing profileId at the top level of the document, where
+        /// gameData?.profileId is undefined, so offline mode has never once
+        /// engaged. Nothing else was wrong: not the token, not the browser,
+        /// not the menu.
+        /// </summary>
         public static bool SetProfileId(int profileId)
         {
             try
@@ -152,7 +201,15 @@ namespace Thornswood
                 string file = SettingsFile;
                 if (!File.Exists(file)) return false;
                 string before = File.ReadAllText(file);
-                string after = SetNumber(before, "profileId", profileId);
+
+                // Put one inside gameData if it is not there, then bring every
+                // copy in the file to the same number. Older files carry a top
+                // level profileId from before this was understood, and two
+                // copies that disagree is how GetProfileId starts answering
+                // with the wrong slot.
+                string after = EnsureInGameData(before, "profileId", profileId.ToString());
+                after = SetEveryNumber(after, "profileId", profileId);
+
                 if (string.Equals(before, after, StringComparison.Ordinal)) return false;
                 if (!LooksLikeJson(after)) return false;
                 File.WriteAllText(file, after, new UTF8Encoding(false));
@@ -166,6 +223,68 @@ namespace Thornswood
         // Absent is worth handling: an older settings file predates some of
         // these keys, and silently doing nothing would leave the game pointed at
         // localhost with no sign of why.
+
+        /// <summary>
+        /// Makes sure gameData holds this key, without disturbing anything
+        /// else in it. The value itself is set afterwards by SetEveryNumber,
+        /// so this only has to create the slot.
+        ///
+        /// Braces are walked rather than matched with a pattern, because
+        /// gameData holds objects of its own and a lazy pattern stops at the
+        /// first inner brace.
+        /// </summary>
+        static string EnsureInGameData(string json, string key, string literal)
+        {
+            var at = Regex.Match(json, "\"gameData\"\\s*:\\s*\\{");
+            if (!at.Success)
+            {
+                // No gameData at all, which is an older file. Give it one.
+                return Insert(json, "gameData", "{ \"" + key + "\": " + literal + " }");
+            }
+
+            int open = at.Index + at.Length - 1;
+            int depth = 0, close = -1;
+            bool inStr = false, esc = false;
+            for (int i = open; i < json.Length; i++)
+            {
+                char c = json[i];
+                if (inStr)
+                {
+                    if (esc) { esc = false; continue; }
+                    if (c == '\\') { esc = true; continue; }
+                    if (c == '"') inStr = false;
+                    continue;
+                }
+                if (c == '"') { inStr = true; continue; }
+                if (c == '{') depth++;
+                else if (c == '}') { depth--; if (depth == 0) { close = i; break; } }
+            }
+            if (close < 0) return json;
+
+            string block = json.Substring(open, close - open + 1);
+            if (Regex.IsMatch(block, "\"" + Regex.Escape(key) + "\"\\s*:")) return json;
+
+            string indent = "    ";
+            var m = Regex.Match(block, "\\r?\\n([ \\t]+)\"");
+            if (m.Success) indent = m.Groups[1].Value;
+
+            string rest = block.Substring(1);
+            string sep = Regex.IsMatch(rest, "^\\s*\\}") ? "" : ",";
+            string next = "{" + Environment.NewLine + indent + "\"" + key + "\": " + literal + sep + rest;
+
+            return json.Substring(0, open) + next + json.Substring(close + 1);
+        }
+
+        /// <summary>
+        /// Same value everywhere the key appears. SetNumber stops at the first
+        /// one, which is right for a key that occurs once and wrong for one
+        /// that an older file put in two places.
+        /// </summary>
+        static string SetEveryNumber(string json, string key, int value)
+        {
+            var rx = new Regex("(\"" + Regex.Escape(key) + "\"\\s*:\\s*)(-?\\d+(?:\\.\\d+)?|null)");
+            return rx.Replace(json, "${1}" + value.ToString());
+        }
 
         static string SetString(string json, string key, string value)
         {

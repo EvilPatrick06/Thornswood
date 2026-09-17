@@ -26,6 +26,7 @@ param(
     [string]$Port = '7777',
     [string]$Root = 'C:\Thornswood',
     [string]$RepoDir,
+    [string]$ReleaseDir,
     [switch]$Force,
     [switch]$NoPush,
     [switch]$NoPause
@@ -35,6 +36,11 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $RepoDir) { $RepoDir = Split-Path -Parent $Here }
+# version.json is published from the public releases clone, not the source one.
+if (-not $ReleaseDir) {
+    $guess = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
+    $ReleaseDir = if (Test-Path (Join-Path $guess '.git')) { $guess } else { $RepoDir }
+}
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -80,7 +86,7 @@ Say ("  now  {0}:{1}" -f $Address, $Port) 'Green'
 
 # ------------------------------------------------------------ version.json ---
 Head 'Everyone else'
-$VersionFile = Join-Path $RepoDir 'version.json'
+$VersionFile = Join-Path $ReleaseDir 'version.json'
 if (-not (Test-Path -LiteralPath $VersionFile)) { Die "not found: $VersionFile" }
 
 $doc = Get-Content -LiteralPath $VersionFile -Raw | ConvertFrom-Json
@@ -103,9 +109,9 @@ else {
     Head 'Pushing'
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    & git -C $RepoDir add version.json 2>&1 | Out-Host
-    & git -C $RepoDir commit -m "Server is now ${Address}:${Port}" 2>&1 | Out-Host
-    & git -C $RepoDir push 2>&1 | Out-Host
+    & git -C $ReleaseDir add version.json 2>&1 | Out-Host
+    & git -C $ReleaseDir commit -m "Server is now ${Address}:${Port}" 2>&1 | Out-Host
+    & git -C $ReleaseDir push 2>&1 | Out-Host
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     if ($rc -ne 0) { Die "git push exited with $rc. Both files are fixed here, they are just not up yet." }

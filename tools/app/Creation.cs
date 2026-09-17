@@ -44,23 +44,98 @@ namespace Thornswood
         // items: the kits are built from form ids, and a list written here
         // would be a second copy of them, free to drift and wrong the moment
         // somebody edits the table.
-        public static readonly Option[] Trades = new Option[] {
-            new Option("warrior",    "Warrior",     "Fighting work. Guarding a shop, walking goods between holds, clearing a cellar out. Starts in iron with 75 gold."),
-            new Option("hunter",     "Hunter",      "Meat, hides and horns, which the cooks and tanners buy. Bow and arrows, 75 gold."),
-            new Option("mage",       "Mage",        "Spells for hire. Robes, a couple of tomes and soul gems. 75 gold."),
-            new Option("smith",      "Smith",       "Weapons, armour and repairs. Starts with ingots and leather to work, and 100 gold."),
-            new Option("miner",      "Miner",       "Ore out of the ground, which is what the smiths run on. Pickaxe and 75 gold."),
-            new Option("woodworker", "Woodworker",  "Firewood and timber. An axe, work clothes and 75 gold."),
-            new Option("alchemist",  "Alchemist",   "Potions and poisons. Starts with a full satchel of ingredients and 75 gold."),
-            new Option("bard",       "Bard",        "Playing the inns for coin. Starts with a lute, a flute and a drum, good clothes and 200 gold, second most of any trade."),
-            new Option("cook",       "Cook",        "Cooked food, with a week of stock to sell on day one. 75 gold."),
-            new Option("enchanter",  "Enchanter",   "Putting enchantments on other people's gear. Starts with six soul gems and 75 gold."),
-            new Option("farmer",     "Farmer",      "Crops and produce, which feeds everyone else. Tools, food and 75 gold."),
-            new Option("fisher",     "Fisher",      "Fish from the lakes and the coast. Starts with a rod, a net and a filleting kit, work clothes, a catch to sell and 75 gold."),
-            new Option("merchant",   "Merchant",    "Buying and selling whatever moves. 400 gold, by far the most, fine clothes to be taken seriously in, and an amulet of Zenithar."),
-            new Option("priest",     "Priest",      "Healing and rites. Vestments, amulets of Arkay and Mara, cure disease and 75 gold."),
-            new Option("scholar",    "Scholar",     "Books, research and writing for hire. Robes, tomes and 75 gold."),
-            new Option("thief",      "Thief",       "Locks and pockets. Leather, fifteen lockpicks and 75 gold."),
+        /// <summary>A profession and the two halves of it you must pick between.</summary>
+        public class Trade
+        {
+            public Option O;
+            public Option[] Halves;
+            public int Pick;          // how many halves to choose, 1 normally, 2 for the mage
+            public bool NoKit;        // no starter kit in the content yet
+            public Trade(Option o, int pick, bool noKit, params Option[] halves)
+            { O = o; Pick = pick; NoKit = noKit; Halves = halves; }
+        }
+
+        /*
+          Three choices now instead of one, and they do different jobs.
+
+            Profession   what you make, or how you fight
+            Half         which side of it you are able to do at all
+            Class        where raw material comes from
+
+          The key sent to the server is still the PROFESSION's, because the
+          starter kits are form ids in Thornswood-Content.esp keyed by that and
+          nothing else. Tailor and Gatherer have no kit yet, which is said on
+          the card rather than left to be discovered on the first morning.
+
+          The class does not fire a kit either. A smith who mines starts with a
+          smith's kit and no pickaxe until the kits carry tools for the class as
+          well as the profession.
+        */
+        public static readonly Trade[] Professions = new Trade[] {
+            new Trade(new Option("warrior", "Warrior",
+                "Fighting work. Guarding a shop, walking goods between holds, clearing a cellar out. Starts in iron with 75 gold."), 1, false,
+                new Option("tank",    "Bulwark",      "You are what stands between it and everybody else. Shields, heavy plate, holding a doorway."),
+                new Option("brawler", "Berserker",    "You are what it has to deal with. Two weapons, or none, and getting there first.")),
+
+            new Trade(new Option("mage", "Mage",
+                "Spells for hire. Robes, a couple of tomes and soul gems. 75 gold."), 2, false,
+                new Option("destruction",  "Destruction",  "Fire, frost and shock. The loud one."),
+                new Option("restoration",  "Restoration",  "Healing, wards, and turning what should not be walking."),
+                new Option("alteration",   "Alteration",   "Armour out of nothing, water breathing, and opening what is shut."),
+                new Option("illusion",     "Illusion",     "Fear, calm, fury and not being seen."),
+                new Option("conjuration",  "Conjuration",  "Calling things up, and binding a weapon out of air.")),
+
+            new Trade(new Option("alchemist", "Alchemist",
+                "Potions and poisons. Starts with a full satchel of ingredients and 75 gold."), 1, false,
+                new Option("harm",    "Blightbrewer", "What goes on a blade. Damage, paralysis, lingering things."),
+                new Option("mend",    "Physicker",    "What goes in a cup. Healing, cures, stamina, keeping people upright.")),
+
+            new Trade(new Option("cook", "Cook",
+                "Cooked food, with a week of stock to sell on day one. 75 gold."), 1, false,
+                new Option("dinner",  "Hearthcook",   "Stews, roasts, soups. What a hold eats after a day's work."),
+                new Option("dessert", "Confectioner", "Sweet rolls, pies, honey. What people buy when they are already fed.")),
+
+            new Trade(new Option("smith", "Smith",
+                "Weapons, armour and repairs. Starts with ingots and leather to work, and 100 gold."), 1, false,
+                new Option("armour",  "Platewright",  "Cuirasses, helms, shields. You cannot make a sword."),
+                new Option("weapons", "Edgewright",   "Blades, axes, bows. You cannot make a cuirass.")),
+
+            new Trade(new Option("enchanter", "Enchanter",
+                "Putting enchantments on other people's gear. Starts with six soul gems and 75 gold."), 1, false,
+                new Option("weapon",  "Bladebinder",  "What a blade does when it lands."),
+                new Option("apparel", "Wardweaver",   "What a person walks around wearing.")),
+
+            new Trade(new Option("tailor", "Tailor",
+                "Cloth rather than steel. No starter kit built yet, so you begin with only what everybody gets."), 1, true,
+                new Option("robes",  "Liverywright", "Mage robes, temple vestments, what a guild wants its people seen in."),
+                new Option("common", "Haberdasher",  "What everybody wears, and what the ones with money wear.")),
+        };
+
+        /// <summary>
+        /// The professions as a flat list of Options.
+        ///
+        /// Two places turn a saved trade key back into a label for display, and
+        /// neither cares about halves. Renaming the old array away broke the
+        /// build in exactly those two places, so the name stays.
+        /// </summary>
+        public static Option[] Trades { get { return ToOptions(Professions); } }
+
+        /// <summary>
+        /// Where raw material comes from. Each one owns a verb that nobody else
+        /// in the game has.
+        ///
+        /// A class carries no starter kit and is not meant to. The kit comes
+        /// from the profession, and the tool comes from the world: a miner buys
+        /// or is given a pickaxe like anybody else would have to. Handing one
+        /// out at creation would make the class a bag of items rather than a
+        /// thing only you can do.
+        /// </summary>
+        public static readonly Option[] Classes = new Option[] {
+            new Option("hunter",   "Hunter",   "The only one who can loot an animal body. Everybody else walks past the carcass and gets nothing."),
+            new Option("fisher",   "Fisher",   "The only one who can fish. Every cook and every alchemist eventually needs one of you."),
+            new Option("miner",    "Miner",    "The only one who can mine. Ore is what every smith in Skyrim runs on."),
+            new Option("farmer",   "Farmer",   "The only one who can farm. Crops feed the cooks, and the cooks feed everybody."),
+            new Option("gatherer", "Gatherer", "The only one who can gather material out of the world. Flowers, fungus, wood, reagents."),
         };
 
         // Each one names the inn you actually wake up in, because that is where
@@ -119,24 +194,56 @@ namespace Thornswood
         /// </summary>
         public static bool Ask(Window owner, string who, out string trade, out string town)
         {
+            string half, cls;
+            return Ask(owner, who, out trade, out half, out cls, out town);
+        }
+
+        public static bool Ask(Window owner, string who, out string trade,
+                               out string half, out string cls, out string town)
+        {
             trade = null;
+            half = null;
+            cls = null;
             town = null;
 
-            var dlg = new Window();
-            dlg.Owner = owner;
-            dlg.WindowStyle = WindowStyle.None;
-            dlg.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            dlg.ResizeMode = ResizeMode.NoResize;
-            dlg.ShowInTaskbar = false;
-            dlg.Width = 820;
-            dlg.Height = 600;
-            dlg.Background = Brushes.Transparent;
-            dlg.AllowsTransparency = true;
+            // In the launcher window rather than a window of its own, when the
+            // XAML has somewhere to put it. A second top level window is a
+            // second thing to alt tab past, it opens wherever Windows decides,
+            // and anybody capturing the launcher window on a stream loses the
+            // whole of character creation off the side of their capture.
+            //
+            // The separate window is kept as a fallback so an older ui.xaml,
+            // or one somebody has edited, still gets a working dialog.
+            Grid overlay = null; Border host = null;
+            try
+            {
+                overlay = owner.FindName("Overlay") as Grid;
+                host    = owner.FindName("OverlayHost") as Border;
+            }
+            catch { }
+            bool inWindow = overlay != null && host != null;
 
-            // The theme lives in the main window's resources and the themes are
-            // swapped there at runtime, so borrowing the dictionary is what
-            // makes this follow whichever one is on.
-            dlg.Resources = owner.Resources;
+            Window dlg = null;
+            if (!inWindow)
+            {
+                dlg = new Window();
+                dlg.Owner = owner;
+                dlg.WindowStyle = WindowStyle.None;
+                dlg.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                dlg.ResizeMode = ResizeMode.NoResize;
+                dlg.ShowInTaskbar = false;
+                // Four columns now rather than two, so it needs the room.
+                // Still inside 1280 wide, the smallest screen anybody here has.
+                dlg.Width = 1180;
+                dlg.Height = 640;
+                dlg.Background = Brushes.Transparent;
+                dlg.AllowsTransparency = true;
+
+                // The theme lives in the main window's resources and is swapped
+                // there at runtime, so borrowing the dictionary is what makes
+                // this follow whichever one is on.
+                dlg.Resources = owner.Resources;
+            }
 
             var shell = new Border();
             shell.Background = B(owner, "Bg", Brushes.Black);
@@ -147,7 +254,16 @@ namespace Thornswood
             rows.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             rows.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             shell.Child = rows;
-            dlg.Content = shell;
+
+            // Bounded rather than fixed, because the launcher can be as small
+            // as 1020 by 670 and a 1180 wide panel inside that would have its
+            // last column off the edge.
+            shell.MaxWidth = 1180;
+            shell.MaxHeight = 660;
+            shell.HorizontalAlignment = HorizontalAlignment.Center;
+            shell.VerticalAlignment = VerticalAlignment.Center;
+            shell.Margin = new Thickness(14);
+            if (!inWindow) dlg.Content = shell;
 
             // ------------------------------------------------------- title --
             var bar = new Border();
@@ -195,16 +311,59 @@ namespace Thornswood
             root.Children.Add(head);
 
             var cols = new Grid();
-            cols.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            cols.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
-            cols.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (int c = 0; c < 7; c++)
+            {
+                cols.ColumnDefinitions.Add(new ColumnDefinition {
+                    Width = (c % 2 == 1) ? new GridLength(14) : new GridLength(1, GridUnitType.Star) });
+            }
             Grid.SetRow(cols, 1);
             root.Children.Add(cols);
 
             var tradePicks = new List<Pick>();
-            var townPicks = new List<Pick>();
-            Column(cols, 0, "Starter class", Trades, owner, tradePicks);
-            Column(cols, 2, "Starter location", Towns, owner, townPicks);
+            var halfPicks  = new List<Pick>();
+            var classPicks = new List<Pick>();
+            var townPicks  = new List<Pick>();
+
+            // The halves column is empty until a profession is picked, and is
+            // rebuilt every time one is. Built first so the profession column's
+            // handler has something to fill.
+            StackPanel halfCol;
+            var halfHost = Column(cols, 2, "Which half", new Option[0], owner, halfPicks,
+                                  1, null, null, out halfCol);
+
+            var halfLabel = new TextBlock();
+            halfLabel.FontSize = 11.5;
+            halfLabel.TextWrapping = TextWrapping.Wrap;
+            halfLabel.Margin = new Thickness(2, 7, 0, 0);
+            halfLabel.Foreground = B(owner, "Faint", Brushes.Gray);
+            halfLabel.Text = "Pick a profession first.";
+            // Under the halves column, which is the only place it means anything.
+            if (halfCol != null) halfCol.Children.Add(halfLabel);
+
+            Trade[] prof = { null };
+
+            Action rebuildHalves = delegate
+            {
+                string key = Chosen(tradePicks);
+                prof[0] = null;
+                foreach (Trade t in Professions) if (t.O.Key == key) prof[0] = t;
+                if (prof[0] == null)
+                {
+                    halfHost.Children.Clear();
+                    halfPicks.Clear();
+                    halfLabel.Text = "Pick a profession first.";
+                    return;
+                }
+                Column(cols, 2, "Which half", prof[0].Halves, owner, halfPicks,
+                       prof[0].Pick, halfHost, null);
+                halfLabel.Text = prof[0].Pick > 1
+                    ? "Pick " + prof[0].Pick + ". Both from one school is allowed, and leaves the other one to come back to."
+                    : "Pick one. It decides what you are able to make at all, not what you are better at.";
+            };
+
+            Column(cols, 0, "Profession", ToOptions(Professions), owner, tradePicks, 1, null, rebuildHalves);
+            Column(cols, 4, "Class", Classes, owner, classPicks);
+            Column(cols, 6, "Where you wake up", Towns, owner, townPicks);
 
             // ------------------------------------------------------- footer --
             var foot = new Grid();
@@ -240,28 +399,61 @@ namespace Thornswood
             root.Children.Add(foot);
 
             bool done = false;
-            cancel.Click += delegate { dlg.Close(); };
-            dlg.KeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e)
+
+            // A nested dispatcher frame is what ShowDialog does underneath, so
+            // Ask still blocks and returns a bool and every caller is unchanged.
+            var frame = new System.Windows.Threading.DispatcherFrame();
+            System.Windows.Input.KeyEventHandler esc = null;
+            Action shut = delegate
             {
-                if (e.Key == System.Windows.Input.Key.Escape) dlg.Close();
-            };
-            ok.Click += delegate
-            {
-                if (Chosen(tradePicks) == null || Chosen(townPicks) == null)
+                if (inWindow)
                 {
-                    warn.Text = "Pick one of each.";
-                    return;
+                    if (esc != null) owner.PreviewKeyDown -= esc;
+                    overlay.Visibility = Visibility.Collapsed;
+                    host.Child = null;
+                    frame.Continue = false;
                 }
-                done = true;
-                dlg.Close();
+                else dlg.Close();
             };
 
-            dlg.ShowDialog();
+            cancel.Click += delegate { shut(); };
+            esc = delegate(object sender, System.Windows.Input.KeyEventArgs e)
+            {
+                if (e.Key == System.Windows.Input.Key.Escape) shut();
+            };
+            if (inWindow) owner.PreviewKeyDown += esc;
+            else dlg.KeyDown += esc;
+            ok.Click += delegate
+            {
+                if (Chosen(tradePicks) == null) { warn.Text = "Pick a profession."; return; }
+                int need = prof[0] == null ? 1 : prof[0].Pick;
+                if (AllChosen(halfPicks).Count != need)
+                {
+                    warn.Text = need > 1
+                        ? "Pick " + need + " in the second column."
+                        : "Pick which half of it you do.";
+                    return;
+                }
+                if (Chosen(classPicks) == null) { warn.Text = "Pick a class. It is where your material comes from."; return; }
+                if (Chosen(townPicks) == null)  { warn.Text = "Pick where you wake up."; return; }
+                done = true;
+                shut();
+            };
+
+            if (inWindow)
+            {
+                host.Child = shell;
+                overlay.Visibility = Visibility.Visible;
+                System.Windows.Threading.Dispatcher.PushFrame(frame);
+            }
+            else dlg.ShowDialog();
             if (!done) return false;
 
             trade = Chosen(tradePicks);
-            town = Chosen(townPicks);
-            return trade != null && town != null;
+            half  = string.Join("+", AllChosen(halfPicks).ToArray());
+            cls   = Chosen(classPicks);
+            town  = Chosen(townPicks);
+            return trade != null && town != null && cls != null && half.Length > 0;
         }
 
         class Pick
@@ -269,6 +461,13 @@ namespace Thornswood
             public Option O;
             public Border Card;
             public bool On;
+        }
+
+        static Option[] ToOptions(Trade[] t)
+        {
+            var o = new Option[t.Length];
+            for (int i = 0; i < t.Length; i++) o[i] = t[i].O;
+            return o;
         }
 
         static string Chosen(List<Pick> picks)
@@ -290,7 +489,41 @@ namespace Thornswood
         static void Column(Grid parent, int col, string heading, Option[] items,
                            Window owner, List<Pick> picks)
         {
+            Column(parent, col, heading, items, owner, picks, 1, null, null);
+        }
+
+        /// <summary>
+        /// max is how many may be on at once. One behaves as it always did:
+        /// picking clears the rest. Two or more toggles instead, and refuses to
+        /// go past max, which is what the mage's pair of schools needs.
+        ///
+        /// host, when given, is an existing panel to fill rather than a new
+        /// column to make. That is how the halves column is rebuilt when the
+        /// profession beside it changes.
+        /// </summary>
+        static StackPanel Column(Grid parent, int col, string heading, Option[] items,
+                                 Window owner, List<Pick> picks, int max,
+                                 StackPanel host, Action onChange)
+        {
+            StackPanel outer;
+            return Column(parent, col, heading, items, owner, picks, max, host, onChange, out outer);
+        }
+
+        static StackPanel Column(Grid parent, int col, string heading, Option[] items,
+                                 Window owner, List<Pick> picks, int max,
+                                 StackPanel host, Action onChange, out StackPanel outer)
+        {
+            outer = null;
+            if (host != null)
+            {
+                host.Children.Clear();
+                picks.Clear();
+                FillList(host, items, owner, picks, max, onChange);
+                return host;
+            }
+
             var stack = new StackPanel();
+            outer = stack;
 
             var lbl = new TextBlock();
             lbl.Text = heading.ToUpperInvariant();
@@ -314,6 +547,17 @@ namespace Thornswood
             var list = new StackPanel();
             scroll.Content = list;
 
+            FillList(list, items, owner, picks, max, onChange);
+
+            stack.Children.Add(frame);
+            Grid.SetColumn(stack, col);
+            parent.Children.Add(stack);
+            return list;
+        }
+
+        static void FillList(StackPanel list, Option[] items, Window owner,
+                             List<Pick> picks, int max, Action onChange)
+        {
             Brush card = B(owner, "Card", Brushes.Black);
             Brush hover = B(owner, "CardHover", Brushes.Black);
             Brush line = B(owner, "Line", Brushes.DimGray);
@@ -360,23 +604,50 @@ namespace Thornswood
                 box.MouseLeave += delegate { if (!pick.On) box.Background = card; };
                 box.MouseLeftButtonDown += delegate
                 {
-                    foreach (Pick other in picks)
+                    if (max <= 1)
                     {
-                        other.On = false;
-                        other.Card.Background = card;
-                        other.Card.BorderBrush = line;
+                        foreach (Pick other in picks)
+                        {
+                            other.On = false;
+                            other.Card.Background = card;
+                            other.Card.BorderBrush = line;
+                        }
+                        pick.On = true;
                     }
-                    pick.On = true;
-                    box.Background = soft;
-                    box.BorderBrush = accent;
+                    else if (pick.On)
+                    {
+                        pick.On = false;
+                    }
+                    else
+                    {
+                        int on = 0;
+                        foreach (Pick q in picks) if (q.On) on++;
+                        // Full already, so the oldest one gives way rather than
+                        // the click doing nothing and looking broken.
+                        if (on >= max)
+                        {
+                            foreach (Pick q in picks) { if (q.On) { q.On = false; break; } }
+                        }
+                        pick.On = true;
+                    }
+
+                    foreach (Pick q in picks)
+                    {
+                        q.Card.Background = q.On ? soft : card;
+                        q.Card.BorderBrush = q.On ? accent : line;
+                    }
+                    if (onChange != null) onChange();
                 };
 
                 list.Children.Add(box);
             }
+        }
 
-            stack.Children.Add(frame);
-            Grid.SetColumn(stack, col);
-            parent.Children.Add(stack);
+        static List<string> AllChosen(List<Pick> picks)
+        {
+            var got = new List<string>();
+            foreach (Pick p in picks) if (p.On) got.Add(p.O.Key);
+            return got;
         }
 
         /// <summary>
@@ -392,6 +663,12 @@ namespace Thornswood
         /// </summary>
         public static string Send(Config cfg, int profileId, string trade, string town, string name)
         {
+            return Send(cfg, profileId, trade, "", "", town, name);
+        }
+
+        public static string Send(Config cfg, int profileId, string trade,
+                                  string half, string cls, string town, string name)
+        {
             if (profileId <= 0) return "no profile id";
             if (string.IsNullOrEmpty(cfg.ServerAddress)) return "no server address";
 
@@ -400,8 +677,19 @@ namespace Thornswood
             if (port <= 0) port = 7778;
 
             string url = "http://" + cfg.ServerAddress + ":" + port + "/choose";
+
+            // The ticket proves this profile belongs to the Discord account
+            // sending the choice. Without it /choose takes anybody's word for
+            // anything, and a stranger could set your profession and home town
+            // before you ever claimed them.
+            string ticket = "";
+            try { ticket = Discord.Ticket ?? ""; } catch { ticket = ""; }
+
             string body = "{\"profileId\":" + profileId +
+                          ",\"ticket\":\"" + Esc(ticket) + "\"" +
                           ",\"trade\":\"" + Esc(trade) + "\"" +
+                          ",\"half\":\"" + Esc(half ?? "") + "\"" +
+                          ",\"cls\":\"" + Esc(cls ?? "") + "\"" +
                           ",\"town\":\"" + Esc(town) + "\"" +
                           ",\"name\":\"" + Esc(name) + "\"}";
 

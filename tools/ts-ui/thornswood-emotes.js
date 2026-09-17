@@ -16,8 +16,7 @@
 (function () {
   if (window.thornswoodSetRing) return;
 
-  var R_IN = 62, R_OUT = 232, R_LABEL = 152;
-  var RING_TITLES = ['Gestures', 'Business'];
+  var R_IN = 62, R_OUT = 244, R_LABEL = 158;
   var items = [];
 
   // ------------------------------------------------------------------ css --
@@ -30,7 +29,7 @@
     '#thornswood-wheel .seg{fill:rgba(14,13,11,.72);stroke:rgba(198,170,109,.28);',
     'stroke-width:1;transition:fill 90ms linear}',
     '#thornswood-wheel .seg.hot{fill:rgba(120,94,44,.88);stroke:rgba(233,209,155,.9)}',
-    '#thornswood-wheel .label{fill:#d9cfb4;font-size:14px;text-anchor:middle;',
+    '#thornswood-wheel .label{fill:#d9cfb4;font-size:13px;text-anchor:middle;',
     'dominant-baseline:middle;pointer-events:none}',
     '#thornswood-wheel .label.hot{fill:#f6e9c8}',
     '#thornswood-wheel .num{fill:rgba(198,170,109,.5);font-size:10px;text-anchor:middle;',
@@ -65,7 +64,7 @@
   host.className = 'gone';
   host.innerHTML =
     '<svg width="520" height="560" viewBox="-260 -270 520 560" aria-label="Emote wheel">' +
-    '<text id="thornswood-ringname" x="0" y="-238">Thornswood</text>' +
+    '<text id="thornswood-ringname" x="0" y="-238">ThornsWood</text>' +
     '<g id="thornswood-segments"></g>' +
     '<circle id="thornswood-hub" cx="0" cy="0" r="54"></circle>' +
     '<text id="thornswood-hubtext" x="0" y="0">STOP</text>' +
@@ -76,6 +75,8 @@
   var segs = document.getElementById('thornswood-segments');
   var hub = document.getElementById('thornswood-hub');
   var ringName = document.getElementById('thornswood-ringname');
+  var hubText = document.getElementById('thornswood-hubtext');
+  var hintText = document.getElementById('thornswood-hint');
 
   function polar(r, deg) {
     var a = (deg - 90) * Math.PI / 180;
@@ -138,8 +139,14 @@
         path.addEventListener('mouseenter', function () { hot(true); });
         path.addEventListener('mouseleave', function () { hot(false); });
         path.addEventListener('click', function () {
-          say('__clicked ' + item.name);
-          say(item.event);
+          // The index, not the event.
+          //
+          // The wheel has two levels now, categories and then the emotes in
+          // one, so a wedge is not always an animation: picking "Revelry" is
+          // not something to play. The page draws whatever list it was handed
+          // and says which one was chosen; deciding what that means belongs
+          // with the plugin, which is the side that knows which level is up.
+          say('__pick ' + i + ' ' + item.name);
         });
 
         segs.appendChild(path);
@@ -151,12 +158,12 @@
 
   hub.addEventListener('mouseenter', function () { hub.setAttribute('class', 'hot'); });
   hub.addEventListener('mouseleave', function () { hub.setAttribute('class', ''); });
-  hub.addEventListener('click', function () { say('IdleForceDefaultState'); });
+  hub.addEventListener('click', function () { say('__hub'); });
 
   document.addEventListener('contextmenu', function (e) {
     if (host.className.indexOf('gone') !== -1) return;
     e.preventDefault();
-    say('__page');
+    say('__back');
   });
 
   // ---------------------------------------------------------------- keys ---
@@ -180,19 +187,63 @@
   // arrives here a moment later, where it reads as "close the wheel". The log
   // proves it: the overlay came up and then said "the page asked to close",
   // twice, without anybody pressing anything else.
-  var shownAt = 0;
-
+  /*
+   * Whether the key that opened the wheel has been let go yet.
+   *
+   * This was a 400 millisecond timer and the timer was the bug. Holding G for
+   * half a second is not a second press, but the browser sends autorepeat
+   * keydowns the whole time it is held, and the first one past the deadline
+   * closed the wheel. Worse, closing is a round trip through the plugin, so
+   * every repeat after it sent another close while the wheel was still up:
+   *
+   *     [emotes] the page asked to close
+   *     [emotes] the page asked to close
+   *
+   * From the chair that is a wheel that never appeared, a G that went to the
+   * game instead and drew your fists, and a second or two with no keyboard
+   * while focus went up and came back down.
+   *
+   * A release is not a guess. The wheel cannot be closed by the key that
+   * opened it until that key has actually come up.
+   */
   function open() { return host.className.indexOf('gone') === -1; }
 
   document.addEventListener('keydown', function (e) {
     if (!open()) return;
+    // Autorepeat is one press being held, never a new one.
+    if (e.repeat) { e.preventDefault(); return; }
     var k = e.key || '';
-    var settled = Date.now() - shownAt > 400;
 
-    if (k === 'Escape' || e.keyCode === 27) { e.preventDefault(); say('__close'); return; }
-    if (k === 'Tab' || e.keyCode === 9) { e.preventDefault(); say('__page'); return; }
-    if (settled && closeChar && k.toLowerCase() === closeChar) {
-      e.preventDefault(); say('__close'); return;
+    // Back rather than close. On the emote list it steps up to the categories,
+    // and only closes from there, so getting out of a category you opened by
+    // mistake does not throw the whole wheel away.
+    if (k === 'Escape' || e.keyCode === 27) { e.preventDefault(); say('__back'); return; }
+    if (k === 'Tab' || e.keyCode === 9) { e.preventDefault(); say('__next'); return; }
+    /*
+      The close key is swallowed here and decided by the plugin.
+
+      This page used to close the wheel itself, on the theory that raising
+      browser focus stops the plugin hearing keys at all. That theory is wrong.
+      DInputHook feeds plugins from the keyboard snapshot and only withholds
+      the buffer from the game, so the plugin sees every press whether the
+      wheel holds focus or not. The front log says so outright:
+
+          input: 145 keys in 5s, browser focus yes, menu no
+
+      With both ends acting on the same key they raced, and the page won. One
+      tap opened the wheel and shut it again in the same frame:
+
+          [emotes] opening the wheel
+          [emotes] the page asked to close
+          [emotes] closing the wheel
+
+      Eleven times in one session, which from the chair is a wheel that never
+      appears. One end owns the decision now, and it is the end that can see
+      whether the wheel is already open.
+    */
+    if (closeChar && k.toLowerCase() === closeChar) {
+      e.preventDefault();
+      return;
     }
 
     // 1 to 9, then 0, matching the digit printed under each label.
@@ -200,22 +251,30 @@
       var at = k === '0' ? 9 : (k.charCodeAt(0) - 49);
       if (items[at]) {
         e.preventDefault();
-        say(items[at].event);
+        say('__pick ' + at + ' ' + items[at].name);
       }
     }
   }, true);
 
   // Called by the plugin every time it shows the wheel or turns the ring.
-  window.thornswoodSetRing = function (list, index, count, closeKeyChar) {
+  /**
+   * Show a list.
+   *
+   * Everything about what the list means is decided by the plugin: the title
+   * across the top, the word in the hub, the line along the bottom. This file
+   * knows how to draw a ring and how to report a click, and deliberately
+   * nothing else, so adding a third level or reordering the categories never
+   * touches it.
+   */
+  window.thornswoodSetRing = function (list, title, hubWord, hint, closeKeyChar) {
     items = list || [];
     if (typeof closeKeyChar === 'string' && closeKeyChar) {
       closeChar = closeKeyChar.toLowerCase();
     }
-    var was = open();
     host.className = items.length ? '' : 'gone';
-    if (!was && items.length) { shownAt = Date.now(); }
-    ringName.textContent = (RING_TITLES[index] || 'Emotes') +
-                           (count > 1 ? '  ' + (index + 1) + ' / ' + count : '');
+    ringName.textContent = title || 'Emotes';
+    hubText.textContent = hubWord || 'STOP';
+    hintText.textContent = hint || '';
     draw(items);
   };
 

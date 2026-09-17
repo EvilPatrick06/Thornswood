@@ -45,14 +45,40 @@ if (-not $node) {
 Write-Host ("node {0}  at {1}" -f (& node --version), $node.Source) -ForegroundColor DarkGray
 
 # ---- unpack ----------------------------------------------------------------
-# The world folder is the one thing worth preserving across reinstalls: it holds
-# every character on the server.
+<#
+  Two things survive a reinstall, not one.
+
+  world is the obvious one: it holds every character on the server.
+
+  data is the one that was being quietly thrown away. The gamemode writes
+  data\characters.json while people are online, and that file is where the
+  launcher gets the race, the sex and the name to put on a character card. It
+  is written by playing, not by building, so nothing in the payload can put it
+  back. Every publish was wiping it and taking the details off everybody's
+  cards until each person next logged in.
+
+  The two are restored differently and the difference matters. world is copied
+  back over the top, because the payload has no world and whatever was here is
+  the truth. data does have shipped contents, so only files the fresh unpack
+  did NOT provide are put back: runtime state returns, and anything that came
+  with the build stays at the version that was just installed.
+#>
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+
 $world = Join-Path $Root 'world'
 $worldBak = $null
 if (Test-Path -LiteralPath $world) {
-    $worldBak = Join-Path $env:TEMP ("world-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    $worldBak = Join-Path $env:TEMP ("world-" + $stamp)
     Copy-Item -LiteralPath $world -Destination $worldBak -Recurse -Force
     Write-Host "existing world set aside at $worldBak" -ForegroundColor Yellow
+}
+
+$dataDir = Join-Path $Root 'data'
+$dataBak = $null
+if (Test-Path -LiteralPath $dataDir) {
+    $dataBak = Join-Path $env:TEMP ("serverdata-" + $stamp)
+    Copy-Item -LiteralPath $dataDir -Destination $dataBak -Recurse -Force
+    Write-Host "existing data set aside at $dataBak" -ForegroundColor Yellow
 }
 
 if (Test-Path -LiteralPath $Root) { Remove-Item -LiteralPath $Root -Recurse -Force }
@@ -63,6 +89,24 @@ Write-Host "unpacked to $Root" -ForegroundColor Cyan
 if ($worldBak) {
     Copy-Item -LiteralPath $worldBak -Destination $world -Recurse -Force
     Write-Host 'world restored' -ForegroundColor Cyan
+}
+
+if ($dataBak) {
+    $kept = 0
+    New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+    foreach ($f in @(Get-ChildItem -LiteralPath $dataBak -Recurse -File -Force -EA SilentlyContinue)) {
+        $rel = $f.FullName.Substring($dataBak.Length).TrimStart('\')
+        $to = Join-Path $dataDir $rel
+        # Only what the build did not bring. A shipped file that also exists in
+        # the backup is a file the new build is entitled to replace.
+        if (Test-Path -LiteralPath $to) { continue }
+        New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
+        Copy-Item -LiteralPath $f.FullName -Destination $to -Force
+        $kept++
+    }
+    if ($kept -gt 0) {
+        Write-Host "kept $kept runtime file$(if ($kept -eq 1) { '' } else { 's' }) in data, including the character book" -ForegroundColor Cyan
+    }
 }
 
 # ---- check the load order resolves before trusting it ----------------------

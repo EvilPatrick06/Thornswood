@@ -75,6 +75,8 @@ function Find-Ref([string]$name) {
 $needed = @(
     'System.dll', 'System.Core.dll', 'System.Drawing.dll',
     'System.Runtime.Serialization.dll',
+    # DPAPI, for the server password and the Discord ticket on disk.
+    'System.Security.dll',
     'System.IO.Compression.dll', 'System.IO.Compression.FileSystem.dll',
     'PresentationFramework.dll', 'PresentationCore.dll', 'WindowsBase.dll', 'System.Xaml.dll',
     'System.Windows.Forms.dll'
@@ -86,6 +88,33 @@ foreach ($n in $needed) {
     if ($p) { $refs += $p } else { $missing += $n }
 }
 if ($missing.Count) { Die ("Could not find these assemblies: " + ($missing -join ', ')) }
+
+# ------------------------------------------------- WebView2, for voice
+#
+# Not a framework assembly, so the name search above cannot find it. These
+# three files are Microsoft's redistributable WebView2 SDK and they are what
+# gives this launcher a browser, which is what gives it a microphone and
+# WebRTC. The game's own in-game browser has neither a permission prompt nor
+# an autoplay policy anyone can satisfy, which is why voice never carried
+# audio from in there.
+#
+# They are referenced for the compile AND embedded into the exe further down,
+# because the update system publishes exactly one asset and SelfUpdate
+# replaces exactly one file. Sidecar DLLs would need the publisher, the
+# version document and the updater changed together, and would leave every
+# launcher broken in between.
+$wv2Dir = Join-Path $Here 'lib\webview2'
+$wv2Managed = @('Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.Wpf.dll')
+$wv2Loader  = 'WebView2Loader.dll'
+$wv2Missing = @()
+foreach ($n in ($wv2Managed + $wv2Loader)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $wv2Dir $n))) { $wv2Missing += $n }
+}
+if ($wv2Missing.Count) {
+    Die ("WebView2 files are missing from tools\lib\webview2: " + ($wv2Missing -join ', '))
+}
+foreach ($n in $wv2Managed) { $refs += (Join-Path $wv2Dir $n) }
+
 Say "  $($refs.Count) references resolved" 'Green'
 foreach ($r in $refs) { Say "    $r" 'DarkGray' }
 
@@ -186,6 +215,19 @@ if (Test-Path $logo) { $cscArgs += "/resource:$((Resolve-Path $logo).Path),logo.
 # contents. That is what stops Windows showing a remembered picture of the old
 # one, and it has to travel with the update rather than sit loose in a folder.
 $cscArgs += "/resource:$((Resolve-Path $icon).Path),app.ico"
+
+# WebView2 travels inside the exe. Voice.cs hands the two managed ones back to
+# the CLR from an AssemblyResolve handler, and writes the native loader out
+# beside the exe on startup, because a native DLL cannot be loaded from memory.
+foreach ($n in ($wv2Managed + $wv2Loader)) {
+    $cscArgs += "/resource:$((Resolve-Path (Join-Path $wv2Dir $n)).Path),$n"
+}
+
+# The voice page rides along too, for the same reason: one published asset.
+$voicePage = Join-Path $Here 'launcher\voice-host.html'
+if (-not (Test-Path -LiteralPath $voicePage)) { Die "Missing tools\launcher\voice-host.html" }
+$cscArgs += "/resource:$((Resolve-Path $voicePage).Path),voice-host.html"
+
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 foreach ($f in $cs)   { $cscArgs += $f.FullName }
 if ($infoApp) { $cscArgs += $infoApp }

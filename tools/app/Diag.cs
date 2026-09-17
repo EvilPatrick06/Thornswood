@@ -144,12 +144,12 @@ namespace Thornswood
 
             try
             {
-                Grab(work, Path.Combine(Paths.MyGames, "SKSE\\skse64.log"));
-                Grab(work, Path.Combine(Paths.MyGames, "SKSE\\SSEDisplayTweaks.log"));
-                Grab(work, Path.Combine(Paths.LocalAD, "plugins.txt"));
+                Grab(work, Path.Combine(Paths.LiveMyGames, "SKSE\\skse64.log"));
+                Grab(work, Path.Combine(Paths.LiveMyGames, "SKSE\\SSEDisplayTweaks.log"));
+                Grab(work, Path.Combine(Paths.Live, "plugins.txt"));
                 Grab(work, Path.Combine(Paths.Golden, "plugins.txt"), "plugins-expected.txt");
                 Grab(work, Paths.LogFile);
-                Grab(work, Path.Combine(Paths.MyGames, "SkyrimPrefs.ini"));
+                Grab(work, Path.Combine(Paths.LiveMyGames, "SkyrimPrefs.ini"));
 
                 Entry crash = Files.NewestCrash();
                 if (crash != null) Grab(work, crash.FullPath);
@@ -187,7 +187,7 @@ namespace Thornswood
             // .NET Framework csc that ships with Windows, which predates them.
             Action<string, string> Add = delegate(string k, string v) { s.AppendLine(k.PadRight(22) + v); };
 
-            s.AppendLine("Thornswood - report");
+            s.AppendLine("ThornsWood - report");
             s.AppendLine("===================");
             s.AppendLine(DateTime.Now.ToString("dddd d MMMM yyyy, HH:mm"));
             s.AppendLine();

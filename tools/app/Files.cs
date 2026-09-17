@@ -14,8 +14,8 @@ namespace Thornswood
 
     static class Files
     {
-        public static string SkseLogDir { get { return Path.Combine(Paths.MyGames, "SKSE"); } }
-        public static string SaveDir { get { return Path.Combine(Paths.MyGames, "Saves"); } }
+        public static string SkseLogDir { get { return Path.Combine(Paths.LiveMyGames, "SKSE"); } }
+        public static string SaveDir { get { return Path.Combine(Paths.LiveMyGames, "Saves"); } }
         public static string BackupDir { get { return Path.Combine(Paths.ProfileDir, "Backups"); } }
 
         static string Size(long b)

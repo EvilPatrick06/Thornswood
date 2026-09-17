@@ -14,7 +14,33 @@ param(
     [switch]$NoArchive,
     [switch]$Plain7z,
     [switch]$ReuseStage,
-    [switch]$NoPause
+    [switch]$NoPause,
+    # Straight onto the docs site when it is done, so nobody has to be sent a
+    # file. -NoPublish builds without touching the site.
+    [switch]$NoPublish,
+    # Leave out every file the Vortex collection installs, because anybody
+    # following the collection already has them and shipping them again is
+    # both a 14 GB download and somebody else's mod in your installer.
+    #
+    # The path is Vortex's own record of what it put in the game folder, so
+    # this is exact rather than a guess at which folders are "mods". A file is
+    # only left out if Vortex is actually providing it, which means the
+    # installer shrinks as the collection fills in and never drops something
+    # nobody can get back.
+    [string]$VortexManifest = 'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\vortex.deployment.json',
+    # Ship everything, the way it was before the collection existed.
+    [switch]$NoVortex,
+    # Build out of the Skyrim that Steam owns and Vortex deploys into, rather
+    # than out of the launcher's own copy under Root. Normally there is nothing
+    # to pass: if that copy is gone this finds the Steam one by itself. The
+    # switch is for forcing it while both still exist.
+    [switch]$Vortex,
+    # One file instead of two. The payload is appended to the setup program and
+    # a 24 byte trailer on the end says where it starts, which is the shape
+    # Bootstrap.cs has always been able to read. This was dropped when the
+    # payload was 14 GB, because Windows would not load an executable that big.
+    # It is under a gigabyte now that the mods come from the collection.
+    [switch]$OneFile
 )
 
 
@@ -42,7 +68,56 @@ $ProfileDir = Join-Path $Root 'Profile'
 $LaunchDir  = Join-Path $Root 'Launcher'
 $stage      = Join-Path $OutDir 'stage'
 
-if (-not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) { Die "No build at $GameDir. Run Build-Thornswood.ps1 first." }
+<#
+  Which Skyrim this installer is built out of.
+
+  An install made before 1.1 keeps its own copy of the game under Root, and
+  that copy is what gets packaged. Once it is retired the build lives in the
+  Skyrim that Steam owns, with the collection deployed into it, and the
+  packager has to follow it there. It did not, and the line below is a Die, so
+  the first release after that folder was renamed would have stopped dead with
+  "No build" and no installer.
+
+  Decided by looking rather than by a switch, the same way the launcher decides
+  which game it is pointed at, so the two cannot end up disagreeing about it.
+
+  Nothing about the payload changes. Bethesda's own files were already left out
+  by name, and anything the collection provides is left out by reading Vortex's
+  own manifest, so pointing this at a 20 GB Steam install still produces an
+  installer of the launcher and our own content and nothing else.
+#>
+function Get-SkyrimPath {
+    $roots = @()
+    foreach ($k in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam')) {
+        try { $sp = (Get-ItemProperty -Path $k -EA Stop).SteamPath; if ($sp) { $roots += ($sp -replace '/', '\') } } catch { }
+    }
+    foreach ($r in @($roots)) {
+        $vdf = Join-Path $r 'config\libraryfolders.vdf'
+        if (Test-Path -LiteralPath $vdf) {
+            foreach ($line in Get-Content -LiteralPath $vdf) {
+                if ($line -match '^\s*"path"\s+"(.+)"\s*$') { $roots += ($Matches[1] -replace '\\\\', '\') }
+            }
+        }
+    }
+    foreach ($r in $roots) {
+        $g = Join-Path $r 'steamapps\common\Skyrim Special Edition'
+        if (Test-Path -LiteralPath (Join-Path $g 'SkyrimSE.exe')) { return $g }
+    }
+    return ''
+}
+
+if ($Vortex -or -not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
+    $steamGame = Get-SkyrimPath
+    if ($steamGame) {
+        $GameDir = $steamGame
+        Write-Host ''
+        Write-Host "  building out of the Steam copy: $GameDir" -ForegroundColor Cyan
+    }
+}
+
+if (-not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
+    Die "No build at $GameDir, and no Steam copy of Skyrim either. Run Build-Thornswood.ps1, or install the collection in Vortex."
+}
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
@@ -62,12 +137,53 @@ $vanillaDataFiles = @(
 $vanillaDataPatterns = @('Skyrim - *.bsa', 'cc*.esm', 'cc*.esl', 'cc*.esp', 'cc*.bsa')
 $vanillaDataDirs     = @('Video', 'Strings')
 
+# ---- what never ships: other people's frameworks and modding tools --------
+#
+# Vortex's manifest answers "did Vortex put this here", which is not the same
+# question as "does Thornswood need this". These folders answered no to the
+# first and were shipped to everybody as though they were ours.
+#
+# NirnLabUIPlatform is another roleplay server's user interface framework and
+# on its own it is 356 MB. Nemesis, FNIS, BodySlide and xEdit are tools that
+# belong on the machine of somebody who builds mods, not in a folder handed to
+# somebody who plays. Source is Papyrus script sources, which the game never
+# reads. The rest is documentation, installer leftovers and a shader cache
+# that rebuilds itself on first launch.
+#
+# All of them stay where they are on this machine. This only decides what goes
+# into the installer.
+$foreignDataDirs = @(
+    'NirnLabUIPlatform',
+    'Nemesis_Engine', 'FNIS Behavior SE 7.6', 'CalienteTools', 'tools',
+    'Source', 'ModderResource', 'FOMod',
+    'Docs', 'Docs and Screenshots', 'readmes',
+    'ShaderCache'
+)
+
 $vanillaRootFiles = @(
     'SkyrimSE.exe', 'SkyrimSELauncher.exe', 'steam_api64.dll', 'bink2w64.dll',
     'Skyrim.ccc', 'installscript.vdf', 'Skyrim_Default.ini',
-    'High.ini', 'Low.ini', 'Medium.ini', 'Ultra.ini'
+    'High.ini', 'Low.ini', 'Medium.ini', 'Ultra.ini',
+
+    # Only ever seen when this is building out of the Steam copy rather than
+    # out of a game folder we built ourselves.
+    #
+    # The script extender is not ours to hand out and it is in the collection
+    # now, so shipping it again would be redistributing somebody's mod and
+    # doing it twice. VERSION and steam_appid.txt belong to Steam and the
+    # downgrader. imgui.ini and the d3dx9 log are written at runtime by
+    # whatever was last run against this install.
+    'skse64_loader.exe', 'skse64_1_6_1170.dll',
+    'skse64_readme.txt', 'skse64_whatsnew.txt',
+    'VERSION', 'steam_appid.txt', 'imgui.ini', 'd3dx9_42.log'
 )
-$vanillaRootDirs = @('_DowngraderBackups', 'Creations', 'Mods', 'Skyrim', 'src')
+$vanillaRootDirs = @(
+    '_DowngraderBackups', 'Creations', 'Mods', 'Skyrim', 'src',
+
+    # Bethesda's launcher keeps its own folder, and DaedricData is another
+    # roleplay server's. Neither is ours and neither goes in an installer.
+    'BStarData', 'DaedricData'
+)
 
 function Test-Vanilla([string]$rel) {
     $parts = $rel -split '\\'
@@ -76,6 +192,7 @@ function Test-Vanilla([string]$rel) {
     if ($parts.Count -eq 1) { return ($vanillaRootFiles -contains $top) }
     if ($top -ne 'Data') { return $false }
     if ($parts.Count -ge 3 -and ($vanillaDataDirs -contains $parts[1])) { return $true }
+    if ($parts.Count -ge 2 -and ($foreignDataDirs -contains $parts[1])) { return $true }
     if ($parts.Count -eq 2) {
         $leaf = $parts[1]
         if ($vanillaDataFiles -contains $leaf) { return $true }
@@ -103,21 +220,121 @@ function Test-Runtime([string]$rel) {
     return $false
 }
 
+# ---- what ships separately: the optional packs ----------------------------
+# Everything listed in optional-packs.txt is left out here and published as its
+# own download instead. Publish-Pack.ps1 reads the same file and builds those
+# zips from it, so the installer and the packs can never disagree about which
+# half of the build a file belongs to.
+$optionalPrefixes = @()
+$optionalFile = Join-Path $Here 'optional-packs.txt'
+if (Test-Path -LiteralPath $optionalFile) {
+    foreach ($line in (Get-Content -LiteralPath $optionalFile)) {
+        $t = $line.Trim()
+        if ($t.Length -eq 0 -or $t.StartsWith('#')) { continue }
+        $parts = $t -split '\|'
+        if ($parts.Count -lt 3) {
+            Say "  optional-packs.txt line ignored, needs id | name | path:  $t" 'Yellow'
+            continue
+        }
+        # These three lines lost their backslashes at some point. EndsWith('')
+        # is true for every string, so the trailing separator was never added
+        # and 'Data\textures' also matched 'Data\texturesOld\'. Publish-Pack
+        # trims a leading backslash and this did not, so the two could disagree
+        # about which half of the build a file belongs to, which is the one
+        # thing optional-packs.txt says must never happen.
+        $prefix = $parts[2].Trim().TrimStart('\')
+        if ($prefix.Length -eq 0) { continue }
+        if (-not $prefix.EndsWith('\')) { $prefix += '\' }
+        $optionalPrefixes += [pscustomobject]@{ Id = $parts[0].Trim(); Prefix = $prefix }
+    }
+}
+function Test-Optional([string]$rel) {
+    foreach ($o in $optionalPrefixes) {
+        if ($rel.StartsWith($o.Prefix, 'OrdinalIgnoreCase')) { return $true }
+    }
+    return $false
+}
+if ($optionalPrefixes.Count) {
+    Say ("  {0} optional path(s) will be left out and published separately" -f $optionalPrefixes.Count) 'Green'
+}
+
+# ---- what the collection provides: also left out --------------------------
+# Vortex writes a record of every file it put in the game folder. That record,
+# not a guess at which folders count as "mods", is what decides this. A file is
+# left out only when Vortex is actually providing it, so the installer shrinks
+# as the collection fills in and can never drop a file nobody can get back.
+$vortexFiles = $null
+if (-not $NoVortex) {
+    if (Test-Path -LiteralPath $VortexManifest) {
+        try {
+            $raw = (Get-Content -LiteralPath $VortexManifest -Raw) -replace '^\uFEFF', ''
+            $vdoc = $raw | ConvertFrom-Json
+            $vortexFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+            foreach ($vf in @($vdoc.files)) {
+                $r = [string]$vf.relPath
+                if (-not $r) { continue }
+                # Vortex records paths relative to the game's Data folder. The
+                # installer walks one level higher, so they need the prefix.
+                [void]$vortexFiles.Add('Data\' + $r.TrimStart('\'))
+            }
+            Say ("  the collection provides {0:n0} file(s), which are left out" -f $vortexFiles.Count) 'Green'
+        }
+        catch {
+            Say '  the Vortex record is there but could not be read, so nothing is left out for it:' 'Yellow'
+            Say ('    ' + $_.Exception.Message) 'Yellow'
+            $vortexFiles = $null
+        }
+    }
+    else {
+        Say '  no Vortex record found, so this installer carries every mod file.' 'Yellow'
+        Say "  looked for: $VortexManifest" 'DarkGray'
+        Say '  Deploy once in Vortex and it appears.' 'DarkGray'
+    }
+}
+
+function Test-FromCollection([string]$rel) {
+    if ($null -eq $vortexFiles) { return $false }
+    return $vortexFiles.Contains($rel)
+}
+
 Say '  Listing the build...'
 $all = @(Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)
 $prefix = $GameDir.TrimEnd('\') + '\'
 
-$ship = @(); $skipBytes = 0; $shipBytes = 0
+$ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0
+$collectionBytes = 0; $collectionCount = 0
 foreach ($f in $all) {
     $rel = $f.FullName.Substring($prefix.Length)
     if (Test-Vanilla $rel) { $skipBytes += $f.Length; continue }
     if (Test-Runtime $rel) { $skipBytes += $f.Length; continue }
+    if (Test-Optional $rel) { $optionalBytes += $f.Length; $optionalCount++; continue }
+    if (Test-FromCollection $rel) { $collectionBytes += $f.Length; $collectionCount++; continue }
     if ($f.Extension -in '.pdb', '.log') { $skipBytes += $f.Length; continue }
     $ship += [pscustomobject]@{ Rel = $rel; Full = $f.FullName; Len = $f.Length; Time = $f.LastWriteTimeUtc }
     $shipBytes += $f.Length
 }
 Say ("  {0:n0} files kept ({1:n1} GB), {2:n0} left out ({3:n1} GB of Bethesda files and debug symbols)" -f `
     $ship.Count, ($shipBytes / 1GB), ($all.Count - $ship.Count), ($skipBytes / 1GB)) 'Green'
+if ($collectionCount) {
+    Say ("  {0:n0} of the left out ({1:n1} GB) are files the collection provides." -f `
+        $collectionCount, ($collectionBytes / 1GB)) 'Green'
+    Write-Host ''
+    Say '  THIS INSTALLER NOW NEEDS THE COLLECTION.' 'Yellow'
+    Say '  On its own it is a launcher and your own content. Somebody who runs it' 'Yellow'
+    Say '  without following the collection has no mods and cannot connect, and the' 'Yellow'
+    Say '  error they see is a load order mismatch, which reads as a broken launcher.' 'Yellow'
+    Say '  The launcher has to send them to the collection before this goes on the site.' 'Yellow'
+    Write-Host ''
+}
+if ($optionalCount) {
+    Say ("  {0:n0} more ({1:n1} GB) are in optional packs and published separately." -f `
+        $optionalCount, ($optionalBytes / 1GB)) 'DarkGray'
+}
+if ($optionalCount) {
+    Say ("  {0:n0} more ({1:n1} GB) belong to optional packs and are published separately." -f `
+        $optionalCount, ($optionalBytes / 1GB)) 'Green'
+    Say '  Run .\Publish-Pack.ps1 after this, or nobody can get them.' 'Yellow'
+}
 
 $payload = Join-Path $stage 'payload'
 $reuse = $ReuseStage -and (Test-Path $payload)
@@ -184,7 +401,25 @@ Say "  longest path is $longest characters" $(if ($longest -gt 250) { 'Yellow' }
 if ($longest -gt 250) { Say "    $longestPath" 'DarkGray' }
 
 # ---- profile + launcher + installer ---------------------------------------
-Copy-Item (Join-Path $ProfileDir 'Default\*') (Join-Path $stage 'profile') -Force -ErrorAction SilentlyContinue
+#
+# Where the reference load order lives depends on which kind of build this is.
+# With a Game folder of our own it is Profile\Default. A collection build has
+# no Game folder, the game is the Steam copy, and Vortex writes the real
+# plugins.txt into AppData, so Profile\Default is empty and always will be.
+#
+# Shipping the empty one is what put "this build shipped without a reference
+# plugin list" in the launcher's Mods tab and left the manifest claiming zero
+# plugins.
+$ownGameDir = Join-Path $Root 'Game'
+$refProfile = if (Test-Path -LiteralPath $ownGameDir) { Join-Path $ProfileDir 'Default' } else { Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition' }
+Say "  load order from $refProfile" 'DarkGray'
+Copy-Item (Join-Path $refProfile '*') (Join-Path $stage 'profile') -Force -ErrorAction SilentlyContinue
+$stagedPlug = Join-Path (Join-Path $stage 'profile') 'plugins.txt'
+if (-not (Test-Path -LiteralPath $stagedPlug)) {
+    Say '  NO plugins.txt found, so this build ships without a reference load order.' 'Red'
+    Say '  The launcher cannot check anybody against the server without it.' 'Red'
+    Say "  Looked in: $refProfile" 'DarkGray'
+}
 $lexe = Get-LauncherExe $LaunchDir
 if (Test-Path $lexe) {
     Copy-Item $lexe $stage -Force
@@ -202,7 +437,64 @@ foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRS
 $cfgSrc = Join-Path $Root 'config.json'
 if (Test-Path $cfgSrc) { Copy-Item $cfgSrc $stage -Force }
 
-$plug = Join-Path $ProfileDir 'Default\plugins.txt'
+# ---- what this build already has ------------------------------------------
+#
+# The launcher works out what needs updating by taking every pack in
+# version.json and subtracting the ones listed in Profile\applied.txt. On a
+# machine that has been here a while that is right. On a fresh install
+# applied.txt does not exist, so nothing is subtracted, and the launcher
+# decides all 165 packs ever published are waiting: it says "165 mod updates",
+# tries to fetch the lot, falls over, and sits on UPDATE FIRST with Play shut.
+#
+# This build already contains every one of them, because it was made from the
+# game they were applied to. So the list ships with it and the installer lays
+# it down, and a fresh install starts level with this machine instead of at
+# the beginning of the project.
+# ---- which shape of install this payload is for ---------------------------
+#
+# A payload built with the collection's files left out cannot stand up its own
+# Skyrim, because most of that Skyrim is what was left out. The installer has
+# to put it into the Steam copy Vortex deployed into instead, and the launcher
+# only reads the Steam copy when C:\Thornswood\Game does not exist. So the
+# build says which shape it is and the installer does not have to guess.
+$collectionFlag = Join-Path $stage 'collection.txt'
+if (Test-Path -LiteralPath $collectionFlag) { Remove-Item $collectionFlag -Force }
+if ($collectionCount -gt 0) {
+    [IO.File]::WriteAllText($collectionFlag,
+        "This build leaves out everything the Nexus collection provides.`r`n" +
+        "The installer puts Thornswood into the Steam copy rather than making`r`n" +
+        "one of its own, because the collection is deployed there.`r`n",
+        (New-Object Text.UTF8Encoding($false)))
+    Say '  built for the collection, so the installer will use the Steam copy' 'Green'
+}
+
+$appliedOut = Join-Path $stage 'applied.txt'
+$vLive = Join-Path 'C:\Users\evilp\Downloads\Thornswood-Releases' 'version.json'
+if (-not (Test-Path -LiteralPath $vLive)) { $vLive = Join-Path (Split-Path -Parent $here) 'version.json' }
+if (Test-Path -LiteralPath $vLive) {
+    try {
+        $vd = ((Get-Content $vLive -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
+        $ids = @()
+        foreach ($pk in @($vd.packs)) {
+            if ($pk -and $pk.PSObject.Properties['id'] -and $pk.id) { $ids += [string]$pk.id }
+        }
+        $ids = @($ids | Select-Object -Unique)
+        if ($ids.Count -gt 0) {
+            [IO.File]::WriteAllLines($appliedOut, $ids, (New-Object Text.UTF8Encoding($false)))
+            Say ("  {0} packs marked as already in this build" -f $ids.Count) 'Green'
+        } else {
+            Say '  version.json lists no packs, so nothing was marked applied.' 'DarkGray'
+        }
+    } catch {
+        Say "  could not read the pack list: $($_.Exception.Message)" 'Yellow'
+        Say '  A fresh install will think every pack is a pending update.' 'Yellow'
+    }
+} else {
+    Say '  no version.json found, so nothing was marked applied.' 'Yellow'
+    Say '  A fresh install will think every pack is a pending update.' 'Yellow'
+}
+
+$plug = Join-Path $refProfile 'plugins.txt'
 $manifest = [ordered]@{
     builtAt   = (Get-Date).ToString('u')
     files     = $shipCount
@@ -277,16 +569,50 @@ Say "  $ver" 'DarkGray'
 
 $blob = Join-Path $OutDir 'payload.zip'
 if (Test-Path $blob) { Remove-Item $blob -Force }
+
+# Room to write it. The stage is already a full copy of the build, and the zip
+# lands beside it, so this wants roughly the size of the build again. 7-Zip
+# answers a full disk with exit code 2 and a wall of progress text, which is
+# not a sentence anybody can act on.
+$stageBytes = (Get-ChildItem $stage -Recurse -File -EA SilentlyContinue |
+               Measure-Object -Sum Length).Sum
+$drive = (Get-Item $OutDir).PSDrive
+$free  = $drive.Free
+$want  = [long]($stageBytes * 0.75)
+Say ("  staged {0:n1} GB, {1:n1} GB free on {2}:" -f ($stageBytes/1GB), ($free/1GB), $drive.Name) 'DarkGray'
+if ($free -lt $want) {
+    Say ''
+    Say ("There is not enough room to write the archive. It needs about {0:n0} GB free" -f ($want/1GB)) 'Red'
+    Say ("and {0}: has {1:n1} GB." -f $drive.Name, ($free/1GB)) 'Red'
+    Say ''
+    Say 'Two ways out:' 'Yellow'
+    Say ''
+    Say '  Put the archive on another drive:' 'Yellow'
+    Say '    .\tools\Package-Thornswood.ps1 -ReuseStage -OutDir D:\Thornswood-dist' 'Green'
+    Say ''
+    Say ("  Or free up space on {0}: and re-run with -ReuseStage, which skips" -f $drive.Name) 'Yellow'
+    Say '  the twenty minute copy because the staged folder is already there.' 'Yellow'
+    Say ''
+    Die "Not enough free space on $($drive.Name):."
+}
+
 Say '  Most of this content is already compressed, so the level is deliberately low.'
 Say '  Around 18 GB in. Expect ten minutes or more.' 'DarkGray'
 
 # A native tool writing a single line to stderr is enough to kill the whole
 # script while ErrorActionPreference is Stop, so 7-Zip runs with it relaxed.
+# Its output is kept rather than returned: returning it alongside the exit code
+# made $rc an array of every line 7-Zip printed, so the failure message read as
+# a paragraph and the -le 1 test below was comparing against a list.
+$script:zipSaid = @()
 function Invoke-7z([string[]]$zargs) {
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     Push-Location $stage
-    try { & $7z @zargs; return $LASTEXITCODE }
+    try {
+        $script:zipSaid = @(& $7z @zargs 2>&1 | ForEach-Object { "$_" })
+        return [int]$LASTEXITCODE
+    }
     finally { Pop-Location; $ErrorActionPreference = $old }
 }
 
@@ -302,12 +628,20 @@ foreach ($try in $attempts) {
     $rc = Invoke-7z $try
     if ($rc -le 1 -and (Test-Path $blob)) { break }
     Say "  that attempt exited with $rc" 'Yellow'
+    # The useful part of what 7-Zip said is at the end, not the start, and the
+    # start is 30,000 lines of file names.
+    $tail = @($script:zipSaid | Where-Object { $_ -and $_ -notmatch '^\s*\d+%' }) | Select-Object -Last 8
+    foreach ($l in $tail) { Say "    $l" 'DarkGray' }
     if (Test-Path $blob) { Remove-Item $blob -Force -EA SilentlyContinue }
 }
 if (-not (Test-Path $blob)) {
     Say ''
     Say "The staged folder is still at $stage, so nothing is lost." 'Yellow'
     Say 'Re-run with -ReuseStage once this is sorted and it will skip the copy.' 'Yellow'
+    Say ''
+    Say 'Exit code 2 from 7-Zip is nearly always the disk filling up part way' 'DarkGray'
+    Say 'through, or a file being held open by something. Check free space first:' 'DarkGray'
+    Say '    Get-PSDrive C | Select-Object Used, Free' 'Green'
     Die '7-Zip did not produce the archive.'
 }
 Say ("  payload.zip is {0:n2} GB" -f ((Get-Item $blob).Length / 1GB)) 'Green'
@@ -348,6 +682,28 @@ if (Test-Path $exe) { Remove-Item $exe -Force }
 Copy-Item $stub $exe -Force
 Say "  stub: $stub" 'DarkGray'
 
+# ---- one file, payload attached -------------------------------------------
+# STSFX001, then the offset the payload starts at, then its length. Both are
+# 64 bit and little endian, which is what BinaryReader.ReadInt64 wants on the
+# other side. Written after the copy so a failure here leaves a plain stub
+# rather than a half attached one.
+if ($OneFile) {
+    Say '  attaching the payload to the setup program' 'DarkGray'
+    $fsOut = [IO.File]::Open($exe, [IO.FileMode]::Append, [IO.FileAccess]::Write)
+    try {
+        $off = $fsOut.Position
+        $fsIn = [IO.File]::OpenRead($zip)
+        try { $fsIn.CopyTo($fsOut, 4MB) } finally { $fsIn.Dispose() }
+        $len = (Get-Item $zip).Length
+        $bw = New-Object IO.BinaryWriter($fsOut)
+        $bw.Write([Text.Encoding]::ASCII.GetBytes('STSFX001'))
+        $bw.Write([long]$off)
+        $bw.Write([long]$len)
+        $bw.Flush()
+    } finally { $fsOut.Dispose() }
+    Say ("  attached, offset {0:n0}, {1:n2} GB" -f $off, ($len / 1GB)) 'Green'
+}
+
 # ---- prove it before it goes anywhere ------------------------------------
 Head 'Checking the installer'
 $ok = $true
@@ -364,8 +720,20 @@ try {
     }
 } finally { $fs.Close() }
 
-# Anything near the loader's limit is the bug this split exists to avoid.
-if ($exeLen -gt 100MB) { Say '  the setup program is far bigger than it should be' 'Red'; $ok = $false }
+# Anything near the loader's limit is the bug the two file split exists to
+# avoid. With the payload attached it is meant to be big, so the ceiling moves
+# to the point where Windows starts refusing to load it at all.
+if ($OneFile) {
+    if ($exeLen -lt 64MB) {
+        Say '  the setup program is too small to have the payload in it' 'Red'; $ok = $false
+    } elseif ($exeLen -gt 2GB) {
+        Say '  the setup program is over 2 GB, which Windows will refuse to load' 'Red'; $ok = $false
+    } else {
+        Say ("  payload attached, {0:n2} GB in one file" -f ($exeLen / 1GB)) 'Green'
+    }
+} elseif ($exeLen -gt 100MB) {
+    Say '  the setup program is far bigger than it should be' 'Red'; $ok = $false
+}
 
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 $listing = & $7z l $zip 2>&1
@@ -443,11 +811,35 @@ if (-not $ok) { Die 'The installer did not come out right. Do not send these fil
 
 $gb = [math]::Round((Get-Item $zip).Length / 1GB, 2)
 Head 'Done'
-Say ("Thornswood-Setup.exe  -  {0:n0} KB" -f ($exeLen / 1KB)) 'Green'
-Say "Thornswood-Setup.zip  -  $gb GB" 'Green'
+if ($OneFile) {
+    Say ("Thornswood-Setup.exe  -  {0:n2} GB, one file, nothing beside it" -f ($exeLen / 1GB)) 'Green'
+} else {
+    Say ("Thornswood-Setup.exe  -  {0:n0} KB" -f ($exeLen / 1KB)) 'Green'
+    Say "Thornswood-Setup.zip  -  $gb GB" 'Green'
+}
 Write-Host ''
-Say 'Upload BOTH to the same place. Your friends need both in one folder, then' 'Gray'
-Say 'they run the exe. It finds the zip on its own and does the rest.' 'Gray'
-Say 'They must not unzip it themselves.' 'DarkGray'
+
+if (-not $NoPublish) {
+    Head 'Publishing to the site'
+    $pub = Join-Path $PSScriptRoot 'Publish-Installer.ps1'
+    if (Test-Path -LiteralPath $pub) {
+        try {
+            if ($OneFile) { & $pub -OutDir $OutDir -OneFile } else { & $pub -OutDir $OutDir }
+        } catch {
+            Say "  could not publish: $_" 'Yellow'
+            Say '  The installer is still built and fine. Run' 'DarkGray'
+            Say '  .\tools\Publish-Installer.ps1 when the VPS is reachable.' 'DarkGray'
+        }
+    } else {
+        Say '  Publish-Installer.ps1 is missing, nothing was published.' 'Yellow'
+    }
+} elseif ($OneFile) {
+    Say 'One file. Upload the exe and nothing else. Whoever gets it runs it.' 'Gray'
+} else {
+    Say 'Upload BOTH to the same place. Your friends need both in one folder, then' 'Gray'
+    Say 'they run the exe. It finds the zip on its own and does the rest.' 'Gray'
+    Say 'They must not unzip it themselves.' 'DarkGray'
+}
+
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

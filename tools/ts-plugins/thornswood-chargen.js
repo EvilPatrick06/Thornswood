@@ -26,19 +26,105 @@
 (function () {
 'use strict';
 
+// ------------------------------------------------------------ whose game ----
+// Skyrim Platform loads every plugin in Data/Platform/Plugins, whichever server
+// skymp5-client is about to join. Somebody who also plays Keizaal Online starts
+// it from this same Skyrim, so on 2026-09-16 Thornswood's voice indicator sat
+// on top of Keizaal's menu. Whichever launcher ran last wrote
+// skymp5-client-settings.txt, and its server-ip says whose game this is. Not
+// ours: this file does nothing at all. Unreadable: carry on, as before.
+//
+// Ours is the address in Thornswood.ini's ServerAddress line when there is
+// one, so a server move is an ini edit, and the fixed address below when
+// there is not.
+if (!thornswoodGame()) { return; }
+function thornswoodGame() {
+  const ours = ['192.135.112.23'];
+  let ip = '';
+  try {
+    const fs = require('fs');
+    try {
+      const m = fs.readFileSync('Data/SKSE/Plugins/Thornswood.ini', 'utf8')
+        .match(/^\s*ServerAddress\s*=\s*([^\s;]+)/m);
+      if (m) { ours.push(m[1]); }
+    } catch (e) { }
+    let raw = fs.readFileSync('Data/Platform/Plugins/skymp5-client-settings.txt', 'utf8');
+    if (raw.charCodeAt(0) === 0xFEFF) { raw = raw.slice(1); }
+    ip = String((JSON.parse(raw) || {})['server-ip'] || '').trim();
+  } catch (e) { return true; }
+  if (ip && ours.indexOf(ip) < 0) {
+    try { skyrimPlatform.printConsole('[thornswood] the client points at ' + ip + ', not this server. Plugin idle.'); } catch (e) { }
+    return false;
+  }
+  // The client can point at us and this still not be our session: another
+  // server's launcher that never rewrites the client settings leaves our
+  // address in them. So the launcher leaves a note when it starts the game
+  // and takes it away when the game closes. No fresh note, not our session.
+  try {
+    const note = String(require('fs').readFileSync('Data/Platform/thornswood-session.txt', 'utf8')).trim();
+    const first = note.split(/\s+/)[0];
+    let when = Number(first);         // unix milliseconds from the launcher
+    if (!isFinite(when) || when < 1e12) { when = Date.parse(first); }
+    if (isFinite(when) && Math.abs(Date.now() - when) < 24 * 3600 * 1000) { return true; }
+    try { skyrimPlatform.printConsole('[thornswood] the launcher\'s session note is stale, so this is another server\'s session. Plugin idle.'); } catch (e) { }
+  } catch (e) {
+    try { skyrimPlatform.printConsole('[thornswood] the launcher left no session note, so this is another server\'s session. Plugin idle.'); } catch (e2) { }
+  }
+  return false;
+}
+
 const sp = skyrimPlatform;
+
+/*
+ * Equipping anything pins your weapon drawn, and nothing ever unpins it.
+ *
+ * Not a Skyrim bug and not this plugin's. skymp5-client hooks every animation
+ * event the game sends, and in sync/animation.ts any name containing "equip"
+ * that is not an unequip and not a torch becomes "SkympFakeEquip". Whoever
+ * receives that calls applyWeapDrawn(actor, true), which calls
+ * TESModPlatform.setWeaponDrawnMode(actor, 1), and that writes
+ * share.weapDrawnMode[formId] = 1 and leaves it there. There is no expiry.
+ *
+ * Mode 1 is not a suggestion. FridaHooks hooks DrawSheatheWeaponPC and
+ * DrawSheatheWeaponActor, and while the mode is 1 it rewrites the sheathe
+ * argument into a draw on every single call. So the hands cannot go down, by
+ * anybody's action, for the rest of the session.
+ *
+ * Which is what putting clothes on somebody does: they arrive, this equips
+ * two items, and they spend the evening running around with their fists up
+ * unable to hit anything.
+ *
+ * So the pin is taken off after dressing. -1 is WEAP_DRAWN_MODE_DEFAULT, which
+ * is not "sheathed", it is "stop overriding this", and normal behaviour comes
+ * back. Sheathing afterwards is what actually puts the hands down, and it also
+ * makes the next outgoing movement report weapon-not-drawn, which stops the
+ * server echoing the old state back and pinning it again.
+ */
+let pinned = false;
+let pinnedAt = 0;
+
+function unpin() {
+  if (!pinned) { return; }
+  pinned = false;
+  const pc = player();
+  if (!pc) { return; }
+  try {
+    sp.TESModPlatform.setWeaponDrawnMode(pc, -1);
+    if (pc.isWeaponDrawn && pc.isWeaponDrawn()) {
+      try { pc.sheatheWeapon(); } catch (e) { }
+    }
+    log('took the weapon-drawn pin back off after dressing');
+  } catch (e) {
+    log('could not clear the weapon-drawn pin:', e);
+  }
+}
 
 // Not under Data/Platform/Plugins. SkyrimPlatform watches that folder and
 // reloads every plugin whenever anything in it changes, so a log written there
 // is a plugin reload per line: a black screen and a dead keyboard.
 const LOG_FILE = 'Data/Platform/thornswood-dress.log';
 
-// Quick while the kit is still arriving, slow once it has. The server defers
-// the trade's gear until several seconds after the teleport, so the first
-// minute is when this matters and the rest of the session is a formality.
-const EVERY_MS = 2500;
-const SETTLED_MS = 8000;
-const BUSY_FOR_MS = 120000;
+const EVERY_MS = 5000;
 const HEAD = 0x2;            // slot 30, the face you just made
 const BODY = 0x4;            // slot 32, which is what "dressed" means
 
@@ -75,7 +161,6 @@ function busy() {
 
 let lastRun = 0;
 let lastCount = -1;
-let firstRun = 0;
 
 /**
  * One pass. Only ever fills an empty slot, so somebody who takes their boots
@@ -119,31 +204,18 @@ function dress(pc) {
   wearable.sort(function (a, b) { return b.rating - a.rating; });
 
   let put = 0;
-  const names = [];
   for (const item of wearable) {
     if (item.mask & taken) { continue; }
     try {
       pc.equipItem(item.form, false, true);
+      pinned = true;
+      pinnedAt = Date.now();
       taken |= item.mask;
       put++;
-      let what = '';
-      try { what = item.form.getName() || ''; } catch (e) { what = ''; }
-      names.push((what || '0x' + item.form.getFormID().toString(16)) +
-                 ' [slots 0x' + item.mask.toString(16) + ']');
     } catch (e) { }
   }
 
-  // Named, because "put on 2 things" was true and told us nothing: two boots
-  // and two boots plus a cuirass look identical in a log and completely
-  // different on a character.
-  if (put) {
-    log('put on', put + ':', names.join(', '));
-    log('  slots now covered: 0x' + taken.toString(16),
-        (taken & BODY) ? '(body is covered)' : '(BODY IS STILL BARE)');
-  } else {
-    log('nothing to put on.', n, 'items in the pack, slots covered: 0x' + taken.toString(16),
-        (taken & BODY) ? '' : '- BODY IS STILL BARE');
-  }
+  if (put) { log('put on', put, put === 1 ? 'thing' : 'things'); }
 }
 
 /**
@@ -165,9 +237,13 @@ function dress(pc) {
  */
 sp.on('update', guard('tick', () => {
   const now = Date.now();
-  if (!firstRun) { firstRun = now; }
-  const every = (now - firstRun < BUSY_FOR_MS) ? EVERY_MS : SETTLED_MS;
-  if (now - lastRun < every) { return; }
+
+  // Ahead of the throttle on purpose. The pin is put on by the game a frame or
+  // two after equipItem returns, so this has to be looked at every tick rather
+  // than every few seconds, and it is one boolean when there is nothing to do.
+  if (pinned && now - pinnedAt > 1500) { unpin(); }
+
+  if (now - lastRun < EVERY_MS) { return; }
 
   const pc = player();
   if (!pc || busy()) { return; }

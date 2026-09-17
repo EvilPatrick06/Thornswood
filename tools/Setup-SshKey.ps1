@@ -22,6 +22,10 @@
 
       .\Setup-SshKey.ps1            make the key and install it
       .\Setup-SshKey.ps1 -Test      only check whether it already works
+      .\Setup-SshKey.ps1 -KeyOnly   make the key and point ssh at it, then print
+                                    the public line for Gavin to add on the VPS.
+                                    For a second developer who does not hold the
+                                    VPS password.
 #>
 [CmdletBinding()]
 param(
@@ -29,6 +33,7 @@ param(
     [string]$VpsUser = 'Administrator',
     [string]$KeyPath,
     [switch]$Test,
+    [switch]$KeyOnly,
     [switch]$NoPause
 )
 
@@ -114,6 +119,37 @@ if (Test-Path -LiteralPath "$KeyPath.pub") {
     Say "  made $KeyPath" 'Green'
 }
 $pub = (Get-Content -LiteralPath "$KeyPath.pub" -Raw).Trim()
+
+if ($KeyOnly) {
+    # The ssh config entry below is still wanted, so every script picks the key
+    # up once the VPS knows it. The install step is the one thing skipped.
+    Head 'Pointing ssh at it'
+    $cfg = Join-Path $HOME '.ssh\config'
+    $block = @"
+Host $VpsHost
+    User $VpsUser
+    IdentityFile $KeyPath
+    IdentitiesOnly yes
+"@
+    $text = ''
+    if (Test-Path -LiteralPath $cfg) { $text = [IO.File]::ReadAllText($cfg) }
+    if ($text -notmatch [regex]::Escape("Host $VpsHost")) {
+        $text = $text.TrimEnd() + "`r`n`r`n" + $block
+        [IO.File]::WriteAllText($cfg, $text, (New-Object Text.UTF8Encoding($false)))
+        Say "  added a Host entry to $cfg" 'Green'
+    } else {
+        Say '  there is already an entry for this host, left alone' 'DarkGray'
+    }
+    Head 'Send this line to Gavin'
+    Say '  It is the public half of the key. It is safe to paste anywhere; only this machine holds the private half.' 'DarkGray'
+    Write-Host ''
+    Write-Host $pub -ForegroundColor White
+    Write-Host ''
+    Say "  Once it is on the VPS, .\Setup-SshKey.ps1 -Test proves it." 'DarkGray'
+    Write-Host ''
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+}
 
 # ---------------------------------------------------------------- install ---
 Head 'Installing it on the VPS'

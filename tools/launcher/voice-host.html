@@ -1,0 +1,301 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ThornsWood voice</title>
+<body style="background:#111;color:#ccc;font:12px sans-serif">
+<div id="s">starting</div>
+<script>
+/*
+  Proximity voice, running in the launcher instead of the game.
+
+  Everything this page does used to happen inside SkyrimPlatform's in-game CEF
+  overlay: getUserMedia, WebRTC, the panner, playback. That browser has no
+  permission UI, an autoplay policy that will not start audio without a click
+  nobody can give it, and a focus flag that takes the keyboard off the game
+  when raised. Signalling worked in there, which is why names, distances and
+  the speaking indicator were always right. Audio never did.
+
+  Here there is a real browser, the microphone is granted by the host because
+  nothing is ever on screen to prompt, and nothing this page does can touch the
+  game's input. The page talks to the same voice server on the same protocol.
+  The only thing it needs from the game is push to talk, which arrives from the
+  launcher over a local socket.
+*/
+'use strict';
+
+var S = document.getElementById('s');
+var cfg = null;          // {host, port, profileId, name}
+var ws = null, myPeer = 0, myProfile = 0;
+var ctx = null, mic = null, micTrack = null;
+var talking = false, mode = 'local';
+var conns = new Map();   // peerId -> record
+var places = {};         // profileId -> {pos, angleZ, cell, name}
+
+var UNITS_PER_METRE = 70;
+var RANGE = { whisper: 4, local: 18, yell: 45 };
+
+function host(kind, text) {
+  try {
+    window.chrome.webview.postMessage(JSON.stringify({ t: kind, text: String(text) }));
+  } catch (e) { }
+  if (kind === 'status') { S.textContent = text; }
+}
+
+function say(text) { host('log', text); }
+
+// Goes to launcher.log and nowhere else. The launcher has one status line and
+// it is the only thing most people ever read, so the running commentary of a
+// WebRTC connection does not get to sit on it.
+function quiet(text) { host('debug', text); }
+
+// Somebody whose name has not arrived yet is a person, not a peer id.
+function who(rec) { return (rec && rec.name) ? rec.name : 'someone nearby'; }
+
+// ------------------------------------------------------------------ audio --
+function audio() {
+  if (ctx) return ctx;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  return ctx;
+}
+
+function openMic() {
+  if (mic || !navigator.mediaDevices) return;
+  navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  }).then(function (str) {
+    mic = str;
+    micTrack = str.getAudioTracks()[0] || null;
+    // Held closed until push to talk says otherwise. The track stays in every
+    // connection so that talking does not need renegotiation.
+    if (micTrack) { micTrack.enabled = false; }
+    say('microphone open: ' + (micTrack ? (micTrack.label || 'unnamed') : 'no track'));
+    host('status', 'mic ready');
+    // Any connection built before the microphone existed needs the track now.
+    conns.forEach(function (rec) {
+      try { mic.getAudioTracks().forEach(function (t) { rec.pc.addTrack(t, mic); }); }
+      catch (e) { }
+    });
+  }).catch(function (e) {
+    say('microphone refused: ' + e);
+    host('status', 'no microphone');
+  });
+}
+
+// ------------------------------------------------------------ signalling --
+function send(o) {
+  try { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); } catch (e) { }
+}
+
+function connect() {
+  if (!cfg) return;
+  var url = 'ws://' + cfg.host + ':' + cfg.port + '/';
+  say('connecting to ' + url);
+  try { ws = new WebSocket(url); } catch (e) { say('socket refused: ' + e); return; }
+
+  ws.onopen = function () {
+    send({ t: 'join', profileId: cfg.profileId, name: cfg.name, mode: mode });
+    host('status', 'connected');
+  };
+  ws.onclose = function () {
+    host('status', 'disconnected');
+    conns.forEach(function (rec, id) { drop(id); });
+    setTimeout(connect, 2000);
+  };
+  ws.onerror = function () { };
+  ws.onmessage = function (ev) {
+    var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.t === 'welcome') { myPeer = m.peer; myProfile = cfg.profileId; return; }
+    if (m.t === 'peers') { onPeers(m.peers || []); return; }
+    if (m.t === 'pos') { places = m.who || {}; place(); return; }
+    if (m.t === 'sdp') { onSdp(m); return; }
+    if (m.t === 'ice') { onIce(m); return; }
+    if (m.t === 'vmode') {
+      var r = conns.get(m.from);
+      if (r) { r.mode = m.mode; }
+      return;
+    }
+  };
+}
+
+function onPeers(list) {
+  var seen = {};
+  list.forEach(function (p) {
+    if (p.peer === myPeer) return;
+    seen[p.peer] = true;
+    var had = conns.get(p.peer);
+    if (had) { had.mode = p.mode; had.profileId = p.profileId; had.name = p.name; return; }
+    // Only the lower peer id offers, so two offers never cross on a new pair.
+    open(p.peer, p, myPeer < p.peer);
+  });
+  conns.forEach(function (rec, id) { if (!seen[id]) drop(id); });
+  host('peers', String(conns.size));
+}
+
+function open(id, info, initiator) {
+  var pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  var a = audio();
+  var gain = a.createGain();
+  var panner = a.createPanner();
+  panner.panningModel = 'HRTF';
+  panner.distanceModel = 'inverse';
+  panner.refDistance = 1;
+  panner.rolloffFactor = 1.4;
+  panner.connect(gain).connect(a.destination);
+
+  var rec = {
+    pc: pc, panner: panner, gain: gain, el: null,
+    profileId: info.profileId, name: info.name, mode: info.mode || 'local',
+    polite: !initiator, makingOffer: false, haveRemote: false,
+    pendingIce: [], restarts: 0
+  };
+  conns.set(id, rec);
+
+  if (mic) {
+    mic.getAudioTracks().forEach(function (t) { pc.addTrack(t, mic); });
+  } else {
+    try { pc.addTransceiver('audio', { direction: 'recvonly' }); } catch (e) { }
+  }
+
+  pc.onicecandidate = function (e) {
+    if (e.candidate) send({ t: 'ice', to: id, candidate: e.candidate });
+  };
+
+  pc.oniceconnectionstatechange = function () {
+    var st = pc.iceConnectionState;
+    quiet('peer ' + id + ' (' + (rec.name || 'no name yet') + ') is ' + st);
+    if (st !== 'failed') return;
+    if (rec.restarts >= 1) {
+      // The launcher puts "Voice: " on the front of anything this sends.
+      say('could not reach ' + who(rec) + '. One of you is behind a router ' +
+          'that will not let the two of you talk directly.');
+      return;
+    }
+    rec.restarts++;
+    quiet('peer ' + id + ' failed, trying again');
+    try { pc.restartIce(); } catch (e) { }
+  };
+
+  pc.ontrack = function (e) {
+    var src = a.createMediaStreamSource(e.streams[0]);
+    src.connect(panner);
+    // Chromium will not pump a WebRTC stream through WebAudio unless it is
+    // also attached to an element. Muted: the panner is the audible path.
+    var el = new Audio();
+    el.srcObject = e.streams[0];
+    el.muted = true;
+    el.play().catch(function () { });
+    rec.el = el;
+    if (a.state === 'suspended') { a.resume().catch(function () { }); }
+    say('receiving from ' + who(rec));
+  };
+
+  // Both sides, because the microphone is opened after connections exist and
+  // adding a track needs renegotiation. Perfect negotiation settles collisions.
+  pc.onnegotiationneeded = function () {
+    rec.makingOffer = true;
+    Promise.resolve()
+      .then(function () { return pc.setLocalDescription(); })
+      .then(function () { send({ t: 'sdp', to: id, sdp: pc.localDescription }); })
+      .catch(function (e) { say('offer failed: ' + e); })
+      .then(function () { rec.makingOffer = false; });
+  };
+}
+
+function onSdp(m) {
+  var rec = conns.get(m.from);
+  if (!rec) return;
+  var collision = m.sdp.type === 'offer' &&
+                  (rec.makingOffer || rec.pc.signalingState !== 'stable');
+  if (collision && !rec.polite) return;
+
+  rec.pc.setRemoteDescription(m.sdp).then(function () {
+    rec.haveRemote = true;
+    var queued = rec.pendingIce; rec.pendingIce = [];
+    queued.forEach(function (c) { rec.pc.addIceCandidate(c).catch(function () { }); });
+    if (m.sdp.type !== 'offer') return null;
+    return rec.pc.setLocalDescription().then(function () {
+      send({ t: 'sdp', to: m.from, sdp: rec.pc.localDescription });
+    });
+  }).catch(function (e) { say('sdp failed: ' + e); });
+}
+
+function onIce(m) {
+  var rec = conns.get(m.from);
+  if (!rec) return;
+  // Candidates routinely arrive before the description they belong to.
+  if (!rec.haveRemote) { rec.pendingIce.push(m.candidate); return; }
+  rec.pc.addIceCandidate(m.candidate).catch(function () { });
+}
+
+function drop(id) {
+  var rec = conns.get(id);
+  if (!rec) return;
+  try { rec.pc.close(); } catch (e) { }
+  try { if (rec.el) { rec.el.srcObject = null; } } catch (e) { }
+  conns.delete(id);
+  host('peers', String(conns.size));
+}
+
+// ------------------------------------------------------------- positions --
+function place() {
+  var me = places[myProfile];
+  if (!me || !me.pos) return;
+  var rad = (Number(me.angleZ) || 0) * Math.PI / 180;
+  var cos = Math.cos(rad), sin = Math.sin(rad);
+
+  conns.forEach(function (rec) {
+    var them = places[rec.profileId];
+    if (!them || !them.pos || them.cell !== me.cell) { rec.gain.gain.value = 0; return; }
+    rec.gain.gain.value = 1;
+
+    var dx = them.pos[0] - me.pos[0];
+    var dy = them.pos[1] - me.pos[1];
+    var dz = them.pos[2] - me.pos[2];
+
+    // Skyrim's angle is a compass bearing, so rotate the world into the
+    // listener's frame rather than moving the listener.
+    var forward = (dy * cos + dx * sin) / UNITS_PER_METRE;
+    var right   = (dx * cos - dy * sin) / UNITS_PER_METRE;
+    var up      = dz / UNITS_PER_METRE;
+
+    rec.panner.maxDistance = RANGE[rec.mode] || RANGE.local;
+    // WebAudio looks down -z, so what is in front is negative.
+    if (rec.panner.positionX) {
+      rec.panner.positionX.value = right;
+      rec.panner.positionY.value = up;
+      rec.panner.positionZ.value = -forward;
+    } else {
+      rec.panner.setPosition(right, up, -forward);
+    }
+  });
+}
+
+// ------------------------------------------------------ the launcher talks --
+window.chrome.webview.addEventListener('message', function (e) {
+  var m; try { m = JSON.parse(e.data); } catch (err) { return; }
+
+  if (m.t === 'config') {
+    cfg = { host: m.host, port: m.port, profileId: Number(m.profileId) || 0, name: String(m.name || '') };
+    myProfile = cfg.profileId;
+    say('configured as profile ' + cfg.profileId);
+    audio();
+    openMic();
+    connect();
+    return;
+  }
+
+  if (m.t === 'ptt') {
+    talking = !!m.on;
+    if (micTrack) micTrack.enabled = talking;
+    host('talking', talking ? '1' : '0');
+    return;
+  }
+
+  if (m.t === 'mode') {
+    mode = m.mode || 'local';
+    send({ t: 'vmode', mode: mode });
+    return;
+  }
+});
+
+host('status', 'waiting for config');
+</script>

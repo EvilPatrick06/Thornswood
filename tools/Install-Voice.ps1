@@ -21,6 +21,9 @@
 #>
 [CmdletBinding()]
 param(
+  # The site the voice server asks about character creation choices. Empty
+  # turns that check off, which is how this behaved before it existed.
+  [string]$Site = 'https://thornswood.net',
     [string]$VpsHost  = '192.135.112.23',
     [string]$VpsUser  = 'Administrator',
     [string]$Root     = 'C:\Thornswood-Voice',
@@ -73,6 +76,50 @@ if ($LASTEXITCODE -ne 0) { Die "ssh exited with $LASTEXITCODE" }
 
 & scp (Join-Path $src 'voice-server.js') "${target}:$($Root -replace '\\','/')/voice-server.js"
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+
+<#
+  The shared secret for the character register, taken from version.json.
+
+  It is the game server's own password, out of a private repo, so it is not
+  public. It is not a purpose made secret either: everyone who plays here has
+  it, because having it is what playing here means.
+
+  What it buys is narrow and worth having. The register answers "which
+  characters belong to this Steam account", and a Steam id is close to public,
+  so without a second thing to know, anybody could ask the server for a
+  friend's profile ids and then connect as them. With it, reading the register
+  is exactly as hard as being allowed on the server at all. It is not
+  protection from the five people already here, and is not meant to be.
+
+  No file means the register switches itself off rather than answering openly.
+#>
+$secret = ''
+$secretFile = Join-Path (Split-Path -Parent $Here) 'server-secret.txt'
+try {
+    # Kept out of version.json on purpose: that file is published into a PUBLIC
+    # repository, so a secret written there is a secret handed to everybody.
+    # server-secret.txt is gitignored and never leaves this machine. The
+    # version.json fallback is only for a checkout made before that changed.
+    if (Test-Path -LiteralPath $secretFile) {
+        $secret = [string]([IO.File]::ReadAllText($secretFile)).Trim()
+    }
+    if (-not $secret) {
+        $vjson = Join-Path (Split-Path -Parent $Here) 'version.json'
+        if (Test-Path -LiteralPath $vjson) {
+            $secret = [string]((Get-Content -LiteralPath $vjson -Raw | ConvertFrom-Json).serverPassword)
+        }
+    }
+} catch { }
+
+if ($secret) {
+    $tmp = Join-Path $env:TEMP 'thornswood-voice-secret.txt'
+    [IO.File]::WriteAllText($tmp, $secret, (New-Object Text.UTF8Encoding($false)))
+    & scp $tmp "${target}:$($Root -replace '\\','/')/secret.txt"
+    Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue
+    Say 'character register secret sent' 'DarkGray'
+} else {
+    Say 'no server-secret.txt, so the character register stays off' 'Yellow'
+}
 & scp (Join-Path $src 'public\index.html') "${target}:$($Root -replace '\\','/')/public/index.html"
 & scp (Join-Path $src 'public\voice.js') "${target}:$($Root -replace '\\','/')/public/voice.js"
 Say 'copied' 'Green'
@@ -110,7 +157,14 @@ if (-not (Get-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContin
 }
 
 `$log = Join-Path '$Root' 'voice.log'
-`$cmd = ('/c ""{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
+# THORNSWOOD_SITE is what lets /choose check that a character creation choice
+# actually came from the person who owns that profile. That endpoint has to be
+# reachable from every person's machine, so it cannot be locked to the loopback,
+# and without this it takes anybody's word for anything.
+#
+# set is used rather than a scheduled task environment block because a task
+# action has nowhere to put one, and this is the whole command line anyway.
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
 
 <#
   Stop the old service, and mean it.

@@ -42,18 +42,43 @@ new HelpItem("Emotes", "Getting out of one",
 new HelpItem("Emotes", "It will not open over a menu",
                 "The wheel stays shut during loading screens, conversations, the appearance menu, and anything else the game is showing, and it closes itself if one of those opens while it is up. It also refuses to open while you are still in the creation room."),
 
+            // ================================================== the mods
+            new HelpItem("The mods", "Where they come from",
+                "Thornswood's mods are not in the installer. They come from a collection on Nexus, which Vortex downloads and installs for you. That is why the download is small, why a mod update does not mean reinstalling everything, and why the mods are the real ones from their own authors rather than copies."),
+
+            new HelpItem("The mods", "Installing the collection makes its own profile",
+                "You do not have to make one by hand. Vortex installs a collection into a profile of its own and switches to it, so your existing Skyrim setup is left as it was. If you have never used profiles, that is the moment they appear."),
+
+            new HelpItem("The mods", "If you do not see Profiles in Vortex",
+                "They are hidden until you turn them on. Settings, then Interface, then the Profiles switch. A Profiles entry appears in the list down the left side. Nothing about your mods changes when you turn it on."),
+
+            new HelpItem("The mods", "Making a profile for your own Skyrim",
+                "On the Profiles page, the button under the tiles makes a new one. Give it a name you will recognise, and tick both boxes: this profile has its own save games, and this profile has its own game settings. Those two are what keep Thornswood's saves and inis from mixing with your own. The icon in the bottom right of a tile copies the enabled mod list from one profile to another, which is the quick way to build a profile that matches what you already had."),
+
+            new HelpItem("The mods", "Switching between them",
+                "Each profile tile has an Enable button underneath it. Press it and Vortex deploys that profile's mods and takes the other one's out. Close Skyrim first. Switching while the game is running is how you get a save that expects mods which are no longer there."),
+
+            new HelpItem("The mods", "Play the right one",
+                "The launcher checks. If the mods it can see do not match what the server has, it says so rather than letting you load in and get turned away at the door. Almost every time, the fix is that a different profile is enabled in Vortex."),
+
+            new HelpItem("The mods", "Putting your Skyrim back to normal",
+                "Purge Mods in Vortex, under the Mods page. It takes every deployed mod out and leaves the game as it was before Vortex touched it. Nothing is deleted: the mods stay in Vortex and go back with one press of Deploy. That is the answer to \"how do I undo all of this\", and it is worth knowing before you start rather than after."),
+
+            new HelpItem("The mods", "Removing Thornswood without losing the mods",
+                "Uninstall in Settings has a box for it. Leave it unticked and the mods stay where they are, so another server that wants the same ones does not cost you the download again. The mods belong to Vortex either way, and Vortex is where they go from."),
+
             // ================================================ starting out
             new HelpItem("Starting out", "Pick the city, the trade decides the rest",
                 "Where you wake up and what you do for a living are two separate choices and they do not constrain each other. Any of the nine hold capitals is open to every trade, and Raven Rock as well. You are asked the trade first and the place second, and you arrive the moment you have answered both."),
 
             new HelpItem("Starting out", "What everyone gets, whatever they do",
-                "A full waterskin and two bottles of water, a torch, a meal or two, something to drink, and two minor potions. Fifty to a hundred and fifty gold, except the Merchant. Nobody starts with a bounty, nobody starts with a standing stone, and nobody starts as a werewolf or a vampire unless they go looking."),
+                "A full waterskin and two bottles of water, a torch, a meal or two, something to drink, and two minor potions. Fifty to a hundred and fifty gold. Nobody starts with a bounty, nobody starts with a standing stone, and nobody starts as a werewolf or a vampire unless they go looking."),
 
             new HelpItem("Starting out", "Everyone starts poor except one",
-                "Every trade begins on the poor purse: fifty to a hundred and fifty gold, cheap food, cheap drink. The Merchant sits one tier above at a hundred and fifty to four hundred, with better food and an extra potion, which is the whole point of the trade. Nobody is meant to start comfortable."),
+                "Everybody begins on the poor purse: fifty to a hundred and fifty gold, cheap food, cheap drink. Nobody is meant to start comfortable, and nothing you pick at the start changes that."),
 
-            new HelpItem("Starting out", "A trade is a starting kit, not a class",
-                "Nothing here locks a skill, a perk or a path. The Warrior can take up alchemy on the first afternoon and the Bard can wear the heaviest plate they can find. All a trade decides is what is in your hands when you stand up."),
+            new HelpItem("Starting out", "Profession and class are two choices, not one",
+                "You pick both, and they do not overlap. The profession, and which half of it, decides what you are able to make: an Edgewright cannot make armour however long they have been at it. The class decides where raw material comes from: only a Hunter loots an animal, only a Miner mines. So a Smith who took Miner digs their own ore, and a Smith who took Hunter has to know somebody who did. Neither one locks a skill or a perk. What they decide is what you can make and where the material for it comes from."),
 
             new HelpItem("Starting out", "Alchemist",
                 "Robed and stocked. The one trade that starts able to brew something worth selling.  Monk robes and boots, an iron dagger.  50 to 150 gold.  Carried: Blue Mountain Flower x3, Red Mountain Flower x3, Purple Mountain Flower x2, Lavender x3, Deathbell x2, Nirnroot x2, Thistle Branch x3, Snowberries x3, Elves Ear x3, Juniper Berries x3, Tundra Cotton x3, Frost Mirriam x2, Salt Pile x5, Alchemy skill book, Alchemy skill book II, Potion of Minor Healing x2, Potion of Minor Magicka x2, Potion of Minor Stamina x2, Potion of Cure Disease.  Plus what everyone gets: a full waterskin, two bottles of water, a torch, a meal or two and something to drink, and two minor potions."),
@@ -120,8 +145,8 @@ new HelpItem("Emotes", "It will not open over a menu",
             new HelpItem("In game", "What dying costs you",
                 "You keep everything you were carrying. Nothing is taken off your body and nobody loots you, whatever the mod's own defaults said: those are set to zero in this build. What you do lose is up to two fifths of the gold on you, a quarter of your progress toward the next level, and a quarter of your progress in whatever skills you were part way through. You wake up at the nearest temple. It is meant to sting rather than set you back a night."),
 
-            new HelpItem("In game", "No voice and no text chat, use Discord",
-                "The client this build ships is compiled without the overlay, which is where both would live: the only things it reads out of its settings file are the server address and which character you are. So there is no talk key to bind and no chat box to type in, and you will not find either on the Controls page. Discord does the job and everyone is already in it."),
+            new HelpItem("In game", "Talking to people",
+                "Proximity voice runs in the launcher rather than in the game, so whoever is near you hears you and nobody else does. There is no text chat box, because the client is compiled without the overlay both would live in. For anything out of character there is a command: type /ooc and then what you meant to say. It reaches whoever is standing near you, comes out in brackets with your name on it, and /ooc can we not ends any scene immediately with no explanation owed."),
 
             new HelpItem("In game", "Where your saves are",
                 "C:\\Thornswood\\Profile\\MyGames\\Saves, deliberately separate from your other Skyrim saves so nothing here can overwrite another playthrough. Settings, Folders, Open saves takes you straight there."),
@@ -158,7 +183,7 @@ new HelpItem("Emotes", "It will not open over a menu",
                 "Settings, Repair. It puts the game settings and load order back to exactly what shipped, without touching your saves."),
 
             new HelpItem("If it breaks", "Updates stopped arriving",
-                "If the launcher says the access token was refused, its key to the update feed has stopped working and no update can reach you until it is replaced. Ask Gavin for a new config.json and drop it into C:\\Thornswood, replacing the one there."),
+                "Updates come from a public feed and need no key on your machine, so there is nothing here that can expire. If the launcher says the access token was refused it is running a build from before that changed: take the newest installer from thornswood.net and it sorts itself. Anything else means the feed itself is not answering, which is not your end."),
 
             // ===================================================== tips
             new HelpItem("Tips", "A few settings are held in place for you",

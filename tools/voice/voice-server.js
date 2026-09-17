@@ -26,20 +26,24 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = Number(process.env.THORNSWOOD_VOICE_PORT || 7778);
-const HERE = __dirname;
 
 /*
- * Stamped into /health so that "is the VPS running the copy I just sent it"
- * is one request rather than an afternoon.
- *
- * Node does not reload a file it has already required, so copying this up
- * changes nothing until the scheduled task is restarted, and every symptom of
- * a missed restart looks like a bug somewhere else. Slash commands echoing
- * into the room instead of reaching the game server was exactly that.
- *
- * Bump it whenever anything in this file changes behaviour.
- */
-const BUILD = 'chat-commands-2';
+  Where to check that a character creation choice came from the person who owns
+  that profile.
+
+  /choose cannot be locked to the loopback: every person's launcher calls it
+  from their own machine, which is the whole point of it. So until now it took
+  anybody's word for anything, and a stranger could set your profession, your
+  half and your home town before you ever claimed them.
+
+  THORNSWOOD_SITE off means no checking, which is how this behaved before and
+  is still the behaviour when the site cannot be reached. That is deliberate:
+  being unable to create a character is loud and total, and the thing being
+  prevented is griefing rather than a breach. Every unverified choice is logged
+  so it is visible rather than silent.
+*/
+const SITE = String(process.env.THORNSWOOD_SITE || '').replace(/\/+$/, '');
+const HERE = __dirname;
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -249,6 +253,49 @@ function readBody(req, res, limit, then) {
 // ------------------------------------------------------------------ http ---
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 
+
+/*
+  Ask the site whether this ticket owns this profile.
+
+  Answers 'yes', 'no', or 'unchecked' when there is nobody to ask. Never throws
+  and never hangs: a three second timeout, and anything unexpected counts as
+  unchecked rather than as a refusal, because refusing on a hiccup would stop
+  somebody creating a character for no reason they could understand.
+*/
+function owns(ticket, profileId, then) {
+  if (!SITE || !ticket) { then('unchecked'); return; }
+  let mod;
+  try { mod = SITE.startsWith('https:') ? require('https') : require('http'); }
+  catch (e) { then('unchecked'); return; }
+
+  const payload = JSON.stringify({ ticket: ticket, profileId: profileId });
+  let done = false;
+  const finish = (v) => { if (!done) { done = true; then(v); } };
+
+  let req2;
+  try {
+    req2 = mod.request(SITE + '/api/play/owns', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json',
+                 'content-length': Buffer.byteLength(payload) }
+    }, (resp) => {
+      let buf = '';
+      resp.on('data', (d) => { buf += d; });
+      resp.on('end', () => {
+        if (resp.statusCode !== 200) { finish('unchecked'); return; }
+        let doc;
+        try { doc = JSON.parse(buf); } catch (e) { finish('unchecked'); return; }
+        finish(doc && doc.ok === true ? 'yes' : 'no');
+      });
+    });
+  } catch (e) { finish('unchecked'); return; }
+
+  req2.setTimeout(3000, () => { try { req2.destroy(); } catch (e) { } finish('unchecked'); });
+  req2.on('error', () => finish('unchecked'));
+  req2.write(payload);
+  req2.end();
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/positions') {
     // Loopback only. This is the gamemode talking to the service on the same
@@ -296,19 +343,41 @@ const server = http.createServer((req, res) => {
     readBody(req, res, 4000, (doc) => {
       const pid = Number(doc.profileId);
       if (!pid) { res.writeHead(400).end('no profileId'); return; }
-      // Not validated against a list here on purpose. The gamemode holds the
-      // trades and the towns and checks them against the records it actually
-      // has; a second copy of that list here could only ever drift from it.
-      choices[String(pid)] = {
-        trade: String(doc.trade || ''),
-        town: String(doc.town || ''),
-        name: String(doc.name || ''),
-        at: Date.now()
-      };
-      saveChoices();
-      console.log('[voice] choice stored for profile ' + pid +
-                  ': ' + choices[String(pid)].trade + ' in ' + choices[String(pid)].town);
-      res.writeHead(204).end();
+
+      owns(String(doc.ticket || ''), pid, (verdict) => {
+        if (verdict === 'no') {
+          console.log('[voice] REFUSED a choice for profile ' + pid +
+                      ': the ticket does not own it');
+          res.writeHead(403).end('not your profile');
+          return;
+        }
+        if (verdict === 'unchecked') {
+          console.log('[voice] UNVERIFIED choice for profile ' + pid +
+                      (SITE ? ' (could not reach ' + SITE + ')' : ' (THORNSWOOD_SITE not set)'));
+        }
+        // Not validated against a list here on purpose. The gamemode holds the
+        // trades and the towns and checks them against the records it actually
+        // has; a second copy of that list here could only ever drift from it.
+        choices[String(pid)] = {
+          // trade is the PROFESSION key, and stays called trade because it is
+          // what keys the starter kits and what every older launcher sends.
+          trade: String(doc.trade || ''),
+          // Which half of it. One key, or two joined by + for the mage's schools.
+          half: String(doc.half || ''),
+          // Where raw material comes from. Carries no kit of its own.
+          cls: String(doc.cls || ''),
+          town: String(doc.town || ''),
+          name: String(doc.name || ''),
+          at: Date.now()
+        };
+        saveChoices();
+        console.log('[voice] choice stored for profile ' + pid +
+                    ': ' + choices[String(pid)].trade +
+                    (choices[String(pid)].half ? '/' + choices[String(pid)].half : '') +
+                    (choices[String(pid)].cls ? ', ' + choices[String(pid)].cls : '') +
+                    ' in ' + choices[String(pid)].town);
+        res.writeHead(204).end();
+      });
     });
     return;
   }
@@ -374,8 +443,7 @@ const server = http.createServer((req, res) => {
 
   if (route === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, build: BUILD,
-                            peers: peers.size, tracked: positions.size,
+    res.end(JSON.stringify({ ok: true, peers: peers.size, tracked: positions.size,
                             waitingChoices: Object.keys(choices).length,
                             queuedCommands: commands.length }));
     return;

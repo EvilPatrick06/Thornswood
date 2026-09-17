@@ -40,8 +40,60 @@ param(
     [string]$ServerName = 'Thornswood',
     [int]   $Port     = 7777,
     [switch]$MinimalLoadOrder,   # masters plus Thornswood-Content.esp only
-    [switch]$FullLoadOrder       # list everything, indices be damned. for bisecting
+    [switch]$FullLoadOrder,      # list everything, indices be damned. for bisecting
+    [switch]$Vortex              # read the Steam game and the active Vortex profile
 )
+
+# ---------------------------------------------------------------- -Vortex ---
+#
+# Where the build actually is.
+#
+# Two answers, and the wrong one is silent: it produces a load order that
+# looks fine and does not match what anybody is running. The old build under
+# C:\Thornswood\Game is still on this machine and still readable, so a default
+# that points at it keeps working long after it stopped being the truth.
+#
+# -Vortex reads the live one instead: Skyrim where Steam put it, with the mods
+# Vortex has deployed into it, and the plugin list of whichever Vortex profile
+# is active. That is what is loaded when the game starts, so it is what the
+# server should be built from.
+function Get-SkyrimPath {
+    $roots = @()
+    foreach ($k in 'HKCU:\Software\Valve\Steam','HKCU:\Software\Wow6432Node\Valve\Steam') {
+        try { $p = (Get-ItemProperty -Path $k -Name SteamPath -EA Stop).SteamPath } catch { continue }
+        if ($p) { $roots += ($p -replace '/','\') }
+    }
+    try { $p = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam' -Name InstallPath -EA Stop).InstallPath } catch { $p = $null }
+    if ($p) { $roots += $p }
+
+    # Games are not always in Steam's own folder. Every extra library is listed
+    # in this file, one "path" line each, with the separator escaped.
+    foreach ($r in @($roots)) {
+        $vdf = Join-Path $r 'config\libraryfolders.vdf'
+        if (-not (Test-Path -LiteralPath $vdf)) { continue }
+        foreach ($line in (Get-Content -LiteralPath $vdf)) {
+            $m = [regex]::Match($line, '^\s*"path"\s+"(.+)"\s*$')
+            if ($m.Success) { $roots += ($m.Groups[1].Value -replace '\\\\','\') }
+        }
+    }
+
+    foreach ($r in ($roots | Select-Object -Unique)) {
+        $g = Join-Path $r 'steamapps\common\Skyrim Special Edition'
+        if (Test-Path -LiteralPath (Join-Path $g 'SkyrimSE.exe')) { return $g }
+    }
+    return ''
+}
+
+if ($Vortex) {
+    $sk = Get-SkyrimPath
+    if (-not $sk) { throw "Could not find Skyrim Special Edition through Steam, so -Vortex has nothing to read." }
+    $Data    = Join-Path $sk 'Data'
+    $Plugins = Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition\Plugins.txt'
+    if (-not (Test-Path -LiteralPath $Plugins)) { throw "No plugin list at $Plugins. Start Vortex, activate the Thornswood profile and deploy, then run this again." }
+    Write-Host "  -Vortex" -ForegroundColor Cyan
+    Write-Host "    data     $Data" -ForegroundColor DarkGray
+    Write-Host "    plugins  $Plugins" -ForegroundColor DarkGray
+}
 
 
 # Resolved from where this script is rather than from a fixed path under

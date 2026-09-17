@@ -52,6 +52,7 @@ function Get-GameProcesses {
             if ($n -eq 'Thornswood' -or $n -eq 'SkyrimTogether') {
                 if (-not $path) { continue }
                 if ($launcher -and ($path -eq $launcher)) { continue }
+                if ($path -like '*\Launcher\Thornswood.exe') { continue }
             }
             $out += $p
         }

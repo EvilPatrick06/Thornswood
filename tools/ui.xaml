@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Thornswood" Width="1220" Height="800" MinWidth="1020" MinHeight="670"
+        Title="ThornsWood" Width="1220" Height="800" MinWidth="1020" MinHeight="670"
         WindowStyle="None" ResizeMode="CanResize" WindowStartupLocation="Manual"
         Background="#100D0A" FontFamily="Segoe UI" TextOptions.TextFormattingMode="Display">
 
@@ -417,7 +417,7 @@
                 <StackPanel Orientation="Horizontal" Margin="22,16,18,0">
                   <Image x:Name="EmblemSmall" Width="28" Height="28" Margin="0,0,12,0" VerticalAlignment="Center"
                          RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed"/>
-                  <TextBlock Text="Thornswood" FontFamily="Constantia, Georgia" FontSize="17"
+                  <TextBlock x:Name="TxtBrandSmall" Text="ThornsWood" FontFamily="Constantia, Georgia" FontSize="17"
                              Typography.Capitals="SmallCaps" TextOptions.TextFormattingMode="Ideal"
                              Foreground="{DynamicResource Ink}" VerticalAlignment="Center"/>
                 </StackPanel>
@@ -523,7 +523,7 @@
                     <Image x:Name="Emblem" Width="84" Height="84" Margin="0,0,22,0" VerticalAlignment="Center"
                            RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed"/>
                     <StackPanel VerticalAlignment="Center">
-                      <TextBlock Text="Thornswood" Style="{StaticResource Display}"/>
+                      <TextBlock x:Name="TxtBrandBig" Text="ThornsWood" Style="{StaticResource Display}"/>
                       <StackPanel Orientation="Horizontal" Margin="2,8,0,0">
                         <Rectangle Width="26" Height="2" Fill="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                         <TextBlock x:Name="TxtHeroLine" Style="{StaticResource Small}" FontSize="12" VerticalAlignment="Center"/>
@@ -549,6 +549,29 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
+                  <!-- Discord is the door. The launcher asks the site who you are
+                       every time you press Play, so this has to be linked before
+                       the game will start. -->
+                  <StackPanel x:Name="DiscordCard">
+                    <TextBlock Text="Your account" Style="{StaticResource Eyebrow}"/>
+                    <Border Style="{StaticResource Slab}">
+                      <StackPanel>
+                        <TextBlock x:Name="LabelDiscord" Style="{StaticResource Body}"
+                                   Text="Discord: not linked"/>
+                        <TextBlock x:Name="NoteDiscord" Style="{StaticResource Small}"
+                                   Foreground="{DynamicResource Muted}" TextWrapping="Wrap"
+                                   Margin="0,6,0,0"
+                                   Text="Thornswood asks Discord who you are. One click, your browser opens, and it closes itself."/>
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                          <Button x:Name="ButtonDiscord" Style="{StaticResource Ghost}"
+                                  Content="Connect Discord"/>
+                          <Button x:Name="ButtonDiscordForget" Style="{StaticResource Link}"
+                                  Content="Forget it" Margin="12,0,0,0" Visibility="Collapsed"/>
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+
                   <StackPanel x:Name="FirstRunCard">
                     <TextBlock Text="First time" Style="{StaticResource Eyebrow}"/>
                     <Border Style="{StaticResource Slab}">
@@ -707,13 +730,22 @@
               <StackPanel Grid.Column="0" Orientation="Horizontal">
                 <Button x:Name="TabPlugins" Style="{StaticResource Ghost}" Content="Server list" Margin="0,0,8,0"/>
                 <Button x:Name="TabSkse"    Style="{StaticResource Ghost}" Content="Script extender" Margin="0,0,8,0"/>
-                <Button x:Name="TabMine"    Style="{StaticResource Ghost}" Content="Your own"/>
+                <Button x:Name="TabMine"    Style="{StaticResource Ghost}" Content="Your own" Margin="0,0,8,0"/>
+                <Button x:Name="TabAddons"  Style="{StaticResource Ghost}" Content="Add-ons"/>
               </StackPanel>
               <TextBox x:Name="BoxSearch" Grid.Column="1" Style="{StaticResource Field}" Margin="18,0,0,0" MaxWidth="340" HorizontalAlignment="Right"/>
             </Grid>
 
             <StackPanel Grid.Row="2" Margin="0,15,0,0">
               <TextBlock x:Name="TxtModCount" Style="{StaticResource Small}"/>
+              <Border x:Name="AddonsCard" Style="{StaticResource Slab}" Margin="0,13,0,0" Visibility="Collapsed">
+                <StackPanel>
+                  <TextBlock Style="{StaticResource Body}" Text="Extras you can have if you want them and skip if you do not. These are textures, meshes, weather and shaders, never a plugin, which is why they are safe: the server compares plugin lists and never looks at anything in here. Nobody is at a disadvantage for leaving them off, and the installer does not carry them, so it stays small."/>
+                  <StackPanel Orientation="Horizontal" Margin="0,15,0,0">
+                    <Button x:Name="BtnRefreshAddons" Style="{StaticResource Ghost}" Content="Check for add-ons"/>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
               <Border x:Name="MineCard" Style="{StaticResource Slab}" Margin="0,13,0,0" Visibility="Collapsed">
                 <StackPanel>
                   <TextBlock Style="{StaticResource Body}" Text="Anything you drop in the folder below is copied into the game every time you press Play. Textures, meshes, sounds and music are safe, because the server only compares plugin lists and never sees them. A plugin here (.esp, .esm or .esl) will get you rejected when you connect, and the scan above will flag it."/>
@@ -888,18 +920,31 @@
                 <TextBlock Text="Display" Style="{StaticResource Eyebrow}"/>
                 <StackPanel Margin="0,0,0,30">
                   <StackPanel x:Name="DisplayModeRow" Orientation="Horizontal" Margin="0,0,0,15"/>
+                  <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="155"/><ColumnDefinition Width="12"/>
+                      <ColumnDefinition Width="112"/><ColumnDefinition Width="14"/>
+                      <ColumnDefinition Width="Auto"/><ColumnDefinition Width="18"/>
+                      <ColumnDefinition Width="86"/><ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Style="{StaticResource Small}" Text="Resolution"/>
+                    <TextBlock Grid.Column="2" Style="{StaticResource Small}" Text="Frame limit"/>
+                    <TextBlock Grid.Column="6" Style="{StaticResource Small}" Text="Field of view"/>
+                  </Grid>
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="155"/><ColumnDefinition Width="12"/>
                       <ColumnDefinition Width="112"/><ColumnDefinition Width="14"/>
-                      <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/><ColumnDefinition Width="18"/>
+                      <ColumnDefinition Width="86"/><ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="BoxResolution" Grid.Column="0" Style="{StaticResource Field}" FontFamily="Cascadia Mono, Consolas"/>
                     <TextBox x:Name="BoxFrameLimit" Grid.Column="2" Style="{StaticResource Field}" FontFamily="Cascadia Mono, Consolas"/>
                     <CheckBox x:Name="ChkVSync" Grid.Column="4" Content="VSync" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    <TextBox x:Name="BoxFov" Grid.Column="6" Style="{StaticResource Field}" FontFamily="Cascadia Mono, Consolas"/>
                   </Grid>
                   <TextBlock x:Name="TxtDisplayNote" Style="{StaticResource Small}" Margin="0,10,0,0"
-                             Text="Resolution as 1920x1080, frame limit in frames per second. Blank resolution leaves it to the game."/>
+                             Text="Resolution as 1920x1080, frame limit in frames per second. Blank resolution leaves it to the game. Skyrim's own field of view is 65; leave it there and nothing touches it."/>
                   <CheckBox x:Name="ChkLockRes" Content="Lock resolution" Margin="0,14,0,0"/>
                   <TextBlock Style="{StaticResource Body}" Margin="0,4,0,0"
                              Text="Left unticked, pressing Play sets the game to whatever your screen is currently running at. Tick it to keep the resolution you typed above, even when it does not match the monitor."/>
@@ -936,11 +981,25 @@
 
                     <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
 
-                    <TextBlock Style="{StaticResource H2}" Text="Uninstall Thornswood"/>
+                    <StackPanel x:Name="PnlDev">
+                      <TextBlock Style="{StaticResource H2}" Text="The dev build"/>
+                      <TextBlock Style="{StaticResource Body}" Text="A second launcher beside this one, in its own folder with its own Start menu entry. It gets new changes first and joins the dev server, so things get broken there instead of here. Same Skyrim, same mods; each launcher puts its own files back before it plays. Characters on the dev server are separate, and they are throwaway. The Owner and Dev roles only."/>
+                      <TextBlock x:Name="TxtDevState" Style="{StaticResource Small}" Margin="0,8,0,0"/>
+                      <StackPanel Orientation="Horizontal" Margin="0,13,0,0">
+                        <Button x:Name="BtnDevInstall" Style="{StaticResource Ghost}" Content="Install the dev build" Margin="0,0,8,0"/>
+                        <Button x:Name="BtnDevRemove" Style="{StaticResource Ghost}" Content="Remove the dev build"/>
+                      </StackPanel>
+
+                      <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
+                    </StackPanel>
+
+                    <TextBlock Style="{StaticResource H2}" Text="Uninstall ThornsWood"/>
                     <TextBlock Style="{StaticResource Body}" Text="Puts your Windows Skyrim folders back, then deletes this build and the launcher with it. Your own Skyrim in Steam is never touched: this is a separate copy and Steam does not know it exists. There is no undo, and the whole thing has to be downloaded again afterwards."/>
+                    <CheckBox x:Name="ChkDeleteMods" Content="Delete the mods as well" Margin="0,13,0,0" IsChecked="True"/>
+                    <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0" Text="Untick this and the Game folder stays exactly where it is. Reinstalling then reuses what is already on the disk instead of pulling the whole collection down again, which is the difference between a few minutes and an evening."/>
                     <CheckBox x:Name="ChkKeepSaves" Content="Keep this build's saves and settings" Margin="0,13,0,0" IsChecked="True"/>
                     <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0" Text="Leaves the Profile folder where it is, so a reinstall picks your characters and settings back up."/>
-                    <Button x:Name="BtnUninstall" Style="{StaticResource Ghost}" Content="Uninstall Thornswood" HorizontalAlignment="Left" Margin="0,15,0,0"/>
+                    <Button x:Name="BtnUninstall" Style="{StaticResource Ghost}" Content="Uninstall ThornsWood" HorizontalAlignment="Left" Margin="0,15,0,0"/>
                   </StackPanel>
                 </Border>
               </StackPanel>
@@ -958,6 +1017,19 @@
                      VerticalAlignment="Center" HorizontalAlignment="Right"/>
         </Grid>
       </Border>
+
+      <!-- ================= in window dialogs =================
+           Character creation used to be its own top level window. That is a
+           second thing to alt tab past, it lands wherever Windows decides,
+           and anybody capturing the launcher window rather than the whole
+           screen loses the entire of character creation off their stream.
+           It goes in here instead, over everything including the title bar.
+           ============================================================== -->
+      <Grid x:Name="Overlay" Grid.RowSpan="3" Panel.ZIndex="99" Visibility="Collapsed"
+            Background="#D00A0807">
+        <Border x:Name="OverlayHost"/>
+      </Grid>
+
     </Grid>
   </Border>
 </Window>
