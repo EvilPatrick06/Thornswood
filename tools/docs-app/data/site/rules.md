@@ -48,7 +48,7 @@ Send people here instead.
 Open microphones with a fan in the background ruin it for everybody.
 
 **6. Bugs and ideas have their own channels.**
-Not general, where they get lost. Check the known issues first.
+Not general, where they get lost. Check the [known issues](/known) first.
 
 **7. Staff decide.**
 If a Moderator or a Gamemaster asks you to stop, stop first and argue after.

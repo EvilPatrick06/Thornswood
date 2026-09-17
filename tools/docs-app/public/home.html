@@ -544,6 +544,8 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
         <a href="/downloads">How to join</a>
         <a href="/downloads">Download</a>
         <a href="/classes">Professions</a>
+        <a href="/help">Help</a>
+        <a href="/known">Known issues</a>
         <a href="/report">Report a problem</a>
       </div>
       <div>
@@ -589,7 +591,7 @@ Array.prototype.forEach.call(nav.querySelectorAll('a'), function(a){ a.onclick =
   to a file rather than a deploy.
 */
 var PAGES = { '/world':1, '/rules':1, '/join':1, '/support':1, '/credits':1,
-              '/classes':1 };
+              '/classes':1, '/known':1, '/help':1 };
 var here = location.pathname.replace(/\/+$/, '').toLowerCase() || '/';
 
 /* What each address says when it is pasted into a channel. A crawler reads the

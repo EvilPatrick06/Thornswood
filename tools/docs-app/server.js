@@ -163,7 +163,15 @@ const LEVEL = {
    and a login box was the first thing anybody saw. */
 const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/support', '/join',
                       '/classes', '/roadmap', '/news', '/gallery',
-                      '/downloads', '/report'];
+                      '/downloads', '/report',
+                      // Known Issues and Help are for the person whose install
+                      // will not start or who cannot sign in, so they cannot
+                      // sit behind the sign in. They are known.md and help.md
+                      // in the data folder, read through /api/page like the
+                      // site pages. The hub's own pages moved to /hub/known
+                      // and /hub/help to make room.
+                      '/known', '/help'];
+const PUBLIC_DOCS = ['known', 'help'];
 /* The public pages are markdown on disk like everything else here, so the
    wording can be fixed from the site rather than by a deploy. */
 const SITE = path.join(DATA, 'site');
@@ -195,8 +203,8 @@ const escAttr = (s) => String(s == null ? '' : s)
 
 const PAGES = {
   '/hub':         'home',
-  '/help':        'help',
-  '/known':       'known',
+  '/hub/help':    'help',
+  '/hub/known':   'known',
   '/roadmap':     'roadmap',
   '/suggestions': 'suggestions',
   '/news':        'news',
@@ -1077,8 +1085,11 @@ http.createServer(async (req, res) => {
 
   const pg = route.match(/^\/api\/page\/([a-z-]+)$/);
   if (pg && req.method === 'GET') {
-    const file = path.join(SITE, pg[1] + '.md');
-    if (!file.startsWith(SITE + path.sep) || !fs.existsSync(file)) {
+    // Known Issues and Help live in the data folder with the other documents
+    // (Help is edited in the hub), not under site. Same read, other folder.
+    const dir = PUBLIC_DOCS.indexOf(pg[1]) >= 0 ? DATA : SITE;
+    const file = path.join(dir, pg[1] + '.md');
+    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
       return sendJson(res, 404, { error: 'no such page' });
     }
     return sendJson(res, 200, { md: fs.readFileSync(file, 'utf8') });
