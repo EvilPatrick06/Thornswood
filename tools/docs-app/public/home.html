@@ -822,6 +822,35 @@ if (PAGES[here]) {
              '</p></div>';
     }
 
+    // Say what Windows is going to do before it does it.
+    //
+    // Defender flags the installer as Trojan:Win32/Wacatac.B!ml and Chrome
+    // then refuses the download outright. The !ml is the whole story: it is a
+    // machine learning guess, not a match against known malware, and the thing
+    // it is guessing from is the shape. A small unsigned .NET program that
+    // fetches a payload and runs it is what a downloader trojan looks like,
+    // and it is also exactly what a setup stub is. Every build since 15 Sep
+    // has been flagged.
+    //
+    // Somebody who meets that with no explanation is right to stop, so this
+    // says it plainly and does not tell anybody to switch anything off. The
+    // honest fix is a signing certificate, and until there is one this is the
+    // least it can do.
+    if (exe) {
+      grab += '<p class="also faintly" style="margin-top:14px">' +
+              '<strong>Windows may say this file is a virus.</strong> Do not take our word for ' +
+              'that either. Put the file into VirusTotal and see for yourself what agrees and what ' +
+              'does not. Defender calls it ' +
+              'Trojan:Win32/Wacatac.B!ml. The ml on the end means a machine guessed, from the ' +
+              'shape of the file, rather than recognising anything: the installer is a small ' +
+              'unsigned program that downloads the rest and runs it, which is what a setup ' +
+              'program does and also what a bad one does. We have not bought a signing ' +
+              'certificate yet, which is the thing that would settle it. Until we do, that ' +
+              'warning comes with every build. If you would rather not click past a malware ' +
+              'warning, do not, and say so in Discord instead. That is a reasonable thing to do ' +
+              'and nobody will mind.</p>';
+    }
+
     out += '<h2>Apply first, then four steps</h2>' +
            '<div class="steps">' +
            '<div class="step"><div><h3>Come into the Discord and apply</h3>' +
