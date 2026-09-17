@@ -18,7 +18,7 @@ namespace Thornswood
     {
         static bool ownGameBusy, ownGameStarted, restarting;
         static TextBlock txtOwnGameState;
-        static Button btnOwnGameMake, btnOwnGameRefresh;
+        static Button btnOwnGameMake, btnOwnGameRefresh, btnFirewall;
 
         static void WireOwnGame()
         {
@@ -30,6 +30,45 @@ namespace Thornswood
             if (btnOwnGameMake != null) btnOwnGameMake.Click += delegate { AskOwnGame(false); };
             if (btnOwnGameRefresh != null) btnOwnGameRefresh.Click += delegate { StartOwnGame(false, true); };
             if (panel != null) panel.IsVisibleChanged += delegate { if (panel.IsVisible) DrawOwnGame(); };
+
+            // The firewall question about the game's browser.
+            //
+            // A button rather than something the launcher does on its own,
+            // because writing a firewall rule needs administrator and a
+            // Windows prompt appearing unasked when somebody opens a launcher
+            // is worse than the thing it fixes. Pressed once per machine.
+            btnFirewall = F<Button>("BtnFirewall");
+            if (btnFirewall != null)
+            {
+                btnFirewall.Click += delegate
+                {
+                    btnFirewall.IsEnabled = false;
+                    if (Firewall.Present().Count == 0)
+                    {
+                        Log("There is no browser helper in this game folder, so Windows has nothing to ask about.");
+                        btnFirewall.IsEnabled = true;
+                        return;
+                    }
+
+                    Log("Writing the firewall rule. Windows will ask for administrator.");
+                    ThreadPool.QueueUserWorkItem(delegate
+                    {
+                        string said = null;
+                        try { said = Firewall.Ensure(delegate(string line) { Tell(line); }); }
+                        catch (Exception ex) { said = "Could not write the rule: " + ex.Message; }
+                        string final = said;
+                        try
+                        {
+                            win.Dispatcher.BeginInvoke((Action)delegate
+                            {
+                                if (!string.IsNullOrEmpty(final)) Log(final);
+                                btnFirewall.IsEnabled = true;
+                            });
+                        }
+                        catch { }
+                    });
+                };
+            }
 
             // Once the window is on screen, so a question has something to sit
             // in front of and the check does not hold up the first draw.
@@ -50,6 +89,13 @@ namespace Thornswood
             };
 
             DrawOwnGame();
+        }
+
+        /// <summary>A log line from a pool thread, put back on the window's.</summary>
+        static void Tell(string line)
+        {
+            try { win.Dispatcher.BeginInvoke((Action)delegate { Log(line); }); }
+            catch { }
         }
 
         static void OwnGameAtStart()

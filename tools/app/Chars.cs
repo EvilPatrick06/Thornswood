@@ -747,9 +747,15 @@ namespace Thornswood
         /// SkyrimPlatform stops on that before the game draws anything. A
         /// machine with NirnLab in the folder has one working answer.
         ///
-        /// Which means the firewall prompt is not fixable from here. It goes
-        /// when NirnLab is not in the folder, and Thornswood only controls
-        /// that in the game folder it builds itself.
+        /// The firewall prompt is not fixable from here either, and not for
+        /// the reason this used to give. BOTH backends draw out of process.
+        /// NirnLab starts CEFSubprocess.exe; the one we ship starts
+        /// SkyrimPlatformCEF.exe.hidden, which lives in
+        /// Data\Platform\Distribution\RuntimeDependencies and goes out in the
+        /// installer. On 17 Sep a search for *.exe missed it, because of the
+        /// .hidden on the end, and this comment said tilted spawned nothing.
+        /// Taking NirnLab out changes which program Windows asks about and
+        /// nothing else. The answer is a firewall rule; see Firewall.cs.
         ///
         /// The file is edited, never rewritten. It also carries the log level,
         /// the console window geometry and the plugin folder list, none of
@@ -785,11 +791,12 @@ namespace Thornswood
                 // Measured on 17 Sep. This method was changed to prefer
                 // tilted, a launcher carrying that change wrote tilted into
                 // a game folder that had NirnLab in it, and the next Play
-                // produced exactly that box. Choosing tilted here is not a
-                // way to get rid of the CEFSubprocess.exe firewall prompt.
-                // The only way to get rid of that is for NirnLab not to be
-                // in the folder at all, which is New-GameFolder's job when
-                // Thornswood builds a folder of its own.
+                // produced exactly that box.
+                //
+                // Choosing a backend here is also not a way to get rid of the
+                // firewall prompt. Whichever one runs starts a second program
+                // that binds a socket, so the prompt follows the backend
+                // rather than going away. Firewall.cs is what settles it.
                 string want = nirnlab ? "nirnlab" : "tilted";
 
                 string text = File.ReadAllText(PlatformIni);
