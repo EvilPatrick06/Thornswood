@@ -34,9 +34,66 @@ const WORLDSPACES = new Set(DATA.worldspaces);
 // small helpers
 // ---------------------------------------------------------------------------
 
+/*
+  Thornswood's own lines, in a file of their own.
+
+  Of 6,617 lines in one day's server.log, 951 were "Script not found in the
+  script storage", 785 were "GetBaseActorValues Negative Magicka/Health/
+  Stamina" for eight NPC base forms, and 3,412 were "Skipping non-Sweet
+  scripts". That is 78 percent of the log, none of it ours and none of it
+  actionable, and every real finding had to be dug out from under it.
+
+  So every line this file writes goes to the console as before, and also to
+  thornswood.log beside the server's data, which holds nothing else. Nothing
+  is filtered out of server.log: the engine's noise is still there for anybody
+  who wants it, it is just no longer the only place our own lines live.
+
+  Opened lazily and given up on for good the first time a write fails, because
+  a log that throws once a tick is worse than no log.
+*/
+let logFile = null;
+let logBroken = false;
+
+function logPath() {
+  if (logFile !== null || logBroken) { return logFile; }
+  try {
+    const fsl = require('fs');
+    const pathl = require('path');
+    let dataDir = 'data';
+    try {
+      const cfg = JSON.parse(fsl.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+    } catch (e) { }
+    logFile = pathl.join(dataDir, 'thornswood.log');
+  } catch (e) {
+    logBroken = true;
+    logFile = null;
+  }
+  return logFile;
+}
+
+function stamp() {
+  const d = new Date();
+  const two = (n) => (n < 10 ? '0' + n : String(n));
+  return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) +
+         ' ' + two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds());
+}
+
 function log() {
   const args = Array.prototype.slice.call(arguments);
-  console.log('[thornswood] ' + args.join(' '));
+  const line = '[thornswood] ' + args.join(' ');
+  console.log(line);
+  if (logBroken) { return; }
+  const where = logPath();
+  if (!where) { return; }
+  try {
+    require('fs').appendFileSync(where, stamp() + ' ' + line + '\n');
+  } catch (e) {
+    // Once. A log that throws every tick is worse than no log.
+    logBroken = true;
+    console.log('[thornswood] could not write thornswood.log, carrying on ' +
+                'with the console only: ' + e);
+  }
 }
 
 /** Run fn, swallow and report anything it throws. Handlers must never escape. */
@@ -979,6 +1036,40 @@ function chargenTick() {
   for (const actorId of online) {
     if (!firstSeen.has(actorId)) {
       firstSeen.set(actorId, now);
+      /*
+        Somebody who arrives already dead still gets a temple.
+
+        spawnPoint is only ever written in onDeath, at the moment the body
+        falls, so a death that happened while the client was disconnected, or
+        during a kick window, leaves the character dead with whatever spawn
+        point they had before. The SkyMP server does respawn a dead actor when
+        it re-attaches, so they come back, and they come back at the default
+        point rather than at the nearest consecrated ground.
+
+        Written here, once, on the tick that first sees them. Nothing is moved
+        and nothing is resurrected: this only decides where the respawn the
+        server is already going to do puts them.
+      */
+      let dead = false;
+      try { dead = !!mp.get(actorId, 'isDead'); } catch (e) { dead = false; }
+      if (dead) {
+        try {
+          const where = {
+            desc: mp.get(actorId, 'worldOrCellDesc'),
+            pos: mp.get(actorId, 'pos'),
+          };
+          const back = resolveArrival(where);
+          if (back) {
+            mp.set(actorId, 'spawnPoint', {
+              cellOrWorldDesc: back.desc, pos: back.pos, rot: back.rot,
+            });
+            log('login', actorId.toString(16), 'came back dead in', where.desc,
+                '-> ' + back.cell + ' (' + back.slot + ')');
+          }
+        } catch (e) {
+          log('login', actorId.toString(16), 'could not set a spawn point:', e);
+        }
+      }
     }
     if (now - firstSeen.get(actorId) < SETTLE_MS) {
       continue;
@@ -1840,15 +1931,38 @@ log('gamemode loaded:',
     if (globalThis.__thornswoodOnlineWriter) {
       try { clearInterval(globalThis.__thornswoodOnlineWriter); } catch (e) { }
     }
+    var lastRestarting = false;
+
     globalThis.__thornswoodOnlineWriter = setInterval(function () {
       var n = 0;
       try { n = (mp.get(0, 'onlinePlayers') || []).length; } catch (e) { return; }
-      // Only when it moves. This file sits in a folder the server serves, and
-      // rewriting it twice a second for no reason is churn nobody asked for.
-      if (n === lastWritten) return;
-      lastWritten = n;
+
+      /*
+        Whether a countdown is running, for the client's own probe.
+
+        thornswood-front.js watches this folder to decide the server is still
+        there, and quits to the main menu after a run of misses. A restart
+        people were told to sit through looks identical to the server being
+        gone, so everybody who did as they were told got thrown out anyway.
+        The countdown state lives on globalThis so this writer can see it from
+        another block.
+      */
+      var restarting = false;
       try {
-        fs.writeFileSync(onlineFile, JSON.stringify({ now: n, at: Date.now() }));
+        var r = globalThis.__thornswoodRestart;
+        restarting = !!(r && r.at && r.at > Date.now());
+      } catch (e) { restarting = false; }
+
+      // Only when something moves. This file sits in a folder the server
+      // serves, and rewriting it twice a second for no reason is churn nobody
+      // asked for.
+      if (n === lastWritten && restarting === lastRestarting) return;
+      lastWritten = n;
+      lastRestarting = restarting;
+      try {
+        fs.writeFileSync(onlineFile, JSON.stringify({
+          now: n, at: Date.now(), restarting: restarting
+        }));
       } catch (e) { }
     }, 2000);
 
@@ -2623,9 +2737,18 @@ log('gamemode loaded:',
 (function () {
   'use strict';
 
+  /*
+    A hot reload replaces this block rather than being turned away by it.
+
+    This used to return early when it had already run, which kept an in flight
+    countdown alive but meant every edit to a command sat in the file doing
+    nothing until somebody restarted the server. The countdown is the only
+    thing here worth keeping across a reload, so it lives on globalThis and
+    survives on its own, and the timer at the bottom clears the old one before
+    arming a new one. Everything else is functions, and replacing those is the
+    point of a reload.
+  */
   var g = globalThis;
-  if (g.__thornswoodCommands) { return; }
-  g.__thornswoodCommands = true;
 
   var VOICE_PORT = 7778;
 
@@ -2877,7 +3000,14 @@ log('gamemode loaded:',
     keeping any more, and the reconnect that follows is messier than a clean
     exit. mp.kick ends it on our terms.
   */
-  var restart = { at: 0, said: {}, why: '', mode: 'update' };
+  // On globalThis, so a hot reload in the middle of a countdown does not lose
+  // it and start announcing from ten minutes again. The online.json writer
+  // reads the same object to tell the client probe the server is on its way
+  // back rather than gone.
+  if (!g.__thornswoodRestart) {
+    g.__thornswoodRestart = { at: 0, said: {}, why: '', mode: 'update' };
+  }
+  var restart = g.__thornswoodRestart;
 
   // Marks at which the room is told again. Anything longer than the notice
   // given is skipped, so /restart 2 does not shout about ten minutes.
