@@ -80,6 +80,9 @@ namespace Thornswood
         static StackPanel pnlDev;
         static TextBlock txtServerState;
         static Border updateBar, mineCard;
+        static Border downgradeBar;
+        static TextBlock txtDowngradeNote;
+        static Button btnDowngrade;
         static Grid titleBar;
         static Button buttonDiscord, buttonDiscordForget;
         static TextBlock labelDiscord, noteDiscord;
@@ -430,6 +433,7 @@ namespace Thornswood
             txtCharNote = F<TextBlock>("TxtCharNote");
             chkAutoUpdate = F<CheckBox>("ChkAutoUpdate");
             updateBar = F<Border>("UpdateBar"); titleBar = F<Grid>("TitleBar");
+            downgradeBar = F<Border>("DowngradeBar"); txtDowngradeNote = F<TextBlock>("TxtDowngradeNote"); btnDowngrade = F<Button>("BtnDowngrade");
 
             btnPlay = F<Button>("BtnPlay"); btnRecheck = F<Button>("BtnRecheck"); btnCopy = F<Button>("BtnCopy");
             btnUpdate = F<Button>("BtnUpdate"); btnMin = F<Button>("BtnMin"); btnMax = F<Button>("BtnMax");
@@ -687,11 +691,8 @@ namespace Thornswood
             boxSearch.Text = SearchHint;
             boxSearch.Foreground = Res("Faint");
 
-            long bytes = 0;
-            try { if (File.Exists(Paths.Exe)) bytes = new FileInfo(Paths.Exe).Length; } catch { }
-            txtBuildLine.Text = (bytes == cfg.ExpectedExeBytes ? "game 1.6.1170" : "game unknown");
+            DrawBuildLine();
             txtStatusRight.Text = Paths.Root;
-            txtHeroLine.Text = Checks.EnabledPlugins() + " plugins  ·  game 1.6.1170  ·  launcher " + Updater.Version;
             chkKeepOpen.IsChecked = cfg.KeepLauncherOpen;
             // The address, the port, the update source and the voice port are
             // not on this page any more. They are not settings: they are facts
@@ -787,6 +788,7 @@ namespace Thornswood
             }
 
             btnUpdate.Click += delegate { RunUpdate(); };
+            if (btnDowngrade != null) btnDowngrade.Click += delegate { RunDowngrade(); };
             btnInstallNow.Click += delegate
             {
                 if (collectionBarUp)
@@ -1202,6 +1204,17 @@ namespace Thornswood
                 btnInstallNow.Visibility = Visibility.Collapsed;
             }
 
+            // Wrong Skyrim build: the one thing on this page with a button that
+            // fixes it. Below the update bar in priority, because an update can
+            // carry a new expected build and settle the question by itself.
+            bool wrongBuild = Downgrade.Needed(cfg);
+            if (downgradeBar != null)
+            {
+                bool updateUp = updateBar != null && updateBar.Visibility == Visibility.Visible;
+                downgradeBar.Visibility = (wrongBuild && !updateUp && !playing) ? Visibility.Visible : Visibility.Collapsed;
+                if (btnDowngrade != null) btnDowngrade.IsEnabled = !Downgrade.Busy;
+            }
+
             btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp;
             // Only worth offering while there is something to quit, and it is
             // the one control on this page that stays live during a session.
@@ -1234,12 +1247,63 @@ namespace Thornswood
                     charBar.Visibility = Visibility.Collapsed;
                 }
             }
+            else if (wrongBuild && !playing && !collectionBarUp)
+            {
+                btnPlay.Content = Downgrade.Busy ? "DOWNGRADING..." : "DOWNGRADE FIRST";
+                btnPlay.ToolTip = "This Skyrim is not build 1.6.1170. The card above puts it right.";
+                if (charPickerOpen)
+                {
+                    charPickerOpen = false;
+                    charBar.Visibility = Visibility.Collapsed;
+                }
+            }
             else if (!playing)
             {
                 btnPlay.ToolTip = null;
                 if (!charPickerOpen) btnPlay.Content = "PLAY";
             }
             return all;
+        }
+
+        /// <summary>
+        /// "game 1.6.1170" in the corner and in the hero line, or what the exe
+        /// actually is when it is not that. Redrawn after a downgrade.
+        /// </summary>
+        static void DrawBuildLine()
+        {
+            string build = Downgrade.Needed(cfg) ? Downgrade.Describe(cfg) : "1.6.1170";
+            if (txtBuildLine != null) txtBuildLine.Text = "game " + build;
+            if (txtHeroLine != null) txtHeroLine.Text = Checks.EnabledPlugins() + " plugins  ·  game " + build + "  ·  launcher " + Updater.Version;
+        }
+
+        /// <summary>
+        /// The Downgrade button. Everything happens on Downgrade's own thread;
+        /// its words come back here through the dispatcher, into the log and
+        /// the line under the button, and the page is redrawn.
+        /// </summary>
+        static void RunDowngrade()
+        {
+            if (Downgrade.Busy) return;
+            if (Checks.GameRunning()) { Log("Close Skyrim first, then press Downgrade."); return; }
+            btnDowngrade.IsEnabled = false;
+            btnDowngrade.Content = "Working...";
+            Downgrade.Start(cfg,
+                PresenceLog,
+                delegate (string s) { try { win.Dispatcher.BeginInvoke(new Action(delegate { txtDowngradeNote.Text = s; })); } catch { } },
+                delegate (bool ok)
+                {
+                    try
+                    {
+                        win.Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            btnDowngrade.Content = ok ? "Done" : "Try again";
+                            btnDowngrade.IsEnabled = !ok;
+                            DrawStatus();
+                            DrawBuildLine();
+                        }));
+                    }
+                    catch { }
+                });
         }
 
         // ------------------------------------------------------------- mods

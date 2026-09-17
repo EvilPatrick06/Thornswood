@@ -310,7 +310,7 @@ namespace Thornswood
             int plugins = EnabledPlugins();
 
             var l = new List<Check>();
-            l.Add(new Check("Game build", bytes == cfg.ExpectedExeBytes, bytes == 0 ? "missing" : "1.6.1170"));
+            l.Add(new Check("Game build", bytes == cfg.ExpectedExeBytes, Downgrade.Describe(cfg)));
             l.Add(new Check("Script Extender", File.Exists(Path.Combine(Paths.Game, "skse64_1_6_1170.dll")), "skse64 2.2.6"));
             l.Add(new Check("Multiplayer", File.Exists(Paths.MpClient), "SkyMP client"));
             l.Add(new Check("Mods", plugins > 40, plugins + " plugins"));

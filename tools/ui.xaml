@@ -617,6 +617,19 @@
               </StackPanel>
             </Border>
 
+            <Border x:Name="DowngradeBar" Grid.Row="2" Background="{DynamicResource Card}" BorderBrush="{DynamicResource Accent}"
+                    BorderThickness="1" CornerRadius="2" Padding="20,16" Margin="36,0,36,16" Visibility="Collapsed">
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                  <TextBlock x:Name="TxtDowngradeTitle" Style="{StaticResource H2}" Text="Skyrim is on the wrong build"/>
+                  <TextBlock x:Name="TxtDowngradeNote" Style="{StaticResource Small}" Margin="0,2,0,0" TextWrapping="Wrap"
+                             Text="The server runs 1.6.1170 and this Skyrim is newer. Press the button: Steam downloads the 1.6.1170 files under your own account and the launcher puts them in place. About 11 GB, and Steam has to be signed in."/>
+                </StackPanel>
+                <Button x:Name="BtnDowngrade" Grid.Column="1" Style="{StaticResource Solid}" Content="Downgrade to 1.6.1170" VerticalAlignment="Center" Margin="18,0,0,0"/>
+              </Grid>
+            </Border>
+
             <Grid Grid.Row="3" Margin="36,4,36,28">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1.9*" MinWidth="330"/>

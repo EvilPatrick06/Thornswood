@@ -198,6 +198,13 @@ that parks files before Play and puts them back after is doing what Keep
 already does, and two things moving the same files is how a crash leaves one
 of them wrong.
 
+A Skyrim on a newer build than 1.6.1170 gets a Downgrade button on the Play
+page (Downgrade.cs): the launcher opens Steam's console, types the three
+`download_depot` commands itself, watches Steam's content_log.txt for each
+depot to finish, copies the 1.6.1170 files over the Steam copy and removes the
+downloads. Nothing is typed unless Steam's window is confirmed in front; if it
+cannot be, the command goes on the clipboard and the log says where to paste.
+
 `tools\Why-Keizaal.ps1` is the read only diagnostic: which server the client
 points at, what is in `Data\Platform`, who deployed what, the Keizaal launcher's
 install. Run it on any machine where the servers are getting into each other.
