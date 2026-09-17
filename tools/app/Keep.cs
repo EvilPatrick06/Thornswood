@@ -81,6 +81,21 @@ namespace Thornswood
             get { return Path.Combine(Paths.ProfileDir, "Keep"); }
         }
 
+        /// <summary>
+        /// Whether there is a kept copy of one file, so somebody can be told
+        /// whether Repair can put it back or whether the only way is a
+        /// reinstall. A kept copy exists only for a file one of this
+        /// build's own updates wrote, so an install that came from the
+        /// installer and has never taken a pack has none of them, and
+        /// telling that person to press Repair is telling them to press a
+        /// button that does nothing.
+        /// </summary>
+        public static bool HasKept(string rel)
+        {
+            try { return File.Exists(Path.Combine(Dir, rel)); }
+            catch { return false; }
+        }
+
         /// <summary>Where another server's plugins wait while Thornswood runs.</summary>
         public static string ParkDir
         {

@@ -988,8 +988,8 @@
                       <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
                     </StackPanel>
 
-                    <TextBlock Style="{StaticResource H2}" Text="Repair settings"/>
-                    <TextBlock Style="{StaticResource Body}" Text="Puts the game settings and load order back to the versions that shipped with this build. Use it if the game stops loading the right mods, or after you have changed something you cannot undo."/>
+                    <TextBlock Style="{StaticResource H2}" Text="Repair"/>
+                    <TextBlock Style="{StaticResource Body}" Text="Puts this build's own files back: the settings and load order that shipped with it, the client and the overlays under Data, the mod settings this build pins, and the class preset names. Another server's launcher can replace any of those, and an install that has never taken an update has never had a spare copy of them. This is everything Play does on the way in, done on demand, and it is safe to press twice. Close Skyrim first."/>
                     <Button x:Name="BtnRepair" Style="{StaticResource Ghost}" Content="Repair" HorizontalAlignment="Left" Margin="0,13,0,0"/>
 
                     <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>

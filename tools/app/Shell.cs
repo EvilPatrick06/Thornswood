@@ -1046,8 +1046,82 @@ namespace Thornswood
             btnOpenSaves.Click += delegate { Open(Path.Combine(Paths.LiveMyGames, "Saves")); };
             btnRepair.Click += delegate
             {
-                Log("Restored " + Swap.RepairConfigs() + " settings files from the shipped originals.");
-                DrawStatus(); BuildModList();
+                // Everything a Play does to put this build's files back, on
+                // demand, because the one time somebody needs it is the time
+                // they cannot press Play.
+                //
+                // It used to be one line: restore the settings files. That left
+                // it useless for the thing people actually reach for it over,
+                // which is Thornswood's own files in Data\Platform having been
+                // replaced, parked or never written. Another server's launcher
+                // rewrites the page the front plugin loads and drops its own
+                // plugin in beside ours; an install that came from the
+                // installer rather than from an update has no kept copy of
+                // anything until something makes one. Both are what this is
+                // for now.
+                //
+                // Every step is one Play already does on the way in, so none of
+                // it is new behaviour, and all of it is safe to run twice.
+                if (Checks.GameRunning())
+                {
+                    Log("Close Skyrim first. Repair writes into the game folder, and Skyrim writes its own files back when it exits.");
+                    return;
+                }
+
+                btnRepair.IsEnabled = false;
+                try
+                {
+                    var did = new List<string>();
+
+                    int cfgs = Swap.RepairConfigs();
+                    if (cfgs > 0) did.Add(cfgs + " settings file" + (cfgs == 1 ? "" : "s"));
+
+                    // A machine that installed rather than updated has nothing
+                    // kept, so there is nothing to put back until this runs.
+                    int seeded = 0;
+                    try { seeded = Keep.Seed(); } catch { }
+                    if (seeded > 0) did.Add("kept a copy of " + seeded + " of this build's file" + (seeded == 1 ? "" : "s"));
+
+                    // The one that matters: our Data\Platform files back from
+                    // the kept copies, and another server's plugins aside.
+                    try
+                    {
+                        string kept = Keep.Restore();
+                        if (!string.IsNullOrEmpty(kept)) Log(kept);
+                    }
+                    catch (Exception ex) { Log("Could not put this build's files back: " + ex.Message); }
+
+                    try
+                    {
+                        string ini = ThornIni.Ensure();
+                        if (!string.IsNullOrEmpty(ini)) Log(ini);
+                    }
+                    catch { }
+
+                    try
+                    {
+                        int rules = Enforce.Apply(cfg);
+                        if (rules > 0) did.Add(rules + " mod setting" + (rules == 1 ? "" : "s"));
+                    }
+                    catch { }
+
+                    try
+                    {
+                        int names = Files.FixPresetNames();
+                        if (names > 0) did.Add(names + " class preset name" + (names == 1 ? "" : "s"));
+                    }
+                    catch { }
+
+                    Log(did.Count > 0
+                        ? "Repair put right: " + string.Join(", ", did.ToArray()) + "."
+                        : "Repair found nothing to put right.");
+
+                    // The Client row reads the bundle, so it has to be asked
+                    // again rather than trusting what it answered a moment ago.
+                    DrawStatus();
+                    BuildModList();
+                }
+                finally { btnRepair.IsEnabled = true; }
             };
             btnRestore.Click += delegate
             {
