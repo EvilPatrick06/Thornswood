@@ -390,6 +390,16 @@ namespace Thornswood
                 File.Copy(dest, Path.Combine(Paths.Replaced, i.Plugin + "." + DateTime.Now.ToString("yyyyMMdd-HHmmss")), true);
             }
             catch { }
+            // Our bytes go in our copy of the file and nowhere else.
+            //
+            // Vortex deploys by hard link, so this plugin and the Nexus mod in
+            // Vortex's staging are one file under two names, and staging is
+            // shared with every other Skyrim profile on this machine. Without
+            // this, pressing Fix here reached into another SkyMP server's
+            // collection and changed a plugin it was relying on. FileMode.Create
+            // truncates the file it is given rather than replacing it, so the
+            // link has to come off first.
+            OwnGame.Detach(dest);
             try
             {
                 using (var fs = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -467,7 +477,12 @@ namespace Thornswood
                 try
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(full));
-                    OwnGame.Unshare(full);
+                    // Detach rather than Unshare: the same reason as the plugin
+                    // write above. Unshare does nothing on a collection install,
+                    // which is the layout that ships, so somebody's own file
+                    // copied over a Vortex deployed one went straight into the
+                    // Nexus mod in staging.
+                    OwnGame.Detach(full);
                     File.Copy(src, full, true);
                     n++;
                 }
