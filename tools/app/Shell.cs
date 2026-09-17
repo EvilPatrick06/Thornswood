@@ -2560,16 +2560,16 @@ namespace Thornswood
             {
                 var sp = new StackPanel();
 
-                if (!string.IsNullOrEmpty(n.date) || n.IsDev)
+                if (!string.IsNullOrEmpty(n.DateText) || n.IsDev)
                 {
                     var stamp = new StackPanel();
                     stamp.Orientation = Orientation.Horizontal;
                     stamp.Margin = new Thickness(0, 0, 0, 6);
 
-                    if (!string.IsNullOrEmpty(n.date))
+                    if (!string.IsNullOrEmpty(n.DateText))
                     {
                         var d = new TextBlock();
-                        d.Text = n.date.ToUpperInvariant();
+                        d.Text = n.DateText.ToUpperInvariant();
                         d.FontSize = 9.5; d.FontWeight = FontWeights.SemiBold;
                         d.Foreground = Res("Accent");
                         d.VerticalAlignment = VerticalAlignment.Center;
@@ -2590,7 +2590,7 @@ namespace Thornswood
                         chip.BorderThickness = new Thickness(1);
                         chip.CornerRadius = new CornerRadius(3);
                         chip.Padding = new Thickness(5, 1, 5, 1);
-                        chip.Margin = new Thickness(string.IsNullOrEmpty(n.date) ? 0 : 8, 0, 0, 0);
+                        chip.Margin = new Thickness(string.IsNullOrEmpty(n.DateText) ? 0 : 8, 0, 0, 0);
                         chip.VerticalAlignment = VerticalAlignment.Center;
                         chip.Child = ct;
                         stamp.Children.Add(chip);

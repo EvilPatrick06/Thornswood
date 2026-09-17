@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
@@ -338,6 +339,40 @@ namespace Thornswood
         public bool IsDev
         {
             get { return channel == "dev"; }
+        }
+
+        /// <summary>
+        /// The date as it is shown, month first and with the time on it.
+        ///
+        /// The publisher writes this field, and what it writes has changed:
+        /// entries from before carry a bare "17 Sep 2026" with no time at all.
+        /// Rewriting the feed to match would be rewriting history for the sake
+        /// of a format, so the reading end converts instead, exactly as the
+        /// site does with the stamp under its download button.
+        ///
+        /// A date that arrives in none of the shapes below is shown as it came,
+        /// because a note with an odd date is still a note worth reading.
+        /// </summary>
+        public string DateText
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(date)) return "";
+
+                string[] withTime = { "M-d-yyyy h:mm tt", "yyyy-MM-dd HH:mm", "d MMM yyyy HH:mm" };
+                string[] dateOnly = { "d MMM yyyy", "M-d-yyyy", "yyyy-MM-dd" };
+                DateTime t;
+
+                if (DateTime.TryParseExact(date, withTime, CultureInfo.InvariantCulture,
+                                           DateTimeStyles.None, out t))
+                    return t.ToString("M-d-yyyy h:mm tt", CultureInfo.InvariantCulture);
+
+                if (DateTime.TryParseExact(date, dateOnly, CultureInfo.InvariantCulture,
+                                           DateTimeStyles.None, out t))
+                    return t.ToString("M-d-yyyy", CultureInfo.InvariantCulture);
+
+                return date;
+            }
         }
     }
 
