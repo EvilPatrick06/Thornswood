@@ -353,15 +353,16 @@ def said_yes(text):
 
 
 QUESTIONS = {
-    # The one application to be in the world. It asks about testing because
-    # that is what being in it is right now, and about the person because a
-    # character still has somebody behind it.
+    # The one application to be in the world. It asks about the character,
+    # because that is what somebody is here for, and about testing, because
+    # that is what being in it means today. It does not ask who they are
+    # outside the game: that is answered by them being in the Discord.
     'playtest': [
         AGE_Q,
-        ('Who are you, outside the game?', 'Whatever you want to say. Nobody is checking papers.', False),
         ('Have you roleplayed before, and where?', 'No is a perfectly good answer.', True),
-        ('How much time can you give it?', 'Hours a week, and which days.', True),
         ('Who do you want to play?', 'A sentence about the character, not a biography.', True),
+        ('How much time can you give it?', 'Hours a week, and which days.', True),
+        ('Describe a bug you have run into', 'What you did, what happened, what should have happened. Short.', True),
     ],
     # The only application here that is answered in character. The seats are
     # empty and the first people to hold them are picked out of these, so the
