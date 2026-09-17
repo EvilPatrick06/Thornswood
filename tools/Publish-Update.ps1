@@ -231,7 +231,17 @@ function Get-SkyrimPath {
     return ''
 }
 
+# What never leaves a machine in a pack: runtime folders, one machine's own
+# files, other servers' files, sign in tokens, and the collection's files in a
+# Game folder the launcher made. The rules live in Ship-Rules.ps1, shared with
+# Package-Thornswood.ps1, so the installer follows exactly the same rules as
+# the packs (it did not, and shipped a token file).
+. (Join-Path $Here 'Ship-Rules.ps1')
+
 $IsCollection = -not (Test-Path -LiteralPath $GameDir)
+# A Game folder the launcher made out of Vortex's deployment (OwnGame.cs) is
+# not the old installer's copy: most of it is the collection, linked in.
+$ownCollection = if ($IsCollection) { $null } else { Get-ShipOwnGameCollection $ProfileDir }
 if ($IsCollection) {
     $steamGame = Get-SkyrimPath
     if (-not $steamGame) {
@@ -269,6 +279,16 @@ if ($IsCollection) {
         Die 'Refusing to publish the whole collection as an update. Deploy once in Vortex and run this again.'
     }
 }
+elseif ($null -ne $ownCollection) {
+    $vortexFiles = $ownCollection
+    Write-Host ''
+    Write-Host "  Thornswood's own game folder, made from Vortex's deployment:" -ForegroundColor DarkGray
+    Write-Host "  $GameDir" -ForegroundColor DarkGray
+    Write-Host ("  the collection provides {0:n0} file(s), which are not published" -f $vortexFiles.Count) -ForegroundColor DarkGray
+    if ($vortexFiles.Count -eq 0) {
+        Die "The launcher's record of what came from Vortex (Profile\OwnGame\files.txt) lists nothing, so this release would carry every mod file. In the launcher, Settings, Maintenance, bring the folder up to date from Vortex, then publish again."
+    }
+}
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
     return $vortexFiles.Contains($rel)
@@ -304,11 +324,7 @@ function Test-Vanilla([string]$rel) {
     return $false
 }
 
-# What never leaves a machine in a pack: runtime folders, one machine's own
-# files, other servers' files and sign in tokens. The lists live in
-# Ship-Rules.ps1, shared with Package-Thornswood.ps1, so the installer follows
-# exactly the same rules as the packs (it did not, and shipped a token file).
-. (Join-Path $Here 'Ship-Rules.ps1')
+# The rules themselves are in Ship-Rules.ps1, dot-sourced above.
 $runtimeDirs = $ShipRuntimeDirs
 function Test-Runtime([string]$rel) { return (Test-ShipRuntime $rel) }
 function Test-OtherServer([string]$rel) { return (Test-ShipOtherServer $rel) }
@@ -555,15 +571,20 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
             # stops a release dead with "that file is this build's reference
             # plugin list", which is how 1.1.1 failed to publish.
             #
-            # Same test the launcher uses to decide the same thing.
+            # Same test the launcher uses to decide the same thing. A folder
+            # made from Vortex keeps the Vortex profile's list as it stood when
+            # the folder was last brought up to date, which is the collection's
+            # order. Get-ShipLoadOrderDir (Ship-Rules.ps1) picks between the
+            # three, the same for the installer.
             if ($part -eq $groups.Count) {
                 $ownGame = Join-Path $Root 'Game'
                 $isCollection = -not (Test-Path -LiteralPath $ownGame)
-                # One line, because PowerShell ends the statement at a newline
-                # and then fails on a stray else.
-                $refDir = if ($isCollection) { Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition' } else { Join-Path $ProfileDir 'Default' }
+                $refDir = Get-ShipLoadOrderDir $Root $ProfileDir
                 if ($isCollection) {
                     Say "  reference load order from the Vortex profile: $refDir" 'DarkGray'
+                }
+                elseif ($refDir -eq (Join-Path $ProfileDir 'OwnGame')) {
+                    Say "  reference load order from the Vortex profile, as of the folder's last update: $refDir" 'DarkGray'
                 }
                 foreach ($f in 'plugins.txt', 'loadorder.txt') {
                     $src = Join-Path $refDir $f

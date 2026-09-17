@@ -225,11 +225,12 @@ namespace Thornswood
         /// what is in there belongs to Bethesda or to Vortex, and the one thing
         /// this must never do is delete either.
         /// </summary>
-        public static string[] OurGameFiles(out long bytes, out int count)
+        public static string[] OurGameFiles(Config cfg, out long bytes, out int count)
         {
             bytes = 0; count = 0;
             var outp = new System.Collections.Generic.List<string>();
-            if (!Paths.Collection) return outp.ToArray();
+            string into = InstalledInto(cfg);
+            if (into.Length == 0) return outp.ToArray();
 
             string list = Path.Combine(Paths.ProfileDir, "installed-into-game.txt");
             if (!File.Exists(list)) return outp.ToArray();
@@ -240,7 +241,7 @@ namespace Thornswood
             var vortex = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
             try
             {
-                string vm = Path.Combine(Paths.Game, "Data\\vortex.deployment.json");
+                string vm = Path.Combine(into, "Data\\vortex.deployment.json");
                 if (File.Exists(vm))
                 {
                     // Scanned over the whole file rather than line by line.
@@ -268,7 +269,7 @@ namespace Thornswood
             catch { }
 
             string game;
-            try { game = Path.GetFullPath(Paths.Game).TrimEnd('\\') + "\\"; }
+            try { game = Path.GetFullPath(into).TrimEnd('\\') + "\\"; }
             catch { return outp.ToArray(); }
 
             foreach (string raw in File.ReadAllLines(list))
@@ -278,7 +279,7 @@ namespace Thornswood
                 if (vortex.Contains(rel)) continue;
 
                 string full;
-                try { full = Path.GetFullPath(Path.Combine(Paths.Game, rel)); }
+                try { full = Path.GetFullPath(Path.Combine(into, rel)); }
                 catch { continue; }
                 // A relative path with .. in it would escape the game folder.
                 if (!full.StartsWith(game, StringComparison.OrdinalIgnoreCase)) continue;
@@ -297,10 +298,30 @@ namespace Thornswood
         /// script, because the script's last fence refuses anything outside
         /// Root and that fence is worth keeping exactly as it is.
         /// </summary>
-        static int RemoveOurGameFiles(Action<string> say)
+        /// <summary>
+        /// The Skyrim the installer wrote into. Under the collection that is the
+        /// game folder itself. With Thornswood's own folder (OwnGame) it is the
+        /// Steam copy the folder was made from: the installer put its files in
+        /// there before the folder existed, and making the folder never took
+        /// them back out. Empty for an install that never wrote into a Steam
+        /// copy at all, which is an own Game folder from an installer older
+        /// than the collection.
+        /// </summary>
+        static string InstalledInto(Config cfg)
+        {
+            if (Paths.Collection) return Paths.Game;
+            try
+            {
+                if (OwnGame.Active) return OwnGame.Source(cfg);
+            }
+            catch { }
+            return "";
+        }
+
+        static int RemoveOurGameFiles(Config cfg, Action<string> say)
         {
             long bytes; int count;
-            string[] ours = OurGameFiles(out bytes, out count);
+            string[] ours = OurGameFiles(cfg, out bytes, out count);
             if (ours.Length == 0) return 0;
 
             say("Taking Thornswood's files back out of your Skyrim...");
@@ -323,7 +344,7 @@ namespace Thornswood
             // too. Never recursive, never forced: a directory with anything left
             // in it stays, which is what keeps this away from Vortex's files.
             string game;
-            try { game = Path.GetFullPath(Paths.Game).TrimEnd('\\') + "\\"; }
+            try { game = Path.GetFullPath(InstalledInto(cfg)).TrimEnd('\\') + "\\"; }
             catch { return gone; }
             var ordered = new System.Collections.Generic.List<string>(dirs);
             ordered.Sort(delegate(string a, string b) { return b.Length.CompareTo(a.Length); });
@@ -374,7 +395,7 @@ namespace Thornswood
         /// what is left for the handover script, or an empty array if nothing
         /// is.
         /// </summary>
-        public static string[] Begin(bool keepSaves, bool deleteMods, Action<string> say)
+        public static string[] Begin(Config cfg, bool keepSaves, bool deleteMods, Action<string> say)
         {
             say("Closing the game...");
             Kill();
@@ -419,11 +440,13 @@ namespace Thornswood
             // A collection install has no Game folder of ours, but it did write
             // our own content into the person's Steam copy. That comes back out
             // here, from the list the installer left, and nothing else in that
-            // folder is touched.
-            if (deleteMods && Paths.Collection)
+            // folder is touched. The same for an install that began that way
+            // and then made Thornswood's own folder: the folder goes above, and
+            // what the installer left in the Steam copy goes here.
+            if (deleteMods && InstalledInto(cfg).Length > 0)
             {
-                int gone = RemoveOurGameFiles(say);
-                if (gone > 0) say(gone.ToString("n0") + " files removed from your Skyrim.");
+                int gone = RemoveOurGameFiles(cfg, say);
+                if (gone > 0) say(gone.ToString("n0") + " files removed from your Skyrim on Steam.");
             }
             leave.Add(Paths.Personal);
             if (!keepSaves)

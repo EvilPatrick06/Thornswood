@@ -31,7 +31,7 @@ a half.
 | Releases repo | github.com/EvilPatrick06/Thornswood-Releases (public), clone beside the source repo as `Thornswood-Releases`, dev branch as a worktree `Thornswood-Releases-dev` | `version.json` per branch (main, dev) and the release assets: packs and launcher exes |
 | Launcher | `tools\app\*.cs` + `tools\ui.xaml`, built by `tools\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Settings page | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Owner and Dev roles only |
-| Game | The Steam copy of Skyrim Special Edition, mods deployed by Vortex from the Nexus collection | Both launchers share it. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
+| Game | The Steam copy of Skyrim Special Edition, mods deployed by Vortex from the Nexus collection, or `<Root>\Game` once the launcher has made Thornswood's own folder from that deployment (see Separate Skyrim folders) | Without its own folder, every launcher shares the Steam copy. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
 | Plugins | `tools\ts-plugins\thornswood-{front,chargen,emotes,mark,voice}.js`, UI in `tools\ts-ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
 | Game server | VPS 192.135.112.23, `C:\Thornswood-Server`, UDP/TCP 7777, resources 3000, task `Thornswood Server` | skymp5-server with `gamemode.js`; the door reads its allowed list from the site |
 | Dev game server | `C:\Thornswood-Server-Dev`, 7787, resources 7788, task `Thornswood Dev Server` | Same binaries, fresh world, door list is Owner and Dev only (`https://thornswood.net/dev`) |
@@ -243,6 +243,76 @@ cannot be, the command goes on the clipboard and the log says where to paste.
 `tools\Why-Keizaal.ps1` is the read only diagnostic: which server the client
 points at, what is in `Data\Platform`, who deployed what, the Keizaal launcher's
 install. Run it on any machine where the servers are getting into each other.
+
+## Separate Skyrim folders
+
+Keep and Hold only reach `Data\Platform`. Everything else the servers share in
+one Skyrim still collides: `Data\Interface\startmenu.swf` (Thornswood's packs
+ship one, so Keizaal came up with Thornswood's backdrop), the SkyMP dlls in
+`Data\SKSE\Plugins`, the vanilla masters Keizaal replaces, and above all the
+mods themselves, because switching the profile in Vortex takes the other
+collection out of the folder. The full fix is a Skyrim folder per server.
+
+**Thornswood.** The launcher makes `<Root>\Game` itself (`tools\app\OwnGame.cs`,
+Settings, Maintenance, "Thornswood's own Skyrim folder"). With the Thornswood
+profile deployed in Vortex, it builds the folder from that deployment, then
+restarts and runs from it. `Paths.Init` already prefers `<Root>\Game` over the
+Steam copy, which is the layout installs had before the collection, so from
+then on the launcher points Windows' Skyrim settings, plugin list and saves at
+`Profile` for each session and ignores which profile Vortex has on. When Vortex
+deploys a newer Thornswood collection, the next launcher start brings it in by
+itself. On a machine where another SkyMP server has been, the launcher offers
+this once at startup.
+
+**Keizaal and Daedric.** `tools\New-GameFolder.ps1 -Server Keizaal` (or
+`Daedric`), run with that server's profile deployed in Vortex, makes
+`<drive>:\Skyrim-<Server>` beside the Steam copy. Then point that server's
+launcher at it. Run it again after that collection updates.
+
+**Links, not copies.** Big files (archives, textures, meshes, plugins) are hard
+links to Vortex's copies, so a collection is not on the disk twice; this needs
+the folders on the same drive as the Skyrim Vortex deploys into. A hard link is
+the same file under a second name, so anything written into one in place lands
+in every folder that links it. So these are always copied: the game's root
+files, `Data\Platform`, `Data\NirnLabUIPlatform`, `Data\SKSE`, `Data\MCM`,
+`Data\Video`, settings, script and program files, the vanilla masters, and
+anything listed in a `keizaal-backup-*` folder. The launcher's own writes into
+the game folder go through `OwnGame.Unshare` or `OwnGame.Separate` first.
+
+**Left out of every folder:** other servers' files (the same list as
+`Test-ShipOtherServer` in `tools\Ship-Rules.ps1`; `OwnGame.Foreign` in the
+launcher, change both together), `Data\Platform\PluginsNoLoad` (sign-in data
+with an access token in it), Vortex's records and markers, logs, and
+`Claude outputs`.
+
+**Records.** `Profile\OwnGame\files.txt` lists each file brought in, whether it
+was linked or copied and whether Vortex deployed it. Ship-Rules.ps1 reads that
+list (`Get-ShipOwnGameCollection`) so Publish-Update and Package-Thornswood keep
+the collection out of packs and the installer, exactly as they read
+`vortex.deployment.json` when the game is the Steam copy, and both refuse to go
+on if the list is empty. `Profile\OwnGame\plugins.txt` and `loadorder.txt` are
+the Vortex profile's lists as of the folder's last update, and are the
+reference load order a release carries (`Get-ShipLoadOrderDir`). Ship patches
+the client in `<Root>\Game` when it exists. The other servers' records are in
+`%LOCALAPPDATA%\Thornswood\GameFolders`.
+
+**The Skyrim build.** Steam updates the Steam copy by itself. With Thornswood's
+own folder, the Downgrade button works on the Steam copy the folder is made
+from, never on the folder's copies, and the folder is then brought up to date
+from it. Until the Steam copy is back on 1.6.1170 the folder is not made or
+refreshed, so Thornswood keeps playing on the build it has, and the card above
+Play says the Steam copy is on the wrong build. Files a mod replaces are left as
+the mod has them. The sign in file the 16 Sep installer carried is removed from
+the Steam copy as well as from the folder (`Leaks.cs`).
+
+**Testing it on the dev channel.** The dev build runs from
+`<Root>-DevBuild`, which has no Game folder, so it starts on the Steam copy.
+Its own Settings, Maintenance has "Make it", which builds
+`<Root>-DevBuild\Game` the same way.
+
+Skyrim reads its plugin list from one Windows folder per user. Thornswood swaps
+it per session; Keizaal and Daedric read whatever Vortex's active profile wrote,
+so leave Vortex on the profile of the other server you play next.
 
 ## Where things are written down
 

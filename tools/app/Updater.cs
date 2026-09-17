@@ -431,6 +431,9 @@ namespace Thornswood
                         // that came with the build does not, and deleting that
                         // on removal would leave a hole in the core.
                         bool existed = File.Exists(full);
+                        // In a game folder made of links, extracting over a
+                        // linked file would rewrite Vortex's copy with it.
+                        if (existed && inGame) OwnGame.Unshare(full);
                         e.ExtractToFile(full, true);
                         string under = full.Substring(fence.TrimEnd('\\', '/').Length).TrimStart('\\', '/');
                         wrote.Add((existed ? "R|" : "N|") + (inGame ? GameMark : "") + under);

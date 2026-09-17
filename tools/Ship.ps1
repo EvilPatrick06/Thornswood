@@ -277,7 +277,13 @@ if (-not $ModsOnly) {
 # main menu for everybody who installs it. See the header of that script.
 Head 'Client patch'
 $LASTEXITCODE = 0
-& (Join-Path $Here 'Patch-Client.ps1')
+# The client lives in whichever Skyrim this build runs from. With a Game folder
+# of its own (OwnGame.cs) that is not the Steam copy, and patching the Steam copy
+# would publish an unpatched client out of the build's folder.
+$patchArgs = @{}
+$ownGameDir = Join-Path $Root 'Game'
+if (Test-Path -LiteralPath (Join-Path $ownGameDir 'SkyrimSE.exe')) { $patchArgs['Game'] = $ownGameDir }
+& (Join-Path $Here 'Patch-Client.ps1') @patchArgs
 if ($LASTEXITCODE -ne 0) {
     Unbump 'the client patch did not apply'
     Die 'Patch-Client.ps1 refused. Nothing was published.'
