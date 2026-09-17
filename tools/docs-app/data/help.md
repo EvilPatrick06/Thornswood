@@ -116,7 +116,7 @@ they are usually the difference between a fix and a guess.
 - Mod settings menus forget themselves every session, because there is no save
   to write them to.
 - NPCs stand still when nobody is near them.
-- No levelling, no fast travel, and the difficulty is fixed at Expert.
+- No levelling, no fast travel, and the difficulty is fixed at Legendary.
 - Start On Save is in the mod list but never loads a save. The launcher points
   it at a character that does not exist, on purpose: a single player save
   cannot be loaded under Thornswood.
