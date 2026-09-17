@@ -762,6 +762,50 @@
     }
   }));
 
+  /*
+    A lock that has just been opened is handed straight back to the server.
+
+    While a door or a chest is locked the client deliberately does not block it,
+    so Skyrim runs its own handling and the mini game appears. The bundle does
+    put the block back once the thing is no longer locked, but only the next time
+    it builds a view of that reference, which is long after the pick. In between,
+    the press that finishes the mini game is handled entirely by Skyrim: the chest
+    swings open here and nowhere else, so the server never made this person its
+    occupant and never sent the contents, and every item taken out of it is thrown
+    away on arrival. That is the chest that cannot be looted.
+
+    So the block goes back on the moment the lock opens rather than whenever the
+    view is next made. This is the same flag the bundle would set itself, set
+    earlier, so it is not fighting it.
+
+    Containers and doors only. An unlocked display case is still Skyrim's.
+  */
+  sp.on('lockChanged', guard('lockchanged', (e) => {
+    const ref = e ? e.lockedObject : null;
+    if (!ref) { return; }
+
+    let locked = true;
+    try { locked = ref.isLocked(); } catch (err) { return; }
+    if (locked) { return; }
+
+    let type = -1;
+    try {
+      const b = ref.getBaseObject();
+      type = b ? b.getType() : -1;
+    } catch (err) { }
+    if (type !== 28 && type !== 29) { return; }
+
+    let id = 0;
+    try { id = ref.getFormID(); } catch (err) { }
+
+    try {
+      ref.blockActivation(true);
+      say('lock opened on ' + id.toString(16) + ', handed it back to the server');
+    } catch (err) {
+      say('could not hand ' + id.toString(16) + ' back to the server: ' + err);
+    }
+  }));
+
   const CONSOLE_MENUS = ['Console Native UI Menu', 'Console'];
   let consoleSince = 0;
 
