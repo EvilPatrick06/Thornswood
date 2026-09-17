@@ -23,9 +23,16 @@ Permanent limits of how this server works. None are bugs, none are changing. Not
 |---|---|
 | SunHelm Survival | Polls on a timer, the one script type still running. Writes health, stamina, magicka and carry weight against a server that crops and corrects them |
 | SunHelm Diseases | Same, and depends on SunHelm |
-| Respawn - Death Overhaul | Sets you essential and runs its own death handler. Death cannot complete locally and the server owns respawn |
-| Tavern Games | Creates gold client side |
 | Immersive Armors, standard version | Distributes through a script with settings that do not persist. A script free version exists |
+
+## Taken out
+
+These were in the list and are not any more. They were added before it was clear they could not work here, and leaving them in meant the release notes advertised them while this page said they did nothing.
+
+| Mod | Why it went |
+|---|---|
+| Respawn - Death Overhaul | Sets you essential and runs its own death handler. Death cannot complete on your own machine and the server owns respawn, so it could only ever fight the server |
+| Tavern Games | Creates gold on your own machine, which the server does not accept. The games ran and the coin never arrived |
 
 ## What the server owns
 
