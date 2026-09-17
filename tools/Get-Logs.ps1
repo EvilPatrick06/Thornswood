@@ -56,6 +56,10 @@ $target = "$User@$Vps"
 # only change needed to have it come down with the rest.
 $logs = @(
     @{ Name = 'server.log'; Path = 'C:\Thornswood-Server\server.log'; What = 'the game server' }
+    # Thornswood's own lines and nothing else. server.log is about four fifths
+    # engine noise on a normal day, so this is the one to read first and
+    # server.log is where you go when the answer is not in it.
+    @{ Name = 'thornswood.log'; Path = 'C:\Thornswood-Server\thornswood.log'; What = 'the gamemode, without the engine noise' }
     @{ Name = 'voice.log';  Path = 'C:\Thornswood-Voice\voice.log';   What = 'voice and the character register' }
 )
 

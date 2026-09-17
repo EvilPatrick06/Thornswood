@@ -44,9 +44,14 @@ const WORLDSPACES = new Set(DATA.worldspaces);
   actionable, and every real finding had to be dug out from under it.
 
   So every line this file writes goes to the console as before, and also to
-  thornswood.log beside the server's data, which holds nothing else. Nothing
-  is filtered out of server.log: the engine's noise is still there for anybody
-  who wants it, it is just no longer the only place our own lines live.
+  thornswood.log, which holds nothing else. Nothing is filtered out of
+  server.log: the engine's noise is still there for anybody who wants it, it
+  is just no longer the only place our own lines live.
+
+  Beside server.log in the server's own folder, deliberately NOT under data.
+  The resources server hands out anything under data over plain HTTP to
+  anybody who asks, which is right for online.json and the plugin files and
+  wrong for a log of who was standing where.
 
   Opened lazily and given up on for good the first time a write fails, because
   a log that throws once a tick is worse than no log.
@@ -56,19 +61,9 @@ let logBroken = false;
 
 function logPath() {
   if (logFile !== null || logBroken) { return logFile; }
-  try {
-    const fsl = require('fs');
-    const pathl = require('path');
-    let dataDir = 'data';
-    try {
-      const cfg = JSON.parse(fsl.readFileSync('server-settings.json', 'utf8'));
-      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
-    } catch (e) { }
-    logFile = pathl.join(dataDir, 'thornswood.log');
-  } catch (e) {
-    logBroken = true;
-    logFile = null;
-  }
+  // The working directory is the server's own folder: it is where
+  // server-settings.json is read from and where server.log is written.
+  logFile = 'thornswood.log';
   return logFile;
 }
 
