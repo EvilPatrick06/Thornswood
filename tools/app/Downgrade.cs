@@ -47,14 +47,56 @@ namespace Thornswood
         public const long NewerExeBytes = 37910440;
 
         static Thread worker;
-        public static bool Busy { get { return worker != null && worker.IsAlive; } }
+        // Cleared before done is called, not when the thread ends, so what done
+        // starts (Thornswood's own folder brought up to date) does not find the
+        // downgrade still busy.
+        static volatile bool running;
+        public static bool Busy { get { return running; } }
 
         /// <summary>The game is there and its exe is not the build the server runs.</summary>
-        public static bool Needed(Config cfg)
+        public static bool Needed(Config cfg) { return Wrong(cfg, Paths.Exe); }
+
+        /// <summary>
+        /// Thornswood runs from its own folder (OwnGame) and the Steam copy that
+        /// folder is made from is on another build, which is what Steam does by
+        /// itself when it updates the game. Thornswood still plays, but the next
+        /// refresh from Vortex would bring that build in, so OwnGame refuses to
+        /// refresh until this is put right.
+        /// </summary>
+        public static bool SourceNeeded(Config cfg)
+        {
+            if (!OwnGame.Active) return false;
+            string src = OwnGame.Source(cfg);
+            return src.Length > 0 && Wrong(cfg, Path.Combine(src, "SkyrimSE.exe"));
+        }
+
+        /// <summary>
+        /// The Skyrim folder the downgrade writes into. With Thornswood's own
+        /// folder that is the Steam copy the folder is made from, never the own
+        /// folder: its files are brought over from the Steam copy afterwards, the
+        /// same way a Vortex deployment is, so the two cannot end up on different
+        /// builds. Otherwise the folder the game runs from.
+        /// </summary>
+        public static string Target(Config cfg)
+        {
+            if (OwnGame.Active)
+            {
+                string src = OwnGame.Source(cfg);
+                if (src.Length > 0) return src;
+            }
+            return Paths.Game;
+        }
+
+        static bool SameFolder(string a, string b)
+        {
+            try { return string.Equals(Path.GetFullPath(a).TrimEnd('\\'), Path.GetFullPath(b).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase); }
+            catch { return false; }
+        }
+
+        static bool Wrong(Config cfg, string exe)
         {
             try
             {
-                string exe = Paths.Exe;
                 if (!File.Exists(exe)) return false;
                 return new FileInfo(exe).Length != cfg.ExpectedExeBytes;
             }
@@ -62,11 +104,12 @@ namespace Thornswood
         }
 
         /// <summary>What the check row should say about the build.</summary>
-        public static string Describe(Config cfg)
+        public static string Describe(Config cfg) { return Describe(cfg, Paths.Exe); }
+
+        public static string Describe(Config cfg, string exe)
         {
             try
             {
-                string exe = Paths.Exe;
                 if (!File.Exists(exe)) return "missing";
                 long n = new FileInfo(exe).Length;
                 if (n == cfg.ExpectedExeBytes) return "1.6.1170";
@@ -86,16 +129,19 @@ namespace Thornswood
         public static void Start(Config cfg, Action<string> log, Action<string> status, Action<bool> done)
         {
             if (Busy) return;
+            running = true;
             worker = new Thread(delegate ()
             {
                 bool ok = false;
                 try { ok = Run(cfg, log, status); }
                 catch (Exception ex) { log("Downgrade stopped: " + ex.Message); }
+                finally { running = false; }
                 try { done(ok); } catch { }
             });
             worker.IsBackground = true;
             worker.SetApartmentState(ApartmentState.STA);   // the clipboard fallback needs it
-            worker.Start();
+            try { worker.Start(); }
+            catch { running = false; throw; }
         }
 
         static bool Run(Config cfg, Action<string> log, Action<string> status)
@@ -113,6 +159,27 @@ namespace Thornswood
             {
                 log("Skyrim is running. Close it, then press the button again.");
                 return false;
+            }
+
+            string target = Target(cfg);
+            string targetExe = Path.Combine(target, "SkyrimSE.exe");
+            bool ownFolder = !SameFolder(target, Paths.Game);
+            if (ownFolder)
+            {
+                // Another server's session plays out of the Steam copy, and its
+                // files cannot be replaced while that runs.
+                if (Checks.OtherSkyrimRunning())
+                {
+                    log("A Skyrim from another folder is running, most likely another server's session in the Steam copy. Close it, then press the button again.");
+                    return false;
+                }
+                if (File.Exists(targetExe) && !Wrong(cfg, targetExe))
+                {
+                    log("The Steam copy in " + target + " is already on 1.6.1170, so nothing needs downloading. Thornswood's own folder is brought up to date from it next.");
+                    status("The Steam copy is already on 1.6.1170.");
+                    return true;
+                }
+                log("Thornswood runs from its own folder, which is made from the Steam copy in " + target + ". The Steam copy is downgraded, then the folder is brought up to date from it.");
             }
 
             log("Downgrading Skyrim to 1.6.1170. Steam downloads the build's files under your own account; nothing is touched until all three parts are down.");
@@ -213,7 +280,11 @@ namespace Thornswood
                 return false;
             }
             status("Putting the 1.6.1170 files in place...");
-            long copied = 0; int files = 0;
+            // A file a mod replaces is the collection's, and in the Steam copy it
+            // is a hard link to Vortex's own copy: writing the vanilla file over
+            // it would change the mod inside Vortex. Those are left as they are.
+            HashSet<string> modded = OwnGame.DeployedIn(target);
+            long copied = 0; int files = 0, leftForMods = 0;
             foreach (string[] d in Depots)
             {
                 string folder = Path.Combine(content, "depot_" + d[0]);
@@ -223,12 +294,18 @@ namespace Thornswood
                 {
                     string rel = f.Substring(prefix.Length);
                     if (rel.StartsWith(".thornswood", StringComparison.OrdinalIgnoreCase)) continue;
-                    string dest = Path.Combine(Paths.Game, rel);
+                    if (modded.Contains(rel)) { leftForMods++; continue; }
+                    string dest = Path.Combine(target, rel);
                     try
                     {
                         Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                        if (File.Exists(dest)) File.SetAttributes(dest, FileAttributes.Normal);
-                        File.Copy(f, dest, true);
+                        // The name comes off before the copy, so the new file is
+                        // this folder's alone. Copying over the name would write
+                        // through any hard link to it, including the links in
+                        // Thornswood's own folder, which are brought up to date
+                        // from here afterwards.
+                        if (File.Exists(dest)) OwnGame.DropName(dest);
+                        File.Copy(f, dest, false);
                         copied += new FileInfo(f).Length; files++;
                         if (files % 25 == 0) status("Putting the 1.6.1170 files in place: " + (copied / 1048576).ToString("n0") + " MB");
                     }
@@ -239,12 +316,13 @@ namespace Thornswood
                     }
                 }
             }
-            log("Copied " + files + " files, " + (copied / 1048576).ToString("n0") + " MB, over the Steam copy.");
+            log("Copied " + files + " files, " + (copied / 1048576).ToString("n0") + " MB, into " + target + "." +
+                (leftForMods > 0 ? " " + leftForMods + " that a mod replaces were left as the mod has them." : ""));
 
-            bool right = !Needed(cfg);
+            bool right = File.Exists(targetExe) && !Wrong(cfg, targetExe);
             if (!right)
             {
-                log("SkyrimSE.exe is still not the 1.6.1170 build after the copy (" + Describe(cfg) + "). Send Gavin your launcher log.");
+                log("SkyrimSE.exe is still not the 1.6.1170 build after the copy (" + Describe(cfg, targetExe) + "). Send Gavin your launcher log.");
                 return false;
             }
 

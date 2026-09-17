@@ -115,10 +115,18 @@ namespace Thornswood
         /// Null when a folder can be made or refreshed from <paramref name="src"/>
         /// right now, otherwise a sentence saying why not.
         /// </summary>
-        public static string WhyNot(string src)
+        public static string WhyNot(Config cfg, string src)
         {
             if (string.IsNullOrEmpty(src) || !File.Exists(Path.Combine(src, "SkyrimSE.exe")))
                 return "There is no Skyrim to make it from. Steam does not list one.";
+            // Steam updates the Steam copy by itself. Bringing that build in would
+            // put Thornswood on a Skyrim the server does not run, so the Steam
+            // copy is put right first and the folder follows it (Downgrade).
+            long exeBytes = -1;
+            try { exeBytes = new FileInfo(Path.Combine(src, "SkyrimSE.exe")).Length; } catch { }
+            if (exeBytes >= 0 && exeBytes != cfg.ExpectedExeBytes)
+                return "Skyrim in " + src + " is " + Downgrade.Describe(cfg, Path.Combine(src, "SkyrimSE.exe")) +
+                       ", most likely because Steam updated it. Press Downgrade on the Play page first; the folder is brought up to date from it after that.";
             if (SameFolder(src, Folder))
                 return "Vortex is set to deploy into Thornswood's own folder, which would make it out of itself.";
             if (!File.Exists(Path.Combine(src, "Data\\vortex.deployment.json")))
@@ -171,7 +179,7 @@ namespace Thornswood
         {
             if (!Active) return false;
             string src = Source(cfg);
-            if (WhyNot(src) != null) return false;
+            if (WhyNot(cfg, src) != null) return false;
             return DeploymentStamp(src) != Recorded("deployment");
         }
 
@@ -197,7 +205,7 @@ namespace Thornswood
         public static string Make(Config cfg, Action<string> say)
         {
             string src = Source(cfg);
-            string why = WhyNot(src);
+            string why = WhyNot(cfg, src);
             if (why != null) throw new Exception(why);
             if (Directory.Exists(Folder))
                 throw new Exception("There is already a Game folder at " + Folder + ", so nothing was made.");
@@ -275,7 +283,7 @@ namespace Thornswood
         {
             if (!Active) throw new Exception("This install is not running from a folder of its own.");
             string src = Source(cfg);
-            string why = WhyNot(src);
+            string why = WhyNot(cfg, src);
             if (why != null) throw new Exception(why);
 
             Dictionary<string, Rec> old = ReadFiles();
@@ -462,7 +470,7 @@ namespace Thornswood
         /// the name, so read only is only cleared when the delete is refused,
         /// and then on a file this folder is letting go of anyway.
         /// </summary>
-        static void DropName(string path)
+        public static void DropName(string path)
         {
             try { File.Delete(path); }
             catch (UnauthorizedAccessException)
@@ -615,6 +623,8 @@ namespace Thornswood
         /// record in Data is relative to Data; the ones in the game's root (the
         /// script extender's loader is one) are relative to the root.
         /// </summary>
+        public static HashSet<string> DeployedIn(string src) { return Deployed(src); }
+
         static HashSet<string> Deployed(string src)
         {
             var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

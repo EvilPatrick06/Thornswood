@@ -66,7 +66,7 @@ namespace Thornswood
                     else if (collection && !OwnGame.Declined)
                     {
                         string src = OwnGame.Source(c);
-                        offer = OwnGame.WhyNot(src) == null && OwnGame.OtherServerHere(src);
+                        offer = OwnGame.WhyNot(c, src) == null && OwnGame.OtherServerHere(src);
                     }
                 }
                 catch { }
@@ -87,7 +87,7 @@ namespace Thornswood
         {
             if (OwnGame.Active) { Log("Thornswood already runs from its own Skyrim folder, " + OwnGame.Folder + "."); return; }
             string src = OwnGame.Source(cfg);
-            string why = OwnGame.WhyNot(src);
+            string why = OwnGame.WhyNot(cfg, src);
             if (why != null)
             {
                 Log(why);
@@ -120,6 +120,13 @@ namespace Thornswood
         static void StartOwnGame(bool make, bool loud)
         {
             if (ownGameBusy) return;
+            // The downgrade is writing into the Steam copy this reads from. It
+            // starts the refresh itself when it is done.
+            if (Downgrade.Busy)
+            {
+                Log("Skyrim is being downgraded. Thornswood's own folder is brought up to date when that is done.");
+                return;
+            }
             if (playing || Checks.GameRunning())
             {
                 string msg = "Close Skyrim first, then " + (make ? "make" : "update") + " Thornswood's own folder. " + Checks.StuckReport();
@@ -184,7 +191,7 @@ namespace Thornswood
             else if (!Paths.Collection) state = "This install already has a Game folder of its own from its installer.";
             else
             {
-                string why = OwnGame.WhyNot(OwnGame.Source(cfg));
+                string why = OwnGame.WhyNot(cfg, OwnGame.Source(cfg));
                 state = why == null ? "Off. Vortex has the Thornswood collection deployed, so it can be made now." : "Off. " + why;
             }
             txtOwnGameState.Text = state;

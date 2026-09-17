@@ -94,7 +94,7 @@ namespace Thornswood
         static TextBlock txtServerState;
         static Border updateBar, mineCard;
         static Border downgradeBar;
-        static TextBlock txtDowngradeNote;
+        static TextBlock txtDowngradeNote, txtDowngradeTitle;
         static Button btnDowngrade;
         static Grid titleBar;
         static Button buttonDiscord, buttonDiscordForget;
@@ -227,7 +227,7 @@ namespace Thornswood
 
             if (Swap.Restore()) Log("Cleaned up a redirect left behind by a crash.");
             Keep.TakeNote();
-            try { string leak = Leaks.Clean(); if (leak != null) Log(leak); } catch { }
+            try { string leak = Leaks.Clean(cfg); if (leak != null) Log(leak); } catch { }
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch { }
             try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch { }
             {
@@ -459,6 +459,7 @@ namespace Thornswood
             chkAutoUpdate = F<CheckBox>("ChkAutoUpdate");
             updateBar = F<Border>("UpdateBar"); titleBar = F<Grid>("TitleBar");
             downgradeBar = F<Border>("DowngradeBar"); txtDowngradeNote = F<TextBlock>("TxtDowngradeNote"); btnDowngrade = F<Button>("BtnDowngrade");
+            txtDowngradeTitle = F<TextBlock>("TxtDowngradeTitle");
 
             btnPlay = F<Button>("BtnPlay"); btnRecheck = F<Button>("BtnRecheck"); btnCopy = F<Button>("BtnCopy");
             btnUpdate = F<Button>("BtnUpdate"); btnMin = F<Button>("BtnMin"); btnMax = F<Button>("BtnMax");
@@ -1298,6 +1299,11 @@ namespace Thornswood
             // outranks both, below, because an update can carry a new expected
             // build and settle the question by itself.
             bool wrongBuild = Downgrade.Needed(cfg);
+            // With Thornswood's own folder the card also comes up when only the
+            // Steam copy it is made from has moved on: Thornswood still plays,
+            // so Play is not held back, but the folder cannot follow Vortex until
+            // the Steam copy is back on the right build.
+            bool steamCopyWrong = !wrongBuild && Downgrade.SourceNeeded(cfg);
             if (updateBar != null && btnInstallNow != null && ModsMissing() && !wrongBuild)
             {
                 ShowCollectionBar();
@@ -1316,8 +1322,10 @@ namespace Thornswood
             if (downgradeBar != null)
             {
                 bool updateUp = updateBar != null && updateBar.Visibility == Visibility.Visible;
-                downgradeBar.Visibility = (wrongBuild && !updateUp && !playing) ? Visibility.Visible : Visibility.Collapsed;
+                downgradeBar.Visibility = ((wrongBuild || steamCopyWrong) && !updateUp && !playing) ? Visibility.Visible : Visibility.Collapsed;
                 if (btnDowngrade != null) btnDowngrade.IsEnabled = !Downgrade.Busy && !ownGameBusy;
+                if (txtDowngradeTitle != null)
+                    txtDowngradeTitle.Text = steamCopyWrong ? "The Steam copy of Skyrim is on the wrong build" : "Skyrim is on the wrong build";
             }
 
             btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy;
@@ -1398,11 +1406,15 @@ namespace Thornswood
         /// <summary>
         /// The Downgrade button. Everything happens on Downgrade's own thread;
         /// its words come back here through the dispatcher, into the log and
-        /// the line under the button, and the page is redrawn.
+        /// the line under the button, and the page is redrawn. With
+        /// Thornswood's own folder the downgrade is done to the Steam copy the
+        /// folder is made from, and the folder is brought up to date from it
+        /// once that has worked.
         /// </summary>
         static void RunDowngrade()
         {
             if (Downgrade.Busy) return;
+            if (ownGameBusy) { Log("Thornswood's own Skyrim folder is being prepared. Press Downgrade when that is done."); return; }
             if (Checks.GameRunning()) { Log("Close Skyrim first, then press Downgrade."); return; }
             btnDowngrade.IsEnabled = false;
             btnDowngrade.Content = "Working...";
@@ -1417,6 +1429,7 @@ namespace Thornswood
                         {
                             btnDowngrade.Content = ok ? "Done" : "Try again";
                             btnDowngrade.IsEnabled = !ok;
+                            if (ok && OwnGame.Active) StartOwnGame(false, true);
                             DrawStatus();
                             DrawBuildLine();
                         }));
