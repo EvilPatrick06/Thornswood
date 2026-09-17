@@ -80,7 +80,7 @@ if (-not $Version) {
 # Shown under the download button, so it is read the way a clock is read
 # rather than the way a log line is. The site reformats an older 24 hour
 # stamp too, for the one already sitting in files.json.
-if (-not $Version) { $Version = $exeItem.LastWriteTime.ToString('yyyy-MM-dd h:mm tt') }
+if (-not $Version) { $Version = $exeItem.LastWriteTime.ToString('M-d-yyyy h:mm tt') }
 
 $stamp  = $exeItem.LastWriteTime.ToString('yyyyMMdd-HHmm')
 $exeOut = "Thornswood-Setup-$stamp.exe"

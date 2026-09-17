@@ -746,14 +746,16 @@ if (PAGES[here]) {
     // string already published sits in files.json on the server and would
     // otherwise stay 22:06 until the next installer goes up. Anything that is
     // not a plain date and time is left exactly as it is, since this field also
-    // carries real version numbers.
+    // carries real version numbers, and so is a stamp already written month
+    // first by a newer Publish-Installer.
     function clock(v) {
-      var m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/.exec(String(v || ''));
+      var m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String(v || ''));
       if (!m) return v;
-      var h = parseInt(m[2], 10);
+      var h = parseInt(m[4], 10);
       var half = h < 12 ? 'AM' : 'PM';
       h = h % 12; if (h === 0) { h = 12; }
-      return m[1] + ' ' + h + ':' + m[3] + ' ' + half;
+      return parseInt(m[2], 10) + '-' + parseInt(m[3], 10) + '-' + m[1] +
+             ' ' + h + ':' + m[5] + ' ' + half;
     }
 
     function human(b) {
