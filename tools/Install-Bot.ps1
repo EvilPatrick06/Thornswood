@@ -4,7 +4,9 @@
   Puts the Thornswood bot on the VPS and keeps it running. This is the one that
   stays up, unlike Setup-Discord.ps1 which builds the server once and exits.
 
-      .\Install-Bot.ps1
+      .\Install-Bot.ps1               all of it, asks for the token
+      .\Install-Bot.ps1 -CodeOnly    just the code, then restart
+      .\Install-Bot.ps1 -NoToken     everything except asking for it
 
   What it does:
 
@@ -47,6 +49,11 @@ param(
   # silently stopped tickets reaching the site inbox until Deploy-Docs was run
   # again. The key is kept unless you ask for a new one.
   [switch]$RotateKey,
+  # Just the code. Sends bot.py, card.py and the artwork, restarts, and
+  # leaves Python, the libraries, the token and the scheduled task alone.
+  # This is what a change to bot.py wants, and it never asks for anything,
+  # so it runs unattended.
+  [switch]$CodeOnly,
   [switch]$NoToken,
   [switch]$NoPause
 )
@@ -136,6 +143,58 @@ if (Test-Path $art) {
   Say '  assets\join-card.png' 'Green'
 } else {
   Say '  no join-card.png, cards will fall back to a plain background' 'Yellow'
+}
+
+# ----------------------------------------------------------- code only ---
+# A change to bot.py and nothing else, which is most of them.
+#
+# The full run checks Python, reinstalls three libraries over the network,
+# rewrites bot.env.json and re-registers the scheduled task, and none of that
+# has anything to do with the code having changed. This sends the files and
+# restarts, which is the whole job, and it never asks for the token, so it
+# runs unattended.
+if ($CodeOnly) {
+    Head 'Restarting it'
+    Remote @"
+`$ErrorActionPreference = 'Continue'
+`$log = '$rootWin\bot.log'
+`$before = 0
+if (Test-Path `$log) { `$before = (Get-Item `$log).Length }
+
+# By command line rather than by task, because a bot started by hand once is
+# still a bot holding the token and answering tickets.
+Get-CimInstance Win32_Process |
+  Where-Object { `$_.Name -like 'python*' -and `$_.CommandLine -like '*Thornswood-Bot*' } |
+  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue; 'stopped pid ' + `$_.ProcessId }
+Start-Sleep -Seconds 2
+Stop-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
+Start-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
+Start-Sleep -Seconds 12
+
+`$p = Get-CimInstance Win32_Process |
+      Where-Object { `$_.Name -like 'python*' -and `$_.CommandLine -like '*Thornswood-Bot*' }
+if (`$p) { 'bot up, pid ' + (`$p | Select-Object -First 1).ProcessId } else { 'BOT DID NOT START' }
+
+# Only what this start wrote. The file is held open by the bot, so it is read
+# with FileShare ReadWrite or not at all.
+`$fs = `$null
+try {
+  `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
+  if (`$fs.Length -gt `$before) {
+    [void]`$fs.Seek(`$before, 'Begin')
+    `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
+    (`$sr.ReadToEnd()) -split "\r?\n" | Where-Object { `$_ } | Select-Object -Last 12
+    `$sr.Close()
+  } else { 'nothing new in the log yet' }
+} catch { 'could not read the log: ' + `$_.Exception.Message } finally { if (`$fs) { `$fs.Dispose() } }
+"@ | ForEach-Object { Say "  $_" }
+
+    Write-Host ''
+    Say '  Code only. Python, the libraries, the token and the task were left alone.' 'DarkGray'
+    Say '  The ticket panel updates itself on startup, so a changed panel is already up.' 'DarkGray'
+    Write-Host ''
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
 }
 
 # ---------------------------------------------------------------- deps ---
