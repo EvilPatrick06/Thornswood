@@ -390,8 +390,18 @@ namespace Thornswood
         {
             try
             {
-                if (!File.Exists(ClientBundle)) return "skymp5-client.js is missing, press Repair in Settings";
-                if (!ClientPatched()) return "skymp5-client.js is not this build's, press Repair in Settings";
+                // Which remedy is named depends on whether there is anything
+                // to put back. Repair restores a Data\Platform file from the
+                // kept copy under Profile\Keep, and a kept copy only exists
+                // for a file one of this build's updates wrote. An install
+                // that came from the installer and has never taken a pack has
+                // none, so Repair would find nothing and say so, and the
+                // person would be stuck on a blocked button being told to
+                // press one that cannot help.
+                string how = Keep.HasKept(@"Data\Platform\Plugins\skymp5-client.js")
+                    ? "press Repair in Settings" : "reinstall Thornswood";
+                if (!File.Exists(ClientBundle)) return "skymp5-client.js is missing, " + how;
+                if (!ClientPatched()) return "skymp5-client.js is not this build's, " + how;
             }
             catch { return "client bundle"; }
             return "client bundle";
