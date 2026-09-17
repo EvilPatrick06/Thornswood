@@ -208,17 +208,13 @@ function Test-Vanilla([string]$rel) {
 # locked while the client is running. Publishing it churned hundreds of files
 # per release, sent one player's browser state to everyone else, and eventually
 # failed outright on a file the game still had open.
-$runtimeDirs = @(
-    'Data\SkyrimTogetherReborn\cache\',
-    'Data\SkyrimTogetherReborn\logs\',
-    '.sentry-native\'
-)
-function Test-Runtime([string]$rel) {
-    foreach ($d in $runtimeDirs) {
-        if ($rel.StartsWith($d, 'OrdinalIgnoreCase')) { return $true }
-    }
-    return $false
-}
+# The same rules as the packs, from the same file, so the installer can never
+# carry what a pack would not: runtime folders, one machine's own files,
+# other servers' files, and the SkyMP client's saved sign in token, which the
+# installer built on 16 Sep did carry.
+. (Join-Path $Here 'Ship-Rules.ps1')
+$runtimeDirs = $ShipRuntimeDirs
+function Test-Runtime([string]$rel) { return (Test-ShipRuntime $rel) }
 
 # ---- what ships separately: the optional packs ----------------------------
 # Everything listed in optional-packs.txt is left out here and published as its
@@ -301,12 +297,13 @@ Say '  Listing the build...'
 $all = @(Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)
 $prefix = $GameDir.TrimEnd('\') + '\'
 
-$ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0
+$ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0
 $collectionBytes = 0; $collectionCount = 0
 foreach ($f in $all) {
     $rel = $f.FullName.Substring($prefix.Length)
     if (Test-Vanilla $rel) { $skipBytes += $f.Length; continue }
     if (Test-Runtime $rel) { $skipBytes += $f.Length; continue }
+    if (Test-ShipMachine $rel) { $skipBytes += $f.Length; $machineCount++; continue }
     if (Test-Optional $rel) { $optionalBytes += $f.Length; $optionalCount++; continue }
     if (Test-FromCollection $rel) { $collectionBytes += $f.Length; $collectionCount++; continue }
     if ($f.Extension -in '.pdb', '.log') { $skipBytes += $f.Length; continue }
@@ -315,6 +312,7 @@ foreach ($f in $all) {
 }
 Say ("  {0:n0} files kept ({1:n1} GB), {2:n0} left out ({3:n1} GB of Bethesda files and debug symbols)" -f `
     $ship.Count, ($shipBytes / 1GB), ($all.Count - $ship.Count), ($skipBytes / 1GB)) 'Green'
+if ($machineCount) { Say ("  {0:n0} of this machine's own files, other servers' files and sign in tokens left out" -f $machineCount) 'DarkGray' }
 if ($collectionCount) {
     Say ("  {0:n0} of the left out ({1:n1} GB) are files the collection provides." -f `
         $collectionCount, ($collectionBytes / 1GB)) 'Green'

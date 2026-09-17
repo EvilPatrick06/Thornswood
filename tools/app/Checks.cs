@@ -643,6 +643,22 @@ namespace Thornswood
             if (string.IsNullOrEmpty(path)) return true;
 
             if (!string.IsNullOrEmpty(self) && string.Equals(path, self, StringComparison.OrdinalIgnoreCase)) return true;
+
+            // Any Thornswood launcher at all, not only this install's. The dev
+            // build lives in its own root beside the main one, so the folder
+            // test below said "not mine" and it was counted as the game: Play
+            // stayed blocked and Clear went after it. The game is never called
+            // Thornswood.exe or SkyrimTogether.exe, so the name and a parent
+            // folder called Launcher settle it whatever the root.
+            try
+            {
+                string leaf = Path.GetFileName(path);
+                string parent = Path.GetFileName(Path.GetDirectoryName(path).TrimEnd('\\'));
+                if ((string.Equals(leaf, "Thornswood.exe", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(leaf, "SkyrimTogether.exe", StringComparison.OrdinalIgnoreCase)) &&
+                    string.Equals(parent, "Launcher", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            catch { }
             // Matched by folder rather than by file name. The launcher has been
             // called SkyrimTogether.exe and is called Thornswood.exe now, and an
             // install made before the rename still carries the old name, so a

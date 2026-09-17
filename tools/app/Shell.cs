@@ -214,6 +214,7 @@ namespace Thornswood
 
             if (Swap.Restore()) Log("Cleaned up a redirect left behind by a crash.");
             Keep.TakeNote();
+            try { string leak = Leaks.Clean(); if (leak != null) Log(leak); } catch { }
             {
                 int parked = Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");
@@ -3544,14 +3545,28 @@ namespace Thornswood
             // problem that is not there.
             if (ModsMissing())
             {
-                updatePending = false;
-                updateAnswered = true;
-                ShowCollectionBar();
-                DrawStatus();
-                Log("The collection is not installed yet. Updates wait until it is.");
-                return;
+                if (!newLauncher)
+                {
+                    updatePending = false;
+                    updateAnswered = true;
+                    ShowCollectionBar();
+                    DrawStatus();
+                    Log("The collection is not installed yet. Updates wait until it is.");
+                    return;
+                }
+                // The launcher itself needs no mods to update. Holding it back
+                // with the packs left a machine whose Vortex was on another
+                // server's profile stuck on an old launcher for good, and the
+                // fix for that (this line) could never reach it. The packs
+                // still wait; the exe goes ahead.
+                pendingPacks = new List<Pack>();
+                collectionBarUp = false;
+                Log("The collection is not installed yet. The mod updates wait until it is; the launcher update goes ahead.");
             }
-            collectionBarUp = false;
+            else
+            {
+                collectionBarUp = false;
+            }
             btnInstallNow.Content = "Install now";
 
             if (pendingPacks.Count == 0 && !newLauncher)

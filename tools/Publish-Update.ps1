@@ -304,131 +304,15 @@ function Test-Vanilla([string]$rel) {
     return $false
 }
 
-# The multiplayer client's menu is a Chromium window, and it keeps a browser
-# profile beside itself: caches, cookie databases, shader blobs, its own logs.
-# All of it is per machine, all of it is rewritten on every launch, and it is
-# locked while the client is running. Publishing it churned hundreds of files
-# per release, sent one player's browser state to everyone else, and eventually
-# failed outright on a file the game still had open.
-#
-# 'Claude outputs' is where the Claude desktop app drops files it hands to
-# Gavin in chat. It chose the game folder for that, so a report, a script and
-# a png rode along in packs 20260916-0130 to 0937 and landed in everybody's
-# Skyrim folder. Leaving it out here makes the next release list them as
-# removed, and the launcher takes them back off every install.
-$runtimeDirs = @(
-    'Claude outputs\',
-    # Where files are parked on Gavin's machine when they cannot be deleted
-    # from a session (rm is refused there, mv is not). A test plugin parked
-    # here rode in packs 20260916-1800 and 1802-dev. Leaving the folder out
-    # lists it as removed, and the launcher takes it back off every install.
-    '_to_delete\',
-    # RaceMenu writes a face export here when somebody saves one in game. It
-    # is that person's face, not part of the build.
-    'Data\SKSE\Plugins\CharGen\Exported\',
-    'Data\SkyrimTogetherReborn\cache\',
-    'Data\SkyrimTogetherReborn\logs\',
-    '.sentry-native\'
-)
-function Test-Runtime([string]$rel) {
-    foreach ($d in $runtimeDirs) {
-        if ($rel.StartsWith($d, 'OrdinalIgnoreCase')) { return $true }
-    }
-    return $false
-}
-
-# Settings that belong to the machine rather than to the build. SSE Display
-# Tweaks holds the screen resolution, so publishing it stamped one person's
-# monitor onto everyone: a friend on a 2560x1440 screen was running the game at
-# 3440x1440 because that is what the pack carried. The launcher writes this one
-# per machine on every start, so it must not ride along in a pack.
-#
-# It must also be kept out of the removal list. Dropping a file from the scan
-# makes it look deleted, and delete.txt would then strip it from every install.
-#
-# The same goes for the multiplayer client's settings file. The launcher writes
-# gameData.profileId into it on every Play, so it is one person's character
-# slot, and it also carried a token nothing in this build reads. It rode in
-# pack-20260916-0314 and every earlier pack where the id had changed, which put
-# Gavin's slot and that token on the public releases page and briefly into
-# every install until their launcher rewrote it. overlay-boot.count and the
-# plugin logs beside it are written by the game on every launch and are noise.
-$machineFiles = @(
-    'Data\SKSE\Plugins\SSEDisplayTweaks.ini',
-    'Data\Platform\Plugins\skymp5-client-settings.txt',
-    'Data\Platform\overlay-boot.count',
-    'Data\Platform\thornswood-dress.log',
-    'Data\Platform\thornswood-emotes.log',
-    'Data\Platform\thornswood-front.log',
-    'Data\Platform\thornswood-voice.log',
-    # Open Animation Replacer writes this back with its own values on every
-    # exit (UI scale, log sizes, the lot), so it is per machine and would
-    # churn every release. The two values this build cares about, no welcome
-    # banner and no loading bar over the main menu, are held by the launcher's
-    # Enforce table on every Play instead.
-    'Data\SKSE\Plugins\OpenAnimationReplacer.ini',
-    # The launcher and the voice plugin talk through these three, in the game
-    # folder because it is the one place both can find on a collection install.
-    # Live state on this machine, rewritten several times a second while voice
-    # runs. Not a build file.
-    'Data\Platform\voice-port.txt',
-    'Data\Platform\voice-status.txt',
-    'Data\Platform\voice-ptt.txt',
-    # Written by the game on this machine every session: the front plugin's
-    # copy of the real load order, and two mod inis their mods rewrite on the
-    # way out. They changed on every release and shipped every time.
-    'Data\Platform\thornswood-loadorder.txt',
-    # The launcher's note to the plugins that this is our session. See Keep.cs.
-    'Data\Platform\thornswood-session.txt',
-    'Data\SKSE\Plugins\po3_Tweaks.ini',
-    'Data\SKSE\Plugins\CrashLogger.ini'
-)
-# Another SkyMP server's files. Keizaal Online and Daedric Online write into
-# the same Data\Platform as us: their plugins beside ours, .bak copies of
-# files they replace. Keep parks their plugins while Thornswood runs and puts
-# them back after, so they are always in the folder when it is scanned. Ours
-# are thornswood-*.js and the patched skymp5-client.js; anything else there is
-# theirs and must not ride in a pack. Kept out of the removal list as well, so
-# a release never strips another server's install off a tester.
-function Test-OtherServer([string]$rel) {
-    if (-not $rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $false }
-    $leaf = Split-Path $rel -Leaf
-    if ($leaf -like '*.bak') { return $true }
-    if ($rel -like 'Data\Platform\Plugins\*.js') {
-        if ($leaf -like 'thornswood-*.js') { return $false }
-        if ($leaf -eq 'skymp5-client.js') { return $false }
-        return $true
-    }
-    # Keizaal's menu is a Vite build: app.js, vite.svg, an assets folder and its
-    # own art. Ours is flat under UI (build.js and hashed files beside it) and
-    # never has an assets folder, so these can only be theirs.
-    if ($rel -like 'Data\Platform\UI\*') {
-        if ($rel -like 'Data\Platform\UI\assets\*') { return $true }
-        if ($leaf -in 'app.js', 'vite.svg') { return $true }
-        if ($leaf -match 'keizaal|daedric|mereth') { return $true }
-    }
-    return $false
-}
-function Test-Machine([string]$rel) {
-    if (Test-OtherServer $rel) { return $true }
-    foreach ($f in $machineFiles) {
-        if ($rel -eq $f) { return $true }
-    }
-    # Vortex's own bookkeeping. The deployment manifests record what Vortex
-    # put into THIS Skyrim, the .vortex_backup files are what it moved aside
-    # here, and the __folder_managed_by_vortex markers are its claim on a
-    # folder. All of it describes one machine's install, and handing somebody
-    # else's copy to their Vortex is how it loses track of its own deployment.
-    # pack-20260916-1217 carried a 6 MB vortex.deployment.json for exactly that
-    # reason. Kept here rather than in Test-Runtime so that dropping them from
-    # the scan does not list them as removed and strip them from every install.
-    $leaf = Split-Path $rel -Leaf
-    if ($leaf -eq 'vortex.deployment.json') { return $true }
-    if ($leaf -eq 'vortex.deployment.dinput.json') { return $true }
-    if ($leaf -eq '__folder_managed_by_vortex') { return $true }
-    if ($leaf -like '*.vortex_backup') { return $true }
-    return $false
-}
+# What never leaves a machine in a pack: runtime folders, one machine's own
+# files, other servers' files and sign in tokens. The lists live in
+# Ship-Rules.ps1, shared with Package-Thornswood.ps1, so the installer follows
+# exactly the same rules as the packs (it did not, and shipped a token file).
+. (Join-Path $Here 'Ship-Rules.ps1')
+$runtimeDirs = $ShipRuntimeDirs
+function Test-Runtime([string]$rel) { return (Test-ShipRuntime $rel) }
+function Test-OtherServer([string]$rel) { return (Test-ShipOtherServer $rel) }
+function Test-Machine([string]$rel) { return (Test-ShipMachine $rel) }
 
 # ---- another server's menu -------------------------------------------------
 #

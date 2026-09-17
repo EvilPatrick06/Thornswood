@@ -74,26 +74,51 @@ password. Every script closes the launcher and Skyrim itself when it needs to.
 
 ## Two machines shipping
 
-Two people can ship from two machines, on the same channel or different ones.
-What makes it safe:
+Two people, two machines, one repo. The short rules are in `CLAUDE.md` at the
+repo root, which every Claude Code session reads on its own; this is the long
+form.
 
-- The feed is pulled before `version.json` is edited, so a release is added on
-  top of whatever the other machine just published. If the pull fails the
-  publisher stops before touching anything.
-- The baseline is per machine. A machine that did not ship the last release
-  sees those files as changed (the packs it applied carry different time
-  stamps) and ships them again: wasted bytes, never wrong files, and it
-  settles after one release each.
-- Keep, in the launcher, trusts the game folder over its kept copies on any
-  machine with `Profile\developer.flag` (Publish-Update writes it), so an edit
-  you are testing in the game folder is not put back before you can ship it.
-  On testers' machines the kept copies win.
-- Same channel at the same moment is the one thing to avoid: the second push
-  is refused, the publisher says NOT SHIPPED, and the assets are up with no
-  feed entry. Pull and run Ship again. Different channels never collide.
-
-Say in #dev (or wherever you two talk) before a main Ship. Dev Ships need no
-warning.
+- **main is what ships.** Only Gavin's machine ships main. `Ship.ps1`
+  refuses a main release that is not on the `main` branch or is behind
+  `origin/main`, and when a main release is out it commits the source and
+  pushes it, so the other machine can `git pull` exactly what shipped.
+- **Work happens on a branch.** `git checkout -b djinn/what-it-is` (or
+  `gavin/...`), small commits with plain messages, `git push -u origin
+  <branch>`, then `gh pr create --fill`. The other person reads the pull
+  request and it is merged on GitHub. Nothing is pushed over main from a
+  second machine, and nothing is force pushed.
+- **One fix per pull request.** A branch that changes eight things is eight
+  reviews at once; split it.
+- **`git pull` before anything.** A conflicting pull is resolved on your
+  branch (`git fetch`, `git rebase origin/main`), never on main. A rejected
+  push means pull first; never `--force`.
+- **The dev channel is for trying.** `.\tools\Ship.ps1 -Channel dev "..."`
+  runs from any branch on either machine and puts that build on the dev
+  server. There is one dev feed and the last dev Ship wins, so say in #dev
+  when you take it. A main Ship resets dev to match main.
+- **Settled design is a proposal first.** The Steam copy with Vortex (no own
+  Game folder, no hard links, no per server folders), Keep and Hold for the
+  shared Data\Platform, the patched client bundle, C# 5 only, one complete
+  release at a time: changing any of these starts as a few lines in #dev,
+  agreed before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
+  `Updater.cs` or `Publish-Update.ps1` gets a line in #dev too; both
+  machines touch them.
+- **The publisher pulls the feed** before `version.json` is edited, so a
+  release is added on top of whatever the other machine just published; a
+  refused push means NOT SHIPPED, pull and run Ship again.
+- **The baseline is per machine.** A machine that did not ship the last
+  release ships those files again once; wasted bytes, never wrong files.
+- **Keep trusts the game folder** over its kept copies on any machine with
+  `Profile\developer.flag` (Publish-Update writes it), so an edit you are
+  testing is not put back before you can ship it.
+- **What never leaves a machine** in a pack or an installer is one list,
+  `tools\Ship-Rules.ps1`, read by `Publish-Update.ps1` and
+  `Package-Thornswood.ps1` both: runtime folders, one machine's own files,
+  other servers' files, and the SkyMP client's saved sign in
+  (`Data\Platform\PluginsNoLoad`). The installer of 16 Sep carried that
+  sign in file before the list was shared; the launcher removes that exact
+  copy from every install (Leaks.cs), matched by content so nobody's own
+  sign in is touched.
 
 ## Setting up a machine
 

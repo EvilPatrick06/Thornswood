@@ -140,6 +140,32 @@ Write-Host ''
 Write-Host '  SHIP' -ForegroundColor White
 Write-Host "  $Notes" -ForegroundColor DarkGray
 
+# ------------------------------------------------------------ git
+# Two people ship from two machines. A main release is what everybody gets,
+# so it comes off main, with nothing uncommitted and nothing unpulled: the
+# other machine's last push has to be in this build or the release loses it.
+# A dev release is for trying things, so it may come off any branch, and the
+# feed says which. Skipped with -DryRun and when this is not a git clone.
+if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
+    Head 'Git'
+    # git talks on stderr even when all is well, which Stop turns into a halt.
+    $oldEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $branch = (& git -C $RepoDir rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()
+    $dirty = @(& git -C $RepoDir status --porcelain --untracked-files=no 2>$null | Where-Object { $_ })
+    & git -C $RepoDir fetch --quiet origin 2>$null | Out-Null
+    $behind = 0
+    try { $behind = [int]((& git -C $RepoDir rev-list --count "HEAD..origin/$branch" 2>$null | Out-String).Trim()) } catch { $behind = 0 }
+    $ErrorActionPreference = $oldEap
+    Say ("  branch {0}, {1} uncommitted change(s), {2} commit(s) behind origin/{0}" -f $branch, $dirty.Count, $behind) 'DarkGray'
+    if (-not $Dev) {
+        if ($branch -ne 'main') { Die "A main release ships from main. This is $branch. Merge it into main first, or use -Channel dev to try it on the dev server." }
+        if ($behind -gt 0) { Die "main is $behind commit(s) behind origin/main. Run git pull first, so the other machine's work is in this release." }
+        if ($dirty.Count) { Say '  the uncommitted changes are what this release is built from; they are committed and pushed when it is out' 'DarkGray' }
+    } elseif ($behind -gt 0) {
+        Say "  this branch is $behind commit(s) behind origin; the dev build will not carry them" 'Yellow'
+    }
+}
+
 # ------------------------------------------------------------ version
 $updaterCs = Join-Path $Here 'app\Updater.cs'
 if (-not (Test-Path $updaterCs)) { Die "Could not find $updaterCs" }
@@ -505,6 +531,23 @@ if (-not $DryRun -and -not $Dev) {
             Say "  could not reset the dev feed: $_" 'Yellow'
         }
     }
+}
+
+if (-not $DryRun -and -not $Dev -and (Test-Path (Join-Path $RepoDir '.git'))) {
+    Head 'Source'
+    $oldEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        & git -C $RepoDir add -A 2>$null | Out-Null
+        $staged = @(& git -C $RepoDir diff --cached --name-only 2>$null | Where-Object { $_ })
+        if ($staged.Count) {
+            & git -C $RepoDir commit -q -m "$target`: $Notes" 2>$null | Out-Null
+            Say ("  committed {0} file(s) as {1}" -f $staged.Count, $target) 'Green'
+        } else { Say '  nothing new to commit' 'DarkGray' }
+        $pushed = & git -C $RepoDir push -q origin HEAD 2>&1
+        if ($LASTEXITCODE -eq 0) { Say '  pushed to GitHub' 'Green' }
+        else { Say "  push did not go through: $pushed" 'Yellow'; Say '  Run git pull, then git push, so the other machine gets this release''s source.' 'Yellow' }
+    } catch { Say "  could not commit the source: $_" 'Yellow' }
+    $ErrorActionPreference = $oldEap
 }
 
 Head 'Done'

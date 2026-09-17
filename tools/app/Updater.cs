@@ -10,7 +10,7 @@ namespace Thornswood
 {
     static class Updater
     {
-        public const string Version = "1.1.38";
+        public const string Version = "1.1.39";
 
         static WebClient Client(Config cfg, bool octet, string url)
         {
