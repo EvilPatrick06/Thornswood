@@ -72,6 +72,15 @@ foreach ($d in @($Docs)) {
   $docNames += $n
 }
 
+# Runs a command up there and hands back what it said.
+#
+# 2>&1 means anything ssh writes to stderr comes back in the same stream as the
+# output, as an ErrorRecord rather than a string. Callers that only print are
+# fine with that. Callers that treat the result as text are not: OpenSSH now
+# warns about post-quantum key exchange on every connection, that warning
+# arrived among the filenames, and $_.Trim() stopped the deploy with "does not
+# contain a method named 'Trim'" after the files had already gone up. The two
+# places that build a list from this take only the strings.
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
   & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
@@ -109,7 +118,7 @@ Write-Host ('  ' + ($sentPublic -join ', '))
 # from the site rather than redeployed. Same rule: only the missing ones go.
 Remote "if (-not (Test-Path '$rootWin\data\site')) { New-Item -ItemType Directory -Path '$rootWin\data\site' -Force | Out-Null }" | Out-Null
 $siteThere = @((Remote "Get-ChildItem '$rootWin\data\site' -File -EA SilentlyContinue | ForEach-Object Name") |
-               ForEach-Object { $_.Trim() } | Where-Object { $_ })
+               Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 Get-ChildItem (Join-Path $App 'data/site') -Filter *.md -EA SilentlyContinue | ForEach-Object {
   if ($SeedDocs -or $Site -or ($siteThere -notcontains $_.Name)) {
     Push $_.FullName "$Root/data/site/$($_.Name)"
@@ -140,7 +149,7 @@ foreach (`$f in Get-ChildItem '$rootWin\data' -File -Include *.md,*.json -EA Sil
 "@ | ForEach-Object { "  $_" }
 }
 $there = @((Remote "Get-ChildItem '$rootWin\data' -File -EA SilentlyContinue | ForEach-Object Name") |
-           ForEach-Object { $_.Trim() } | Where-Object { $_ })
+           Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $sent = 0
 Get-ChildItem (Join-Path $App 'data') | Where-Object { $_.Extension -in '.md','.json' } |
   ForEach-Object {
