@@ -399,6 +399,14 @@ function Test-OtherServer([string]$rel) {
         if ($leaf -eq 'skymp5-client.js') { return $false }
         return $true
     }
+    # Keizaal's menu is a Vite build: app.js, vite.svg, an assets folder and its
+    # own art. Ours is flat under UI (build.js and hashed files beside it) and
+    # never has an assets folder, so these can only be theirs.
+    if ($rel -like 'Data\Platform\UI\*') {
+        if ($rel -like 'Data\Platform\UI\assets\*') { return $true }
+        if ($leaf -in 'app.js', 'vite.svg') { return $true }
+        if ($leaf -match 'keizaal|daedric|mereth') { return $true }
+    }
     return $false
 }
 function Test-Machine([string]$rel) {
