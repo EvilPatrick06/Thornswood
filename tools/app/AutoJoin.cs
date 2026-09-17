@@ -29,6 +29,54 @@ namespace Thornswood
             get { return Path.Combine(Paths.Game, "Data\\Platform\\Plugins\\skymp5-client-settings.txt"); }
         }
 
+        /// <summary>
+        /// Makes sure the settings file exists at all, and says so when it had
+        /// to be made.
+        ///
+        /// Nothing ships this file. The 16 Sep installer carried one person's
+        /// character id inside it, so every new install walked in as that
+        /// character. The fix that evening made it a machine file that never
+        /// leaves a machine, which was right, and nothing was put in its place.
+        /// The client bundle does not create it, and every function in this
+        /// class returned early when it was missing. So from that evening on a
+        /// fresh install could not choose a character: SetProfileId returned
+        /// false, GetProfileId read nothing, and Chars.StartAs stopped with
+        /// "they still say no profile", which is what a tester reported on
+        /// 17 Sep after reinstalling.
+        ///
+        /// The file holds only what the bundle reads: both profile ids at 0,
+        /// no hours offset, and an empty server address for Apply to fill on
+        /// the way to Play. Keybinds are left out on purpose; Keys.cs makes
+        /// that block the first time it writes one.
+        /// </summary>
+        public static bool Ensure(Action<string> say)
+        {
+            try
+            {
+                string file = SettingsFile;
+                if (File.Exists(file)) return false;
+                Directory.CreateDirectory(Path.GetDirectoryName(file));
+                string json =
+                    "{" + Environment.NewLine +
+                    "  \"profileId\": 0," + Environment.NewLine +
+                    "  \"gameData\": { \"profileId\": 0 }," + Environment.NewLine +
+                    "  \"hoursOffset\": 0," + Environment.NewLine +
+                    "  \"master\": \"\"," + Environment.NewLine +
+                    "  \"server-ip\": \"\"," + Environment.NewLine +
+                    "  \"server-port\": 7777," + Environment.NewLine +
+                    "  \"server-master-key\": \"\"" + Environment.NewLine +
+                    "}" + Environment.NewLine;
+                File.WriteAllText(file, json, new UTF8Encoding(false));
+                if (say != null) say("Made a fresh client settings file, because this install had none.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (say != null) say("Could not make the client settings file: " + ex.Message);
+                return false;
+            }
+        }
+
         /// <summary>Writes the address and port. Returns a line for the log, or null when nothing changed.</summary>
 
         /// <summary>
@@ -78,8 +126,9 @@ namespace Thornswood
             try
             {
                 string file = SettingsFile;
+                Ensure(null);
                 if (!File.Exists(file))
-                    return "SkyMP's client settings file is missing, so the server address was not set.";
+                    return "SkyMP's client settings file is missing and could not be made, so the server address was not set.";
 
                 if (!cfg.AutoJoin)
                     return "Auto join is off, leaving the server address as it is.";
@@ -200,6 +249,7 @@ namespace Thornswood
             try
             {
                 string file = SettingsFile;
+                Ensure(null);
                 if (!File.Exists(file)) return false;
                 string before = File.ReadAllText(file);
 

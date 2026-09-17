@@ -243,6 +243,12 @@ namespace Thornswood
             // install that already exists gets one on its next launch.
             try { Register.Ensure(cfg); } catch { }
 
+            // The client settings file, made here if this install has none.
+            // Nothing ships it, the client does not create it, and without it
+            // a character cannot be chosen. From startup, so the log says so
+            // before Play or a character choice can trip over its absence.
+            try { AutoJoin.Ensure(Log); } catch { }
+
             // A launcher killed mid-session and opened again finds the game
             // still up. Taking the redirect off now would send the rest of
             // that session's settings and saves into the real Windows folders,
