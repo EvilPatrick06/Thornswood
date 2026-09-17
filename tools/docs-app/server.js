@@ -1330,6 +1330,74 @@ http.createServer(async (req, res) => {
     return sendJson(res, 200, out);
   }
 
+  /*
+    Does this ticket own this profile number?
+
+    The voice service asks, because /choose cannot be locked to the loopback:
+    every person's launcher posts their character creation choice to it from
+    their own machine. Without an answer here it took anybody's word for
+    anything, and a stranger could set your profession, your half and your
+    home town before you ever claimed them.
+
+    This route did not exist. voice-server.js has been posting here since it
+    was written, every call fell through to the sign in gate below and came
+    back 401, owns() reads anything that is not a 200 as "unchecked", and the
+    service stored the choice anyway and logged UNVERIFIED. So the check has
+    never once run, and the ticket the launcher sends to the voice port in
+    clear was being spent on nothing.
+
+    Claimed, not registered. A profile number that nobody has ever checked in
+    with belongs to whoever asks for it first, which is the launcher that just
+    made the character: refusing those would break character creation for
+    every new character, which is the one case this runs in. A number already
+    against somebody else's Discord account is theirs, and that is the case
+    worth refusing.
+  */
+  if (p === '/api/play/owns' && req.method === 'POST') {
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const t = readTicket(o.ticket);
+    if (!t) return sendJson(res, 200, { ok: false, why: 'ticket' });
+    const pid = Number(o.profileId) || 0;
+    if (pid <= 0) return sendJson(res, 200, { ok: false, why: 'profile' });
+
+    // Still has to be somebody who is allowed in at all. A ticket from an
+    // account that has been banned or has left owns nothing.
+    const st = await standingCached(t.d);
+    /*
+      Could not ask Discord is not the same answer as not allowed.
+
+      standing() leaves play false on any lookup that failed, and sets
+      lookupFailed to say why, because a 404 is the only failure that really
+      means "not in the server". Answering 200 with ok false here would turn a
+      Discord outage into every new character being refused their profession
+      and home town, and voice-server.js reads a non-200 as unchecked and
+      stores the choice anyway, which is exactly the behaviour a failed lookup
+      should get. /api/allowed a few routes down already does this.
+    */
+    if (st.lookupFailed) {
+      return sendJson(res, 503, { ok: false, why: 'could not ask Discord' });
+    }
+    if (!st.play || st.banned) return sendJson(res, 200, { ok: false, why: 'role' });
+
+    const linked = jsonFile(LINKED, {});
+    const mine = (linked[t.d] && Array.isArray(linked[t.d].profiles))
+      ? linked[t.d].profiles.map(Number) : [];
+    if (mine.indexOf(pid) >= 0) return sendJson(res, 200, { ok: true, why: 'theirs' });
+
+    for (const d of Object.keys(linked)) {
+      if (String(d) === String(t.d)) continue;
+      const theirs = (linked[d] && Array.isArray(linked[d].profiles))
+        ? linked[d].profiles.map(Number) : [];
+      if (theirs.indexOf(pid) >= 0) {
+        return sendJson(res, 200, { ok: false, why: 'somebody else' });
+      }
+    }
+    // Nobody has it. The launcher that just made the character is the one
+    // asking, and it checks in with this number a moment later anyway.
+    return sendJson(res, 200, { ok: true, why: 'unclaimed' });
+  }
+
   // The same question without asking for the password, for the launcher to
   // show who it is linked as without pretending it is about to connect.
   if (p === '/api/play/who' && req.method === 'POST') {
