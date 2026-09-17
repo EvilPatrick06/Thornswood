@@ -1020,8 +1020,8 @@
 
                     <TextBlock Style="{StaticResource H2}" Text="Uninstall ThornsWood"/>
                     <TextBlock Style="{StaticResource Body}" Text="Puts your Windows Skyrim folders back, then deletes this build and the launcher with it. Your own Skyrim in Steam is never touched: this is a separate copy and Steam does not know it exists. There is no undo, and the whole thing has to be downloaded again afterwards."/>
-                    <CheckBox x:Name="ChkDeleteMods" Content="Delete the mods as well" Margin="0,13,0,0" IsChecked="True"/>
-                    <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0" Text="Untick this and the Game folder stays exactly where it is. Reinstalling then reuses what is already on the disk instead of pulling the whole collection down again, which is the difference between a few minutes and an evening."/>
+                    <CheckBox x:Name="ChkDeleteMods" Content="Delete Thornswood's copy of the game as well" Margin="0,13,0,0" IsChecked="True"/>
+                    <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0" Text="This is Thornswood's own Game folder, built from what Vortex deployed. It is not the mods themselves and it is not your Skyrim in Steam, neither of which this can touch: taking the mods off is Purge in Vortex and nothing here does it for you. Untick this and the folder stays exactly where it is, so reinstalling reuses what is already on the disk instead of pulling the collection down again, which is the difference between a few minutes and an evening."/>
                     <CheckBox x:Name="ChkKeepSaves" Content="Keep this build's saves and settings" Margin="0,13,0,0" IsChecked="True"/>
                     <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0" Text="Leaves the Profile folder where it is, so a reinstall picks your characters and settings back up."/>
                     <Button x:Name="BtnUninstall" Style="{StaticResource Ghost}" Content="Uninstall ThornsWood" HorizontalAlignment="Left" Margin="0,15,0,0"/>
