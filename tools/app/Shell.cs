@@ -1302,9 +1302,11 @@ namespace Thornswood
             // With Thornswood's own folder the card also comes up when only the
             // Steam copy it is made from has moved on: Thornswood still plays,
             // so Play is not held back, but the folder cannot follow Vortex until
-            // the Steam copy is back on the right build.
+            // the Steam copy is back on the right build. The mods card waits for
+            // that one as well: Vortex deploys into the Steam copy, and the
+            // downgrade rewrites the Steam copy, so the order is the same.
             bool steamCopyWrong = !wrongBuild && Downgrade.SourceNeeded(cfg);
-            if (updateBar != null && btnInstallNow != null && ModsMissing() && !wrongBuild)
+            if (updateBar != null && btnInstallNow != null && ModsMissing() && !wrongBuild && !steamCopyWrong)
             {
                 ShowCollectionBar();
             }
@@ -2861,7 +2863,7 @@ namespace Thornswood
                 // says. But the dialog said it, which is the worst possible
                 // sentence to read at that exact moment.
                 long ourBytes = 0; int ourCount = 0;
-                try { Uninstall.OurGameFiles(out ourBytes, out ourCount); }
+                try { Uninstall.OurGameFiles(cfg, out ourBytes, out ourCount); }
                 catch { ourBytes = 0; ourCount = 0; }
                 string ours = ourCount > 0
                     ? ourCount.ToString("n0") + " files, " +
@@ -2871,6 +2873,28 @@ namespace Thornswood
                 if (dropMods) goes.AppendLine("    Thornswood's own files inside your Skyrim   (" + ours + ")");
                 else          stays.AppendLine("    Thornswood's own files inside your Skyrim   (" + ours + ")");
                 stays.AppendLine("    Your Skyrim on Steam. None of it is touched");
+                stays.AppendLine("    The collection's mods. Purge Mods in Vortex is what removes those");
+            }
+            else if (OwnGame.Active)
+            {
+                // Made of links to Vortex's copies, so deleting it frees the
+                // copied part and not the collection; the collection's files
+                // stay Vortex's under their other names.
+                if (dropMods) goes.AppendLine("    " + Paths.Game + "   (Thornswood's own game folder; the linked mods stay Vortex's)");
+                else          stays.AppendLine("    " + Paths.Game + "   (Thornswood's own game folder)");
+
+                // What the installer wrote into the Steam copy before the folder
+                // existed comes out with it, from the installer's own list.
+                long ourBytes = 0; int ourCount = 0;
+                try { Uninstall.OurGameFiles(cfg, out ourBytes, out ourCount); }
+                catch { ourBytes = 0; ourCount = 0; }
+                string ours = ourCount > 0
+                    ? ourCount.ToString("n0") + " files, " +
+                      (ourBytes / 1024.0 / 1024.0).ToString("0") + " MB"
+                    : "nothing on record";
+                if (dropMods) goes.AppendLine("    Thornswood's own files inside your Skyrim on Steam   (" + ours + ")");
+                else          stays.AppendLine("    Thornswood's own files inside your Skyrim on Steam   (" + ours + ")");
+                stays.AppendLine("    Your Skyrim on Steam. None of the rest of it is touched");
                 stays.AppendLine("    The collection's mods. Purge Mods in Vortex is what removes those");
             }
             else
@@ -2939,7 +2963,7 @@ namespace Thornswood
             btnUninstall.IsEnabled = false;
             try
             {
-                string[] rest = Uninstall.Begin(keep, dropMods, Log);
+                string[] rest = Uninstall.Begin(cfg, keep, dropMods, Log);
                 Log("Handing the rest to Windows and closing...");
                 Uninstall.Finish(rest, keep, dropMods);
             }

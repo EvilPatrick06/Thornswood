@@ -405,8 +405,24 @@ namespace Thornswood
             // keyboard on its command line, which it does on its own.
             Thread.Sleep(1200);
             if (!ForegroundIsSteam()) return false;
+
+            // Whatever is on the command line goes first. The retry used to
+            // type the command a second time onto the first one, and Steam ran
+            // "download_depot ... 8442952117333549665download_depot ..." (Djinn,
+            // 17 Sep). Select all, delete, then type.
+            Chord(VK_CONTROL, VK_A);
+            Thread.Sleep(80);
+            Key(VK_BACK);
+            Thread.Sleep(120);
             Type(cmd);
-            Thread.Sleep(150);
+            Thread.Sleep(250);
+            // Twice. Steam's console suggests commands as you type, and while a
+            // suggestion is up the first Enter takes the suggestion instead of
+            // running the line; that is how the command sat there typed and not
+            // run. With no suggestion up, the second Enter runs an empty line,
+            // which Steam ignores.
+            Key(VK_RETURN);
+            Thread.Sleep(350);
             Key(VK_RETURN);
             return true;
         }
@@ -580,6 +596,9 @@ namespace Thornswood
         const int SW_RESTORE = 9;
         const ushort VK_RETURN = 0x0D;
         const ushort VK_MENU = 0x12;
+        const ushort VK_CONTROL = 0x11;
+        const ushort VK_BACK = 0x08;
+        const ushort VK_A = 0x41;
         const uint INPUT_MOUSE = 0, INPUT_KEYBOARD = 1;
         const uint KEYEVENTF_KEYUP = 0x0002, KEYEVENTF_UNICODE = 0x0004;
         const uint MOUSEEVENTF_LEFTDOWN = 0x0002, MOUSEEVENTF_LEFTUP = 0x0004;
@@ -636,6 +655,16 @@ namespace Thornswood
             var down = new INPUT(); down.type = INPUT_KEYBOARD; down.u.ki.wVk = vk;
             var up = new INPUT(); up.type = INPUT_KEYBOARD; up.u.ki.wVk = vk; up.u.ki.dwFlags = KEYEVENTF_KEYUP;
             SendInput(2, new[] { down, up }, Marshal.SizeOf(typeof(INPUT)));
+        }
+
+        /// <summary>A modifier held while another key is pressed, Ctrl+A for one.</summary>
+        static void Chord(ushort modifier, ushort vk)
+        {
+            var mDown = new INPUT(); mDown.type = INPUT_KEYBOARD; mDown.u.ki.wVk = modifier;
+            var kDown = new INPUT(); kDown.type = INPUT_KEYBOARD; kDown.u.ki.wVk = vk;
+            var kUp = new INPUT(); kUp.type = INPUT_KEYBOARD; kUp.u.ki.wVk = vk; kUp.u.ki.dwFlags = KEYEVENTF_KEYUP;
+            var mUp = new INPUT(); mUp.type = INPUT_KEYBOARD; mUp.u.ki.wVk = modifier; mUp.u.ki.dwFlags = KEYEVENTF_KEYUP;
+            SendInput(4, new[] { mDown, kDown, kUp, mUp }, Marshal.SizeOf(typeof(INPUT)));
         }
 
         static void Mouse(uint flag)
