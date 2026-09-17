@@ -194,11 +194,21 @@ namespace Thornswood
             return "ThornswoodLauncher-" + h.ToString("x8");
         }
 
+        /// <summary>
+        /// Windows sent us here from Installed apps, so open on the page that
+        /// does it. The entry in Settings points at this rather than deleting
+        /// anything itself, because the uninstall asks two questions that
+        /// matter and puts the Windows Skyrim folders back first.
+        /// </summary>
+        static bool askedToUninstall;
+
         static void Run(string[] args)
         {
             string root = null;
             for (int i = 0; i < args.Length - 1; i++)
                 if (args[i].Equals("-root", StringComparison.OrdinalIgnoreCase)) root = args[i + 1];
+            for (int i = 0; i < args.Length; i++)
+                if (args[i].Equals("-uninstall", StringComparison.OrdinalIgnoreCase)) askedToUninstall = true;
 
             Paths.Init(root);
             cfg = Config.Load(Paths.CfgFile);
@@ -223,7 +233,15 @@ namespace Thornswood
             BuildHelp();
             BuildModList();
             RefreshDiscord();
-            ShowPage(PagePlay);
+            // Windows Settings sends people here with -uninstall, so land on
+            // the page that does it rather than on Play with no clue why the
+            // launcher opened.
+            ShowPage(askedToUninstall ? PageSettings : PagePlay);
+
+            // And put Thornswood in Installed apps, or bring the entry up to
+            // date. Done here rather than in the installer so that every
+            // install that already exists gets one on its next launch.
+            try { Register.Ensure(cfg); } catch { }
 
             // A launcher killed mid-session and opened again finds the game
             // still up. Taking the redirect off now would send the rest of
