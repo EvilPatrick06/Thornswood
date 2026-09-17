@@ -2295,14 +2295,23 @@ log('gamemode loaded:',
     }
     var PLUG = path.join(DIR, 'plugins');
     try { fs.mkdirSync(PLUG, { recursive: true }); } catch (e) { }
+    // Clear what a previous start left here. 1.1.43 published these under their
+    // real names, and the resources server refuses any file whose name contains
+    // .esp, .esm or .esl (a 403), so those never served. The name is gone now:
+    // each file is served as its position in the manifest with a .bin
+    // extension, which the resources server does hand over. The launcher
+    // fetches /plugins/<index>.bin for the manifest entry at that index.
+    try {
+      var stale = fs.readdirSync(PLUG);
+      for (var s = 0; s < stale.length; s++) { try { fs.unlinkSync(path.join(PLUG, stale[s])); } catch (e) { } }
+    } catch (e) { }
     var linked = 0, copied = 0, missing = 0, bytes = 0;
     for (var j = 0; j < mods.length; j++) {
       var name = mods[j].filename;
       if (STOREFRONT[name.toLowerCase()]) continue;
       var src = byName[name.toLowerCase()];
       if (!src || !fs.existsSync(src)) { missing++; continue; }
-      var dst = path.join(PLUG, name);
-      try { fs.unlinkSync(dst); } catch (e) { }
+      var dst = path.join(PLUG, j + '.bin');
       try {
         fs.linkSync(src, dst);
         linked++;

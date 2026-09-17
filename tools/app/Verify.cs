@@ -21,6 +21,7 @@ namespace Thornswood
         public string Plugin;
         public long WantSize;
         public int WantCrc;
+        public int WantIndex;   // position in the server manifest; the file is served at /plugins/<index>.bin
         public Issue(string t, bool b) { Text = t; Blocking = b; }
         public Issue(string t, bool b, bool absent) { Text = t; Blocking = b; Absent = absent; }
     }
@@ -246,8 +247,9 @@ namespace Thornswood
             BytesChecked = true;
 
             string data = Path.Combine(Paths.Game, "Data");
-            foreach (ServerMod m in mods)
+            for (int idx = 0; idx < mods.Length; idx++)
             {
+                ServerMod m = mods[idx];
                 if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename)) continue;
                 string p = Path.Combine(data, m.filename);
                 long size;
@@ -274,6 +276,7 @@ namespace Thornswood
                 i.Plugin = m.filename;
                 i.WantSize = m.size;
                 i.WantCrc = (int)m.crc32;
+                i.WantIndex = idx;
                 issues.Add(i);
             }
             return issues;
@@ -365,7 +368,10 @@ namespace Thornswood
         static bool FetchPlugin(Config cfg, Issue i, Action<string> say)
         {
             string dest = Path.Combine(Paths.Game, "Data", i.Plugin);
-            byte[] bytes = Get(ServerBase(cfg) + "/plugins/" + Uri.EscapeDataString(i.Plugin), 90000);
+            // Served by manifest position, not name: the resources server refuses
+            // any URL whose name contains .esp/.esm/.esl. gamemode publishFiles
+            // writes each plugin as <index>.bin at the same position.
+            byte[] bytes = Get(ServerBase(cfg) + "/plugins/" + i.WantIndex + ".bin", 90000);
             if (bytes == null)
             {
                 say(i.Plugin + ": the server did not hand over its copy. It publishes the files at start, so a server older than this launcher, or one that is down, has none to give.");
