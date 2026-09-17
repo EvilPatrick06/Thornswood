@@ -151,6 +151,11 @@ namespace Thornswood
             string bat = Path.Combine(Path.GetTempPath(), "thornswood-dev-remove.cmd");
             var sb = new StringBuilder();
             sb.Append("@echo off\r\n");
+            // cmd reads a .cmd file in the console's OEM code page, not the
+            // UTF-8 this is written in, so a path with any character outside
+            // ASCII would reach rmdir and del as different bytes and the dev
+            // build would still be sitting there afterwards.
+            sb.Append("chcp 65001 >nul\r\n");
             sb.Append("ping 127.0.0.1 -n 4 >nul\r\n");
             sb.Append("rmdir /s /q \"" + root + "\"\r\n");
             foreach (string lnk in Icons.ShortcutPaths("Thornswood Dev"))

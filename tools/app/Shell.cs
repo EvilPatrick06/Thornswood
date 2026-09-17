@@ -225,13 +225,36 @@ namespace Thornswood
             RefreshDiscord();
             ShowPage(PagePlay);
 
-            if (Swap.Restore()) Log("Cleaned up a redirect left behind by a crash.");
-            Keep.TakeNote();
+            // A launcher killed mid-session and opened again finds the game
+            // still up. Taking the redirect off now would send the rest of
+            // that session's settings and saves into the real Windows folders,
+            // and putting other servers' plugins back would hand them to
+            // SkyrimPlatform while it is loading them. So the session is picked
+            // up where it was, and the two second tick does all of it properly
+            // once the game has actually closed.
+            playing = Checks.GameRunning();
+            if (playing)
+            {
+                // Only the part of the session this launcher can see is
+                // counted. Stats.StartedPlaying already ran in the instance
+                // that started the game, so it is not run again here.
+                playStartedAt = DateTime.Now;
+                btnPlay.Content = "RUNNING";
+                Log("Skyrim is still running, so this session is taken over rather than pulled apart under it. Your Windows folders stay pointed at this build until the game closes.");
+                int holding = 0;
+                try { holding = Hold.Take(PresenceLog); } catch { }
+                if (holding > 0) Log("Holding " + holding + " of " + cfg.BuildName + "'s game files again, so nothing else can change them under the running game.");
+            }
+            else
+            {
+                if (Swap.Restore()) Log("Cleaned up a redirect left behind by a crash.");
+                Keep.TakeNote();
+            }
             try { string leak = Leaks.Clean(cfg); if (leak != null) Log(leak); } catch { }
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch { }
             try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch { }
             {
-                int parked = Keep.Unpark();
+                int parked = playing ? 0 : Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");
                 // Packs go in before the launcher updates itself, so the first
                 // launcher with Keep finds files it never saw arrive.
@@ -336,7 +359,11 @@ namespace Thornswood
                 catch { }
             });
 
-            RunScan();
+            // Scan asks the server for its plugin list. The server having a bad
+            // night is not a reason for the launcher to stop halfway through
+            // starting, with the window built and nothing on it.
+            try { RunScan(); }
+            catch (Exception ex) { Log("Could not check the mod list on the way in: " + ex.Message); }
             if (DrawStatus()) Log("Ready."); else Log("Something needs attention before you can play.");
             AutoDisplayOnce();
             StartPing();
@@ -960,6 +987,12 @@ namespace Thornswood
             btnScan.Click += delegate { RunScan(); };
             btnFix.Click += delegate
             {
+                if (Checks.GameRunning())
+                {
+                    Log("Close Skyrim first. It writes the plugin list back when it exits, which would undo the fix.");
+                    return;
+                }
+
                 // Off the window's thread: a plugin fetched from the server is a
                 // few megabytes, and the window has to keep answering meanwhile.
                 var said = new List<string>();
@@ -1081,6 +1114,13 @@ namespace Thornswood
                 }
                 playing = false;
                 inPlayTicks = 0;
+                // An update was seen during the session and they quit before
+                // the five minutes were up. The clock goes, the fact does not:
+                // it is fetched now, the same as it would have been had the
+                // launcher closed the game itself. Otherwise quitting early was
+                // a way to stay on a build the rest of the room had moved past,
+                // with nothing on screen to say so.
+                if (updateSeenAt != DateTime.MinValue) closedForUpdate = true;
                 updateSeenAt = DateTime.MinValue;
                 try { Presence.Stop(); } catch { }
                 try { Hold.Release(); } catch { }
@@ -1129,6 +1169,19 @@ namespace Thornswood
                     }
                     catch { }
                 });
+
+                // Shut Play before the window comes back, not after. Nothing
+                // in the in-play check sets updatePending, so the status drawn
+                // here said PLAY while the pack the game was just closed for
+                // was still being fetched, and a press in that gap started
+                // Skyrim on half a pack. updateAnswered goes back to false so
+                // the button reads CHECKING, and so Unblock can free Play again
+                // if the check never reaches the source.
+                if (closedForUpdate)
+                {
+                    updatePending = true;
+                    updateAnswered = false;
+                }
 
                 DrawStatus();
                 win.WindowState = WindowState.Normal;
@@ -1230,10 +1283,41 @@ namespace Thornswood
         static string ClearLeftovers()
         {
             if (!Checks.GameRunning() || Checks.GameVisible()) return null;
+            // A game that is still starting has no window yet either. With this
+            // mod list Skyrim takes the better part of a minute to put one up
+            // and skse64_loader hands over well before that, so a launcher
+            // opened in those seconds reads a session that is loading in as the
+            // leftovers of a crashed one and kills it. Anything younger than
+            // three minutes is left alone; a crash worth clearing is older than
+            // that by the time somebody has opened the launcher again, and
+            // Clear is there for the rest.
+            if (JustStarted(180)) return null;
             int n = Checks.CloseGame();
             string still = Checks.StuckReport();
             if (still.Length > 0) return "Something Skyrim left behind would not close. " + still;
             return n > 0 ? "Closed " + n + " Skyrim process" + (n == 1 ? "" : "es") + " left over from the last session." : null;
+        }
+
+        /// <summary>
+        /// True when one of the game's processes started fewer than this many
+        /// seconds ago. A start time that cannot be read counts as old, the same
+        /// call Checks.GameProcesses makes about a path it cannot read: a
+        /// process that has already fallen over is the one that hides its own
+        /// details, and those are the ones worth closing.
+        /// </summary>
+        static bool JustStarted(int seconds)
+        {
+            List<Process> ps = Checks.GameProcesses();
+            bool young = false;
+            foreach (Process p in ps)
+            {
+                DateTime started;
+                try { started = p.StartTime; }
+                catch { continue; }
+                if ((DateTime.Now - started).TotalSeconds < seconds) { young = true; break; }
+            }
+            foreach (Process p in ps) { try { p.Dispose(); } catch { } }
+            return young;
         }
 
         static void Open(string path)
@@ -1876,7 +1960,7 @@ namespace Thornswood
             {
                 try
                 {
-                    if (installed) Updater.RemovePack(p, SafeLog);
+                    if (installed) Updater.RemovePack(cfg, p, SafeLog);
                     else Updater.ApplyPack(cfg, p, SafeLog);
                 }
                 catch (Exception ex)
@@ -2796,6 +2880,10 @@ namespace Thornswood
             {
                 int port = 7778;
                 int.TryParse(c.VoicePort, out port);
+                // TryParse writes zero over the default when the config value
+                // is not a number, and a probe to port zero can only ever say
+                // voice is down. Creation.Send guards the same value.
+                if (port <= 0) port = 7778;
                 bool up = false;
                 try
                 {
@@ -3077,7 +3165,12 @@ namespace Thornswood
                     return true;
                 }
 
-                string why = SkyMp.Start(cfg, Log);
+                // Up to forty eight seconds of waiting on the server to answer,
+                // and the window has to keep drawing through it or Windows
+                // offers to close the launcher instead. SafeLog, because what
+                // Start says now comes from another thread.
+                string why = null;
+                Waiting(delegate { why = SkyMp.Start(cfg, SafeLog); });
                 if (why == null) { Log("The server is up."); return true; }
 
                 Log(why);
@@ -3095,6 +3188,17 @@ namespace Thornswood
         {
             try
             {
+                // The button is not the only way in here. The character cards
+                // and a session coming back call this too, and greying out
+                // btnPlay does nothing for those, so the three things the
+                // button is disabled for are checked again on the way in. The
+                // one that bites is updatePending: the game closes for an
+                // update, the pack is being fetched, and a press in that gap
+                // starts Skyrim on a half extracted build.
+                if (updatePending) { Log("An update is going in. Play comes back when it is done."); return; }
+                if (collectionBarUp) { Log("The collection is not installed yet. Open it from the card above Play, then come back."); return; }
+                if (ownGameBusy) { Log("Thornswood's own Skyrim folder is being prepared. Play comes back when it is done."); return; }
+
                 if (!File.Exists(Paths.Loader)) { Log("skse64_loader.exe is missing from this build."); return; }
                 if (!File.Exists(Paths.MpClient)) { Log("MpClientPlugin.dll is missing, so this build has no multiplayer in it."); return; }
 
@@ -3147,7 +3251,11 @@ namespace Thornswood
                     return;
                 }
 
-                int mine = Verify.DeployPersonal();
+                // Every file in the personal folder, copied over the top on
+                // every Play with nothing comparing them first, so a big one is
+                // a visible stall on the window's own thread.
+                int mine = 0;
+                Waiting(delegate { mine = Verify.DeployPersonal(); });
                 if (mine > 0) Log("Copied in " + mine + " of your own files.");
 
                 // Several of these mods rewrite their own ini when Skyrim
@@ -3356,6 +3464,13 @@ namespace Thornswood
             return null;
         }
 
+        // A Discord check is out and the game starts on its answer. Only
+        // btnPlay was ever switched off while it was, and the slot cards sit
+        // on their own bar: two presses on a slot's Play sent two checks, both
+        // came back allowed, and the second start found the first Skyrim
+        // already up, closed it as a stuck one, and started again.
+        static bool doorCheckOut = false;
+
         static void StartAs(int slot, bool fresh)
         {
             // Discord decides who gets in, and it is asked here rather than
@@ -3365,7 +3480,12 @@ namespace Thornswood
             // frozen launcher looks like a crash.
             if (!Door.RecentlyCleared)
             {
+                if (doorCheckOut) { Log("Still asking Discord. One moment."); return; }
+                doorCheckOut = true;
                 btnPlay.IsEnabled = false;
+                // The cards go with it. They are the only other way into here
+                // and they are not on the Play button.
+                charBar.IsEnabled = false;
                 int s2 = slot; bool f2 = fresh;
                 Door.Check(win, Log,
                     delegate (Standing st)
@@ -3377,8 +3497,20 @@ namespace Thornswood
                         Door.Forget();
                         Door.Explain(win, st, delegate { ShowPage(PagePlay); });
                     },
-                    delegate { StartAs(s2, f2); },
-                    delegate { btnPlay.IsEnabled = true; RefreshDiscord(); DrawStatus(); DrawDevBuild(); });
+                    // Cleared before the start, because this goes straight back
+                    // into StartAs and the whole launch runs inside that call.
+                    // Door holds the yes for a few minutes, so the second pass
+                    // takes the path below rather than sending another check.
+                    delegate { doorCheckOut = false; StartAs(s2, f2); },
+                    delegate
+                    {
+                        doorCheckOut = false;
+                        btnPlay.IsEnabled = true;
+                        charBar.IsEnabled = true;
+                        RefreshDiscord();
+                        DrawStatus();
+                        DrawDevBuild();
+                    });
                 return;
             }
 
@@ -3397,13 +3529,17 @@ namespace Thornswood
                 if (!Creation.Ask(win, SlotName(slot), out trade, out half, out cls, out town)) return;
             }
 
-            // Only ever waits on a machine with no character list, which means a
-            // fresh install or a computer this person has not played on. Chars.Use
-            // is about to decide who they are, and on a blank machine it would
-            // hand slot one profile id 1, the id every install picks, rather
-            // than the character the server is a second away from naming.
-            if (Chars.Blank() && !Chars.WaitForSync(7000))
-                Log("Still asking the server about your characters. Carrying on.");
+            // No wait for the character list here any more. It waited on
+            // Chars.Sync, and Sync asks the voice service for /whoami, which
+            // tools\voice\voice-server.js does not serve: its routes are
+            // /positions, /choose, /choices, /claimed, /commands, /say, /health
+            // and the page. The POST comes back 404, Account.Whoami is always
+            // empty, and on a blank machine Sync returns having changed
+            // nothing, so seven seconds of frozen window on a first Play bought
+            // an answer that never arrives. Claim takes a fresh id now rather
+            // than handing out profile 1, which is what the wait was guarding
+            // against. If the voice service ever serves /whoami and /claim, the
+            // wait comes back with them.
 
             try
             {
@@ -3425,7 +3561,13 @@ namespace Thornswood
                 int id = 0;
                 try { id = Chars.ProfileOf(slot); } catch { }
                 try { Chars.SetChoice(slot, trade, town); } catch { }
-                string why = Creation.Send(cfg, id, trade, half, cls, town, SlotName(slot));
+                // Five seconds on the connection and five more on the read, so
+                // the POST goes off this thread. The name is worked out here
+                // first, because SlotName reads the character list and the
+                // roster and that belongs on the thread that owns them.
+                string who = SlotName(slot);
+                string why = null;
+                Waiting(delegate { why = Creation.Send(cfg, id, trade, half, cls, town, who); });
                 if (why == null)
                 {
                     Log("You are starting as a " + trade + " in " + town + ".");
@@ -3832,12 +3974,20 @@ namespace Thornswood
             ThreadPool.QueueUserWorkItem(delegate
             {
                 bool due = false;
+                // A check that could not be made is not a check that said no.
+                // GitHub answers 403 once the hour's requests are spent, and a
+                // thrown check landed below looking exactly like "no update",
+                // so it wiped the five minute clock every two minutes and the
+                // countdown the server was already running never ran out on
+                // this machine. True until a document actually comes back.
+                bool failed = true;
                 string what = "";
                 try
                 {
                     VersionDoc v = Updater.Check(cfg);
                     if (v != null)
                     {
+                        failed = false;
                         List<Pack> packs = Updater.Pending(v);
                         bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version)
                                            && !string.IsNullOrEmpty(v.launcherUrl);
@@ -3854,6 +4004,9 @@ namespace Thornswood
                     win.Dispatcher.BeginInvoke(new Action(delegate
                     {
                         checkingInPlay = false;
+                        // Leave the clock alone when there was no answer. Only
+                        // a check that came back and found nothing clears it.
+                        if (failed) return;
                         if (!playing || !due) { updateSeenAt = DateTime.MinValue; return; }
                         if (updateSeenAt == DateTime.MinValue)
                         {
@@ -4051,6 +4204,12 @@ namespace Thornswood
                     win.Dispatcher.BeginInvoke(new Action(delegate
                     {
                         Log("Update failed: " + ex.Message);
+                        // Everything before the pack that broke is in. Without
+                        // this the card still counts them and pressing Update
+                        // again unpacks them a second time, which rewrites each
+                        // one's file list with every path marked as one the pack
+                        // wrote over, so a later Remove leaves its own files.
+                        pendingPacks = Updater.Pending(doc);
                         txtUpdateTitle.Text = "Update failed";
                         btnUpdate.IsEnabled = true;
                         btnInstallNow.IsEnabled = true;

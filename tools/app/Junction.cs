@@ -78,13 +78,21 @@ namespace Thornswood
         {
             why = null;
             string direct = null;
+            bool made = false;
             try
             {
-                if (!Directory.Exists(link)) Directory.CreateDirectory(link);
+                if (!Directory.Exists(link)) { Directory.CreateDirectory(link); made = true; }
                 Set(link, target, out direct);
             }
             catch (Exception ex) { direct = ex.Message; }
             if (IsLink(link)) return true;
+
+            // Set failed and left behind the empty folder made for it a moment
+            // ago. That folder has to go. It sits exactly where the person's
+            // own folder has to be put back, and Restore will not move a
+            // backup onto a name that already exists. It also unblocks the
+            // mklink attempt below, which refuses a path that is already there.
+            if (made) { try { Directory.Delete(link); } catch { } }
 
             string shell = null;
             try

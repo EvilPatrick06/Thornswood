@@ -91,7 +91,7 @@ namespace Thornswood
             else if (last < 0) txtSrvState.Text = "Nothing answered. The server is not running, or nothing can reach it from here.";
             else if (serverServing) txtSrvState.Text = "Up and serving, " + last + " ms away.";
             else txtSrvState.Text = "The machine answered in " + last + " ms, but the server is not listening on it. It is probably not running.";
-            txtSrvState.Foreground = Res(last < 0 ? "Warn" : last == -2 ? "Faint" : serverServing ? "Muted" : "Warn");
+            txtSrvState.Foreground = Res(last == -2 ? "Faint" : last < 0 ? "Warn" : serverServing ? "Muted" : "Warn");
 
             DrawPingBars();
 

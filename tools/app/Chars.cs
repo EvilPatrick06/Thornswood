@@ -562,6 +562,23 @@ namespace Thornswood
             int id = Claim(slot, fresh);
             AutoJoin.SetProfileId(id);
 
+            // Read it back rather than trust the write. SetProfileId answers
+            // false both when it could not write the file and when the file
+            // already held this id, so its answer cannot tell those apart, and
+            // the file is the only thing that decides which character the
+            // client asks the server for. A read only settings file, or one
+            // holding the id as "3" in quotes where the edit does not match it,
+            // keeps the number the last slot left there and the game walks in
+            // as that character. Stop here instead: StartAs logs this and never
+            // reaches Play, which beats handing somebody another character.
+            int wrote = AutoJoin.GetProfileId();
+            if (wrote != id)
+                throw new Exception(
+                    "Character " + slot + "'s id could not be written into the client settings: they still say " +
+                    (wrote > 0 ? "profile " + wrote : "no profile") + " instead of profile " + id + ". " +
+                    "Skyrim would have connected as the character before this one, so it was not started. " +
+                    "Check that Data\\Platform\\Plugins\\skymp5-client-settings.txt is not read only.");
+
             // Voice read the old id out of the settings file at startup and has
             // been using it ever since. The line above just changed it.
             Voice.Reconfigure();
