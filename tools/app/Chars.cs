@@ -720,24 +720,36 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Which in game browser SkyrimPlatform uses, decided by what is on
-        /// disk rather than by a value nobody can see.
+        /// Which in game browser SkyrimPlatform uses. Ours, wherever ours is
+        /// present, which is everywhere.
         ///
-        /// There are two backends. nirnlab is the NirnLab UI Platform SKSE
-        /// plugin. tilted is the CEF stack built into SkyrimPlatform, and it
-        /// is the only one this build actually ships: its runtime lives in
-        /// Data\Platform\Distribution and goes out inside the installer.
+        /// There are two backends. tilted is the CEF stack built into
+        /// SkyrimPlatform. Its runtime lives in Data\Platform\Distribution,
+        /// it goes out inside the installer, it draws inside the game's own
+        /// process, and there is no executable anywhere in that folder.
+        /// nirnlab is the NirnLab UI Platform SKSE plugin and it draws out of
+        /// process: Data\NirnLabUIPlatform\CEFSubprocess.exe is a
+        /// second program, so the first time it runs Windows Firewall stops
+        /// the game to ask about a name nobody recognises.
         ///
-        /// NirnLab is in neither the installer nor the collection. Machines
-        /// that have it got it from somewhere else entirely. Asking for
-        /// nirnlab on a machine without it produces no browser at all, which
-        /// means no chat, no character creation and no way into the world,
-        /// while the launcher sits there reporting that everything checks
-        /// out. That is not a failure anybody can diagnose from the outside.
+        /// NirnLab is not ours. Package-Thornswood lists NirnLabUIPlatform
+        /// among the folders that never go into the installer, and
+        /// Clean-OtherServers names it as another roleplay server's interface
+        /// framework. Machines that have it got it from that server's
+        /// collection. Every other part of this repo treats it as somebody
+        /// else's. This method used to be the one place that went looking for
+        /// it and handed our own interface to it, firewall prompt and all, on
+        /// the machines unlucky enough to have both installed.
         ///
-        /// So the choice is written on every Play from what is present.
-        /// Nobody holding NirnLab is moved off it, and nobody without it is
-        /// left with a game that cannot draw its own interface.
+        /// So the folder decides, and NirnLab wins where it is present. Not
+        /// because it is better but because tilted will not run beside it:
+        /// NirnLab puts its own directory on the process PATH and
+        /// SkyrimPlatform stops on that before the game draws anything. A
+        /// machine with NirnLab in the folder has one working answer.
+        ///
+        /// Which means the firewall prompt is not fixable from here. It goes
+        /// when NirnLab is not in the folder, and Thornswood only controls
+        /// that in the game folder it builds itself.
         ///
         /// The file is edited, never rewritten. It also carries the log level,
         /// the console window geometry and the plugin folder list, none of
@@ -761,6 +773,23 @@ namespace Thornswood
                 // tilted no matter what they have installed.
                 bool nirnlab = File.Exists(Path.Combine(
                     Paths.Game, "Data\\NirnLabUIPlatform\\NirnLabUIPlatform.dll"));
+
+                // nirnlab wins whenever NirnLab is on disk, and this is not a
+                // preference. SkyrimPlatform refuses to start on tilted while
+                // NirnLab is in the folder: NirnLab puts its own directory on
+                // the process PATH, its libcef.dll would be loaded instead of
+                // the one in Distribution, and SkyrimPlatform stops with a
+                // box reading "Your PATH environment variable contains
+                // incompatible entries" before the game draws anything.
+                //
+                // Measured on 17 Sep. This method was changed to prefer
+                // tilted, a launcher carrying that change wrote tilted into
+                // a game folder that had NirnLab in it, and the next Play
+                // produced exactly that box. Choosing tilted here is not a
+                // way to get rid of the CEFSubprocess.exe firewall prompt.
+                // The only way to get rid of that is for NirnLab not to be
+                // in the folder at all, which is New-GameFolder's job when
+                // Thornswood builds a folder of its own.
                 string want = nirnlab ? "nirnlab" : "tilted";
 
                 string text = File.ReadAllText(PlatformIni);
