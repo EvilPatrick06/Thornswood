@@ -76,7 +76,6 @@ let cfg = {
   },
   botKey: '',            // shared secret the Discord bot signs /api/ticket with
   admins: [],            // discord ids, an override for when the bot is down
-  serverPassword: '',    // what the launcher is handed once somebody checks out
   secret: ''
 };
 /* The byte order mark matters. Windows PowerShell puts one on the front of
@@ -1288,8 +1287,7 @@ http.createServer(async (req, res) => {
       name: st.name || t.n,
       admin: st.admin,
       dev: !!st.dev,
-      roles: st.roles,
-      password: cfg.serverPassword || ''
+      roles: st.roles
     });
   }
 
@@ -1484,8 +1482,7 @@ http.createServer(async (req, res) => {
     (cfg.gamePort || 7777) + ', which cannot be probed), count from ' + cfg.onlineFile);
   console.log('[thornswood-docs] discord login ' +
     (cfg.discord.clientId ? 'ready' : 'NOT SET UP') +
-    ', guild check ' + (cfg.discord.botToken && cfg.discord.guildId ? 'on' : 'OFF') +
-    ', server password ' + (cfg.serverPassword ? 'held' : 'NOT SET'));
+    ', guild check ' + (cfg.discord.botToken && cfg.discord.guildId ? 'on' : 'OFF'));
 
   /* Ask Discord once on the way up, and say so loudly if it will not answer.
      Without this a dead bot token is invisible from here and shows up as every
