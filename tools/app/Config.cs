@@ -440,6 +440,23 @@ namespace Thornswood
         // finds its way home.
         [DataMember] public string updateRepo = "";
         [DataMember] public string voicePort = "";
+
+        /// <summary>
+        /// Where voice lives, when that is not the server address and a port.
+        /// </summary>
+        /// <remarks>
+        /// NULL BY DEFAULT, and that is the whole point of it. Every other
+        /// field here is picked up only when it arrives non-empty, which can
+        /// set a value and can never clear one. That is fine for an address
+        /// that only ever changes to another address.
+        ///
+        /// This one has to be clearable. Pointing everybody at Caddy and then
+        /// finding a fault in it has to be undoable in one release, and the way
+        /// back is an empty value reaching every machine. Null means the feed
+        /// did not mention it; empty means the feed said to clear it. Those are
+        /// different answers and the reader below tells them apart.
+        /// </remarks>
+        [DataMember] public string voiceUrl = null;
         [DataMember] public string discordAppId = "";
         [DataMember] public string siteUrl = "";
         [DataMember] public string presenceImage = "";

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -4052,6 +4052,11 @@ namespace Thornswood
             // point at, and the picture on it.
             if (!string.IsNullOrEmpty(v.discordAppId) && v.discordAppId != cfg.DiscordAppId) { cfg.DiscordAppId = v.discordAppId; quiet = true; }
             if (!string.IsNullOrEmpty(v.siteUrl) && v.siteUrl != cfg.SiteUrl) { cfg.SiteUrl = v.siteUrl; quiet = true; }
+            // Not IsNullOrEmpty, deliberately. An empty voiceUrl in the feed is
+            // an instruction to stop using the proxy and go back to the raw
+            // port, and that is the only way back once everybody has been
+            // pointed at Caddy. Null means the feed did not mention it.
+            if (v.voiceUrl != null && v.voiceUrl != cfg.VoiceUrl) { cfg.VoiceUrl = v.voiceUrl; quiet = true; }
             if (!string.IsNullOrEmpty(v.presenceImage) && v.presenceImage != cfg.PresenceImage) { cfg.PresenceImage = v.presenceImage; quiet = true; }
             if (quiet)
             {

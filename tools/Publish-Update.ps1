@@ -888,6 +888,15 @@ if (Test-Path $cfgPath) {
             if ($cfg.PSObject.Properties.Name -contains $pair[0]) { Set-Prop $doc $pair[1] ([string]$cfg.($pair[0])) }
         }
 
+        # VoiceUrl travels even when it is empty, which none of the above do.
+        # Empty is a real instruction here: it tells every launcher to stop
+        # using the proxy and go back to the raw port, and it is the only way
+        # back once they have all been pointed at Caddy. Writing it always is
+        # what makes that one release rather than one per machine.
+        if ($cfg.PSObject.Properties.Name -contains 'VoiceUrl') {
+            Set-Prop $doc 'voiceUrl' ([string]$cfg.VoiceUrl)
+        }
+
         # How many the room holds. A number, not a string, because the launcher
         # reads it as one and a quoted "25" comes back as zero, which reads as
         # no limit at all. It rides along for the same reason the address does:
