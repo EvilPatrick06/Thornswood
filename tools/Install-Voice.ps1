@@ -330,19 +330,56 @@ if ($LASTEXITCODE -ne 0) { Die "the install on the VPS exited with $LASTEXITCODE
 
 # ---------------------------------------------------------------- verify ----
 Head 'Checking from here'
-$up = $false
+
+<#
+  What "working" looks like depends on the bind, and it used to not.
+
+  This reached for the raw address and called silence a failure. Once the
+  service is on loopback that silence is the entire point, so a correct install
+  printed "Installed, but nothing is answering" in red. That is how somebody
+  panics and reverts a change that worked, which is worse than the change
+  having failed.
+
+  So: on 0.0.0.0 the port must answer. On 127.0.0.1 it must NOT, and the
+  service is reached through whatever is proxying instead.
+#>
+$reachable = $false
 for ($i = 0; $i -lt 15; $i++) {
     try {
         $c = New-Object Net.Sockets.TcpClient
         $null = $c.BeginConnect($VpsHost, $Port, $null, $null).AsyncWaitHandle.WaitOne(1000)
-        $up = $c.Connected; $c.Close()
+        $reachable = $c.Connected; $c.Close()
     } catch { }
-    if ($up) { break }
+    if ($reachable) { break }
+    # On loopback we are waiting to be sure it stays shut, not for it to open,
+    # so there is nothing to keep retrying for.
+    if ($Bind -eq '127.0.0.1') { break }
     Start-Sleep -Seconds 1
 }
 
 Write-Host ''
-if ($up) {
+if ($Bind -eq '127.0.0.1') {
+    if ($reachable) {
+        Say "$VpsHost`:$Port IS STILL ANSWERING from outside, and it should not be." 'Red'
+        Say '  The bind did not take, or the firewall rule is still open.' 'Red'
+        Say "  ssh $target `"powershell -NoProfile -Command Get-Content '$Root\voice.log' -Tail 20`"" 'DarkGray'
+    } else {
+        Say "Loopback only, and ${VpsHost}:$Port is correctly shut from out here." 'Green'
+        # The service is only useful if something is carrying it, so say whether
+        # anything actually is rather than leaving that to be assumed.
+        $via = ''
+        if ($Site) { $via = $Site.TrimEnd('/') + $(if ($Port -eq 7778) { '/voice' } else { '/voice-dev' }) }
+        if ($via) {
+            try {
+                $h = Invoke-RestMethod ($via + '/health') -TimeoutSec 10
+                Say "Reached it through $via, build $($h.build), bind $($h.bind)." 'Green'
+            } catch {
+                Say "But $via/health did not answer either, so nothing is carrying it." 'Red'
+                Say '  Check the Caddyfile has the handle_path block for this port.' 'DarkGray'
+            }
+        }
+    }
+} elseif ($reachable) {
     Say "Voice is up at http://${VpsHost}:$Port" 'Green'
     Write-Host ''
     Say 'Next:  .\Add-VoiceFeed.ps1   then  .\Publish-Server.ps1' 'Yellow'
