@@ -96,6 +96,49 @@ foreach ($f in $files) {
   '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
 }
 
+# ---------------------------------------------------------- which build is this
+#
+# The binaries have always been copied rather than rebuilt here, and until
+# 2026-09-17 nothing mapped scam_native.node back to a commit. The only evidence
+# that the shipped one carried the committed server changes was that its file
+# date was six minutes later than the last edit to ScampServer.cpp, which is an
+# argument rather than a proof.
+#
+# tools\server-build.json is that proof: the hash of the binary a release was
+# tested with, and the commit it came from. Regenerate it with
+# tools\New-ServerBuildRecord.ps1 after every rebuild.
+#
+# No record yet means carry on with a warning, so a machine that has not made one
+# can still deploy. A record that disagrees is a stop: it means this binary is not
+# the one the release was built and tested against, and shipping it would put an
+# unknown server in front of everybody.
+$recordPath = Join-Path $Here 'server-build.json'
+$binPath = Join-Path $Dist 'scam_native.node'
+if (Test-Path -LiteralPath $recordPath) {
+  $rec = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+  $have = (Get-FileHash -LiteralPath $binPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  $want = "$($rec.sha256)".ToLowerInvariant()
+  if ($have -ne $want) {
+    Write-Host ''
+    Write-Host '  scam_native.node is not the build this release recorded.' -ForegroundColor Red
+    Write-Host ("    on disk   {0}" -f $have) -ForegroundColor Red
+    Write-Host ("    recorded  {0}" -f $want) -ForegroundColor Red
+    Write-Host ("    recorded build came from commit {0}" -f $rec.source.commit) -ForegroundColor Yellow
+    Write-Host ''
+    Write-Host '  If you rebuilt on purpose, record the new build and deploy again:' -ForegroundColor Yellow
+    Write-Host '    .\tools\New-ServerBuildRecord.ps1' -ForegroundColor Yellow
+    Write-Host '  If you did not, find out what changed before this reaches the VPS.' -ForegroundColor Yellow
+    throw 'server binary does not match tools\server-build.json'
+  }
+  Write-Host ('{0,-22} matches the record, commit {1}' -f 'build', $rec.source.commit.Substring(0, 8)) -ForegroundColor DarkGray
+}
+else {
+  Write-Host ''
+  Write-Host '  No tools\server-build.json, so nothing says which commit this binary is.' -ForegroundColor Yellow
+  Write-Host '  Make one with .\tools\New-ServerBuildRecord.ps1 and commit it.' -ForegroundColor Yellow
+  Write-Host ''
+}
+
 # ------------------------------------------------------------- load order
 #
 # server-settings.json comes out of Deploy-Gamemode with this machine's paths in
@@ -219,6 +262,16 @@ foreach ($f in $files) {
   & scp @ssh $src "$User@${Vps}:$Root/$f"
   if ($LASTEXITCODE -ne 0) { throw "scp failed for $f" }
   Write-Host "  $f"
+}
+
+# The record goes up with the binary, so the box itself answers what it is
+# running. Hash $Root/scam_native.node against it there and the two halves of
+# the question, what source and what binary, both have an answer on the machine
+# serving people rather than only on a developer's disk.
+if (Test-Path -LiteralPath $recordPath) {
+  & scp @ssh $recordPath "$User@${Vps}:$Root/server-build.json"
+  if ($LASTEXITCODE -ne 0) { throw 'scp failed for server-build.json' }
+  Write-Host '  server-build.json'
 }
 
 Write-Host ''
