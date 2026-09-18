@@ -23,7 +23,7 @@
 'use strict';
 
 var S = document.getElementById('s');
-var cfg = null;          // {host, port, profileId, name}
+var cfg = null;          // {host, port, profileId, name, token}
 var ws = null, myPeer = 0, myProfile = 0;
 var ctx = null, mic = null, micTrack = null;
 var talking = false, mode = 'local';
@@ -92,7 +92,11 @@ function connect() {
   try { ws = new WebSocket(url); } catch (e) { say('socket refused: ' + e); return; }
 
   ws.onopen = function () {
-    send({ t: 'join', profileId: cfg.profileId, name: cfg.name, mode: mode });
+    // The token is what says who we are. profileId goes with it only so an
+    // older service that has never heard of tokens still works; the new one
+    // reads the token and ignores the number.
+    send({ t: 'join', profileId: cfg.profileId, name: cfg.name, mode: mode,
+           token: cfg.token || '' });
     host('status', 'connected');
   };
   ws.onclose = function () {
@@ -274,9 +278,11 @@ window.chrome.webview.addEventListener('message', function (e) {
   var m; try { m = JSON.parse(e.data); } catch (err) { return; }
 
   if (m.t === 'config') {
-    cfg = { host: m.host, port: m.port, profileId: Number(m.profileId) || 0, name: String(m.name || '') };
+    cfg = { host: m.host, port: m.port, profileId: Number(m.profileId) || 0,
+            name: String(m.name || ''), token: String(m.token || '') };
     myProfile = cfg.profileId;
-    say('configured as profile ' + cfg.profileId);
+    say('configured as profile ' + cfg.profileId +
+        (cfg.token ? '' : ', with no join token'));
     audio();
     openMic();
     connect();

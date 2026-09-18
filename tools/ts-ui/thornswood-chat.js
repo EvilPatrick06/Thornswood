@@ -33,6 +33,9 @@
   var PORT = Number(CFG.port || 7778);
   var ME   = Number(CFG.profileId || 0);
   var NAME = String(CFG.name || 'Traveller');
+  // Who the voice service believes we are. Everything else on this socket,
+  // chat included, hangs off the identity this establishes.
+  var TOKEN = String(CFG.token || '');
 
   // Colours from the launcher's own palette so the chat looks like the rest of
   // the build rather than like a web page.
@@ -91,7 +94,7 @@
       tries = 0;
       joined = false;
       try {
-        ws.send(JSON.stringify({ t: 'join', profileId: ME, name: NAME }));
+        ws.send(JSON.stringify({ t: 'join', profileId: ME, name: NAME, token: TOKEN }));
       } catch (e) { }
     };
 

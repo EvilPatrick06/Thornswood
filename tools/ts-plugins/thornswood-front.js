@@ -170,6 +170,25 @@
     try { return JSON.parse(readText(CLIENT_SETTINGS)) || {}; } catch (e) { return {}; }
   })();
   const HOST = String(client['server-ip'] || '');
+
+  /*
+    The token that says which profile may join the voice room.
+
+    Fetched by the launcher, which is the only thing here holding a Discord
+    ticket, and left in the same folder it already uses for the push to talk
+    state. Read at every injection rather than once, because a token is good
+    for five minutes and this page can be rebuilt later in a session.
+
+    Empty is not an error to report here. The service decides what to do
+    with a join it cannot check, and says so in its own log.
+  */
+  function joinToken() {
+    for (const d of ['Data/Platform/', '../Profile/']) {
+      const raw = readText(d + 'voice-token.txt').trim();
+      if (raw) { return raw; }
+    }
+    return '';
+  }
   const PROFILE = Number((client.gameData || {}).profileId) || 0;
 
   // ---------------------------------------------------------------- focus --
@@ -1483,10 +1502,14 @@
       phase = 2; at = now;
       sentName = myName() || 'Traveller';
       T.js('window.THORNSWOOD=' + JSON.stringify({
-        host: HOST, port: VOICE_PORT, profileId: PROFILE, name: sentName
+        host: HOST, port: VOICE_PORT, profileId: PROFILE, name: sentName,
+        token: joinToken()
       }) + ';');
       OVERLAYS.forEach(inject);
-      log('overlays injected. host', HOST + ':' + VOICE_PORT, 'profile', PROFILE, 'as', sentName);
+      // The token itself is never logged. It is what somebody would need to
+      // join as this person, and this log is a file on disk.
+      log('overlays injected. host', HOST + ':' + VOICE_PORT, 'profile', PROFILE,
+          'as', sentName, 'join token', joinToken() ? 'yes' : 'NONE');
       return;
     }
 

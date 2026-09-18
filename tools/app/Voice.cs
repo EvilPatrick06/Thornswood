@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -516,6 +516,104 @@ namespace Thornswood
             catch { }
         }
 
+        /// <summary>
+        /// A short lived token saying which profile this launcher may join as.
+        /// </summary>
+        /// <remarks>
+        /// The voice port used to believe whatever the join message said its
+        /// profile was, and that number is the whole of somebody's identity
+        /// here. Anybody who could reach the port was anybody they liked: they
+        /// heard every conversation in the world, spoke as somebody else, and
+        /// read every person's position off the roster.
+        ///
+        /// The Discord ticket is what proves anything. The voice service asks
+        /// the site whether that ticket owns this profile and signs the answer,
+        /// and the page sends what comes back instead of a bare number.
+        ///
+        /// Empty on any failure, deliberately. While the service is set to log
+        /// rather than refuse, a token that could not be fetched means voice
+        /// still works and a line lands in the service log. When it is set to
+        /// refuse, this is the difference between voice and no voice, and the
+        /// person needs to be told which, so the caller says so.
+        /// </remarks>
+        static string FetchToken(string host, string port, long profile, Action<string> log)
+        {
+            string ticket = "";
+            try { ticket = Discord.Ticket; } catch { ticket = ""; }
+            if (ticket == null) ticket = "";
+            if (ticket.Length == 0)
+            {
+                if (log != null) log("Voice: not linked to Discord, so no join token. Voice may be refused.");
+                return "";
+            }
+
+            string url = "http://" + host + ":" + port + "/token";
+            string body = "{\"profileId\":" + profile.ToString(CultureInfo.InvariantCulture) +
+                          ",\"ticket\":\"" + JsonEscape(ticket) + "\"}";
+            try
+            {
+                var req = (HttpWebRequest)WebRequest.Create(url);
+                req.Method = "POST";
+                req.ContentType = "application/json";
+                req.Timeout = 5000;
+                req.ReadWriteTimeout = 5000;
+                byte[] rawBody = Encoding.UTF8.GetBytes(body);
+                req.ContentLength = rawBody.Length;
+                using (var s = req.GetRequestStream()) { s.Write(rawBody, 0, rawBody.Length); }
+                using (var resp = (HttpWebResponse)req.GetResponse())
+                {
+                    string text;
+                    using (var r = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    {
+                        text = r.ReadToEnd();
+                    }
+                    Match m = Regex.Match(text, "\"token\"\\s*:\\s*\"([^\"]+)\"");
+                    if (!m.Success)
+                    {
+                        if (log != null) log("Voice: the service answered without a token.");
+                        return "";
+                    }
+                    // Never the token itself. It is what somebody would need to
+                    // join as this person, and the log is a file on disk.
+                    if (log != null) log("Voice: got a join token for profile " + profile);
+                    return m.Groups[1].Value;
+                }
+            }
+            catch (WebException we)
+            {
+                var hr = we.Response as HttpWebResponse;
+                if (hr != null && (int)hr.StatusCode == 403)
+                {
+                    if (log != null) log("Voice: the server says this Discord account does not own profile " + profile + ".");
+                }
+                else if (log != null)
+                {
+                    log("Voice: could not get a join token (" + we.Message + ").");
+                }
+                return "";
+            }
+            catch (Exception e)
+            {
+                if (log != null) log("Voice: could not get a join token (" + e.Message + ").");
+                return "";
+            }
+        }
+
+        /// <summary>Quote anything that would end a JSON string early.</summary>
+        static string JsonEscape(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var b = new StringBuilder(s.Length + 8);
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (c == '"' || c == '\\') { b.Append('\\'); b.Append(c); }
+                else if (c < ' ') { b.Append(' '); }
+                else { b.Append(c); }
+            }
+            return b.ToString();
+        }
+
         // The last config the page was given, as host, port and profile.
         static string lastConfig = "";
 
@@ -553,9 +651,22 @@ namespace Thornswood
             }
             lastConfig = want;
 
+            // Fetched here rather than in the page, because the ticket lives in
+            // this process and has no business being handed to a browser.
+            string token = FetchToken(host, port, profile, Say);
+
+            // The game's overlay joins the same room on its own socket and holds
+            // no ticket, so it reads the token out of the folder the two already
+            // share for push to talk. Short lived on purpose: five minutes, for
+            // one profile, and worth nothing to anybody who is not already on
+            // this machine as this person.
+            try { WriteChannel("voice-token.txt", token); } catch { }
+
             Post("{\"t\":\"config\",\"host\":\"" + host + "\",\"port\":\"" + port +
-                 "\",\"profileId\":" + profile + ",\"name\":\"\"}");
-            Say("Voice: configured for " + host + ":" + port + " as profile " + profile);
+                 "\",\"profileId\":" + profile + ",\"name\":\"\"" +
+                 ",\"token\":\"" + JsonEscape(token) + "\"}");
+            Say("Voice: configured for " + host + ":" + port + " as profile " + profile +
+                (token.Length == 0 ? " with no join token" : ""));
         }
 
         /// <summary>

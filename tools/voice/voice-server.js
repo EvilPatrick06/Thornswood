@@ -317,12 +317,39 @@ function announce() {
 }
 
 function onJoin(ws, msg) {
-  const id = nextPeer++;
-  const profileId = Number(msg.profileId) || 0;
-  const name = String(msg.name || '').slice(0, 40);
-  peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode) });
+  const claimed = Number(msg.profileId) || 0;
+  const tok = readToken(msg.token);
+  let profileId = 0;
+  let why = '';
 
-  ws.send({ t: 'welcome', peer: id });
+  if (tok && !tok.expired) {
+    // The only line here that decides who somebody is. Note that it reads the
+    // token and not the message, even when the two agree.
+    profileId = tok.profileId;
+    if (claimed && claimed !== profileId) {
+      console.log('[voice] join claimed profile ' + claimed + ' with a token for ' +
+                  profileId + '. The token wins.');
+    }
+  } else {
+    why = !msg.token ? 'no token' : (tok && tok.expired ? 'an expired token' : 'a token that does not check out');
+    if (AUTH === 'on') {
+      console.log('[voice] REFUSED a join for profile ' + claimed + ': ' + why);
+      ws.send({ t: 'denied', why: why });
+      try { ws.close(); } catch (e) { }
+      return 0;
+    }
+    if (AUTH === 'log') {
+      console.log('[voice] UNPROVEN join as profile ' + claimed + ': ' + why +
+                  '. Allowed because THORNSWOOD_VOICE_AUTH is log.');
+    }
+    profileId = claimed;
+  }
+
+  const id = nextPeer++;
+  const name = String(msg.name || '').slice(0, 40);
+  peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode), proven: !!profileId && !why });
+
+  ws.send({ t: 'welcome', peer: id, profileId: profileId });
   announce();
   return id;
 }
@@ -434,6 +461,100 @@ function readBody(req, res, limit, then) {
 // ------------------------------------------------------------------ http ---
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 
+/*
+  Who is allowed to connect at all, and who they are once they have.
+
+  The room used to take a stranger's word for everything. join carried a
+  profileId, nothing checked it, and that one number is the whole of somebody's
+  identity here: send theirs and you are them. You heard every conversation in
+  the world, your voice arrived as them, and because the roster carries
+  positions you learned where every person lives. The port was open on every
+  interface, so none of this needed the game, an account, or the mod list.
+
+  So identity comes from a token now, and never from the message. The launcher
+  proves who it is to /token with the Discord ticket it already holds, the site
+  answers whether that ticket owns that profile, and what comes back is signed
+  by this service and good for five minutes. join carries the token; the
+  profileId in the message is ignored.
+
+  The key is this service's own, made on first run and kept beside it. Not the
+  server password: everybody who plays here holds that, which is right for
+  reading the character register and useless for telling two of them apart.
+
+  Five minutes because a token is only ever carried from pressing Play to the
+  socket opening, and a connection that is already up is not rechecked. It is
+  not a session, and nothing renews it.
+
+  THORNSWOOD_VOICE_AUTH says what to do with a connection that cannot prove
+  itself:
+
+    on     refuse it
+    log    let it in and write down that it could not, which is how to find
+           out who would be locked out before locking anybody out
+    off    the old behaviour, for working out what is broken
+
+  It ships as log for one release. Read the UNPROVEN lines out of the service
+  log, confirm the only ones left are yours, then set it to on. Turning it on
+  while an older launcher is still out there takes voice away from whoever is
+  running it, and they will not know why.
+*/
+const AUTH = String(process.env.THORNSWOOD_VOICE_AUTH || 'log').toLowerCase();
+const TOKEN_LIFETIME_MS = 5 * 60 * 1000;
+
+const TOKEN_KEY_FILE = path.join(HERE, 'token-key.txt');
+let TOKEN_KEY = '';
+try {
+  TOKEN_KEY = String(fs.readFileSync(TOKEN_KEY_FILE, 'utf8')).trim();
+} catch (e) {
+  TOKEN_KEY = '';
+}
+if (!TOKEN_KEY) {
+  try {
+    TOKEN_KEY = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(TOKEN_KEY_FILE, TOKEN_KEY);
+    console.log('[voice] made a signing key for join tokens at ' + TOKEN_KEY_FILE);
+  } catch (e) {
+    // Without somewhere to keep it, one that lasts as long as this process is
+    // still better than none: everybody reconnects on a restart anyway.
+    TOKEN_KEY = crypto.randomBytes(32).toString('hex');
+    console.log('[voice] could not write ' + TOKEN_KEY_FILE +
+                ', using a key that lasts until this service restarts');
+  }
+}
+
+function signToken(profileId, until) {
+  const body = String(profileId) + '.' + String(until);
+  const mac = crypto.createHmac('sha256', TOKEN_KEY).update(body).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return 'v1.' + body + '.' + mac;
+}
+
+/*
+  What a token says, or null.
+
+  Checked with timingSafeEqual on equal length buffers rather than ===, so how
+  long this takes says nothing about how nearly right a guess was.
+*/
+function readToken(raw) {
+  const s = String(raw == null ? '' : raw);
+  const parts = s.split('.');
+  if (parts.length !== 4 || parts[0] !== 'v1') return null;
+  const profileId = Number(parts[1]) || 0;
+  const until = Number(parts[2]) || 0;
+  if (profileId <= 0 || until <= 0) return null;
+  const want = signToken(profileId, until);
+  const a = Buffer.from(want);
+  const b = Buffer.from(s);
+  if (a.length !== b.length) return null;
+  let ok = false;
+  try { ok = crypto.timingSafeEqual(a, b); } catch (e) { return null; }
+  if (!ok) return null;
+  // Expiry last. A token that is genuinely ours but stale is a different thing
+  // from one that was made up, and the log should be able to say which.
+  if (Date.now() > until) return { profileId: profileId, expired: true };
+  return { profileId: profileId, expired: false };
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/positions') {
     // Loopback only. This is the gamemode talking to the service on the same
@@ -474,6 +595,40 @@ const server = http.createServer((req, res) => {
   // through to the file reader, asked the disk for a file named '/', and
   // answered every single person with 'not found'.
   const route = (req.url || '/').split('?')[0];
+
+  /*
+    A token to join the room with.
+
+    Answered over the internet, because the launcher asks it from somebody's
+    house before the game has started. The ticket is what proves anything; the
+    profileId on its own proves nothing, which was the whole problem.
+  */
+  if (req.method === 'POST' && route === '/token') {
+    readBody(req, res, 4000, (doc) => {
+      const pid = Number(doc.profileId) || 0;
+      if (pid <= 0) { res.writeHead(400).end('no profileId'); return; }
+      owns(String(doc.ticket || ''), pid, (verdict) => {
+        if (verdict === 'no') {
+          console.log('[voice] REFUSED a token for profile ' + pid +
+                      ': the ticket does not own it');
+          res.writeHead(403).end('not your profile');
+          return;
+        }
+        if (verdict === 'unchecked') {
+          // The site is the only thing that can answer this. Minting anyway
+          // keeps a site outage from taking voice down with it, and the line
+          // below is what says the check did not really happen.
+          console.log('[voice] UNCHECKED token for profile ' + pid +
+                      (SITE ? ' (could not reach ' + SITE + ')' : ' (THORNSWOOD_SITE not set)'));
+        }
+        const until = Date.now() + TOKEN_LIFETIME_MS;
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ token: signToken(pid, until), until: until,
+                                 profileId: pid, checked: verdict === 'yes' }));
+      });
+    });
+    return;
+  }
 
   // The launcher, from wherever the person is. Deliberately not restricted to
   // loopback: that is the whole point of it.
@@ -684,7 +839,7 @@ const server = http.createServer((req, res) => {
 
   if (route === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, build: BUILD,
+    res.end(JSON.stringify({ ok: true, build: BUILD, auth: AUTH,
                             peers: peers.size, tracked: positions.size,
                             waitingChoices: Object.keys(choices).length,
                             queuedCommands: commands.length,
