@@ -15,7 +15,9 @@
     server-settings.json  the port, the name, the load order
     gamemode.js           so a restore is a working server and not a puzzle
     the site's data       linked Discord accounts, the boards, the documents
-    the bot's config      and the voice service's owners.json and choices.json
+    the bot's config      bot.env.json, and the voice service's owners.json,
+                          choices.json and secret.txt
+    the Caddyfile         whatever is answering on 443 for thornswood.net
 
   What it leaves: node_modules, the installer under the site's public folder,
   and anything over the size cap. All of those come back from the repo.
@@ -39,6 +41,7 @@ param(
   [string]$GameRoot   = 'C:\Thornswood-Server',
   [string]$SiteRoot   = 'C:\Thornswood-Docs',
   [string]$BotRoot    = 'C:\Thornswood-Bot',
+  [string]$CaddyRoot  = 'C:\Thornswood-Caddy',
   [string]$VoiceRoot  = 'C:\Thornswood-Voice',
   [string]$Out        = 'C:\Thornswood-Backup',
   # The passphrase. Created by Install-Backup.ps1 if it is not already there,
@@ -111,7 +114,16 @@ Grab (Join-Path $GameRoot 'server-settings.json') 'game\server-settings.json'
 Grab (Join-Path $GameRoot 'gamemode.js')          'game\gamemode.js'
 Grab (Join-Path $SiteRoot 'data')                 'site\data'
 Grab (Join-Path $SiteRoot 'config.json')          'site\config.json'
-Grab (Join-Path $BotRoot  'config.json')          'bot\config.json'
+# bot.env.json, not config.json. The first nightly run reported the bot config
+# missing because this asked for a name the bot has never used.
+Grab (Join-Path $BotRoot  'bot.env.json')         'bot\bot.env.json'
+# The shared secret the character register checks against. Without it the
+# register is switched off on a restored box until somebody rotates it.
+# token-key.txt is deliberately not here: it makes itself on first run and
+# losing it only expires join tokens that were good for five minutes anyway.
+Grab (Join-Path $VoiceRoot 'secret.txt')          'voice\secret.txt'
+# Whatever is terminating TLS. RESTORING.md needs it on a fresh box.
+Grab (Join-Path $CaddyRoot 'Caddyfile')           'web\Caddyfile'
 Grab (Join-Path $VoiceRoot 'owners.json')         'voice\owners.json'
 Grab (Join-Path $VoiceRoot 'choices.json')        'voice\choices.json'
 
