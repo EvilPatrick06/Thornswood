@@ -3,6 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Google Ads conversion tag, AW-18458864483. This file is the whole public
+     front: server.js serves it for every route in PUBLIC_PAGES and swaps the
+     body in through /api/page, so the tag loads once here and covers the
+     download page, the join page and the rest. It is deliberately NOT in
+     index.html, which is the signed in half, because tracking people who have
+     already joined serves no advertising purpose and widens what leaves the
+     site. Two things this depends on and neither exists yet: a privacy page
+     saying that Google receives visitor data, which is entry 32, and a consent
+     gate for visitors in the EU and the UK, where Google Ads expects Consent
+     Mode rather than an unconditional load. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-18458864483"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'AW-18458864483');
+</script>
 <title>Thornswood</title>
 <meta name="description" content="A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.">
 <!-- What a link to this site looks like when it is pasted into Discord. Without
