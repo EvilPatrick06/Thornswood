@@ -934,6 +934,7 @@ const server = http.createServer((req, res) => {
   if (route === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: true, build: BUILD, auth: AUTH,
+                            bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             peers: peers.size, tracked: positions.size,
                             waitingChoices: Object.keys(choices).length,
@@ -1048,7 +1049,32 @@ server.on('upgrade', (req, socket, head) => {
   };
 });
 
-server.listen(PORT, () => {
-  console.log('[voice] listening on ' + PORT);
+/*
+  Which addresses the service answers on.
+
+  It has always been every interface, because the launcher and everybody's
+  browser reach it from their own house. That also means the port is open to
+  the whole internet, which entry 6 is about.
+
+  Behind Caddy it does not need to be. Caddy already holds 443 for the site, it
+  can carry /voice/ through to here, and then this can listen on loopback only:
+  one door instead of two, with a certificate on it, and wss:// instead of ws://
+  so nobody's voice traffic crosses the internet in the clear.
+
+  It is a setting rather than a rewrite because the two halves cannot land at
+  the same instant. Every launcher already out there connects to the raw port.
+  Bind this to loopback before those are replaced and none of them can reach it,
+  and no server side change brings them back, because the address they try is
+  compiled into the copy on their machine. So: ship the clients that can use
+  wss first, let them go out, then set this.
+
+  THORNSWOOD_VOICE_BIND=127.0.0.1 is the whole switch, and unsetting it is the
+  whole rollback.
+*/
+const BIND = String(process.env.THORNSWOOD_VOICE_BIND || '0.0.0.0').trim() || '0.0.0.0';
+
+server.listen(PORT, BIND, () => {
+  console.log('[voice] listening on ' + BIND + ':' + PORT +
+              (BIND === '127.0.0.1' ? ' (loopback only, so something must be proxying to it)' : ''));
   console.log('[voice] positions accepted from loopback at POST /positions');
 });
