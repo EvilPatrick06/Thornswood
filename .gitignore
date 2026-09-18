@@ -22,6 +22,12 @@ tools/discord/news-webhook.txt
 # Scratch beside the repo, and the local patch runs that made 1.1.35.
 _to_delete/
 
+# Python's bytecode cache. Running the bot once leaves tools\discord\__pycache__
+# behind, and it then shows up as untracked in every git status after, which is
+# how it nearly went into an unrelated pull request on 2026-09-17.
+__pycache__/
+*.pyc
+
 # The dev build's own news webhook, for the dev updates channel. Same rule as
 # news-webhook.txt above: anyone holding the URL can post as the bot.
 tools/discord/dev-webhook.txt
