@@ -37,6 +37,8 @@ tools/discord/dev-webhook.txt
 # tools\Sign-Artifact.ps1 does nothing when this is absent, which is how a
 # machine without a certificate still builds.
 tools/signing.json
+# and any copy of it kept beside it while the setup is being changed.
+tools/signing.json.*
 
 # The passphrase the nightly backups are encrypted with. Restore-Backup.ps1
 # looks for it beside itself, so the name has to be unable to land in here.

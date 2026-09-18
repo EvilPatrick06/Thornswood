@@ -50,7 +50,15 @@
   stopping the build.
 
 .PARAMETER Required
-  Fail instead of skipping when there is no signing.json. For a real release.
+  Fail instead of skipping. Covers all three reasons this would otherwise skip:
+  no signing.json, "enabled": false, and a certificate profile that has not been
+  filled in yet. For a real release.
+
+  TO TURN SIGNING OFF while you are still setting it up, put "enabled": false in
+  tools\signing.json. The config stays where it is and the build stops trying.
+  A metadata.json whose CertificateProfileName is still a placeholder does the
+  same thing on its own, because that is not a mistake, it is the middle of
+  setting this up.
 
 .EXAMPLE
   .\Sign-Artifact.ps1 -Path .\Thornswood.exe, .\setup-stub.exe
@@ -86,6 +94,51 @@ try {
 } catch {
     Say ("  tools\signing.json is not valid JSON: " + $_.Exception.Message) 'Red'
     exit 1
+}
+
+# ------------------------------------------------------------ half done ----
+# Setting this up is not one step, and the middle of it used to break the build.
+#
+# On 18 September a release went out having printed "Signing failed. Nothing was
+# published." The Azure account and signtool existed, signing.json was correct,
+# and the certificate profile did not exist yet because the identity validation
+# was still in progress. signtool answered 403 on every file. There is nothing
+# wrong with being at that point; it is most of a working setup. It should not
+# stop anybody shipping.
+#
+# So two ways out, and both say which one they took rather than going quiet.
+# "enabled": false turns it off while keeping the config. A metadata.json whose
+# CertificateProfileName is still a placeholder is the same situation and is
+# detected rather than sent to the service to be refused.
+#
+# -Required overrides both, because a real release has to be signed and finding
+# that out at the end is the point of that switch.
+function Skip($why) {
+    if ($Required) {
+        Say ("  " + $why) 'Red'
+        Say '  -Required was passed, and a release has to be signed.' 'Red'
+        exit 1
+    }
+    Say ("  not signing: " + $why) 'Yellow'
+    exit 0
+}
+
+if ($null -ne $cfg.enabled -and -not $cfg.enabled) {
+    Skip ('tools' + [char]92 + 'signing.json has "enabled": false')
+}
+
+$m = if ($cfg.metadata) { [string]$cfg.metadata } else { '' }
+if ($m -and (Test-Path -LiteralPath $m)) {
+    $meta = $null
+    try { $meta = Get-Content -LiteralPath $m -Raw | ConvertFrom-Json } catch { $meta = $null }
+    # Not $profile: that is an automatic variable holding the PowerShell
+    # profile path, and writing to it here would be confusing at best.
+    $profName = if ($meta -and $meta.CertificateProfileName) { [string]$meta.CertificateProfileName } else { '' }
+    # Anything still carrying the words from the example, or nothing at all.
+    # A real profile name is 5 to 100 characters and has no spaces in it.
+    if (-not $profName -or $profName -match 'FILL THIS IN|YOUR_|<|\s') {
+        Skip ("the certificate profile in " + $m + " is not filled in yet, so there is nothing to sign with")
+    }
 }
 
 # ---------------------------------------------------------------- signtool --
