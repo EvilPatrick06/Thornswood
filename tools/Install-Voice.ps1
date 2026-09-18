@@ -210,14 +210,28 @@ if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) { Unregister-S
 foreach (`$p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
     if (-not `$p.CommandLine) { continue }
     if (`$p.CommandLine -notlike '*voice-server.js*') { continue }
+    # The log path is NOT on node's own command line. The task runs
+    # cmd.exe /c "set ... && node voice-server.js >> <log>", so cmd owns the
+    # redirect and node's command line is bare: node.exe voice-server.js.
+    # Measured on the box 18 September, where a check that read node's line
+    # could not tell live from dev and answered '?'. The parent shell is what
+    # carries the folder.
     if (`$p.CommandLine -like ('*' + '$log' + '*')) { `$mine += `$p.ProcessId; continue }
+    `$parent = Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$p.ParentProcessId) -EA SilentlyContinue
+    if (`$parent -and `$parent.CommandLine -like ('*' + '$log' + '*')) { `$mine += `$p.ProcessId; continue }
     `$onPort = Get-NetTCPConnection -State Listen -LocalPort $Port -EA SilentlyContinue |
               Where-Object { `$_.OwningProcess -eq `$p.ProcessId }
     if (`$onPort) { `$mine += `$p.ProcessId }
 }
 `$killed = 0
 foreach (`$id in (`$mine | Select-Object -Unique)) {
+    # The parent shell first, so it cannot outlive the node it started.
+    `$par = (Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$id) -EA SilentlyContinue).ParentProcessId
     Stop-Process -Id `$id -Force -EA SilentlyContinue
+    if (`$par) {
+        `$pp = Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$par) -EA SilentlyContinue
+        if (`$pp -and `$pp.Name -eq 'cmd.exe') { Stop-Process -Id `$par -Force -EA SilentlyContinue }
+    }
     `$killed++
 }
 if (`$killed) { "stopped `$killed old voice process(es) for this root" }
