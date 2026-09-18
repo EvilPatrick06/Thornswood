@@ -73,7 +73,6 @@ namespace Thornswood
         // typed it in for people. SkyMP has no such screen: the client reads an
         // address and a port and connects. Kept so an older config.json still
         // loads, and as somewhere to put one if a gate is added later.
-        [DataMember] public string ServerPassword = "";
         [DataMember] public long ExpectedExeBytes = 37157144;
 
         // Set these to turn on updates. Leave blank and the launcher never
@@ -202,7 +201,6 @@ namespace Thornswood
             // anything else is a choice somebody made.
             if (ServerPort == "25565") ServerPort = "7777";
             if (ServerAddress == "192.135.119.166") ServerAddress = "192.135.112.23";
-            if (ServerPassword == null) ServerPassword = "";
             if (ExpectedExeBytes <= 0) ExpectedExeBytes = 37157144;
             // The releases repo is public now, so there is a right answer here
             // and no reason to make a fresh install go looking for it. A blank
@@ -243,7 +241,6 @@ namespace Thornswood
                             // Anything written before this existed is plain text
                             // and comes back through unchanged, then gets
                             // encrypted by the next Save.
-                            c.ServerPassword = Secrets.Unprotect(c.ServerPassword);
                             c.UpdateToken    = Secrets.Unprotect(c.UpdateToken);
                             return c;
                         }
@@ -254,16 +251,12 @@ namespace Thornswood
             return new Config();
         }
 
-        public void Save(string path)
+                public void Save(string path)
         {
-            // Swap the two secrets for their encrypted form, write, swap back.
-            // Doing it here rather than in the fields means nothing else in the
-            // launcher has to know this is happening.
-            string pw = ServerPassword, tk = UpdateToken;
+            string tk = UpdateToken;
             try
             {
-                ServerPassword = Secrets.Protect(pw);
-                UpdateToken    = Secrets.Protect(tk);
+                UpdateToken = Secrets.Protect(tk);
                 using (var ms = new MemoryStream())
                 {
                     new DataContractJsonSerializer(typeof(Config)).WriteObject(ms, this);
@@ -274,8 +267,7 @@ namespace Thornswood
             catch { }
             finally
             {
-                ServerPassword = pw;
-                UpdateToken    = tk;
+                UpdateToken = tk;
             }
         }
     }
