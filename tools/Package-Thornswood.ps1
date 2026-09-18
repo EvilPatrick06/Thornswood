@@ -723,6 +723,25 @@ if ($OneFile) {
     Say ("  attached, offset {0:n0}, {1:n2} GB" -f $off, ($len / 1GB)) 'Green'
 }
 
+# ---- sign it, if this machine can -----------------------------------------
+#
+# After the payload is attached, not before. Bootstrap.cs:648-660 already
+# expects this: the certificate lands on the end after the trailer, which is
+# exactly why its loader scans backwards for STSFX001 rather than reading a
+# fixed offset from the end.
+#
+# Does nothing without tools\signing.json, so a machine with no certificate
+# still produces a working, unsigned installer.
+$signer = Join-Path $here 'Sign-Artifact.ps1'
+if (Test-Path -LiteralPath $signer) {
+    Head 'Signing the installer'
+    & $signer -Path $exe
+    if ($LASTEXITCODE -ne 0) {
+        Say '  the installer could not be signed, so it is not fit to publish' 'Red'
+        if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 1
+    }
+}
+
 # ---- prove it before it goes anywhere ------------------------------------
 Head 'Checking the installer'
 $ok = $true
