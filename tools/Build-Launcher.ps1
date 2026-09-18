@@ -437,3 +437,12 @@ Head 'Done'
 Say $exe 'Green'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+
+# Said out loud rather than left to chance.
+#
+# A PowerShell script that runs off the end does not reset $LASTEXITCODE: the
+# caller sees whatever the last native command left behind, and this script runs
+# csc and signtool. Ship.ps1 reads that code to decide whether a release may go
+# out, so a stray value here would either hide a failure or stop a good build
+# for no reason.
+exit 0

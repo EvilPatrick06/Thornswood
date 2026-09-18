@@ -251,6 +251,29 @@ if (-not $ModsOnly) {
     }
 
     & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -NoPause
+    $buildCode = $LASTEXITCODE
+
+    <#
+      The build script's own answer, read before anything else.
+
+      Whether the launcher built used to be judged only on an exe appearing with
+      a newer timestamp. Compiling happens near the start, so every step after
+      csc was invisible here: the stub, the signing, anything added later.
+
+      On 18 September that shipped a release that had already stopped.
+      Build-Launcher printed "STOP. Signing failed. Nothing was published." and
+      exited 1 because the Azure certificate profile did not exist yet. The exe
+      from the compile was sitting there and it was newer than before, so the
+      check below passed, and Ship went on to build the pack, upload it, rewrite
+      version.json, post the news, tell Discord and tell everybody in the world
+      they had five minutes. 1.1.48 went out unsigned, announcing that nothing
+      had been published.
+    #>
+    if ($buildCode -ne 0) {
+        Unbump 'the launcher build failed'
+        Die ('The launcher build stopped with exit code ' + $buildCode +
+             '. Nothing was published. The errors are above.')
+    }
 
     $exe = Get-LauncherExe $launchDir
     $built = Test-Path -LiteralPath $exe
