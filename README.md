@@ -1,19 +1,11 @@
-# Skyrim Together
+# Thornswood
 
 Five player co-op Skyrim. One install, and it does not touch the Skyrim you
 already have.
 
 ## Download
 
-[**Both files, from here**](https://drive.google.com/drive/folders/1zESrSYy6s-kzUtCVF6g0RMrfCUvooTaT?usp=drive_link) — put them in the same folder:
-
-| | |
-| --- | --- |
-| `SkyrimTogether-Setup.exe` | tiny, this is what you run |
-| `SkyrimTogether-Setup.zip` | about 9 GB, everything else |
-
-Drive will say it can't scan the big one for viruses. Download anyway. **Don't
-unzip it** — the exe does that part.
+https://thornswood.net/downloads
 
 ## You need
 
@@ -23,14 +15,14 @@ unzip it** — the exe does that part.
 
 ## Install
 
-Run **SkyrimTogether-Setup.exe**, with the zip sitting next to it. Windows says
+Run **Thornswood-Setup.exe**, with the zip sitting next to it. Windows says
 "Windows protected your PC" because it isn't signed → **More info** → **Run
 anyway**. Press Install and leave it alone.
 
 It shows you which zip it found before you press anything, so if it says the zip
 is missing, the two files aren't in the same folder yet.
 
-It copies the base game out of your Steam folder into `C:\SkyrimTogether` and
+It copies the base game out of your Steam folder into `C:\Thornswood` and
 sets that copy up with the whole mod list already installed. **No Nexus
 account, no Vortex, no Nemesis, no mods to install.**
 
@@ -50,7 +42,7 @@ into Steam's own folder and doesn't change your installed game.
 
 ## Playing
 
-Desktop shortcut: **Skyrim Together**.
+Desktop shortcut: **Thornswood**.
 
 **First time only:**
 1. New character, **named after yourself**. That's what everyone sees above
