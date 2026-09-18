@@ -18,6 +18,7 @@
       .\Install-Voice.ps1              install and start it
       .\Install-Voice.ps1 -Restart     just restart it
       .\Install-Voice.ps1 -Remove      take it off again
+      .\Install-Voice.ps1 -Auth on     require a join to prove itself
 #>
 [CmdletBinding()]
 param(
@@ -36,6 +37,13 @@ param(
     # change here reaches it.
     [ValidateSet('0.0.0.0', '127.0.0.1')]
     [string]$Bind     = '0.0.0.0',
+    # Whether a join has to prove itself. log is the shipped default: an
+    # unproven join is let in as whatever profile it claims, and a line is
+    # written so that can be checked before anything is actually refused.
+    # on refuses it outright. off is the behaviour from before entry 6, kept
+    # for working out whether a problem is the auth check or something else.
+    [ValidateSet('on', 'log', 'off')]
+    [string]$Auth     = 'log',
     [string]$TaskName = 'Thornswood Voice',
     [switch]$Restart,
     [switch]$Remove,
@@ -187,7 +195,7 @@ if (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
 # Without it on this line -Port drove the firewall rule, the is-it-free check
 # and the health probe, and nothing else, so -Port 7789 opened 7789, checked
 # 7789 was free, and then started a service that bound 7778 on top of live.
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=$Auth&& "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
 
 <#
   Stop the old service, and mean it.
@@ -372,7 +380,7 @@ if ($Bind -eq '127.0.0.1') {
         if ($via) {
             try {
                 $h = Invoke-RestMethod ($via + '/health') -TimeoutSec 10
-                Say "Reached it through $via, build $($h.build), bind $($h.bind)." 'Green'
+                Say "Reached it through $via, build $($h.build), bind $($h.bind), auth $($h.auth)." 'Green'
             } catch {
                 Say "But $via/health did not answer either, so nothing is carrying it." 'Red'
                 Say '  Check the Caddyfile has the handle_path block for this port.' 'DarkGray'

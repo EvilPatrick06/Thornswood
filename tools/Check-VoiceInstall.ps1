@@ -12,6 +12,7 @@ $Site = 'https://thornswood.net'
 # nothing, which is the whole failure this script exists to catch, so a
 # missing one here would hide the very thing being looked for.
 $Bind = '0.0.0.0'
+$Auth = 'log'
 
 $m = [regex]::Match($src, '(?s)\$remote = @"\r?\n(.*?)\r?\n"@')
 if (-not $m.Success) { throw 'could not find the install here-string' }
