@@ -21,6 +21,25 @@ sentences, no filler, no placeholders. Secrets (server passwords, site keys,
 Discord tokens, the news webhook, anything out of a config.json or .env on the
 VPS) are named by location only; never printed, pasted, committed or logged.
 
+## Everything we need to do goes on the To Do List
+
+The Thornswood To Do List is the one record of outstanding work:
+https://claude.ai/artifact/DEaM2aKgAp3RYQnbox4WqY
+
+Decided by Patrick on 17 Sep. Anything a session turns up goes on it before the
+session ends. A defect, a decision, a correction to something already on there,
+or work started and not finished. Saying it in a reply is not recording it: a
+reply is gone when the window closes and the next person has no way to know it
+was ever found. What prompted this was a Google Ads tag added to the site whose
+only trace was a paragraph on a neighbouring entry, with no step telling anybody
+to deploy it.
+
+The number is the do-order, so a new entry goes where it belongs in that order
+and not on the end. Work that fits an existing entry updates that entry rather
+than making a second one. Write down what was measured and what is left.
+Uncommitted changes sitting in the repo are outstanding work and belong on it
+too. Say in the reply which entries moved.
+
 ## Settled design, not up for a quiet rewrite
 
 - Decided by Patrick and Djinn on 17 Sep, after the three launchers kept
