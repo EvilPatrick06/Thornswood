@@ -499,7 +499,27 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
   running it, and they will not know why.
 */
 const AUTH = String(process.env.THORNSWOOD_VOICE_AUTH || 'log').toLowerCase();
-const TOKEN_LIFETIME_MS = 5 * 60 * 1000;
+/*
+  How long a token is good for.
+
+  This was five minutes, on the reasoning that a token is only carried from
+  pressing Play to the socket opening. That reasoning was wrong, and the first
+  real join proved it: an expired token, from somebody who had just made a
+  character. Between minting and joining sits Skyrim loading, the mod list, the
+  main menu, character creation and the world loading in. Five minutes does not
+  cover a fast session, let alone a new character on a slow disk.
+
+  An hour covers a session's start with room to spare, and the launcher renews
+  it on its own tick while the game runs, so a long evening is covered too.
+
+  The shorter window was also buying less than it looked. The token sits in
+  voice-token.txt in the game folder for the whole session either way, so
+  anybody who can read that file can read it at minute four as easily as at
+  minute fifty. What the expiry actually guards against is a token that leaks
+  out of that machine being useful forever, and an hour is a perfectly good
+  answer to that.
+*/
+const TOKEN_LIFETIME_MS = Number(process.env.THORNSWOOD_TOKEN_MINUTES || 60) * 60 * 1000;
 
 const TOKEN_KEY_FILE = path.join(HERE, 'token-key.txt');
 let TOKEN_KEY = '';

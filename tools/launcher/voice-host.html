@@ -321,6 +321,19 @@ window.chrome.webview.addEventListener('message', function (e) {
     return;
   }
 
+  /*
+    A fresh join token, sent by the launcher part way through a session.
+
+    The one handed over at config expires, and the launcher renews it at half
+    its life. Kept for the next socket rather than acted on: the connection
+    that is already up was let in with the old one and is not rechecked, so
+    there is nothing to do until we reconnect.
+  */
+  if (m.t === 'token') {
+    if (cfg) { cfg.token = String(m.token || ''); }
+    return;
+  }
+
   if (m.t === 'ptt') {
     talking = !!m.on;
     if (micTrack) micTrack.enabled = talking;

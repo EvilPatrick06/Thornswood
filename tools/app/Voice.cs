@@ -614,6 +614,52 @@ namespace Thornswood
             return b.ToString();
         }
 
+        /*
+          When the join token was last fetched, and what it was for.
+
+          A token expires; the host, port and profile it was fetched for do not.
+          Configure() returns early when those three are unchanged, which is
+          almost always, so without this the token was minted once when the
+          voice page loaded and never again. The first real join after shipping
+          was refused as expired for exactly that reason.
+        */
+        static DateTime tokenGot = DateTime.MinValue;
+        static string tokenHost = "";
+        static string tokenPort = "";
+        static long tokenProfile = 0;
+
+        /// <summary>
+        /// Fetch a fresh join token and hand it to both ends, if the last one
+        /// is old enough to be worth replacing.
+        /// </summary>
+        /// <remarks>
+        /// Renewed at half its life rather than at the end of it, so a token is
+        /// never nearly expired when somebody needs it. The service issues them
+        /// for an hour, so this is every thirty minutes, and it costs one small
+        /// request to a service already on the other end of the voice socket.
+        ///
+        /// Quiet on failure. The old token is still in the file and is still
+        /// good for another half hour, which is far better than clearing it.
+        /// </remarks>
+        static void RenewToken()
+        {
+            if (tokenGot == DateTime.MinValue) return;
+            if (tokenProfile <= 0 || tokenHost.Length == 0) return;
+            if ((DateTime.UtcNow - tokenGot).TotalMinutes < 30) return;
+
+            string fresh = FetchToken(tokenHost, tokenPort, tokenProfile, null);
+            if (fresh.Length == 0)
+            {
+                // Try again on the next pass rather than every 100ms.
+                tokenGot = DateTime.UtcNow.AddMinutes(-25);
+                return;
+            }
+            tokenGot = DateTime.UtcNow;
+            try { WriteChannel("voice-token.txt", fresh); } catch { }
+            Post("{\"t\":\"token\",\"token\":\"" + JsonEscape(fresh) + "\"}");
+            Say("Voice: join token renewed");
+        }
+
         // The last config the page was given, as host, port and profile.
         static string lastConfig = "";
 
@@ -654,6 +700,13 @@ namespace Thornswood
             // Fetched here rather than in the page, because the ticket lives in
             // this process and has no business being handed to a browser.
             string token = FetchToken(host, port, profile, Say);
+            if (token.Length > 0)
+            {
+                tokenGot = DateTime.UtcNow;
+                tokenHost = host;
+                tokenPort = port;
+                tokenProfile = profile;
+            }
 
             // The game's overlay joins the same room on its own socket and holds
             // no ticket, so it reads the token out of the folder the two already
@@ -861,6 +914,8 @@ namespace Thornswood
                         {
                             republished = DateTime.UtcNow;
                             lastStatusLine = "";
+                            // On the same slow tick, not the 100ms one.
+                            RenewToken();
                         }
                         PublishStatus();
 
