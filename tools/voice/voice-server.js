@@ -26,7 +26,6 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = Number(process.env.THORNSWOOD_VOICE_PORT || 7778);
-
 /*
   Where to check that a character creation choice came from the person who owns
   that profile.
@@ -45,6 +44,19 @@ const PORT = Number(process.env.THORNSWOOD_VOICE_PORT || 7778);
 const SITE = String(process.env.THORNSWOOD_SITE || '').replace(/\/+$/, '');
 const HERE = __dirname;
 
+/*
+ * Stamped into /health so that "is the VPS running the copy I just sent it"
+ * is one request rather than an afternoon.
+ *
+ * Node does not reload a file it has already required, so copying this up
+ * changes nothing until the scheduled task is restarted, and every symptom of
+ * a missed restart looks like a bug somewhere else. Slash commands echoing
+ * into the room instead of reaching the game server was exactly that.
+ *
+ * Bump it whenever anything in this file changes behaviour.
+ */
+const BUILD = 'owners-5';
+
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
 // hanging in the last place they were heard.
@@ -54,6 +66,115 @@ const STALE_MS = 3000;
 let positions = new Map();   // profileId -> {pos:[x,y,z], angleZ, cell, name, at}
 let nextPeer = 1;
 const peers = new Map();     // peerId -> {ws, profileId, name}
+
+/*
+  Who owns which characters.
+
+  A character under SkyMP is a change form the game server holds, keyed by a
+  profile id, and the id used to exist in exactly one place: a fifty byte
+  profiles.txt on the machine that made it. Reinstall, or move to another
+  computer, and that file is gone. The launcher rolls a fresh random id, the
+  server has never seen it, and creation runs from the top while the real
+  character sits up here forever with nothing left that knows its number.
+
+  Nothing about the character needs to move. It is already on the server. What
+  was missing is a way to prove who you are, so this is that: Steam account to
+  profile ids, written by the launcher every time somebody plays and read back
+  when their profiles.txt is missing.
+
+  Rebuilt by use rather than guarded. Every launch re-registers, so if this file
+  is ever lost each person restores their own entry the next time they play.
+
+  The shared secret is the game server's own password, out of version.json in
+  a private repo. So it is not public, but it is not a purpose made secret
+  either: everyone who plays here holds it, because holding it is what playing
+  here means.
+
+  That is the right bar for what this guards. A Steam id is close to public,
+  so without a second thing to know, anyone could ask the server which profile
+  ids belong to a friend and then connect as them. With it, reading the
+  register is exactly as hard as being allowed on the server at all, and no
+  harder. It is not protection from the people already here.
+*/
+const OWNERS_FILE = path.join(HERE, 'owners.json');
+let owners = {};
+try {
+  owners = JSON.parse(fs.readFileSync(OWNERS_FILE, 'utf8')) || {};
+} catch (e) {
+  owners = {};
+}
+
+/* The password, if the installer left one next to us. Without it every account
+   route is switched off rather than left open. */
+let SECRET = '';
+try {
+  SECRET = String(fs.readFileSync(path.join(HERE, 'secret.txt'), 'utf8')).trim();
+} catch (e) {
+  SECRET = '';
+}
+
+let ownersDirty = false;
+function saveOwners() {
+  if (!ownersDirty) return;
+  ownersDirty = false;
+  const tmp = OWNERS_FILE + '.tmp';
+  try {
+    // Written beside and renamed over, never truncated in place. A power cut
+    // halfway through a plain write leaves an empty file, and an empty file
+    // here means everybody is a stranger.
+    fs.writeFileSync(tmp, JSON.stringify(owners, null, 2));
+    fs.renameSync(tmp, OWNERS_FILE);
+  } catch (e) { }
+}
+setInterval(saveOwners, 4000);
+
+function steamOf(v) {
+  const s = String(v == null ? '' : v).trim();
+  return /^[0-9]{5,20}$/.test(s) ? s : '';
+}
+
+/*
+  Ask the site whether this ticket owns this profile.
+
+  Answers 'yes', 'no', or 'unchecked' when there is nobody to ask. Never throws
+  and never hangs: a three second timeout, and anything unexpected counts as
+  unchecked rather than as a refusal, because refusing on a hiccup would stop
+  somebody creating a character for no reason they could understand.
+*/
+function owns(ticket, profileId, then) {
+  if (!SITE || !ticket) { then('unchecked'); return; }
+  let mod;
+  try { mod = SITE.startsWith('https:') ? require('https') : require('http'); }
+  catch (e) { then('unchecked'); return; }
+
+  const payload = JSON.stringify({ ticket: ticket, profileId: profileId });
+  let done = false;
+  const finish = (v) => { if (!done) { done = true; then(v); } };
+
+  let req2;
+  try {
+    req2 = mod.request(SITE + '/api/play/owns', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json',
+                 'content-length': Buffer.byteLength(payload) }
+    }, (resp) => {
+      let buf = '';
+      resp.on('data', (d) => { buf += d; });
+      resp.on('end', () => {
+        if (resp.statusCode !== 200) { finish('unchecked'); return; }
+        let doc;
+        try { doc = JSON.parse(buf); } catch (e) { finish('unchecked'); return; }
+        finish(doc && doc.ok === true ? 'yes' : 'no');
+      });
+    });
+  } catch (e) { finish('unchecked'); return; }
+
+  req2.setTimeout(3000, () => { try { req2.destroy(); } catch (e) { } finish('unchecked'); });
+  req2.on('error', () => finish('unchecked'));
+  req2.write(payload);
+  req2.end();
+}
+
 
 // Chat lines beginning with a slash, waiting for the gamemode to collect them.
 // Held in memory on purpose: a command nobody was there to run is not worth
@@ -166,9 +287,27 @@ class Sock {
 }
 
 // ------------------------------------------------------------- signalling --
+/*
+  How loudly somebody is speaking, as a name rather than a distance.
+
+  It belongs to the speaker and travels with them, because that is how it works
+  in a room: you decide whether to whisper, and everyone else just hears the
+  result at whatever range your choice carries. The listener's browser is what
+  actually applies the falloff, so it has to be told, which is what this relay
+  is for. Anything unrecognised becomes local rather than being rejected, so an
+  older client that has never heard of modes still sounds normal to everyone.
+*/
+const MODES = ['whisper', 'local', 'yell'];
+function cleanMode(v) {
+  const m = String(v == null ? '' : v).toLowerCase();
+  return MODES.indexOf(m) === -1 ? 'local' : m;
+}
+
 function roster() {
   const list = [];
-  for (const [id, p] of peers) list.push({ peer: id, profileId: p.profileId, name: p.name });
+  for (const [id, p] of peers) {
+    list.push({ peer: id, profileId: p.profileId, name: p.name, mode: p.mode || 'local' });
+  }
   return list;
 }
 
@@ -181,7 +320,7 @@ function onJoin(ws, msg) {
   const id = nextPeer++;
   const profileId = Number(msg.profileId) || 0;
   const name = String(msg.name || '').slice(0, 40);
-  peers.set(id, { ws, profileId, name });
+  peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode) });
 
   ws.send({ t: 'welcome', peer: id });
   announce();
@@ -234,6 +373,48 @@ function saveChoices() {
   catch (e) { console.log('[voice] could not write choices.json: ' + e.message); }
 }
 
+/*
+  Choices nobody ever came to collect.
+
+  A choice waits here for the minutes between somebody pressing Play and their
+  character spawning, and then the gamemode claims it and it is gone. One that
+  is still here a week later belongs to a profile id that never turned into a
+  character: an install that rolled a fresh id and was reinstalled, a launch
+  that did not reach the server, a test.
+
+  Twenty two of them had piled up by the time anyone looked, one under profile
+  id 2, and they are not harmless. Every startup prints the whole list, health
+  reports a count that means nothing, and the file only ever grows. Nothing
+  reads them, so the only question is whether a real person is still waiting on
+  one, and a week is a long time to be halfway through pressing Play.
+*/
+const CHOICE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+
+function pruneChoices(quiet) {
+  const now = Date.now();
+  const dropped = [];
+  for (const pid of Object.keys(choices)) {
+    const at = Number(choices[pid] && choices[pid].at) || 0;
+    // No timestamp at all means it was written before this service recorded
+    // one, which puts it well past any lifetime worth keeping.
+    if (!at || now - at > CHOICE_LIFETIME_MS) {
+      dropped.push(pid);
+      delete choices[pid];
+    }
+  }
+  if (dropped.length) {
+    saveChoices();
+    if (!quiet) {
+      console.log('[voice] dropped ' + dropped.length +
+                  ' choice(s) nobody collected: ' + dropped.join(', '));
+    }
+  }
+  return dropped.length;
+}
+
+pruneChoices(false);
+setInterval(() => pruneChoices(false), 60 * 60 * 1000).unref();
+
 function isLoopback(req) {
   const ra = req.socket.remoteAddress || '';
   return ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1';
@@ -252,49 +433,6 @@ function readBody(req, res, limit, then) {
 
 // ------------------------------------------------------------------ http ---
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-
-
-/*
-  Ask the site whether this ticket owns this profile.
-
-  Answers 'yes', 'no', or 'unchecked' when there is nobody to ask. Never throws
-  and never hangs: a three second timeout, and anything unexpected counts as
-  unchecked rather than as a refusal, because refusing on a hiccup would stop
-  somebody creating a character for no reason they could understand.
-*/
-function owns(ticket, profileId, then) {
-  if (!SITE || !ticket) { then('unchecked'); return; }
-  let mod;
-  try { mod = SITE.startsWith('https:') ? require('https') : require('http'); }
-  catch (e) { then('unchecked'); return; }
-
-  const payload = JSON.stringify({ ticket: ticket, profileId: profileId });
-  let done = false;
-  const finish = (v) => { if (!done) { done = true; then(v); } };
-
-  let req2;
-  try {
-    req2 = mod.request(SITE + '/api/play/owns', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json',
-                 'content-length': Buffer.byteLength(payload) }
-    }, (resp) => {
-      let buf = '';
-      resp.on('data', (d) => { buf += d; });
-      resp.on('end', () => {
-        if (resp.statusCode !== 200) { finish('unchecked'); return; }
-        let doc;
-        try { doc = JSON.parse(buf); } catch (e) { finish('unchecked'); return; }
-        finish(doc && doc.ok === true ? 'yes' : 'no');
-      });
-    });
-  } catch (e) { finish('unchecked'); return; }
-
-  req2.setTimeout(3000, () => { try { req2.destroy(); } catch (e) { } finish('unchecked'); });
-  req2.on('error', () => finish('unchecked'));
-  req2.write(payload);
-  req2.end();
-}
 
 const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/positions') {
@@ -441,11 +579,117 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  /*
+    Which characters belong to this Steam account.
+
+    Answered over the internet rather than loopback, because the launcher asks
+    it from somebody's house before the game has started.
+  */
+  if (req.method === 'POST' && route === '/whoami') {
+    readBody(req, res, 2000, (doc) => {
+      if (!SECRET || String(doc.password || '') !== SECRET) {
+        res.writeHead(403).end('no');
+        return;
+      }
+      const steam = steamOf(doc.steamId);
+      if (!steam) { res.writeHead(400).end('no steam id'); return; }
+      const rec = owners[steam];
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ steamId: steam, profiles: (rec && rec.profiles) || [] }));
+    });
+    return;
+  }
+
+  /*
+    This Steam account owns these profile ids.
+
+    Sent on every launch, so the record follows a character that was made
+    before any of this existed: nothing about the id changes, it just stops
+    being a secret held only by one hard drive.
+  */
+  if (req.method === 'POST' && route === '/claim') {
+    readBody(req, res, 4000, (doc) => {
+      if (!SECRET || String(doc.password || '') !== SECRET) {
+        res.writeHead(403).end('no');
+        return;
+      }
+      const steam = steamOf(doc.steamId);
+      if (!steam) { res.writeHead(400).end('no steam id'); return; }
+
+      const list = Array.isArray(doc.profiles) ? doc.profiles : [];
+      const clean = [];
+      for (const p of list.slice(0, 12)) {
+        const slot = Number(p.slot) || 0;
+        const profileId = Number(p.profileId) || 0;
+        if (slot <= 0 || profileId <= 0) continue;
+        clean.push({
+          slot: slot,
+          profileId: profileId,
+          name: String(p.name || '').slice(0, 40),
+          played: Number(p.played) || 0,
+          // The launcher's own notes about the character. The game server has
+          // none of this: it knows a change form, not that the person playing
+          // it calls themselves a bard from Winterhold with two hours in.
+          seconds: Number(p.seconds) || 0,
+          trade: String(p.trade || '').slice(0, 24),
+          town: String(p.town || '').slice(0, 24)
+        });
+      }
+      if (!clean.length) { res.writeHead(400).end('nothing to claim'); return; }
+
+      /*
+        Current list replaced, history only ever added to.
+
+        The list is what a fresh install gets handed back, so it has to be
+        whatever the machine in front of the person actually has. History is
+        the safety net under that: if somebody reinstalls, makes a character
+        before this has had a chance to hand theirs back, and then claims the
+        new id, the old one is still written down here rather than gone. A
+        character nobody can name is a character nobody can recover.
+      */
+      const was = owners[steam] || {};
+      const seen = Array.isArray(was.seen) ? was.seen.slice(0, 200) : [];
+      for (const p of clean) {
+        if (seen.indexOf(p.profileId) === -1) { seen.push(p.profileId); }
+      }
+
+      owners[steam] = { profiles: clean, seen: seen, at: Date.now() };
+      ownersDirty = true;
+      res.writeHead(204).end();
+    });
+    return;
+  }
+
+  /* The whole book, for the admin script. Same secret, and a POST so the
+     password never lands in a URL or a log line. */
+  if (req.method === 'POST' && route === '/owners') {
+    readBody(req, res, 2000, (doc) => {
+      if (!SECRET || String(doc.password || '') !== SECRET) {
+        res.writeHead(403).end('no');
+        return;
+      }
+      if (doc.forget) {
+        const steam = steamOf(doc.forget);
+        if (steam && owners[steam]) {
+          delete owners[steam];
+          ownersDirty = true;
+          saveOwners();
+        }
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ owners: owners }));
+    });
+    return;
+  }
+
   if (route === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, peers: peers.size, tracked: positions.size,
+    res.end(JSON.stringify({ ok: true, build: BUILD,
+                            peers: peers.size, tracked: positions.size,
                             waitingChoices: Object.keys(choices).length,
-                            queuedCommands: commands.length }));
+                            queuedCommands: commands.length,
+                            accounts: Object.keys(owners).length,
+                            secret: SECRET ? 'set' : 'MISSING' }));
     return;
   }
 
@@ -481,6 +725,21 @@ server.on('upgrade', (req, socket, head) => {
       const to = peers.get(Number(msg.to));
       if (!to) return;
       to.ws.send(Object.assign({}, msg, { from: myId }));
+      return;
+    }
+
+    // How loudly this person is speaking. Held on the peer so that the next
+    // roster carries it to anybody who joins later, and passed on at once so
+    // that a mode change is heard on the very next word rather than on the
+    // next time somebody connects.
+    if (msg.t === 'vmode') {
+      const me = peers.get(myId);
+      if (!me) return;
+      const mode = cleanMode(msg.mode);
+      if (me.mode === mode) return;
+      me.mode = mode;
+      const out = { t: 'vmode', from: myId, profileId: me.profileId, mode: mode };
+      for (const [, p] of peers) p.ws.send(out);
       return;
     }
 
