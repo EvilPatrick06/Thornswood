@@ -910,26 +910,23 @@ if (Test-Path $cfgPath) {
         # are, which is the entire point of the check. What was left was a
         # secret published for no reader.
         #
-        # It is still wanted on this machine, by Install-Voice and Characters,
-        # so it goes into a file beside the private repo that git is told to
-        # ignore. Any copy already sitting in version.json is taken out here,
-        # so the next publish removes it from the public repo rather than
-        # leaving it there forever.
-        $pw = Val $cfg 'ServerPassword'
+        # Any copy already sitting in version.json is taken out here, so a
+        # publish removes it from the public repo rather than leaving it there
+        # forever. That part stays, because a stale copy may still be up there.
+        #
+        # What used to follow it does not. Until 18 September this also copied
+        # config.json's ServerPassword into server-secret.txt on every publish.
+        # That field is gone from the launcher now, and the character register
+        # secret is 32 random bytes written into server-secret.txt directly and
+        # rotated by hand. Leaving the copy in place meant any value that found
+        # its way back into config.json would silently overwrite the real
+        # secret on the next publish, and the register would start refusing
+        # everybody with nothing on screen to say why.
         if ($doc.PSObject.Properties.Name -contains 'serverPassword') {
             $doc.PSObject.Properties.Remove('serverPassword')
             Say '  took the server password out of version.json' 'Yellow'
         }
-        if ($pw) {
-            $secretFile = Join-Path (Split-Path -Parent $Here) 'server-secret.txt'
-            try {
-                [IO.File]::WriteAllText($secretFile, $pw, (New-Object Text.UTF8Encoding($false)))
-            } catch {
-                Say "  could not write server-secret.txt: $($_.Exception.Message)" 'Yellow'
-            }
-        }
-        $shown = if ($pw) { 'kept here, not published' } else { 'not set' }
-        Say "  server $(Val $cfg 'ServerAddress'):$(Val $cfg 'ServerPort'), password $shown" 'Green'
+        Say "  server $(Val $cfg 'ServerAddress'):$(Val $cfg 'ServerPort')" 'Green'
         Say "  updates from $(Val $cfg 'UpdateRepo'), voice on $(Val $cfg 'VoicePort')" 'Green'
     } catch {
         Say "  could not read config.json, left the server details alone: $($_.Exception.Message)" 'Yellow'
