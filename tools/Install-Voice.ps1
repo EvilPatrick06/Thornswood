@@ -1,4 +1,4 @@
-<#
+﻿<#
   Install-Voice.ps1
 
   Puts the proximity voice service on the VPS beside the game server and opens
@@ -161,7 +161,7 @@ if (-not `$node) { throw 'node is not installed on this machine' }
 # The port everyone's browser connects to. The position feed is loopback only
 # and needs nothing opened.
 if (-not (Get-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContinue)) {
-    New-NetFirewallRule -DisplayName 'Thornswood Voice' -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
+    New-NetFirewallRule -DisplayName '$TaskName' -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
 }
 
 `$log = Join-Path '$Root' 'voice.log'
@@ -172,7 +172,11 @@ if (-not (Get-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContin
 #
 # set is used rather than a scheduled task environment block because a task
 # action has nowhere to put one, and this is the whole command line anyway.
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
+# THORNSWOOD_VOICE_PORT is what the service actually reads (voice-server.js:28).
+# Without it on this line -Port drove the firewall rule, the is-it-free check
+# and the health probe, and nothing else, so -Port 7789 opened 7789, checked
+# 7789 was free, and then started a service that bound 7778 on top of live.
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
 
 <#
   Stop the old service, and mean it.
@@ -191,14 +195,35 @@ if (-not (Get-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContin
 Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
 if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) { Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false }
 
-`$killed = 0
+# Ours, and only ours.
+#
+# This used to kill every node running voice-server.js, whatever folder it
+# ran from. There are two of these services, live and dev, so installing
+# either one killed the other. On 18 September installing dev stopped live
+# and the dev copy then took 7778 with dev's data on it.
+#
+# Two ways a process counts as ours, and it needs one of them: it was
+# started from this root, which the log path in its command line shows, or
+# it is sitting on the port we are about to bind, which makes it an orphan
+# in our way whoever started it.
+`$mine = @()
 foreach (`$p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
-    if (`$p.CommandLine -and `$p.CommandLine -like '*voice-server.js*') {
-        Stop-Process -Id `$p.ProcessId -Force -EA SilentlyContinue
-        `$killed++
-    }
+    if (-not `$p.CommandLine) { continue }
+    if (`$p.CommandLine -notlike '*voice-server.js*') { continue }
+    if (`$p.CommandLine -like ('*' + '$log' + '*')) { `$mine += `$p.ProcessId; continue }
+    `$onPort = Get-NetTCPConnection -State Listen -LocalPort $Port -EA SilentlyContinue |
+              Where-Object { `$_.OwningProcess -eq `$p.ProcessId }
+    if (`$onPort) { `$mine += `$p.ProcessId }
 }
-if (`$killed) { "stopped `$killed old voice process(es)" }
+`$killed = 0
+foreach (`$id in (`$mine | Select-Object -Unique)) {
+    Stop-Process -Id `$id -Force -EA SilentlyContinue
+    `$killed++
+}
+if (`$killed) { "stopped `$killed old voice process(es) for this root" }
+`$others = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue |
+            Where-Object { `$_.CommandLine -like '*voice-server.js*' })
+if (`$others.Count) { "left " + `$others.Count + " other voice process(es) alone" }
 
 `$free = `$false
 for (`$i = 0; `$i -lt 30; `$i++) {
