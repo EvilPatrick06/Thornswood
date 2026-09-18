@@ -49,9 +49,13 @@ too. Say in the reply which entries moved.
   stored twice, and copies of everything another launcher rewrites in place
   (settings, scripts, programs, the client folders, the master files and
   whatever Keizaal is known to replace). Keizaal and Daedric get their own
-  folders the same way (`tools\New-GameFolder.ps1`). Until that branch
-  (`djinn/own-game-folder`) is on main, what ships is the Steam copy with
-  Vortex, and the two shapes must not be mixed in one release.
+  folders the same way (`tools\New-GameFolder.ps1`).
+  This is what ships now, corrected 18 Sep. The bullet used to say the Steam
+  copy shipped until `djinn/own-game-folder` reached main. That branch is on
+  main, `C:\Thornswood\Game` is built, and the launcher restarts into it:
+  Profile\launcher.log records "runs from the new folder". A session reading
+  the old wording would have believed the wrong layout was live, which is the
+  one thing this section exists to prevent.
 - Whichever folder the game runs from, the launcher handles sharing on its
   own: Keep puts its files back before Play and parks other servers'
   plugins; Hold keeps its files open read only while the game runs; the
