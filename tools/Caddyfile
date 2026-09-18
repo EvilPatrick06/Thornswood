@@ -1,12 +1,37 @@
 # Thornswood, the one door on 443.
 #
-# This is the reference copy. The live one is C:\Thornswood-Caddy\Caddyfile on
-# the VPS, and until something deploys this, the two are kept the same by hand.
-# It lived only on the box until 18 September, which meant the only record of
-# how the site was reachable was the box itself.
+# This is the reference copy and it matches the live one as of 18 September.
+# The live one is C:\Thornswood-Caddy\Caddyfile on the VPS, and until something
+# deploys this, the two are kept the same by hand. It lived only on the box
+# until now, which meant the only record of how the site was reachable was the
+# box itself.
 #
 # Caddy gets the certificate and renews it on its own. The email below is what
 # Let's Encrypt writes to if one is about to lapse.
+#
+# Keep it in caddy fmt shape. `caddy fmt --overwrite .\Caddyfile` does it, and
+# validate complains about the line if you do not.
+#
+# ---------------------------------------------------------------------------
+# THE VOICE BLOCKS ARE LIVE, AND ON THEIR OWN THEY CHANGE NOTHING.
+#
+# The voice service still answers on 7778 and 7789 directly as well, so every
+# launcher already installed carries on exactly as before. These blocks add a
+# second way in, through the certificate, for clients that know to use it.
+#
+# handle_path strips the prefix, so /voice/health reaches the service as
+# /health and everything it serves keeps working unchanged. Caddy carries a
+# WebSocket upgrade through reverse_proxy without being told to, so the
+# signalling socket needs nothing more than this.
+#
+# What is NOT done yet, in this order:
+#   1. the clients still build ws://host:port and must learn to use wss
+#   2. those clients have to ship and go out
+#   3. only then THORNSWOOD_VOICE_BIND=127.0.0.1 and the two ports close
+#
+# Doing 3 before 2 takes voice from everybody, and no change here brings them
+# back, because the raw address is compiled into the copy on their machine.
+# ---------------------------------------------------------------------------
 
 {
 	email datdude365d@gmail.com
@@ -15,32 +40,12 @@
 thornswood.net, www.thornswood.net {
 	encode gzip
 
-	# ---------------------------------------------------------------- voice --
-	#
-	# NOT SWITCHED ON YET. Adding these two blocks is safe on its own: the voice
-	# service still answers on its own port as well, and nothing is obliged to
-	# come this way. What must not happen yet is the other half, setting
-	# THORNSWOOD_VOICE_BIND=127.0.0.1 and closing 7778, because every launcher
-	# already installed connects to the raw port and no change here brings one
-	# back. Ship the launcher that can use wss first, let it go out, then bind.
-	#
-	# handle_path strips the prefix, so /voice/health reaches the service as
-	# /health and everything it serves keeps working unchanged. Caddy carries a
-	# WebSocket upgrade through reverse_proxy without being told to, so the
-	# signalling socket needs nothing here beyond this.
-	#
-	# What this buys: one port open instead of three, a certificate on the voice
-	# traffic so wss:// replaces ws://, and the same name for everything rather
-	# than an address and a port number people have to be told.
-	#
-	#	handle_path /voice/* {
-	#		reverse_proxy 127.0.0.1:7778
-	#	}
-	#
-	#	handle_path /voice-dev/* {
-	#		reverse_proxy 127.0.0.1:7789
-	#	}
+	handle_path /voice/* {
+		reverse_proxy 127.0.0.1:7778
+	}
 
-	# The site, and everything that is not one of the blocks above.
+	handle_path /voice-dev/* {
+		reverse_proxy 127.0.0.1:7789
+	}
 	reverse_proxy 127.0.0.1:3001
 }

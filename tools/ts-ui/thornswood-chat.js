@@ -75,8 +75,17 @@
     if (c) c.add([{ text: text, color: color || C_SYS }], 'plain');
   }
 
+  /*
+    Through Caddy when the plugin was told about one, the raw port
+    otherwise. A base of https://... gives wss://, and getting that wrong
+    is a mixed content error that says nothing useful about why.
+  */
   function url() {
-    return 'ws://' + HOST + ':' + PORT + '/';
+    var b = String(CFG.base || '').replace(/\/+$/, '');
+    if (!b) { return 'ws://' + HOST + ':' + PORT + '/'; }
+    if (b.indexOf('https://') === 0) { return 'wss://' + b.slice(8) + '/'; }
+    if (b.indexOf('http://') === 0) { return 'ws://' + b.slice(7) + '/'; }
+    return b + '/';
   }
 
   function connect() {

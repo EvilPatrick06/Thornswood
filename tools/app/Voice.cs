@@ -547,7 +547,8 @@ namespace Thornswood
                 return "";
             }
 
-            string url = "http://" + host + ":" + port + "/token";
+            // Through Caddy when one is configured, the raw port otherwise.
+            string url = (conf == null ? ("http://" + host + ":" + port) : conf.VoiceBase()) + "/token";
             string body = "{\"profileId\":" + profile.ToString(CultureInfo.InvariantCulture) +
                           ",\"ticket\":\"" + JsonEscape(ticket) + "\"}";
             try
@@ -715,8 +716,15 @@ namespace Thornswood
             // this machine as this person.
             try { WriteChannel("voice-token.txt", token); } catch { }
 
+            // base and socket are what the page should use. host and port stay on
+            // the message so an older page, or one that has not been rebuilt,
+            // carries on building the url the way it always did.
+            string vbase = conf == null ? ("http://" + host + ":" + port) : conf.VoiceBase();
+            string vsock = conf == null ? ("ws://" + host + ":" + port + "/") : conf.VoiceSocket();
             Post("{\"t\":\"config\",\"host\":\"" + host + "\",\"port\":\"" + port +
                  "\",\"profileId\":" + profile + ",\"name\":\"\"" +
+                 ",\"base\":\"" + JsonEscape(vbase) + "\"" +
+                 ",\"socket\":\"" + JsonEscape(vsock) + "\"" +
                  ",\"token\":\"" + JsonEscape(token) + "\"}");
             Say("Voice: configured for " + host + ":" + port + " as profile " + profile +
                 (token.Length == 0 ? " with no join token" : ""));

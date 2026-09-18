@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization;
@@ -44,6 +44,52 @@ namespace Thornswood
         // audio goes straight between people; this is only where the browser
         // window connects for positions and signalling.
         [DataMember] public string VoicePort = "7778";
+
+        /// <summary>
+        /// Where the voice service is, when it is not simply the server address
+        /// and a port. Empty means it is, which is how this has always worked.
+        /// </summary>
+        /// <remarks>
+        /// Set this to https://thornswood.net/voice and everything voice does
+        /// goes through Caddy on 443 instead of the raw port: one door with a
+        /// certificate on it, and wss:// rather than ws://, so nobody's voice
+        /// signalling crosses the internet in the clear.
+        ///
+        /// It stays empty until the launchers that understand it have gone out.
+        /// A launcher that has never heard of this setting connects to the raw
+        /// port, so the port has to keep answering until they are all replaced.
+        /// </remarks>
+        [DataMember] public string VoiceUrl = "";
+
+        /// <summary>
+        /// The voice service as a base address, with no trailing slash.
+        /// </summary>
+        public string VoiceBase()
+        {
+            string u = VoiceUrl == null ? "" : VoiceUrl.Trim();
+            while (u.EndsWith("/")) { u = u.Substring(0, u.Length - 1); }
+            if (u.Length > 0) { return u; }
+            string p = VoicePort == null ? "" : VoicePort.Trim();
+            if (p.Length == 0) { p = "7778"; }
+            return "http://" + (ServerAddress == null ? "" : ServerAddress) + ":" + p;
+        }
+
+        /// <summary>
+        /// The same address as a WebSocket url, so a secure base gives wss.
+        /// </summary>
+        public string VoiceSocket()
+        {
+            string b = VoiceBase();
+            if (b.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return "wss://" + b.Substring(8) + "/";
+            }
+            if (b.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            {
+                return "ws://" + b.Substring(7) + "/";
+            }
+            return b + "/";
+        }
 
         /*
           Which microphone to record from, by name, or empty for whatever
@@ -192,6 +238,9 @@ namespace Thornswood
             if (ServerFolder == null) ServerFolder = "";
             if (string.IsNullOrEmpty(CollectionUrl)) CollectionUrl = Collection;
             if (string.IsNullOrEmpty(VoicePort)) VoicePort = "7778";
+            if (VoiceUrl == null) VoiceUrl = "";
+            VoiceUrl = VoiceUrl.Trim();
+            while (VoiceUrl.EndsWith("/")) { VoiceUrl = VoiceUrl.Substring(0, VoiceUrl.Length - 1); }
 
             // The old build ran Skyrim Together Reborn on 25565, on a different
             // box. SkyMP does not listen there and that machine is not running

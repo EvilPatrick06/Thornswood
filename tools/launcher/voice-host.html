@@ -99,11 +99,37 @@ The old value stays here as the fallback, so a service that has not been
 told about a relay, or one that cannot be reached for a moment, behaves
 exactly as this did before.
 */
+/*
+  Where the voice service is, for this page.
+
+  The launcher sends base and socket now. Older configs, and anything that has
+  not been rebuilt, send only host and port, so those are still what this falls
+  back to and the behaviour is unchanged for them.
+
+  Two of them because they are not the same string: a base of
+  https://thornswood.net/voice gives wss://thornswood.net/voice/ for the
+  socket, and getting that wrong is a mixed content error that says nothing
+  useful about why.
+*/
+function voiceBase() {
+  if (cfg && cfg.base) { return String(cfg.base).replace(/\/+$/, ''); }
+  if (!cfg) { return ''; }
+  return 'http://' + cfg.host + ':' + cfg.port;
+}
+
+function voiceSocket() {
+  if (cfg && cfg.socket) { return String(cfg.socket); }
+  var b = voiceBase();
+  if (b.indexOf('https://') === 0) { return 'wss://' + b.slice(8) + '/'; }
+  if (b.indexOf('http://') === 0) { return 'ws://' + b.slice(7) + '/'; }
+  return b + '/';
+}
+
 var ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
 function refreshIce() {
   if (!cfg || !cfg.host) { return; }
   try {
-    fetch('http://' + cfg.host + ':' + cfg.port + '/ice')
+    fetch(voiceBase() + '/ice')
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (d && d.iceServers && d.iceServers.length) {
@@ -119,7 +145,7 @@ function refreshIce() {
 function connect() {
   refreshIce();
   if (!cfg) return;
-  var url = 'ws://' + cfg.host + ':' + cfg.port + '/';
+  var url = voiceSocket();
   say('connecting to ' + url);
   try { ws = new WebSocket(url); } catch (e) { say('socket refused: ' + e); return; }
 
@@ -311,7 +337,8 @@ window.chrome.webview.addEventListener('message', function (e) {
 
   if (m.t === 'config') {
     cfg = { host: m.host, port: m.port, profileId: Number(m.profileId) || 0,
-            name: String(m.name || ''), token: String(m.token || '') };
+            name: String(m.name || ''), token: String(m.token || ''),
+            base: String(m.base || ''), socket: String(m.socket || '') };
     myProfile = cfg.profileId;
     say('configured as profile ' + cfg.profileId +
         (cfg.token ? '' : ', with no join token'));

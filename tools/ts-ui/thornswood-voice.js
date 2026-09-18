@@ -598,7 +598,7 @@
   function refreshIce() {
     if (!cfg || !cfg.host) { return; }
     try {
-      fetch('http://' + cfg.host + ':' + cfg.port + '/ice')
+      fetch(String((window.THORNSWOOD || {}).base || ('http://' + cfg.host + ':' + cfg.port)).replace(/\/+$/, '') + '/ice')
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d && d.iceServers && d.iceServers.length) {

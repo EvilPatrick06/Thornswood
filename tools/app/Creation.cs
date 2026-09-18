@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
@@ -672,11 +672,9 @@ namespace Thornswood
             if (profileId <= 0) return "no profile id";
             if (string.IsNullOrEmpty(cfg.ServerAddress)) return "no server address";
 
-            int port = 7778;
-            int.TryParse(cfg.VoicePort, out port);
-            if (port <= 0) port = 7778;
-
-            string url = "http://" + cfg.ServerAddress + ":" + port + "/choose";
+            // Through Caddy when one is configured, the raw port otherwise.
+            // The port is inside VoiceBase now, so it is not picked apart here.
+            string url = cfg.VoiceBase() + "/choose";
 
             // The ticket proves this profile belongs to the Discord account
             // sending the choice. Without it /choose takes anybody's word for

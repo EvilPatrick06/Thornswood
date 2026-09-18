@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -103,7 +103,10 @@ namespace Thornswood
             // shared game folder has to be told which one every launch, or a
             // dev session would put its positions on the main server.
             string port = cfg == null ? "" : (cfg.VoicePort ?? "").Trim();
-            if (want.Length == 0 && port.Length == 0) return "";
+            // And where voice lives, when that is not just a port. The game
+            // overlay opens its own socket and has no other way to be told.
+            string vurl = cfg == null ? "" : (cfg.VoiceUrl ?? "").Trim();
+            if (want.Length == 0 && port.Length == 0 && vurl.Length == 0) return "";
 
             string ini = Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\Thornswood.ini");
             if (!File.Exists(ini)) return "";
@@ -112,6 +115,7 @@ namespace Thornswood
             {
                 var lines = new List<string>(File.ReadAllLines(ini));
                 bool done = false;
+                bool vurlDone = false;
                 for (int i = 0; i < lines.Count; i++)
                 {
                     string t = lines[i].TrimStart();
@@ -125,6 +129,13 @@ namespace Thornswood
                     else if (port.Length > 0 && t.StartsWith("VoicePort", StringComparison.OrdinalIgnoreCase))
                     {
                         lines[i] = "VoicePort = " + port;
+                    }
+                    else if (t.StartsWith("VoiceUrl", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Written even when empty, so clearing it here clears
+                        // it in the game too rather than leaving a stale one.
+                        lines[i] = "VoiceUrl = " + vurl;
+                        vurlDone = true;
                     }
                 }
                 // No line to rewrite, so one is added rather than the name being
@@ -149,6 +160,11 @@ namespace Thornswood
                     else lines.Insert(at, "MicrophoneName = " + want);
                     done = true;
                 }
+                // The shipped template has never carried VoiceUrl, so on every
+                // machine there is no line to rewrite and it has to be added or the
+                // game would never learn about Caddy at all.
+                if (!vurlDone && vurl.Length > 0) { lines.Add("VoiceUrl = " + vurl); }
+
                 File.WriteAllLines(ini, lines.ToArray(), new UTF8Encoding(false));
                 return done ? want : "";
             }

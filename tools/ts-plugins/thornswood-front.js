@@ -164,6 +164,16 @@
   const ini = readText(INI);
   const CHAT_KEY = iniNumber(ini, 'ChatKey', 28);       // Enter
   const VOICE_PORT = iniNumber(ini, 'VoicePort', 7778);
+  /*
+    Where voice lives when it is not just a port on the server address.
+    Written by the launcher at every Play, the same way VoicePort is.
+    Empty is the normal case and means the raw port, which is how this
+    worked before Caddy carried /voice/.
+  */
+  const VOICE_URL = (function () {
+    const m = ini.match(/^\s*VoiceUrl\s*=\s*(\S+)/m);
+    return m ? String(m[1]).replace(/\/+$/, '') : '';
+  })();
   const ESC = 1;
 
   const client = (function () {
@@ -1503,7 +1513,7 @@
       sentName = myName() || 'Traveller';
       T.js('window.THORNSWOOD=' + JSON.stringify({
         host: HOST, port: VOICE_PORT, profileId: PROFILE, name: sentName,
-        token: joinToken()
+        token: joinToken(), base: VOICE_URL
       }) + ';');
       OVERLAYS.forEach(inject);
       // The token itself is never logged. It is what somebody would need to
