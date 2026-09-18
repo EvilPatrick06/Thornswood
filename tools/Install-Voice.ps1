@@ -160,7 +160,10 @@ if (-not `$node) { throw 'node is not installed on this machine' }
 
 # The port everyone's browser connects to. The position feed is loopback only
 # and needs nothing opened.
-if (-not (Get-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContinue)) {
+# Checked under the same name it is created under. This used to look for
+# 'Thornswood Voice' and create '$TaskName', so installing dev found the live
+# rule already there and never opened 7789 at all.
+if (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
     New-NetFirewallRule -DisplayName '$TaskName' -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
 }
 
@@ -210,15 +213,20 @@ if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) { Unregister-S
 foreach (`$p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
     if (-not `$p.CommandLine) { continue }
     if (`$p.CommandLine -notlike '*voice-server.js*') { continue }
+    # NOTE the backtick. $log belongs to the remote script (it is set at the
+    # top of this here-string), not to this one. Written as '$log' the outer
+    # PowerShell expands it, finds nothing, and the test becomes '**', which
+    # matches every voice process there is. That is how this killed live
+    # twice on 18 September while reporting it had stopped one 'for this root'.
     # The log path is NOT on node's own command line. The task runs
     # cmd.exe /c "set ... && node voice-server.js >> <log>", so cmd owns the
     # redirect and node's command line is bare: node.exe voice-server.js.
     # Measured on the box 18 September, where a check that read node's line
     # could not tell live from dev and answered '?'. The parent shell is what
     # carries the folder.
-    if (`$p.CommandLine -like ('*' + '$log' + '*')) { `$mine += `$p.ProcessId; continue }
+    if (`$p.CommandLine -like ('*' + `$log + '*')) { `$mine += `$p.ProcessId; continue }
     `$parent = Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$p.ParentProcessId) -EA SilentlyContinue
-    if (`$parent -and `$parent.CommandLine -like ('*' + '$log' + '*')) { `$mine += `$p.ProcessId; continue }
+    if (`$parent -and `$parent.CommandLine -like ('*' + `$log + '*')) { `$mine += `$p.ProcessId; continue }
     `$onPort = Get-NetTCPConnection -State Listen -LocalPort $Port -EA SilentlyContinue |
               Where-Object { `$_.OwningProcess -eq `$p.ProcessId }
     if (`$onPort) { `$mine += `$p.ProcessId }
