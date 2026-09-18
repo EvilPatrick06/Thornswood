@@ -555,6 +555,65 @@ function readToken(raw) {
   return { profileId: profileId, expired: false };
 }
 
+/*
+  Where everybody's browser should look to find each other.
+
+  Three pages build an RTCPeerConnection and all three had the same Google STUN
+  server typed into them. STUN alone only works when both ends can be reached
+  once they know where to look. Behind a symmetric NAT, some mobile networks and
+  a lot of corporate ones, they cannot, and those two people simply never hear
+  each other while everybody else sounds fine. That is the worst shape a fault
+  can take: it is not down, it is down for one pair.
+
+  TURN is the answer to that, and TURN needs a server to relay through, which is
+  not something that can be typed into a web page. So the list lives here and
+  the pages ask for it. Adding TURN later is then a setting on the VPS and a
+  restart, rather than editing three files and shipping a release.
+
+  THORNSWOOD_TURN_URL     turn:voice.thornswood.net:3478 or similar
+  THORNSWOOD_TURN_SECRET  the static-auth-secret from the TURN server
+  THORNSWOOD_TURN_TTL     how long an issued credential lasts, seconds
+
+  With a secret set, each browser is handed its own credential that expires,
+  built the way coturn's REST scheme expects: the username is an expiry
+  timestamp and the password is an HMAC of it. Nobody gets a standing password
+  to a relay, which matters because that relay would carry their bandwidth bill.
+
+  A plain username and password are supported too, for a service that does not
+  do the REST scheme, but the ephemeral one is better and is what to prefer.
+*/
+const TURN_URL = String(process.env.THORNSWOOD_TURN_URL || '').trim();
+const TURN_SECRET = String(process.env.THORNSWOOD_TURN_SECRET || '').trim();
+const TURN_USER = String(process.env.THORNSWOOD_TURN_USER || '').trim();
+const TURN_PASS = String(process.env.THORNSWOOD_TURN_PASS || '').trim();
+const TURN_TTL = Number(process.env.THORNSWOOD_TURN_TTL || 3600) || 3600;
+
+// The public STUN that has always been here. Kept as the floor so that a box
+// with nothing configured behaves exactly as it does today.
+const STUN = [{ urls: 'stun:stun.l.google.com:19302' }];
+
+function iceServers() {
+  const list = STUN.slice();
+  if (!TURN_URL) return list;
+  const urls = TURN_URL.split(',').map((s) => s.trim()).filter(Boolean);
+  if (TURN_SECRET) {
+    // coturn's use-auth-secret scheme: username is <expiry unix seconds>, and
+    // the password is base64 of HMAC-SHA1 over that username.
+    const until = Math.floor(Date.now() / 1000) + TURN_TTL;
+    const user = String(until);
+    const pass = crypto.createHmac('sha1', TURN_SECRET).update(user).digest('base64');
+    list.push({ urls: urls, username: user, credential: pass });
+  } else if (TURN_USER && TURN_PASS) {
+    list.push({ urls: urls, username: TURN_USER, credential: TURN_PASS });
+  } else {
+    // A relay nobody can authenticate to is worse than none: the browser spends
+    // its gathering time on it and gives up. Say so rather than serving it.
+    console.log('[voice] THORNSWOOD_TURN_URL is set but no credentials are, so it is being ignored');
+    return list;
+  }
+  return list;
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/positions') {
     // Loopback only. This is the gamemode talking to the service on the same
@@ -837,9 +896,25 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  /*
+    The ICE list, for whichever page is about to build a peer connection.
+
+    Answered to anyone who asks. It carries no secret: with the REST scheme the
+    credential is derived and short lived, and it is no use without also being
+    able to reach the relay. The pages that ask are the same pages this service
+    already serves.
+  */
+  if (route === '/ice') {
+    res.writeHead(200, { 'content-type': 'application/json',
+                         'cache-control': 'no-store' });
+    res.end(JSON.stringify({ iceServers: iceServers() }));
+    return;
+  }
+
   if (route === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: true, build: BUILD, auth: AUTH,
+                            turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             peers: peers.size, tracked: positions.size,
                             waitingChoices: Object.keys(choices).length,
                             queuedCommands: commands.length,

@@ -580,7 +580,39 @@
   // listens on it and posts through it. Both files are fetched by the front in
   // the same pass and neither can rely on running first, so this waits rather
   // than assuming.
+  /*
+    Where to look for each other, asked for rather than typed in.
+
+    This was a Google STUN server written into three separate pages. STUN
+    alone only works when both ends can be reached once they know where to
+    look; behind a symmetric NAT, some mobile networks and a lot of corporate
+    ones, they cannot, and that pair of people never hear each other while
+    everybody else sounds fine. TURN fixes it and needs a relay, which cannot
+    be typed into a page, so the service hands the list out at /ice.
+
+    The old value stays here as the fallback, so a service that has not been
+    told about a relay, or one that cannot be reached for a moment, behaves
+    exactly as this did before.
+  */
+  var ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
+  function refreshIce() {
+    if (!cfg || !cfg.host) { return; }
+    try {
+      fetch('http://' + cfg.host + ':' + cfg.port + '/ice')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.iceServers && d.iceServers.length) {
+            ICE = d.iceServers;
+            report('ice', ICE.length + ' server(s), relay ' +
+                   (ICE.some(function (s) { return /^turns?:/.test([].concat(s.urls)[0]); }) ? 'yes' : 'no'));
+          }
+        })
+        .catch(function () { });
+    } catch (e) { }
+  }
+
   function connect() {
+    refreshIce();
     if (wired) { return; }
     var n = net();
     if (!n) {
@@ -651,7 +683,7 @@
   }
 
   function open(id, info, initiator) {
-    var pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    var pc = new RTCPeerConnection({ iceServers: ICE });
     var gain = ctx.createGain();
     var panner = ctx.createPanner();
     panner.panningModel = 'HRTF';
