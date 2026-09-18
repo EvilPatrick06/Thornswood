@@ -8,6 +8,10 @@ $Root = 'C:\Thornswood-Voice-Dev'
 $Port = 7789
 $TaskName = 'Thornswood Dev Voice'
 $Site = 'https://thornswood.net'
+# Every parameter the here-string reads. Leave one out and it expands to
+# nothing, which is the whole failure this script exists to catch, so a
+# missing one here would hide the very thing being looked for.
+$Bind = '0.0.0.0'
 
 $m = [regex]::Match($src, '(?s)\$remote = @"\r?\n(.*?)\r?\n"@')
 if (-not $m.Success) { throw 'could not find the install here-string' }
@@ -25,6 +29,13 @@ foreach ($line in ($expanded -split "`n")) {
     # A quoted empty string where a path belongs.
     if ($l -match "Join-Path\s+''" -or $l -match "-LocalPort\s*$" -or $l -match "TaskName\s+''") {
         Write-Output ("  EMPTY VALUE: " + $l); $problems++
+    }
+    # set NAME=&& or set NAME=" : an environment variable handed nothing.
+    # The service then falls back to its own default and the setting silently
+    # does not apply, which is worse than failing, because everything looks
+    # like it worked.
+    foreach ($m in [regex]::Matches($l, 'set\s+([A-Z_]+)=(?=&&|")')) {
+        Write-Output ("  EMPTY ENV VALUE: " + $m.Groups[1].Value + "  in: " + $l); $problems++
     }
 }
 

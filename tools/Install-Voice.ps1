@@ -28,6 +28,14 @@ param(
     [string]$VpsUser  = 'Administrator',
     [string]$Root     = 'C:\Thornswood-Voice',
     [int]$Port        = 7778,
+    # Which addresses the service answers on. Every interface is how this
+    # has always worked and is what an older launcher needs. 127.0.0.1 is
+    # for when Caddy carries /voice/ and the raw port is closing: check
+    # nothing is still connecting directly before using it, because a
+    # launcher that cannot reach voice has the address compiled in and no
+    # change here reaches it.
+    [ValidateSet('0.0.0.0', '127.0.0.1')]
+    [string]$Bind     = '0.0.0.0',
     [string]$TaskName = 'Thornswood Voice',
     [switch]$Restart,
     [switch]$Remove,
@@ -179,7 +187,7 @@ if (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
 # Without it on this line -Port drove the firewall rule, the is-it-free check
 # and the health probe, and nothing else, so -Port 7789 opened 7789, checked
 # 7789 was free, and then started a service that bound 7778 on top of live.
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
 
 <#
   Stop the old service, and mean it.
@@ -231,6 +239,20 @@ foreach (`$p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA Si
               Where-Object { `$_.OwningProcess -eq `$p.ProcessId }
     if (`$onPort) { `$mine += `$p.ProcessId }
 }
+# Going to loopback with somebody still on the raw port cuts them off in
+# the middle of a word, and nothing on this box can reach them to say so.
+if ('$Bind' -eq '127.0.0.1') {
+    `$direct = @(Get-NetTCPConnection -LocalPort $Port -State Established -EA SilentlyContinue |
+                Where-Object { `$_.RemoteAddress -notin '127.0.0.1', '::1' })
+    if (`$direct.Count) {
+        'REFUSING to bind to loopback: ' + `$direct.Count + ' connection(s) are still on the raw port:'
+        foreach (`$d in `$direct) { '   ' + `$d.RemoteAddress + ' since ' + `$d.CreationTime }
+        'Those are launchers that have not moved to the proxy. Leave the port open.'
+        exit 9
+    }
+    'nothing is on the raw port directly, so loopback is safe'
+}
+
 `$killed = 0
 foreach (`$id in (`$mine | Select-Object -Unique)) {
     # The parent shell first, so it cannot outlive the node it started.
