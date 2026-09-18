@@ -1,0 +1,166 @@
+<#
+.SYNOPSIS
+  Signs a built binary, or says plainly that it is not signing and carries on.
+
+.DESCRIPTION
+  One implementation, called from Build-Launcher.ps1 and Package-Thornswood.ps1,
+  so the launcher, the setup stub and the installer are all signed the same way
+  or all left alone together.
+
+  It does nothing unless tools\signing.json exists. That file is gitignored and
+  lives only on a machine that holds a certificate, so Djinn's machine and every
+  pull request build keep working exactly as they do today. A build that cannot
+  sign is not a failed build.
+
+  Why signing matters here is written out in tools\setup\Bootstrap.cs: SmartScreen
+  builds reputation per file hash, and this project ships a new hash every
+  release, so an unsigned installer starts from zero reputation every single
+  time and warns forever. Signing moves the reputation to the certificate.
+
+  Two shapes of signing.json are understood.
+
+    Azure Trusted Signing, which is what the entry recommends:
+      {
+        "method": "trustedsigning",
+        "dlib": "C:\\tools\\Azure.CodeSigning.Dlib.dll",
+        "metadata": "C:\\tools\\metadata.json",
+        "timestampUrl": "http://timestamp.acs.microsoft.com"
+      }
+
+    A certificate already in the machine's store:
+      {
+        "method": "thumbprint",
+        "thumbprint": "0123456789ABCDEF0123456789ABCDEF01234567",
+        "timestampUrl": "http://timestamp.digicert.com"
+      }
+
+  Never put a password or a key in that file. Trusted Signing does not need one,
+  and a thumbprint names a certificate rather than carrying it.
+
+.PARAMETER Path
+  One or more files to sign. Missing files are reported and skipped rather than
+  stopping the build.
+
+.PARAMETER Required
+  Fail instead of skipping when there is no signing.json. For a real release.
+
+.EXAMPLE
+  .\Sign-Artifact.ps1 -Path .\Thornswood.exe, .\setup-stub.exe
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$Path,
+    [switch]$Required,
+    [string]$ConfigPath
+)
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+if (-not $ConfigPath) { $ConfigPath = Join-Path $Here 'signing.json' }
+
+function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
+
+# ------------------------------------------------------------------ config --
+if (-not (Test-Path -LiteralPath $ConfigPath)) {
+    if ($Required) {
+        Say '  There is no tools\signing.json, so nothing can be signed.' 'Red'
+        Say '  A release has to be signed. See the header of this script.' 'Red'
+        exit 1
+    }
+    Say '  not signing: no tools\signing.json on this machine' 'DarkGray'
+    exit 0
+}
+
+try {
+    $cfg = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+} catch {
+    Say ("  tools\signing.json is not valid JSON: " + $_.Exception.Message) 'Red'
+    exit 1
+}
+
+# ---------------------------------------------------------------- signtool --
+# Newest first. The Windows SDK installs one per version and they are not
+# interchangeable: older ones cannot drive a Trusted Signing dlib.
+$signtool = $null
+$roots = @(
+    "${env:ProgramFiles(x86)}\Windows Kits\10\bin",
+    "$env:ProgramFiles\Windows Kits\10\bin"
+)
+foreach ($r in $roots) {
+    if (-not (Test-Path -LiteralPath $r)) { continue }
+    $found = Get-ChildItem -LiteralPath $r -Recurse -Filter 'signtool.exe' -EA SilentlyContinue |
+             Where-Object { $_.FullName -match '\\x64\\' } |
+             Sort-Object FullName -Descending |
+             Select-Object -First 1
+    if ($found) { $signtool = $found.FullName; break }
+}
+if (-not $signtool) {
+    $c = Get-Command signtool.exe -EA SilentlyContinue
+    if ($c) { $signtool = $c.Source }
+}
+if (-not $signtool) {
+    Say '  signtool.exe was not found. It comes with the Windows SDK.' 'Red'
+    Say '  https://developer.microsoft.com/windows/downloads/windows-sdk/' 'Yellow'
+    exit 1
+}
+Say ("  signtool: " + $signtool) 'DarkGray'
+
+$ts = if ($cfg.timestampUrl) { [string]$cfg.timestampUrl } else { 'http://timestamp.digicert.com' }
+$method = if ($cfg.method) { [string]$cfg.method } else { 'thumbprint' }
+
+# ------------------------------------------------------------------- sign ---
+$failed = 0
+foreach ($p in $Path) {
+    if (-not (Test-Path -LiteralPath $p)) {
+        Say ("  not there, skipped: " + $p) 'Yellow'
+        continue
+    }
+    $full = (Resolve-Path -LiteralPath $p).Path
+    $name = Split-Path $full -Leaf
+
+    switch ($method) {
+        'trustedsigning' {
+            foreach ($k in 'dlib', 'metadata') {
+                if (-not $cfg.$k) { Say ("  signing.json is missing " + $k) 'Red'; exit 1 }
+                if (-not (Test-Path -LiteralPath ([string]$cfg.$k))) {
+                    Say ("  signing.json points " + $k + " at a file that is not there") 'Red'; exit 1
+                }
+            }
+            $args = @('sign', '/v', '/debug', '/fd', 'SHA256',
+                      '/tr', $ts, '/td', 'SHA256',
+                      '/dlib', [string]$cfg.dlib, '/dmdf', [string]$cfg.metadata, $full)
+        }
+        'thumbprint' {
+            if (-not $cfg.thumbprint) { Say '  signing.json is missing thumbprint' 'Red'; exit 1 }
+            $args = @('sign', '/v', '/fd', 'SHA256',
+                      '/tr', $ts, '/td', 'SHA256',
+                      '/sha1', [string]$cfg.thumbprint, $full)
+        }
+        default {
+            Say ("  signing.json has an unknown method: " + $method) 'Red'
+            exit 1
+        }
+    }
+
+    & $signtool @args 2>&1 | ForEach-Object { Say ("    " + $_) 'DarkGray' }
+    if ($LASTEXITCODE -ne 0) {
+        Say ("  signtool exited with " + $LASTEXITCODE + " on " + $name) 'Red'
+        $failed++
+        continue
+    }
+
+    # Signing that reports success and leaves an unsigned file is the failure
+    # worth catching, so the result is read back rather than trusted.
+    $sig = Get-AuthenticodeSignature -LiteralPath $full
+    if ($sig.Status -ne 'Valid') {
+        Say ("  " + $name + " still reports " + $sig.Status + " after signing") 'Red'
+        $failed++
+        continue
+    }
+    Say ("  signed  " + $name.PadRight(22) + " " + $sig.SignerCertificate.Subject) 'Green'
+}
+
+if ($failed -gt 0) { exit 1 }
+exit 0

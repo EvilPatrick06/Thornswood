@@ -329,6 +329,24 @@ if (Test-Path $stubSrc) {
     }
 }
 
+# ------------------------------------------------------------ signing
+#
+# Both binaries or neither. A signed launcher next to an unsigned installer
+# still warns on the thing a stranger runs first, which is the installer.
+#
+# This does nothing at all unless tools\signing.json exists, so Djinn's machine
+# and the pull request build carry on exactly as before. See the header of
+# Sign-Artifact.ps1 for what that file holds, and Bootstrap.cs:75-95 for why
+# any of this matters.
+$signer = Join-Path $Here 'Sign-Artifact.ps1'
+if (Test-Path -LiteralPath $signer) {
+    Head 'Signing'
+    $toSign = @($exe)
+    if (Test-Path -LiteralPath $stub) { $toSign += $stub }
+    & $signer -Path $toSign
+    if ($LASTEXITCODE -ne 0) { Die 'Signing failed. Nothing was published.' }
+}
+
 # ------------------------------------------------------------ shortcut
 Head 'Shortcut'
 
