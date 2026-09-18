@@ -60,7 +60,7 @@ foreach (`$d in (Get-ChildItem 'C:\' -Directory -EA SilentlyContinue)) {
 if (`$roots.Count -eq 0) { 'NOROOT'; exit }
 foreach (`$r in `$roots) {
   'ROOT|' + `$r
-  foreach (`$n in @('world', 'data\characters.json')) {
+  foreach (`$n in @('world', 'private\characters.json')) {
     `$p = Join-Path `$r `$n
     if (-not (Test-Path `$p)) { 'NONE|' + `$n; continue }
     `$b = 0; `$c = 0
@@ -119,7 +119,7 @@ Head 'Moving the old storage aside'
 $moved = Remote @"
 `$ErrorActionPreference = 'Continue'
 `$r = '$root'
-foreach (`$n in @('world', 'data\characters.json')) {
+foreach (`$n in @('world', 'private\characters.json')) {
   `$p = Join-Path `$r `$n
   if (-not (Test-Path `$p)) { continue }
   `$leaf = Split-Path -Leaf `$p
@@ -147,7 +147,7 @@ Start-Sleep -Seconds 12
 `$r = '$root'
 `$lg = Join-Path `$r 'server.log'
 if (Test-Path `$lg) { Get-Content `$lg -Tail 6 | ForEach-Object { 'log  ' + `$_ } }
-`$cf = Join-Path `$r 'data\characters.json'
+`$cf = Join-Path `$r 'private\characters.json'
 if (Test-Path `$cf) {
   try { `$j = Get-Content `$cf -Raw | ConvertFrom-Json; 'now  ' + @(`$j).Count + ' character record(s)' } catch { 'now  characters.json is there but unreadable yet' }
 } else { 'now  no characters.json yet, which is what empty looks like' }

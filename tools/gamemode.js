@@ -2058,13 +2058,15 @@ log('gamemode loaded:',
 
   var EVERY_MS = 4000;
 
-  var dataDir = 'data';
+var dataDir = 'data';
+  var privDir = 'private';
   try {
     var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
     if (cfg && cfg.dataDir) dataDir = String(cfg.dataDir);
+    if (cfg && cfg.privDir) privDir = String(cfg.privDir);
   } catch (e) { }
 
-  var FILE = path.join(dataDir, 'characters.json');
+  var FILE = path.join(privDir, 'characters.json');
 
   var book = {};
   try {
@@ -2299,13 +2301,15 @@ log('gamemode loaded:',
   if (!fs || !path) return;
 
   var dataDir = 'data';
+  var privDir = 'private';
   try {
     var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
     if (cfg && cfg.dataDir) dataDir = String(cfg.dataDir);
+    if (cfg && cfg.privDir) privDir = String(cfg.privDir);
   } catch (e) { }
 
-  var FILE = path.join(dataDir, 'allowed.json');
-  var LOG  = path.join(dataDir, 'door.log');
+  var FILE = path.join(privDir, 'allowed.json');
+  var LOG  = path.join(privDir, 'door.log');
 
   var list = null;       // null means no file, door off
   var readAt = 0;
@@ -2403,7 +2407,7 @@ log('gamemode loaded:',
   function refresh() {
     var conf;
     try {
-      conf = JSON.parse(fs.readFileSync(path.join(dataDir, 'door.json'), 'utf8')
+      conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8')
                           .replace(/^\uFEFF/, ''));
     } catch (e) { return; }
     if (!conf || !conf.site || !conf.key) return;

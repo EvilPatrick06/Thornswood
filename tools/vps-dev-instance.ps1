@@ -33,7 +33,10 @@ Say ("  server files copied (robocopy code {0})" -f $LASTEXITCODE)
 # Data: the door, the allowed list, the manifest and the scripts and api
 # folders come across. characters.json does not: the dev world is its own.
 $dd = Join-Path $dev 'data'
+$pd = Join-Path $dev 'private'
 if (-not (Test-Path $dd)) { New-Item -ItemType Directory -Path $dd | Out-Null }
+if (-not (Test-Path $pd)) { New-Item -ItemType Directory -Path $pd | Out-Null }
+
 foreach ($n in 'door.json', 'allowed.json', 'manifest.json') {
     $src = Join-Path $live "data\$n"
     if ((Test-Path $src) -and -not (Test-Path (Join-Path $dd $n))) { Copy-Item $src (Join-Path $dd $n) }
@@ -42,8 +45,9 @@ foreach ($d in 'scripts', 'api') {
     $src = Join-Path $live "data\$d"
     if ((Test-Path $src) -and -not (Test-Path (Join-Path $dd $d))) { Copy-Item $src (Join-Path $dd $d) -Recurse }
 }
-if (-not (Test-Path (Join-Path $dd 'characters.json'))) { Set-Content (Join-Path $dd 'characters.json') '[]' -Encoding ASCII }
-Say '  data folder ready (fresh characters.json)'
+
+if (-not (Test-Path (Join-Path $pd 'characters.json'))) { Set-Content (Join-Path $pd 'characters.json') '[]' -Encoding ASCII }
+Say '  data and private folders ready (fresh characters.json)'
 
 # server-settings.json: the dev port, the dev name, plugin paths under the dev folder.
 $settingsFile = Join-Path $dev 'server-settings.json'

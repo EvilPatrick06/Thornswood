@@ -51,7 +51,7 @@ Write-Host ("node {0}  at {1}" -f (& node --version), $node.Source) -ForegroundC
   world is the obvious one: it holds every character on the server.
 
   data is the one that was being quietly thrown away. The gamemode writes
-  data\characters.json while people are online, and that file is where the
+  private\characters.json while people are online, and that file is where the
   launcher gets the race, the sex and the name to put on a character card. It
   is written by playing, not by building, so nothing in the payload can put it
   back. Every publish was wiping it and taking the details off everybody's

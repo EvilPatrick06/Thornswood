@@ -256,7 +256,7 @@ if ($ServerSaves) {
   $lines = Remote @"
 `$ErrorActionPreference = 'Continue'
 foreach (`$d in (Get-ChildItem 'C:\' -Directory -EA SilentlyContinue)) {
-  foreach (`$n in @('world', 'data\characters.json', 'data\online.json')) {
+  foreach (`$n in @('world', 'private\characters.json', 'data\online.json')) {
     `$p = Join-Path `$d.FullName `$n
     if (Test-Path `$p) {
       `$b = 0
