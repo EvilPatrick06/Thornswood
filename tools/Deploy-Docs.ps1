@@ -263,16 +263,40 @@ if (-not `$node) { 'NODE NOT FOUND ON THIS MACHINE'; return }
 # 'Thornswood-Docs' on the command line, and the command line is the only way
 # to tell this node from any other one later.
 `$a = New-ScheduledTaskAction -Execute `$node -Argument '$rootWin\server.js' -WorkingDirectory '$rootWin'
+# Built once and used by both branches below.
+#
+# No execution time limit, because a task that is meant to run until the box
+# goes down is stopped after three days by the default and nobody would
+# connect the site vanishing to a deploy seventy two hours earlier.
+#
+# Ten restarts rather than three. Three was enough for one bored scanner to
+# take the site off the internet for the rest of the day: a request for /%
+# used to end the process, and once the three were spent nothing brought it
+# back, which also took the launcher's login with it. The handler answers 400
+# now so this should never be reached, but a service that stops trying to
+# come back is not a thing to leave lying around.
+`$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ``
+      -DontStopIfGoingOnBatteries -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 1) ``
+      -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable
 if (-not (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue)) {
   `$t = New-ScheduledTaskTrigger -AtStartup
-  `$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ``
-        -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
   Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$t -Settings `$s ``
     -RunLevel Highest -User 'SYSTEM' | Out-Null
   'scheduled task created'
 } else {
-  Set-ScheduledTask -TaskName '$Task' -Action `$a | Out-Null
+  # -Settings as well as -Action. Without it an existing task keeps whatever
+  # it was first registered with, which is how the three restart cap survived
+  # every deploy that was meant to change it.
+  Set-ScheduledTask -TaskName '$Task' -Action `$a -Settings `$s | Out-Null
   'scheduled task updated'
+}
+
+# Read back rather than assumed. Set-ScheduledTask is quiet about settings
+# it did not apply.
+`$chk = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Settings
+if (`$chk) {
+  'task settings: restart count ' + `$chk.RestartCount +
+  ', execution time limit ' + (`$(if (`$chk.ExecutionTimeLimit -eq 'PT0S') { 'none' } else { `$chk.ExecutionTimeLimit }))
 }
 
 Start-ScheduledTask -TaskName '$Task'
