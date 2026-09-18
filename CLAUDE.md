@@ -76,12 +76,21 @@ before code; a Claude does not settle it for them.
   a main release that is not on main or is behind origin. A main Ship
   commits and pushes the source when the release is out, so the other
   machine can `git pull` exactly what shipped.
-- Work happens on a branch: `git checkout -b djinn/what-it-is` (or
-  `patrick/...`). Small commits, plain messages saying what changed. Push the
-  branch and open a pull request (`gh pr create --fill`). The other person
-  reads it; it is merged into main from GitHub, never pushed over main.
+- Decided by Patrick on 18 Sep: his own work goes straight to main. Small
+  commits, plain messages saying what changed, pushed to main. No branch and
+  no pull request for it. He owns the repo and ships it, and main requires an
+  approving review that he cannot give himself, so every one of his own pull
+  requests sat blocked until he overrode it with `--admin`. This makes the
+  real practice the written one.
+- Djinn's work still goes on a branch: `git checkout -b djinn/what-it-is`.
+  Small commits, plain messages. Push the branch and open a pull request
+  (`gh pr create --fill`). Patrick reads it; it is merged into main from
+  GitHub, never pushed over main.
   The branches opened before 17 Sep use a `gavin/` prefix; they are the same
   person and were left alone rather than renamed under open pull requests.
+- One fix per commit either way. Going straight to main is not permission to
+  put eight unrelated things in one push, and the reason is the same: a commit
+  that changes eight things cannot be reverted when one of them is wrong.
 - `git pull` before starting anything. If a pull conflicts, resolve it on
   your branch (`git fetch`, `git rebase origin/main`), never on main. If a
   push is rejected, pull, do not force.
