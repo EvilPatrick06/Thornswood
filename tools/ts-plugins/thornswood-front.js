@@ -1440,6 +1440,12 @@
   let phase = 0;
   let at = 0;
   let sentName = '';
+  // What the browser was last told its join token is, and when that was last
+  // checked. Voice.cs refreshes voice-token.txt on its own clock; this is what
+  // notices and passes the new one along, on the same 5 minute rhythm as the
+  // name check below, well inside the token's own half-life.
+  let lastToken = '';
+  let tokenAt = 0;
 
   sp.on('update', guard('tick', () => {
     const now = Date.now();
@@ -1511,9 +1517,10 @@
     if (phase === 1 && now - at > 1200) {
       phase = 2; at = now;
       sentName = myName() || 'Traveller';
+      lastToken = joinToken();
       T.js('window.THORNSWOOD=' + JSON.stringify({
         host: HOST, port: VOICE_PORT, profileId: PROFILE, name: sentName,
-        token: joinToken(), base: VOICE_URL
+        token: lastToken, base: VOICE_URL
       }) + ';');
       OVERLAYS.forEach(inject);
       // The token itself is never logged. It is what somebody would need to
@@ -1635,6 +1642,32 @@
         T.js('try{window.thornswoodNet&&window.thornswoodNet.setName(' +
              JSON.stringify(n) + ');}catch(e){}');
         log('name is now', n);
+      }
+    }
+
+    /*
+      The join token goes stale, and nothing else in this file notices.
+
+      It is read once, at injection, and this browser page is not reloaded for
+      the length of a normal session. Voice.cs on this machine rewrites
+      voice-token.txt at half the token's life, so a five minute check here is
+      well inside that and never the thing standing between a fresh token and
+      an expired one.
+
+      setToken only updates the value the page holds; it does not reconnect.
+      The socket already open was let in and is never rechecked, so this only
+      matters the next time it has to open on its own, which a long session,
+      a network blip or the voice service restarting all eventually ask for.
+    */
+    if (now - tokenAt > 300000) {
+      tokenAt = now;
+      const tok = joinToken();
+      if (tok && tok !== lastToken) {
+        lastToken = tok;
+        T.js('try{window.thornswoodNet&&window.thornswoodNet.setToken(' +
+             JSON.stringify(tok) + ');}catch(e){}');
+        // Never the token itself, same as at injection.
+        log('join token refreshed in the browser');
       }
     }
   }));

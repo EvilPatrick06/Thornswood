@@ -292,6 +292,25 @@
       } else {
         connect();
       }
+    },
+
+    /**
+     * A freshly minted join token, pushed in from thornswood-front.js.
+     *
+     * TOKEN is read once, when this page is first injected, and this browser
+     * page is not reloaded for the length of a normal session. Voice.cs
+     * refreshes voice-token.txt on its own clock, on this machine, but nothing
+     * makes this page look at the file again on its own. Without this, a
+     * socket that drops and reconnects late in a long session, from a network
+     * blip or the voice service restarting, would present whatever token was
+     * good when the world first loaded, which by then can be expired.
+     *
+     * Deliberately does not reconnect. The connection already up was let in
+     * and is never rechecked, so there is nothing here to disrupt; this only
+     * matters the next time the socket has to open on its own.
+     */
+    setToken: function (t) {
+      TOKEN = String(t || '');
     }
   };
 
