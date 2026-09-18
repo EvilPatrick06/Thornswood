@@ -1,4 +1,4 @@
-<#
+﻿<#
   Deploy-DevGamemode.ps1
 
   Sends tools\gamemode.js to the dev server on the VPS and restarts only that
@@ -14,7 +14,8 @@
   too. This script sends gamemode.js alone and stops only the process that is
   listening on the dev port.
 
-    .\Deploy-DevGamemode.ps1        syntax check, copy, restart, tail the log
+    .\Deploy-DevGamemode.ps1        syntax check, copy, point at 7789,
+                                   restart, tail the log
 
   A gamemode change that also changes the load order or the CHARGEN records
   needs Deploy-Gamemode.ps1 -Vortex first. Code-only changes do not.
@@ -25,6 +26,11 @@ param(
   [string]$User = 'Administrator',
   [string]$Root = 'C:/Thornswood-Server-Dev',
   [string]$Task = 'Thornswood Dev Server',
+  # The dev voice service. gamemode.js reads this out of the dev server's
+  # own server-settings.json; without it the dev server talks to the live
+  # voice service on 7778, pushes its positions over the live ones and
+  # drains the live command and choice queues.
+  [int]$VoicePort = 7789,
   [string]$Gamemode
 )
 
@@ -82,6 +88,29 @@ Write-Host 'Copying...'
 & scp @ssh $Gamemode "$User@${Vps}:$Root/gamemode.js"
 if ($LASTEXITCODE -ne 0) { throw 'scp failed for gamemode.js' }
 Write-Host '  gamemode.js'
+
+Write-Host ''
+Write-Host 'Pointing the dev server at the dev voice service...'
+# Deliberately not sent from here. server-settings.json on the dev box
+# carries the dev port and name and must not be overwritten from a local
+# build, which is the whole reason this script exists rather than
+# Deploy-Server.ps1. One key is set in place instead, and the old file is
+# kept beside it.
+Remote @"
+`$p = '$rootWin\server-settings.json'
+if (-not (Test-Path `$p)) { 'NO server-settings.json AT ' + `$p; exit 0 }
+`$s = Get-Content `$p -Raw | ConvertFrom-Json
+`$have = 0
+if (`$s.PSObject.Properties.Name -contains 'thornswoodVoicePort') { `$have = [int]`$s.thornswoodVoicePort }
+if (`$have -eq $VoicePort) {
+  'thornswoodVoicePort is already $VoicePort'
+} else {
+  Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
+  `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
+  `$s | ConvertTo-Json -Depth 30 | Set-Content `$p -Encoding UTF8
+  'thornswoodVoicePort set to $VoicePort, was ' + `$have + '. Old file kept as server-settings.json.before-<stamp>'
+}
+"@ | ForEach-Object { "  `$_" }
 
 Write-Host ''
 Write-Host 'Starting...'

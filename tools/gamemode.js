@@ -91,6 +91,44 @@ function log() {
   }
 }
 
+/*
+  Which voice service this server talks to.
+
+  It used to be the number 7778 written out in five places, which was fine
+  while there was one server and became wrong the day there were two: the dev
+  server shipped the same file, so it pushed its positions over the live ones
+  and its GET /commands and GET /choices drained the live queues. A live
+  person's slash command could be collected and run by the dev server, and
+  their character creation choice could be eaten before the live server asked
+  for it.
+
+  It stays out of the client's reach. The comment on the voice feed below says
+  nobody can move their own voice by editing a file and that is still true:
+  this is server-settings.json in the server's own folder on the VPS, which
+  only whoever runs the server can write, not anything a person has on their
+  machine.
+
+  Read once and kept. The file does not change under a running server, and a
+  readFileSync five times a second for a number that cannot move is a waste.
+*/
+let voicePortCached = 0;
+function voicePort() {
+  if (voicePortCached) { return voicePortCached; }
+  let n = 0;
+  try {
+    n = Number(JSON.parse(require('fs').readFileSync('server-settings.json', 'utf8')).thornswoodVoicePort) || 0;
+  } catch (e) {
+    n = 0;
+  }
+  // Anything absent or nonsensical falls back to the live port, which is what
+  // every deployment did before this existed.
+  voicePortCached = (n > 0 && n < 65536) ? n : 7778;
+  if (voicePortCached !== 7778) {
+    log('voice service port is ' + voicePortCached + ', from server-settings.json');
+  }
+  return voicePortCached;
+}
+
 /** Run fn, swallow and report anything it throws. Handlers must never escape. */
 function guard(name, fn) {
   return function () {
@@ -145,7 +183,7 @@ function say(actorId, text) {
   try { http = require('http'); } catch (e) { return; }
   var body = JSON.stringify({ profileId: pid, text: text });
   var req = http.request({
-    host: '127.0.0.1', port: 7778, path: '/say', method: 'POST', timeout: 2000,
+    host: '127.0.0.1', port: voicePort(), path: '/say', method: 'POST', timeout: 2000,
     headers: { 'content-type': 'application/json',
                'content-length': Buffer.byteLength(body) }
   }, function () { });
@@ -654,7 +692,7 @@ function refreshChoices() {
   let http;
   try { http = require('http'); } catch (e) { return; }
   const req = http.request({
-    host: '127.0.0.1', port: 7778, path: '/choices', method: 'GET', timeout: 2000
+    host: '127.0.0.1', port: voicePort(), path: '/choices', method: 'GET', timeout: 2000
   }, (res) => {
     let body = '';
     res.on('data', (d) => { body += d; });
@@ -691,7 +729,7 @@ function claimChoice(profileId) {
   try { http = require('http'); } catch (e) { return; }
   const payload = JSON.stringify({ profileId: profileId });
   const req = http.request({
-    host: '127.0.0.1', port: 7778, path: '/claimed', method: 'POST', timeout: 2000,
+    host: '127.0.0.1', port: voicePort(), path: '/claimed', method: 'POST', timeout: 2000,
     headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) }
   }, function () { });
   req.on('error', function () { });
@@ -1875,7 +1913,7 @@ log('gamemode loaded:',
 // slow or not installed must never be able to take the game server with it, so
 // every call is wrapped and failures are counted rather than thrown.
 (function () {
-  var VOICE_PORT = 7778;
+  var VOICE_PORT = voicePort();
   var EVERY_MS = 200;
   var http = null;
 
@@ -2811,7 +2849,7 @@ var dataDir = 'data';
   */
   var g = globalThis;
 
-  var VOICE_PORT = 7778;
+  var VOICE_PORT = voicePort();
 
   function post(path, payload) {
     var http;
