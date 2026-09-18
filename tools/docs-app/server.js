@@ -736,7 +736,65 @@ function notAllowedPage(me, st) {
 }
 
 // ------------------------------------------------------------------ serve --
-http.createServer(async (req, res) => {
+/*
+  One malformed request used to take the whole site down, and the game's login
+  with it.
+
+  The handler is async, so anything it throws becomes a rejected promise rather
+  than an exception, and an unhandled rejection ends the process. A request for
+  /% is enough on its own: decodeURIComponent throws URIError on a percent sign
+  that is not followed by two hex digits, and that is the third line of the
+  handler, before any route has been looked at. Nobody has to be attacking
+  anything. A scanner walking the address space does it without meaning to.
+
+  Deploy-Docs.ps1 restarts the process three times an hour and then gives up,
+  so a few seconds of a bored scanner took the site off the internet until
+  somebody noticed, and with it /api/play/allowed, which is what the launcher
+  asks before it will let anybody connect. The site being down meant nobody
+  could start the game.
+
+  So the handler is a named function now and nothing calls it without a catch.
+  A bad URL is the request's fault and gets 400; anything else is ours and gets
+  500, logged with a stack so it can be fixed rather than quietly swallowed.
+*/
+function failed(req, res, e) {
+  const bad = e instanceof URIError;
+  console.error('[thornswood-docs] ' + (bad ? 'malformed request ' : 'handler threw on ') +
+                JSON.stringify(String(req.url || '').slice(0, 200)) + ': ' +
+                (e && e.stack ? e.stack : e));
+  try {
+    // Half an answer is already on the wire and cannot be taken back. Cutting
+    // the connection is the only honest end to it.
+    if (res.headersSent) { res.destroy(); return; }
+    res.writeHead(bad ? 400 : 500, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end(bad ? 'bad request' : 'server error');
+  } catch (e2) {
+    // The socket went away while we were answering. Nothing left to tell.
+  }
+}
+
+/*
+  The last net, under everything rather than around one handler.
+
+  A throw inside a setTimeout, or a promise nobody waited for, never reaches
+  the catch above and would end the process exactly the way a bad URL used to.
+  Logged and carried on with instead. A site answering most requests is worth
+  more than a site that is gone, and the log line is the thing that says
+  something here needs fixing.
+
+  How the process is hosted and the three restarts an hour are entry 105; this
+  is only about not needing them.
+*/
+process.on('unhandledRejection', (e) => {
+  console.error('[thornswood-docs] unhandled rejection, carrying on: ' +
+                (e && e.stack ? e.stack : e));
+});
+process.on('uncaughtException', (e) => {
+  console.error('[thornswood-docs] uncaught exception, carrying on: ' +
+                (e && e.stack ? e.stack : e));
+});
+
+async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   const p = decodeURIComponent(url.pathname);
   const route = p.replace(/\/+$/, '').toLowerCase() || '/';
@@ -1472,6 +1530,21 @@ http.createServer(async (req, res) => {
   }
 
   send(res, 404, 'not here', 'text/plain');
+}
+
+http.createServer((req, res) => {
+  // Both halves matter. A throw before the first await arrives here as an
+  // exception, and one after it arrives as a rejected promise.
+  let done;
+  try {
+    done = handle(req, res);
+  } catch (e) {
+    failed(req, res, e);
+    return;
+  }
+  if (done && typeof done.catch === 'function') {
+    done.catch((e) => failed(req, res, e));
+  }
 }).listen(PORT, BIND, () => {
   console.log('[thornswood-docs] listening on ' + BIND + ':' + PORT);
   console.log('[thornswood-docs] documents in ' + DATA);
