@@ -80,6 +80,30 @@ if ($Restart) {
     exit 0
 }
 
+<#
+  What is already running, so a flag left off does not quietly undo it.
+
+  -Bind and -Auth both changed real behaviour today and both default to
+  0.0.0.0 and log whatever is already live. That is right for a first
+  install. Once the service is on loopback and enforcing, though, a later
+  command that leaves either one off, which is the easy thing to do once this
+  is routine, would silently reopen the port or drop back out of enforcing
+  it. Read what is actually running first, and keep it unless the flag was
+  actually passed.
+#>
+$bindExplicit = $PSBoundParameters.ContainsKey('Bind')
+$authExplicit = $PSBoundParameters.ContainsKey('Auth')
+if (-not $bindExplicit -or -not $authExplicit) {
+    $probe = @"
+try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; 'bind=' + `$h.bind + ';auth=' + `$h.auth } catch { 'none' }
+"@
+    $current = & (Join-Path $Here 'Remote.ps1') $probe -VpsHost $VpsHost -VpsUser $VpsUser 2>$null | Select-Object -Last 1
+    if ("$current" -match 'bind=([\d.]+);auth=(on|log|off)') {
+        if (-not $bindExplicit) { Say "  keeping the current bind, $($Matches[1]), since -Bind was not passed" 'DarkGray'; $Bind = $Matches[1] }
+        if (-not $authExplicit) { Say "  keeping the current auth, $($Matches[2]), since -Auth was not passed" 'DarkGray'; $Auth = $Matches[2] }
+    }
+}
+
 # ---------------------------------------------------------------- files -----
 $src = Join-Path $Here 'voice'
 foreach ($f in 'voice-server.js', 'public\index.html', 'public\voice.js') {
