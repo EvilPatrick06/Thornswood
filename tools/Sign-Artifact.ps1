@@ -19,9 +19,17 @@
 
   Two shapes of signing.json are understood.
 
-    Azure Trusted Signing, which is what the entry recommends:
+    Azure Artifact Signing, which is what entry 2 recommends. The service was
+    called Trusted Signing and before that Azure Code Signing, so both older
+    method names are accepted here and mean the same thing.
+
+    Its certificates are valid for THREE DAYS. The timestamp is what keeps a
+    signature valid after that, so it is not optional and the right authority
+    is the default. Its metadata.json needs Endpoint, CodeSigningAccountName
+    and CertificateProfileName, and the Endpoint must name the same region the
+    account was created in, or signing fails with a 403 that does not say why.
       {
-        "method": "trustedsigning",
+        "method": "artifactsigning",
         "dlib": "C:\\tools\\Azure.CodeSigning.Dlib.dll",
         "metadata": "C:\\tools\\metadata.json",
         "timestampUrl": "http://timestamp.acs.microsoft.com"
@@ -107,8 +115,15 @@ if (-not $signtool) {
 }
 Say ("  signtool: " + $signtool) 'DarkGray'
 
-$ts = if ($cfg.timestampUrl) { [string]$cfg.timestampUrl } else { 'http://timestamp.digicert.com' }
 $method = if ($cfg.method) { [string]$cfg.method } else { 'thumbprint' }
+if ($method -eq 'trustedsigning' -or $method -eq 'codesigning') { $method = 'artifactsigning' }
+
+# Artifact Signing certificates last three days. Without a timestamp every
+# release would stop verifying by the weekend, so its own authority is the
+# default rather than a general purpose one.
+$ts = if ($cfg.timestampUrl) { [string]$cfg.timestampUrl }
+      elseif ($method -eq 'artifactsigning') { 'http://timestamp.acs.microsoft.com' }
+      else { 'http://timestamp.digicert.com' }
 
 # ------------------------------------------------------------------- sign ---
 $failed = 0
@@ -121,7 +136,7 @@ foreach ($p in $Path) {
     $name = Split-Path $full -Leaf
 
     switch ($method) {
-        'trustedsigning' {
+        'artifactsigning' {
             foreach ($k in 'dlib', 'metadata') {
                 if (-not $cfg.$k) { Say ("  signing.json is missing " + $k) 'Red'; exit 1 }
                 if (-not (Test-Path -LiteralPath ([string]$cfg.$k))) {
