@@ -812,6 +812,69 @@ namespace Thornswood
             log(msg);
         }
 
+        /// <summary>
+        /// Who the downloaded launcher has to be signed by.
+        ///
+        /// Empty means the check is skipped, and that is deliberate. Every
+        /// release before signing begins is unsigned, so a launcher that
+        /// refused them would strand everybody on whatever they already have.
+        ///
+        /// Fill this in with a distinctive part of the certificate's Subject
+        /// line, in the same release that first ships a signed exe, and never
+        /// before. Match on a fragment rather than the whole Subject, because
+        /// certificate authorities add and reorder fields between renewals and
+        /// an exact-match check would refuse a perfectly good update the day
+        /// the certificate is renewed.
+        ///
+        /// This is a third layer, not the only one. The host allow list at
+        /// AllowedHosts decides where a byte may come from, the SHA-256 in
+        /// version.json decides the bytes are the ones published, and this
+        /// decides who built them. Removing either of the other two because
+        /// this exists would be a straight loss.
+        /// </summary>
+        public const string ExpectedSigner = "";
+
+        /// <summary>
+        /// The Subject of whoever signed a file, or an empty string when it is
+        /// not signed. CreateFromSignedFile throws on an unsigned file rather
+        /// than returning null, so the throw is what "unsigned" looks like.
+        /// </summary>
+        static string SignerOf(string path)
+        {
+            try
+            {
+                var c = System.Security.Cryptography.X509Certificates.X509Certificate
+                            .CreateFromSignedFile(path);
+                if (c == null) return "";
+                return c.Subject;
+            }
+            catch { return ""; }
+        }
+
+        /// <summary>
+        /// Refuses a launcher that is not signed by us. Says which of the two
+        /// things went wrong, because "it would not update" with no reason is
+        /// the report nobody can act on.
+        /// </summary>
+        static void CheckSigner(string path, Action<string> log)
+        {
+            if (String.IsNullOrEmpty(ExpectedSigner)) return;
+            string who = SignerOf(path);
+            if (who.Length == 0)
+            {
+                throw new Exception(
+                    "The launcher that was downloaded is not signed. " +
+                    "Nothing has been replaced and the one you are running is untouched.");
+            }
+            if (who.IndexOf(ExpectedSigner, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                throw new Exception(
+                    "The launcher that was downloaded was signed by somebody else. " +
+                    "Nothing has been replaced. Tell Patrick before running anything.");
+            }
+            log("Signed by the expected publisher.");
+        }
+
         /// <summary>Replaces the running exe and restarts, via a short detached script.</summary>
         public static void SelfUpdate(Config cfg, VersionDoc v, Action<string> log)
         {
@@ -819,6 +882,11 @@ namespace Thornswood
             string tmp = Download(cfg, v.launcherUrl, v.launcherSha256, log);
             string exe = System.Reflection.Assembly.GetExecutingAssembly().Location;
             string neu = exe + ".new";
+            // Before the copy, not after. Once a file is sitting at exe.new the
+            // swap script will pick it up on the next start whatever happens
+            // here, so a check that ran later would be checking a decision
+            // already made.
+            CheckSigner(tmp, log);
             File.Copy(tmp, neu, true);
             try { File.Delete(tmp); } catch { }
 
