@@ -15,9 +15,17 @@
                                 pages
     the bot folder              its config and its log
     the voice server folder     its config
-    the game server             server-settings.json, gamemode.js and the data
-                                folder next to it, which is where the door list
-                                and the online count live
+    the game server             server-settings.json, gamemode.js, and the
+                                data, world and private folders next to it.
+                                world is the characters: every person who plays
+                                here is a change form in that folder and nowhere
+                                else. private is the door list, who is allowed
+                                in, and the door log.
+
+                                world and private were both missing until 18
+                                September. The two backups that existed were
+                                taken sixteen minutes apart on 15 September and
+                                neither one had a single character in it.
     the web server config       whatever is answering on 443 for thornswood.net
     the three scheduled tasks   exported as xml, so they can be imported whole
                                 on a new box instead of rebuilt by hand
@@ -136,6 +144,15 @@ foreach (`$root in `$found) {
   Grab (Join-Path `$root 'server-settings.json') (`$tag + '\server-settings.json')
   if (Test-Path (Join-Path `$root 'gamemode.js')) { Grab (Join-Path `$root 'gamemode.js') (`$tag + '\gamemode.js') }
   if (Test-Path (Join-Path `$root 'data')) { Grab (Join-Path `$root 'data') (`$tag + '\data') }
+  # The characters. Every person who plays here is a change form in this
+  # folder and nowhere else, and it was not in the backup: the 15 September
+  # zip is 195 KB with 47 entries and nothing under world at all. It is
+  # 1,423 files and about 2 MB, so there was never a size reason to skip it.
+  if (Test-Path (Join-Path `$root 'world')) { Grab (Join-Path `$root 'world') (`$tag + '\world') }
+  # The door list, who is allowed in, and the door log. Moved here out of
+  # data so that the web server stops serving them, which means anything
+  # that only took data stopped taking them too.
+  if (Test-Path (Join-Path `$root 'private')) { Grab (Join-Path `$root 'private') (`$tag + '\private') }
 }
 
 # Whatever is terminating TLS for the site. Guessing at fixed folders missed
