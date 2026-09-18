@@ -31,6 +31,10 @@ param(
   [string]$User = 'Administrator',
   [string]$Site = 'https://thornswood.net',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
+  # Which server. Empty finds the live one itself. Give it
+  # C:\Thornswood-Server-Dev to point at the dev instance, which is the
+  # only way to refresh the dev door after the site key is rotated.
+  [string]$Root,
   [switch]$Connect,
   [switch]$Enforce,
   [switch]$Watch,
@@ -57,14 +61,18 @@ Write-Host ''
 Write-Host '  THORNSWOOD  -  the door on the game server' -ForegroundColor White
 
 Head 'Finding the server'
-$found = Remote @"
+if ($Root) {
+  $root = $Root.TrimEnd('\', '/')
+} else {
+  $found = Remote @"
 `$ErrorActionPreference = 'Continue'
 foreach (`$d in (Get-ChildItem 'C:\' -Directory -EA SilentlyContinue)) {
   if (Test-Path (Join-Path `$d.FullName 'server-settings.json')) { 'ROOT ' + `$d.FullName }
 }
 "@
-$root = (@($found) | Where-Object { $_ -match '^ROOT ' } | Select-Object -First 1) -replace '^ROOT ', ''
-$root = "$root".Trim()
+  $root = (@($found) | Where-Object { $_ -match '^ROOT ' } | Select-Object -First 1) -replace '^ROOT ', ''
+  $root = "$root".Trim()
+}
 if (-not $root) { Die 'No server-settings.json anywhere on C: of the VPS.' }
 Say "  $root"
 
@@ -77,12 +85,12 @@ if ($Connect) {
   $out = Remote @"
 `$ErrorActionPreference = 'Continue'
 `$root = '$root'
-`$dataDir = 'data'
+`$privDir = 'private'
 try {
   `$s = Get-Content (Join-Path `$root 'server-settings.json') -Raw | ConvertFrom-Json
-  if (`$s.dataDir) { `$dataDir = [string]`$s.dataDir }
+  if (`$s.privDir) { `$privDir = [string]`$s.privDir }
 } catch { }
-`$data = Join-Path `$root `$dataDir
+`$priv = Join-Path `$root `$privDir
 
 `$key = ''
 try {
@@ -92,7 +100,8 @@ try {
 if (-not `$key) { 'NO BOT KEY in $docsWin\config.json. Run Install-Bot.ps1 first.'; exit }
 
 `$doc = @{ site = '$Site'; key = `$key } | ConvertTo-Json
-[IO.File]::WriteAllText((Join-Path `$data 'door.json'), `$doc, (New-Object Text.UTF8Encoding(`$false)))
+if (-not (Test-Path `$priv)) { New-Item -ItemType Directory -Path `$priv -Force | Out-Null }
+[IO.File]::WriteAllText((Join-Path `$priv 'door.json'), `$doc, (New-Object Text.UTF8Encoding(`$false)))
 'door.json written, pointing at $Site'
 'The gamemode picks it up within five minutes, or restart the server to be sure.'
 "@
@@ -107,12 +116,12 @@ if ($Enforce -or $Watch) {
   $out = Remote @"
 `$ErrorActionPreference = 'Continue'
 `$root = '$root'
-`$dataDir = 'data'
+`$privDir = 'private'
 try {
   `$s = Get-Content (Join-Path `$root 'server-settings.json') -Raw | ConvertFrom-Json
-  if (`$s.dataDir) { `$dataDir = [string]`$s.dataDir }
+  if (`$s.privDir) { `$privDir = [string]`$s.privDir }
 } catch { }
-`$f = Join-Path (Join-Path `$root `$dataDir) 'allowed.json'
+`$f = Join-Path (Join-Path `$root `$privDir) 'allowed.json'
 if (-not (Test-Path `$f)) { 'NO LIST YET. Run -Connect first and give it five minutes.'; exit }
 `$d = Get-Content `$f -Raw | ConvertFrom-Json
 `$n = @(`$d.profiles).Count
@@ -135,14 +144,14 @@ Head 'What the door has'
 $out = Remote @"
 `$ErrorActionPreference = 'Continue'
 `$root = '$root'
-`$dataDir = 'data'
+`$privDir = 'private'
 try {
   `$s = Get-Content (Join-Path `$root 'server-settings.json') -Raw | ConvertFrom-Json
-  if (`$s.dataDir) { `$dataDir = [string]`$s.dataDir }
+  if (`$s.privDir) { `$privDir = [string]`$s.privDir }
 } catch { }
-`$data = Join-Path `$root `$dataDir
+`$priv = Join-Path `$root `$privDir
 
-`$f = Join-Path `$data 'allowed.json'
+`$f = Join-Path `$priv 'allowed.json'
 if (-not (Test-Path `$f)) {
   'NO allowed.json. The door is OFF and anybody can connect.'
 } else {
@@ -152,7 +161,7 @@ if (-not (Test-Path `$f)) {
   'updated   ' + `$(if (`$d.at) { `$d.at } else { 'never, this list was written by hand' })
   foreach (`$p in @(`$d.people)) { '  ' + `$p.name + '  ' + (@(`$p.profiles) -join ', ') }
 }
-`$j = Join-Path `$data 'door.json'
+`$j = Join-Path `$priv 'door.json'
 'refreshing ' + `$(if (Test-Path `$j) { 'yes, from the site' } else { 'NO. Run -Connect, or the list never updates.' })
 "@
 $out | ForEach-Object { Say "  $_" }
@@ -162,12 +171,12 @@ if ($Log -gt 0) {
   Remote @"
 `$ErrorActionPreference = 'Continue'
 `$root = '$root'
-`$dataDir = 'data'
+`$privDir = 'private'
 try {
   `$s = Get-Content (Join-Path `$root 'server-settings.json') -Raw | ConvertFrom-Json
-  if (`$s.dataDir) { `$dataDir = [string]`$s.dataDir }
+  if (`$s.privDir) { `$privDir = [string]`$s.privDir }
 } catch { }
-`$l = Join-Path (Join-Path `$root `$dataDir) 'door.log'
+`$l = Join-Path (Join-Path `$root `$privDir) 'door.log'
 if (Test-Path `$l) { Get-Content `$l -Tail $Log } else { 'nothing logged yet' }
 "@ | ForEach-Object { Say "  $_" }
 }
