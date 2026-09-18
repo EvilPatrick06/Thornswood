@@ -78,11 +78,19 @@ if ($LASTEXITCODE -ne 0) { Die "ssh exited with $LASTEXITCODE" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
 
 <#
-  The shared secret for the character register, taken from version.json.
+  The shared secret for the character register, read from server-secret.txt.
 
-  It is the game server's own password, out of a private repo, so it is not
-  public. It is not a purpose made secret either: everyone who plays here has
-  it, because having it is what playing here means.
+  Corrected on 18 September. This used to say the value was the game server's
+  own password, out of a private repo, so it was not public. Both halves of
+  that were wrong. It was published into version.json in the PUBLIC releases
+  repository on every release, and it is still in that repository's history
+  between 4ac2786 and 6dbc8e2, so anybody could read it. It was also only four
+  digits.
+
+  What is here now is a purpose made secret: 32 random bytes, held in
+  server-secret.txt on the shipping machine and in secret.txt on the VPS, in
+  neither case in git and never printed. Rotating it is a hand job, and the
+  register is down until this script has run.
 
   What it buys is narrow and worth having. The register answers "which
   characters belong to this Steam account", and a Steam id is close to public,
