@@ -102,15 +102,41 @@ if (-not (Test-Path `$p)) { 'NO server-settings.json AT ' + `$p; exit 0 }
 `$s = Get-Content `$p -Raw | ConvertFrom-Json
 `$have = 0
 if (`$s.PSObject.Properties.Name -contains 'thornswoodVoicePort') { `$have = [int]`$s.thornswoodVoicePort }
-if (`$have -eq $VoicePort) {
+# A byte order mark counts as needing a rewrite even when the number is
+# already right. The run on 18 September set the value AND wrote a mark, so
+# a second run that only compared the number would have said 'already 7789'
+# and left the server unable to parse its own settings.
+`$bom = `$false
+try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
+if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
+if (`$have -eq $VoicePort -and -not `$bom) {
   'thornswoodVoicePort is already $VoicePort'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
-  `$s | ConvertTo-Json -Depth 30 | Set-Content `$p -Encoding UTF8
+  # NOT Set-Content -Encoding UTF8. At the far end of ssh this is Windows
+  # PowerShell 5.1, where that means UTF-8 WITH a byte order mark, and the
+  # server reads this file with JSON.parse, which refuses one:
+  #   SyntaxError: Unexpected token 'ï»¿' is not valid JSON
+  # On 18 September that took the dev server down on the first run of this
+  # step. pwsh 7 writes no mark for the same flag, so it looks fine here and
+  # breaks there. WriteAllText with an explicit UTF8Encoding($false) is the
+  # one spelling that means the same thing in both.
+  `$json = `$s | ConvertTo-Json -Depth 30
+  [IO.File]::WriteAllText(`$p, `$json, (New-Object Text.UTF8Encoding `$false))
   'thornswoodVoicePort set to $VoicePort, was ' + `$have + '. Old file kept as server-settings.json.before-<stamp>'
+  # Proved rather than assumed: reparse what was written, and check the
+  # first byte is not a mark.
+  try {
+    `$back = Get-Content `$p -Raw | ConvertFrom-Json
+    `$b0 = [IO.File]::ReadAllBytes(`$p)[0]
+    if (`$b0 -eq 0xEF) { 'WROTE A BYTE ORDER MARK. The server will not start. Put the .before- copy back.' }
+    else { 'read back fine, thornswoodVoicePort is ' + `$back.thornswoodVoicePort }
+  } catch {
+    'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
+  }
 }
-"@ | ForEach-Object { "  `$_" }
+"@ | ForEach-Object { "  $_" }
 
 Write-Host ''
 Write-Host 'Starting...'
