@@ -156,6 +156,10 @@ if (-not (Test-Path $logoSml)) { $logoSml = $logo }
 # without it the band keeps its pattern.
 $headerArt = Join-Path $Here 'launcher-header.jpg'
 if (-not (Test-Path $headerArt)) { Say '  launcher-header.jpg is missing, the title band will keep its pattern' 'Yellow' }
+# The same strip moving, over the picture. Optional too: without it the band
+# keeps the still picture.
+$headerVideo = Join-Path $Here 'launcher-header.mp4'
+if (-not (Test-Path $headerVideo)) { Say '  launcher-header.mp4 is missing, the title band will keep the still picture' 'Yellow' }
 Say "  $($cs.Count) source files" 'Green'
 
 $outDir = Join-Path $Root 'Launcher'
@@ -240,6 +244,7 @@ $cscArgs = @(
 )
 if (Test-Path $logo) { $cscArgs += "/resource:$((Resolve-Path $logo).Path),logo.png" }
 if (Test-Path $headerArt) { $cscArgs += "/resource:$((Resolve-Path $headerArt).Path),launcher-header.jpg" }
+if (Test-Path $headerVideo) { $cscArgs += "/resource:$((Resolve-Path $headerVideo).Path),launcher-header.mp4" }
 # The artwork goes in as a resource as well as a win32 icon, because the
 # launcher writes it back out beside itself under a name derived from its own
 # contents. That is what stops Windows showing a remembered picture of the old

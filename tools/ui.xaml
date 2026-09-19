@@ -524,6 +524,11 @@
                      and the picture shows most in the gap between them. -->
                 <Grid x:Name="HeaderArt" Visibility="Collapsed" IsHitTestVisible="False">
                   <Border x:Name="HeaderArtPicture"/>
+                  <!-- The same strip moving, from Art.HeaderVideo(), painted by a
+                       brush the way the picture is so the two line up. Stays
+                       collapsed when the build has no video or this machine cannot
+                       play one, and the picture shows as it always did. -->
+                  <Border x:Name="HeaderArtVideo" Visibility="Collapsed"/>
                   <Rectangle Fill="{DynamicResource Panel}" Opacity="0.45"/>
                   <Rectangle Fill="{DynamicResource Panel}" Width="520" HorizontalAlignment="Left">
                     <Rectangle.OpacityMask>
