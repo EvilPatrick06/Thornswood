@@ -352,7 +352,13 @@ if ($GameDir) {
 # stops the release, because an unpatched client connects and then sits on the
 # main menu for everybody who installs it. See the header of that script.
 Head 'Client patch'
-$LASTEXITCODE = 0
+# global:, never a bare assignment. Run from a prompt, as Ship always is, a
+# bare $LASTEXITCODE = 0 makes a copy that belongs to this script alone, while
+# a child script's exit and a program's exit code land in the global one. Every
+# check after it then read this script's 0: on 19 Sep Patch-Client refused the
+# bundle, exited 1, and a dev release went out with it anyway. Under -File the
+# two are the same variable, which is why testing that way never showed it.
+$global:LASTEXITCODE = 0
 # The client lives in whichever Skyrim this build runs from. With a Game folder
 # of its own (OwnGame.cs) that is not the Steam copy, and patching the Steam copy
 # would publish an unpatched client out of the build's folder.
@@ -406,7 +412,8 @@ if ($DryRun) {
     }
 }
 
-$LASTEXITCODE = 0
+# global: for the reason at the client patch step.
+$global:LASTEXITCODE = 0
 & (Join-Path $Here 'Publish-Update.ps1') @pubArgs
 $published = $LASTEXITCODE
 
@@ -428,13 +435,15 @@ if ($DryRun) {
     Say '  dry run cleaned up: the feed and the baseline are as they were' 'DarkGray'
 }
 
-# Ground truth, because the exit code is not.
+# Ground truth, as well as the exit code.
 #
 # The publisher stopped dead on a missing baseline, printed STOP in red, and
 # this script carried on to tell the Discord and empty the server for a
 # release that does not exist. The guard below was already there and did not
-# fire: an exit inside a .ps1 called with & does not reliably reach the caller
-# as $LASTEXITCODE, so the number being checked was somebody else's.
+# fire. The exit did reach the global $LASTEXITCODE; this script was reading a
+# copy of its own, made by a bare $LASTEXITCODE = 0 (see the client patch
+# step). The exit code is trustworthy now, and this check stays because a
+# written version.json is a better witness than any number.
 #
 # version.json is the fact. It is the file the whole world reads to find out
 # what the current launcher is, and the publisher writes it last, after every
