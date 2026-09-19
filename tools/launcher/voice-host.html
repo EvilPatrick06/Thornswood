@@ -145,6 +145,21 @@ function refreshIce() {
 function connect() {
   refreshIce();
   if (!cfg) return;
+
+  // A second config (a new character on Play) calls this with the first
+  // socket still open. Left there, the service keeps both as peers, this page
+  // takes its own old peer for somebody nearby, and offers for one person
+  // arrive on both sockets into the same connection. The handlers go first so
+  // closing it does not schedule a reconnect of its own.
+  if (ws) {
+    var old = ws;
+    ws = null;
+    old.onopen = old.onclose = old.onerror = old.onmessage = null;
+    try { old.close(); } catch (e) { }
+    conns.forEach(function (rec, id) { drop(id); });
+    myPeer = 0;
+  }
+
   var url = voiceSocket();
   say('connecting to ' + url);
   try { ws = new WebSocket(url); } catch (e) { say('socket refused: ' + e); return; }
