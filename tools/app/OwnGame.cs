@@ -186,8 +186,11 @@ namespace Thornswood
         ///    this the folder was given it, SkyrimPlatform would not start on
         ///    the browser we ship while it was there, and CEFSubprocess.exe
         ///    came with it for Windows Firewall to ask about.
+        /// 2: Creation Club plugins the reference list does not name are left
+        ///    out, and taken out of a folder that already has them. See
+        ///    UnwantedCreation.
         /// </summary>
-        const int Rules = 1;
+        const int Rules = 2;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -248,6 +251,7 @@ namespace Thornswood
 
             HashSet<string> deployed = Deployed(src);
             replacedByOthers = ReplacedByOthers(src);
+            wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
             List<Found> all = Walk(src);
 
             long copyBytes = 0, totalBytes = 0;
@@ -320,6 +324,7 @@ namespace Thornswood
             HashSet<string> deployed = Deployed(src);
             HashSet<string> owned = Owned(deployed);
             replacedByOthers = ReplacedByOthers(src);
+            wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
             List<Found> all = Walk(src);
 
             var lines = new List<string>();
@@ -372,9 +377,15 @@ namespace Thornswood
 
             // The collection dropped these. Only Vortex's files are taken out;
             // anything else in the folder is not this refresh's to judge.
+            //
+            // Except a Creation Club plugin this folder brought in itself before
+            // rules 2. Those were never Vortex's, so without this a folder that
+            // already had them would keep them for good and keep showing LOAD
+            // ORDER ERROR, which is the thing rules 2 is for.
             foreach (KeyValuePair<string, Rec> kv in old)
             {
-                if (seen.Contains(kv.Key) || kv.Value.Origin != 'V' || owned.Contains(kv.Key)) continue;
+                if (seen.Contains(kv.Key) || owned.Contains(kv.Key)) continue;
+                if (kv.Value.Origin != 'V' && !UnwantedCreation(kv.Key)) continue;
                 try
                 {
                     string dest = Path.Combine(Folder, kv.Key);
@@ -571,7 +582,39 @@ namespace Thornswood
             if (rel.StartsWith(".sentry-native\\", StringComparison.OrdinalIgnoreCase)) return "crash reporter scratch";
             if (rel.Equals("Data\\Platform\\thornswood-session.txt", StringComparison.OrdinalIgnoreCase)) return "session note";
             if (Foreign(rel)) return "another server's";
+            if (UnwantedCreation(rel)) return "a Creation Club plugin the server does not load";
             return null;
+        }
+
+        /// <summary>
+        /// The plugins switched on in the reference list, set at the start of
+        /// Make and Refresh.
+        /// </summary>
+        static HashSet<string> wantedPlugins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// A Creation Club plugin in Data that the reference list does not name.
+        ///
+        /// Skyrim.ccc lists the Creation Club's plugins, and the game loads any of
+        /// them it finds in Data straight after the five masters, whatever
+        /// plugins.txt says. Steam installs four with the game since the 1.6
+        /// updates (Fish and AdvDSGS are full masters, Curios and SurvivalMode
+        /// are light), and the server's list has none of them. So a folder that is
+        /// given them loads two masters the server does not have, and every
+        /// plugin after Dragonborn.esm sits two places off: LOAD ORDER ERROR.
+        ///
+        /// Measured on 19 Sep. Keizaal's launcher had parked them in
+        /// Data\_disabledByKzl in the Steam copy, Daedric Online's launcher put
+        /// them back into Data, and the next refresh brought them in here. The
+        /// game loaded 62 full plugins against the server's 60 while the scan
+        /// said everything checks out. The archives stay, because nothing loads
+        /// an archive without its plugin. Packs never carry any of these either:
+        /// Publish-Update.ps1 counts cc*.es? as vanilla.
+        /// </summary>
+        static bool UnwantedCreation(string rel)
+        {
+            if (!Regex.IsMatch(rel, @"^Data\\cc[^\\]*\.(esm|esl|esp)$", RegexOptions.IgnoreCase)) return false;
+            return !wantedPlugins.Contains(rel.Substring("Data\\".Length));
         }
 
         /// <summary>
