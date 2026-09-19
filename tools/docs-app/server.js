@@ -1357,6 +1357,13 @@ async function handle(req, res) {
     within a refresh. If any lookup failed the answer says so and the door
     keeps the list it had, because a short list built while Discord was down
     would turn away everybody missing from it.
+
+    devProfiles rides along in the same answer: the subset of the same people
+    who also hold the dev or admin role, whichever server they connect to.
+    st.dev already folds admin in (out.dev = out.admin || has(cfg.access.dev)
+    up in standing()), so this is free, and it is what lets the game server
+    tell a tester apart from anybody else without a second question to Discord
+    for every command somebody types.
   */
   // The dev server's door.json names the site as https://thornswood.net/dev,
   // so its question lands here and gets only the people the dev build is
@@ -1368,8 +1375,9 @@ async function handle(req, res) {
       return sendJson(res, 401, { error: 'no' });
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], people: [], lookupFailed: false, at: Date.now() };
+    const out = { profiles: [], devProfiles: [], people: [], lookupFailed: false, at: Date.now() };
     const seen = new Set();
+    const seenDev = new Set();
     for (const d of Object.keys(linked)) {
       const row = linked[d] || {};
       const profiles = (Array.isArray(row.profiles) ? row.profiles : [])
@@ -1381,6 +1389,9 @@ async function handle(req, res) {
       if (!st.play || st.banned) continue;
       if (devDoor && !st.dev) continue;
       for (const n of profiles) if (!seen.has(n)) { seen.add(n); out.profiles.push(n); }
+      if (st.dev) {
+        for (const n of profiles) if (!seenDev.has(n)) { seenDev.add(n); out.devProfiles.push(n); }
+      }
       out.people.push({ id: String(d), name: st.name || row.name || '', profiles });
     }
     return sendJson(res, 200, out);

@@ -2325,11 +2325,14 @@ var dataDir = 'data';
 //
 // The allow list lives at <dataDir>/allowed.json:
 //
-//     { "enforce": false, "profiles": [123, 456], "note": "..." }
+//     { "enforce": false, "profiles": [123, 456], "devProfiles": [123], "note": "..." }
 //
-// enforce   false logs and lets everyone in. true kicks anybody not listed.
-// profiles  the profileId of each person allowed in. The launcher shows a
-//           person's profile id on the Diagnostics page.
+// enforce      false logs and lets everyone in. true kicks anybody not listed.
+// profiles     the profileId of each person allowed in. The launcher shows a
+//              person's profile id on the Diagnostics page.
+// devProfiles  the subset who also hold the dev or admin role. Read by
+//              __thornswoodIsDev below, for gating a command rather than a
+//              connection.
 //
 // No file means the door is off entirely and this costs one failed stat per
 // thirty seconds.
@@ -2365,12 +2368,37 @@ var dataDir = 'data';
           if (n) ids[n] = true;
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, count: Object.keys(ids).length };
+      // Who among them also holds the dev or admin role, from the same
+      // answer, so a command gate elsewhere in this file can ask without a
+      // second trip anywhere.
+      var devIds = {};
+      if (Array.isArray(doc.devProfiles)) {
+        for (var j = 0; j < doc.devProfiles.length; j++) {
+          var dn = Number(doc.devProfiles[j]);
+          if (dn) devIds[dn] = true;
+        }
+      }
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
     return list;
   }
+
+  /*
+    Whether this profile's Discord account holds the dev or playtest role,
+    right now, as of the last five minute refresh from the site.
+
+    On globalThis because this whole module is one closed IIFE and the command
+    handler that wants this lives in a different one further down the file.
+    False whenever there is nothing to ask, which is a door that is off
+    entirely (no door.json) rather than a reason to trust nobody: it is a
+    ceiling raised for people who already hold a role, never a floor.
+  */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsDev = function (profileId) {
+    var l = load();
+    return !!(l && l.devIds && l.devIds[Number(profileId)]);
+  };
 
   function note(line) {
     var stamp = new Date().toISOString();
@@ -2490,12 +2518,14 @@ var dataDir = 'data';
             fs.writeFileSync(FILE, JSON.stringify({
               enforce: enforce,
               profiles: doc.profiles,
+              devProfiles: Array.isArray(doc.devProfiles) ? doc.devProfiles : [],
               people: doc.people || [],
               at: new Date().toISOString(),
               note: 'Written by the gamemode from the site. Set enforce true to turn the door on.'
             }, null, 2));
             readAt = 0;                       // make the next tick re-read it
-            note('list refreshed from the site, ' + doc.profiles.length + ' profiles');
+            note('list refreshed from the site, ' + doc.profiles.length + ' profiles, ' +
+                 (Array.isArray(doc.devProfiles) ? doc.devProfiles.length : 0) + ' dev');
           } catch (e) {
             note('could not write ' + FILE + ': ' + e);
           }
