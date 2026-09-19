@@ -1182,6 +1182,162 @@
   }));
 
   /*
+   * Jump and sprint, measured rather than guessed. Temporary.
+   *
+   * Jump and sprint are reported doing nothing while walking and running are
+   * fine (WORKING-NOTES entry 212). Reading the code has ruled out everything
+   * it can: the client bundle's two jump and sprint blocks never arm on this
+   * server (one waits for flags only another server's code sets, the other for
+   * a plugin named SweetPie that is not in the load order), the server takes
+   * whatever stamina the client reports, and vanilla Skyrim needs no stamina
+   * to jump. So the cause has to be caught in the game.
+   *
+   * Every jump or sprint key press gets one line saying which of these
+   * happened, with the state that decides between the causes beside it:
+   *
+   *   no event   the game never tried the animation. Stamina at zero stops a
+   *              sprint here, and so does standing still; a control switched
+   *              off stops both.
+   *   cancelled  the game tried and a sendAnimationEvent hook blanked the name
+   *              on the way through, which only the client bundle does.
+   *   refused    the animation went through intact and the behaviour graph
+   *              turned it down, so the character is in a state with no way
+   *              into a jump, the kind an unfinished idle leaves behind.
+   *
+   * It only reads. The hook copies a name and a flag into an array, because a
+   * hook runs where the game's own functions cannot be called; the state is
+   * read on the next update, a frame after the key. Take it out once known.md
+   * says which cause it was.
+   */
+  const PROBE_WINDOW_MS = 800;    // how long a key press waits for its animation
+  const PROBE_GAP_MS = 1500;      // one line per action this often, however hard it is mashed
+  const probeSeen = [];           // { name, out, ok, at }, from the hook
+  const probePresses = [];        // { kind, at, state }, from the keys
+  const probeLast = { jump: 0, sprint: 0 };
+  const probeKeys = { jump: -1, sprint: -1, at: 0 };
+  // A hook that never runs or always throws would make every press read
+  // "no event", which is a verdict. So every line says how the hook is doing.
+  let probeHookCalls = 0;
+  let probeHookErrors = 0;
+
+  function probeStart(kind, name) {
+    return kind === 'jump' ? /^Jump(Standing|Directional)Start/i.test(name) : name === 'SprintStart';
+  }
+
+  try {
+    // 0x14 to 0x14 is your own character and nobody else's.
+    sp.hooks.sendAnimationEvent.add({
+      enter: function (ctx) {
+        probeHookCalls++;
+        try {
+          const name = String(ctx.animEventName || '');
+          // Empty means a hook before this one already blanked it.
+          if (name === '' || /^Jump/i.test(name) || name === 'SprintStart') {
+            ctx.storage.set('thornswoodProbe', name);
+          }
+        } catch (e) { probeHookErrors++; }
+      },
+      leave: function (ctx) {
+        try {
+          if (!ctx.storage.has('thornswoodProbe')) { return; }
+          probeSeen.push({
+            name: ctx.storage.get('thornswoodProbe'),
+            out: String(ctx.animEventName || ''),
+            ok: !!ctx.animationSucceeded,
+            at: Date.now()
+          });
+          if (probeSeen.length > 32) { probeSeen.shift(); }
+        } catch (e) { probeHookErrors++; }
+      }
+    }, 0x14, 0x14);
+  } catch (e) {
+    log('probe: could not hook animation events:', e);
+  }
+
+  function probeVerdict(p) {
+    let blanked = false;
+    for (const s of probeSeen) {
+      if (s.at < p.at - 100 || s.at > p.at + PROBE_WINDOW_MS) { continue; }
+      if (probeStart(p.kind, s.name)) {
+        if (s.out === '') { return 'cancelled, a hook blanked ' + s.name; }
+        if (!s.ok) { return 'refused, ' + s.name + ' went through and the animation graph turned it down'; }
+        return 'played ' + s.name;
+      }
+      if (s.name === '') { blanked = true; }
+    }
+    if (blanked) { return 'cancelled, an animation was blanked before this file saw its name'; }
+    return 'no event, the game never sent the ' + p.kind + ' animation';
+  }
+
+  function probeState() {
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return 'no character'; }
+    const bits = [];
+    const yn = (b) => (b ? 'yes' : 'no');
+    function ask(label, fn) {
+      try { bits.push(label + ' ' + fn()); } catch (e) { bits.push(label + ' unknown'); }
+    }
+    ask('stamina', () => Math.round(pc.getActorValue('Stamina')) + ' (' +
+      Math.round(pc.getActorValuePercentage('Stamina') * 100) + '%, base ' +
+      Math.round(pc.getBaseActorValue('Stamina')) + ')');
+    ask('regen', () => pc.getActorValue('StaminaRate') + ' x ' + pc.getActorValue('StaminaRateMult') + '%');
+    ask('speed', () => Math.round(pc.getAnimationVariableFloat('Speed')));
+    ask('running', () => yn(pc.isRunning()));
+    ask('sprinting', () => yn(pc.isSprinting()));
+    ask('in the air', () => yn(pc.getAnimationVariableBool('bInJumpState')));
+    ask('encumbered', () => yn(pc.isOverEncumbered()));
+    ask('sneaking', () => yn(pc.isSneaking()));
+    ask('swimming', () => yn(pc.isSwimming()));
+    ask('mounted', () => yn(pc.isOnMount()));
+    ask('weapon out', () => yn(pc.isWeaponDrawn()));
+    const theirs = notOurs();
+    if (theirs) { bits.push(theirs); }
+    const off = readControlsNow();
+    bits.push(off.length ? 'controls off [' + off.join(', ') + ']' : 'controls on');
+    return bits.join(', ');
+  }
+
+  sp.on('buttonEvent', guard('probe keys', (e) => {
+    if (!e.isDown || e.isUp) return;
+    // By the game's own name for the control, so a rebound key still counts.
+    // The key codes are the fallback for an event that arrives without one.
+    let kind = '';
+    if (e.userEventName === 'Jump' || (!e.userEventName && e.code === probeKeys.jump)) { kind = 'jump'; }
+    if (e.userEventName === 'Sprint' || (!e.userEventName && e.code === probeKeys.sprint)) { kind = 'sprint'; }
+    if (!kind) return;
+    // The chat or the wheel has the keyboard, or a menu does: not a jump.
+    if (anyClaim() || busyMenuOpen()) return;
+    const now = Date.now();
+    if (now - probeLast[kind] < PROBE_GAP_MS) return;
+    probeLast[kind] = now;
+    probePresses.push({ kind: kind, at: now, state: '' });
+  }));
+
+  sp.on('update', guard('probe', () => {
+    const now = Date.now();
+    if (now - probeKeys.at > 30000) {
+      const first = !probeKeys.at;
+      probeKeys.at = now;
+      try { probeKeys.jump = sp.Input.getMappedKey('Jump', 0); } catch (e) { }
+      try { probeKeys.sprint = sp.Input.getMappedKey('Sprint', 0); } catch (e) { }
+      if (first) {
+        say('probe: watching jump (key ' + probeKeys.jump + ') and sprint (key ' +
+            probeKeys.sprint + '), one line per press');
+      }
+    }
+    if (!probePresses.length) return;
+    for (const p of probePresses) {
+      if (!p.state) { p.state = probeState(); }
+    }
+    while (probePresses.length && now - probePresses[0].at >= PROBE_WINDOW_MS) {
+      const p = probePresses.shift();
+      say('probe ' + p.kind + ': ' + probeVerdict(p) + '. ' + p.state + '. hook saw ' +
+          probeHookCalls + ' events' + (probeHookErrors ? ' and threw ' + probeHookErrors + ' times' : ''));
+    }
+  }));
+
+  /*
    * Guards that never stop trying to kill you.
    *
    * A bounty is not what makes a guard murderous. Arrest dialogue, the pay a
