@@ -1215,6 +1215,10 @@
   const probePresses = [];        // { kind, at, state }, from the keys
   const probeLast = { jump: 0, sprint: 0 };
   const probeKeys = { jump: -1, sprint: -1, at: 0 };
+  // A hook that never runs or always throws would make every press read
+  // "no event", which is a verdict. So every line says how the hook is doing.
+  let probeHookCalls = 0;
+  let probeHookErrors = 0;
 
   function probeStart(kind, name) {
     return kind === 'jump' ? /^Jump(Standing|Directional)Start/i.test(name) : name === 'SprintStart';
@@ -1224,13 +1228,14 @@
     // 0x14 to 0x14 is your own character and nobody else's.
     sp.hooks.sendAnimationEvent.add({
       enter: function (ctx) {
+        probeHookCalls++;
         try {
           const name = String(ctx.animEventName || '');
           // Empty means a hook before this one already blanked it.
           if (name === '' || /^Jump/i.test(name) || name === 'SprintStart') {
             ctx.storage.set('thornswoodProbe', name);
           }
-        } catch (e) { }
+        } catch (e) { probeHookErrors++; }
       },
       leave: function (ctx) {
         try {
@@ -1242,7 +1247,7 @@
             at: Date.now()
           });
           if (probeSeen.length > 32) { probeSeen.shift(); }
-        } catch (e) { }
+        } catch (e) { probeHookErrors++; }
       }
     }, 0x14, 0x14);
   } catch (e) {
@@ -1327,7 +1332,8 @@
     }
     while (probePresses.length && now - probePresses[0].at >= PROBE_WINDOW_MS) {
       const p = probePresses.shift();
-      say('probe ' + p.kind + ': ' + probeVerdict(p) + '. ' + p.state);
+      say('probe ' + p.kind + ': ' + probeVerdict(p) + '. ' + p.state + '. hook saw ' +
+          probeHookCalls + ' events' + (probeHookErrors ? ' and threw ' + probeHookErrors + ' times' : ''));
     }
   }));
 
