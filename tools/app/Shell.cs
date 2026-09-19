@@ -809,6 +809,16 @@ namespace Thornswood
                 catch { }
             }
 
+            // The landscape behind the title travels the same way. Without it
+            // the band stays collapsed and keeps its pattern.
+            ImageBrush headerArt = Art.Header();
+            if (headerArt != null)
+            {
+                var band = F<Grid>("HeaderArt");
+                var picture = F<Border>("HeaderArtPicture");
+                if (band != null && picture != null) { picture.Background = headerArt; band.Visibility = Visibility.Visible; }
+            }
+
             titleBar.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
             {
                 if (e.ClickCount == 2)
