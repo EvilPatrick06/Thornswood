@@ -111,6 +111,40 @@ before code; a Claude does not settle it for them.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #dev first; both machines touch those.
 
+## After a pull request is merged
+
+Merging on GitHub changes nothing anybody sees. Patrick runs the rest on his
+machine, from the repo folder. A Claude shows him the commands and does not
+run them.
+
+1. `git checkout main`, then `git pull`. Ship.ps1 refuses a main release
+   that is behind origin, so the pull comes first.
+2. Then one command for each part the pull request touched:
+   - The launcher (`tools\app`, `tools\ui.xaml`, the art and video that
+     Build-Launcher.ps1 embeds), the game plugins (`tools\ts-plugins`), or
+     anything else that goes out in a pack: `.\tools\Ship.ps1 "what changed"`.
+   - The site's app or `tools\docs-app\public`: `.\tools\Deploy-Docs.ps1`.
+     The public pages (`tools\docs-app\data\site\*.md`) need
+     `.\tools\Deploy-Docs.ps1 -Site`.
+   - The bot's code or join card art in `tools\discord`:
+     `.\tools\Install-Bot.ps1 -CodeOnly`.
+   - The bot's avatar (`tools\discord\thornswood-bot-*.png`): no script
+     sends it. It is uploaded by hand in the Discord developer portal.
+   - `tools\gamemode.js`: `.\tools\Deploy-Gamemode.ps1`, then
+     `.\tools\Deploy-Server.ps1`.
+   - The voice service (`tools\voice\voice-server.js`, `tools\voice\public`):
+     `.\tools\Install-Voice.ps1`.
+   - Only scripts that run on Patrick's machine (Ship.ps1, Publish-Update.ps1,
+     the Deploy scripts): nothing more. The pull is the change.
+   A pull request that touches several of these gets every one of them, in
+   the same sitting, so nothing goes out half done.
+3. Djinn, once it is out, from the main folder: `git checkout main`, then
+   `git pull`. If the branch had its own folder, `git worktree remove
+   ..\<that folder>`. Then `git branch -D djinn/what-it-is`, after GitHub
+   shows the pull request as merged; GitHub squashes the merge, so
+   `git branch -d` refuses. A file the branch added that also sits untracked
+   in the main folder stops the pull, so delete that copy first.
+
 ## What a Claude here does itself and what the person does
 
 Read anything. Run git status, diff, log, fetch, the read only scripts
