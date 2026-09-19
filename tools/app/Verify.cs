@@ -130,6 +130,21 @@ namespace Thornswood
                 }
             }
 
+            // Creation Club plugins the game loads because Skyrim.ccc names
+            // them, which no plugin list shows. After the positional pass on
+            // purpose: that pass only runs when nothing else was found, and a
+            // light one here is only a warning. See Checks.StrayCreations.
+            foreach (string p in Checks.StrayCreations(wantSet))
+            {
+                bool full = !Checks.TakesNoPlace(p);
+                issues.Add(new Issue(
+                    p + " is loaded by the game on its own, because Skyrim.ccc names it, and the server does not have it" +
+                    (full ? ", so every plugin after it is out of place and the game shows LOAD ORDER ERROR. "
+                          : ". It takes no place in the load order, but it is still content the server does not know. ") +
+                    "Fix moves it aside into Thornswood's Isolated folder and nothing is deleted.",
+                    full));
+            }
+
             // A plugin the list references but that is not actually on disk.
             string data = Path.Combine(Paths.Game, "Data");
             foreach (string p in want)
@@ -446,6 +461,12 @@ namespace Thornswood
             // because somebody who plays here may also play there.
             n += Checks.IsolateForeign(null);
             n += Checks.FlagLight(null);
+
+            // Creation Club plugins the game would load because Skyrim.ccc
+            // names them. Moved aside the same way, and said, because these are
+            // Steam's files and somebody may go looking for them.
+            var wanted = new HashSet<string>(Enabled(Path.Combine(Paths.Golden, "plugins.txt")), StringComparer.OrdinalIgnoreCase);
+            n += Checks.IsolateCreations(wanted, say);
 
             // The server's copy of every plugin whose bytes are not its own.
             if (cfg != null)
