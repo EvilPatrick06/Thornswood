@@ -3065,25 +3065,28 @@ namespace Thornswood
             txtVoiceState.Text = "checking";
             ThreadPool.QueueUserWorkItem(delegate
             {
-                int port = 7778;
-                int.TryParse(c.VoicePort, out port);
-                // TryParse writes zero over the default when the config value
-                // is not a number, and a probe to port zero can only ever say
-                // voice is down. Creation.Send guards the same value.
-                if (port <= 0) port = 7778;
+                // Asked at the address voice really uses, not by knocking on the
+                // raw port. Since 1.1.49 the service sits behind the site's
+                // certificate and listens only on the VPS's own loopback, so the
+                // raw port no longer answers from outside, and the knock said
+                // nobody would hear anybody while voice was working. VoiceBase is
+                // the feed's voiceUrl, or host and port on a config that has
+                // none, which asks the same place the knock did.
+                string where = c.VoiceBase();
                 bool up = false;
                 try
                 {
-                    using (var s = new System.Net.Sockets.TcpClient())
-                    {
-                        IAsyncResult ar = s.BeginConnect(c.ServerAddress, port, null, null);
-                        if (ar.AsyncWaitHandle.WaitOne(900) && s.Connected) { s.EndConnect(ar); up = true; }
-                    }
+                    try { System.Net.ServicePointManager.SecurityProtocol |= (System.Net.SecurityProtocolType)3072; } catch { }
+                    var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(where + "/health");
+                    req.Method = "GET";
+                    req.Timeout = 4000;
+                    req.ReadWriteTimeout = 4000;
+                    using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
+                        up = resp.StatusCode == System.Net.HttpStatusCode.OK;
                 }
                 catch { }
 
                 bool fUp = up;
-                int fPort = port;
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     try
@@ -3099,9 +3102,9 @@ namespace Thornswood
                         catch { }
 
                         txtVoiceState.Text = fUp
-                            ? ("Running on " + c.ServerAddress + ":" + fPort +
+                            ? ("Running at " + where +
                                ". It starts inside the game on its own." + keys)
-                            : ("Not answering on " + c.ServerAddress + ":" + fPort +
+                            : ("Not answering at " + where +
                                ", so nobody will hear anybody. It is not installed on the server, or not running.");
                     }
                     catch { }
