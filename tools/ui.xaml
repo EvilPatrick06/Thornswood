@@ -514,6 +514,36 @@
             <Border Grid.Row="0" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
               <Grid>
                 <Rectangle Fill="{StaticResource Hatch}" Opacity="0.85"/>
+                <!-- The landscape behind the title, filled in from Art.Header().
+                     Collapsed when the build carries no picture, which leaves the
+                     pattern above exactly as it was. Every veil is the theme's own
+                     panel colour, so a light theme washes the picture light and a
+                     dark one dark. The two heavier veils are fixed widths anchored
+                     to the sides, because the title and the figures are fixed
+                     widths too: at any window size the text sits on a strong veil
+                     and the picture shows most in the gap between them. -->
+                <Grid x:Name="HeaderArt" Visibility="Collapsed" IsHitTestVisible="False">
+                  <Border x:Name="HeaderArtPicture"/>
+                  <Rectangle Fill="{DynamicResource Panel}" Opacity="0.45"/>
+                  <Rectangle Fill="{DynamicResource Panel}" Width="520" HorizontalAlignment="Left">
+                    <Rectangle.OpacityMask>
+                      <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#B0000000" Offset="0"/>
+                        <GradientStop Color="#B0000000" Offset="0.7"/>
+                        <GradientStop Color="#00000000" Offset="1"/>
+                      </LinearGradientBrush>
+                    </Rectangle.OpacityMask>
+                  </Rectangle>
+                  <Rectangle Fill="{DynamicResource Panel}" Width="520" HorizontalAlignment="Right">
+                    <Rectangle.OpacityMask>
+                      <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#00000000" Offset="0"/>
+                        <GradientStop Color="#B0000000" Offset="0.3"/>
+                        <GradientStop Color="#B0000000" Offset="1"/>
+                      </LinearGradientBrush>
+                    </Rectangle.OpacityMask>
+                  </Rectangle>
+                </Grid>
                 <Grid Margin="36,26,36,24">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>

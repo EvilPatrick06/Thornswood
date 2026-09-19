@@ -152,6 +152,10 @@ $logo    = Join-Path $Here 'logo.png'
 $logoSml = Join-Path $Here 'logo-192.png'
 if (-not (Test-Path $logo))    { Say '  logo.png is missing, the launcher will run without its emblem' 'Yellow' }
 if (-not (Test-Path $logoSml)) { $logoSml = $logo }
+# The landscape behind the title on the Play page. Optional the same way:
+# without it the band keeps its pattern.
+$headerArt = Join-Path $Here 'launcher-header.jpg'
+if (-not (Test-Path $headerArt)) { Say '  launcher-header.jpg is missing, the title band will keep its pattern' 'Yellow' }
 Say "  $($cs.Count) source files" 'Green'
 
 $outDir = Join-Path $Root 'Launcher'
@@ -235,6 +239,7 @@ $cscArgs = @(
     "/resource:$((Resolve-Path $xaml).Path),ui.xaml"
 )
 if (Test-Path $logo) { $cscArgs += "/resource:$((Resolve-Path $logo).Path),logo.png" }
+if (Test-Path $headerArt) { $cscArgs += "/resource:$((Resolve-Path $headerArt).Path),launcher-header.jpg" }
 # The artwork goes in as a resource as well as a win32 icon, because the
 # launcher writes it back out beside itself under a name derived from its own
 # contents. That is what stops Windows showing a remembered picture of the old
