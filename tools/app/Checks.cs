@@ -251,31 +251,7 @@ namespace Thornswood
                 string name = Path.GetFileName(f);
                 try
                 {
-                    bool isDir = Directory.Exists(f);
-                    string off = f + OffSuffix;
-                    if (File.Exists(off) || Directory.Exists(off)) off = off + "-" + stamp;
-
-                    if (isDir)
-                    {
-                        Directory.Move(f, off);
-                    }
-                    else
-                    {
-                        try { File.SetAttributes(f, FileAttributes.Normal); } catch { }
-                        File.Move(f, off);
-                    }
-
-                    string landed = off;
-                    try
-                    {
-                        Directory.CreateDirectory(bin);
-                        string dest = Path.Combine(bin, Path.GetFileName(off));
-                        if (isDir) Directory.Move(off, dest); else File.Move(off, dest);
-                        landed = dest;
-                    }
-                    catch { }
-
-                    NoteIsolated(bin, f, landed);
+                    string landed = MoveAside(f, bin, stamp);
                     n++;
                     if (say != null)
                         say(name + " belongs to another server. Moved aside to " + landed +
@@ -289,6 +265,40 @@ namespace Thornswood
                 }
             }
             return n;
+        }
+
+        /// <summary>
+        /// The two steps IsolateForeign describes, for one file or folder.
+        /// Returns where it ended up; throws when even the rename fails.
+        /// </summary>
+        static string MoveAside(string f, string bin, string stamp)
+        {
+            bool isDir = Directory.Exists(f);
+            string off = f + OffSuffix;
+            if (File.Exists(off) || Directory.Exists(off)) off = off + "-" + stamp;
+
+            if (isDir)
+            {
+                Directory.Move(f, off);
+            }
+            else
+            {
+                try { File.SetAttributes(f, FileAttributes.Normal); } catch { }
+                File.Move(f, off);
+            }
+
+            string landed = off;
+            try
+            {
+                Directory.CreateDirectory(bin);
+                string dest = Path.Combine(bin, Path.GetFileName(off));
+                if (isDir) Directory.Move(off, dest); else File.Move(off, dest);
+                landed = dest;
+            }
+            catch { }
+
+            NoteIsolated(bin, f, landed);
+            return landed;
         }
 
         static void NoteIsolated(string bin, string from, string to)
@@ -306,6 +316,83 @@ namespace Thornswood
         /// <summary>Old name. Kept so nothing that still calls it deletes
         /// anything, because it never did anything else after this change.</summary>
         public static int RemoveForeign(Action<string> say) { return IsolateForeign(say); }
+
+        /// <summary>
+        /// Creation Club plugins the game will load without being asked, and
+        /// that <paramref name="wanted"/>, the reference list, does not name.
+        ///
+        /// Skyrim.ccc in the game's root lists the Creation Club's plugins, and
+        /// the game loads every one of them it finds in Data straight after the
+        /// five masters, whatever plugins.txt says. So they are in no plugin
+        /// list and every other row of the scan passes them.
+        ///
+        /// Measured on 19 Sep. Daedric Online's launcher put the free ones back
+        /// into Data, Thornswood's folder took them in, and the game loaded two
+        /// full masters the server does not have. Every plugin after
+        /// Dragonborn.esm was two places off, the game showed LOAD ORDER ERROR,
+        /// and this scan said everything checks out.
+        /// </summary>
+        public static List<string> StrayCreations(ICollection<string> wanted)
+        {
+            var l = new List<string>();
+            if (wanted == null || wanted.Count == 0) return l;
+            try
+            {
+                string ccc = Path.Combine(Paths.Game, "Skyrim.ccc");
+                if (!File.Exists(ccc)) return l;
+                string data = Path.Combine(Paths.Game, "Data");
+                foreach (string raw in File.ReadAllLines(ccc))
+                {
+                    string n = raw.Trim();
+                    if (n.Length == 0 || n.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) continue;
+                    if (wanted.Contains(n) || l.Contains(n)) continue;
+                    if (File.Exists(Path.Combine(data, n))) l.Add(n);
+                }
+            }
+            catch { }
+            return l;
+        }
+
+        /// <summary>True when a plugin in Data takes no place in the load
+        /// order: an .esl, or the ESL flag in its header.</summary>
+        public static bool TakesNoPlace(string name)
+        {
+            if (name.EndsWith(".esl", StringComparison.OrdinalIgnoreCase)) return true;
+            return IsLight(Path.Combine(Paths.Game, "Data\\" + name));
+        }
+
+        /// <summary>
+        /// Moves each of StrayCreations aside, the same two steps as
+        /// IsolateForeign, never deleting anything. Steam put these there and
+        /// another server may want them, so each one goes into the Isolated
+        /// folder with a line in restore.txt saying where it came from.
+        /// </summary>
+        public static int IsolateCreations(ICollection<string> wanted, Action<string> say)
+        {
+            int n = 0;
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
+            string bin = Path.Combine(Paths.Isolated, stamp);
+            string data = Path.Combine(Paths.Game, "Data");
+
+            foreach (string name in StrayCreations(wanted))
+            {
+                try
+                {
+                    string landed = MoveAside(Path.Combine(data, name), bin, stamp);
+                    n++;
+                    if (say != null)
+                        say(name + " is a Creation Club plugin the server does not have. Moved aside to " + landed +
+                            ". Nothing was deleted, and it can be put back.");
+                }
+                catch (Exception ex)
+                {
+                    if (say != null)
+                        say("Could not move " + name + " aside: " + ex.Message +
+                            "  Close Skyrim and try again.");
+                }
+            }
+            return n;
+        }
 
         /// <summary>
         /// The SkyMP client bundle. Not MpClientPlugin.dll, which is the SKSE
