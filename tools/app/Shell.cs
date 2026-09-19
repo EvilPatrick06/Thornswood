@@ -747,6 +747,106 @@ namespace Thornswood
             else if (i == PageDiag) BuildDiag();
         }
 
+        /// <summary>
+        /// Puts the moving strip over the still one on the Play page.
+        ///
+        /// A MediaPlayer painted through a brush rather than a MediaElement. The
+        /// band takes its height from the title beside it, and a MediaElement
+        /// asks for room at the video's own shape: it took the band from 135 to
+        /// 195 high. A brush asks for no room at all and crops exactly as the
+        /// picture's brush does, so the two line up.
+        ///
+        /// The clip is made to loop, and a timeline that repeats forever joins
+        /// the end to the start more smoothly than going back to the start when
+        /// it ends: the band held one picture for 61 to 78 ms at the join that
+        /// way, against 94 to 111 ms, where any two ordinary frames are 33 ms
+        /// apart. While playing, the two cost the same as far as measuring could
+        /// tell: 3 to 14% of one core, varying from run to run.
+        ///
+        /// It plays only while somebody can see it: stopped while the window is
+        /// minimised or another page is open, and carried on from the same point
+        /// when the Play page is back. Stopped, not paused, because a paused
+        /// timeline went on costing up to 6.9% of one core with nothing on
+        /// screen, and a stopped one next to nothing. If it will not play (Windows
+        /// N without the Media Feature Pack, a file that will not open) it is
+        /// hidden and the still picture shows exactly as before.
+        /// </summary>
+        static void StartHeaderVideo()
+        {
+            string file = Art.HeaderVideo();
+            var layer = F<Border>("HeaderArtVideo");
+            var page = F<Grid>("PagePlay");
+            if (file == null || layer == null || page == null) return;
+
+            MediaPlayer player = null;
+            MediaClock clock = null;
+            bool gone = false;
+            // Where it was when it was put away. Null while it plays.
+            TimeSpan? heldAt = null;
+            Action<string> drop = delegate(string why)
+            {
+                if (gone) return;
+                gone = true;
+                layer.Visibility = Visibility.Collapsed;
+                layer.Background = null;
+                try { if (player != null) { player.Clock = null; player.Close(); } } catch { }
+                Stamp("Title band: the video did not play (" + why + "), the still picture stays");
+            };
+            Action decide = delegate
+            {
+                if (gone || clock == null) return;
+                bool seen = page.IsVisible && win.WindowState != WindowState.Minimized;
+                if (seen && heldAt != null)
+                {
+                    TimeSpan at = heldAt.Value;
+                    heldAt = null;
+                    clock.Controller.Begin();
+                    clock.Controller.Seek(at, System.Windows.Media.Animation.TimeSeekOrigin.BeginTime);
+                }
+                else if (!seen && heldAt == null)
+                {
+                    heldAt = clock.CurrentTime ?? TimeSpan.Zero;
+                    clock.Controller.Stop();
+                }
+            };
+
+            try
+            {
+                player = new MediaPlayer();
+                player.IsMuted = true;
+                player.Volume = 0;
+                var frame = new VideoDrawing();
+                frame.Player = player;
+                var brush = new DrawingBrush(frame);
+                brush.Stretch = Stretch.UniformToFill;
+                brush.AlignmentX = AlignmentX.Center;
+                brush.AlignmentY = AlignmentY.Center;
+
+                player.MediaOpened += delegate
+                {
+                    if (player.NaturalVideoWidth <= 0 || player.NaturalVideoHeight <= 0) { drop("no picture in it"); return; }
+                    frame.Rect = new Rect(0, 0, player.NaturalVideoWidth, player.NaturalVideoHeight);
+                    layer.Background = brush;
+                    layer.Visibility = Visibility.Visible;
+                    decide();
+                };
+                player.MediaFailed += delegate(object s, ExceptionEventArgs e)
+                {
+                    drop(e.ErrorException == null ? "no reason given" : e.ErrorException.Message);
+                };
+
+                var timeline = new MediaTimeline(new Uri(file));
+                timeline.RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever;
+                clock = timeline.CreateClock();
+                player.Clock = clock;
+            }
+            catch (Exception ex) { drop(ex.Message); return; }
+
+            decide();
+            win.StateChanged += delegate { decide(); };
+            page.IsVisibleChanged += delegate { decide(); };
+        }
+
         static void Wire()
         {
             // The Play page names the server rather than addressing it. See the
@@ -817,6 +917,7 @@ namespace Thornswood
                 var band = F<Grid>("HeaderArt");
                 var picture = F<Border>("HeaderArtPicture");
                 if (band != null && picture != null) { picture.Background = headerArt; band.Visibility = Visibility.Visible; }
+                StartHeaderVideo();
             }
 
             titleBar.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)

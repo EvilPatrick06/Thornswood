@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -22,6 +23,9 @@ namespace Thornswood
 
         static ImageBrush header;
         static bool triedHeader;
+
+        static string headerVideo;
+        static bool triedHeaderVideo;
 
         public static BitmapImage Emblem()
         {
@@ -54,6 +58,61 @@ namespace Thornswood
             }
             catch { header = null; }
             return header;
+        }
+
+        /// <summary>
+        /// The same strip moving, as a file on disk, because WPF plays video
+        /// from a file and not from a stream. It is written beside the exe once,
+        /// under a name taken from its own contents the way the icon is, so the
+        /// next start finds it already there and a build with a new video writes
+        /// a new file rather than trusting an old one. Null when this build
+        /// carries no video or the file cannot be written, and the band then
+        /// keeps the still picture.
+        /// </summary>
+        public static string HeaderVideo()
+        {
+            if (triedHeaderVideo) return headerVideo;
+            triedHeaderVideo = true;
+            try
+            {
+                byte[] bytes = Bytes("launcher-header.mp4");
+                if (bytes == null || bytes.Length == 0) return null;
+                if (!Directory.Exists(Paths.LauncherDir)) return null;
+
+                string hash;
+                using (SHA256 sha = SHA256.Create())
+                    hash = BitConverter.ToString(sha.ComputeHash(bytes), 0, 4).Replace("-", "").ToLowerInvariant();
+
+                string want = Path.Combine(Paths.LauncherDir, "header-" + hash + ".mp4");
+                if (!File.Exists(want) || new FileInfo(want).Length != bytes.Length)
+                    File.WriteAllBytes(want, bytes);
+
+                // The one an older build wrote is only taking up room now.
+                foreach (string f in Directory.GetFiles(Paths.LauncherDir, "header-*.mp4"))
+                    if (!string.Equals(f, want, StringComparison.OrdinalIgnoreCase))
+                        try { File.Delete(f); } catch { }
+
+                headerVideo = want;
+            }
+            catch { headerVideo = null; }
+            return headerVideo;
+        }
+
+        static byte[] Bytes(string name)
+        {
+            Assembly asm = Assembly.GetExecutingAssembly();
+            string pick = null;
+            foreach (string n in asm.GetManifestResourceNames())
+                if (n.EndsWith(name, StringComparison.OrdinalIgnoreCase)) { pick = n; break; }
+            if (pick == null) return null;
+
+            using (Stream st = asm.GetManifestResourceStream(pick))
+            {
+                if (st == null) return null;
+                var ms = new MemoryStream();
+                st.CopyTo(ms);
+                return ms.ToArray();
+            }
         }
 
         static BitmapImage Load(string name)
