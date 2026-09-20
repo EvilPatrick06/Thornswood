@@ -159,8 +159,11 @@
   var LATER = 'later';     // the row key of the "Choose later" card; never sent anywhere
 
   // ---------------------------------------------------------------- state --
-  var sections = ['class', 'profession', 'tree'];   // 'home' is added while creating
-  var section = 'class';
+  // Profession first, then class, then the tree, and the home last while
+  // creating: Patrick's order, 20 September. The home is the last thing
+  // because confirming it is what ends creation.
+  var sections = ['profession', 'class', 'tree'];   // 'home' is added while creating
+  var section = 'profession';
   var rowAt = 0;
   var mine = null;         // what the server says this character is: the panel view
   var picked = {};         // section -> { row: key, subs: [keys] } chosen in the panel, not yet confirmed
@@ -418,7 +421,7 @@
   }
 
   function draw() {
-    sections = creating() ? ['class', 'profession', 'home', 'tree'] : ['class', 'profession', 'tree'];
+    sections = creating() ? ['profession', 'class', 'tree', 'home'] : ['profession', 'class', 'tree'];
     if (sections.indexOf(section) < 0) section = sections[0];
     var n = countRows();
     if (rowAt >= n) rowAt = n ? n - 1 : 0;
@@ -702,8 +705,12 @@
       var left = DATA[section].title;
       later[section] = true;
       picked[section] = null;
+      // On to the next section with something to choose; the tree has
+      // nothing to choose yet, so it is stepped over.
       var i = sections.indexOf(section);
-      if (i >= 0 && i + 1 < sections.length) { goTo(sections[i + 1]); }
+      for (var j = i + 1; j < sections.length; j++) {
+        if (sections[j] !== 'tree') { goTo(sections[j]); break; }
+      }
       status = left + ' left for later. You can pick it in the world, from this panel.'; statusKind = 'ok';
       draw();
       return;
