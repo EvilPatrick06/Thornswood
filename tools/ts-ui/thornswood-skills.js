@@ -140,6 +140,42 @@
             { key: 'precision', name: 'Precision', desc: 'Critical and ranged', perk: 'Lethal Aim: ranged attacks ignore half of physical armour.' }] }
       ]
     },
+    /*
+      The spell book. The names are Skyrim's own spells, sorted into the
+      mage's four ranks (the game's Apprentice and Adept tiers both sit
+      under Advanced). Not wired to the server yet, on Patrick's word of
+      20 September: this is the shape of the page. The server does not know
+      spells or spell points, so what is drawn comes from here, every spell
+      reads as one you could take, and nothing is sent.
+    */
+    spells: {
+      title: 'Spell book',
+      lead: 'The spells of your two schools, by rank. A spell costs one point; points come with each rank.',
+      ranks: [{ key: 'novice', name: 'Novice' }, { key: 'advanced', name: 'Advanced' },
+              { key: 'expert', name: 'Expert' }, { key: 'master', name: 'Master' }],
+      schools: {
+        destruction: { novice: ['Flames', 'Frostbite', 'Sparks'],
+                       advanced: ['Firebolt', 'Ice Spike', 'Lightning Bolt', 'Fireball', 'Ice Storm', 'Chain Lightning', 'Flame Cloak', 'Frost Cloak', 'Lightning Cloak'],
+                       expert: ['Incinerate', 'Icy Spear', 'Thunderbolt', 'Wall of Flames', 'Wall of Frost', 'Wall of Storms'],
+                       master: ['Fire Storm', 'Blizzard', 'Lightning Storm'] },
+        restoration: { novice: ['Healing', 'Lesser Ward'],
+                       advanced: ['Healing Hands', 'Fast Healing', 'Steadfast Ward', 'Turn Undead', 'Close Wounds', 'Heal Other', 'Greater Ward', 'Repel Lesser Undead'],
+                       expert: ['Grand Healing', 'Circle of Protection', 'Repel Undead', 'Turn Greater Undead'],
+                       master: ['Guardian Circle', 'Bane of the Undead'] },
+        alteration:  { novice: ['Candlelight', 'Oakflesh'],
+                       advanced: ['Magelight', 'Stoneflesh', 'Detect Life', 'Ironflesh', 'Telekinesis', 'Waterbreathing'],
+                       expert: ['Ebonyflesh', 'Paralyze', 'Detect Dead'],
+                       master: ['Dragonhide', 'Mass Paralysis'] },
+        conjuration: { novice: ['Conjure Familiar', 'Raise Zombie', 'Bound Sword'],
+                       advanced: ['Conjure Flame Atronach', 'Reanimate Corpse', 'Bound Battleaxe', 'Soul Trap', 'Conjure Frost Atronach', 'Banish Daedra', 'Revenant', 'Bound Bow'],
+                       expert: ['Conjure Storm Atronach', 'Dread Zombie', 'Conjure Dremora Lord', 'Expel Daedra', 'Command Daedra'],
+                       master: ['Dead Thrall', 'Flame Thrall', 'Frost Thrall', 'Storm Thrall'] },
+        illusion:    { novice: ['Courage', 'Clairvoyance', 'Fury'],
+                       advanced: ['Calm', 'Fear', 'Muffle', 'Frenzy', 'Rally', 'Invisibility'],
+                       expert: ['Pacify', 'Rout', 'Call to Arms'],
+                       master: ['Harmony', 'Hysteria', 'Mayhem'] }
+      }
+    },
     home: {
       title: 'Home',
       lead: 'Where you wake up. The inn keeps a room for you, and it is where you come back to.',
@@ -168,6 +204,7 @@
   var mine = null;         // what the server says this character is: the panel view
   var picked = {};         // section -> { row: key, subs: [keys] } chosen in the panel, not yet confirmed
   var later = {};          // section -> true when "Choose later" was confirmed; this page's mark only
+  var marked = {};         // spell name -> true, marked in the spell book; this page's mark only, nothing is sent
   var pending = null;      // the last pick sent and not yet answered, for the status line
   var status = '';         // the line under the panel
   var statusKind = '';     // '' | 'ok' | 'no'
@@ -279,6 +316,18 @@
     // gave Confirm a 50px box with five letters showing. A class name nobody
     // else uses is the only rule that holds against a stylesheet we do not
     // write.
+    // the spell book
+    '#ts-skills .spellbar{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin:0 0 12px}',
+    '#ts-skills .spellpts{font-size:14px;color:#e9d19b}',
+    '#ts-skills .spellnote{font-size:12px;font-style:italic;color:rgba(217,207,180,.55)}',
+    '#ts-skills .spellcols{grid-template-columns:repeat(2,minmax(0,1fr))}',
+    '#ts-skills .rankhead{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:rgba(217,207,180,.5);margin:10px 0 4px}',
+    '#ts-skills .spell{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 10px;',
+    'border:1px solid transparent;cursor:pointer}',
+    '#ts-skills .spell.at{border-color:rgba(233,209,155,.7);background:rgba(120,94,44,.16)}',
+    '#ts-skills .spell.on .spellname{color:#f6e9c8}',
+    '#ts-skills .spell.mine .spellname{color:#9fcf92}',
+    '#ts-skills .spellname{font-size:14px}',
     // the K, drawn as a key cap beside Close
     '#ts-skills .key{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;',
     'border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;border-radius:3px;background:rgba(0,0,0,.35);',
@@ -356,6 +405,21 @@
     return cap(key);
   }
   function creating() { return !!(mine && mine.creating); }
+  function isMage() {
+    if (mine && mine.profession) return mine.profession === 'mage';
+    // Nothing confirmed yet: the Mage card lit while creating counts, so the
+    // book is there to read before the profession is sent.
+    var p = picked.profession;
+    return !!(creating() && p && p.row === 'mage');
+  }
+  /* The schools the spell book shows: the server's, or the ones lit on the Mage card. */
+  function bookSchools() {
+    if (mine && mine.profession) return mine.profession === 'mage' ? (mine.schools || []).slice() : [];
+    var p = picked.profession;
+    return (creating() && p && p.row === 'mage') ? (p.subs || []).slice() : [];
+  }
+  /* Spell points, from the server when it has them; until then none. */
+  function spellPoints() { return mine ? Number(mine.spellPoints) || 0 : 0; }
   function rows() { return DATA[section] ? DATA[section].rows : []; }
 
   // ----------------------------------------------------- what you already are --
@@ -402,6 +466,7 @@
   function countRows() {
     if (section === 'home') return ((mine && mine.towns) || []).length;
     if (section === 'tree') return 15;
+    if (section === 'spells') return bookRows().length;
     return rows().length + (laterOffered(section) ? 1 : 0);
   }
   /* Another section: the top row, and the status line back to the hint. */
@@ -417,11 +482,15 @@
   function viewKey() {
     var v = null;
     if (mine) { v = {}; for (var k in mine) if (k !== 'note') v[k] = mine[k]; }
-    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, v]);
+    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, v]);
   }
 
   function draw() {
+    // A mage gets the spell book, between Profession and Class, the moment
+    // Mage is the profession: confirmed by the server, or still lit on the
+    // Profession card while creating.
     sections = creating() ? ['profession', 'class', 'tree', 'home'] : ['profession', 'class', 'tree'];
+    if (isMage()) sections.splice(1, 0, 'spells');
     if (sections.indexOf(section) < 0) section = sections[0];
     var n = countRows();
     if (rowAt >= n) rowAt = n ? n - 1 : 0;
@@ -467,6 +536,11 @@
       return { t: nameOf('profession', mine.profession) + (halves.length ? ', ' + halves.join(' and ') : ''), c: 'set' };
     }
     if (sec === 'home') return haveHome() ? { t: cap(mine.home), c: 'set' } : { t: 'choose one', c: 'need' };
+    if (sec === 'spells') {
+      var sp = spellPoints();
+      var m = 0; for (var mk in marked) if (marked[mk]) m++;
+      return { t: sp ? sp + ' to spend' : (m ? m + ' marked' : 'nothing yet'), c: sp ? 'need' : '' };
+    }
     var pts = mine ? Number(mine.points) || 0 : 0;
     var spent = 0;
     if (mine && mine.tree) for (var k in mine.tree) spent += Number(mine.tree[k]) || 0;
@@ -496,7 +570,73 @@
     if (section === 'class') drawClass();
     else if (section === 'profession') drawProfession();
     else if (section === 'home') drawHome();
+    else if (section === 'spells') drawSpells();
     else drawTree();
+  }
+
+  /* Every spell the book shows, flat, for the keyboard: [{school, rank, name}]. */
+  function bookRows() {
+    var out = [];
+    var schools = bookSchools();
+    var book = DATA.spells;
+    if (!book) return out;
+    schools.forEach(function (sc) {
+      var byRank = book.schools[sc];
+      if (!byRank) return;
+      book.ranks.forEach(function (r) {
+        (byRank[r.key] || []).forEach(function (name) { out.push({ school: sc, rank: r.key, name: name }); });
+      });
+    });
+    return out;
+  }
+
+  /*
+    The spell book: one column per school, the spells under their rank,
+    each with a mark that says have, marked, or could take. Have comes from
+    the server once it sends spells (mine.spells); until then everything
+    reads as one you could take, and a click marks it on this page only.
+  */
+  function drawSpells() {
+    var schools = bookSchools();
+    var book = DATA.spells;
+    if (!schools.length) {
+      elBody.appendChild(el('p', 'lead', 'Pick your two schools on the Profession card first. The book fills with their spells.'));
+      return;
+    }
+    var pts = spellPoints();
+    var have = (mine && mine.spells) || {};
+    var n = 0; for (var k in marked) if (marked[k]) n++;
+    var top = el('div', 'spellbar');
+    top.appendChild(el('div', 'spellpts', pts + (pts === 1 ? ' spell point' : ' spell points') + ' to spend' + (n ? ', ' + n + ' marked' : '')));
+    top.appendChild(el('div', 'spellnote', 'Not sent to the server yet. What you mark here stays on this page.'));
+    elBody.appendChild(top);
+    var cols = el('div', 'cols spellcols');
+    var idx = 0;
+    schools.forEach(function (sc) {
+      var col = el('div', 'col');
+      col.appendChild(el('div', 'colhead', cap(sc)));
+      var byRank = book.schools[sc] || {};
+      book.ranks.forEach(function (r) {
+        var names = byRank[r.key] || [];
+        if (!names.length) return;
+        col.appendChild(el('div', 'rankhead', r.name));
+        names.forEach(function (name) {
+          var i = idx++;
+          var got = !!have[name];
+          var row = el('div', 'spell' + (i === rowAt ? ' at' : '') + (got ? ' mine' : '') + (marked[name] ? ' on' : ''));
+          row.appendChild(el('span', 'spellname', name));
+          row.appendChild(el('span', 'tag' + (got ? '' : (marked[name] ? ' gold' : ' dim')), got ? 'yours' : (marked[name] ? 'marked' : 'could take')));
+          row.onclick = function () {
+            rowAt = i;
+            if (!got) marked[name] = !marked[name];
+            draw();
+          };
+          col.appendChild(row);
+        });
+      });
+      cols.appendChild(col);
+    });
+    elBody.appendChild(cols);
   }
 
   /* The last card of Class and of Profession while creating. */
@@ -650,18 +790,22 @@
     var can = canConfirm();
     var line = status || hint();
     var label = section === 'home' ? 'Make it home' : 'Confirm';
-    var key = JSON.stringify([line, statusKind, can, label, section === 'tree']);
+    var key = JSON.stringify([line, statusKind, can, label, section === 'tree' || section === 'spells']);
     if (key === footKey) return;
     footKey = key;
     elStatus.className = 'status' + (statusKind ? ' ' + statusKind : '');
     elStatus.textContent = line;
     elConfirm.className = 'tsbtn primary' + (can ? '' : ' off');
     elConfirm.textContent = label;
-    elConfirm.style.display = section === 'tree' ? 'none' : '';
+    elConfirm.style.display = (section === 'tree' || section === 'spells') ? 'none' : '';
   }
 
   function hint() {
     if (section === 'tree') return 'Press + on a skill to put a point in it.';
+    if (section === 'spells') {
+      if (!bookSchools().length) return 'The book needs your two schools.';
+      return 'Click a spell to mark it. Spells are not sent to the server yet.';
+    }
     if (section === 'class') {
       if (haveClass()) return 'Your class is set for good.';
       if (later['class']) return 'Class left for later. Pick one now if you would rather, then confirm.';
@@ -774,6 +918,11 @@
       } else if (canConfirm()) { confirm(); }
       else {
         // Enter on a row picks it, the second Enter confirms.
+        if (section === 'spells') {
+          var sr = bookRows()[rowAt];
+          if (sr && !((mine && mine.spells) || {})[sr.name]) { marked[sr.name] = !marked[sr.name]; draw(); }
+          e.preventDefault(); return;
+        }
         var r = section === 'home' ? ((mine && mine.towns) || [])[rowAt] : rows()[rowAt];
         if (!r && rowAt === rows().length && laterOffered(section)) { picked[section] = { row: LATER, subs: [] }; draw(); }
         else if (r && section === 'class' && !haveClass()) { picked['class'] = { row: r.key, subs: [] }; draw(); }
