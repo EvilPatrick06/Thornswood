@@ -51,8 +51,9 @@ says so.
    tick already does them.
 2. Updater.cs delete.txt: `Path.GetFullPath` before `Inside`, like the
    entries loop already does.
-3. Creation.cs Send: stop sending `ticket` in the /choose body. The voice
-   service never reads it.
+3. Done another way, 20 September: Creation.cs is deleted, nothing posts to
+   /choose and the route is gone from the voice service. The class, the
+   profession and the home town are chosen in the game, on K.
 4. Shell.cs: set `updatePending = true` in the closed-for-update branch before
    `CheckUpdatesBackground(true)`; Play() refuses while `updatePending`,
    `collectionBarUp` or `ownGameBusy`.
@@ -81,12 +82,14 @@ says so.
 14. Voice.cs Reconfigure: skip the Post when host, port and profile match the
     last one; the voice page closes the old WebSocket before opening a new
     one.
-15. Account.cs: confirm against the deployed C:\Thornswood-Voice\voice-server.js
-    whether /whoami and /claim exist. If not, drop the 7 s WaitForSync at
-    Play. If they do, note they key on a public Steam id with no ticket.
-16. Shell.cs Play: run `Chars.WaitForSync`, `Creation.Send`,
-    `Verify.DeployPersonal` and `SkyMp.Start` through Waiting. Also the
-    startup RunScan in a try/catch.
+15. Settled 20 September: /whoami and /claim exist in the voice service and
+    refuse every launcher, because they want the service's secret and
+    Account.cs never sent one. Account.cs and CharSync.cs are deleted; the
+    launcher keeps its own list of characters and the site's linked.json is
+    the account register. The owners.json register on the voice service is
+    dead and can go with the next voice change.
+16. Shell.cs Play: run `Verify.DeployPersonal` and `SkyMp.Start` through
+    Waiting. Also the startup RunScan in a try/catch.
 17. Uninstall.Begin: `Hold.Release(); Keep.Unpark();` after Kill, before
     anything under Profile is deleted.
 18. Every generated .cmd (Uninstall.cs, Updater.cs, ShellOwnGame.cs,
@@ -178,14 +181,15 @@ Suggestions: a hot-reload guard around the commands block; write
     C:\Thornswood-Docs\data\, edited on the site, never overwritten by a
     deploy unless -SeedDocs; repo seeds under tools\docs-app\data\): the
     install story, 1.6.1170 and Downgrade, Scan compares bytes and Fix
-    downloads the server's copy, what happens around Play (trade and town are
-    chosen in the launcher before Play, then the hall, the race menu for the
-    face, then the chosen town's inn with the kit; books are only the
-    gamemode's fallback when no launcher choice arrived, nobody reads books),
-    log paths for both layouts (Steam copy and C:\Thornswood\Profile), Start
-    On Save present but inert, and settle the Tavern Games and Respawn
-    contradiction between the 15 Sep news and known.md (ask Gavin which is
-    true).
+    downloads the server's copy, what happens around Play (since 20
+    September: Play, then the game's main menu asks which character, a new
+    one wakes in the hall, the race menu for the face, then the K panel opens
+    on its own for the class, the profession and the home town, and the third
+    choice sends them to the inn wearing the shift and nothing else; no kits,
+    no books, no launcher choice), log paths for both layouts (Steam copy and
+    C:\Thornswood\Profile), Start On Save present but inert, and settle the
+    Tavern Games and Respawn contradiction between the 15 Sep news and
+    known.md (ask Patrick which is true).
 46. Check-Site.ps1: add HTTP GET and HEAD of / and every PUBLIC_PAGES route,
     /api/public status, the invite's `expires_at`, and stop hardcoding the
     VPS address and admin user.

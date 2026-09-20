@@ -76,15 +76,16 @@ everybody has to be running the same files or nobody can connect. It also
 compares every plugin with the server's copy, byte for byte. If one differs it
 says so, and **Fix** downloads the server's copy of that plugin.
 
-With a new character it asks two things before the game starts: what you did
-before, which is a profession, one half of it and a class, and which town you
-wake up in. Those are the choices on the [Professions](/classes) page, and the
-launcher is the only place they are made.
+Then the game loads to its main menu and asks who you are today: one of your
+characters, or a new one. Pick and press Play.
 
-Then the game loads. You arrive in a quiet hall and the race menu opens, and
-that is where you make your face. When you are done you wake up at the inn in
-the town you chose, with the tools of your trade in your pack. The hall is only
-where the face gets made.
+A new character arrives in a quiet hall and the race menu opens, and that is
+where you make your face. When you are done, a panel opens on its own for the
+three choices on the [Professions](/classes) page: your class, your
+profession and the half of it you will make your own, and the town you wake
+up in. Take them in any order; the last one sends you to your inn. You arrive
+in the clothes you stand in and nothing else. The same panel is behind **K**
+from then on, for your skill points.
 
 There is no address to type and no password to remember.
 

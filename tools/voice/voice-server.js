@@ -27,13 +27,12 @@ const path = require('path');
 
 const PORT = Number(process.env.THORNSWOOD_VOICE_PORT || 7778);
 /*
-  Where to check that a character creation choice came from the person who owns
-  that profile.
+  Where to check that a claim on a profile came from the person who owns it.
 
-  /choose cannot be locked to the loopback: every person's launcher calls it
-  from their own machine, which is the whole point of it. So until now it took
-  anybody's word for anything, and a stranger could set your profession, your
-  half and your home town before you ever claimed them.
+  Until 20 September this guarded /choose, the launcher's character creation
+  choice, which is gone: creation happens in the game now, on K, and the
+  server takes the picks off the command queue below under the profile id the
+  join token proves. The check stays for the join itself and for the roster.
 
   THORNSWOOD_SITE off means no checking, which is how this behaved before and
   is still the behaviour when the site cannot be reached. That is deliberate:
@@ -371,77 +370,6 @@ setInterval(() => {
   for (const [, p] of peers) p.ws.send({ t: 'pos', at: Date.now(), who: snap });
 }, 200);
 
-// --------------------------------------------------------------- choices ---
-// What somebody picked in the launcher, waiting for their character to exist.
-//
-// Character creation used to happen inside the game: the server put sixteen
-// books in your pack, your client resolved each one's form id, drew a message
-// box, and reported back which one you equipped. Fourteen steps, each able to
-// fail without saying anything, and every one of them dependent on the two
-// load orders agreeing.
-//
-// So the choice is made in the launcher, before the game starts, and left here
-// for the server to pick up. This service is the only thing both of them can
-// reach: the launcher over the internet, the gamemode over loopback.
-//
-// Kept on disk as well as in memory, because a restart between somebody
-// pressing Play and their character spawning would otherwise lose it.
-const CHOICES_FILE = path.join(HERE, 'choices.json');
-let choices = {};
-
-try {
-  choices = JSON.parse(fs.readFileSync(CHOICES_FILE, 'utf8')) || {};
-} catch (e) {
-  choices = {};
-}
-
-function saveChoices() {
-  try { fs.writeFileSync(CHOICES_FILE, JSON.stringify(choices, null, 2)); }
-  catch (e) { console.log('[voice] could not write choices.json: ' + e.message); }
-}
-
-/*
-  Choices nobody ever came to collect.
-
-  A choice waits here for the minutes between somebody pressing Play and their
-  character spawning, and then the gamemode claims it and it is gone. One that
-  is still here a week later belongs to a profile id that never turned into a
-  character: an install that rolled a fresh id and was reinstalled, a launch
-  that did not reach the server, a test.
-
-  Twenty two of them had piled up by the time anyone looked, one under profile
-  id 2, and they are not harmless. Every startup prints the whole list, health
-  reports a count that means nothing, and the file only ever grows. Nothing
-  reads them, so the only question is whether a real person is still waiting on
-  one, and a week is a long time to be halfway through pressing Play.
-*/
-const CHOICE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
-
-function pruneChoices(quiet) {
-  const now = Date.now();
-  const dropped = [];
-  for (const pid of Object.keys(choices)) {
-    const at = Number(choices[pid] && choices[pid].at) || 0;
-    // No timestamp at all means it was written before this service recorded
-    // one, which puts it well past any lifetime worth keeping.
-    if (!at || now - at > CHOICE_LIFETIME_MS) {
-      dropped.push(pid);
-      delete choices[pid];
-    }
-  }
-  if (dropped.length) {
-    saveChoices();
-    if (!quiet) {
-      console.log('[voice] dropped ' + dropped.length +
-                  ' choice(s) nobody collected: ' + dropped.join(', '));
-    }
-  }
-  return dropped.length;
-}
-
-pruneChoices(false);
-setInterval(() => pruneChoices(false), 60 * 60 * 1000).unref();
-
 function isLoopback(req) {
   const ra = req.socket.remoteAddress || '';
   return ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1';
@@ -709,73 +637,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // The launcher, from wherever the person is. Deliberately not restricted to
-  // loopback: that is the whole point of it.
-  if (req.method === 'POST' && route === '/choose') {
-    readBody(req, res, 4000, (doc) => {
-      const pid = Number(doc.profileId);
-      if (!pid) { res.writeHead(400).end('no profileId'); return; }
-
-      owns(String(doc.ticket || ''), pid, (verdict) => {
-        if (verdict === 'no') {
-          console.log('[voice] REFUSED a choice for profile ' + pid +
-                      ': the ticket does not own it');
-          res.writeHead(403).end('not your profile');
-          return;
-        }
-        if (verdict === 'unchecked') {
-          console.log('[voice] UNVERIFIED choice for profile ' + pid +
-                      (SITE ? ' (could not reach ' + SITE + ')' : ' (THORNSWOOD_SITE not set)'));
-        }
-        // Not validated against a list here on purpose. The gamemode holds the
-        // trades and the towns and checks them against the records it actually
-        // has; a second copy of that list here could only ever drift from it.
-        choices[String(pid)] = {
-          // trade is the PROFESSION key, and stays called trade because it is
-          // what keys the starter kits and what every older launcher sends.
-          trade: String(doc.trade || ''),
-          // Which half of it. One key, or two joined by + for the mage's schools.
-          half: String(doc.half || ''),
-          // Where raw material comes from. Carries no kit of its own.
-          cls: String(doc.cls || ''),
-          town: String(doc.town || ''),
-          name: String(doc.name || ''),
-          at: Date.now()
-        };
-        saveChoices();
-        console.log('[voice] choice stored for profile ' + pid +
-                    ': ' + choices[String(pid)].trade +
-                    (choices[String(pid)].half ? '/' + choices[String(pid)].half : '') +
-                    (choices[String(pid)].cls ? ', ' + choices[String(pid)].cls : '') +
-                    ' in ' + choices[String(pid)].town);
-        res.writeHead(204).end();
-      });
-    });
-    return;
-  }
-
-  // The gamemode, on the same machine.
-  if (route === '/choices') {
-    if (!isLoopback(req)) { res.writeHead(403).end('no'); return; }
-    res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify(choices));
-    return;
-  }
-
-  // Applied, so it should not be applied again next time they connect.
-  if (req.method === 'POST' && route === '/claimed') {
-    if (!isLoopback(req)) { res.writeHead(403).end('no'); return; }
-    readBody(req, res, 1000, (doc) => {
-      const pid = String(Number(doc.profileId) || 0);
-      if (choices[pid]) {
-        delete choices[pid];
-        saveChoices();
-        console.log('[voice] choice claimed for profile ' + pid);
-      }
-      res.writeHead(204).end();
-    });
-    return;
-  }
+  // /choose, /choices and /claimed lived here until 20 September: the
+  // launcher's creation choice, waiting for the gamemode to collect it. Gone
+  // with the launcher's selector; the picks ride the command queue below.
 
   // The gamemode's end of the command queue. Read and emptied in one go: a
   // command handled twice is a second teleport somebody did not ask for.
@@ -937,7 +801,6 @@ const server = http.createServer((req, res) => {
                             bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             peers: peers.size, tracked: positions.size,
-                            waitingChoices: Object.keys(choices).length,
                             queuedCommands: commands.length,
                             accounts: Object.keys(owners).length,
                             secret: SECRET ? 'set' : 'MISSING' }));
@@ -1013,7 +876,7 @@ server.on('upgrade', (req, socket, head) => {
       // It goes this way round because the game server cannot see chat: chat
       // rides this socket precisely because adding a packet type to
       // skymp5-client would mean recompiling it. The gamemode already talks to
-      // this service over loopback for the launcher's choices, so it collects
+      // this service over loopback for the position feed, so it collects
       // commands on the same trip.
       //
       // This is also the only teleport there is. SkyMP's client forwards

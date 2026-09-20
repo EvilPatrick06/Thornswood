@@ -486,9 +486,10 @@ function burnCharcoal(actorId, refrId) {
 //
 // What does work, on mechanisms already proven in this build: the inventory can
 // be set from the server, and reading a book from the inventory comes back as
-// onReadBook(actorId, baseId). So the books are the interface. Each one says
-// what it does in its own text, which the game renders in its own book UI, and
-// reading it is the choice. Nothing here depends on a message arriving.
+// onReadBook(actorId, baseId). The books were the interface once, and then the
+// launcher was, and since 20 September the choice is made in the game, on K,
+// in the panel the character block owns. This block runs the hall: the face,
+// the wait, the reminder, and the trip to the town when the choices are in.
 //
 // The state machine is driven by a timer rather than an event, because there is
 // no event. It is cheap: a property read per online person every few seconds.
@@ -593,42 +594,11 @@ const MOVED_ENOUGH_MS = 500;
  * spot with the mouse produces. 10 degrees is a glance. */
 const MOVED_UNITS = 32;
 const MOVED_DEGREES = 10;
-/* How long after a teleport before the kit is handed over, and how often it is
- * checked afterwards. Both deliberately unhurried: nobody is doing anything in
- * the first few seconds of arriving in an inn, and an item that turns up a
- * moment late is invisible, while one that never turns up is a bard with no
- * shirt. */
-const GEAR_DELAY_MS = 5000;
-const GEAR_RECHECK_MS = 4000;
-
-/*
-  How long arriving is allowed to mean anything.
-
-  Arriving is a moment: somebody lands in their starting town and their kit is
-  topped up over the next few passes until it reads back complete. It is not a
-  state anybody should still be in tomorrow, and until now it could be, because
-  it is written into the change form and it only ends when three passes in a row
-  find nothing missing.
-
-  A session that ends before that, a crash, a lockup, closing the game, leaves
-  the mark set. The next login walks straight back into the top up, and the top
-  up compares against STARTING quantities, so it replaces everything that has
-  been eaten, drunk, sold, dropped or handed to somebody else since. The whole
-  kit, back in the pack, and the client equipping it over what was already worn.
-
-  Ten minutes is far longer than an arrival takes and far shorter than a gap
-  between sessions, so the mark closes itself and nobody's pack is touched.
-*/
-const ARRIVE_WINDOW_MS = 10 * 60 * 1000;
-
-/* How long to wait for a choice from the launcher before falling back to the
- * books. Long enough that a slow post never loses the race. */
-const CHOICE_WAIT_MS = 20000;
-
-/* Where somebody ends up when no choice ever arrives. Not a setting: it is the
- * shape of a bug, and the log says as much when it is used. */
-const DEFAULT_TRADE = 'warrior';
-const DEFAULT_TOWN = 'whiterun';
+/* How often somebody standing in the hall with the panel still to fill in is
+ * reminded, in chat, that K opens it. The panel opens itself the moment
+ * creation begins; this is for the person who closed it, or whose page had
+ * not mounted it yet when the server first asked. */
+const CHOOSE_REMIND_MS = 30000;
 /* Five minutes, not forty five seconds. This exists so nobody is stranded when
  * the race menu never opens, and it used to be short enough to fire on somebody
  * who was simply still making their face: it would give up and start them
@@ -651,167 +621,142 @@ const HALL = {
   rot: [0, 0, 180],
 };
 
-const CHARGEN = {"welcome":"e80000:Thornswood-Content.esp","shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"classes":{"e80010:Thornswood-Content.esp":{"key":"warrior","gear":[["12e49:Skyrim.esm",1],["12e4b:Skyrim.esm",1],["12e46:Skyrim.esm",1],["12e4d:Skyrim.esm",1],["12eb7:Skyrim.esm",1],["12eb6:Skyrim.esm",1],["3eadd:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80011:Thornswood-Content.esp":{"key":"hunter","gear":[["13911:Skyrim.esm",1],["13910:Skyrim.esm",1],["13912:Skyrim.esm",1],["13913:Skyrim.esm",1],["13985:Skyrim.esm",1],["1397d:Skyrim.esm",60],["1397e:Skyrim.esm",1],["3eae5:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80012:Thornswood-Content.esp":{"key":"mage","gear":[["10710a:Skyrim.esm",1],["d1921:Skyrim.esm",1],["9cd51:Skyrim.esm",1],["9e2af:Skyrim.esm",1],["2e4e2:Skyrim.esm",2],["3eae0:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80013:Thornswood-Content.esp":{"key":"smith","gear":[["5b69f:Skyrim.esm",1],["5b69e:Skyrim.esm",1],["5ace4:Skyrim.esm",5],["5ace5:Skyrim.esm",2],["800e4:Skyrim.esm",10],["f:Skyrim.esm",100]]},"e80014:Thornswood-Content.esp":{"key":"miner","gear":[["80697:Skyrim.esm",1],["80699:Skyrim.esm",1],["e3c16:Skyrim.esm",1],["1d4ec:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80015:Thornswood-Content.esp":{"key":"woodworker","gear":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1],["2f2f4:Skyrim.esm",1],["1d4ec:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e80016:Thornswood-Content.esp":{"key":"alchemist","gear":[["bacf3:Skyrim.esm",1],["bacd7:Skyrim.esm",1],["1397e:Skyrim.esm",1],["45c28:Skyrim.esm",3],["59b86:Skyrim.esm",2],["134aa:Skyrim.esm",3],["34d31:Skyrim.esm",3],["5076e:Skyrim.esm",3],["516c8:Skyrim.esm",2],["ae723:Skyrim.esm",1],["f:Skyrim.esm",75]]},"e80017:Thornswood-Content.esp":{"key":"bard","gear":[["5b6a1:Skyrim.esm",1],["5b6a0:Skyrim.esm",1],["1397e:Skyrim.esm",1],["1d9b:PlayFluteLuteDrum.esp",1],["287f:PlayFluteLuteDrum.esp",1],["d62:PlayFluteLuteDrum.esp",1],["65c97:Skyrim.esm",2],["64b31:Skyrim.esm",2],["f:Skyrim.esm",200]]},"e80018:Thornswood-Content.esp":{"key":"cook","gear":[["1bc82:Skyrim.esm",1],["1bca7:Skyrim.esm",1],["18801:Skyrim.esm",1],["721e8:Skyrim.esm",3],["e8947:Skyrim.esm",3],["722bd:Skyrim.esm",2],["64b43:Skyrim.esm",2],["f4314:Skyrim.esm",2],["64b41:Skyrim.esm",4],["64b3f:Skyrim.esm",3],["64b40:Skyrim.esm",3],["669a5:Skyrim.esm",3],["1397e:Skyrim.esm",1],["f:Skyrim.esm",75]]},"e80019:Thornswood-Content.esp":{"key":"enchanter","gear":[["10710a:Skyrim.esm",1],["d1921:Skyrim.esm",1],["2e4e2:Skyrim.esm",3],["2e4e4:Skyrim.esm",2],["2e4e6:Skyrim.esm",1],["1397e:Skyrim.esm",1],["3eae0:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001a:Thornswood-Content.esp":{"key":"farmer","gear":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1],["4b0ba:Skyrim.esm",5],["64b41:Skyrim.esm",4],["64b3f:Skyrim.esm",3],["64b40:Skyrim.esm",3],["669a5:Skyrim.esm",2],["1397e:Skyrim.esm",1],["2f2f4:Skyrim.esm",1],["f:Skyrim.esm",75]]},"e8001b:Thornswood-Content.esp":{"key":"fisher","gear":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1],["207e2:FishingInSkyrim.esp",1],["d68:FishingInSkyrim.esp",1],["25eb7:FishingInSkyrim.esp",1],["65c9f:Skyrim.esm",3],["64b3b:Skyrim.esm",2],["1397e:Skyrim.esm",1],["65c97:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001c:Thornswood-Content.esp":{"key":"merchant","gear":[["86991:Skyrim.esm",1],["86993:Skyrim.esm",1],["878bb:Skyrim.esm",1],["1397e:Skyrim.esm",1],["3eadd:Skyrim.esm",2],["3eae0:Skyrim.esm",1],["64b31:Skyrim.esm",3],["65c97:Skyrim.esm",3],["f:Skyrim.esm",400]]},"e8001d:Thornswood-Content.esp":{"key":"priest","gear":[["bacf3:Skyrim.esm",1],["bacd7:Skyrim.esm",1],["9e2af:Skyrim.esm",1],["cc848:Skyrim.esm",1],["c891b:Skyrim.esm",1],["ae723:Skyrim.esm",2],["3eadd:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001e:Thornswood-Content.esp":{"key":"scholar","gear":[["10710a:Skyrim.esm",1],["d1921:Skyrim.esm",1],["9e2a8:Skyrim.esm",1],["9cd53:Skyrim.esm",1],["1d4ec:Skyrim.esm",2],["3eae0:Skyrim.esm",2],["f:Skyrim.esm",75]]},"e8001f:Thornswood-Content.esp":{"key":"thief","gear":[["3619e:Skyrim.esm",1],["13920:Skyrim.esm",1],["13921:Skyrim.esm",1],["1397e:Skyrim.esm",1],["a:Skyrim.esm",15],["3eae5:Skyrim.esm",2],["f:Skyrim.esm",75]]}},"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-178.0,-1504.0,128.0],"rot":[0,0,90.0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16.0],"rot":[0,0,180.0]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[673.1,-620.3,0.0],"rot":[0,0,180.0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1824.3,-683.7,0.0],"rot":[0,0,180.0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}},"tradeMenus":["e80050:Thornswood-Content.esp","e80051:Thornswood-Content.esp"],"townMenus":["e80052:Thornswood-Content.esp","e80053:Thornswood-Content.esp"],"tradePages":[["e80010:Thornswood-Content.esp","e80011:Thornswood-Content.esp","e80012:Thornswood-Content.esp","e80013:Thornswood-Content.esp","e80014:Thornswood-Content.esp","e80015:Thornswood-Content.esp","e80016:Thornswood-Content.esp","e80017:Thornswood-Content.esp"],["e80018:Thornswood-Content.esp","e80019:Thornswood-Content.esp","e8001a:Thornswood-Content.esp","e8001b:Thornswood-Content.esp","e8001c:Thornswood-Content.esp","e8001d:Thornswood-Content.esp","e8001e:Thornswood-Content.esp","e8001f:Thornswood-Content.esp"]],"townPages":[["e80030:Thornswood-Content.esp","e80031:Thornswood-Content.esp","e80032:Thornswood-Content.esp","e80033:Thornswood-Content.esp","e80034:Thornswood-Content.esp"],["e80035:Thornswood-Content.esp","e80036:Thornswood-Content.esp","e80037:Thornswood-Content.esp","e80038:Thornswood-Content.esp"]]};
-
-const WELCOME_BOOK = CHARGEN.welcome;
+const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-178.0,-1504.0,128.0],"rot":[0,0,90.0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16.0],"rot":[0,0,180.0]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[673.1,-620.3,0.0],"rot":[0,0,180.0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1824.3,-683.7,0.0],"rot":[0,0,180.0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}}};
 
 /* Something to wear while choosing. The appearance menu hands you back with an
- * empty inventory, and picking a trade naked in a stone room is nobody's idea
+ * empty inventory, and choosing a life naked in a stone room is nobody's idea
  * of a first morning. */
 const SHIFT = CHARGEN.shift;
 
-/* Sixteen trades and ten towns, generated from the same table the plugin and
- * the message box records came from, so the three cannot drift apart. */
-const CLASSES = CHARGEN.classes;
+/* Nine towns, each with the inn a new arrival wakes up in. The one table left
+ * of the sixteen trades and their kits. The class, the profession and the
+ * half are the character block's (progression, further down), and nothing is
+ * handed out for any of them: decided by Patrick on 20 September, the starter
+ * kits are gone, and everybody begins with the shift and what they earn. */
 const PASSAGES = CHARGEN.towns;
 
-/* The launcher sends a trade and a town as their short keys, 'warrior' and
- * 'whiterun', because those are stable. The records are keyed by descriptor,
- * which is not: it carries the plugin name and moves whenever the content is
- * rebuilt. So the lookup goes through the key. */
-const CLASS_BY_KEY = (function () {
-  const m = {};
-  for (const desc in CLASSES) { m[CLASSES[desc].key] = desc; }
-  return m;
-})();
+/* The panel sends a town as its short key, 'whiterun', because that is
+ * stable. The records are keyed by descriptor, which is not: it carries the
+ * plugin name and moves whenever the content is rebuilt. */
 const TOWN_BY_KEY = (function () {
   const m = {};
   for (const desc in PASSAGES) { m[PASSAGES[desc].key] = desc; }
   return m;
 })();
 
-/* What people picked in the launcher, fetched from the voice service, which is
- * the one thing both the launcher and this can reach. Refreshed on a timer
- * rather than asked for on demand, because the tick must never wait on a
- * socket: a slow answer there would stall everybody's creation, not just the
- * person it was for. */
-let launcherChoices = {};
-let choiceFetchFailed = false;
-
-function refreshChoices() {
-  let http;
-  try { http = require('http'); } catch (e) { return; }
-  const req = http.request({
-    host: '127.0.0.1', port: voicePort(), path: '/choices', method: 'GET', timeout: 2000
-  }, (res) => {
-    let body = '';
-    res.on('data', (d) => { body += d; });
-    res.on('end', () => {
-      try {
-        const got = JSON.parse(body) || {};
-        const before = Object.keys(launcherChoices).length;
-        const after = Object.keys(got).length;
-        launcherChoices = got;
-        // Only when it changes, or this writes a line every two seconds
-        // forever and the log becomes useless for anything else.
-        if (before !== after) {
-          log('chargen: the launcher has', after, 'choice(s) waiting:',
-              Object.keys(got).join(', '));
-        }
-      } catch (e) {
-        log('chargen: could not read the choices list:', e);
-      }
-    });
-  });
-  req.on('error', function (e) {
-    if (!choiceFetchFailed) {
-      choiceFetchFailed = true;
-      log('chargen: cannot reach the voice service for launcher choices:',
-          e && e.message ? e.message : e);
-    }
-  });
-  req.on('timeout', function () { req.destroy(); });
-  req.end();
-}
-
-function claimChoice(profileId) {
-  let http;
-  try { http = require('http'); } catch (e) { return; }
-  const payload = JSON.stringify({ profileId: profileId });
-  const req = http.request({
-    host: '127.0.0.1', port: voicePort(), path: '/claimed', method: 'POST', timeout: 2000,
-    headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) }
-  }, function () { });
-  req.on('error', function () { });
-  req.on('timeout', function () { req.destroy(); });
-  req.end(payload);
-  delete launcherChoices[String(profileId)];
+/** The town list as the panel shows it: key and name, in the table's order. */
+function townsForPanel() {
+  const out = [];
+  for (const desc in PASSAGES) {
+    const t = PASSAGES[desc];
+    if (t && t.arrival) { out.push({ key: t.key, name: t.town }); }
+  }
+  return out;
 }
 
 /**
- * Everything the books used to do, done at once, from a choice already made.
- *
- * Returns true when it applied. The books remain the fallback for anybody whose
- * launcher did not send one, so nothing is lost if the two ever disagree.
+ * The shift, worn. Given the moment the face is made, which is the moment the
+ * race menu has emptied the pack, and well before the teleport: an inventory
+ * write and a teleport composed in the same tick reach the client as a load
+ * and a set of item changes racing each other, which is how a bard once
+ * arrived in Windhelm with everything but a shirt.
  */
-function applyLauncherChoice(actorId, state, choice) {
-  const classDesc = CLASS_BY_KEY[choice.trade];
-  const townDesc = TOWN_BY_KEY[choice.town];
-  if (!classDesc || !townDesc) {
-    log('chargen', actorId.toString(16), 'launcher sent an unknown choice:',
-        choice.trade, '/', choice.town, '- falling back to the books');
+function giveShift(actorId) {
+  let inv = { entries: [] };
+  try { inv = mp.get(actorId, 'inventory') || { entries: [] }; } catch (e) { return; }
+  const entries = (inv.entries || []).slice();
+  let added = 0;
+  for (const pair of SHIFT) {
+    const baseId = idOf(pair[0]);
+    if (!baseId) { continue; }
+    let have = false;
+    for (const e of entries) { if (e.baseId === baseId) { have = true; break; } }
+    if (have) { continue; }
+    entries.push({ baseId: baseId, count: pair[1], worn: true });
+    added++;
+  }
+  if (added) { mp.set(actorId, 'inventory', { entries: entries }); }
+}
+
+/**
+ * The face is made. Now the panel.
+ *
+ * Class, profession and a home town are chosen in the game, on K, checked by
+ * the character block, and the last of the three brings them back here to
+ * arriveAt. Nothing is chosen anywhere else. The launcher used to send a
+ * choice ahead through the voice service and this waited on it, which is what
+ * left people standing in this room when the choice went to the wrong service
+ * (the dev server asks the dev voice service; the launcher told the live one,
+ * 20 September) or never came at all.
+ */
+function beginChoosing(actorId, state, why) {
+  giveShift(actorId);
+  state.stage = 'choosing';
+  state.at = Date.now();
+  state.remindAt = Date.now() + CHOOSE_REMIND_MS;
+  setChargen(actorId, state);
+  closeRaceMenu(actorId);
+  const opened = openCreation(actorId);
+  say(actorId, 'Welcome to Thornswood. Press K to choose your class, your profession ' +
+               'and where you will start.');
+  log('chargen', actorId.toString(16), '-> choosing (' + why + ')' +
+      (opened ? ', panel opened' : ', panel NOT opened'));
+}
+
+/** Ask the character block to push the panel open on this person's screen. */
+function openCreation(actorId) {
+  try {
+    const c = globalThis.__thornswoodCharacter;
+    if (c && c.beginCreation) { c.beginCreation(actorId); return true; }
+  } catch (e) {
+    log('chargen', actorId.toString(16), 'could not open creation:', e);
+  }
+  return false;
+}
+
+/**
+ * The last choice is in. Off to the town.
+ *
+ * Called by the character block when class, profession and home are all set
+ * on somebody whose stage is choosing. Returns true when they were sent.
+ */
+function arriveAt(actorId, townKey) {
+  const state = chargenOf(actorId);
+  if (!state || state.stage !== 'choosing') { return false; }
+  const desc = TOWN_BY_KEY[String(townKey || '').toLowerCase()];
+  const entry = desc ? PASSAGES[desc] : null;
+  if (!entry || !entry.arrival) {
+    log('chargen', actorId.toString(16), 'no such town', townKey, '- staying in the hall');
     return false;
   }
-
-  const cls = CLASSES[classDesc];
-  const entry = PASSAGES[townDesc];
   const arrival = entry.arrival;
-  if (!arrival) {
-    log('chargen', actorId.toString(16), 'no arrival for', entry.key, '- falling back to the books');
-    return false;
-  }
-
-  // Deliberately no items here. See the 'arriving' stage below.
-  //
-  // They used to be handed over in this breath, immediately before the two
-  // lines that teleport somebody across Skyrim, and a bard turned up in
-  // Windhelm with his lute, his flute, his drum, his dagger, his bread, his
-  // cheese and his two hundred gold, and no shirt. One entry out of nine, gone.
-  //
-  // An inventory write and a teleport composed in the same server tick reach
-  // the client as a load and a set of item changes racing each other, and the
-  // client rebuilds the actor around whichever it finishes first. So the
-  // teleport goes now and the kit follows once they have landed, and then it is
-  // read back and checked rather than assumed.
   mp.set(actorId, 'spawnPoint', {
     cellOrWorldDesc: arrival.desc, pos: arrival.pos, rot: arrival.rot,
   });
   mp.set(actorId, 'locationalData', {
     cellOrWorldDesc: arrival.desc, pos: arrival.pos, rot: arrival.rot,
   });
-
-  state.stage = 'arriving';
-  state.class = cls.key;
-  /* The three the launcher now sends. Only 'class' keys a starter kit, because
-   * the kits are form ids in the content and there is one per profession.
-   *
-   *   class       the profession, and the kit
-   *   half        which side of it. One key, or two joined by + for a mage's
-   *               two schools. Decides what they are able to MAKE, which is
-   *               server side and has nothing to do with what they carry.
-   *   gathering   hunter, fisher, miner, farmer or gatherer. Owns a verb
-   *               nobody else has. Carries no kit on purpose: a miner buys a
-   *               pickaxe like anybody else would have to.
-   *
-   * Stored on the character here so the crafting and gathering checks have
-   * them the moment they are written, rather than waiting for a second trip. */
-  state.half = String(choice.half || '');
-  state.gathering = String(choice.cls || '');
+  state.stage = 'done';
   state.destination = entry.key;
-  state.fromLauncher = true;
   state.at = Date.now();
-  state.gearAt = Date.now() + GEAR_DELAY_MS;
-  state.gearTries = 0;
-  state.clean = 0;
   setChargen(actorId, state);
   closeRaceMenu(actorId);
-
-  log('chargen', actorId.toString(16), 'launcher choice applied:',
-      cls.key + (state.half ? '/' + state.half : '') +
-      (state.gathering ? ', ' + state.gathering : ''),
-      'in', entry.key, '(' + arrival.cell + '), kit to follow');
+  log('chargen', actorId.toString(16), 'home =', entry.key, '(' + arrival.cell + ') -> done');
   return true;
 }
+
+/* What the character block, further down the file, needs from here. Through
+ * the global rather than the scope, the same way it reaches the rules, so the
+ * sections stay separable. */
+globalThis.__thornswoodChargen = {
+  towns: townsForPanel,
+  hasTown: function (key) { return !!TOWN_BY_KEY[String(key || '').toLowerCase()]; },
+  isChoosing: function (actorId) {
+    const st = chargenOf(actorId);
+    return !!(st && st.stage === 'choosing');
+  },
+  arrive: arriveAt
+};
 
 /**
  * The race menu is finished with, whatever route got us here.
@@ -827,33 +772,6 @@ function closeRaceMenu(actorId) {
   } catch (e) {
     log('chargen', actorId.toString(16), 'could not close the race menu:', e);
   }
-}
-
-/**
- * Put whatever is missing from somebody's trade kit into their pack.
- *
- * Returns the number of entries it had to add. Zero means the kit is all there,
- * which is the only thing worth trusting: the point of this function is that
- * setting an inventory is not the same as somebody having the items.
- */
-function ensureGear(actorId, gear) {
-  let have = { entries: [] };
-  try { have = mp.get(actorId, 'inventory') || { entries: [] }; } catch (e) { return -1; }
-  const entries = have.entries || [];
-
-  const missing = [];
-  for (const pair of gear) {
-    const baseId = idOf(pair[0]);
-    if (!baseId) { continue; }
-    let count = 0;
-    for (const e of entries) {
-      if (e.baseId === baseId) { count = e.count || 0; break; }
-    }
-    if (count < pair[1]) { missing.push([pair[0], pair[1] - count]); }
-  }
-
-  if (missing.length) { giveItems(actorId, missing, +1); }
-  return missing.length;
 }
 
 /**
@@ -916,13 +834,6 @@ function giveItems(actorId, pairs, sign) {
     if (entries[at].count <= 0) entries.splice(at, 1);
   }
   mp.set(actorId, 'inventory', { entries: entries });
-}
-
-/** Every writ, or every passage, as [descriptor, 1] pairs. */
-function oneOfEach(table) {
-  const out = [];
-  for (const d in table) out.push([d, 1]);
-  return out;
 }
 
 /** Put somebody in the creation hall. Once, at the moment the stage opens. */
@@ -989,60 +900,13 @@ function beginAppearance(actorId) {
       state.moved ? '(moving to the hall, menu to follow)' : '(already in the hall)');
 }
 
-function beginClass(actorId, state) {
-  giveItems(actorId, SHIFT.concat([[WELCOME_BOOK, 1]]).concat(oneOfEach(CLASSES)), +1);
-  state.stage = 'class';
-  state.at = Date.now();
-  setChargen(actorId, state);
-  log('chargen', actorId.toString(16), '-> class');
-}
-
-function chooseClass(actorId, state, desc) {
-  const cls = CLASSES[desc];
-  giveItems(actorId, oneOfEach(CLASSES), -1);
-  giveItems(actorId, cls.gear.concat(oneOfEach(PASSAGES)), +1);
-  state.stage = 'destination';
-  state.class = cls.key;
-  state.at = Date.now();
-  setChargen(actorId, state);
-  log('chargen', actorId.toString(16), 'class =', cls.key, '-> destination');
-}
-
-function chooseDestination(actorId, state, desc) {
-  const entry = PASSAGES[desc];
-  const town = entry.key;
-  const arrival = entry.arrival;
-  giveItems(actorId, oneOfEach(PASSAGES).concat([[WELCOME_BOOK, 1]]), -1);
-
-  if (!arrival) {
-    log('chargen', actorId.toString(16), 'no arrival for', town, '- staying in the hall');
-    return;
-  }
-  mp.set(actorId, 'spawnPoint', {
-    cellOrWorldDesc: arrival.desc,
-    pos: arrival.pos,
-    rot: arrival.rot,
-  });
-  mp.set(actorId, 'locationalData', {
-    cellOrWorldDesc: arrival.desc,
-    pos: arrival.pos,
-    rot: arrival.rot,
-  });
-  state.stage = 'done';
-  state.destination = town;
-  state.at = Date.now();
-  setChargen(actorId, state);
-  closeRaceMenu(actorId);
-  log('chargen', actorId.toString(16), 'destination =', town,
-      '(' + arrival.cell + ') -> done');
-}
-
 /**
  * One pass over everybody online.
  *
- * The only transition the timer owns is appearance -> class, because the race
- * menu closing is not an event either: the appearance simply turns up on the
- * change form, and this notices. The rest is driven by onReadBook.
+ * The timer owns two transitions: appearance -> choosing, because the race
+ * menu closing is not an event, the appearance simply turns up on the change
+ * form and this notices; and the reminder while somebody is choosing. The
+ * exit from choosing is the character block's, when the last pick lands.
  */
 function chargenTick() {
   if (!CHARGEN_ENABLED) {
@@ -1230,23 +1094,13 @@ function chargenTick() {
             ', so creation is skipped for them');
         setChargen(actorId, { stage: 'done', at: now, legacy: true });
         closeRaceMenu(actorId);
-        // The choice is stale the moment it turns out to belong to somebody
-        // who already exists. Dropping it here is what stops this character
-        // looking new again on the next login, and the one after that.
-        if (pidNew && launcherChoices[String(pidNew)]) {
-          claimChoice(pidNew);
-          log('chargen', actorId.toString(16),
-              'dropped the stale launcher choice for profile', pidNew);
-        }
         continue;
       }
 
-      // Genuinely new: an empty pack, standing in the hall. Whether a choice
-      // is waiting only changes the log line; the flow reads it later.
+      // Genuinely new: an empty pack, standing in the hall.
       log('chargen', actorId.toString(16), 'profile', pidNew,
           'is new, in the hall with nothing' +
-          (appearance ? ', face already on' : '') +
-          (pidNew && launcherChoices[String(pidNew)] ? ', the launcher has a choice waiting' : ', no launcher choice'));
+          (appearance ? ', face already on' : ''));
       beginAppearance(actorId);
       continue;
     }
@@ -1268,61 +1122,37 @@ function chargenTick() {
       try { armBard(actorId); } catch (e) { }
     }
 
-    // Landed, or landing. The kit goes in here rather than alongside the
-    // teleport, and then it is checked. Three clean passes and we stop looking.
+    // 'arriving' was the kit top-up after the teleport. There are no kits, so
+    // anybody still marked arriving from before 20 September is simply done.
     if (state.stage === 'arriving') {
-      // Left over from a session that ended before the kit read back complete.
-      // Close it, and do not touch what they are carrying.
-      const arrivedAt = Number(state.at) || 0;
-      if (arrivedAt && (now - arrivedAt) > ARRIVE_WINDOW_MS) {
-        state.stage = 'done';
-        setChargen(actorId, state);
-        closeRaceMenu(actorId);
-        if (state.class === 'bard') { try { armBard(actorId); } catch (e) { } }
-        log('chargen', actorId.toString(16), 'was still marked arriving from',
-            Math.round((now - arrivedAt) / 60000) + ' minutes ago.',
-            'Closing it without touching their pack.');
-        continue;
-      }
-
-      if (now < (state.gearAt || 0)) { continue; }
-
-      const classDesc = CLASS_BY_KEY[state.class];
-      const cls = classDesc ? CLASSES[classDesc] : null;
-      if (!cls) {
-        log('chargen', actorId.toString(16), 'no kit for', state.class, '- nothing to hand over');
-        state.stage = 'done';
-        setChargen(actorId, state);
-        closeRaceMenu(actorId);
-        continue;
-      }
-
-      const added = ensureGear(actorId, cls.gear);
-      state.gearAt = now + GEAR_RECHECK_MS;
-      state.gearTries = (state.gearTries || 0) + 1;
-
-      if (added > 0) {
-        state.clean = 0;
-        log('chargen', actorId.toString(16), 'put', added,
-            added === 1 ? 'missing item' : 'missing items', 'into the', state.class, 'kit',
-            '(pass ' + state.gearTries + ')');
-      } else if (added === 0) {
-        state.clean = (state.clean || 0) + 1;
-      }
-
-      if ((state.clean || 0) >= 3 || state.gearTries > 12) {
-        state.stage = 'done';
-        setChargen(actorId, state);
-        closeRaceMenu(actorId);
-        // Here rather than with the items, because the instruments have to be
-        // in the pack before the ability to use them is worth anything, and
-        // this is the one point that knows they are.
-        if (state.class === 'bard') { try { armBard(actorId); } catch (e) { } }
-        log('chargen', actorId.toString(16), 'kit confirmed:', state.class, 'in', state.destination);
-        continue;
-      }
-
+      state.stage = 'done';
       setChargen(actorId, state);
+      closeRaceMenu(actorId);
+      if (state.class === 'bard') { try { armBard(actorId); } catch (e) { } }
+      log('chargen', actorId.toString(16), 'was marked arriving from before the kits went; closed');
+      continue;
+    }
+
+    /*
+      Standing in the hall with the panel to fill in.
+
+      The exit is not here: the character block sends them the moment the
+      third pick lands (arriveAt). This is the reminder, and the reopen after
+      a reconnect, because the page that had the panel is gone with the old
+      session and the property does not fire again on its own.
+    */
+    if (state.stage === 'choosing') {
+      const cameOnC = firstSeen.get(actorId) || 0;
+      if (state.seenAt !== cameOnC) {
+        state.seenAt = cameOnC;
+        state.remindAt = now;
+        setChargen(actorId, state);
+      }
+      if (now < (state.remindAt || 0)) { continue; }
+      state.remindAt = now + CHOOSE_REMIND_MS;
+      setChargen(actorId, state);
+      openCreation(actorId);
+      say(actorId, 'Press K to choose your class, your profession and where you will start.');
       continue;
     }
 
@@ -1349,7 +1179,6 @@ function chargenTick() {
         delete state.where;
         delete state.askedAt;
         delete state.nudged;
-        delete state.waitedForChoice;
         // Long enough for the arrival to settle before a baseline is taken,
         // the same grace a fresh arrival gets.
         state.askAt = now + 4000;
@@ -1447,47 +1276,7 @@ function chargenTick() {
       const faceIsNew = !!appearance && faceNow !== (state.faceWas || '');
 
       if (faceIsNew) {
-        // Straight from the launcher if they chose there, which is the path
-        // everybody takes now. The books below are what happens when they did
-        // not, which is an old launcher or a choice that did not arrive.
-        let pid = 0;
-        try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
-        const choice = pid ? launcherChoices[String(pid)] : null;
-
-        if (choice && applyLauncherChoice(actorId, state, choice)) {
-          claimChoice(pid);
-          continue;
-        }
-
-        // No books. The trade and the town are chosen in the launcher and
-        // nowhere else, so nothing here ever puts a writ or a passage in
-        // anybody's pack.
-        //
-        // What is left is the case where the choice never arrives: the voice
-        // service is down, or the post failed, or they are on an old launcher.
-        // Standing in an empty room forever is the worst possible answer to
-        // that, so after a wait they start as a warrior in Whiterun and the log
-        // says so loudly. Somebody in the wrong trade can be fixed in a minute.
-        // Somebody stuck in a room cannot do anything at all.
-        if (!state.waitedForChoice) {
-          state.waitedForChoice = Date.now();
-          setChargen(actorId, state);
-          log('chargen', actorId.toString(16), 'has a face, profile', pid,
-              '- no launcher choice for that id yet.',
-              'Known ids:', Object.keys(launcherChoices).join(', ') || '(none)');
-          continue;
-        }
-        if (now - state.waitedForChoice < CHOICE_WAIT_MS) {
-          continue;
-        }
-
-        log('chargen', actorId.toString(16), 'NO LAUNCHER CHOICE after',
-            Math.round((now - state.waitedForChoice) / 1000) + 's for profile', pid + '.',
-            'Starting them as', DEFAULT_TRADE, 'in', DEFAULT_TOWN,
-            'so they are not stuck. This should not happen.');
-        if (!applyLauncherChoice(actorId, state, { trade: DEFAULT_TRADE, town: DEFAULT_TOWN })) {
-          log('chargen', actorId.toString(16), 'could not even apply the default. Something is very wrong.');
-        }
+        beginChoosing(actorId, state, 'the face arrived');
         continue;
       }
 
@@ -1512,33 +1301,21 @@ function chargenTick() {
       // was already measuring it a dozen lines up in order to decide whether
       // nudging was safe.
       //
-      // So: on your feet for eight seconds, with a trade and a town already
-      // waiting from the launcher, and we get on with it. The appearance can
-      // arrive whenever it likes.
+      // So: on your feet, and we get on with it. The appearance can arrive
+      // whenever it likes.
       const onFeetFor = state.liveSince ? (now - state.liveSince) : 0;
 
       if (onFeetFor > MOVED_ENOUGH_MS) {
-        let pidM = 0;
-        try { pidM = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pidM = 0; }
-        const choiceM = pidM ? launcherChoices[String(pidM)] : null;
-
-        if (choiceM) {
-          // Said in full because the appearance not arriving is still a bug
-          // and this is the only place it can be seen from.
-          log('chargen', actorId.toString(16), 'walking after',
-              Math.round(onFeetFor / 1000) + 's and the face never arrived.',
-              'appearance is', appearance ? 'present' : 'MISSING,',
-              'mark now', JSON.stringify(faceNow) + ',',
-              'mark at the start', JSON.stringify(state.faceWas || '') + '.',
-              'Going on the movement instead.');
-
-          if (applyLauncherChoice(actorId, state, choiceM)) {
-            claimChoice(pidM);
-            continue;
-          }
-          log('chargen', actorId.toString(16),
-              'could not apply the launcher choice on the movement path.');
-        }
+        // Said in full because the appearance not arriving is still a bug
+        // and this is the only place it can be seen from.
+        log('chargen', actorId.toString(16), 'walking after',
+            Math.round(onFeetFor / 1000) + 's and the face never arrived.',
+            'appearance is', appearance ? 'present' : 'MISSING,',
+            'mark now', JSON.stringify(faceNow) + ',',
+            'mark at the start', JSON.stringify(state.faceWas || '') + '.',
+            'Going on the movement instead.');
+        beginChoosing(actorId, state, 'on their feet');
+        continue;
       }
 
       // Nobody is ever left standing in the hall with nothing to do.
@@ -1595,19 +1372,10 @@ function chargenTick() {
         // Still no face. Go on without one rather than leave them standing
         // here: a character who never saw the race menu can change their face
         // later, a character who cannot leave the room can do nothing at all.
-        let pid2 = 0;
-        try { pid2 = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid2 = 0; }
-        const c2 = pid2 ? launcherChoices[String(pid2)] : null;
-
         log('chargen', actorId.toString(16),
             'appearance never arrived after', Math.round(waited / 1000) + 's,',
-            'starting them anyway');
-
-        if (c2 && applyLauncherChoice(actorId, state, c2)) {
-          claimChoice(pid2);
-        } else {
-          applyLauncherChoice(actorId, state, { trade: DEFAULT_TRADE, town: DEFAULT_TOWN });
-        }
+            'going on to the choices anyway');
+        beginChoosing(actorId, state, 'no face after ' + Math.round(waited / 1000) + 's');
       }
     }
   }
@@ -1619,12 +1387,6 @@ function startChargenTimer() {
     return;
   }
 
-  // Every two seconds is often enough: somebody presses Play, then sits through
-  // a loading screen and the race menu before any of this is needed.
-  const g2 = globalThis;
-  if (g2.__thornswoodChoiceTimer) { clearInterval(g2.__thornswoodChoiceTimer); }
-  g2.__thornswoodChoiceTimer = setInterval(guard('refreshChoices', refreshChoices), 2000);
-  refreshChoices();
   // Hot reload runs this file again in a fresh module, but the Node process and
   // its timers survive. Without this the ticks stack up one per save.
   const g = globalThis;
@@ -1633,36 +1395,6 @@ function startChargenTimer() {
   }
   g.__thornswoodChargenTimer = setInterval(guard('chargenTick', chargenTick),
                                            CHARGEN_TICK_MS);
-}
-
-/** Returns true if the book was a chargen book and has been dealt with. */
-function chargenReadBook(actorId, baseId) {
-  if (!CHARGEN_ENABLED) {
-    return false;
-  }
-  const state = chargenOf(actorId);
-
-  for (const desc in CLASSES) {
-    if (idOf(desc) !== baseId) continue;
-    if (!state || state.stage !== 'class') {
-      log('chargen', actorId.toString(16), 'read a writ out of turn, ignoring');
-      return true;
-    }
-    chooseClass(actorId, state, desc);
-    return true;
-  }
-
-  for (const desc in PASSAGES) {
-    if (idOf(desc) !== baseId) continue;
-    if (!state || state.stage !== 'destination') {
-      log('chargen', actorId.toString(16), 'read a passage out of turn, ignoring');
-      return true;
-    }
-    chooseDestination(actorId, state, desc);
-    return true;
-  }
-
-  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -1723,8 +1455,6 @@ mp.onRespawn = guard('onRespawn', function (actorId) {
  * harmless and grants nothing twice.
  */
 mp.onReadBook = guard('onReadBook', function (actorId, baseId) {
-  if (chargenReadBook(actorId, baseId)) return;
-
   for (const d in MANUALS) {
     if (idOf(d) !== baseId) continue;
     const m = MANUALS[d];
@@ -1957,7 +1687,6 @@ log('gamemode loaded:',
     Object.keys(DATA.cellToHold).length + ' cells mapped,',
     Object.keys(MANUALS).length + ' manuals,',
     Object.keys(STATIONS).length + ' station types,',
-    Object.keys(CLASSES).length + ' trades,',
     Object.keys(PASSAGES).length + ' starting towns');
 
 // ==== thornswood voice feed, added by Add-VoiceFeed.ps1 ====
@@ -2359,6 +2088,10 @@ log('gamemode loaded:',
         var look = mp.get(id, 'appearance') || null;
         var state = null;
         try { state = chargenOf(id); } catch (e) { state = null; }
+        // The profession lives on the character property since 20 September;
+        // the old trade key is read for anybody made before it.
+        var ch = null;
+        try { ch = mp.get(id, 'thornswoodCharacter'); } catch (e) { ch = null; }
 
         var where = '';
         try { where = placeName(mp.get(id, 'worldOrCellDesc')); } catch (e) { where = ''; }
@@ -2367,7 +2100,7 @@ log('gamemode loaded:',
           name: String((look && look.name) || ''),
           race: look ? raceName(look.raceId) : '',
           female: !!(look && look.isFemale),
-          trade: String((state && state.class) || ''),
+          trade: String((ch && ch.prof) || (state && state.class) || ''),
           town: String((state && state.destination) || ''),
           // Where they were standing the last time the server looked. Kept on
           // the row rather than thrown away when they log out, because the
@@ -2857,134 +2590,6 @@ log('gamemode loaded:',
 })();
 // ==== end thornswood server manifest ====
 
-// ==== thornswood gear check ====
-// ------------------------------------------------------------ gear check ---
-// Reads back every form id the trade kits hand out and says what it is.
-//
-// Not a formality. These ids come from lists and wikis, and a wrong one does
-// not fail: mp.getIdFromDesc resolves a descriptor against the load order and
-// hands back a number whether or not a record of the expected kind is sitting
-// at it. So a bard can be given three of something silently, or nothing, and
-// the only evidence is somebody opening their pack and finding no lute.
-//
-// So the server reads each one out of the espm it actually loaded and prints
-// the editor id. That is the ground truth on this machine rather than a claim
-// about Skyrim in general, and it costs one pass at startup.
-(function () {
-  var EVERY = 'e80017';   // only the bard is checked loudly; see below
-
-  function textOf(bytes) {
-    var out = '';
-    for (var i = 0; i < bytes.length; i++) {
-      if (!bytes[i]) break;
-      out += String.fromCharCode(bytes[i]);
-    }
-    return out;
-  }
-
-  /** The editor id of a record, or '' when it cannot be read. */
-  function edidOf(id) {
-    try {
-      var found = mp.lookupEspmRecordById(id);
-      var rec = found && found.record;
-      if (!rec) return '';
-      var fields = rec.fields || [];
-      for (var i = 0; i < fields.length; i++) {
-        if (String(fields[i].type) === 'EDID') {
-          return textOf(fields[i].data || []);
-        }
-      }
-      return '(' + String(rec.type || '????') + ', no editor id)';
-    } catch (e) {
-      return '';
-    }
-  }
-
-  setTimeout(function () {
-    var bad = 0;
-    var lines = [];
-
-    for (var desc in CLASSES) {
-      var cls = CLASSES[desc];
-      var gear = cls.gear || [];
-      for (var i = 0; i < gear.length; i++) {
-        var d = gear[i][0];
-        var id = idOf(d);
-        if (!id) {
-          bad++;
-          lines.push('  ' + cls.key + ': ' + d + ' does not resolve at all');
-          continue;
-        }
-        var name = edidOf(id);
-        if (!name) {
-          bad++;
-          lines.push('  ' + cls.key + ': ' + d + ' resolves to ' +
-                     id.toString(16) + ' but there is no record there');
-        }
-      }
-    }
-
-    if (bad) {
-      log('gear check: ' + bad + ' entr' + (bad === 1 ? 'y' : 'ies') + ' in the trade kits is wrong');
-      for (var j = 0; j < lines.length; j++) { log(lines[j]); }
-    } else {
-      log('gear check: every item in every trade kit resolves');
-    }
-
-    // And then the whole thing, by name, class by class.
-    //
-    // Sixteen kits were written from lists, and "several of the classes are
-    // wrong" is not a thing anybody can check by reading hex. A resolved id
-    // proves a record exists at that number; only the editor id proves it is
-    // the record that was meant. This is the one place that can say so, because
-    // it is reading the espm this server actually loaded.
-    log('--- trade kits, as they resolve on this machine ---');
-    for (var d2 in CLASSES) {
-      var c2 = CLASSES[d2];
-      var parts = [];
-      var g2 = c2.gear || [];
-      for (var q = 0; q < g2.length; q++) {
-        var gid = idOf(g2[q][0]);
-        var nm = gid ? (edidOf(gid) || '???') : 'UNRESOLVED';
-        parts.push(g2[q][0].split(':')[0] + ' ' + nm + (g2[q][1] > 1 ? ' x' + g2[q][1] : ''));
-      }
-      log('  ' + c2.key + ': ' + parts.join(' | '));
-    }
-    log('--- end trade kits ---');
-
-    // Where a new character lands, which is a raw form id in server-settings
-    // and therefore rots the moment the load order moves.
-    //
-    // It had. startPoints said 0x3919BAD4, which is index 57, which by then was
-    // RaceMenuMorphsCBBE.esp; Skyrim Unbound had drifted to 59. So everybody
-    // spawned at whatever record happened to sit at 0x19BAD4 in a body morph
-    // plugin, the gamemode noticed they were not in the hall and teleported
-    // them, and that is the tavern, then the hall, then the wait, then the
-    // teleport. Deploy-Gamemode.ps1 computes this correctly; Publish-Server
-    // does not run it, so nothing recomputed it and nothing said so.
-    try {
-      var fs2 = require('fs');
-      var cfg2 = JSON.parse(fs2.readFileSync('server-settings.json', 'utf8'));
-      var sp2 = (cfg2.startPoints || [])[0];
-      var want = idOf(HALL.desc);
-      var have = sp2 ? Number(sp2.worldOrCell) : 0;
-      if (!want) {
-        log('start point: cannot resolve ' + HALL.desc + ', so it cannot be checked');
-      } else if (have === want) {
-        log('start point: correct, 0x' + want.toString(16) + ' ' + (edidOf(want) || HALL.desc));
-      } else {
-        log('START POINT IS WRONG. server-settings.json says 0x' + have.toString(16) +
-            ' (' + (edidOf(have) || 'nothing there') + ') and ' + HALL.desc +
-            ' is 0x' + want.toString(16) + '.');
-        log('  Everybody spawns in the wrong cell and gets teleported out of it.');
-        log('  Run Deploy-Gamemode.ps1, then Publish-Server.ps1.');
-      }
-    } catch (e) { }
-  }, 8000);
-})();
-// ==== end thornswood gear check ====
-
-
 
 // ==== thornswood progression ====
 /*
@@ -3380,8 +2985,9 @@ log('gamemode loaded:',
     What the panel is told. Not the whole state: the panel marks what is
     yours and shows rank and points, and nothing on the client needs more.
   */
-  function forPanel(s) {
+  function forPanel(s, creating) {
     if (!s) { return null; }
+    var chargen = g.__thornswoodChargen;
     return {
       profession: s.prof || null,
       'class': s.cls || null,
@@ -3390,13 +2996,23 @@ log('gamemode loaded:',
       ranks: s.ranks || {},
       tree: s.tree || {},
       points: s.points || 0,
-      perks: P.perks(s)
+      perks: P.perks(s),
+      home: s.home || null,
+      // The last refusal, so the panel can say why under itself. The chat
+      // line says the same; the panel cannot read the chat.
+      note: s.note || null,
+      // While creating, the panel opens itself and shows the town list; the
+      // moment the third choice lands this flips and the panel closes.
+      creating: !!creating,
+      towns: (creating && chargen) ? chargen.towns() : []
     };
   }
 
   /*
     The client side script. It runs inside skymp5-client every time the
-    property changes for its owner, with ctx.value the new value. Everything
+    property changes for its owner, with ctx.value the new value. While the
+    server says creating, it also opens the panel, which is how creation
+    lands on somebody's screen without them pressing anything. Everything
     it does is guarded, because a page that has not mounted the panel yet is
     the normal case for the first second of a session.
   */
@@ -3406,7 +3022,8 @@ log('gamemode loaded:',
       '  try {',
       '    var v = ctx.value;',
       '    if (!v || typeof v !== "object") { return; }',
-      '    var src = "try{window.thornswoodSkills&&window.thornswoodSkills.setData(null," + JSON.stringify(v) + ");}catch(e){}";',
+      '    var open = (v.panel && v.panel.creating) ? "window.thornswoodSkills.open();" : "";',
+      '    var src = "try{if(window.thornswoodSkills){window.thornswoodSkills.setData(null," + JSON.stringify(v) + ");" + open + "}}catch(e){}";',
       '    ctx.sp.browser.executeJavaScript(src);',
       '  } catch (e) { }',
       '})();'
@@ -3437,7 +3054,8 @@ log('gamemode loaded:',
     s.v = 1;
     // forPanel is what the client sees; the rules state is what is stored.
     // Both travel in the one property so the panel never sees a half state.
-    s.panel = forPanel(s);
+    var chargen = g.__thornswoodChargen;
+    s.panel = forPanel(s, !!(chargen && chargen.isChoosing(actorId)));
     try { mp.set(actorId, CHAR_PROPERTY, s); } catch (e) { clog('could not write', actorId.toString(16), e); }
     return s;
   }
@@ -3490,9 +3108,16 @@ log('gamemode loaded:',
       /pick class hunter
       /pick profession smith platewright
       /pick profession mage destruction,restoration
+      /pick town riften                  while creating, and never after
+      /pick spend vitality               the panel's spelling of /spend
       /spend vitality
 
     Returns true when the word was one of these, so handle() stops.
+
+    Creation is these same picks. Somebody whose chargen stage is choosing is
+    standing in the hall with the panel open; the moment class, profession and
+    home are all set, arrive sends them to the town and the panel closes on
+    the next property write. Nothing else moves anybody.
   */
   function command(word, parts, actorId, profileId, toProfile) {
     if (word !== '/pick' && word !== '/spend') { return false; }
@@ -3501,6 +3126,8 @@ log('gamemode loaded:',
       return true;
     }
     var s = stateOf(actorId);
+    var chargen = g.__thornswoodChargen;
+    var creating = !!(chargen && chargen.isChoosing(actorId));
     var r = null;
 
     if (word === '/pick') {
@@ -3517,8 +3144,21 @@ log('gamemode loaded:',
         r = (prof === 'mage')
           ? P.pickProfession(s, prof, rest ? rest.split(',') : [])
           : P.pickProfession(s, prof, mapHalf(rest));
+      } else if (what === 'town') {
+        var town = String(parts[2] || '').toLowerCase();
+        if (!creating) {
+          r = { ok: false, why: 'your home is already chosen' };
+        } else if (!chargen.hasTown(town)) {
+          r = { ok: false, why: 'no such town' };
+        } else {
+          var s2 = P.clone(s);
+          s2.home = town;
+          r = { ok: true, state: s2 };
+        }
+      } else if (what === 'spend') {
+        r = P.spendPoint(s, String(parts[2] || '').toLowerCase());
       } else {
-        toProfile(profileId, 'Pick what? class, or profession.');
+        toProfile(profileId, 'Pick what? class, profession or town.');
         return true;
       }
     } else {
@@ -3527,18 +3167,42 @@ log('gamemode loaded:',
 
     if (!r.ok) {
       toProfile(profileId, 'No: ' + r.why + '.');
+      // The same word to the panel, through the property, since a refusal
+      // changes nothing else and the panel would otherwise sit on 'Sent'.
+      s.note = { text: r.why, at: Date.now() };
+      writeState(actorId, s);
       clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'refused:', r.why);
       return true;
     }
-    writeState(actorId, r.state);
+    r.state.note = null;
+    var st = writeState(actorId, r.state);
     clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'accepted');
+
+    if (creating && st.cls && st.prof && st.home) {
+      if (chargen.arrive(actorId, st.home)) {
+        // Written again so the panel hears creating is over and closes.
+        writeState(actorId, st);
+        clog('creation finished for', actorId.toString(16) + ':', st.cls + ',', st.prof +
+             (st.half ? '/' + st.half : '') + (st.schools && st.schools.length ? '/' + st.schools.join('+') : '') +
+             ', home', st.home);
+      }
+    }
     return true;
+  }
+
+  /*
+    The hall calls this when the face is made and on every reminder: one
+    property write with creating on, which the client script turns into the
+    panel opening. Nothing to decide here; the state is whatever it was.
+  */
+  function beginCreation(actorId) {
+    writeState(actorId, stateOf(actorId));
   }
 
   g.__thornswoodCharacter = {
     PROPERTY: CHAR_PROPERTY, stateOf: stateOf, writeState: writeState,
     forPanel: forPanel, mapHalf: mapHalf, migrate: migrate, command: command,
-    updateOwnerScript: updateOwnerScript
+    beginCreation: beginCreation, updateOwnerScript: updateOwnerScript
   };
   clog('ready');
 })();

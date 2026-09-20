@@ -2,10 +2,13 @@
 
 Skyrim's own levelling is switched off here. Nothing you do raises a vanilla
 skill and no perk menu opens when you sleep. What replaced it is three choices
-made once, in the launcher before your first Play with a new character, that
-decide what you are for. The town you wake up in is chosen there too. Your
-face is the one thing made in the game, in the hall you arrive in, and nothing
-else is decided there.
+made once, in the game, that decide what you are for. A new character wakes
+in the creation hall, makes a face, and then the panel behind K opens on its
+own: your class, your profession and the half of it you will make your own,
+and the town you wake up in tomorrow. Take them in any order. The third one
+sends you to your inn. The same panel, on K, is where you spend skill points
+for the rest of your character's life. Nothing is handed out at the start but
+the clothes you stand in: what you carry, you earn, buy or are given.
 
 **A profession.** What you make, or how you fight.
 **A sub profession.** Which half of that you actually do.
