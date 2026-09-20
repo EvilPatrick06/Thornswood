@@ -206,6 +206,11 @@ namespace Thornswood
                 bool inUi = rel.StartsWith("Data\\Platform\\UI\\", StringComparison.OrdinalIgnoreCase);
                 if (!inPlugins && !inUi) return;
                 if (rel.EndsWith(".log", StringComparison.OrdinalIgnoreCase)) return;
+                // The character list the launcher writes beside the menu page
+                // for the choice at the main menu. Our own plugin deletes it
+                // once the pick is made, so the reload in the world does not
+                // bring the choice back. Not another launcher's doing.
+                if (string.Equals(rel, "Data\\Platform\\UI\\thornswood-characters.js", StringComparison.OrdinalIgnoreCase)) return;
                 lock (gate)
                 {
                     foreach (string s in stubs) if (string.Equals(s, full, StringComparison.OrdinalIgnoreCase)) return;
