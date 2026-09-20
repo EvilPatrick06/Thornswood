@@ -14,16 +14,19 @@
     .\Request-Restart.ps1 -Cancel
     .\Request-Restart.ps1 -Mode restart -ThenRestart
 
-  A mode that disconnects people has to say which half is coming, and is
-  refused outright without one of them. A kick with nothing restarting behind
-  it leaves everybody who reconnects in an empty world with no NPCs, and they
-  stay that way until the process is bounced, so the two are not separable.
+  Only -Mode restart disconnects people, and it has to say which half is
+  coming, and is refused outright without one of them. A kick with nothing
+  restarting behind it leaves everybody who reconnects in an empty world with
+  no NPCs, and they stay that way until the process is bounced, so the two are
+  not separable.
 
     -ThenRestart     this script waits out the countdown and bounces it
     -RestartFollows  you are going to, or your caller is. Deploy-Server
                      passes this, because it stops and starts the task itself
 
-  -Mode notice needs neither, because it disconnects nobody.
+  -Mode notice and -Mode update need neither, because they disconnect nobody:
+  an update is a word in chat, and the launcher closes the game itself when
+  it sees the pack. Ship.ps1 sends update.
 
   Mode decides the wording and whether anybody is put out.
 
@@ -57,8 +60,8 @@ $ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
 
 if ($ThenRestart -and $Cancel) { throw 'Use one or the other: -Cancel calls it off, -ThenRestart sees it through.' }
-if ($ThenRestart -and $Mode -eq 'notice') {
-  throw 'A notice disconnects nobody, so there is nothing to restart afterwards. Drop -ThenRestart, or use -Mode restart.'
+if ($ThenRestart -and $Mode -ne 'restart') {
+  throw ('-Mode ' + $Mode + ' disconnects nobody, so there is nothing to restart afterwards. Drop -ThenRestart, or use -Mode restart.')
 }
 
 # The kick and the process restart are now inseparable, because separating them
@@ -69,7 +72,12 @@ if ($ThenRestart -and $Mode -eq 'notice') {
 # walk away. So a mode that disconnects people now has to say which half is
 # coming. -ThenRestart means this script does it. -RestartFollows means the
 # caller does, which is what Deploy-Server passes.
-if (-not $Cancel -and $Mode -ne 'notice' -and -not $ThenRestart -and -not $RestartFollows) {
+#
+# Only restart kicks. An update has not kicked since 17 September: the server
+# stays up, the launcher closes the game five minutes after it sees the pack.
+# The first version of this guard refused update too, which refused Ship's
+# own announcement on 20 September ("could not announce it").
+if (-not $Cancel -and $Mode -eq 'restart' -and -not $ThenRestart -and -not $RestartFollows) {
   throw ('-Mode ' + $Mode + " ends in a kick, and a kick on its own strands everybody who " +
          'reconnects in an empty world with no NPCs. Add -ThenRestart to have this script bounce ' +
          'the process afterwards, or -RestartFollows if you are going to do it yourself. ' +
@@ -119,7 +127,7 @@ Write-Host "  server told: $what" -ForegroundColor Green
 # sees it through and the bare call says what it is leaving undone.
 # -Cancel calls the countdown off, so nothing was kicked and nothing is owed.
 # It used to fall through here and announce a kick it had just prevented.
-if ($Mode -ne 'notice' -and -not $Cancel) {
+if ($Mode -eq 'restart' -and -not $Cancel) {
   if ($ThenRestart) {
     $wait = [int][Math]::Round($Minutes * 60) + 15   # the countdown, plus the tick that acts on it
     Write-Host ''
