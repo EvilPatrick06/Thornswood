@@ -398,6 +398,15 @@ try {
     playsinline iOS opens it fullscreen instead. The poster is the still, so
     the first paint is a picture rather than black, and it is what stays on
     screen for anybody who has asked their machine for less motion.
+
+    Both files are copies of what the launcher embeds and nothing else:
+    banner.mp4 is tools/launcher-header.mp4 and banner.jpg is
+    tools/launcher-header.jpg, its own first frame. The poster was once
+    built from tools/art/thornswood-banner-1672.png instead, which is a
+    different picture in a different shape, 1672x941 against the video's
+    1536x300. While the video was unplayable that poster was the whole
+    hero, so the front page showed art nobody had asked for and showed it
+    still. If either file is replaced, take it from the launcher's.
   -->
   <video class="art" autoplay muted loop playsinline preload="metadata"
          poster="/banner.jpg" aria-hidden="true" tabindex="-1">
