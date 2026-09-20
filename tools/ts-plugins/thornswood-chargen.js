@@ -17,6 +17,16 @@
 //
 // Head is deliberately left alone. You have just spent time on a face.
 //
+// RETIRED 20 September. The kits it was written to put on are gone (the
+// server hands out one shift, worn, and skymp5-client equips a worn entry on
+// its own through pushWornState), so all it had left to do was dress people
+// in whatever they picked up: a helmet or a circlet on an empty head, since
+// the mask it skipped, 0x2, is slot 31 (hair) and not slot 30 (head), and
+// anything else into any empty slot five seconds after a pack change. That
+// is Patrick's "it is auto equipping things sometimes, like a hat". The
+// file stays until the install and revert scripts that name it are changed;
+// it does nothing now.
+//
 // Wrapped, because plugins share one global scope. A top level `function log()`
 // becomes a property of that shared object, so the last plugin loaded silently
 // replaces every other plugin's log, and a top level `const sp` in two files is
@@ -38,6 +48,8 @@
 // one, so a server move is an ini edit, and the fixed address below when
 // there is not.
 if (!thornswoodGame()) { return; }
+try { skyrimPlatform.printConsole('[thornswood dress] retired: nothing is put on anybody'); } catch (e) { }
+return;
 function thornswoodGame() {
   const ours = ['192.135.112.23'];
   let ip = '';
