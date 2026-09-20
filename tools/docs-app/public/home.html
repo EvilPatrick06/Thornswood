@@ -148,6 +148,9 @@ nav.top a:hover{color:var(--page)}
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.06'/></svg>")}
 .hero > *{position:relative;z-index:1}
 @media(max-width:640px){ .hero{min-height:auto;padding:72px 0 88px} }
+/* A video ignores prefers-reduced-motion on its own, so it is stopped in
+   script below and the poster is what stays on screen. This only covers the
+   slow drift on top of it. */
 @media(prefers-reduced-motion:no-preference){
   .hero .art{animation:drift 60s ease-in-out infinite alternate}
   @keyframes drift{ from{transform:scale(1.04) translateY(0)} to{transform:scale(1.09) translateY(-14px)} }
@@ -364,9 +367,42 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
   </div>
 </div>
 
+<script>
+/*
+  Autoplay is a video attribute and no media query turns it off, so somebody
+  who has asked their system for less motion still gets 24 seconds of drifting
+  aurora behind the title. Paused here instead, which leaves the poster frame
+  showing: the same picture, holding still.
+
+  Wrapped because a page that throws here loses everything below it, and this
+  is decoration.
+*/
+try {
+  var m = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (m && m.matches) {
+    document.addEventListener('DOMContentLoaded', function () {
+      var v = document.querySelector('video.art');
+      if (v) { try { v.pause(); v.removeAttribute('autoplay'); } catch (e) { } }
+    });
+  }
+} catch (e) { }
+</script>
+
 <div id="landing">
 <div class="hero">
-  <img class="art" src="/banner.jpg" alt="" fetchpriority="high" decoding="async">
+  <!--
+    The animated banner, the same one the launcher plays in its title band.
+
+    muted and playsinline because a hero that asks permission to play does not
+    play at all: autoplay is only allowed without sound, and without
+    playsinline iOS opens it fullscreen instead. The poster is the still, so
+    the first paint is a picture rather than black, and it is what stays on
+    screen for anybody who has asked their machine for less motion.
+  -->
+  <video class="art" autoplay muted loop playsinline preload="metadata"
+         poster="/banner.jpg" aria-hidden="true" tabindex="-1">
+    <source src="/banner.mp4" type="video/mp4">
+  </video>
   <div class="wrap">
     <img class="crest" src="/logo.png" alt="">
     <h1>Thornswood</h1>
