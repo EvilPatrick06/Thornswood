@@ -727,12 +727,22 @@
   }
 
   /* The server answered by rewriting the property. Say what changed. */
+  /* Creation is over: the panel shuts and forgets its marks. */
+  function leave() { closing = false; status = ''; statusKind = ''; later = {}; api.close(); }
+
   function answered(before, after) {
     if (!pending) return;
     var p = pending; pending = null;
     if (p.section === 'class' && after['class'] && !(before && before['class'])) { status = nameOf('class', after['class']) + ' it is.'; statusKind = 'ok'; later['class'] = false; }
     else if (p.section === 'profession' && after.profession && !(before && before.profession)) { status = 'You are a ' + nameOf('profession', after.profession).toLowerCase() + ' now.'; statusKind = 'ok'; later.profession = false; }
-    else if (p.section === 'home' && after.home && !(before && before.home)) { status = cap(after.home) + '. See you there.'; statusKind = 'ok'; }
+    else if (p.section === 'home' && after.home && !(before && before.home)) {
+      status = cap(after.home) + '. See you there.'; statusKind = 'ok';
+      // The home is the pick that ends creation, so the panel goes now, on
+      // the answer. It used to wait for the server's creating flag, which
+      // is written after the move and reached the page halfway through the
+      // loading screen, with the panel still up over it.
+      if (creating() && !closing) { later = {}; closing = true; setTimeout(leave, 700); }
+    }
     else if (p.section === 'tree') { status = 'Spent.'; statusKind = 'ok'; }
     else { status = ''; statusKind = ''; }
     picked[p.section] = null;
@@ -813,11 +823,10 @@
         // Creation just ended: the home was confirmed and the server moved
         // you. The panel keeps what it shows, says so, and shuts itself; the
         // marks for later are cleared, since in the world there is no later.
-        if (wasCreating && !mine.creating) {
+        if (wasCreating && !mine.creating && !closing) {
           status = 'Off you go.'; statusKind = 'ok';
-          later = {};
           closing = true;
-          setTimeout(function () { closing = false; status = ''; statusKind = ''; api.close(); }, 1200);
+          setTimeout(leave, 700);
         }
         wasCreating = !!mine.creating;
       }
