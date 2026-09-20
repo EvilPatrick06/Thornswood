@@ -1239,6 +1239,35 @@
    * pressed forty keys in five seconds without moving, and a person who can
    * walk and run perfectly well never looks stuck, so it never ran for this.
    *
+   * THAT WAS NOT IT, and this is written here rather than tidied away because
+   * the next person will otherwise have the same idea. 1.1.53 shipped the two
+   * corrections above and jump and sprint are exactly as broken. The probe
+   * lines from that build say why they cannot have been the cause:
+   *
+   *   jump: refused, JumpDirectionalStart went through and the animation graph
+   *   turned it down. stamina 100 (100%), speed 369, running yes, in the air
+   *   no, bSprintOK yes, IsNPC no, bIsSynced no, bAnimationDriven no,
+   *   controls on
+   *
+   * Every gate reads clear and both events are still refused. The corrections
+   * stay because AI driven has no getter and nothing else keeps it off, but
+   * they are not a fix for this and must not be reported as one.
+   *
+   * The useful part is bSprintOK. It is the ONLY condition on the sprint
+   * transition, in 0_master and mt_behavior both. A transition being evaluated
+   * cannot refuse with its only condition satisfied, so that transition is not
+   * being evaluated at all: the state machine holding it is not the active one,
+   * and the jump transitions live in the same place. Which is why the state
+   * line now carries bIsInMT, IsFirstPerson, bAttached and currentDefaultState,
+   * the four things the shipped graph uses to decide which branch is live.
+   *
+   * One thing that has been ruled out cheaply and is worth not repeating: the
+   * behaviour files in the Thornswood game folder are byte for byte the ones
+   * in the Steam copy Vortex deploys into. So this is not the folder the
+   * launcher builds, and it should fail in plain single player Skyrim too.
+   * Somebody trying that settles whether this is the mod list or this server
+   * in about two minutes, which is cheaper than anything else left.
+   *
    * bSprintOK is held open separately, while the sprint key is down and
    * Skyrim's own rule says it should be: it is the whole of the game's
    * decision about sprinting and the one condition the graph actually reads.
@@ -1261,6 +1290,23 @@
   // "no event", which is a verdict. So every line says how the hook is doing.
   let probeHookCalls = 0;
   let probeHookErrors = 0;
+  /*
+    And whether the flag the whole verdict rests on is ever true.
+
+    "refused" means animationSucceeded came back false. A build where that
+    property was not wired would answer false for every event in the game and
+    every press would read "refused", which is a diagnosis made of nothing. The
+    string is in SkyrimPlatformImpl.dll on this build, so it is real here, but
+    a count costs one integer and settles it from the log instead of from a
+    grep over a DLL that ships from somewhere else and can change under us.
+
+    Any event at all counts, not only jump and sprint: JumpLand and JumpFall
+    come through constantly and those succeed in a game where anything works.
+    All-false across thousands is the instrument lying, not the graph refusing.
+  */
+  let probeHookOk = 0;
+  let probeHookNo = 0;
+  let probeTallyAt = 0;
 
   let sprintHeldSince = 0;   // while the sprint key is down, and only then
   let ownedAt = 0;           // last heartbeat that put the character back
@@ -1286,6 +1332,9 @@
       },
       leave: function (ctx) {
         try {
+          // Every event that passes through, not only the ones kept below: the
+          // tally is about whether the flag answers at all.
+          if (ctx.animationSucceeded) { probeHookOk++; } else { probeHookNo++; }
           if (!ctx.storage.has('thornswoodProbe')) { return; }
           probeSeen.push({
             name: ctx.storage.get('thornswoodProbe'),
@@ -1326,6 +1375,10 @@
      same answer and telling them apart is the whole point of the line. */
   function varText(pc, name) {
     try { return pc.getAnimationVariableBool(name) ? 'yes' : 'no'; } catch (e) { return 'unknown'; }
+  }
+
+  function varInt(pc, name) {
+    try { return String(pc.getAnimationVariableInt(name)); } catch (e) { return 'unknown'; }
   }
 
   /**
@@ -1419,6 +1472,28 @@
     ask('IsNPC', () => varText(pc, 'IsNPC'));
     ask('bIsSynced', () => varText(pc, 'bIsSynced'));
     ask('bAnimationDriven', () => varText(pc, 'bAnimationDriven'));
+    /*
+      Which branch of the graph the character is actually in.
+
+      Those four above all came back clear on 19 September and both events were
+      still refused, with bSprintOK yes and SprintStart turned down anyway. That
+      is the interesting part: bSprintOK is the ONLY condition on the sprint
+      transition, in 0_master and in mt_behavior both, so a transition that is
+      being evaluated cannot refuse with it set. It follows that the transition
+      is not being evaluated, which means the state machine holding it is not the
+      active one, and the jump transitions live in the same place.
+
+      These four are what decide that. bIsInMT is a condition in the shipped
+      graph in as many words. bAttached and currentDefaultState gate the attach
+      of the sub-behaviours in four separate conditions. IsFirstPerson picks
+      between two whole branches. None of them is forced here: they belong to
+      the graph and writing them would be lying to it. They are read so the next
+      line says which branch the character was in when it said no.
+    */
+    ask('bIsInMT', () => varText(pc, 'bIsInMT'));
+    ask('IsFirstPerson', () => varText(pc, 'IsFirstPerson'));
+    ask('bAttached', () => varInt(pc, 'bAttached'));
+    ask('currentDefaultState', () => varInt(pc, 'currentDefaultState'));
     const theirs = notOurs();
     if (theirs) { bits.push(theirs); }
     const off = readControlsNow();
@@ -1459,9 +1534,9 @@
       try { probeKeys.sprint = sp.Input.getMappedKey('Sprint', 0); } catch (e) { }
       if (first) {
         say('jump and sprint: jump is key ' + probeKeys.jump + ', sprint is key ' +
-            probeKeys.sprint + '. The character is taken off the AI and off IsNPC every ' +
-            'two seconds, the sprint gate is held open while the key is down, and a press ' +
-            'the graph still refuses writes one line.');
+            probeKeys.sprint + '. Every press writes a line now, the one that worked as ' +
+            'well as the one that did not, with which branch of the graph the character ' +
+            'was in and how many animations have succeeded at all.');
       }
     }
 
@@ -1492,13 +1567,21 @@
     while (probePresses.length && now - probePresses[0].at >= PROBE_WINDOW_MS) {
       const p = probePresses.shift();
       const verdict = probeVerdict(p);
-      // A jump that jumps is not news, and the log is somebody's whole session.
-      if (verdict.indexOf('played ') === 0) { continue; }
-      // Neither is a sprint key pressed standing still. Skyrim does not sprint
-      // from a standstill and that is most of what anybody presses.
+      /*
+        A press that worked is written down too, and it was a mistake to hide
+        it. The last run wrote nothing but "refused", which reads as a graph
+        turning everything down, and it was impossible to tell from the log
+        whether this file had ever seen a jump succeed on any machine. One line
+        per action per 1.5 s is already the limit, so it is not much noise and
+        it is the difference between a measurement and an assumption.
+      */
+      // A sprint key pressed standing still is Skyrim saying no, not a bug, and
+      // it is most of what anybody presses. That one still goes unsaid.
       if (p.kind === 'sprint' && !p.moving && verdict.indexOf('no event') === 0) { continue; }
       say(p.kind + ': ' + verdict + '. ' + p.state + '. hook saw ' +
-          probeHookCalls + ' events' + (probeHookErrors ? ' and threw ' + probeHookErrors + ' times' : ''));
+          probeHookCalls + ' events, ' + probeHookOk + ' of them succeeded and ' +
+          probeHookNo + ' did not' +
+          (probeHookErrors ? ', and threw ' + probeHookErrors + ' times' : ''));
     }
   }));
 
