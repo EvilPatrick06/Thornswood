@@ -2275,7 +2275,17 @@ log('gamemode loaded:',
           if (dn) devIds[dn] = true;
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, count: Object.keys(ids).length };
+      // The site's admins (the Owner and Dev roles, unless its config says
+      // otherwise), so an Owner's new character is an admin in here too and
+      // not only the one profile number written into server-settings.json.
+      var adminIds = {};
+      if (Array.isArray(doc.adminProfiles)) {
+        for (var a = 0; a < doc.adminProfiles.length; a++) {
+          var an = Number(doc.adminProfiles[a]);
+          if (an) adminIds[an] = true;
+        }
+      }
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -2295,6 +2305,10 @@ log('gamemode loaded:',
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsDev = function (profileId) {
     var l = load();
     return !!(l && l.devIds && l.devIds[Number(profileId)]);
+  };
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsAdmin = function (profileId) {
+    var l = load();
+    return !!(l && l.adminIds && l.adminIds[Number(profileId)]);
   };
 
   /*
@@ -2337,6 +2351,19 @@ log('gamemode loaded:',
   // there.
   var judged = {};
 
+  // When the list last came down from the site, when the site was last asked
+  // for an unknown profile, and when each connection was first seen. A
+  // character made a minute ago is on the site (the launcher checks the
+  // chosen profile in at the main menu) and not on a list that is up to five
+  // minutes old; on 20 September that refused /tp to Patrick's new character
+  // for the rest of the refresh window, and with the door enforcing it would
+  // have turned them away. So an unknown profile makes the door ask the site
+  // again, at most once in twenty seconds, and hold its judgement until the
+  // answer is in or thirty seconds have gone.
+  var listAt = 0;
+  var askedAt = 0;
+  var seenAt = {};
+
   function tick() {
     var conf = load();
     if (!conf) return;                       // no allowed.json, door is off
@@ -2346,18 +2373,29 @@ log('gamemode loaded:',
     if (!Array.isArray(online)) return;
 
     var here = {};
+    var now = Date.now();
     for (var i = 0; i < online.length; i++) here[online[i]] = true;
     for (var k in judged) { if (!here[k]) delete judged[k]; }
+    for (var k2 in seenAt) { if (!here[k2]) delete seenAt[k2]; }
 
     for (var j = 0; j < online.length; j++) {
       var actorId = online[j];
       if (judged[actorId]) continue;
-      judged[actorId] = true;
+      if (!seenAt[actorId]) seenAt[actorId] = now;
 
       var pid = 0;
       try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
 
       var ok = pid && conf.ids[pid];
+      if (!ok && listAt < seenAt[actorId] && now - seenAt[actorId] < 30000) {
+        if (now - askedAt > 20000) {
+          askedAt = now;
+          note('profile ' + (pid || 'unknown') + ' is not on the list yet, asking the site again');
+          try { refresh(); } catch (e) { note('refresh threw: ' + e); }
+        }
+        continue;
+      }
+      judged[actorId] = true;
       if (ok) {
         note('let in profile ' + pid + ' (actor ' + actorId.toString(16) + ')');
         continue;
@@ -2445,13 +2483,16 @@ log('gamemode loaded:',
               enforce: enforce,
               profiles: doc.profiles,
               devProfiles: Array.isArray(doc.devProfiles) ? doc.devProfiles : [],
+              adminProfiles: Array.isArray(doc.adminProfiles) ? doc.adminProfiles : [],
               people: doc.people || [],
               at: new Date().toISOString(),
               note: 'Written by the gamemode from the site. Set enforce true to turn the door on.'
             }, null, 2));
             readAt = 0;                       // make the next tick re-read it
+            listAt = Date.now();
             note('list refreshed from the site, ' + doc.profiles.length + ' profiles, ' +
-                 (Array.isArray(doc.devProfiles) ? doc.devProfiles.length : 0) + ' dev');
+                 (Array.isArray(doc.devProfiles) ? doc.devProfiles.length : 0) + ' dev, ' +
+                 (Array.isArray(doc.adminProfiles) ? doc.adminProfiles.length : 0) + ' admin');
           } catch (e) {
             note('could not write ' + FILE + ': ' + e);
           }
@@ -3691,7 +3732,11 @@ log('gamemode loaded:',
   }
 
   function isAdmin(profileId) {
-    return admins().indexOf(Number(profileId)) !== -1;
+    if (admins().indexOf(Number(profileId)) !== -1) { return true; }
+    // The site's admins, the Owner and Dev roles, by every profile they have
+    // checked in with; see the door block. The written list stays for the
+    // day the site is down.
+    return roleFromDoor('Admin', profileId);
   }
 
   /*

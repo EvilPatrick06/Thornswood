@@ -1511,9 +1511,10 @@ async function handle(req, res) {
       return sendJson(res, 401, { error: 'no' });
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], people: [], lookupFailed: false, at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
+    const seenAdmin = new Set();
     for (const d of Object.keys(linked)) {
       const row = linked[d] || {};
       const profiles = (Array.isArray(row.profiles) ? row.profiles : [])
@@ -1527,6 +1528,12 @@ async function handle(req, res) {
       for (const n of profiles) if (!seen.has(n)) { seen.add(n); out.profiles.push(n); }
       if (st.dev) {
         for (const n of profiles) if (!seenDev.has(n)) { seenDev.add(n); out.devProfiles.push(n); }
+      }
+      // The admin roles (access.admin: Owner and Dev unless config.json says
+      // otherwise), so the game server can hold an Owner's new character to
+      // the same standing as the one profile number in its own settings.
+      if (st.admin) {
+        for (const n of profiles) if (!seenAdmin.has(n)) { seenAdmin.add(n); out.adminProfiles.push(n); }
       }
       out.people.push({ id: String(d), name: st.name || row.name || '', profiles });
     }
