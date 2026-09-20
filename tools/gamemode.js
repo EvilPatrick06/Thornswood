@@ -2096,13 +2096,40 @@ log('gamemode loaded:',
 
   var EVERY_MS = 4000;
 
-var dataDir = 'data';
+  var dataDir = 'data';
   var privDir = 'private';
   try {
     var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
     if (cfg && cfg.dataDir) dataDir = String(cfg.dataDir);
     if (cfg && cfg.privDir) privDir = String(cfg.privDir);
   } catch (e) { }
+
+
+  /*
+    Make the folder before writing into it.
+
+    privDir held door.json, allowed.json and characters.json on 18 September
+    and on 20 September the whole folder was gone. Every write into it is
+    wrapped in a try, so a missing folder is not an error anybody sees: the
+    character register silently stops being saved, the door silently never
+    fetches a roster, and /tp silently refuses everybody because the list it
+    reads was never written. That is three separate reports with one cause and
+    no log line between them.
+
+    One mkdir at load costs nothing and there is no case where the right answer
+    is to carry on writing into a folder that is not there.
+  */
+  function ensureDir(d) {
+    try {
+      if (d && !fs.existsSync(d)) {
+        fs.mkdirSync(d, { recursive: true });
+        console.log('[thornswood] made the missing folder ' + d);
+      }
+    } catch (e) {
+      console.log('[thornswood] could not make ' + d + ': ' + e);
+    }
+  }
+  ensureDir(privDir);
 
   var FILE = path.join(privDir, 'characters.json');
 
@@ -2349,6 +2376,33 @@ var dataDir = 'data';
     if (cfg && cfg.privDir) privDir = String(cfg.privDir);
   } catch (e) { }
 
+
+  /*
+    Make the folder before writing into it.
+
+    privDir held door.json, allowed.json and characters.json on 18 September
+    and on 20 September the whole folder was gone. Every write into it is
+    wrapped in a try, so a missing folder is not an error anybody sees: the
+    character register silently stops being saved, the door silently never
+    fetches a roster, and /tp silently refuses everybody because the list it
+    reads was never written. That is three separate reports with one cause and
+    no log line between them.
+
+    One mkdir at load costs nothing and there is no case where the right answer
+    is to carry on writing into a folder that is not there.
+  */
+  function ensureDir(d) {
+    try {
+      if (d && !fs.existsSync(d)) {
+        fs.mkdirSync(d, { recursive: true });
+        console.log('[thornswood] made the missing folder ' + d);
+      }
+    } catch (e) {
+      console.log('[thornswood] could not make ' + d + ': ' + e);
+    }
+  }
+  ensureDir(privDir);
+
   var FILE = path.join(privDir, 'allowed.json');
   var LOG  = path.join(privDir, 'door.log');
 
@@ -2398,6 +2452,35 @@ var dataDir = 'data';
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsDev = function (profileId) {
     var l = load();
     return !!(l && l.devIds && l.devIds[Number(profileId)]);
+  };
+
+  /*
+    And the playtest roster, which is the same list the door already keeps.
+
+    A profile is only in allowed.json at all because the site asked Discord and
+    got back somebody who may play, so being on it IS holding the play role.
+    That is what makes this worth reading for a command gate: it is the same
+    fact, already fetched, already five minutes fresh, and nobody has to
+    maintain a second copy of it by hand.
+  */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsAllowed = function (profileId) {
+    var l = load();
+    return !!(l && l.ids && l.ids[Number(profileId)]);
+  };
+
+  /*
+    Whether the role lists are actually answering, for the startup line.
+
+    A door that was never configured returns false to every question above,
+    silently, and that is exactly how /tp came to refuse everybody on 19 and 20
+    September: the code was right and there was no list anywhere for it to
+    read. Saying so once at startup is the difference between a bug somebody
+    reports and a line somebody notices.
+  */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodRoleSource = function () {
+    var l = load();
+    if (!l) { return 'none'; }
+    return Object.keys(l.ids).length + ' allowed, ' + Object.keys(l.devIds || {}).length + ' dev';
   };
 
   function note(line) {
@@ -3047,11 +3130,37 @@ var dataDir = 'data';
         page has to present.
       */
       if (!isPlaytester(profileId)) {
-        // Which list they are not on, because "not yours to run" told nobody
-        // anything and the answer was always the same whoever asked.
+        /*
+          Which list they are not on, because "not yours to run" told nobody
+          anything and the answer was always the same whoever asked.
+
+          And whether there is a list at all, because on 19 and 20 September
+          there was not: no door.json, so no roster, and none of the three
+          written lists set either. Every tier answered no to everybody and the
+          refusal read as a decision about that person. A refusal from a server
+          that has nothing to check against should say so, or the next person
+          to hit this spends the evening looking at their own Discord roles.
+        */
+        var src = 'none';
+        try {
+          var g3 = (typeof globalThis !== 'undefined') ? globalThis : this;
+          if (typeof g3.__thornswoodRoleSource === 'function') { src = g3.__thornswoodRoleSource(); }
+        } catch (e) { }
+        var written = rolelist('thornswoodDevs').length + rolelist('thornswoodPlaytesters').length;
+
+        if (src === 'none' && !written) {
+          toProfile(profileId,
+            'This server has no playtester list to check, so /tp refuses everybody. ' +
+            'That is a server fault rather than anything about you: private\door.json ' +
+            'is missing, so the roles never arrive. Profile ' + profileId + '.');
+          log('/tp refused profile ' + profileId + ' and there is NO ROLE SOURCE AT ALL: ' +
+              'no door.json roster and no written lists in server-settings.json');
+          return;
+        }
         toProfile(profileId,
           'You are not on the playtester or dev list, so /tp is not yours to run. ' +
           'Ask Patrick to add profile ' + profileId + '.');
+        log('/tp refused profile ' + profileId + ' (roster: ' + src + ', written: ' + written + ')');
         return;
       }
       var table = places();
@@ -3274,14 +3383,45 @@ var dataDir = 'data';
     return [];
   }
 
+  /*
+    The same question, asked of Discord instead of a hand written list.
+
+    Added 20 September, because the three lists above were the whole answer and
+    on the live server not one of them was set. Every tier fell through to the
+    single hard coded admin id, which is not an id anybody currently plays, so
+    /tp refused every single person including Patrick. The code shipped on 19
+    September was right and there was nothing anywhere for it to read.
+
+    The door already fetches this every five minutes and writes it beside
+    itself: allowed.json holds everyone the site says may play, and the
+    devProfiles inside it are the ones who also hold the dev or admin role. So
+    the roles people already have in Discord answer this on their own, and a
+    new playtester is a playtester the moment their role lands rather than when
+    somebody remembers to add a number to a file.
+
+    The written lists stay and win first. They cost nothing, they work on a
+    server with no door configured at all, and they are the way to give
+    somebody a tier that their Discord role does not.
+  */
+  function roleFromDoor(which, profileId) {
+    try {
+      var g2 = (typeof globalThis !== 'undefined') ? globalThis : this;
+      var fn = g2['__thornswoodIs' + which];
+      if (typeof fn === 'function') { return !!fn(profileId); }
+    } catch (e) { }
+    return false;
+  }
+
   function isDev(profileId) {
     if (isAdmin(profileId)) { return true; }
-    return rolelist('thornswoodDevs').indexOf(Number(profileId)) !== -1;
+    if (rolelist('thornswoodDevs').indexOf(Number(profileId)) !== -1) { return true; }
+    return roleFromDoor('Dev', profileId);
   }
 
   function isPlaytester(profileId) {
     if (isDev(profileId)) { return true; }
-    return rolelist('thornswoodPlaytesters').indexOf(Number(profileId)) !== -1;
+    if (rolelist('thornswoodPlaytesters').indexOf(Number(profileId)) !== -1) { return true; }
+    return roleFromDoor('Allowed', profileId);
   }
 
   /** What to call somebody in a refusal, so they know which list to be on. */
