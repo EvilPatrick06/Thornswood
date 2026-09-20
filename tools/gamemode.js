@@ -681,9 +681,10 @@ function giveShift(actorId) {
 /**
  * The face is made. Now the panel.
  *
- * Class, profession and a home town are chosen in the game, on K, checked by
- * the character block, and the last of the three brings them back here to
- * arriveAt. Nothing is chosen anywhere else. The launcher used to send a
+ * A home town is chosen in the game, on K, checked by the character block,
+ * and that one choice brings them back here to arriveAt. Class and
+ * profession are chosen on the same panel, in the hall or later in the
+ * world. Nothing is chosen anywhere else. The launcher used to send a
  * choice ahead through the voice service and this waited on it, which is what
  * left people standing in this room when the choice went to the wrong service
  * (the dev server asks the dev voice service; the launcher told the live one,
@@ -697,8 +698,8 @@ function beginChoosing(actorId, state, why) {
   setChargen(actorId, state);
   closeRaceMenu(actorId);
   const opened = openCreation(actorId);
-  say(actorId, 'Welcome to Thornswood. Press K to choose your class, your profession ' +
-               'and where you will start.');
+  say(actorId, 'Welcome to Thornswood. Press K to choose where you will start. ' +
+               'Your class and profession can be chosen there too, or later in the world.');
   log('chargen', actorId.toString(16), '-> choosing (' + why + ')' +
       (opened ? ', panel opened' : ', panel NOT opened'));
 }
@@ -715,10 +716,11 @@ function openCreation(actorId) {
 }
 
 /**
- * The last choice is in. Off to the town.
+ * The home is chosen. Off to the town.
  *
- * Called by the character block when class, profession and home are all set
- * on somebody whose stage is choosing. Returns true when they were sent.
+ * Called by the character block when a home is set on somebody whose stage
+ * is choosing; class and profession may still be empty, and are picked in
+ * the world. Returns true when they were sent.
  */
 function arriveAt(actorId, townKey) {
   const state = chargenOf(actorId);
@@ -1137,7 +1139,7 @@ function chargenTick() {
       Standing in the hall with the panel to fill in.
 
       The exit is not here: the character block sends them the moment the
-      third pick lands (arriveAt). This is the reminder, and the reopen after
+      home is picked (arriveAt). This is the reminder, and the reopen after
       a reconnect, because the page that had the panel is gone with the old
       session and the property does not fire again on its own.
     */
@@ -1152,7 +1154,7 @@ function chargenTick() {
       state.remindAt = now + CHOOSE_REMIND_MS;
       setChargen(actorId, state);
       openCreation(actorId);
-      say(actorId, 'Press K to choose your class, your profession and where you will start.');
+      say(actorId, 'Press K to choose where you will start. Your class and profession can wait until you are there.');
       continue;
     }
 
@@ -3050,7 +3052,7 @@ log('gamemode loaded:',
       // line says the same; the panel cannot read the chat.
       note: s.note || null,
       // While creating, the panel opens itself and shows the town list; the
-      // moment the third choice lands this flips and the panel closes.
+      // moment the home is chosen this flips and the panel closes.
       creating: !!creating,
       towns: (creating && chargen) ? chargen.towns() : []
     };
@@ -3163,9 +3165,10 @@ log('gamemode loaded:',
     Returns true when the word was one of these, so handle() stops.
 
     Creation is these same picks. Somebody whose chargen stage is choosing is
-    standing in the hall with the panel open; the moment class, profession and
-    home are all set, arrive sends them to the town and the panel closes on
-    the next property write. Nothing else moves anybody.
+    standing in the hall with the panel open; the moment a home is set, arrive
+    sends them to the town and the panel closes on the next property write.
+    Class and profession can be set there too, or later in the world, since
+    only a second pick of either is refused. Nothing else moves anybody.
   */
   function command(word, parts, actorId, profileId, toProfile) {
     if (word !== '/pick' && word !== '/spend') { return false; }
@@ -3226,12 +3229,15 @@ log('gamemode loaded:',
     var st = writeState(actorId, r.state);
     clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'accepted');
 
-    if (creating && st.cls && st.prof && st.home) {
+    // The home is the one pick that ends creation. Class and profession may
+    // still be unset: they are picked in the world, from the same panel, and
+    // the rules (pickClass, pickProfession) refuse only a second one.
+    if (creating && st.home) {
       if (chargen.arrive(actorId, st.home)) {
         // Written again so the panel hears creating is over and closes.
         writeState(actorId, st);
-        clog('creation finished for', actorId.toString(16) + ':', st.cls + ',', st.prof +
-             (st.half ? '/' + st.half : '') + (st.schools && st.schools.length ? '/' + st.schools.join('+') : '') +
+        clog('creation finished for', actorId.toString(16) + ':', (st.cls || 'no class yet') + ',',
+             (st.prof ? st.prof + (st.half ? '/' + st.half : '') + (st.schools && st.schools.length ? '/' + st.schools.join('+') : '') : 'no profession yet') +
              ', home', st.home);
       }
     }
