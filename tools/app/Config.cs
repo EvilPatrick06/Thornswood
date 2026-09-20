@@ -196,8 +196,31 @@ namespace Thornswood
         // The launcher's music: off, or a volume from 0 to 100. Asked for by
         // Patrick on 20 September, the day the dev test track went in
         // (Shell.StartMenuMusic). Nothing plays on the main build yet.
-        [DataMember] public bool MusicOn = true;
-        [DataMember] public int MusicVolume = 45;
+        //
+        // Stored the way round that makes ABSENT mean on and half: the
+        // deserializer skips field initialisers (see AfterLoad), so a bool
+        // that was not in the file is false and an int is 0, and the first
+        // config.json with no music fields in it came up switched off and
+        // silent. A false MusicOff is on; a null MusicLevel is 50.
+        [DataMember] public bool MusicOff = false;
+        [DataMember] public string MusicLevel = "50";
+
+        public bool MusicOn
+        {
+            get { return !MusicOff; }
+            set { MusicOff = !value; }
+        }
+
+        public int MusicVolume
+        {
+            get
+            {
+                int v;
+                if (!int.TryParse(MusicLevel, out v)) return 50;
+                return Math.Max(0, Math.Min(100, v));
+            }
+            set { MusicLevel = Math.Max(0, Math.Min(100, value)).ToString(); }
+        }
 
         // The Skyrim folder Vortex deploys into, which Thornswood's own folder is
         // made from (see OwnGame). Blank means the Steam copy. Set it when Vortex
