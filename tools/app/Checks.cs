@@ -343,12 +343,26 @@ namespace Thornswood
                 string ccc = Path.Combine(Paths.Game, "Skyrim.ccc");
                 if (!File.Exists(ccc)) return l;
                 string data = Path.Combine(Paths.Game, "Data");
+                // Only a plugin that takes a place in the load order counts.
+                // A light one loaded this way is no different to the server
+                // from the forty odd light plugins in the list itself: the
+                // server's list never holds a light plugin, so none of them
+                // is "content the server has", and none of those draws a
+                // card. Until 20 September _ResourcePack.esl drew one on
+                // every machine: Bethesda's own update 1.6.1130 put it and
+                // its archive in every Data folder and Skyrim.ccc names it,
+                // it is light, and it holds no placed content (statics,
+                // textures and four quests, "additional resources for
+                // Creations"). A card about a file nobody installed, that
+                // changes nothing anyone can touch, was an alarm with no fire.
                 foreach (string raw in File.ReadAllLines(ccc))
                 {
                     string n = raw.Trim();
                     if (n.Length == 0 || n.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) continue;
                     if (wanted.Contains(n) || l.Contains(n)) continue;
-                    if (File.Exists(Path.Combine(data, n))) l.Add(n);
+                    if (!File.Exists(Path.Combine(data, n))) continue;
+                    if (TakesNoPlace(n)) continue;
+                    l.Add(n);
                 }
             }
             catch { }
