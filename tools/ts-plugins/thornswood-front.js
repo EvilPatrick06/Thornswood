@@ -1182,32 +1182,64 @@
   }));
 
   /*
-   * Jump and sprint, measured rather than guessed. Temporary.
+   * Jump and sprint.
    *
-   * Jump and sprint are reported doing nothing while walking and running are
-   * fine (WORKING-NOTES entry 212). Reading the code has ruled out everything
-   * it can: the client bundle's two jump and sprint blocks never arm on this
-   * server (one waits for flags only another server's code sets, the other for
-   * a plugin named SweetPie that is not in the load order), the server takes
-   * whatever stamina the client reports, and vanilla Skyrim needs no stamina
-   * to jump. So the cause has to be caught in the game.
+   * The probe that used to sit here wrote one line per press saying whether
+   * the game sent the animation, whether a hook blanked it on the way, or
+   * whether the behaviour graph turned it down. It has run, and the answer on
+   * 19 September is the same on every press, in Data\Platform\thornswood-
+   * front.log:
    *
-   * Every jump or sprint key press gets one line saying which of these
-   * happened, with the state that decides between the causes beside it:
+   *   probe jump: refused, JumpDirectionalStart went through and the
+   *   animation graph turned it down. stamina 100 (100%, base 100), speed
+   *   369, running yes, in the air no, encumbered no, sneaking no, swimming
+   *   no, mounted no, controls on
    *
-   *   no event   the game never tried the animation. Stamina at zero stops a
-   *              sprint here, and so does standing still; a control switched
-   *              off stops both.
-   *   cancelled  the game tried and a sendAnimationEvent hook blanked the name
-   *              on the way through, which only the client bundle does.
-   *   refused    the animation went through intact and the behaviour graph
-   *              turned it down, so the character is in a state with no way
-   *              into a jump, the kind an unfinished idle leaves behind.
+   *   probe sprint: refused, SprintStart went through and the animation
+   *   graph turned it down. stamina 100 (100%, base 100), running yes ...
    *
-   * It only reads. The hook copies a name and a flag into an array, because a
-   * hook runs where the game's own functions cannot be called; the state is
-   * read on the next update, a frame after the key. Take it out once known.md
-   * says which cause it was.
+   * So the key arrives, the game sends the event, nothing blanks it, and the
+   * graph says no with full stamina and every control enabled. That is the end
+   * of WORKING-NOTES entry 212's diagnosis, which was SunHelm and the server
+   * fighting over stamina. Stamina was never the problem.
+   *
+   * It is not the behaviour files either. The shipped graph was read against
+   * the vanilla one it was generated from, Nemesis_0_master.xml, which sits
+   * beside it: the two jump transitions, events 637 and 639, carry no
+   * condition in either, and the only condition on the sprint transition,
+   * event 12, is bSprintOK == 1 in both. A Nemesis patch that gated jump would
+   * show up as a condition string in 0_master.hkx that the vanilla file does
+   * not have, and the only one there is Precision's, about collision.
+   *
+   * What is left is the state of the character when the key is pressed, and
+   * two states make the graph refuse both events while leaving walking and
+   * running working. Neither is ever right for the person's own character:
+   *
+   *   AI driven   the character is handed to the AI, which walks it where the
+   *               keys say and has no jump and no sprint in it. There is no
+   *               getter, which is why it has survived every check in this
+   *               file, and whoever turns it on is the one meant to turn it
+   *               off, so anything that throws or disconnects leaves it on.
+   *   IsNPC       a graph variable. Set, the graph takes the branch written
+   *               for everybody who is not the person playing, and that branch
+   *               has no jump or sprint transition to take.
+   *
+   * Both are put back where they belong on a two second heartbeat. The
+   * watchdog above already did the first one, but only after somebody had
+   * pressed forty keys in five seconds without moving, and a person who can
+   * walk and run perfectly well never looks stuck, so it never ran for this.
+   *
+   * bSprintOK is held open separately, while the sprint key is down and
+   * Skyrim's own rule says it should be: it is the whole of the game's
+   * decision about sprinting and the one condition the graph actually reads.
+   *
+   * Dying, sitting in anything and riding are left alone. A cart ride is the
+   * one time the AI is supposed to have the character, and it is furniture, so
+   * notOurs() already names it.
+   *
+   * The probe stays, quieter. A press that jumps writes nothing; a press the
+   * graph still refuses writes one line with the gates beside it, so a fix
+   * that stops working says so instead of going quiet.
    */
   const PROBE_WINDOW_MS = 800;    // how long a key press waits for its animation
   const PROBE_GAP_MS = 1500;      // one line per action this often, however hard it is mashed
@@ -1219,6 +1251,11 @@
   // "no event", which is a verdict. So every line says how the hook is doing.
   let probeHookCalls = 0;
   let probeHookErrors = 0;
+
+  let sprintHeldSince = 0;   // while the sprint key is down, and only then
+  let ownedAt = 0;           // last heartbeat that put the character back
+  let saidIsNpc = false;     // each of these is worth saying once, not every tick
+  let saidSprintGate = false;
 
   function probeStart(kind, name) {
     return kind === 'jump' ? /^Jump(Standing|Directional)Start/i.test(name) : name === 'SprintStart';
@@ -1269,6 +1306,81 @@
     return 'no event, the game never sent the ' + p.kind + ' animation';
   }
 
+  /* A graph variable a build might not have must not take the caller down
+     with it. False is the answer that makes everything below do nothing. */
+  function varBool(pc, name) {
+    try { return !!pc.getAnimationVariableBool(name); } catch (e) { return false; }
+  }
+
+  /* The same read for the log, where "not in this build" and "no" are not the
+     same answer and telling them apart is the whole point of the line. */
+  function varText(pc, name) {
+    try { return pc.getAnimationVariableBool(name) ? 'yes' : 'no'; } catch (e) { return 'unknown'; }
+  }
+
+  /**
+   * The character is the person's to drive.
+   *
+   * Both of these are switched on by somebody and switched back off by the
+   * same somebody, so anything that throws, disconnects or is never told it
+   * has finished leaves them on, and AI driven has no getter to ask. Setting
+   * them off when they were already off is not a state change and costs a
+   * native call, so this runs on a timer rather than trying to find out who
+   * did it.
+   */
+  function ownTheCharacter(pc) {
+    // The game switches controls off for its own menus, and race creation
+    // hands the character over on purpose.
+    if (busyMenuOpen()) { return; }
+    // Dead or sitting in something, which includes the cart.
+    if (notOurs()) { return; }
+    try { if (pc.isOnMount()) { return; } } catch (e) { }
+
+    try { sp.Game.setPlayerAIDriven(false); } catch (e) { }
+
+    if (varBool(pc, 'IsNPC')) {
+      try {
+        pc.setAnimationVariableBool('IsNPC', false);
+        if (!saidIsNpc) {
+          saidIsNpc = true;
+          say('jump and sprint: the character was flagged IsNPC, which is what takes both out of the graph. Cleared.');
+        }
+      } catch (e) { }
+    }
+  }
+
+  /**
+   * Hold the sprint gate open while the key is down.
+   *
+   * bSprintOK is the only condition on the sprint transition, in 0_master and
+   * in mt_behavior both, so with it shut SprintStart is refused however much
+   * stamina there is. Skyrim's own rule is repeated here rather than
+   * overridden: no sprinting while over encumbered, out of stamina, swimming
+   * or on a horse. Only while the key is actually down, so nothing is held
+   * open for somebody who is not asking for it.
+   */
+  function holdSprintGate(pc) {
+    if (!sprintHeldSince) { return; }
+    // A release this file never saw, because a menu or the wheel took the
+    // keyboard mid press. Eight seconds is longer than anybody sprints in one
+    // hold and short enough that it cannot stay stuck.
+    if (Date.now() - sprintHeldSince > 8000) { sprintHeldSince = 0; return; }
+    if (anyClaim() || busyMenuOpen() || notOurs()) { return; }
+    try {
+      if (pc.isOverEncumbered()) { return; }
+      if (pc.isSwimming() || pc.isOnMount()) { return; }
+      if (pc.getActorValue('Stamina') <= 0) { return; }
+    } catch (e) { return; }
+    if (varBool(pc, 'bSprintOK')) { return; }
+    try {
+      pc.setAnimationVariableBool('bSprintOK', true);
+      if (!saidSprintGate) {
+        saidSprintGate = true;
+        say('jump and sprint: bSprintOK was shut with stamina left, which is what refuses SprintStart. Held open while the key is down.');
+      }
+    } catch (e) { }
+  }
+
   function probeState() {
     let pc = null;
     try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
@@ -1291,6 +1403,12 @@
     ask('swimming', () => yn(pc.isSwimming()));
     ask('mounted', () => yn(pc.isOnMount()));
     ask('weapon out', () => yn(pc.isWeaponDrawn()));
+    // The gates themselves, so a line that says "refused" also says which one
+    // said no rather than leaving the next reader to run the whole thing again.
+    ask('bSprintOK', () => varText(pc, 'bSprintOK'));
+    ask('IsNPC', () => varText(pc, 'IsNPC'));
+    ask('bIsSynced', () => varText(pc, 'bIsSynced'));
+    ask('bAnimationDriven', () => varText(pc, 'bAnimationDriven'));
     const theirs = notOurs();
     if (theirs) { bits.push(theirs); }
     const off = readControlsNow();
@@ -1298,23 +1416,31 @@
     return bits.join(', ');
   }
 
-  sp.on('buttonEvent', guard('probe keys', (e) => {
-    if (!e.isDown || e.isUp) return;
+  sp.on('buttonEvent', guard('jump and sprint keys', (e) => {
     // By the game's own name for the control, so a rebound key still counts.
     // The key codes are the fallback for an event that arrives without one.
     let kind = '';
     if (e.userEventName === 'Jump' || (!e.userEventName && e.code === probeKeys.jump)) { kind = 'jump'; }
     if (e.userEventName === 'Sprint' || (!e.userEventName && e.code === probeKeys.sprint)) { kind = 'sprint'; }
     if (!kind) return;
+
+    // Sprint is a hold, not a press, and the gate is only worth holding open
+    // for as long as somebody is holding the key.
+    if (kind === 'sprint') {
+      if (e.isUp) { sprintHeldSince = 0; }
+      else if (e.isDown && !sprintHeldSince) { sprintHeldSince = Date.now(); }
+    }
+
+    if (!e.isDown || e.isUp) return;
     // The chat or the wheel has the keyboard, or a menu does: not a jump.
     if (anyClaim() || busyMenuOpen()) return;
     const now = Date.now();
     if (now - probeLast[kind] < PROBE_GAP_MS) return;
     probeLast[kind] = now;
-    probePresses.push({ kind: kind, at: now, state: '' });
+    probePresses.push({ kind: kind, at: now, state: '', moving: true });
   }));
 
-  sp.on('update', guard('probe', () => {
+  sp.on('update', guard('jump and sprint', () => {
     const now = Date.now();
     if (now - probeKeys.at > 30000) {
       const first = !probeKeys.at;
@@ -1322,17 +1448,46 @@
       try { probeKeys.jump = sp.Input.getMappedKey('Jump', 0); } catch (e) { }
       try { probeKeys.sprint = sp.Input.getMappedKey('Sprint', 0); } catch (e) { }
       if (first) {
-        say('probe: watching jump (key ' + probeKeys.jump + ') and sprint (key ' +
-            probeKeys.sprint + '), one line per press');
+        say('jump and sprint: jump is key ' + probeKeys.jump + ', sprint is key ' +
+            probeKeys.sprint + '. The character is taken off the AI and off IsNPC every ' +
+            'two seconds, the sprint gate is held open while the key is down, and a press ' +
+            'the graph still refuses writes one line.');
       }
     }
+
+    // The character is only fetched on a frame that has something to do with
+    // it. Three handlers in this file already ask for it every frame and that
+    // is three too many.
+    const heartbeat = now - ownedAt >= 2000;
+    let pc = null;
+    if (heartbeat || sprintHeldSince || probePresses.length) {
+      try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    }
+    if (pc) {
+      // Two seconds, because this is a state that has to be wrong for a whole
+      // key press to matter and nothing here is worth a native call a frame.
+      if (heartbeat) { ownedAt = now; ownTheCharacter(pc); }
+      // Every frame, but only while the key is down: the graph reads the gate
+      // on the frame it handles the event, so a timer would miss it.
+      holdSprintGate(pc);
+    }
+
     if (!probePresses.length) return;
     for (const p of probePresses) {
-      if (!p.state) { p.state = probeState(); }
+      if (!p.state) {
+        p.state = probeState();
+        try { p.moving = pc ? pc.getAnimationVariableFloat('Speed') > 1 : true; } catch (e) { p.moving = true; }
+      }
     }
     while (probePresses.length && now - probePresses[0].at >= PROBE_WINDOW_MS) {
       const p = probePresses.shift();
-      say('probe ' + p.kind + ': ' + probeVerdict(p) + '. ' + p.state + '. hook saw ' +
+      const verdict = probeVerdict(p);
+      // A jump that jumps is not news, and the log is somebody's whole session.
+      if (verdict.indexOf('played ') === 0) { continue; }
+      // Neither is a sprint key pressed standing still. Skyrim does not sprint
+      // from a standstill and that is most of what anybody presses.
+      if (p.kind === 'sprint' && !p.moving && verdict.indexOf('no event') === 0) { continue; }
+      say(p.kind + ': ' + verdict + '. ' + p.state + '. hook saw ' +
           probeHookCalls + ' events' + (probeHookErrors ? ' and threw ' + probeHookErrors + ' times' : ''));
     }
   }));
