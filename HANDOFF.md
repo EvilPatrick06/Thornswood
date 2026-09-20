@@ -189,8 +189,13 @@ Suggestions: a hot-reload guard around the commands block; write
     VPS address and admin user.
 Suggestions: og:title, og:description, og:image in home.html;
 Strict-Transport-Security; robots.txt; /download and /install redirect to
-/downloads; /world#accord scrolls after the body loads; keep a /support link
-when Patreon is set.
+/downloads; /world#accord scrolls after the body loads.
+
+/support is gone as of 20 September. It existed to say what a tier cost
+while there was nowhere else to read it; the Patreon is set up and says it
+now, so the nav button and the footer link both go straight there. The
+address 404s rather than redirecting, so an old link shared in a channel
+lands on 'not here'.
 
 server.js changes need the full `Deploy-Docs.ps1` (no switch); it copies
 server.js and public\, restarts the 'Thornswood Docs' task, and leaves the

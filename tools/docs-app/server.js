@@ -160,7 +160,7 @@ const LEVEL = {
 /* The public front lives at / and needs no password. The working area moved
    to /hub, because a server nobody can read about is a server nobody joins,
    and a login box was the first thing anybody saw. */
-const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/support', '/join',
+const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/join',
                       '/classes', '/roadmap', '/news', '/gallery',
                       '/downloads', '/report',
                       // Known Issues and Help are for the person whose install
@@ -185,7 +185,6 @@ const BLURB = {
   '/world':     ['The world', 'Fifty years after the Stormcloaks won. A free Skyrim, an Empire with an embassy and no soldiers, and the White Harbour Accord.'],
   '/rules':     ['Rules', 'Nine rules, short on purpose. Nobody dies without agreeing to, play a person rather than a legend, and staff decide.'],
   '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
-  '/support':   ['Supporting Thornswood', 'Free and always will be. Nothing here makes your character stronger.'],
   '/credits':   ['Credits', 'Everyone whose work Thornswood is built on.'],
   '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
   '/known':     ['Known issues', 'Permanent limits of how a shared Skyrim works, each with the reason. Read this before reporting anything.'],

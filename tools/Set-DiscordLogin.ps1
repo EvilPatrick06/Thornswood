@@ -92,7 +92,8 @@ function AskSecret($what) {
 if ($NewPatreon) {
   Write-Host ''
   Write-Host '  Your Patreon page address, the one people visit.' -ForegroundColor DarkGray
-  Write-Host '  Press enter on an empty line to clear it and go back to /support.' -ForegroundColor DarkGray
+  Write-Host '  Press enter on an empty line to clear it. The site keeps the' -ForegroundColor DarkGray
+  Write-Host '  address written into the page, so the buttons still work.' -ForegroundColor DarkGray
   Write-Host ''
   $typed = (Read-Host '  Paste it here').Trim()
   $Patreon = if ($typed) { $typed } else { 'none' }
