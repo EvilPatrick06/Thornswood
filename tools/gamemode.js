@@ -2904,15 +2904,50 @@ var dataDir = 'data';
     post('/say', { profileId: profileId, text: text });
   }
 
-  /** actorId for a connected profile, or 0. */
+  /*
+    actorId for a connected profile, or 0.
+
+    "The server cannot find your character right now" was reported often
+    enough to be the normal answer rather than the rare one, and this is why.
+    The sweep is the only lookup, it runs on the tick the line arrives, and
+    three separate things make it come back empty for somebody who is plainly
+    standing in the world:
+
+      - onlinePlayers is read inside a try that returns 0 on a throw, so one
+        bad read loses the whole list rather than one entry;
+      - mp.get(id, 'profileId') has its own try that turns a throw into 0, and
+        an actor part way through spawning throws there;
+      - a chat line composed while the character is being moved or re-created
+        arrives in the gap where the actor exists but is not yet listed.
+
+    So the answer is remembered. Every successful sweep records it, and a
+    sweep that finds nothing falls back to the last actor seen for that
+    profile, confirmed by asking that actor who it belongs to. If the actor is
+    gone the confirm throws and the fallback is dropped, so this cannot hand
+    back a stale character: it only covers the gap where the sweep is blind and
+    the actor is still there.
+  */
+  // On globalThis, so a hot reload does not forget who everybody was and put
+  // the gap straight back.
+  if (!globalThis.__thornswoodLastActor) { globalThis.__thornswoodLastActor = {}; }
+  var lastActor = globalThis.__thornswoodLastActor;
+
   function actorOf(profileId) {
     var online = [];
-    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return 0; }
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
     for (var i = 0; i < online.length; i++) {
       var id = online[i];
       var pid = 0;
       try { pid = Number(mp.get(id, 'profileId')) || 0; } catch (e) { pid = 0; }
-      if (pid === profileId) { return id; }
+      if (pid === profileId) { lastActor[profileId] = id; return id; }
+    }
+
+    var had = lastActor[profileId];
+    if (had) {
+      var still = 0;
+      try { still = Number(mp.get(had, 'profileId')) || 0; } catch (e) { still = 0; }
+      if (still === profileId) { return had; }
+      delete lastActor[profileId];
     }
     return 0;
   }
@@ -2940,10 +2975,22 @@ var dataDir = 'data';
     var word = parts[0].toLowerCase();
     var arg = (parts[1] || '').toLowerCase();
 
+    /*
+      A missing character no longer refuses every command.
+
+      This used to stop the dispatcher before it had read the word, so a lookup
+      that came back empty answered "The server cannot find your character
+      right now" to /help and to /tp with no argument, neither of which needs a
+      character at all. Now the commands that need one say so where they need
+      it, and the message says what to do about it.
+    */
     var actorId = actorOf(profileId);
-    if (!actorId) {
-      toProfile(profileId, 'The server cannot find your character right now.');
-      return;
+    function needCharacter() {
+      if (actorId) { return true; }
+      toProfile(profileId,
+        'The server cannot find your character right now. Give it a moment and ' +
+        'try again; if it keeps saying that, say so and what you were doing.');
+      return false;
     }
 
     // A lockpick that broke in somebody's game.
@@ -2963,6 +3010,7 @@ var dataDir = 'data';
     // with this is throw away its own lockpicks. It is capped anyway, and
     // takeItem refuses when the pack does not hold that many.
     if (word === '/tspicks') {
+      if (!needCharacter()) { return; }
       var picks = Math.max(1, Math.min(20, Number(parts[1]) || 1));
       if (takeItem(actorId, 'a:Skyrim.esm', picks)) {
         log('spent ' + picks + ' lockpick(s) for ' + actorId.toString(16));
@@ -2971,6 +3019,7 @@ var dataDir = 'data';
     }
 
     if (word === '/where') {
+      if (!needCharacter()) { return; }
       var pos = [0, 0, 0], ang = [0, 0, 0], cell = '';
       try {
         pos = mp.get(actorId, 'pos') || [0, 0, 0];
@@ -2997,8 +3046,12 @@ var dataDir = 'data';
         character across Skyrim. It stays until a login hands out a token the
         page has to present.
       */
-      if (!isAdmin(profileId)) {
-        toProfile(profileId, 'That one is not yours to run.');
+      if (!isPlaytester(profileId)) {
+        // Which list they are not on, because "not yours to run" told nobody
+        // anything and the answer was always the same whoever asked.
+        toProfile(profileId,
+          'You are not on the playtester or dev list, so /tp is not yours to run. ' +
+          'Ask Patrick to add profile ' + profileId + '.');
         return;
       }
       var table = places();
@@ -3011,6 +3064,9 @@ var dataDir = 'data';
         toProfile(profileId, 'No such place. Try: ' + Object.keys(table).sort().join(', '));
         return;
       }
+      // The listing above answers whether or not the sweep found anybody. The
+      // move is the part that needs a character to move.
+      if (!needCharacter()) { return; }
       try {
         mp.set(actorId, 'locationalData', {
           cellOrWorldDesc: where.desc, pos: where.pos, rot: where.rot
@@ -3061,6 +3117,9 @@ var dataDir = 'data';
         toProfile(profileId, 'Say /ooc and then whatever you meant to say.');
         return;
       }
+      // Needs a character: who hears it is worked out from where that
+      // character is standing.
+      if (!needCharacter()) { return; }
       if (said.length > 300) { said = said.slice(0, 300); }
 
       var myPos = [0, 0, 0], myCell = '';
@@ -3116,7 +3175,10 @@ var dataDir = 'data';
         '/ooc <what you meant> talks out of character to whoever is near you. ' +
         '/where prints your cell, position and facing. ' +
         '/roll is in the chat itself.' +
-        (isAdmin(profileId) ? ' /tp <place> moves you.' : ''));
+        (isPlaytester(profileId)
+          ? ' /tp <place> moves you, and /tp on its own lists the places (' +
+            roleOf(profileId) + ').'
+          : ''));
       return;
     }
 
@@ -3177,6 +3239,57 @@ var dataDir = 'data';
 
   function isAdmin(profileId) {
     return admins().indexOf(Number(profileId)) !== -1;
+  }
+
+  /*
+    Who may run what, in three tiers.
+
+    There was one tier and one name in it, so /tp answered "That one is not
+    yours to run" to every developer and every playtester on the server, which
+    is what was reported. Asked for by Djinn on 19 Sep: the people running the
+    playtest need to move themselves around without asking Patrick to do it.
+
+    The lists live in server-settings.json on the VPS beside thornswoodAdmins,
+    as thornswoodDevs and thornswoodPlaytesters, both arrays of profile ids.
+    Neither is a secret and neither has a default: a server that names nobody
+    has no devs and no playtesters, which is the same as today.
+
+    An admin is a dev is a playtester, so nobody has to be listed twice.
+
+    WHAT THIS WIDENS, said plainly rather than buried. The profile id a chat
+    line arrives under is a claim, not a fact: the page joins the voice socket
+    with whatever id is in the settings file on that machine, and the service
+    queues the line under it. /tp only ever moves the character belonging to
+    the id it arrived under, so the worst anybody can do is move a character
+    they can already claim to be. Going from one id to a handful widens that by
+    a handful, and it is the same hole either way. It closes when a login hands
+    the page a token it has to present, which is where this was always going.
+  */
+  function rolelist(name) {
+    try {
+      var cfg = mp.getServerSettings() || {};
+      var list = cfg[name];
+      if (Array.isArray(list) && list.length) { return list.map(Number); }
+    } catch (e) { }
+    return [];
+  }
+
+  function isDev(profileId) {
+    if (isAdmin(profileId)) { return true; }
+    return rolelist('thornswoodDevs').indexOf(Number(profileId)) !== -1;
+  }
+
+  function isPlaytester(profileId) {
+    if (isDev(profileId)) { return true; }
+    return rolelist('thornswoodPlaytesters').indexOf(Number(profileId)) !== -1;
+  }
+
+  /** What to call somebody in a refusal, so they know which list to be on. */
+  function roleOf(profileId) {
+    if (isAdmin(profileId)) { return 'admin'; }
+    if (isDev(profileId)) { return 'dev'; }
+    if (isPlaytester(profileId)) { return 'playtester'; }
+    return 'none';
   }
 
   /** Everybody connected, by profile, so the message goes through the chat. */
