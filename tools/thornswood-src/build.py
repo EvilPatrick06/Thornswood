@@ -5,7 +5,7 @@ Assemble gamemode.js.
 The four data blobs were recovered from the deployed gamemode.js rather than
 rebuilt from the plugin, because the intermediate JSON that mkgamemode.py read
 did not survive. They are byte-identical to what the server is running now,
-apart from the alchemy novice manual added below: Keizaal shipped Advanced,
+apart from the alchemy novice manual added below: the earlier plugin shipped Advanced,
 Expert and Master for that track and no Novice, which left tier 1 unreachable.
 """
 import json

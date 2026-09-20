@@ -28,9 +28,9 @@
 
   // ------------------------------------------------------------ whose game ----
   // Skyrim Platform loads every plugin in Data/Platform/Plugins, whichever server
-  // skymp5-client is about to join. Somebody who also plays Keizaal Online starts
+  // skymp5-client is about to join. Somebody who also plays another server starts
   // it from this same Skyrim, so on 2026-09-16 Thornswood's voice indicator sat
-  // on top of Keizaal's menu. Whichever launcher ran last wrote
+  // on top of that server's menu. Whichever launcher ran last wrote
   // skymp5-client-settings.txt, and its server-ip says whose game this is. Not
   // ours: this file does nothing at all. Unreadable: carry on, as before.
   //

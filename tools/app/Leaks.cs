@@ -15,7 +15,7 @@ namespace Thornswood
     /// that installer got a copy. The packaging rules now leave the folder
     /// out (Ship-Rules.ps1), and this removes the copies that already went.
     ///
-    /// Matched by content, never by name. On a machine that plays Keizaal or
+    /// Matched by content, never by name. On a machine that plays another server or
     /// Daedric the same file name holds that person's own sign in, and that
     /// is theirs; only the exact bytes that shipped are taken away.
     /// </summary>

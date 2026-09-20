@@ -180,9 +180,8 @@ $vanillaRootFiles = @(
 $vanillaRootDirs = @(
     '_DowngraderBackups', 'Creations', 'Mods', 'Skyrim', 'src',
 
-    # Bethesda's launcher keeps its own folder, and DaedricData is another
-    # roleplay server's. Neither is ours and neither goes in an installer.
-    'BStarData', 'DaedricData'
+    # Bethesda's launcher keeps its own folder. Not ours, not in an installer.
+    'BStarData'
 )
 
 function Test-Vanilla([string]$rel) {
@@ -428,7 +427,7 @@ if ($longest -gt 250) { Say "    $longestPath" 'DarkGray' }
 $refProfile = Get-ShipLoadOrderDir $Root $ProfileDir
 Say "  load order from $refProfile" 'DarkGray'
 # Only the two lists. Other launchers leave .bak copies of them beside the
-# originals (Plugins.txt.keizaal-<date>.bak and the like); those are one
+# originals (Plugins.txt.<server>-<date>.bak and the like); those are one
 # machine's history, and the 16 Sep installer carried three of them.
 Get-ChildItem -LiteralPath $refProfile -File -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -in 'plugins.txt', 'loadorder.txt' } |

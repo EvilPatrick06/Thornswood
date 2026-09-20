@@ -345,29 +345,30 @@ if ($GameDir) {
     Say '  installed into the Steam copy; no own game folder to check them against' 'Yellow'
 }
 
-# ------------------------------------------------------------ client patch
-# The client bundle has to send the login this server answers, and the copy in
-# the game folder is the only source there is: nothing in the repo builds it.
-# Patch-Client.ps1 is idempotent and says why if it cannot apply. A refusal
-# stops the release, because an unpatched client connects and then sits on the
-# main menu for everybody who installs it. See the header of that script.
-Head 'Client patch'
+# ------------------------------------------------------------ client build
+# The client runtime is built from the fork and recorded in client-build.json.
+# Until 20 September the copy in the game folder was whatever another server's
+# launcher had last written into the Steam copy, patched by text; now a release
+# refuses to go out unless the six recorded files are the recorded build, byte
+# for byte, in the folder this release packs. Sync-Client.ps1 -Check answers
+# that without copying anything: 0 all in place, 2 something differs, 1 the
+# build itself is not the recorded one or the record is missing.
+Head 'Client build'
 # global:, never a bare assignment. Run from a prompt, as Ship always is, a
 # bare $LASTEXITCODE = 0 makes a copy that belongs to this script alone, while
-# a child script's exit and a program's exit code land in the global one. Every
-# check after it then read this script's 0: on 19 Sep Patch-Client refused the
-# bundle, exited 1, and a dev release went out with it anyway. Under -File the
-# two are the same variable, which is why testing that way never showed it.
+# a child script's exit lands in the global one. On 19 Sep a refused check was
+# read as this script's own 0 and a dev release went out over it.
 $global:LASTEXITCODE = 0
-# The client lives in whichever Skyrim this build runs from. With a Game folder
-# of its own (OwnGame.cs) that is not the Steam copy, and patching the Steam copy
-# would publish an unpatched client out of the build's folder.
-$patchArgs = @{}
-if ($GameDir) { $patchArgs['Game'] = $GameDir }
-& (Join-Path $Here 'Patch-Client.ps1') @patchArgs
+$syncArgs = @{ Check = $true; NoPause = $true }
+if ($GameDir) { $syncArgs['Game'] = $GameDir }
+& (Join-Path $Here 'Sync-Client.ps1') @syncArgs
+if ($LASTEXITCODE -eq 2) {
+    Unbump 'the client in the game folder is not the recorded build'
+    Die 'The game folder does not hold the recorded client. Run .\tools\Sync-Client.ps1, then Ship again.'
+}
 if ($LASTEXITCODE -ne 0) {
-    Unbump 'the client patch did not apply'
-    Die 'Patch-Client.ps1 refused. Nothing was published.'
+    Unbump 'the client build could not be checked'
+    Die 'Sync-Client.ps1 refused. Rebuild the client, run .\tools\New-ClientBuildRecord.ps1, and Ship again.'
 }
 
 # ------------------------------------------------------------ publish

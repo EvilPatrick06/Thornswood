@@ -14,7 +14,7 @@ namespace Thornswood
     /// actually happened: on 16 Sep Thornswood started the game at 19:03 and
     /// another server's launcher was opened at 19:08, while the game was live.
     /// At 19:08:47 it rewrote UI\index.html, skymp5-client.js, the client
-    /// settings and its own skymp5-activity.js. Skyrim Platform reloads plugins
+    /// settings and its own activity plugin. Skyrim Platform reloads plugins
     /// the moment their files change, so the swap took effect at once and both
     /// servers were on screen together.
     ///

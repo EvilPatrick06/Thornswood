@@ -179,59 +179,69 @@ from your machine; without it Ship says so and carries on.
 
 Never paste any of them into a chat, a commit, a Discord message or a doc.
 
-## The three launchers problem
+## One Skyrim of its own
 
-Keizaal Online, Daedric Online and Thornswood are all SkyMP servers, and every
-SkyMP launcher writes into the same `Data\Platform` of the same Skyrim: its own
-`UI\index.html`, its own plugins beside ours, its own `skymp5-client-settings.txt`.
-Skyrim Platform runs every plugin it finds and the front plugin loads whatever
-`index.html` is there. That is how Keizaal's menu showed under Thornswood's
-chat and Thornswood's voice indicator over Keizaal's menu.
+Thornswood runs from its own game folder, `<Root>\Game`, and nothing here
+supports another server's install. Decided by Patrick on 20 September, after
+measuring what the old sharing code had actually let through: the SkyMP client
+runtime in Thornswood's folder, the bundle, `MpClientPlugin.dll`, both
+SkyrimPlatform DLLs, the CEF host and `TESModPlatform.pex`, were all another
+launcher's builds, copied across from the Steam copy on every rebuild and then
+patched by text. None of them had come from Vortex and none had come from
+here.
 
-What Thornswood does about it, all in the launcher and plugins, nothing for a
-person to do:
+**The folder.** The launcher makes `<Root>\Game` itself (`tools\app\OwnGame.cs`,
+Settings, Maintenance, "Thornswood's own Skyrim folder"). With the Thornswood
+profile deployed in Vortex, it builds the folder from that deployment, then
+restarts and runs from it. `Paths.Init` prefers `<Root>\Game` over the Steam
+copy, so from then on the launcher points Windows' Skyrim settings, plugin list
+and saves at `Profile` for each session and ignores which profile Vortex has
+on. When Vortex deploys a newer Thornswood collection, the next launcher start
+brings it in by itself. The offer to make the folder is made at startup
+whenever it is possible; it used to wait for another server's files to be
+found, and no longer looks for any.
 
-1. Every Thornswood plugin idles unless the client settings point at our server
-   AND the launcher left a fresh session note, `Data\Platform\thornswood-session.txt`
-   (unix milliseconds, written at Play, deleted when the game closes and when
-   the launcher starts). A launcher that never rewrites the client settings
-   cannot make our plugins wake up.
-2. Before every Play, Keep puts back every file our own updates wrote under
-   `Data\Platform` and parks any other `.js` in `Plugins` (another server's
-   plugin, or the other build's) in `Profile\Parked`, then puts them back the
-   moment the game closes. Their launcher finds its files where it left them.
-3. Nothing touches Vortex. Switching servers is pressing Play in whichever
-   launcher you want.
-4. While the game runs, the launcher holds its own files open read only
-   (Hold.cs): the kept files, the client settings, and an empty stand-in
-   where each parked plugin was. The game and Skyrim Platform can read them;
-   nothing can write, replace or delete them, so another launcher opened
-   mid-session cannot swap them under Skyrim Platform's hot reload (that is
-   what happened on 16 Sep at 19:08). Anything else written into Plugins or
-   UI during the session is named in the launcher log. Let go at game close,
-   before the parked plugins go back.
-5. On a machine that ships, Publish-Update leaves the other servers' files
-   out of every pack and every removal list (`.bak` files and any plugin in
-   `Data\Platform\Plugins` that is not `thornswood-*.js` or the patched
-   `skymp5-client.js`), and if another launcher has written its own
-   `UI\index.html`, puts Thornswood's back from `tools\ts-ui\index.html`
-   before scanning. So playing Keizaal or Daedric on your shipping machine
-   cannot put their files into a Thornswood release.
+**The client.** The SkyMP client runtime is built from the fork,
+`C:\Thornswood-Dev\skymp` on `thornswood/engine-changes`: `npx webpack` in
+`skymp5-client` for the bundle and the native build for the rest. After a
+rebuild, `tools\New-ClientBuildRecord.ps1` records the six files that build
+produces which differ from upstream, by hash, against the fork commit, into
+`tools\client-build.json`. `tools\Sync-Client.ps1` copies those six from the
+build output into the game folder and refuses any file that is not the
+recorded one; `Go.ps1` runs it beside the overlays and the plugins. Ship runs
+`Sync-Client.ps1 -Check` and refuses a release whose client is not the recorded
+build. `OwnGame.Foreign` never takes those six paths from the Steam copy. The
+launcher's Client row on the Play page tests the bundle for the
+`THORNSWOOD PATCH` marker the fork's source carries.
 
-Where this is going: Gavin and Djinn decided on 17 Sep, after the servers
-kept getting into each other's files, that Thornswood will run from its own
-game folder (`Thornswood\Game`), built by the launcher from what Vortex has
-deployed into the Steam copy: hard links for the big files, copies of
-everything another launcher rewrites in place, and its own plugin list,
-settings and saves on every Play. Keizaal and Daedric get folders of their
-own the same way (`tools\New-GameFolder.ps1`). The work is on the branch
-`djinn/own-game-folder`; everything above describes what ships until it
-lands, and the points above still hold inside the own folder.
+**Links, not copies.** Big files (archives, textures, meshes, plugins) are hard
+links to Vortex's copies, so a collection is not on the disk twice; this needs
+the folders on the same drive as the Skyrim Vortex deploys into. A hard link is
+the same file under a second name, so anything written into one in place lands
+in every folder that links it. So these are always copied: the game's root
+files, `Data\Platform`, `Data\NirnLabUIPlatform`, `Data\SKSE`, `Data\MCM`,
+`Data\Video`, settings, script and program files, and the vanilla masters. The
+launcher's own writes into the game folder go through `OwnGame.Unshare` or
+`OwnGame.Separate` first.
 
-No wrapper script is needed around the launcher for any of this. A script
-that parks files before Play and puts them back after is doing what Keep
-already does, and two things moving the same files is how a crash leaves one
-of them wrong.
+**Left out of the folder, and of every pack and installer:** decided by what
+belongs, never by whose a file is. `OwnGame.Foreign` in the launcher and
+`Test-ShipOtherServer` in `tools\Ship-Rules.ps1` are the same list; change both
+together. In `Data\Platform\Plugins` only `thornswood-*.js` and the recorded
+bundle belong; in `Data\Platform\UI` only `index.html`, `build.js` and
+`thornswood-*.js`; `PluginsNoLoad` is sign-in data with a token in it and never
+travels; NirnLab UI Platform is left out because SkyrimPlatform will not start
+on its own browser with it present. Vortex's records and markers, logs and
+`Claude outputs` are left out too.
+
+**In the folder while the game runs.** Keep puts back every file our own
+updates wrote under `Data\Platform` before Play and parks any `.js` in
+`Plugins` that is not ours in `Profile\Parked`, then puts them back the moment
+the game closes. Hold keeps its own files open read only while the game runs,
+so nothing can swap them under Skyrim Platform's hot reload. Every Thornswood
+plugin idles unless the client settings point at our server and the launcher
+left a fresh session note, `Data\Platform\thornswood-session.txt`. No wrapper
+script is needed around the launcher for any of this.
 
 A Skyrim on a newer build than 1.6.1170 gets a Downgrade button on the Play
 page (Downgrade.cs): the launcher opens Steam's console, types the three
@@ -240,51 +250,6 @@ depot to finish, copies the 1.6.1170 files over the Steam copy and removes the
 downloads. Nothing is typed unless Steam's window is confirmed in front; if it
 cannot be, the command goes on the clipboard and the log says where to paste.
 
-`tools\Why-Keizaal.ps1` is the read only diagnostic: which server the client
-points at, what is in `Data\Platform`, who deployed what, the Keizaal launcher's
-install. Run it on any machine where the servers are getting into each other.
-
-## Separate Skyrim folders
-
-Keep and Hold only reach `Data\Platform`. Everything else the servers share in
-one Skyrim still collides: `Data\Interface\startmenu.swf` (Thornswood's packs
-ship one, so Keizaal came up with Thornswood's backdrop), the SkyMP dlls in
-`Data\SKSE\Plugins`, the vanilla masters Keizaal replaces, and above all the
-mods themselves, because switching the profile in Vortex takes the other
-collection out of the folder. The full fix is a Skyrim folder per server.
-
-**Thornswood.** The launcher makes `<Root>\Game` itself (`tools\app\OwnGame.cs`,
-Settings, Maintenance, "Thornswood's own Skyrim folder"). With the Thornswood
-profile deployed in Vortex, it builds the folder from that deployment, then
-restarts and runs from it. `Paths.Init` already prefers `<Root>\Game` over the
-Steam copy, which is the layout installs had before the collection, so from
-then on the launcher points Windows' Skyrim settings, plugin list and saves at
-`Profile` for each session and ignores which profile Vortex has on. When Vortex
-deploys a newer Thornswood collection, the next launcher start brings it in by
-itself. On a machine where another SkyMP server has been, the launcher offers
-this once at startup.
-
-**Keizaal and Daedric.** `tools\New-GameFolder.ps1 -Server Keizaal` (or
-`Daedric`), run with that server's profile deployed in Vortex, makes
-`<drive>:\Skyrim-<Server>` beside the Steam copy. Then point that server's
-launcher at it. Run it again after that collection updates.
-
-**Links, not copies.** Big files (archives, textures, meshes, plugins) are hard
-links to Vortex's copies, so a collection is not on the disk twice; this needs
-the folders on the same drive as the Skyrim Vortex deploys into. A hard link is
-the same file under a second name, so anything written into one in place lands
-in every folder that links it. So these are always copied: the game's root
-files, `Data\Platform`, `Data\NirnLabUIPlatform`, `Data\SKSE`, `Data\MCM`,
-`Data\Video`, settings, script and program files, the vanilla masters, and
-anything listed in a `keizaal-backup-*` folder. The launcher's own writes into
-the game folder go through `OwnGame.Unshare` or `OwnGame.Separate` first.
-
-**Left out of every folder:** other servers' files (the same list as
-`Test-ShipOtherServer` in `tools\Ship-Rules.ps1`; `OwnGame.Foreign` in the
-launcher, change both together), `Data\Platform\PluginsNoLoad` (sign-in data
-with an access token in it), Vortex's records and markers, logs, and
-`Claude outputs`.
-
 **Records.** `Profile\OwnGame\files.txt` lists each file brought in, whether it
 was linked or copied and whether Vortex deployed it. Ship-Rules.ps1 reads that
 list (`Get-ShipOwnGameCollection`) so Publish-Update and Package-Thornswood keep
@@ -292,9 +257,8 @@ the collection out of packs and the installer, exactly as they read
 `vortex.deployment.json` when the game is the Steam copy, and both refuse to go
 on if the list is empty. `Profile\OwnGame\plugins.txt` and `loadorder.txt` are
 the Vortex profile's lists as of the folder's last update, and are the
-reference load order a release carries (`Get-ShipLoadOrderDir`). Ship patches
-the client in `<Root>\Game` when it exists. The other servers' records are in
-`%LOCALAPPDATA%\Thornswood\GameFolders`.
+reference load order a release carries (`Get-ShipLoadOrderDir`). Ship checks
+the client in `<Root>\Game` against `tools\client-build.json`.
 
 **The Skyrim build.** Steam updates the Steam copy by itself. With Thornswood's
 own folder, the Downgrade button works on the Steam copy the folder is made
@@ -311,8 +275,7 @@ Its own Settings, Maintenance has "Make it", which builds
 `<Root>-DevBuild\Game` the same way.
 
 Skyrim reads its plugin list from one Windows folder per user. Thornswood swaps
-it per session; Keizaal and Daedric read whatever Vortex's active profile wrote,
-so leave Vortex on the profile of the other server you play next.
+it per session and ignores which profile Vortex has on.
 
 ## Where things are written down
 

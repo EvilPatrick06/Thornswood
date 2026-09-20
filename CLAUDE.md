@@ -48,23 +48,33 @@ too. Say in the reply which entries moved.
   into the Steam copy, the big files as hard links so the collection is not
   stored twice, and copies of everything another launcher rewrites in place
   (settings, scripts, programs, the client folders, the master files and
-  whatever Keizaal is known to replace). Keizaal and Daedric get their own
-  folders the same way (`tools\New-GameFolder.ps1`).
+  whatever else rewrites a copied file in place). Decided by Patrick on
+  20 Sep: nothing here supports another server's install any more. The SkyMP
+  client runtime is built from the fork and recorded in
+  `tools\client-build.json`; `Sync-Client.ps1` puts it in the game folder and
+  Ship refuses a release whose client is not the recorded build. Nothing is
+  taken from the Steam copy's `Data\Platform` or its SkyMP DLLs, because until
+  that day another launcher's builds of all of them were what shipped.
   This is what ships now, corrected 18 Sep. The bullet used to say the Steam
   copy shipped until `djinn/own-game-folder` reached main. That branch is on
   main, `C:\Thornswood\Game` is built, and the launcher restarts into it:
   Profile\launcher.log records "runs from the new folder". A session reading
   the old wording would have believed the wrong layout was live, which is the
   one thing this section exists to prevent.
-- Whichever folder the game runs from, the launcher handles sharing on its
-  own: Keep puts its files back before Play and parks other servers'
-  plugins; Hold keeps its files open read only while the game runs; the
-  plugins idle unless the client points at our server and a fresh session
-  note is there; Publish-Update keeps other servers' files out of packs
-  (Ship-Rules.ps1). No wrapper scripts around the launcher, nothing moved by
-  hand in Data\Platform, nothing touches Vortex's own files.
-- The SkyMP client bundle (skymp5-client.js) is not built here; the copy in
-  the game folder is patched by Patch-Client.ps1 and shipped as is.
+- Whichever folder the game runs from, the launcher looks after its own
+  files: Keep puts its files back before Play and parks any plugin in
+  `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
+  only while the game runs; the plugins idle unless the client points at our
+  server and a fresh session note is there; Publish-Update packs what belongs
+  and nothing else (Ship-Rules.ps1, by what is ours rather than by whose
+  anything is). No wrapper scripts around the launcher, nothing moved by hand
+  in Data\Platform, nothing touches Vortex's own files.
+- The SkyMP client runtime is built from the fork, `C:\Thornswood-Dev\skymp`
+  on `thornswood/engine-changes`, and recorded in `tools\client-build.json`
+  by `New-ClientBuildRecord.ps1`. `Sync-Client.ps1` puts the six recorded
+  files in the game folder and refuses any that is not the recorded build;
+  Ship refuses a release whose client is not. Every change Patch-Client.ps1
+  used to make by text is in the fork's source, and that script is gone.
 - Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
   no expression bodied members, no out var.
 - Every change goes out as one complete release: launcher, game files and
@@ -150,7 +160,7 @@ run them.
 ## What a Claude here does itself and what the person does
 
 Read anything. Run git status, diff, log, fetch, the read only scripts
-(Why-Keizaal.ps1, Check-*.ps1, Setup-SshKey.ps1 -Test), and compile checks.
+(Check-*.ps1, Setup-SshKey.ps1 -Test, Sync-Client.ps1 -Check), and compile checks.
 Edit source on a branch when asked. The person runs what leaves the machine:
 Ship.ps1, git push, gh pr create, and every script that talks to the VPS
 (Deploy-*, Request-Restart, Install-Bot, Rotate-ServerPassword, Publish-*).

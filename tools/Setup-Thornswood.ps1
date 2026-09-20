@@ -349,7 +349,7 @@ if ((Get-ExeBytes) -ne $TARGET_EXE_BYTES -and -not $SkipDowngrade) {
 
 # ------------------------------------------------------------- tamper check
 # The size check above only proves the build number. Multiplayer setups like
-# Keizaal Online and Daedric Online install into the Steam folder, and a patched
+# another server and another server install into the Steam folder, and a patched
 # loader of exactly the right size would sail straight past it and end up in
 # this copy. So the three files that get patched are matched by content against
 # the ones this package was built from.

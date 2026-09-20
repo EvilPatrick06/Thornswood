@@ -121,6 +121,24 @@ if (Test-Path -LiteralPath $plSrc) {
   Bad 'the ts-plugins folder is not next to this script'
 }
 
+# ------------------------------------------------------------------ client --
+# The SkyMP client runtime, built from the fork and recorded in
+# client-build.json: the bundle, MpClientPlugin.dll, both SkyrimPlatform DLLs,
+# the CEF host and TESModPlatform.pex. Sync-Client.ps1 copies the six from the
+# fork's build output and refuses any file that is not the recorded one. This
+# is the same job as the two sections above, for the part of the client that
+# is compiled rather than written here. Until 20 September none of it came
+# from here: the Steam copy held another server's launcher's builds and the
+# folder build copied them across.
+Head 'Client'
+$sync = Join-Path $Here 'Sync-Client.ps1'
+if (Test-Path -LiteralPath $sync) {
+  & $sync -Game $Game -NoPause
+  if ($LASTEXITCODE -ne 0) { Bad 'the client runtime is not the recorded build; see the lines above' }
+} else {
+  Bad 'Sync-Client.ps1 is not next to this script'
+}
+
 # The probe's job is done: the voice client reports the same facts, in its own
 # log, and unlike the probe it does not fight the front for the browser.
 $probe = Join-Path $plugins 'thornswood-probe.js'
@@ -138,7 +156,10 @@ if (Test-Path -LiteralPath $probe) {
 # installed on it first still had that server's overlay sitting in here, which
 # is how somebody ends up with two fronts fighting over the browser. So the
 # list is what belongs, not what looks wrong.
-$keep = @('skymp5-client.js', 'skymp5-activity.js', 'skymp5-client-settings.txt')
+# The recorded bundle and the per machine settings file. An activity plugin
+# used to be kept here as well; it exists in no build of ours and in no game
+# folder, so its name is gone.
+$keep = @('skymp5-client.js', 'skymp5-client-settings.txt')
 foreach ($f in (Get-ChildItem -LiteralPath $plSrc -File -Filter *.js -EA SilentlyContinue)) { $keep += $f.Name }
 
 foreach ($s in (Get-ChildItem -LiteralPath $plugins -File)) {

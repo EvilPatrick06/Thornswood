@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-patch_esp.py - give the Keizaal skill manuals a name, a mesh and a text, and add
+patch_esp.py - give the salvaged skill manuals a name, a mesh and a text, and add
 the character-creation books.
 
-Keizaal shipped its fifteen manuals as bare shells: EDID, an empty OBND, an empty
+The earlier plugin shipped its fifteen manuals as bare shells: EDID, an empty OBND, an empty
 DESC and a DATA of all zeros. No FULL, so no name. No MODL, so no mesh. In game
 they are nameless, invisible, weightless objects, which is fine for a mod that
 only ever counted them in a script and fatal for a gamemode that expects somebody

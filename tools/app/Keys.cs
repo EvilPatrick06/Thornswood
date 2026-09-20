@@ -487,7 +487,7 @@ namespace Thornswood
                      "Off and on outright, whatever the talk key is doing. For when somebody walks into the room.",
                      ThornIni, "MuteKey", 21));
 
-            // No SkyMP client keys here, deliberately. Keizaal's build reads a
+            // No SkyMP client keys here, deliberately. that server's build reads a
             // "keybinds" block out of skymp5-client-settings.txt with voice,
             // nicknames, an overlay and an animation menu in it. This build's
             // client does not: the only things it reads out of that file are

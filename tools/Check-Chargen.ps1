@@ -8,8 +8,8 @@
   It checks, in order:
     - the server's load order holds both plugins the flow needs
     - the plugin on disk really carries the fourteen new book records
-    - the fifteen Keizaal manuals have a name and a mesh, which they did not
-      when Keizaal shipped them
+    - the fifteen salvaged manuals have a name and a mesh, which they did not
+      when they were first shipped
     - gamemode.js is the build that knows about all of it
     - the start point in server-settings.json is the creation room, computed
       from this load order rather than written down

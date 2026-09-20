@@ -18,7 +18,9 @@
    installer either way, this is just getting it off the disk.
 
 ```
-.\tools\Clean-OtherServers.ps1 -Assets -Go
+That script is gone as of 20 Sep with the rest of the other-server support.
+Delete the folder by hand, or purge and redeploy in Vortex, which rewrites
+Data from staging and leaves nothing that was not deployed.
 ```
 
 ## Next
@@ -62,7 +64,9 @@ python .\tools\Audit-ArmorSlots.py "C:\Program Files (x86)\Steam\steamapps\commo
    reinstalling something. Needs your eyes, not a script's.
 
 ```
-.\tools\Clean-OtherServers.ps1 -Assets
+The listing script is gone as of 20 Sep. To see what Vortex did not put
+there: purge in Vortex, then whatever is left under Data is loose, and a
+redeploy brings the collection back.
 ```
 
 10. Set up a TURN relay on the VPS so voice has a fallback when two people both

@@ -96,7 +96,7 @@ HOLDS = ['Whiterun', 'Solitude', 'Windhelm', 'Riften', 'Markarth',
 # Staff roles are JOB TITLES, not lore titles, and that is deliberate. Thane,
 # Steward, Warden and Housecarl are all things somebody should be able to play,
 # and a moderator wearing one of them makes every in-world use of the word
-# ambiguous. Keizaal splits it the same way.
+# ambiguous. another server splits it the same way.
 ROLES = [
     # name              colour    hoist  permissions
     ('Owner',           0xC9A24B, True,  ADMIN),

@@ -67,10 +67,12 @@ namespace Thornswood
         /// the overlay never booted and nothing put anybody into the creation
         /// hall. Its runtime folder, Data\NirnLabUIPlatform, is the same
         /// thing and is not foreign either.
+        // Empty since 20 September. It held the file names of another
+        // server's client probe, and Thornswood no longer looks for other
+        // servers' files at all: its own folder is built from what belongs,
+        // and anything else is simply left out. The array stays because Fix
+        // walks it; an empty walk is nothing.
         public static readonly string[] ForeignNames = {
-            "DaedricItemUseProbe.dll",
-            "DaedricItemUseProbe.json",
-            "DaedricItemUseProbe.NOTICES.txt",
         };
 
         /// <summary>
@@ -225,8 +227,8 @@ namespace Thornswood
         /// <summary>
         /// Moves another server's files aside. It never deletes anything.
         ///
-        /// Somebody who plays Thornswood may also play Keizaal Online or
-        /// Daedric Online, and their install is theirs. Two steps, because the
+        /// Somebody who plays Thornswood may also play another server or
+        /// another server, and their install is theirs. Two steps, because the
         /// game can sit on a different drive from the launcher:
         ///
         ///   1. Rename in place with .thornswood-off. Always on the same
@@ -326,7 +328,7 @@ namespace Thornswood
         /// five masters, whatever plugins.txt says. So they are in no plugin
         /// list and every other row of the scan passes them.
         ///
-        /// Measured on 19 Sep. Daedric Online's launcher put the free ones back
+        /// Measured on 19 Sep. another server's launcher put the free ones back
         /// into Data, Thornswood's folder took them in, and the game loaded two
         /// full masters the server does not have. Every plugin after
         /// Dragonborn.esm was two places off, the game showed LOAD ORDER ERROR,
@@ -418,11 +420,14 @@ namespace Thornswood
         /// server has no handler for. The game opens, draws our menu, and sits
         /// there. Nothing in the launcher had anything to say about it.
         ///
-        /// Patch-Client.ps1 writes a marker beginning "Thornswood:" into every
-        /// block it changes. The prefix is what is tested rather than the three
-        /// exact sentences, because those get reworded: one of them was nearly
-        /// reworded today, and a launcher that refuses to play over a comma is
-        /// worse than the hole this closes.
+        /// The bundle is built from the fork now, and every change it carries
+        /// is marked "THORNSWOOD PATCH" in the source it was built from. That
+        /// marker is what is tested. The older "Thornswood:" prefix, which
+        /// Patch-Client.ps1 wrote into another server's bundle by text until
+        /// 20 September, is accepted too, so an install that has not taken the
+        /// new client yet is not blocked on the way to it. A marker rather than
+        /// the exact sentences, because those get reworded, and a launcher that
+        /// refuses to play over a comma is worse than the hole this closes.
         ///
         /// Only two things are red. A bundle that is not there, and a bundle
         /// that was read and does not carry a marker. A bundle that is there
@@ -458,7 +463,9 @@ namespace Thornswood
                                                FileShare.ReadWrite | FileShare.Delete))
                 using (var sr = new StreamReader(fs))
                 {
-                    clientOk = sr.ReadToEnd().IndexOf("Thornswood:", StringComparison.Ordinal) >= 0;
+                    string text = sr.ReadToEnd();
+                    clientOk = text.IndexOf("THORNSWOOD PATCH", StringComparison.Ordinal) >= 0
+                            || text.IndexOf("Thornswood:", StringComparison.Ordinal) >= 0;
                 }
                 clientSeen = stamp;
                 return clientOk;

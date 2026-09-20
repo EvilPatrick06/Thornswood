@@ -8,7 +8,7 @@ them from the shipped artifacts cost an afternoon.
 
     index.py          TES4 walker. Records, GRUPs, byte ranges, zlib bodies.
     content.py        The book text, the donor field bytes, the gear tables.
-    patch_esp.py      Reads the shipped .esp, rewrites the fifteen Keizaal
+    patch_esp.py      Reads the shipped .esp, rewrites the fifteen another server
                       manuals so they have a name/mesh/text, appends the
                       fourteen new books, fixes the GRUP sizes and the header.
     validate.py       Structural check on the result. Every GRUP size exact,
@@ -38,7 +38,7 @@ of the deployed `gamemode.js` rather than rebuilt from `respawn-holds.json` and
 `thornswood-descs.json`, which are gone. They are identical to what the server
 was running, with two changes made in `build.py` and visible in its output:
 
-  * the alchemy track gained a Novice manual. Keizaal shipped Advanced, Expert
+  * the alchemy track gained a Novice manual. another server shipped Advanced, Expert
     and Master and no Novice, so tier 1 was unreachable.
   * every arrival rotation was converted from radians to degrees. They were read
     straight out of the markers' REFR DATA fields, which store radians, and both

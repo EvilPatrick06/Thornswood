@@ -170,8 +170,10 @@ Suggestions: a hot-reload guard around the commands block; write
     document route for those two pages, and a link from rule 6 and /join.
 41. HEAD answers 404: every route tests `req.method === 'GET'`. Treat HEAD as
     GET without a body (one place near the top of the handler).
-42. Mark Why-Keizaal.ps1 `hidden` in the files feed (server.js 289-294 is
-    where hidden is read).
+42. Done another way on 20 Sep. That diagnostic script is deleted with the
+    rest of the other-server support, and server.js hides every script from
+    the files feed whatever files.json says, so nothing like it can be offered
+    on the Downloads page again.
 43. and 44. and 45. known.md and help.md (live copies on the VPS under
     C:\Thornswood-Docs\data\, edited on the site, never overwritten by a
     deploy unless -SeedDocs; repo seeds under tools\docs-app\data\): the
@@ -217,8 +219,10 @@ node --check .\tools\ts-plugins\thornswood-mark.js
 node --check .\tools\ts-plugins\thornswood-voice.js
 ```
 
-Patch-Client.ps1 has a -Check mode; test it against a copy of the bundle, not
-the live one.
+Patch-Client.ps1 is gone as of 20 Sep. The client runtime is built from the
+fork and recorded in tools\client-build.json; `Sync-Client.ps1 -Check` says
+whether the six recorded files in the game folder are that build, and copies
+nothing. Ship runs that check and refuses a release that fails it.
 
 Dev launcher release (Gavin or Djinn runs it; says so in #dev; version becomes
 1.1.45.N; announces to the dev server's data folder, no source commit):
@@ -276,7 +280,7 @@ Main release, only ever from Gavin's machine, only when he says main:
   two ticks); nobody listens to connectionDisconnect, NetworkingService just
   reconnects; verifyLoadOrder runs on the first update and checks name, size
   and crc32 by position, skipping the storefront set; the difficulty service
-  writes iDifficulty every 60 updates (Patch-Client sets 3, Expert); LoadGame
+  writes iDifficulty every 60 updates (the fork sets 3, Expert); LoadGame
   writes a synthetic save TESMODPLATFORM-<guid>.ess into the live Saves
   folder; nothing in the bundle reads `__thornswoodInWorld`.
 - Start On Save (po3, v2.8) loads the newest valid save at the first

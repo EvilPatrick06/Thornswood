@@ -20,7 +20,7 @@ namespace Thornswood
         static readonly Dictionary<string, string> Map =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // Names that have no page to go to: the two Keizaal plugins are private
+        // Names that have no page to go to: the two another server plugins are private
         // to that server, and the Bethesda masters are the game itself.
         static readonly Dictionary<string, bool> None =
             new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -175,8 +175,6 @@ namespace Thornswood
             P("STRPluginMessaging", 188907);
             P("AHZmoreHUD", 12688);
 
-            None["Keizaal"] = true;        // the Keizaal Online server's own plugin
-            None["KzlOnlineMods"] = true;
             None["Skyrim"] = true;
             None["Update"] = true;
             None["Dawnguard"] = true;
@@ -198,7 +196,7 @@ namespace Thornswood
             return k.Trim();
         }
 
-        /// <summary>True for the Bethesda masters, Creation Club content, and the two private Keizaal plugins.</summary>
+        /// <summary>True for the Bethesda masters, Creation Club content, and the two private another server plugins.</summary>
         public static bool NoPage(string name)
         {
             string k = Norm(name);

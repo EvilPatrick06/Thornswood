@@ -323,10 +323,10 @@ function listFiles() {
     // instructions back on the downloads page and a 527 MB button next to
     // them that does nothing on its own.
     //
-    // A script is never something a visitor is offered. Why-Keizaal.ps1, a
-    // diagnostic for one machine, sat in this folder and so on the Downloads
-    // page as a file to take, naming a staff member and the game server's
-    // address. Anything with a script extension is hidden whatever
+    // A script is never something a visitor is offered. A read only
+    // diagnostic for one machine once sat in this folder and so on the
+    // Downloads page as a file to take, naming a staff member and the game
+    // server's address. Anything with a script extension is hidden whatever
     // files.json says about it.
     const script = /[.](ps1|psm1|cmd|bat|py|sh)$/i.test(name);
     out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,

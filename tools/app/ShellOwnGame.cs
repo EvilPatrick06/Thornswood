@@ -66,7 +66,13 @@ namespace Thornswood
                     else if (collection && !OwnGame.Declined)
                     {
                         string src = OwnGame.Source(c);
-                        offer = OwnGame.WhyNot(c, src) == null && OwnGame.OtherServerHere(src);
+                        // Offered whenever it is possible. It used to be offered
+                        // only when another server's files were found in the
+                        // Steam copy, on the grounds that sharing a Skyrim was
+                        // the problem the own folder solved. The own folder is
+                        // the settled design now, so the offer stands on its own
+                        // and nothing here looks for other servers any more.
+                        offer = OwnGame.WhyNot(c, src) == null;
                     }
                 }
                 catch { }

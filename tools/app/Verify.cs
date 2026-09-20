@@ -104,7 +104,7 @@ namespace Thornswood
 
             // Another server's client. Not a plugin, so nothing above would ever
             // have found it, and it is the difference between Thornswood loading
-            // and Daedric Online's main menu loading instead.
+            // and another server's main menu loading instead.
             foreach (string f in Checks.ForeignClients())
                 issues.Add(new Issue(
                     Path.GetFileName(f) + " belongs to another server. It replaces the main menu " +

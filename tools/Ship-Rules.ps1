@@ -16,7 +16,7 @@
       . (Join-Path $PSScriptRoot 'Ship-Rules.ps1')
       Test-ShipRuntime $rel        written by the game or a tool at runtime; never shipped, listed as removed when it goes
       Test-ShipMachine $rel        one machine's own; never shipped, never removed
-      Test-ShipOtherServer $rel    another server's or somebody's sign in; never shipped, never removed
+      Test-ShipOtherServer $rel    not one of ours, or somebody's sign in; never shipped, never removed
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
 
@@ -99,67 +99,58 @@ function Test-ShipRuntime([string]$rel) {
     return $false
 }
 
-# Another SkyMP server's files, and anybody's sign in. Keizaal Online and
-# Daedric Online write into the same Data\Platform as us: their plugins beside
-# ours, .bak copies of files they replace, their Vite built menu. Keep parks
-# their plugins while Thornswood runs and puts them back after, so they are
-# always in the folder when it is scanned. Ours are thornswood-*.js and the
-# patched skymp5-client.js; anything else in Plugins is theirs.
+# Not one of ours, and anybody's sign in. Decided by what belongs in the
+# places another launcher could write to, never by whose a file is: this list
+# named two other servers' files until 20 September, and the name of the
+# thing to keep out is not the point, the thing to keep in is.
+#
+# OwnGame.Foreign in the launcher is the same list for Thornswood's own game
+# folder; change the two together.
+#
+# The client runtime is the exception in the other direction. The six files in
+# client-build.json are ours by recorded hash: the bundle, MpClientPlugin.dll,
+# both SkyrimPlatform DLLs, the CEF host and TESModPlatform.pex, built from the
+# fork. Until 20 September the copies in every game folder were another
+# launcher's builds, told apart from ours by nothing but a comment we had
+# written into them. A path in that record is ours whatever else this says.
 #
 # PluginsNoLoad is where the SkyMP client keeps its saved sign in
 # (auth-data-no-load.js, a token). It is one person's login to whichever
 # master issued it and has no place in a pack or an installer, and it is not
-# ours to delete off a machine either: on a machine that plays Keizaal it is
-# that person's own login.
-#
-# Outside Data\Platform too. Keizaal's launcher writes its plugins, meshes,
-# textures, scripts, a VERSION marker, a backup folder and its own menu files
-# straight into the game; Daedric's keeps a DaedricData folder and a client
-# dll. On 16 Sep every one of these was in a shipping machine's baseline as if
-# it were Thornswood's. OwnGame.Foreign in the launcher leaves the same files
-# out of Thornswood's own game folder; change the two together. Never the bare
-# word daedric, which is a vanilla material.
+# ours to delete off a machine either.
+$ShipClientFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+try {
+    $clientRecord = Join-Path $PSScriptRoot 'client-build.json'
+    if (Test-Path -LiteralPath $clientRecord) {
+        $rec = Get-Content -LiteralPath $clientRecord -Raw | ConvertFrom-Json
+        foreach ($p in $rec.files.PSObject.Properties.Name) { [void]$ShipClientFiles.Add($p) }
+    }
+} catch { }
+
 function Test-ShipOtherServer([string]$rel) {
-    if ($rel -match '^keizaal-backup-[^\\]*\\') { return $true }
-    # Where Keizaal's launcher parks the files it is moving out of the way,
-    # which on a machine that plays both is largely OURS. Djinn's had 67 files
-    # sitting in it on 17 Sep while the two launchers undid each other, and a
-    # release published from a machine in that state would have swept them into
-    # a pack and handed everybody a second copy of their own game files under
-    # another server's folder name. Never removed either, because taking it off
-    # a tester is Keizaal's business and not ours.
-    if ($rel -match '^Data\\_disabledByKzl($|\\)') { return $true }
-    if ($rel -match '^DaedricData\\') { return $true }
-    if ($rel -eq 'VERSION') { return $true }
-    if ($rel -match '^Data\\Video\\Interface\\(startmenu|loadwaitspinner)\.swf$') { return $true }
-    if ($rel -match '^Data\\(Keizaal|Kzl)[^\\]*\.(esp|esm|esl|bsa)$') { return $true }
-    if ($rel -match '^Data\\(Meshes|Textures)\\(Keizaal|kzlcustommeshs)\\') { return $true }
-    if ($rel -match '^Data\\Meshes\\weapons\\kzl\\') { return $true }
-    if ($rel -match '^Data\\Scripts\\Kzl[^\\]*\.pex$') { return $true }
-    if ((Split-Path $rel -Leaf) -like 'DaedricItemUseProbe*') { return $true }
+    # Ours by record, before anything else is asked.
+    if ($ShipClientFiles.Contains($rel)) { return $false }
     # NirnLab UI Platform. SkyrimPlatform will not start on its own browser
     # while this is in the game folder, and it is what brings CEFSubprocess.exe,
     # the second program Windows Firewall asks about. Package-Thornswood has
     # kept it out of the installer all along; nothing kept it out of a pack.
     if ($rel -match '^Data\\NirnLabUIPlatform($|\\)') { return $true }
     if ((Split-Path $rel -Leaf) -ieq 'NirnLabUIPlugin.dll') { return $true }
-
     if (-not $rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $false }
     $leaf = Split-Path $rel -Leaf
     if ($rel.StartsWith('Data\Platform\PluginsNoLoad\', 'OrdinalIgnoreCase')) { return $true }
     if ($leaf -like '*.bak') { return $true }
+    # In Plugins only our overlays belong. The bundle is ours by record above.
     if ($rel -like 'Data\Platform\Plugins\*.js') {
         if ($leaf -like 'thornswood-*.js') { return $false }
-        if ($leaf -eq 'skymp5-client.js') { return $false }
         return $true
     }
-    # Keizaal's menu is a Vite build: app.js, vite.svg, an assets folder and
-    # its own art. Ours is flat under UI (build.js and hashed files beside it)
-    # and never has an assets folder, so these can only be theirs.
+    # Under UI only the flat files of ours belong: index.html, build.js and
+    # the thornswood-*.js overlays. Anything else there, assets folders and
+    # Vite output included, is somebody else's menu.
     if ($rel -like 'Data\Platform\UI\*') {
-        if ($rel -like 'Data\Platform\UI\assets\*') { return $true }
-        if ($leaf -in 'app.js', 'vite.svg') { return $true }
-        if ($leaf -match 'keizaal|daedric|mereth') { return $true }
+        if ($leaf -ieq 'index.html' -or $leaf -ieq 'build.js' -or $leaf -like 'thornswood-*.js') { return $false }
+        return $true
     }
     return $false
 }

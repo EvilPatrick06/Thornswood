@@ -196,7 +196,7 @@ new HelpItem("Emotes", "It will not open over a menu",
                 "Mods, Your own. Anything in that folder is copied into the game every time you press Play. Textures, meshes, sounds and music are invisible to the server. A plugin is not, and the launcher will stop you before you get refused."),
 
             new HelpItem("Tips", "Every mod in the list links to where it came from",
-                "Mods. Click any row and its page opens in your browser, so you can read what a mod actually does, or find its own settings and requirements. Server plugins and script extender plugins go to the mod page. Your own files open in Explorer instead. A handful of rows have no page: the Bethesda masters are the game itself, and the two Keizaal plugins came from that server rather than from Nexus."),
+                "Mods. Click any row and its page opens in your browser, so you can read what a mod actually does, or find its own settings and requirements. Server plugins and script extender plugins go to the mod page. Your own files open in Explorer instead. A handful of rows have no page, because the Bethesda masters are the game itself."),
 
             new HelpItem("Tips", "Do not verify Skyrim in Steam",
                 "It drags your Steam copy up to the current version and puts the Creation Club files back. It cannot touch this folder, since Steam does not know it exists, but there is no reason to build the habit."),

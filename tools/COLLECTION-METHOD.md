@@ -4,7 +4,7 @@ Decided 15 September 2026. Thornswood stops keeping its own copy of Skyrim.
 The mods come from a Nexus collection, installed by Vortex into the person's
 own Skyrim, and Thornswood is a Vortex profile they switch to.
 
-This is what Keizaal Online does. Their collection is public in Vortex right
+This is what another server does. Their collection is public in Vortex right
 now: 46 mods, 4.1 GB, described as the collection used by their server.
 
 ## Why, in one paragraph

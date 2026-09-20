@@ -357,7 +357,7 @@ function Test-Machine([string]$rel) { return (Test-ShipMachine $rel) }
 
 # ---- another server's menu -------------------------------------------------
 #
-# Keizaal's and Daedric's launchers write their own Data\Platform\UI\index.html
+# that server's and another launchers write their own Data\Platform\UI\index.html
 # over ours. On a tester's machine Keep puts ours back before Play. On the
 # machine that ships, Keep adopts newer game files (developer.flag), so theirs
 # would go out to everyone as Thornswood's menu and nobody's chat would load.

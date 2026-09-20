@@ -5,7 +5,7 @@ things a bot is not allowed to do for you.
 
 ## The shape of it
 
-Keizaal has nine hold channels, two world instances and eighty Thalmor
+another server has nine hold channels, two world instances and eighty Thalmor
 Inquisitors. That shape is right for eighty thousand people and wrong for six,
 because forty channels with nothing in them reads as abandoned rather than
 organised. This is the same skeleton with the empty rooms left out, and it

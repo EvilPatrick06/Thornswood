@@ -16,7 +16,7 @@ mod list already set up. You do not install mods. You do not run Nemesis. You
 do not need a Nexus account, Vortex, or Mod Organizer.
 
 Your Steam copy of Skyrim is only READ. Nothing there is renamed, patched or
-deleted. If you play Keizaal Online or anything else, it keeps working exactly
+deleted. If you play another server or anything else, it keeps working exactly
 as it does now.
 
 

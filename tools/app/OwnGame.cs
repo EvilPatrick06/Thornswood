@@ -12,10 +12,10 @@ namespace Thornswood
     /// Thornswood's own Skyrim folder, Root\Game, made from whatever Vortex has
     /// deployed while the Thornswood collection is the profile it has on.
     ///
-    /// Keizaal Online, Daedric Online and Thornswood all ran out of the one
+    /// Until 17 September three roleplay servers all ran out of the one
     /// Steam copy of Skyrim. Every launcher wrote its own client into it, every
     /// Vortex profile switch took the other collection out of it, and on 16 Sep
-    /// that was a Keizaal session drawing Thornswood's menu, a Daedric menu
+    /// that was a another server session drawing Thornswood's menu, a Daedric menu
     /// behind every server, and a Thornswood launcher that thought its mods were
     /// gone whenever Vortex had another profile on. With a folder of its own,
     /// Thornswood starts from Root\Game, the other servers start from theirs,
@@ -150,29 +150,6 @@ namespace Thornswood
             return null;
         }
 
-        /// <summary>
-        /// Another SkyMP server has been on this machine: Keizaal Online's
-        /// launcher is installed, Daedric Online left its folder, or another
-        /// server's client files are in the game. The startup offer is only made
-        /// then; everybody else has the button in Settings.
-        /// </summary>
-        public static bool OtherServerHere(string src)
-        {
-            try
-            {
-                string programs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
-                if (Directory.Exists(Path.Combine(programs, "skyrim-rp-launcher"))) return true;
-                if (string.IsNullOrEmpty(src)) return false;
-                if (Directory.Exists(Path.Combine(src, "DaedricData"))) return true;
-                if (File.Exists(Path.Combine(src, "VERSION"))) return true;
-                string plugins = Path.Combine(src, "Data\\Platform\\Plugins");
-                if (Directory.Exists(plugins))
-                    foreach (string f in Directory.GetFiles(plugins, "*.js"))
-                        if (Foreign("Data\\Platform\\Plugins\\" + Path.GetFileName(f))) return true;
-            }
-            catch { }
-            return false;
-        }
 
         /// <summary>True when Vortex has deployed since the folder was last made or refreshed.</summary>
         /// <summary>
@@ -250,7 +227,6 @@ namespace Thornswood
             Directory.CreateDirectory(Dir);
 
             HashSet<string> deployed = Deployed(src);
-            replacedByOthers = ReplacedByOthers(src);
             wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
             List<Found> all = Walk(src);
 
@@ -323,7 +299,6 @@ namespace Thornswood
             Dictionary<string, Rec> old = ReadFiles();
             HashSet<string> deployed = Deployed(src);
             HashSet<string> owned = Owned(deployed);
-            replacedByOthers = ReplacedByOthers(src);
             wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
             List<Found> all = Walk(src);
 
@@ -581,7 +556,8 @@ namespace Thornswood
             if (rel.StartsWith("_to_delete\\", StringComparison.OrdinalIgnoreCase)) return "not part of the game";
             if (rel.StartsWith(".sentry-native\\", StringComparison.OrdinalIgnoreCase)) return "crash reporter scratch";
             if (rel.Equals("Data\\Platform\\thornswood-session.txt", StringComparison.OrdinalIgnoreCase)) return "session note";
-            if (Foreign(rel)) return "another server's";
+            if (ClientFile(rel)) return "the client runtime comes from the build, not the Steam copy";
+            if (Foreign(rel)) return "not one of ours";
             if (UnwantedCreation(rel)) return "a Creation Club plugin the server does not load";
             if (CrashesUs(rel)) return "it crashes the quick favourites menu";
             return null;
@@ -619,7 +595,7 @@ namespace Thornswood
         ///
         /// Djinn, 19 Sep. This is the launcher's own folder build, which is what
         /// makes Thornswood\Game. New-GameFolder.ps1 is the same job for
-        /// Keizaal and Daedric and is not where this belongs: their folders are
+        /// another server and Daedric and is not where this belongs: their folders are
         /// their business.
         /// </remarks>
         static bool CrashesUs(string rel)
@@ -646,11 +622,10 @@ namespace Thornswood
         /// given them loads two masters the server does not have, and every
         /// plugin after Dragonborn.esm sits two places off: LOAD ORDER ERROR.
         ///
-        /// Measured on 19 Sep. Keizaal's launcher had parked them in
-        /// Data\_disabledByKzl in the Steam copy, Daedric Online's launcher put
-        /// them back into Data, and the next refresh brought them in here. The
-        /// game loaded 62 full plugins against the server's 60 while the scan
-        /// said everything checks out. The archives stay, because nothing loads
+        /// Measured on 19 Sep. Something else had moved them out of the Steam
+        /// copy's Data and something else again had put them back, and the
+        /// next refresh brought them in here. The game loaded 62 full plugins
+        /// against the server's 60 while the scan said everything checks out. The archives stay, because nothing loads
         /// an archive without its plugin. Packs never carry any of these either:
         /// Publish-Update.ps1 counts cc*.es? as vanilla.
         /// </summary>
@@ -661,24 +636,40 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Another SkyMP server's file, by exact path or name. The same list
-        /// packs and the installer leave out (Test-ShipOtherServer in
-        /// tools\Ship-Rules.ps1); change both together. Never the bare word
-        /// daedric, which is a vanilla material.
+        /// The SkyMP client runtime Thornswood ships: the six files the fork
+        /// builds that differ from upstream, put into the game folder by
+        /// tools\Sync-Client.ps1 against tools\client-build.json. They are
+        /// never taken from the Steam copy, because until 20 September the Steam
+        /// copy held another server's launcher's builds of every one of them
+        /// and this class copied them across on every rebuild.
+        /// </summary>
+        public static readonly string[] ClientFiles = {
+            "Data\\SKSE\\Plugins\\MpClientPlugin.dll",
+            "Data\\SKSE\\Plugins\\SkyrimPlatform.dll",
+            "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+            "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformCEF.exe.hidden",
+            "Data\\Platform\\Plugins\\skymp5-client.js",
+            "Data\\Scripts\\TESModPlatform.pex",
+        };
+
+        public static bool ClientFile(string rel)
+        {
+            foreach (string c in ClientFiles)
+                if (rel.Equals(c, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Not one of ours, by what belongs rather than by whose it is. The
+        /// same shape as Test-ShipOtherServer in tools\Ship-Rules.ps1; change
+        /// both together. Nothing here names another server: the list is what
+        /// Thornswood's folder holds, and anything else in these places is
+        /// left out whoever wrote it.
         /// </summary>
         public static bool Foreign(string rel)
         {
             const RegexOptions I = RegexOptions.IgnoreCase;
             string leaf = Path.GetFileName(rel);
-            if (Regex.IsMatch(rel, @"^keizaal-backup-[^\\]*\\", I)) return true;
-            if (rel.StartsWith("DaedricData\\", StringComparison.OrdinalIgnoreCase)) return true;
-            if (rel.Equals("VERSION", StringComparison.OrdinalIgnoreCase)) return true;
-            if (Regex.IsMatch(rel, @"^Data\\Video\\Interface\\(startmenu|loadwaitspinner)\.swf$", I)) return true;
-            if (Regex.IsMatch(rel, @"^Data\\(Keizaal|Kzl)[^\\]*\.(esp|esm|esl|bsa)$", I)) return true;
-            if (Regex.IsMatch(rel, @"^Data\\(Meshes|Textures)\\(Keizaal|kzlcustommeshs)\\", I)) return true;
-            if (Regex.IsMatch(rel, @"^Data\\Meshes\\weapons\\kzl\\", I)) return true;
-            if (Regex.IsMatch(rel, @"^Data\\Scripts\\Kzl[^\\]*\.pex$", I)) return true;
-            if (leaf.StartsWith("DaedricItemUseProbe", StringComparison.OrdinalIgnoreCase)) return true;
             // NirnLab UI Platform, another server's interface framework, and
             // the one thing this folder must not be handed.
             //
@@ -698,14 +689,19 @@ namespace Thornswood
 
             if (!rel.StartsWith("Data\\Platform\\", StringComparison.OrdinalIgnoreCase)) return false;
             if (leaf.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)) return true;
+            // The bundle is on ClientFiles and answered above in WhyLeft, so
+            // here it is simply not ours to take from the Steam copy either.
             if (Regex.IsMatch(rel, @"^Data\\Platform\\Plugins\\[^\\]+\.js$", I))
-                return !(leaf.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase) ||
-                         leaf.Equals("skymp5-client.js", StringComparison.OrdinalIgnoreCase));
+                return !leaf.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase);
             if (rel.StartsWith("Data\\Platform\\UI\\", StringComparison.OrdinalIgnoreCase))
             {
                 if (rel.StartsWith("Data\\Platform\\UI\\assets\\", StringComparison.OrdinalIgnoreCase)) return true;
                 if (leaf.Equals("app.js", StringComparison.OrdinalIgnoreCase) || leaf.Equals("vite.svg", StringComparison.OrdinalIgnoreCase)) return true;
-                if (Regex.IsMatch(leaf, "keizaal|daedric|mereth", I)) return true;
+                // Anything under UI that is not a flat file of ours. Ours is
+                // index.html, build.js and the thornswood-*.js overlays.
+                if (!(leaf.Equals("index.html", StringComparison.OrdinalIgnoreCase) ||
+                      leaf.Equals("build.js", StringComparison.OrdinalIgnoreCase) ||
+                      leaf.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase))) return true;
             }
             return false;
         }
@@ -718,45 +714,20 @@ namespace Thornswood
 
         /// <summary>
         /// Skyrim's own master files. The server checks plugins by size and
-        /// checksum, and other servers' launchers replace these (Keizaal's
-        /// backup folder holds its originals of three of them), so a link that
-        /// another launcher writes through would change them under Thornswood.
+        /// checksum, and anything else that writes into the Steam copy would
+        /// change a linked master under Thornswood, so these are copied.
         /// </summary>
         static readonly string[] Masters = {
             "Data\\Skyrim.esm", "Data\\Update.esm", "Data\\Dawnguard.esm", "Data\\HearthFires.esm",
             "Data\\Dragonborn.esm", "Data\\_ResourcePack.esl"
         };
 
-        /// <summary>
-        /// Files some other launcher is known to replace, read off the backup
-        /// folders those launchers keep in the game's root (keizaal-backup-*
-        /// holds Keizaal's originals of everything it swapped). Set at the start
-        /// of Make and Refresh.
-        /// </summary>
-        static HashSet<string> replacedByOthers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        static HashSet<string> ReplacedByOthers(string src)
-        {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            try
-            {
-                foreach (string dir in Directory.GetDirectories(src, "keizaal-backup-*"))
-                {
-                    string fence = dir.TrimEnd('\\') + "\\";
-                    foreach (string f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
-                        set.Add(f.Substring(fence.Length));
-                }
-            }
-            catch { }
-            return set;
-        }
 
         /// <summary>
         /// Copied rather than linked: anything in the game's root folder, the
         /// client and browser folders, the script extender's folder and MCM's
         /// settings, any settings, script or program file wherever it is, the
-        /// game's master files, and whatever another launcher is known to
-        /// replace. Those are what gets rewritten in place.
+        /// game's master files. Those are what gets rewritten in place.
         /// </summary>
         static bool MustCopy(string rel)
         {
@@ -765,7 +736,6 @@ namespace Thornswood
                 if (rel.StartsWith(d, StringComparison.OrdinalIgnoreCase)) return true;
             foreach (string m in Masters)
                 if (rel.Equals(m, StringComparison.OrdinalIgnoreCase)) return true;
-            if (replacedByOthers.Contains(rel)) return true;
             return Array.IndexOf(CopyTypes, Path.GetExtension(rel).ToLowerInvariant()) >= 0;
         }
 

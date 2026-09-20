@@ -27,7 +27,7 @@ MESH = {
 
 KWDA_VENDORITEMBOOK = 0x000937A2
 
-# ---- the fifteen Keizaal manuals, which shipped as empty shells -------------
+# ---- the fifteen another server manuals, which shipped as empty shells -------------
 # fid -> (title, track, tier)
 MANUAL_TITLES = {
   0x0500b276: ("A Miner's First Season",      'mining',     1),

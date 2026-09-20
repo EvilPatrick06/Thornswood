@@ -28,11 +28,9 @@ $targets = @(
     'Lock-SkyrimVersion.ps1'
     'Preflight-FUS.ps1'
     'Prep-VR.ps1'
-    'Remove-Mereth.ps1'
     'Remove-SkyrimRP.ps1'
     'Reset-Vortex.ps1'
     'Restore-VortexData.ps1'
-    'Wipe-Keizaal.ps1'
     'app_preview.png'
 
     # discord exports

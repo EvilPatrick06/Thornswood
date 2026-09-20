@@ -2209,7 +2209,7 @@ namespace Thornswood
         // Plugin and DLL rows go to the mod's own page. Anything the catalogue
         // does not have a confirmed address for falls back to a Nexus search
         // for the name, which is honest about not knowing and still lands the
-        // reader one click away. The Bethesda masters and the two Keizaal
+        // reader one click away. The Bethesda masters and the two another server
         // plugins have nowhere to go, so those rows stay plain.
         static UIElement LinkedRow(int index, string name, bool on, string tag)
         {

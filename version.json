@@ -484,7 +484,7 @@
       "id": "20260911-2211",
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/558578870",
       "sha256": "03bd6bb3b93418991836c5431ee9949a9c990483f60d0adc304300c4840e92f4",
-      "notes": "Keizaal barriers and notice boards removed, difficulty to Expert, respawn watchdog fix"
+      "notes": "The earlier server's barriers and notice boards removed, difficulty to Expert, respawn watchdog fix"
     },
     {
       "id": "20260911-2212",
@@ -502,7 +502,7 @@
       "id": "20260911-2321",
       "url": "https://api.github.com/repos/EvilPatrick06/Thornswood/releases/assets/558671600",
       "sha256": "19ce5192882dbb00d6bffb9ecfff4788e7155575aefa1a77ffe1e6cc7265f092",
-      "notes": "Load order fix: TheNewGentleman late, flute re-registered, Keizaal barriers and boards removed, Expert difficulty"
+      "notes": "Load order fix: TheNewGentleman late, flute re-registered, the earlier server's barriers and boards removed, Expert difficulty"
     },
     {
       "id": "20260911-2325",
