@@ -80,7 +80,8 @@
   T.front = true;
 
   const UI_PATH = 'Data/Platform/UI/index.html';
-  const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js'];
+  const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
+                    'thornswood-skills.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -163,6 +164,13 @@
 
   const ini = readText(INI);
   const CHAT_KEY = iniNumber(ini, 'ChatKey', 28);       // Enter
+  /*
+    Profession, Class and Skill Tree. K, which was the minimap's settings
+    panel until 20 September; that moved to F10 in Keys.cs and this took the
+    letter, because a panel somebody opens once is worth less than the menu
+    the whole progression system lives in.
+  */
+  const SKILLS_KEY = iniNumber(ini, 'SkillsKey', 37);   // K
   const VOICE_PORT = iniNumber(ini, 'VoicePort', 7778);
   /*
     Where voice lives when it is not just a port on the server address.
@@ -1873,6 +1881,25 @@
 
     // Reachable only while focus is down, which is the only time it is needed.
     if (e.code === ESC) { wantTyping(false); return; }
+
+    /*
+      The skills panel. Not while the chat has the keyboard, because the key
+      would be a letter somebody is typing, and not while a real menu is up.
+      The panel is asked to toggle; whether it actually opened comes back as
+      a browserMessage, and that is what moves the focus claim. The page can
+      close itself on Escape, so it is the one that knows.
+    */
+    if (e.code === SKILLS_KEY) {
+      if (claims.chat) { return; }
+      const busyNow = busyMenuOpen();
+      if (!T.hasFocus('skills') && busyNow) {
+        say('skills key seen, but ' + busyNow + ' is open');
+        return;
+      }
+      T.js('try{window.thornswoodSkills&&window.thornswoodSkills.toggle();}catch(e){}');
+      return;
+    }
+
     if (e.code !== CHAT_KEY) return;
 
     // Not while a real menu is up: Enter means something to every one of them.
@@ -2276,6 +2303,23 @@
     const a = event.arguments;
     if (!a || a[0] !== 'thornswood-front') return;
     const what = String(a[1]);
+
+    /*
+      The skills panel says when it opens and closes rather than being
+      assumed. It can close itself on Escape, and a focus claim left up after
+      that is a keyboard that never comes back, which is the failure
+      claimFocus logs every single time for exactly this reason.
+    */
+    if (what === 'skills:opened') { T.claimFocus('skills', true); return; }
+    if (what === 'skills:closed') { T.claimFocus('skills', false); return; }
+    if (what === 'skills:ready') { log('the skills panel is in'); return; }
+    if (what.indexOf('skills:pick ') === 0) {
+      // Recorded and nothing else. The server owns every rule in the
+      // rulebook and none of it is built yet; a client that acted on this
+      // would be a client anybody could edit.
+      log('skills: picked', what.slice(12));
+      return;
+    }
 
     if (what === 'typing') { beat = Date.now(); return; }
     if (what === 'typing-idle') {

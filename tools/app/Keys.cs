@@ -40,7 +40,6 @@ namespace Thornswood
         static string TweaksIni { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\SkyrimTogetherTweaks.ini"); } }
         static string MenuIni   { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\SKSEMenuFramework.ini"); } }
         static string TradeIni  { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\TradeTogether.ini"); } }
-        static string MapIni    { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\Luckycheech_MiniMapMenu.ini"); } }
         static string TdmIni    { get { return Path.Combine(Paths.Game, "Data\\MCM\\Config\\TrueDirectionalMovement\\settings.ini"); } }
         static string SkyUiIni  { get { return Path.Combine(Paths.Game, "Data\\MCM\\Config\\SkyUI_SE\\settings.ini"); } }
         static string BtpsIni   { get { return Path.Combine(Paths.Game, "Data\\MCM\\Config\\BetterThirdPersonSelection\\settings.ini"); } }
@@ -373,12 +372,16 @@ namespace Thornswood
                      "Walks away from an open trade.",
                      TradeIni, "CancelKey", 15));
 
-            l.Add(Dxd("map", "Minimap", "Show or hide the minimap",
-                      "Tap it to turn the corner map on and off. Hold it and the map goes into move and zoom mode, so you can drag it where you want it.",
-                      MapIni, "uMiniMap_controls_btn", "uMiniMap_controls_secondbtn", 38));
-            l.Add(Dxd("mapsettings", "Minimap", "Minimap settings",
-                      "Opens the minimap's own panel: scale, transparency, fog of war, which markers it draws, and the meters that sit under it.",
-                      MapIni, "uMenuManager_open_btn", "uMenuManager_open_secondbtn", 37));
+            // The two minimap binds that used to sit here, L to show it and K
+            // for its settings panel, are gone with the mod. Confirmed on 20
+            // September: no minimap plugin in the load order, and neither
+            // Luckycheech_MiniMapMenu.ini nor MiniMap.dll is anywhere in the
+            // game folder. They were writing settings into a file that does
+            // not exist and putting two rows on the launcher's key page for a
+            // mod nobody has. K is now the profession menu below.
+            //
+            // Config.cs, Display.cs and Enforce.cs still carry minimap code.
+            // That is a separate tidy up and it is on the list.
 
             l.Add(Dx("search", "Inventory", "Search",
                      "Types into the search box at the top of any inventory, container or barter list.",
@@ -453,6 +456,10 @@ namespace Thornswood
             l.Add(Dx("chargenmenu", "ThornsWood", "Open the creation menu",
                      "During character creation, brings up the trade or town question by hand if it has not appeared on its own. Does nothing afterwards.",
                      ThornIni, "MenuKey", 50));
+
+            l.Add(Dx("skills", "ThornsWood", "Profession, class and skill tree",
+                     "Your profession and which half of it you work, your class, and the fifteen sub-skills under Health, Magicka and Stamina. Opens over the world without pausing it. Escape closes it too.",
+                     ThornIni, "SkillsKey", 37));
 
             l.Add(Dx("cyclehold", "Reaching things", "Cycle modifier",
                      "Held down, the two keys below step through everything you could reach instead of the game picking for you.",
