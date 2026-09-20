@@ -238,6 +238,51 @@ function Get-SkyrimPath {
 # the packs (it did not, and shipped a token file).
 . (Join-Path $Here 'Ship-Rules.ps1')
 
+# The reference plugin list ships in the server's order, not in whatever order
+# Vortex or LOOT last wrote it. The game compares its load order with the
+# server's manifest position by position, and one name out of place from any
+# index onwards is LOAD ORDER ERROR for the session; on 20 Sep the reference
+# shipped in LOOT's order while the server ran Vortex's, the game showed that
+# error and the launcher, comparing with the reference, said everything
+# checked out. The rule is in LoadOrder.ps1, the same one the launcher's
+# LoadOrder.cs applies to a machine's own list: only the full plugins the
+# server names move, every other line keeps its place. Nothing on this machine is written: the copy that goes
+# into the pack is made under _dist and removed once it is zipped.
+. (Join-Path $Here 'LoadOrder.ps1')
+
+function Get-ReferenceInServerOrder([string]$src) {
+    $url = Get-LoadOrderManifestUrl $Root
+    $manifest = Get-LoadOrderManifest $url
+    if ($null -eq $manifest) {
+        Die "The server at $url did not answer with its manifest, so the reference plugin list cannot be put into its order. Start the server, or check the address and port in $Root\config.json, then publish again."
+    }
+    $file = Read-LoadOrderFile $src
+    # A plain script block, not a closure: a closure runs in its own module
+    # and cannot see the functions dot-sourced above. It finds $refData by
+    # PowerShell's dynamic scoping, through Get-LoadOrderReordered.
+    $refData = Join-Path $GameDir 'Data'
+    $isLight = { param($n) Test-LoadOrderLight (Join-Path $refData $n) }
+    $ordered = Get-LoadOrderReordered $file.Lines $manifest $isLight
+    if ($null -eq $ordered) {
+        # Assigned, not wrapped in @(): the function hands back one array,
+        # and @() around it would nest that array inside another.
+        $off = Get-LoadOrderNotEnabled $file.Lines $manifest
+        if ($off.Count) {
+            Die ("The server's load order names " + ($off -join ', ') + ", which the reference plugin list at $src does not enable. Enable it there, or deploy the server without it, then publish again.")
+        }
+        Die "The reference plugin list at $src enables the same plugin twice, so it cannot be put into the server's order."
+    }
+    $moved = Get-LoadOrderMoved $file.Lines $ordered
+    if ($moved.Count -eq 0) {
+        Say ("  reference plugin list is already in the server's order ({0} plugins)" -f $manifest.Count) 'DarkGray'
+        return $src
+    }
+    $tmp = Join-Path $DistDir 'reference-plugins.txt'
+    Write-LoadOrderFile $tmp $ordered $file
+    Say ("  reference plugin list put into the server's order: {0} moved, the first {1}" -f $moved.Count, $moved.First) 'Yellow'
+    return $tmp
+}
+
 $IsCollection = -not (Test-Path -LiteralPath $GameDir)
 # A Game folder the launcher made out of Vortex's deployment (OwnGame.cs) is
 # not the old installer's copy: most of it is the collection, linked in.
@@ -619,10 +664,17 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
                         Die ("$src is missing. That file is this build's reference plugin list." + $(if ($isCollection) {
                              " This is a collection build, so it comes from the profile Vortex deployed. Open the game once through the launcher, or switch to the Thornswood profile in Vortex and deploy, then publish again." } else { "" }))
                     }
+                    # plugins.txt goes in the server's order; see
+                    # Get-ReferenceInServerOrder. The file at $src is read and
+                    # never written.
+                    if ($f -eq 'plugins.txt') { $src = Get-ReferenceInServerOrder $src }
                     [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $src, "profile/$f", 'Optimal')
                 }
             }
-        } finally { $zip.Dispose() }
+        } finally {
+            $zip.Dispose()
+            Remove-Item -LiteralPath (Join-Path $DistDir 'reference-plugins.txt') -Force -ErrorAction SilentlyContinue
+        }
 
         $bytes = (Get-Item $zipPath).Length
         $mb = [math]::Round($bytes / 1MB, 1)

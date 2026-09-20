@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.Text;
 
 namespace Thornswood
 {
@@ -45,9 +46,11 @@ namespace Thornswood
 
         /// <summary>
         /// The shipped plugins.txt is what the server was built against, so it is
-        /// the reference. Anything the live list adds, drops or reorders is what
-        /// gets a person refused at connect. With a Config to hand it also asks
-        /// the server what each plugin's bytes should be; see Bytes.
+        /// the reference for what is on and off. Anything the live list adds or
+        /// drops is what gets a person refused at connect. With a Config to hand
+        /// it also asks the server for its manifest: the order is judged against
+        /// that, the way the game judges it (see LoadOrder), and so are the
+        /// bytes of every plugin; see Bytes.
         /// </summary>
         public static List<Issue> Run(Config cfg)
         {
@@ -118,14 +121,50 @@ namespace Thornswood
                 issues.Add(new Issue(
                     p + " is not flagged light, so from there on your load order counts " +
                     "one place differently from the server's. Fix flags it; nothing else changes.", true));
-            if (want.Count == have.Count && issues.Count == 0)
+            // The order, position by position. Only when nothing above was
+            // found, as before: a plugin turned off or not flagged light
+            // already explains the shift from there on, and one problem
+            // should read as one problem.
+            //
+            // Against the server's own manifest when the server answers,
+            // because that is the list the game compares with: the same
+            // walk as loadOrderVerificationService in the client, over the
+            // order the game will count (LoadOrder.GameOrder), names only;
+            // Bytes below does the sizes and crcs. On 20 Sep a list that
+            // matched the shipped reference name for name was in another
+            // order than the server's, LOOT having re-sorted both, and the
+            // game showed LOAD ORDER ERROR while this said everything checked
+            // out. The shipped reference is only for when the server cannot
+            // be asked, and never alongside the manifest, or Fix would be
+            // chasing two orders.
+            if (issues.Count == 0)
             {
-                for (int i = 0; i < want.Count; i++)
+                ServerMod[] mods = null;
+                try { mods = Manifest(cfg); } catch { }
+                if (mods != null)
                 {
-                    if (!string.Equals(want[i], have[i], StringComparison.OrdinalIgnoreCase))
+                    List<string> manifest = Names(mods);
+                    List<string> game = LoadOrder.GameOrder(have, LightOrMissing, Ccc(), InData);
+                    int at = LoadOrder.FirstMismatch(game, manifest);
+                    if (at >= 0)
                     {
-                        issues.Add(new Issue("The load order does not match the server's from " + want[i] + " onwards.", true));
-                        break;
+                        string yours = at < game.Count ? game[at] : "nothing";
+                        string theirs = at < manifest.Count ? manifest[at] : "nothing";
+                        issues.Add(new Issue(
+                            "Your load order is not the server's from position " + at + ": you have " + yours +
+                            " there, the server has " + theirs + ". The game shows that as LOAD ORDER ERROR. " +
+                            "Fix puts the server's order into this build's plugin list; nothing is downloaded.", true));
+                    }
+                }
+                else if (want.Count == have.Count)
+                {
+                    for (int i = 0; i < want.Count; i++)
+                    {
+                        if (!string.Equals(want[i], have[i], StringComparison.OrdinalIgnoreCase))
+                        {
+                            issues.Add(new Issue("The load order does not match the server's from " + want[i] + " onwards.", true));
+                            break;
+                        }
                     }
                 }
             }
@@ -223,6 +262,12 @@ namespace Thornswood
         static ServerMod[] manifestCache;
         static DateTime manifestAt = DateTime.MinValue;
         static string manifestFrom = "";
+        // A fetch that failed is remembered for the same minute a good one is
+        // kept, because Run asks for the manifest once for the order and Bytes
+        // asks again, and a server that does not answer used to cost the four
+        // second timeout twice before the scan could say so.
+        static DateTime manifestFailedAt = DateTime.MinValue;
+        static string manifestFailedFrom = "";
 
         static string ServerBase(Config cfg)
         {
@@ -232,11 +277,14 @@ namespace Thornswood
         /// <summary>The server's manifest, kept for a minute so Play and Scan a second apart do not fetch it twice.</summary>
         static ServerMod[] Manifest(Config cfg)
         {
+            if (cfg == null || string.IsNullOrEmpty(cfg.ServerAddress)) return null;
             string url = ServerBase(cfg) + "/manifest.json";
             if (manifestCache != null && manifestFrom == url && (DateTime.UtcNow - manifestAt).TotalSeconds < 60)
                 return manifestCache;
+            if (manifestFailedFrom == url && (DateTime.UtcNow - manifestFailedAt).TotalSeconds < 60)
+                return null;
             byte[] raw = Get(url, 4000);
-            if (raw == null) return null;
+            if (raw == null) { manifestFailedFrom = url; manifestFailedAt = DateTime.UtcNow; return null; }
             try
             {
                 var ser = new DataContractJsonSerializer(typeof(ServerManifest));
@@ -246,9 +294,10 @@ namespace Thornswood
                 manifestCache = doc.mods;
                 manifestAt = DateTime.UtcNow;
                 manifestFrom = url;
+                manifestFailedFrom = "";
                 return doc.mods;
             }
-            catch { return null; }
+            catch { manifestFailedFrom = url; manifestFailedAt = DateTime.UtcNow; return null; }
         }
 
         /// <summary>Every plugin whose size or crc32 is not the server's, as blocking issues that carry what Fix needs.</summary>
@@ -295,6 +344,119 @@ namespace Thornswood
                 issues.Add(i);
             }
             return issues;
+        }
+
+        /// <summary>The manifest's plugin names in its order, which is the server's load order.</summary>
+        static List<string> Names(ServerMod[] mods)
+        {
+            var l = new List<string>();
+            if (mods == null) return l;
+            foreach (ServerMod m in mods)
+                if (m != null && !string.IsNullOrEmpty(m.filename)) l.Add(m.filename);
+            return l;
+        }
+
+        // ------------------------------------------------------------ order
+        //
+        // What LoadOrder needs to know about this machine, and nothing else:
+        // which plugins Skyrim.ccc names, which are in Data, which are light.
+
+        /// <summary>Every plugin Skyrim.ccc names, in its order. The game loads the ones it finds before it reads any list.</summary>
+        static List<string> Ccc()
+        {
+            var l = new List<string>();
+            try
+            {
+                string ccc = Path.Combine(Paths.Game, "Skyrim.ccc");
+                if (!File.Exists(ccc)) return l;
+                foreach (string raw in File.ReadAllLines(ccc))
+                {
+                    string n = raw.Trim();
+                    if (n.Length == 0 || n.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) continue;
+                    l.Add(n);
+                }
+            }
+            catch { }
+            return l;
+        }
+
+        static bool InData(string name)
+        {
+            try { return File.Exists(Path.Combine(Paths.Game, "Data", name)); }
+            catch { return false; }
+        }
+
+        /// <summary>True when the game gives the plugin no normal index: not in Data, an .esl, or flagged light.</summary>
+        static bool LightOrMissing(string name)
+        {
+            return !InData(name) || Checks.TakesNoPlace(name);
+        }
+
+        /// <summary>True for a plugin in Data that is light. A missing one is not light; the "not in Data" issue owns it.</summary>
+        static bool Light(string name)
+        {
+            return InData(name) && Checks.TakesNoPlace(name);
+        }
+
+        /// <summary>
+        /// This build's plugin list in the server's order, when the server
+        /// answers and the order is not already its own. LoadOrder.Reorder
+        /// moves only the full plugins the server names and leaves every
+        /// other line where it was, so the file keeps its header, its
+        /// comments, its disabled entries and its light plugins. Written
+        /// back with the encoding and line endings it had: a byte order mark
+        /// or a changed newline is enough for the game to read the list as
+        /// something else. Returns 1 when the file was rewritten.
+        /// </summary>
+        static int PutInServerOrder(Config cfg, Action<string> say)
+        {
+            ServerMod[] mods = null;
+            try { mods = Manifest(cfg); } catch { }
+            if (mods == null) return 0;
+            List<string> manifest = Names(mods);
+
+            string live = Path.Combine(Paths.Live, "plugins.txt");
+            if (!File.Exists(live)) return 0;
+            if (LoadOrder.FirstMismatch(LoadOrder.GameOrder(Enabled(live), LightOrMissing, Ccc(), InData), manifest) < 0) return 0;
+
+            byte[] raw;
+            try { raw = File.ReadAllBytes(live); }
+            catch { return 0; }
+            bool bom = raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF;
+            var utf8 = new UTF8Encoding(false);
+            string text = utf8.GetString(raw, bom ? 3 : 0, raw.Length - (bom ? 3 : 0));
+            string nl = text.IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
+            bool trailing = text.EndsWith("\n");
+            var lines = new List<string>(text.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None));
+            if (trailing && lines.Count > 0) lines.RemoveAt(lines.Count - 1);
+
+            List<string> ordered = LoadOrder.Reorder(lines, manifest, Light);
+            if (ordered == null)
+            {
+                List<string> off = LoadOrder.NotEnabled(lines, manifest);
+                say(off.Count > 0
+                    ? "The server's order names " + string.Join(", ", off.ToArray()) + ", which this build's plugin list does not enable, so the order was left alone."
+                    : "This build's plugin list enables the same plugin twice, so the order was left alone.");
+                return 0;
+            }
+            string first;
+            int moved = LoadOrder.Moved(lines, ordered, out first);
+            if (moved == 0) return 0;
+
+            var body = new List<byte>();
+            if (bom) body.AddRange(new byte[] { 0xEF, 0xBB, 0xBF });
+            body.AddRange(utf8.GetBytes(string.Join(nl, ordered.ToArray()) + (trailing ? nl : "")));
+            try
+            {
+                File.WriteAllBytes(live, body.ToArray());
+            }
+            catch (Exception ex)
+            {
+                say("The plugin list could not be written (" + ex.Message.TrimEnd('.') + "). Close Skyrim and press Fix again.");
+                return 0;
+            }
+            say(moved + (moved == 1 ? " plugin" : " plugins") + " moved into the server's order, the first " + first + ".");
+            return 1;
         }
 
         static string Fmt(long bytes)
@@ -431,8 +593,10 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Puts the shipped load order back, into the file that is actually
-        /// read. Same correction as Run: Paths.Live rather than Paths.LocalAD.
+        /// Puts the shipped plugin list back, into the file that is actually
+        /// read, then the server's order into it when the server can be asked
+        /// (PutInServerOrder). Same correction as Run: Paths.Live rather than
+        /// Paths.LocalAD.
         ///
         /// Under the collection this is Vortex's file. Writing it here is still
         /// right, because the server refuses a mismatched list and this is what
@@ -468,6 +632,18 @@ namespace Thornswood
             var wanted = new HashSet<string>(Enabled(Path.Combine(Paths.Golden, "plugins.txt")), StringComparer.OrdinalIgnoreCase);
             n += Checks.IsolateCreations(wanted, say);
 
+            // The server's order, into this build's own list. After the
+            // reference copy, which settles what is on and off, and after the
+            // creations are moved aside, so the order is judged on what the
+            // game will count. Nothing is fetched for it, and the reference
+            // under Profile\Default is not touched: the next release carries
+            // the server's order in it (Publish-Update) and until then this
+            // is what puts it right on a machine.
+            if (cfg != null)
+            {
+                try { n += PutInServerOrder(cfg, say); } catch { }
+            }
+
             // The server's copy of every plugin whose bytes are not its own.
             if (cfg != null)
             {
@@ -481,7 +657,7 @@ namespace Thornswood
         /// launcher to show, because the last hour of this was not knowing.</summary>
         public static string LiveFile { get { return Path.Combine(Paths.Live, "plugins.txt"); } }
 
-        /// <summary>Copies the player's own loose files into the game before launch.</summary>
+        /// <summary>Copies the person's own loose files into the game before launch.</summary>
         public static int DeployPersonal()
         {
             if (!Directory.Exists(Paths.Personal)) { Directory.CreateDirectory(Paths.Personal); return 0; }
