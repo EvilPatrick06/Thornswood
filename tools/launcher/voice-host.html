@@ -29,9 +29,63 @@ var ctx = null, mic = null, micTrack = null;
 var talking = false, mode = 'local';
 var conns = new Map();   // peerId -> record
 var places = {};         // profileId -> {pos, angleZ, cell, name}
+var lastMode = {};       // peerId -> the last mode heard for them
 
 var UNITS_PER_METRE = 70;
-var RANGE = { whisper: 4, local: 18, yell: 45 };
+
+/*
+  Whisper, local and yell, and why the level is worked out here rather than
+  left to the panner.
+
+  The three modes used to set panner.maxDistance and nothing else, and all
+  three sounded identical because WebAudio's inverse distance model never
+  reads maxDistance. Only the linear model does. So every voice in the world
+  carried the same distance whichever mode the speaker was in, and changing
+  mode moved a number nothing looked at.
+
+  Linear is the model that would have honoured it, and it is the wrong shape
+  for a voice: the volume falls at a fixed rate and then stops dead. So the
+  panner keeps HRTF for direction and is told to apply no distance
+  attenuation of its own (rolloffFactor 0 makes the inverse model return 1 at
+  every distance), and the level is worked out below from the speaker's mode.
+
+  Three numbers per mode, metres except the last:
+
+    full   inside this you hear them at the mode's own level
+    quiet  by this you hear nothing, and between the two it fades
+    level  how loud the mode is at all, because a yell across a square is
+           louder than a whisper in your ear and not only further
+
+  Skyrim is 70 units to the metre, so whisper reaches about 350 units, local
+  about 1260 and yell about 3150.
+*/
+var RANGE = {
+  whisper: { full: 1.5, quiet: 5,  level: 0.85 },
+  local:   { full: 4,   quiet: 18, level: 1.0  },
+  yell:    { full: 8,   quiet: 45, level: 1.35 }
+};
+
+// How far through the fade they are, the mode's level at the near edge and
+// nothing at the far one. Squared, because halfway between the two should not
+// sound like half volume: a yell at the edge of its range is meant to be a
+// voice in the distance rather than somebody in the conversation.
+function levelFor(name, metres) {
+  var r = RANGE[name] || RANGE.local;
+  if (metres <= r.full) { return r.level; }
+  if (metres >= r.quiet) { return 0; }
+  var t = 1 - (metres - r.full) / (r.quiet - r.full);
+  return r.level * t * t;
+}
+
+// Ramped rather than assigned. Positions arrive a few times a second and a
+// gain that steps from one value to the next clicks.
+function setGain(rec, value) {
+  try {
+    rec.gain.gain.setTargetAtTime(value, ctx.currentTime, 0.05);
+  } catch (e) {
+    try { rec.gain.gain.value = value; } catch (e2) { }
+  }
+}
 
 function host(kind, text) {
   try {
@@ -187,7 +241,12 @@ function connect() {
     if (m.t === 'ice') { onIce(m); return; }
     if (m.t === 'vmode') {
       var r = conns.get(m.from);
-      if (r) { r.mode = m.mode; }
+      // A mode can arrive before the connection it belongs to, so it is kept
+      // by peer as well: a whisper announced during the handshake used to be
+      // dropped and the speaker was heard at local range until they changed
+      // mode again.
+      lastMode[m.from] = m.mode;
+      if (r) { r.mode = m.mode; place(); }
       return;
     }
   };
@@ -199,7 +258,8 @@ function onPeers(list) {
     if (p.peer === myPeer) return;
     seen[p.peer] = true;
     var had = conns.get(p.peer);
-    if (had) { had.mode = p.mode; had.profileId = p.profileId; had.name = p.name; return; }
+    if (p.mode) { lastMode[p.peer] = p.mode; }
+    if (had) { had.mode = p.mode || had.mode; had.profileId = p.profileId; had.name = p.name; return; }
     // Only the lower peer id offers, so two offers never cross on a new pair.
     open(p.peer, p, myPeer < p.peer);
   });
@@ -213,14 +273,18 @@ function open(id, info, initiator) {
   var gain = a.createGain();
   var panner = a.createPanner();
   panner.panningModel = 'HRTF';
+  // Direction only. The distance is the gain node's job, above: with no
+  // rolloff the inverse model returns 1 at every distance, so the panner
+  // places the voice and never quietens it.
   panner.distanceModel = 'inverse';
   panner.refDistance = 1;
-  panner.rolloffFactor = 1.4;
+  panner.rolloffFactor = 0;
   panner.connect(gain).connect(a.destination);
 
   var rec = {
     pc: pc, panner: panner, gain: gain, el: null,
-    profileId: info.profileId, name: info.name, mode: info.mode || 'local',
+    profileId: info.profileId, name: info.name,
+    mode: info.mode || lastMode[id] || 'local',
     polite: !initiator, makingOffer: false, haveRemote: false,
     pendingIce: [], restarts: 0
   };
@@ -309,6 +373,7 @@ function drop(id) {
   try { rec.pc.close(); } catch (e) { }
   try { if (rec.el) { rec.el.srcObject = null; } } catch (e) { }
   conns.delete(id);
+  delete lastMode[id];
   host('peers', String(conns.size));
 }
 
@@ -321,8 +386,8 @@ function place() {
 
   conns.forEach(function (rec) {
     var them = places[rec.profileId];
-    if (!them || !them.pos || them.cell !== me.cell) { rec.gain.gain.value = 0; return; }
-    rec.gain.gain.value = 1;
+    // A wall is not a distance. Another cell is silence whatever the maths says.
+    if (!them || !them.pos || them.cell !== me.cell) { setGain(rec, 0); return; }
 
     var dx = them.pos[0] - me.pos[0];
     var dy = them.pos[1] - me.pos[1];
@@ -334,7 +399,11 @@ function place() {
     var right   = (dx * cos - dy * sin) / UNITS_PER_METRE;
     var up      = dz / UNITS_PER_METRE;
 
-    rec.panner.maxDistance = RANGE[rec.mode] || RANGE.local;
+    // Their mode, not ours: you decide how far your own voice carries and
+    // everybody else hears the result at whatever range that choice reaches.
+    var metres = Math.sqrt(right * right + forward * forward + up * up);
+    setGain(rec, levelFor(rec.mode, metres));
+
     // WebAudio looks down -z, so what is in front is negative.
     if (rec.panner.positionX) {
       rec.panner.positionX.value = right;
