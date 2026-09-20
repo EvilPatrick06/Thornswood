@@ -79,6 +79,15 @@ namespace Thornswood
         {
             get { return Path.Combine(Paths.Game, "Data\\Platform\\thornswood-choice.txt"); }
         }
+        // The delete icon at the menu: one profile id per line, appended by the
+        // plugin, read by Shell's poll while the game runs, removed at Prepare.
+        static string ForgetFile
+        {
+            get { return Path.Combine(Paths.Game, "Data\\Platform\\thornswood-forget.txt"); }
+        }
+        // Ids this install has forgotten, so they are never minted again: a
+        // returning id would hand back the character that was deleted.
+        static string RetiredFile { get { return Path.Combine(Home, "retired.txt"); } }
 
         // Read used to fill this from the newest save's header as well. That
         // went with the per slot folders on 20 September: one shared folder
@@ -228,6 +237,7 @@ namespace Thornswood
         {
             var taken = new List<int>();
             foreach (Row r in Rows()) taken.Add(r.Id);
+            foreach (int r in Retired()) taken.Add(r);
 
             var bytes = new byte[4];
             using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
@@ -271,6 +281,65 @@ namespace Thornswood
             sp.Played = DateTime.MinValue;
             Save(rows);
             return sp.Id;
+        }
+
+        static List<int> Retired()
+        {
+            var l = new List<int>();
+            try
+            {
+                if (!File.Exists(RetiredFile)) return l;
+                foreach (string line in File.ReadAllLines(RetiredFile))
+                {
+                    int id;
+                    if (int.TryParse(line.Trim(), out id) && id > 0) l.Add(id);
+                }
+            }
+            catch { }
+            return l;
+        }
+
+        /// <summary>
+        /// The ids the delete icon at the menu has asked to forget, one per
+        /// line in the forget file, in order. Read by Shell's poll while the
+        /// game runs; Shell keeps its own note of which it has acted on.
+        /// </summary>
+        public static List<int> ReadForgets()
+        {
+            var l = new List<int>();
+            try
+            {
+                if (!File.Exists(ForgetFile)) return l;
+                foreach (string line in File.ReadAllLines(ForgetFile))
+                {
+                    int id;
+                    if (int.TryParse(line.Trim(), out id) && id > 0 && !l.Contains(id)) l.Add(id);
+                }
+            }
+            catch { }
+            return l;
+        }
+
+        /// <summary>
+        /// Forget a character: its row goes, its id is written down as retired
+        /// so it is never minted again, and the character itself stays on the
+        /// server exactly as the old launcher's Delete left it. The spare is
+        /// never forgotten this way; it was never a character.
+        /// </summary>
+        public static void Forget(int profileId)
+        {
+            if (profileId <= 0) return;
+            List<Row> rows = Rows();
+            Row r = FindId(rows, profileId);
+            if (r == null || r.Slot <= 0) return;
+            rows.Remove(r);
+            Save(rows);
+            try
+            {
+                Directory.CreateDirectory(Home);
+                File.AppendAllText(RetiredFile, profileId + Environment.NewLine);
+            }
+            catch { }
         }
 
         /// <summary>The id played most recently, or 0 when nothing has been.</summary>
@@ -415,18 +484,20 @@ namespace Thornswood
         /// menu from. Written on every Prepare, UTF-8 without a byte order
         /// mark, in exactly this shape:
         ///
-        ///     {"v":1,"last":0,"spare":0,"characters":[
-        ///       {"profileId":0,"name":"","race":"","trade":"","town":"",
-        ///        "where":"","played":"","lastPlayed":""}]}
+        ///     {"v":1,"last":0,"spare":0,"slots":2,"characters":[
+        ///       {"profileId":0,"slot":1,"name":"","race":"","trade":"","town":"",
+        ///        "where":"","played":"","seconds":0,"lastPlayed":""}]}
         ///
         /// The characters are this file's rows in slot order. The name, race,
         /// trade, town and where come from the server's roster when it has the
-        /// character and are empty when it does not; the played text and the
-        /// date are the launcher's own. Throws when the file cannot be written,
-        /// because a menu drawn from a stale list offers last session's spare
-        /// and misses whoever was made since.
+        /// character and are empty when it does not; the played text, the
+        /// seconds and the date are the launcher's own, and slots is how many
+        /// the menu draws (the site's answer: two, or three for a Patreon tier
+        /// or a Gamemaster). Throws when the file cannot be written, because a
+        /// menu drawn from a stale list offers last session's spare and misses
+        /// whoever was made since.
         /// </summary>
-        static void WriteCharacters(Config cfg, List<Row> rows, int last, int spare)
+        static void WriteCharacters(Config cfg, List<Row> rows, int last, int spare, int slots)
         {
             // The roster first, so the names are as fresh as the server can
             // make them. Its own two and a half second timeout, and a server
@@ -436,6 +507,7 @@ namespace Thornswood
             var sb = new StringBuilder();
             sb.Append("{\"v\":1,\"last\":").Append(last)
               .Append(",\"spare\":").Append(spare)
+              .Append(",\"slots\":").Append(slots)
               .Append(",\"characters\":[");
             bool first = true;
             foreach (Row r in Characters(rows))
@@ -445,6 +517,8 @@ namespace Thornswood
                 if (!first) sb.Append(',');
                 first = false;
                 sb.Append("{\"profileId\":").Append(r.Id)
+                  .Append(",\"slot\":").Append(r.Slot)
+                  .Append(",\"seconds\":").Append(r.Seconds)
                   .Append(",\"name\":\"").Append(Json(who == null ? "" : who.Name))
                   .Append("\",\"race\":\"").Append(Json(who == null ? "" : who.Race))
                   .Append("\",\"trade\":\"").Append(Json(who == null ? "" : who.Trade))
@@ -612,11 +686,16 @@ namespace Thornswood
             // Shell hands voice the chosen id again once the menu answers.
             Voice.Reconfigure(point);
 
-            WriteCharacters(cfg, rows, last, spare);
+            // How many slots the menu draws: the site's answer from the door
+            // check a moment ago, two when it said nothing.
+            int slots = 2;
+            try { if (Door.Last != null && Door.Last.Slots > 0) slots = Door.Last.Slots; } catch { }
+            WriteCharacters(cfg, rows, last, spare, slots);
 
-            // A choice left over from the last session would be read as this
-            // session's the moment the game was up.
+            // A choice or a forget left over from the last session would be
+            // read as this session's the moment the game was up.
             try { if (File.Exists(ChoiceFile)) File.Delete(ChoiceFile); } catch { }
+            try { if (File.Exists(ForgetFile)) File.Delete(ForgetFile); } catch { }
 
             if (setAside != null) note = (note == null ? "" : note + " ") + setAside;
             return note;

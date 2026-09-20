@@ -81,6 +81,7 @@ $ShipMachineFiles = @(
     # and the list is every profile id the install owns.
     'Data\Platform\thornswood-characters.json',
     'Data\Platform\thornswood-choice.txt',
+    'Data\Platform\thornswood-forget.txt',
     # Written by the game on this machine every session. The second is the
     # light half of the same list, kept apart because the server's own list
     # drops light plugins and the first file has to match it positionally.

@@ -242,6 +242,7 @@
   */
   const CHOICE_FILE = 'Data/Platform/thornswood-choice.txt';
   const CHARACTERS_FILE = 'Data/Platform/thornswood-characters.json';
+  const FORGET_FILE = 'Data/Platform/thornswood-forget.txt';
   const chooseAtMenu = !!((client.gameData || {}).chooseAtMenu);
   let menuPhase = 0;
   let menuAt = 0;
@@ -2469,6 +2470,18 @@
     if (a[0] !== 'thornswood-front') return;
     const what = String(a[1]);
 
+    // The delete icon at the menu: one id, for the launcher, which drops the
+    // character from its list on its next poll. The character stays on the
+    // server; this is the old launcher's Delete, moved into the game.
+    if (what.indexOf('select:forget ') === 0) {
+      const gid = Number(what.slice(14)) || 0;
+      if (gid > 0) {
+        try { require('fs').appendFileSync(FORGET_FILE, gid + '\n'); }
+        catch (e) { log('menu: could not write the forget for the launcher:', e); }
+        log('menu: forgetting character', gid);
+      }
+      return;
+    }
     // The character choice page reports in plain lines: ready, alive, the
     // first mouse move, the music, the pick. Written as they come.
     if (what.indexOf('select:') === 0) { log('choice page:', what.slice(7)); return; }

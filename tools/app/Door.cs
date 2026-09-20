@@ -89,6 +89,12 @@ namespace Thornswood
             get { return (DateTime.Now - clearedAt).TotalSeconds < HoldSeconds; }
         }
 
+        /// <summary>
+        /// The last yes the site gave, whole, for whoever needs more than the
+        /// fact of it: Chars.Prepare reads the slot count off it.
+        /// </summary>
+        public static Standing Last;
+
         public static void Forget() { clearedAt = DateTime.MinValue; }
 
         /// <summary>
@@ -129,6 +135,7 @@ namespace Thornswood
                         {
                             Remember(true);
                             clearedAt = DateTime.Now;
+                            Last = st;
                             if (st.Name != null && st.Name.Length > 0) log("Discord says yes. " + st.Name + ".");
                             else log("Discord says yes.");
                             if (onAllowed != null) onAllowed();

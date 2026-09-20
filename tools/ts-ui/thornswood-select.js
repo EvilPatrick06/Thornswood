@@ -182,6 +182,14 @@
       var s = Number(c.slot) || 0;
       if (s > 0 && !byslot[s]) byslot[s] = c; else extra.push(c);
     });
+    // A launcher that numbered nothing (before 20 September) or two rows
+    // on one number: the rest take the lowest free slots, in order.
+    var unplaced = extra; extra = [];
+    unplaced.forEach(function (c) {
+      var free = 0;
+      for (var j = 1; j <= SLOTS && !free; j++) if (!byslot[j]) free = j;
+      if (free) byslot[free] = c; else extra.push(c);
+    });
     var top = SLOTS;
     for (var k in byslot) if (Number(k) > top) top = Number(k);
     for (var i = 1; i <= top; i++) {

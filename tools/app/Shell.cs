@@ -3925,8 +3925,24 @@ namespace Thornswood
         /// the play time count at close. The settings file is never touched
         /// here: a write to it hot reloads every plugin under the running game.
         /// </summary>
+        static readonly HashSet<int> forgotten = new HashSet<int>();
+
         static void PollChoice()
         {
+            // The delete icon at the menu. Each id once, whatever the file says
+            // on later ticks; the file itself goes at the next Prepare.
+            List<int> gone = null;
+            try { gone = Chars.ReadForgets(); } catch { gone = null; }
+            if (gone != null)
+            {
+                foreach (int g in gone)
+                {
+                    if (!forgotten.Add(g)) continue;
+                    try { Chars.Forget(g); Log("forgot character " + g + " at the menu"); }
+                    catch (Exception ex) { Log("Could not forget character " + g + ": " + ex.Message); }
+                }
+            }
+
             int id = 0;
             try { id = Chars.ReadChoice(); } catch { id = 0; }
             if (id <= 0 || id == chosenId) return;
