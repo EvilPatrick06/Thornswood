@@ -17,17 +17,34 @@
   in it, not labels in capitals.
 
   CREATION IS THE SAME PANEL. A new character stands in the hall and the
-  server opens this with a fourth section, Home. Pick a class, a profession
-  and a home, in any order, each confirmed on its own, and the third one sends
-  you to your inn. The panel closes itself when the server says creation is
-  over.
+  server opens this with a fourth section, Home. A home is the one choice
+  that has to be made before leaving the hall: confirming it sends you to
+  your inn. Class and profession can be confirmed here too, in any order, or
+  left for later with the last card in each of those sections and picked in
+  the world from this same panel. The panel closes itself when the server
+  says creation is over.
 
   NOTHING HERE DECIDES ANYTHING. It reads what the server says this character
   is and sends what was picked. Every rule in the rulebook, one class only,
   one profession, novice in your sister half, two secondary professions at
   most, ranks, spell points, is the server's to enforce. A client that decided
   any of it would be a client anybody could edit. What the server refuses
-  comes back as a note under the panel, and as a line in the chat.
+  comes back as a note under the panel, and as a line in the chat. "Choose
+  later" is the one thing the server never hears about: it is a mark on this
+  page and nothing else, because leaving a choice unmade changes nothing.
+
+  NOTHING REDRAWS FOR NOTHING, 20 September. The server writes the property
+  on every answer, on every refresh and on every reminder while somebody is
+  still choosing, so the same panel arrives again and again. The first cut
+  tore the section list and the body down and rebuilt them on each arrival,
+  and every click did the same, with 90 millisecond colour transitions on the
+  rebuilt cards: the boxes flashed. Now draw() compares what it would draw
+  with what it drew last, as JSON, and does nothing when they match; the
+  status line is its own smaller redraw; and there are no transitions and no
+  hover rules, for the same reason the character choice page has none (see
+  thornswood-select.js: its first three cuts died the moment the mouse moved
+  over them). The cursor still turns into a hand over anything clickable; a
+  cursor rule restyles nothing.
 
   THE CONTRACT with thornswood-front.js, unchanged from the first cut:
     window.thornswoodSkills = { open, close, toggle, isOpen, setData }
@@ -50,6 +67,7 @@
     'class': {
       title: 'Class',
       lead: 'One class, for good. It is the one kind of work only you can do. Everything else you buy, trade for, or ask a friend to do.',
+      later: 'You can pick your class in the world, from this panel. One class, for good, when you do.',
       rows: [
         { key: 'hunter', name: 'Hunter', desc: 'The only ones who can loot an animal they have brought down. Hides, meat and horn come from a hunter or from nobody.' },
         { key: 'fisher', name: 'Fisher', desc: 'The only ones who can take fish from the water. Every fish on every table was caught by one of you.' },
@@ -61,6 +79,7 @@
     profession: {
       title: 'Profession',
       lead: 'One profession, and one half of it to make your own. You know the novice work of the other half from the start. A Master of another profession can teach you their basics, and you may take that up twice.',
+      later: 'You can pick your profession in the world, from this panel.',
       rows: [
         { key: 'warrior', name: 'Warrior', desc: 'Arms, and the people who carry them.',
           subs: [{ key: 'bulwark', name: 'Bulwark', desc: 'Shields, heavy armour, holding the line' },
@@ -137,6 +156,7 @@
 
   var RANK_NAMES = { novice: 'Novice', advanced: 'Advanced', expert: 'Expert', master: 'Master' };
   var CAP = 5;             // points that fill a skill; the server's LIMITS.skillCap, mirrored for the pips
+  var LATER = 'later';     // the row key of the "Choose later" card; never sent anywhere
 
   // ---------------------------------------------------------------- state --
   var sections = ['class', 'profession', 'tree'];   // 'home' is added while creating
@@ -144,34 +164,50 @@
   var rowAt = 0;
   var mine = null;         // what the server says this character is: the panel view
   var picked = {};         // section -> { row: key, subs: [keys] } chosen in the panel, not yet confirmed
+  var later = {};          // section -> true when "Choose later" was confirmed; this page's mark only
   var pending = null;      // the last pick sent and not yet answered, for the status line
   var status = '';         // the line under the panel
   var statusKind = '';     // '' | 'ok' | 'no'
   var wasCreating = false;
+  var closing = false;     // creation is over and the panel is on its way shut
+  var tableGen = 0;        // bumped when a table arrives from the server, so a redraw is forced
+  var drawnKey = '';       // JSON of what head, nav and body were last drawn from
+  var footKey = '';        // the same for the foot
 
   // ------------------------------------------------------------------ css --
+  /*
+    No transitions and no :hover, on purpose; see the head of the file. The
+    lit card is lit by a click or a key and nothing else.
+
+    The panel is a fixed 1120 by 700 box for a 1920 by 1080 screen, scaled up
+    by fit() on a bigger one, and never wider than the viewport less 24px a
+    side on a smaller one. The flexible grid column is minmax(0,1fr) and every
+    row spanning it has min-width:0, so nothing inside can push the foot past
+    the panel's edge: the buttons sit inside the panel's padding whatever the
+    status line says.
+  */
   var css = [
     '#ts-skills{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;',
     'background:radial-gradient(ellipse at center,rgba(0,0,0,.50) 0%,rgba(0,0,0,.72) 100%);',
     'font-family:"Palatino Linotype",Palatino,Georgia,serif;color:#d9cfb4;user-select:none;pointer-events:auto}',
     '#ts-skills.gone{display:none}',
     '#ts-skills *{box-sizing:border-box}',
-    '#ts-skills .panel{width:min(1120px,94vw);height:min(700px,90vh);display:grid;',
-    'grid-template-columns:250px 1fr;grid-template-rows:auto 1fr auto;',
+    '#ts-skills .panel{width:1120px;max-width:calc(100vw - 48px);height:700px;max-height:calc(100vh - 48px);display:grid;',
+    'grid-template-columns:250px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;',
     'background:rgba(11,10,8,.94);border:1px solid rgba(198,170,109,.42);outline:1px solid rgba(198,170,109,.14);outline-offset:4px;',
     'box-shadow:0 24px 80px rgba(0,0,0,.7);position:relative}',
     // head
-    '#ts-skills .head{grid-column:1/3;display:flex;align-items:flex-end;justify-content:space-between;',
+    '#ts-skills .head{grid-column:1/3;min-width:0;display:flex;align-items:flex-end;justify-content:space-between;gap:32px;',
     'padding:22px 32px 16px;border-bottom:1px solid rgba(198,170,109,.22)}',
     '#ts-skills .eyebrow{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:rgba(198,170,109,.75);margin-bottom:6px}',
-    '#ts-skills .title{font-size:26px;color:#f6e9c8;line-height:1.1}',
-    '#ts-skills .who{text-align:right;font-size:13.5px;color:#d9cfb4;line-height:1.5}',
+    '#ts-skills .title{font-size:26px;color:#f6e9c8;line-height:1.1;white-space:nowrap}',
+    '#ts-skills .who{flex:0 1 560px;min-width:0;text-align:right;font-size:13.5px;color:#d9cfb4;line-height:1.5}',
     '#ts-skills .who .dim{color:rgba(217,207,180,.6);font-style:italic}',
     '#ts-skills .who .pts{color:#e9d19b}',
-    // nav
-    '#ts-skills .nav{grid-column:1;border-right:1px solid rgba(198,170,109,.22);padding:14px 0;overflow:auto}',
-    '#ts-skills .navrow{padding:14px 26px 13px 23px;border-left:3px solid transparent;cursor:pointer;transition:background 90ms linear}',
-    '#ts-skills .navrow:hover{background:rgba(120,94,44,.14)}',
+    // nav: the first row's text sits 22px under the head line, level with the body's lead,
+    // and 32px in from the panel's edge, level with the head and the body
+    '#ts-skills .nav{grid-column:1;min-width:0;border-right:1px solid rgba(198,170,109,.22);padding:8px 0;overflow:auto}',
+    '#ts-skills .navrow{padding:14px 20px 13px 29px;border-left:3px solid transparent;cursor:pointer}',
     '#ts-skills .navrow.on{border-left-color:#e9d19b;background:rgba(120,94,44,.24)}',
     '#ts-skills .navrow .k{font-size:16px;color:#d9cfb4;letter-spacing:.02em}',
     '#ts-skills .navrow.on .k{color:#f6e9c8}',
@@ -179,17 +215,15 @@
     '#ts-skills .navrow .v.set{color:#9fcf92;font-style:normal}',
     '#ts-skills .navrow .v.need{color:#e9d19b}',
     // body
-    '#ts-skills .body{grid-column:2;padding:22px 32px 18px;overflow:auto}',
+    '#ts-skills .body{grid-column:2;min-width:0;padding:22px 32px 18px;overflow:auto}',
     '#ts-skills .lead{font-size:13.5px;line-height:1.55;color:rgba(217,207,180,.66);font-style:italic;margin:0 0 16px;max-width:680px}',
     '#ts-skills .cards{display:grid;grid-template-columns:1fr;gap:9px}',
     '#ts-skills .cards.three{grid-template-columns:repeat(3,1fr)}',
-    '#ts-skills .card{border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);padding:13px 18px 12px;cursor:pointer;',
-    'transition:all 90ms linear;position:relative}',
-    '#ts-skills .card:hover{border-color:rgba(233,209,155,.7);background:rgba(120,94,44,.16)}',
+    '#ts-skills .card{border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);padding:13px 18px 12px;position:relative;cursor:pointer}',
     '#ts-skills .card.at{border-color:rgba(233,209,155,.95);background:rgba(120,94,44,.34)}',
     '#ts-skills .card.mine{border-color:rgba(160,205,150,.8)}',
     '#ts-skills .card.off{opacity:.42}',
-    '#ts-skills .card.off:hover{border-color:rgba(198,170,109,.30);background:rgba(0,0,0,.20)}',
+    '#ts-skills .card.later{border-style:dashed}',
     '#ts-skills .card .name{font-size:16.5px;color:#f6e9c8;display:flex;align-items:baseline;gap:12px}',
     '#ts-skills .card .desc{font-size:13px;line-height:1.5;color:rgba(217,207,180,.78);margin-top:4px}',
     '#ts-skills .card .inn{font-size:12.5px;color:rgba(217,207,180,.6);font-style:italic;margin-top:3px}',
@@ -199,8 +233,7 @@
     // halves and schools inside an open profession card
     '#ts-skills .halves{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}',
     '#ts-skills .halves.five{grid-template-columns:repeat(5,1fr)}',
-    '#ts-skills .half{border:1px solid rgba(198,170,109,.32);padding:9px 12px;background:rgba(0,0,0,.22);cursor:pointer;transition:all 90ms linear}',
-    '#ts-skills .half:hover{border-color:rgba(233,209,155,.75)}',
+    '#ts-skills .half{border:1px solid rgba(198,170,109,.32);padding:9px 12px;background:rgba(0,0,0,.22);cursor:pointer}',
     '#ts-skills .half.on{border-color:rgba(233,209,155,.95);background:rgba(120,94,44,.42)}',
     '#ts-skills .half.mine{border-color:rgba(160,205,150,.8)}',
     '#ts-skills .half .hn{font-size:14.5px;color:#f6e9c8}',
@@ -212,7 +245,7 @@
     '#ts-skills .colhead{font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;color:rgba(198,170,109,.85);',
     'padding-bottom:8px;border-bottom:1px solid rgba(198,170,109,.22);margin-bottom:6px}',
     '#ts-skills .skill{display:grid;grid-template-columns:1fr auto auto;grid-template-rows:auto auto;column-gap:10px;align-items:center;',
-    'padding:9px 6px 8px;border:1px solid transparent;cursor:default}',
+    'padding:9px 6px 8px;border:1px solid transparent}',
     '#ts-skills .skill.at{border-color:rgba(233,209,155,.6);background:rgba(120,94,44,.18)}',
     '#ts-skills .skill .sn{font-size:15px;color:#f6e9c8}',
     '#ts-skills .skill .sd{grid-column:1/4;font-size:12px;color:rgba(217,207,180,.6);line-height:1.45;margin-top:3px}',
@@ -221,25 +254,24 @@
     '#ts-skills .pip{width:10px;height:10px;border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.2)}',
     '#ts-skills .pip.lit{background:#c6aa6d;border-color:#e9d19b}',
     '#ts-skills .plus{width:26px;height:26px;border:1px solid rgba(198,170,109,.55);color:#e9d19b;display:grid;place-items:center;',
-    'font-size:18px;line-height:1;cursor:pointer;background:rgba(0,0,0,.25)}',
-    '#ts-skills .plus:hover{background:rgba(120,94,44,.5);border-color:rgba(233,209,155,.95)}',
+    'font-size:18px;line-height:1;background:rgba(0,0,0,.25);cursor:pointer}',
     '#ts-skills .plus.off{opacity:.25;pointer-events:none}',
-    // foot
-    '#ts-skills .foot{grid-column:1/3;display:flex;align-items:center;justify-content:space-between;gap:20px;',
-    'padding:13px 32px;border-top:1px solid rgba(198,170,109,.22)}',
-    '#ts-skills .status{font-size:13.5px;color:rgba(217,207,180,.7);font-style:italic;min-height:1.4em}',
+    // foot: the hint on the left takes what is left and wraps; the buttons never shrink
+    '#ts-skills .foot{grid-column:1/3;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:24px;',
+    'padding:14px 32px;border-top:1px solid rgba(198,170,109,.22)}',
+    '#ts-skills .status{flex:1 1 auto;min-width:0;font-size:13.5px;line-height:1.4;color:rgba(217,207,180,.7);font-style:italic;min-height:1.4em}',
     '#ts-skills .status.ok{color:#9fcf92;font-style:normal}',
     '#ts-skills .status.no{color:#d9a27a;font-style:normal}',
-    '#ts-skills .btns{display:flex;gap:10px;align-items:center}',
-    '#ts-skills .btn{border:1px solid rgba(198,170,109,.55);padding:10px 26px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;',
-    'cursor:pointer;color:#e9d19b;background:rgba(0,0,0,.25);transition:all 90ms linear;font-family:inherit}',
-    '#ts-skills .btn:hover{background:rgba(120,94,44,.45);border-color:rgba(233,209,155,.95);color:#f6e9c8}',
-    '#ts-skills .btn kbd{font-family:inherit;font-size:11px;opacity:.7;margin-left:8px;letter-spacing:0}',
+    '#ts-skills .btns{flex:0 0 auto;display:flex;gap:10px;align-items:stretch}',
+    '#ts-skills .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:40px;padding:0 24px;',
+    'border:1px solid rgba(198,170,109,.55);font-size:13px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;',
+    'color:#e9d19b;background:rgba(0,0,0,.25);font-family:inherit;cursor:pointer}',
     '#ts-skills .btn.primary{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
-    '#ts-skills .btn.primary:hover{background:#e9d19b;color:#1b1205}',
     '#ts-skills .btn.primary.off{opacity:.35;pointer-events:none}',
-    '#ts-skills .steps{display:flex;gap:14px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(217,207,180,.5);margin-top:4px;justify-content:flex-end}',
-    '#ts-skills .steps .done{color:#9fcf92}'
+    // the K, drawn as a key cap beside Close
+    '#ts-skills .key{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;',
+    'border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;border-radius:3px;background:rgba(0,0,0,.35);',
+    'font-size:11px;letter-spacing:0;line-height:1;color:#e9d19b}'
   ].join('');
 
   var style = document.createElement('style');
@@ -257,7 +289,7 @@
       '<div class="nav"></div>' +
       '<div class="body"></div>' +
       '<div class="foot"><div class="status"></div><div class="btns">' +
-        '<div class="btn ghost" data-act="close">Close<kbd>K</kbd></div>' +
+        '<div class="btn ghost" data-act="close"><span>Close</span><span class="key">K</span></div>' +
         '<div class="btn primary" data-act="confirm">Confirm</div>' +
       '</div></div>' +
     '</div>';
@@ -272,8 +304,14 @@
   var elClose = root.querySelector('[data-act="close"]');
   var elPanel = root.querySelector('.panel');
 
-  /* Laid out for 1920x1080 and scaled up from there: at 3440x1440 the first
-     cut was a postage stamp. */
+  /*
+    Laid out for 1920x1080 and scaled up from there: at 3440x1440 the first
+    cut was a postage stamp. The scale is the smaller of the two ratios, so
+    the scaled box is at most 1120/1920 of the width and 700/1080 of the
+    height, and never meets the edge: 1920x1080 and 2560x1080 draw it as is,
+    3440x1440 draws it at 1.333 (1493 by 933), 2000x837 is below 1 and draws
+    it as is, 700 tall in 837.
+  */
   function fit() {
     try {
       var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
@@ -338,13 +376,52 @@
     return best;
   }
 
+  /*
+    "Choose later" is offered while creating, in Class and Profession, and
+    only while that one is still unset. Home never has it: a home is the one
+    choice that has to be made before leaving the hall. In the world there is
+    no later to choose; the cards are there and they send as they always did.
+  */
+  function laterOffered(sec) {
+    if (!creating()) return false;
+    if (sec === 'class') return !haveClass();
+    if (sec === 'profession') return !haveProf();
+    return false;
+  }
+  function countRows() {
+    if (section === 'home') return ((mine && mine.towns) || []).length;
+    if (section === 'tree') return 15;
+    return rows().length + (laterOffered(section) ? 1 : 0);
+  }
+  /* Another section: the top row, and the status line back to the hint. */
+  function goTo(sec) { section = sec; rowAt = 0; status = ''; statusKind = ''; }
+
   // ------------------------------------------------------------------ draw --
+  /*
+    Everything head, nav and body are drawn from, as one string. The note is
+    left out: it only ever reaches the status line, and a refusal must not
+    tear the cards down. When the string is the one drawn last, nothing is
+    touched, which is what makes the server's repeated writes invisible.
+  */
+  function viewKey() {
+    var v = null;
+    if (mine) { v = {}; for (var k in mine) if (k !== 'note') v[k] = mine[k]; }
+    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, v]);
+  }
+
   function draw() {
     sections = creating() ? ['class', 'profession', 'home', 'tree'] : ['class', 'profession', 'tree'];
     if (sections.indexOf(section) < 0) section = sections[0];
-    drawHead();
-    drawNav();
-    drawBody();
+    var n = countRows();
+    if (rowAt >= n) rowAt = n ? n - 1 : 0;
+    if (rowAt < 0) rowAt = 0;
+    var key = viewKey();
+    if (key !== drawnKey) {
+      drawnKey = key;
+      drawHead();
+      drawNav();
+      drawBody();
+    }
     drawFoot();
   }
 
@@ -352,18 +429,13 @@
     if (creating()) {
       elTitle.textContent = 'Begin your life in Thornswood';
       elWho.textContent = '';
-      elWho.appendChild(el('div', '', 'Choose a class, a profession and a home. Each one is yours the moment you confirm it.'));
-      var steps = el('div', 'steps');
-      steps.appendChild(el('span', haveClass() ? 'done' : '', (haveClass() ? '✓ ' : '') + 'Class'));
-      steps.appendChild(el('span', haveProf() ? 'done' : '', (haveProf() ? '✓ ' : '') + 'Profession'));
-      steps.appendChild(el('span', haveHome() ? 'done' : '', (haveHome() ? '✓ ' : '') + 'Home'));
-      elWho.appendChild(steps);
+      elWho.appendChild(el('div', '', 'Choose a home. Your class and profession can be chosen here too, or later in the world. Each one is yours the moment you confirm it.'));
       return;
     }
     elTitle.textContent = DATA[section] ? DATA[section].title : '';
     elWho.textContent = '';
     var s = summary();
-    elWho.appendChild(el('div', s ? '' : 'dim', s || 'Nothing chosen yet. Class and profession are picked once, in the creation hall.'));
+    elWho.appendChild(el('div', s ? '' : 'dim', s || 'Nothing chosen yet. Class and profession are picked once, here, and never changed.'));
     var rk = topRank();
     var pts = mine ? Number(mine.points) || 0 : 0;
     var line2 = el('div', 'dim');
@@ -374,9 +446,12 @@
   }
 
   function navValue(sec) {
-    if (sec === 'class') return haveClass() ? { t: nameOf('class', mine['class']), c: 'set' } : { t: creating() ? 'choose one' : 'not chosen', c: creating() ? 'need' : '' };
+    if (sec === 'class') {
+      if (haveClass()) return { t: nameOf('class', mine['class']), c: 'set' };
+      return later[sec] ? { t: 'later', c: '' } : { t: 'choose one', c: 'need' };
+    }
     if (sec === 'profession') {
-      if (!haveProf()) return { t: creating() ? 'choose one' : 'not chosen', c: creating() ? 'need' : '' };
+      if (!haveProf()) return later[sec] ? { t: 'later', c: '' } : { t: 'choose one', c: 'need' };
       var halves = ownHalves().map(function (h) { return nameOf('profession', h); });
       return { t: nameOf('profession', mine.profession) + (halves.length ? ', ' + halves.join(' and ') : ''), c: 'set' };
     }
@@ -394,7 +469,7 @@
       row.appendChild(el('div', 'k', DATA[sec].title));
       var v = navValue(sec);
       row.appendChild(el('div', 'v ' + v.c, v.t));
-      row.onclick = function () { section = sec; rowAt = 0; draw(); };
+      row.onclick = function () { goTo(sec); draw(); };
       elNav.appendChild(row);
     });
   }
@@ -411,6 +486,19 @@
     else if (section === 'profession') drawProfession();
     else if (section === 'home') drawHome();
     else drawTree();
+  }
+
+  /* The last card of Class and of Profession while creating. */
+  function laterCard(wrap, sec, i) {
+    var p = picked[sec] || {};
+    var card = el('div', 'card later' + (i === rowAt ? ' at' : ''));
+    var name = el('div', 'name', 'Choose later');
+    if (p.row === LATER) name.appendChild(el('span', 'tag gold', 'chosen, confirm below'));
+    else if (later[sec]) name.appendChild(el('span', 'tag dim', 'left for later'));
+    card.appendChild(name);
+    card.appendChild(el('div', 'desc', DATA[sec].later || ''));
+    card.onclick = function () { rowAt = i; picked[sec] = { row: LATER, subs: [] }; draw(); };
+    wrap.appendChild(card);
   }
 
   function drawClass() {
@@ -432,6 +520,7 @@
       };
       wrap.appendChild(card);
     });
+    if (laterOffered('class')) laterCard(wrap, 'class', rows().length);
     elBody.appendChild(wrap);
   }
 
@@ -484,10 +573,16 @@
       }
       card.onclick = function () {
         if (have) { rowAt = i; draw(); return; }
-        if (rowAt !== i) { rowAt = i; draw(); }
+        // A click on another card starts that card fresh: the half picked on
+        // the last one, or the "later" mark, must not ride under this one and
+        // go out when Confirm is pressed.
+        var fresh = p.row !== r.key;
+        if (fresh) picked.profession = { row: r.key, subs: [] };
+        if (rowAt !== i || fresh) { rowAt = i; draw(); }
       };
       wrap.appendChild(card);
     });
+    if (laterOffered('profession')) laterCard(wrap, 'profession', rows().length);
     elBody.appendChild(wrap);
   }
 
@@ -539,20 +634,36 @@
     elBody.appendChild(cols);
   }
 
+  /* The status line and the two buttons: three elements, set in place, never rebuilt. */
   function drawFoot() {
-    elStatus.className = 'status' + (statusKind ? ' ' + statusKind : '');
-    elStatus.textContent = status || hint();
     var can = canConfirm();
+    var line = status || hint();
+    var label = section === 'home' ? 'Make it home' : 'Confirm';
+    var key = JSON.stringify([line, statusKind, can, label, section === 'tree']);
+    if (key === footKey) return;
+    footKey = key;
+    elStatus.className = 'status' + (statusKind ? ' ' + statusKind : '');
+    elStatus.textContent = line;
     elConfirm.className = 'btn primary' + (can ? '' : ' off');
-    elConfirm.textContent = section === 'home' ? 'Make it home' : 'Confirm';
+    elConfirm.textContent = label;
     elConfirm.style.display = section === 'tree' ? 'none' : '';
   }
 
   function hint() {
     if (section === 'tree') return 'Press + on a skill to put a point in it.';
-    if (section === 'class') return haveClass() ? 'Your class is set for good.' : 'Pick a class, then confirm.';
-    if (section === 'profession') return haveProf() ? 'Your profession is set. Ranks come from doing the work.' : 'Pick a profession and its half, then confirm.';
-    if (section === 'home') return haveHome() ? 'Home is set.' : 'Pick the town you will wake up in.';
+    if (section === 'class') {
+      if (haveClass()) return 'Your class is set for good.';
+      if (later['class']) return 'Class left for later. Pick one now if you would rather, then confirm.';
+      if (creating()) return 'Pick a class and confirm, or choose later and pick it in the world.';
+      return 'Pick a class, then confirm. One class, for good.';
+    }
+    if (section === 'profession') {
+      if (haveProf()) return 'Your profession is set. Ranks come from doing the work.';
+      if (later.profession) return 'Profession left for later. Pick one and its half now if you would rather, then confirm.';
+      if (creating()) return 'Pick a profession and its half and confirm, or choose later and pick it in the world.';
+      return 'Pick a profession and its half, then confirm.';
+    }
+    if (section === 'home') return haveHome() ? 'Home is set.' : 'Pick the town you will wake up in. A home is the one thing you must choose before you leave the hall.';
     return '';
   }
 
@@ -560,6 +671,7 @@
   function canConfirm() {
     var p = picked[section];
     if (!p || !p.row) return false;
+    if (p.row === LATER) return laterOffered(section);
     if (section === 'class') return !haveClass();
     if (section === 'home') return !haveHome() && creating();
     if (section === 'profession') {
@@ -575,6 +687,19 @@
   function confirm() {
     if (!canConfirm()) return;
     var p = picked[section];
+    if (p.row === LATER) {
+      // Nothing goes to the server: leaving a choice unmade changes nothing.
+      // The mark is this page's, the section list says "later", and the
+      // panel moves on to the next section.
+      var left = DATA[section].title;
+      later[section] = true;
+      picked[section] = null;
+      var i = sections.indexOf(section);
+      if (i >= 0 && i + 1 < sections.length) { goTo(sections[i + 1]); }
+      status = left + ' left for later. You can pick it in the world, from this panel.'; statusKind = 'ok';
+      draw();
+      return;
+    }
     var words;
     if (section === 'class') words = 'class ' + p.row;
     else if (section === 'home') words = 'town ' + p.row;
@@ -597,8 +722,8 @@
   function answered(before, after) {
     if (!pending) return;
     var p = pending; pending = null;
-    if (p.section === 'class' && after['class'] && !(before && before['class'])) { status = nameOf('class', after['class']) + ' it is.'; statusKind = 'ok'; }
-    else if (p.section === 'profession' && after.profession && !(before && before.profession)) { status = 'You are a ' + nameOf('profession', after.profession).toLowerCase() + ' now.'; statusKind = 'ok'; }
+    if (p.section === 'class' && after['class'] && !(before && before['class'])) { status = nameOf('class', after['class']) + ' it is.'; statusKind = 'ok'; later['class'] = false; }
+    else if (p.section === 'profession' && after.profession && !(before && before.profession)) { status = 'You are a ' + nameOf('profession', after.profession).toLowerCase() + ' now.'; statusKind = 'ok'; later.profession = false; }
     else if (p.section === 'home' && after.home && !(before && before.home)) { status = cap(after.home) + '. See you there.'; statusKind = 'ok'; }
     else if (p.section === 'tree') { status = 'Spent.'; statusKind = 'ok'; }
     else { status = ''; statusKind = ''; }
@@ -614,8 +739,7 @@
   */
   function onKey(e) {
     if (root.className === 'gone') return;
-    var n = section === 'home' ? ((mine && mine.towns) || []).length
-          : section === 'tree' ? 15 : rows().length;
+    var n = countRows();
     if (e.key === 'Escape') { api.close(); e.preventDefault(); return; }
     if (e.key === 'Enter') {
       if (section === 'tree') {
@@ -626,7 +750,8 @@
       else {
         // Enter on a row picks it, the second Enter confirms.
         var r = section === 'home' ? ((mine && mine.towns) || [])[rowAt] : rows()[rowAt];
-        if (r && section === 'class' && !haveClass()) { picked['class'] = { row: r.key, subs: [] }; draw(); }
+        if (!r && rowAt === rows().length && laterOffered(section)) { picked[section] = { row: LATER, subs: [] }; draw(); }
+        else if (r && section === 'class' && !haveClass()) { picked['class'] = { row: r.key, subs: [] }; draw(); }
         else if (r && section === 'home' && !haveHome()) { picked.home = { row: r.key, subs: [] }; draw(); }
       }
       e.preventDefault(); return;
@@ -635,8 +760,8 @@
     else if (e.key === 'ArrowUp') { rowAt = n ? (rowAt + n - 1) % n : 0; draw(); e.preventDefault(); }
     else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       var i = sections.indexOf(section);
-      section = sections[(i + (e.key === 'ArrowRight' ? 1 : sections.length - 1)) % sections.length];
-      rowAt = 0; draw(); e.preventDefault();
+      goTo(sections[(i + (e.key === 'ArrowRight' ? 1 : sections.length - 1)) % sections.length]);
+      draw(); e.preventDefault();
     }
   }
   window.addEventListener('keydown', onKey, true);
@@ -669,7 +794,7 @@
       comes, replaces the one here wholesale.
     */
     setData: function (table, got) {
-      if (table && typeof table === 'object') { DATA = table; }
+      if (table && typeof table === 'object') { DATA = table; tableGen++; }
       if (got && typeof got === 'object') {
         var before = mine;
         mine = (got.panel && typeof got.panel === 'object') ? got.panel : got;
@@ -677,14 +802,20 @@
         if (mine.note && mine.note.text && (!before || !before.note || before.note.at !== mine.note.at)) {
           status = 'No: ' + mine.note.text + '.'; statusKind = 'no'; pending = null;
         }
-        // Creation just ended: the third pick landed and the server moved you.
+        // Creation just ended: the home was confirmed and the server moved
+        // you. The panel keeps what it shows, says so, and shuts itself; the
+        // marks for later are cleared, since in the world there is no later.
         if (wasCreating && !mine.creating) {
           status = 'Off you go.'; statusKind = 'ok';
-          setTimeout(function () { api.close(); }, 1200);
+          later = {};
+          closing = true;
+          setTimeout(function () { closing = false; status = ''; statusKind = ''; api.close(); }, 1200);
         }
         wasCreating = !!mine.creating;
       }
-      if (root.className !== 'gone') { draw(); }
+      if (root.className !== 'gone') {
+        if (closing) { drawFoot(); } else { draw(); }
+      }
     }
   };
 
