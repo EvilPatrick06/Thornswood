@@ -70,6 +70,12 @@ $ShipMachineFiles = @(
     'Data\Platform\voice-port.txt',
     'Data\Platform\voice-status.txt',
     'Data\Platform\voice-ptt.txt',
+    # One person's signed join token for the voice room, written by the
+    # launcher (Voice.cs) beside the three above. Never listed here until 20
+    # September, which meant a pack built on a machine that had played would
+    # carry it. Sixty minute life, so a stale one opens nothing, but a token is
+    # a token.
+    'Data\Platform\voice-token.txt',
     # Written by the game on this machine every session. The second is the
     # light half of the same list, kept apart because the server's own list
     # drops light plugins and the first file has to match it positionally.
