@@ -253,11 +253,21 @@
    * This asks about the menus that actually mean something instead. The list is
    * skymp5-client's own badMenus, which it uses for the same purpose, plus the
    * few that take text.
+   *
+   * Every name here is Skyrim's own, and Skyrim is not consistent about the
+   * space: some have one and some do not, and Ui.isMenuOpen answers no to a
+   * name that is off by a character rather than saying it has never heard of
+   * it. 'Favorites Menu' was such a name. The quick favourites menu, the one
+   * on Q, is 'FavoritesMenu', so for as long as somebody had it open this file
+   * believed no menu was open at all: the chat key, the emote wheel, the stuck
+   * watchdog and the controls watchdog all treated it as open world. The magic
+   * menu was simply missing. Both are what skymp5-client's own isBadMenuShown
+   * asks for, spelled the way it spells them.
    */
   const KEYBOARD_MENUS = [
-    'Console', 'Crafting Menu', 'ContainerMenu', 'Dialogue Menu', 'Favorites Menu',
+    'Console', 'Crafting Menu', 'ContainerMenu', 'Dialogue Menu', 'FavoritesMenu',
     'GiftMenu', 'InventoryMenu', 'Journal Menu', 'Lockpicking Menu', 'Loading Menu',
-    'MapMenu', 'RaceSex Menu', 'StatsMenu', 'TweenMenu', 'Main Menu',
+    'MagicMenu', 'MapMenu', 'RaceSex Menu', 'StatsMenu', 'TweenMenu', 'Main Menu',
     'MessageBoxMenu', 'Book Menu', 'Sleep/Wait Menu', 'Barter Menu', 'Training Menu',
   ];
 
