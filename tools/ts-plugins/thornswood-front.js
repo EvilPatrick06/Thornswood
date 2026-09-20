@@ -2312,12 +2312,26 @@
     */
     if (what === 'skills:opened') { T.claimFocus('skills', true); return; }
     if (what === 'skills:closed') { T.claimFocus('skills', false); return; }
-    if (what === 'skills:ready') { log('the skills panel is in'); return; }
+    if (what === 'skills:ready') {
+      log('the skills panel is in');
+      // The panel mounts after the first property write of the session, so
+      // it asks the server to say again what this character already is. The
+      // answer comes back through the property's own updateOwner script.
+      tellServer('/pick refresh');
+      return;
+    }
     if (what.indexOf('skills:pick ') === 0) {
-      // Recorded and nothing else. The server owns every rule in the
-      // rulebook and none of it is built yet; a client that acted on this
-      // would be a client anybody could edit.
-      log('skills: picked', what.slice(12));
+      /*
+        Sent to the server as a slash line over the chat socket, the same
+        route a broken lockpick travels. The voice service stamps the profile
+        id from the connection, so what arrives is "this person picked",
+        never "this text claims to be". The server answers by rewriting the
+        property, which is what redraws the panel; a refusal comes back as a
+        chat line saying why.
+      */
+      const rest = what.slice(12).trim();
+      log('skills: picked', rest, '- sent as /pick');
+      tellServer('/pick ' + rest);
       return;
     }
 

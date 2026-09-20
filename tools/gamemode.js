@@ -2985,6 +2985,565 @@ log('gamemode loaded:',
 // ==== end thornswood gear check ====
 
 
+
+// ==== thornswood progression ====
+/*
+  The rulebook, as data and as rules. Patrick, 20 September.
+
+  This block owns what a character IS: their class, their profession and the
+  half of it they work, their rank in each thing they know, their spell points,
+  and their attribute tree. Nothing else in the gamemode decides any of that,
+  and nothing on the client does either. The client draws the table this block
+  sends it and sends back what was picked; every yes and every no is decided
+  here, because a client that decided any of it would be a client anybody
+  could edit.
+
+  Two halves. TABLE is the rulebook transcribed, and it is the one copy: the
+  client's panel carries a default of the same shape only so it draws
+  something before the server has spoken, and setData replaces it wholesale.
+  RULES is a set of pure functions over a character's state. They take a state
+  and an action and hand back either a new state or a reason, and they touch
+  nothing else, which is what makes them testable by lifting them out.
+
+  ON THE FLAT SIXTEEN. The old CHARGEN table has sixteen trades with a kit
+  each, and five of them, bard, merchant, priest, scholar and thief, have no
+  home in the rulebook. Characters exist carrying them. Nothing here deletes
+  that: the old class key stays on the actor untouched, and in THIS system
+  such a character simply has nothing chosen yet and is asked, the same as a
+  new one. What those five become is a decision for the list, entry 6, and
+  this block does not make it.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  // ------------------------------------------------------------ the table --
+  var RANKS = ['novice', 'advanced', 'expert', 'master'];
+
+  var CLASSES = {
+    hunter:   { name: 'Hunter',   only: 'loot an animal body' },
+    fisher:   { name: 'Fisher',   only: 'catch fish' },
+    gatherer: { name: 'Gatherer', only: 'harvest flora and materials out of the world' },
+    miner:    { name: 'Miner',    only: 'mine ore veins' },
+    farmer:   { name: 'Farmer',   only: 'plant and harvest crops' }
+  };
+
+  var SCHOOLS = ['destruction', 'restoration', 'alteration', 'conjuration', 'illusion'];
+
+  var PROFESSIONS = {
+    warrior:    { name: 'Warrior',    halves: { bulwark: 'Bulwark', berserker: 'Berserker' },
+                  perk: { key: 'warlord', name: 'Warlord' } },
+    mage:       { name: 'Mage',       halves: null, schools: 2, mastered: 3,
+                  perk: { key: 'archmage', name: 'Archmage' } },
+    alchemist:  { name: 'Alchemist',  halves: { blightbrewer: 'Blightbrewer', physicker: 'Physicker' },
+                  perk: { key: 'masterchemist', name: 'Master Chemist' } },
+    cook:       { name: 'Cook',       halves: { hearthcook: 'Hearthcook', confectioner: 'Confectioner' },
+                  perk: { key: 'grandchef', name: 'Grand Chef' } },
+    smith:      { name: 'Smith',      halves: { platewright: 'Platewright', edgewright: 'Edgewright' },
+                  perk: { key: 'mastercraft', name: 'Mastercraft' } },
+    enchanter:  { name: 'Enchanter',  halves: { bladebinder: 'Bladebinder', wardweaver: 'Wardweaver' },
+                  perk: { key: 'twinsouls', name: 'Twin Souls' } },
+    tailor:     { name: 'Tailor',     halves: { liverywright: 'Liverywright', haberdasher: 'Haberdasher' },
+                  perk: { key: 'masterweaver', name: 'Master Weaver' } },
+    woodworker: { name: 'Woodworker', halves: { charburner: 'Charburner', woodwright: 'Woodwright' },
+                  perk: { key: 'mastercarver', name: 'Master Carver' } }
+  };
+
+  var TREE = {
+    health:  { name: 'Health',  skills: {
+      vitality:   { name: 'Vitality',   perk: 'cheatdeath' },
+      fortitude:  { name: 'Fortitude',  perk: 'trollsblood' },
+      might:      { name: 'Might',      perk: 'devastatingblow' },
+      resilience: { name: 'Resilience', perk: 'unshakeable' },
+      toughness:  { name: 'Toughness',  perk: 'purifiedblood' } } },
+    magicka: { name: 'Magicka', skills: {
+      capacity:   { name: 'Capacity',   perk: 'archmagesvessel' },
+      clarity:    { name: 'Clarity',    perk: 'leylineattunement' },
+      potency:    { name: 'Potency',    perk: 'overcharge' },
+      ward:       { name: 'Ward',       perk: 'spellbreaker' },
+      efficiency: { name: 'Efficiency', perk: 'fontofmagic' } } },
+    stamina: { name: 'Stamina', skills: {
+      endurance:  { name: 'Endurance',  perk: 'tireless' },
+      vigor:      { name: 'Vigor',      perk: 'secondwind' },
+      agility:    { name: 'Agility',    perk: 'windwalker' },
+      burden:     { name: 'Burden',     perk: 'packmule' },
+      precision:  { name: 'Precision',  perk: 'lethalaim' } } }
+  };
+
+  /*
+    Numbers the rulebook gives, and one it does not.
+
+    SKILL_CAP is how many points fill a sub-skill and grant its perk. The
+    rulebook says "maxing out" and no number, so this is a placeholder to be
+    set by Patrick; every rule below reads it from here and nowhere else.
+  */
+  var LIMITS = {
+    secondaries: 2,       // novice in at most two other professions' halves
+    mageStartSpells: 2,   // spell points a mage begins with
+    mageMasterSpells: 2,  // more at Master, alongside the third school
+    collegeSemester: 2,   // points a mage earns per semester at the College
+    outsiderSemester: 1,  // points a non-mage earns per semester, novice only
+    outsiderSpells: 2,    // the most spells a non-mage can ever hold
+    skillCap: 5           // NOT IN THE RULEBOOK. Placeholder, see above.
+  };
+
+  var TABLE = { ranks: RANKS, classes: CLASSES, schools: SCHOOLS,
+                professions: PROFESSIONS, tree: TREE, limits: LIMITS };
+
+  // ------------------------------------------------------------ the state --
+  /*
+    What is stored on the actor. Every field optional; a missing one means
+    "not yet". Kept flat and JSON-plain because it goes through mp.set.
+
+      cls        'hunter' | ...                 set once
+      prof       'smith' | ...                  set once
+      half       'platewright' | ...            set once; a mage has none
+      schools    ['destruction','restoration']  a mage's chosen schools
+      ranks      { platewright: 'advanced', edgewright: 'novice', ... }
+                 every half this character has any standing in, own or taught.
+                 The sister half is added at novice the moment half is chosen.
+      taught     ['hearthcook']                 halves learned from a Master
+                 of another profession, novice only, at most LIMITS.secondaries
+      spells     { points: 2, known: [...] }    a mage's spell points and spells
+      tree       { vitality: 3, ... }           points spent per sub-skill
+      points     4                              unspent tree points
+  */
+  function fresh() {
+    return { cls: null, prof: null, half: null, schools: [],
+             ranks: {}, taught: [], spells: null, tree: {}, points: 0 };
+  }
+
+  function clone(s) { return JSON.parse(JSON.stringify(s || fresh())); }
+
+  function no(why) { return { ok: false, why: why }; }
+  function yes(state) { return { ok: true, state: state }; }
+
+  function halvesOf(prof) {
+    var p = PROFESSIONS[prof];
+    if (!p) { return []; }
+    if (p.halves) { return Object.keys(p.halves); }
+    return SCHOOLS.slice();
+  }
+
+  function sisterOf(prof, half) {
+    var hs = halvesOf(prof);
+    if (hs.length !== 2) { return null; }
+    return hs[0] === half ? hs[1] : hs[0];
+  }
+
+  function rankIndex(r) { return RANKS.indexOf(r); }
+
+  // ------------------------------------------------------------ the rules --
+
+  /** One class, from the five, and it is never changed. */
+  function pickClass(state, cls) {
+    var s = clone(state);
+    if (!CLASSES[cls]) { return no('no such class'); }
+    if (s.cls) { return no('you already have a class, and nobody has two'); }
+    s.cls = cls;
+    return yes(s);
+  }
+
+  /**
+    One profession and one half of it, in one step, because the half is not
+    a flavour. A mage picks schools instead of a half, exactly two of them.
+    The sister half arrives at novice for nothing; the chosen half starts at
+    novice too, because everybody does.
+  */
+  function pickProfession(state, prof, halfOrSchools) {
+    var s = clone(state);
+    var p = PROFESSIONS[prof];
+    if (!p) { return no('no such profession'); }
+    if (s.prof) { return no('you already have a profession, and nobody has two'); }
+
+    if (prof === 'mage') {
+      var sch = Array.isArray(halfOrSchools) ? halfOrSchools.slice() : [];
+      if (sch.length !== p.schools) { return no('a mage picks ' + p.schools + ' schools'); }
+      for (var i = 0; i < sch.length; i++) {
+        if (SCHOOLS.indexOf(sch[i]) === -1) { return no('no such school: ' + sch[i]); }
+        if (sch.indexOf(sch[i]) !== i) { return no('the same school twice'); }
+      }
+      s.prof = 'mage';
+      s.half = null;
+      s.schools = sch;
+      for (var j = 0; j < sch.length; j++) { s.ranks[sch[j]] = 'novice'; }
+      s.spells = { points: LIMITS.mageStartSpells, known: [] };
+      return yes(s);
+    }
+
+    var half = String(halfOrSchools || '');
+    if (!p.halves[half]) { return no('no such half of ' + p.name); }
+    s.prof = prof;
+    s.half = half;
+    s.ranks[half] = 'novice';
+    var sister = sisterOf(prof, half);
+    if (sister) { s.ranks[sister] = 'novice'; }
+    return yes(s);
+  }
+
+  /**
+    A Master of a half teaches somebody from ANOTHER profession that half, at
+    novice, and never further. At most LIMITS.secondaries times. The sister
+    half does not count and cannot be taught this way, because it is already
+    known; going past novice in it is rankUp under a Master of it, below.
+  */
+  function teach(state, teacherState, half) {
+    var s = clone(state);
+    if (!s.prof) { return no('choose your own profession before learning anybody else’s'); }
+    var tp = teacherState && teacherState.prof;
+    if (!tp || halvesOf(tp).indexOf(half) === -1) { return no('the teacher does not work that half'); }
+    if (teacherState.ranks[half] !== 'master') { return no('only a Master can teach, and they are not one in that half'); }
+    if (halvesOf(s.prof).indexOf(half) !== -1) {
+      return no('that is your own profession; a Master of it can raise your rank, not teach you the basics');
+    }
+    if (s.taught.indexOf(half) !== -1) { return no('you already know that'); }
+    if (s.taught.length >= LIMITS.secondaries) {
+      return no('you may only learn ' + LIMITS.secondaries + ' other trades, and you have');
+    }
+    s.taught.push(half);
+    s.ranks[half] = 'novice';
+    return yes(s);
+  }
+
+  /**
+    Rank goes up one step in a half. Only ever one step, only in a half the
+    character has standing in. Three ceilings: a taught half never leaves
+    novice; the sister half needs a Master of it to go past novice; and a
+    mage's third school and extra points arrive with Master.
+
+    Who is allowed to CALL this is the server's business, when the work has
+    been done. This only says whether the step itself is legal.
+  */
+  function rankUp(state, half, masterState) {
+    var s = clone(state);
+    var cur = s.ranks[half];
+    if (!cur) { return no('no standing in that'); }
+    if (cur === 'master') { return no('already a Master'); }
+    if (s.taught.indexOf(half) !== -1) { return no('a trade learned from another profession never goes past novice'); }
+
+    var own = s.half === half || s.schools.indexOf(half) !== -1;
+    var sister = s.prof && sisterOf(s.prof, s.half) === half;
+    if (sister && !own) {
+      var ok = masterState && masterState.ranks && masterState.ranks[half] === 'master';
+      if (!ok) { return no('past novice in your sister half needs a Master of it to take you on'); }
+    }
+
+    var next = RANKS[rankIndex(cur) + 1];
+    s.ranks[half] = next;
+
+    if (s.prof === 'mage' && own && next === 'master') {
+      s.spells.points += LIMITS.mageMasterSpells;
+    } else if (s.prof === 'mage' && own) {
+      s.spells.points += 1;   // one more spell point with every rank
+    }
+    return yes(s);
+  }
+
+  /** A mage at Master picks the third school. Once. */
+  function pickThirdSchool(state, school) {
+    var s = clone(state);
+    if (s.prof !== 'mage') { return no('not a mage'); }
+    if (SCHOOLS.indexOf(school) === -1) { return no('no such school'); }
+    if (s.schools.indexOf(school) !== -1) { return no('already one of yours'); }
+    if (s.schools.length >= PROFESSIONS.mage.mastered) { return no('a mage holds ' + PROFESSIONS.mage.mastered + ' schools at most'); }
+    var isMaster = false;
+    for (var i = 0; i < s.schools.length; i++) { if (s.ranks[s.schools[i]] === 'master') { isMaster = true; } }
+    if (!isMaster) { return no('the third school comes with Master'); }
+    s.schools.push(school);
+    s.ranks[school] = 'novice';
+    return yes(s);
+  }
+
+  /** One point into one sub-skill. The perk is derived, not stored. */
+  function spendPoint(state, skill) {
+    var s = clone(state);
+    var found = null;
+    for (var attr in TREE) { if (TREE[attr].skills[skill]) { found = TREE[attr].skills[skill]; } }
+    if (!found) { return no('no such sub-skill'); }
+    if (s.points <= 0) { return no('no points to spend'); }
+    var have = s.tree[skill] || 0;
+    if (have >= LIMITS.skillCap) { return no('that one is full'); }
+    s.tree[skill] = have + 1;
+    s.points -= 1;
+    return yes(s);
+  }
+
+  /** Every perk this character holds right now, from state alone. */
+  function perks(state) {
+    var out = [];
+    var s = state || fresh();
+    if (s.prof && s.ranks) {
+      var p = PROFESSIONS[s.prof];
+      var own = s.half ? [s.half] : (s.schools || []);
+      for (var i = 0; i < own.length; i++) {
+        if (s.ranks[own[i]] === 'master' && p && p.perk) { out.push(p.perk.key); break; }
+      }
+    }
+    for (var attr in TREE) {
+      for (var k in TREE[attr].skills) {
+        if ((s.tree && s.tree[k]) >= LIMITS.skillCap) { out.push(TREE[attr].skills[k].perk); }
+      }
+    }
+    return out;
+  }
+
+  /**
+    Can this character do this half's work at this rank. The one question
+    every crafting and gathering gate asks. A taught half answers yes only at
+    novice; anything they have no standing in answers no.
+  */
+  function canWork(state, half, rank) {
+    var s = state || fresh();
+    var have = s.ranks && s.ranks[half];
+    if (!have) { return false; }
+    return rankIndex(have) >= rankIndex(rank || 'novice');
+  }
+
+  /** The class verbs. The only question the five gates ask. */
+  function canDo(state, verb) {
+    var s = state || fresh();
+    var by = { loot: 'hunter', fish: 'fisher', harvest: 'gatherer', mine: 'miner', farm: 'farmer' };
+    return !!s.cls && s.cls === by[verb];
+  }
+
+  g.__thornswoodProgression = {
+    TABLE: TABLE, fresh: fresh, clone: clone,
+    pickClass: pickClass, pickProfession: pickProfession, teach: teach,
+    rankUp: rankUp, pickThirdSchool: pickThirdSchool, spendPoint: spendPoint,
+    perks: perks, canWork: canWork, canDo: canDo,
+    halvesOf: halvesOf, sisterOf: sisterOf
+  };
+})();
+// ==== end thornswood progression ====
+
+// ==== thornswood character ====
+/*
+  What a character IS, held in one place and pushed to the one screen that
+  shows it.
+
+  The rules above decide every yes and no. This block decides nothing; it
+  stores the answer on the actor as 'thornswoodCharacter', turns a /pick or a
+  /spend into a call on the rules, and tells the person why when the answer
+  is no. It is the only writer of that property.
+
+  THE CHANNEL TO THE PANEL is the property's updateOwner script, and it is the
+  only one there is. A visible custom property reaches the client solely
+  through that script, run inside skymp5-client with ctx.sp, ctx.value and
+  ctx.state; there is no other reader. Until 20 September no property here
+  had one, which is why the K panel could draw the rulebook and never learn a
+  thing about the person in front of it. The script here hands ctx.value to
+  window.thornswoodSkills.setData through executeJavaScript, and a panel that
+  mounts after the first write asks for it again with /pick refresh.
+
+  THE OLD KEYS. Characters made through the launcher carry state.class (the
+  trade), state.half and state.gathering on thornswoodChargen, in the
+  launcher's own names: tank, brawler, harm, mend, dinner, dessert, armour,
+  weapons, weapon, apparel, robes, common. The rulebook's names are the ones
+  on the public page and the ones the rules use, so the launcher's are mapped
+  on first sight and never written back. Five old trades have no home in the
+  rulebook, bard, merchant, priest, scholar, thief: a character carrying one
+  keeps it on the old property untouched and starts this system with no
+  profession, the same as somebody new. That is entry 6's decision to make
+  and this block does not make it.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var P = g.__thornswoodProgression;
+  if (!P) { console.log('[thornswood character] the rules block is missing, nothing registered'); return; }
+
+  var CHAR_PROPERTY = 'thornswoodCharacter';
+
+  function clog() {
+    var a = Array.prototype.slice.call(arguments);
+    console.log('[thornswood character] ' + a.join(' '));
+  }
+
+  // The launcher's half names, and the trades that map straight across.
+  var HALF_MAP = {
+    tank: 'bulwark', brawler: 'berserker',
+    harm: 'blightbrewer', mend: 'physicker',
+    dinner: 'hearthcook', dessert: 'confectioner',
+    armour: 'platewright', weapons: 'edgewright',
+    weapon: 'bladebinder', apparel: 'wardweaver',
+    robes: 'liverywright', common: 'haberdasher'
+  };
+
+  function mapHalf(h) {
+    h = String(h || '').toLowerCase();
+    if (!h) { return ''; }
+    if (HALF_MAP[h]) { return HALF_MAP[h]; }
+    return h;   // already a rulebook name, or unknown and refused below
+  }
+
+  /*
+    What the panel is told. Not the whole state: the panel marks what is
+    yours and shows rank and points, and nothing on the client needs more.
+  */
+  function forPanel(s) {
+    if (!s) { return null; }
+    return {
+      profession: s.prof || null,
+      'class': s.cls || null,
+      half: s.half || null,
+      schools: s.schools || [],
+      ranks: s.ranks || {},
+      tree: s.tree || {},
+      points: s.points || 0,
+      perks: P.perks(s)
+    };
+  }
+
+  /*
+    The client side script. It runs inside skymp5-client every time the
+    property changes for its owner, with ctx.value the new value. Everything
+    it does is guarded, because a page that has not mounted the panel yet is
+    the normal case for the first second of a session.
+  */
+  function updateOwnerScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || typeof v !== "object") { return; }',
+      '    var src = "try{window.thornswoodSkills&&window.thornswoodSkills.setData(null," + JSON.stringify(v) + ");}catch(e){}";',
+      '    ctx.sp.browser.executeJavaScript(src);',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  try {
+    mp.makeProperty(CHAR_PROPERTY, {
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: updateOwnerScript(),
+      updateNeighbor: ''
+    });
+    clog('property registered with an updateOwner script,', updateOwnerScript().length, 'chars');
+  } catch (e) {
+    // already made by a previous load; the script cannot be changed after
+    // the fact, so a changed script needs a server restart, which a deploy is.
+  }
+
+  function readState(actorId) {
+    var v = null;
+    try { v = mp.get(actorId, CHAR_PROPERTY); } catch (e) { v = null; }
+    if (v && typeof v === 'object' && v.v === 1) { return v; }
+    return null;
+  }
+
+  function writeState(actorId, s) {
+    s.v = 1;
+    // forPanel is what the client sees; the rules state is what is stored.
+    // Both travel in the one property so the panel never sees a half state.
+    s.panel = forPanel(s);
+    try { mp.set(actorId, CHAR_PROPERTY, s); } catch (e) { clog('could not write', actorId.toString(16), e); }
+    return s;
+  }
+
+  /*
+    First sight of an actor with no character state: build one from the old
+    chargen fields if they are there. Each old key is applied through the
+    rules, so an old value the rules refuse is simply not carried, and the
+    log says which.
+  */
+  function migrate(actorId) {
+    var s = P.fresh();
+    var old = null;
+    try { old = mp.get(actorId, 'thornswoodChargen'); } catch (e) { old = null; }
+    if (old && typeof old === 'object') {
+      var trade = String(old['class'] || '').toLowerCase();
+      var half = mapHalf(old.half);
+      var gathering = String(old.gathering || '').toLowerCase();
+      var r;
+      if (gathering) {
+        r = P.pickClass(s, gathering);
+        if (r.ok) { s = r.state; } else { clog('migrate', actorId.toString(16), 'old class', gathering, 'refused:', r.why); }
+      }
+      if (trade && P.TABLE.professions[trade]) {
+        if (trade === 'mage') {
+          clog('migrate', actorId.toString(16), 'was a mage under the old keys; schools were never recorded, so they will be asked for');
+        } else if (half) {
+          r = P.pickProfession(s, trade, half);
+          if (r.ok) { s = r.state; } else { clog('migrate', actorId.toString(16), 'old trade', trade, half, 'refused:', r.why); }
+        } else {
+          clog('migrate', actorId.toString(16), 'old trade', trade, 'had no half recorded, so it will be asked for');
+        }
+      } else if (trade) {
+        clog('migrate', actorId.toString(16), 'old trade', trade, 'has no home in the rulebook; left on the old property, nothing chosen here');
+      }
+    }
+    return writeState(actorId, s);
+  }
+
+  function stateOf(actorId) {
+    return readState(actorId) || migrate(actorId);
+  }
+
+  /*
+    The commands. Called from handle() in the chat block with the same
+    arguments it has, so the profile id is the one the voice service stamped
+    from the connection and not a number in the text.
+
+      /pick refresh                      send the panel what it already is
+      /pick class hunter
+      /pick profession smith platewright
+      /pick profession mage destruction,restoration
+      /spend vitality
+
+    Returns true when the word was one of these, so handle() stops.
+  */
+  function command(word, parts, actorId, profileId, toProfile) {
+    if (word !== '/pick' && word !== '/spend') { return false; }
+    if (!actorId) {
+      toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
+      return true;
+    }
+    var s = stateOf(actorId);
+    var r = null;
+
+    if (word === '/pick') {
+      var what = String(parts[1] || '').toLowerCase();
+      if (what === 'refresh') {
+        writeState(actorId, s);   // the write is what fires updateOwner
+        return true;
+      }
+      if (what === 'class') {
+        r = P.pickClass(s, String(parts[2] || '').toLowerCase());
+      } else if (what === 'profession') {
+        var prof = String(parts[2] || '').toLowerCase();
+        var rest = String(parts[3] || '').toLowerCase();
+        r = (prof === 'mage')
+          ? P.pickProfession(s, prof, rest ? rest.split(',') : [])
+          : P.pickProfession(s, prof, mapHalf(rest));
+      } else {
+        toProfile(profileId, 'Pick what? class, or profession.');
+        return true;
+      }
+    } else {
+      r = P.spendPoint(s, String(parts[1] || '').toLowerCase());
+    }
+
+    if (!r.ok) {
+      toProfile(profileId, 'No: ' + r.why + '.');
+      clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'refused:', r.why);
+      return true;
+    }
+    writeState(actorId, r.state);
+    clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'accepted');
+    return true;
+  }
+
+  g.__thornswoodCharacter = {
+    PROPERTY: CHAR_PROPERTY, stateOf: stateOf, writeState: writeState,
+    forPanel: forPanel, mapHalf: mapHalf, migrate: migrate, command: command,
+    updateOwnerScript: updateOwnerScript
+  };
+  clog('ready');
+})();
+// ==== end thornswood character ====
+
 // ==== thornswood chat commands ====
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
@@ -3152,6 +3711,13 @@ log('gamemode loaded:',
     // rather than a number in the text, so the worst a modified client can do
     // with this is throw away its own lockpicks. It is capped anyway, and
     // takeItem refuses when the pack does not hold that many.
+    // Profession, class and the tree. The character block owns these
+    // words; it gets the same actor and profile id this function has.
+    try {
+      var charCmd = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCharacter;
+      if (charCmd && charCmd.command(word, parts, actorId, profileId, toProfile)) { return; }
+    } catch (eChar) { log('character command failed:', eChar); }
+
     if (word === '/tspicks') {
       if (!needCharacter()) { return; }
       var picks = Math.max(1, Math.min(20, Number(parts[1]) || 1));
@@ -3743,6 +4309,6 @@ log('gamemode loaded:',
     try { restartTick(); } catch (e) { log('restart tick threw:', e); }
   }, 1500);
 
-  console.log('[thornswood] chat commands running: /ooc, /where, /tp, /help, /restart');
+  console.log('[thornswood] chat commands running: /ooc, /where, /tp, /help, /restart, /pick, /spend');
 })();
 // ==== end thornswood chat commands ====

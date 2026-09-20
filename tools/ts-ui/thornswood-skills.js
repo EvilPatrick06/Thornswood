@@ -216,15 +216,35 @@
 
   function rows() { return (DATA[tab] && DATA[tab].rows) || []; }
 
+  /* What the server says this character is. It arrives through the
+     property's updateOwner script as setData(null, mine), and it is the only
+     thing on this page that is not the rulebook. */
+  function mineHalfText(r) {
+    if (tab !== 'profession' || chosen.profession !== r.key) { return ''; }
+    var ranks = chosen.ranks || {};
+    if (r.key === 'mage') {
+      var sch = chosen.schools || [];
+      return sch.map(function (k) { return k + ' ' + (ranks[k] || 'novice'); }).join(', ');
+    }
+    return chosen.half ? (chosen.half + ' ' + (ranks[chosen.half] || 'novice')) : '';
+  }
+
   function drawMid() {
     elMid.textContent = '';
     var note = DATA[tab] && DATA[tab].note;
     if (note) { elMid.appendChild(el('p', 'note', note)); }
+    if (tab === 'tree') {
+      var pts = chosen.points || 0;
+      elMid.appendChild(el('p', 'note', pts === 1 ? '1 point to spend.' : pts + ' points to spend.'));
+    }
     rows().forEach(function (r, i) {
-      var d = el('div', 'item' + (i === rowAt ? ' at' : '') +
-                        (chosen[tab] === r.key ? ' picked' : ''));
+      var mine = chosen[tab] === r.key;
+      var d = el('div', 'item' + (i === rowAt ? ' at' : '') + (mine ? ' picked' : ''));
       d.appendChild(el('span', '', r.name));
-      if (chosen[tab] === r.key) { d.appendChild(el('span', 'tick', 'yours')); }
+      if (mine) {
+        var detail = mineHalfText(r);
+        d.appendChild(el('span', 'tick', detail ? 'yours, ' + detail : 'yours'));
+      }
       d.onclick = function () { rowAt = i; draw(); };
       elMid.appendChild(d);
     });
