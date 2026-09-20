@@ -1154,23 +1154,81 @@ if ($blank.Count) {
 }
 
 # ------------------------------------------------------------ the server copy
-# ModCheck compares against the server's own Data/loadorder.txt. Change the
-# plugin list here and forget that file, and the server refuses everyone,
-# including whoever changed it. So the file to upload is written out every time
-# the list moves, already in the form the server parses.
+# This used to write Profile\Default\loadorder.txt out to _dist\server and tell
+# the shipper to upload it to the server's Data folder. Do not put that back.
+#
+# It was wrong in three ways at once. The file it wrote carries EVERY entry,
+# 103 of them today, while Deploy-Gamemode.ps1 deliberately drops light plugins
+# from the server's list and cascades that drop to anything mastering them, so
+# the two disagree by construction and uploading one over the other breaks the
+# server rather than fixing it. Nothing packed _dist\server into a release, so
+# the file only ever sat on the shipping machine waiting to tempt somebody. And
+# the mechanism it named, ModCheck comparing against Data/loadorder.txt, exists
+# nowhere else in this repo: the server's list lives in the loadOrder array of
+# server-settings.json, which Deploy-Gamemode.ps1 writes.
+#
+# What replaces it is a check rather than a file. Nothing here can fix a stale
+# server list, because computing it means the light plugin cascade and that
+# logic belongs in one place. So this says whether the list the server is
+# configured with is older than the one just published, which is the whole
+# question, and names the two commands that settle it.
 if ($profileChanged.Count) {
-    $serverDir = Join-Path $DistDir 'server'
-    $null = New-Item -ItemType Directory -Force -Path $serverDir
-    $lo = Join-Path $ProfileDir 'Default\loadorder.txt'
-    $names = @(Get-Content $lo | ForEach-Object { $_.Trim() } |
-               Where-Object { $_ -and -not $_.StartsWith('#') })
-    $serverFile = Join-Path $serverDir 'loadorder.txt'
-    [IO.File]::WriteAllLines($serverFile, [string[]]$names, (New-Object Text.UTF8Encoding($false)))
-
     Head 'The server needs this too'
-    Say "  $serverFile  -  $($names.Count) plugins" 'Yellow'
-    Say "  Upload it to the server's Data folder, replacing what is there, then restart." 'Yellow'
-    Say '  If ModCheck is on, the server turns away anyone with the new list until you do.' 'Yellow'
+
+    # The same default Deploy-Gamemode.ps1 carries. Absent on a machine that
+    # does not build the server, which is fine: the advice still stands.
+    $serverDist = 'C:\Thornswood-Dev\skymp\build\dist\server'
+    $serverSettings = Join-Path $serverDist 'server-settings.json'
+    $profileList = Join-Path $ProfileDir 'Default\loadorder.txt'
+
+    Say '  The plugin list moved, so the server is now configured for the old one.' 'Yellow'
+
+    if (Test-Path -LiteralPath $serverSettings) {
+        $settingsAt = (Get-Item -LiteralPath $serverSettings).LastWriteTimeUtc
+        $profileAt = if (Test-Path -LiteralPath $profileList) {
+            (Get-Item -LiteralPath $profileList).LastWriteTimeUtc
+        } else { [DateTime]::MinValue }
+
+        if ($profileAt -gt $settingsAt) {
+            Say ("  STALE. The server's list was written {0:yyyy-MM-dd HH:mm} and the plugin list changed {1:yyyy-MM-dd HH:mm}." -f $settingsAt, $profileAt) 'Yellow'
+        } else {
+            Say ("  The server's list was written {0:yyyy-MM-dd HH:mm}, after the plugin list. It may already be right." -f $settingsAt) 'Gray'
+        }
+
+        # A plugin the server still expects that is no longer in the profile is
+        # a definite fault in the dangerous direction, and it needs no cascade
+        # logic to spot. The other direction cannot be judged from here,
+        # because a plugin missing from the server's list may have been dropped
+        # on purpose for being light.
+        try {
+            $cfg = Get-Content -LiteralPath $serverSettings -Raw | ConvertFrom-Json
+            $have = @{}
+            foreach ($line in (Get-Content -LiteralPath $profileList -EA SilentlyContinue)) {
+                $n = $line.Trim()
+                if ($n -and -not $n.StartsWith('#')) { $have[$n.TrimStart('*')] = $true }
+            }
+            $gone = @()
+            foreach ($entry in @($cfg.loadOrder)) {
+                $leaf = [IO.Path]::GetFileName(([string]$entry).Replace('/', '\'))
+                if ($leaf -and -not $have.ContainsKey($leaf)) { $gone += $leaf }
+            }
+            if ($gone.Count) {
+                Say "  The server is configured for $($gone.Count) plugin(s) that are no longer in the list:" 'Red'
+                foreach ($g in $gone | Select-Object -First 8) { Say "    $g" 'Red' }
+                if ($gone.Count -gt 8) { Say "    and $($gone.Count - 8) more" 'Red' }
+            }
+        } catch {
+            Say "  Could not read the server's list to compare: $_" 'DarkGray'
+        }
+    } else {
+        Say "  No server build on this machine to check against ($serverDist)." 'DarkGray'
+    }
+
+    Say '  Put it right with, in this order:' 'Yellow'
+    Say '      .\tools\Deploy-Gamemode.ps1' 'Yellow'
+    Say '      .\tools\Publish-Server.ps1 "the load order moved"' 'Yellow'
+    Say '  Deploy-Gamemode recomputes the list AND the start point new characters' 'Yellow'
+    Say '  spawn at, which is a raw form id that rots whenever the order moves.' 'Yellow'
 }
 
 # ------------------------------------------------------------ push
