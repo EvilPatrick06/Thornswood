@@ -184,12 +184,18 @@ namespace Thornswood
             return null;
         }
 
-        /// <summary>The next free slot number, 1 on an empty list.</summary>
+        /// <summary>
+        /// The lowest free slot number, 1 on an empty list. The number only
+        /// orders the menu's list, and a forgotten character's number is free
+        /// again. "Highest plus one" climbed past the allowance: on 20
+        /// September the menu read 1 empty, 2 empty, 3, 4, 5 for an account
+        /// with three slots and three characters.
+        /// </summary>
         static int NextSlot(List<Row> rows)
         {
-            int high = 0;
-            foreach (Row r in rows) if (r.Slot > high) high = r.Slot;
-            return high + 1;
+            int n = 1;
+            while (Find(rows, n) != null) n++;
+            return n;
         }
 
         /// <summary>

@@ -205,29 +205,26 @@
     that exists is not hidden over a role change. Empty slots up to the
     allowance offer a new character.
   */
+  /*
+    The stored slot number only orders the list. What is drawn is 1 to n for
+    the characters there are, then an empty card for each place left under
+    the allowance, and nothing past it. Drawing by the stored number showed
+    "1 empty, 2 empty, 3, 4, 5" on 20 September once two characters had been
+    forgotten and three new ones made, and offered a fourth and a fifth
+    character to an account with three slots.
+  */
   function slots() {
+    var list = chars.slice();
+    list.sort(function (a, b) {
+      var sa = Number(a.slot) || 0, sb = Number(b.slot) || 0;
+      if (sa && sb && sa !== sb) return sa - sb;
+      if (sa && !sb) return -1;
+      if (!sa && sb) return 1;
+      return String(b.lastPlayed || '') < String(a.lastPlayed || '') ? -1 : 1;
+    });
     var out = [];
-    var byslot = {};
-    var extra = [];
-    chars.forEach(function (c) {
-      var s = Number(c.slot) || 0;
-      if (s > 0 && !byslot[s]) byslot[s] = c; else extra.push(c);
-    });
-    // A launcher that numbered nothing (before 20 September) or two rows
-    // on one number: the rest take the lowest free slots, in order.
-    var unplaced = extra; extra = [];
-    unplaced.forEach(function (c) {
-      var free = 0;
-      for (var j = 1; j <= SLOTS && !free; j++) if (!byslot[j]) free = j;
-      if (free) byslot[free] = c; else extra.push(c);
-    });
-    var top = SLOTS;
-    for (var k in byslot) if (Number(k) > top) top = Number(k);
-    for (var i = 1; i <= top; i++) {
-      if (byslot[i]) out.push({ n: i, id: Number(byslot[i].profileId) || 0, c: byslot[i] });
-      else if (i <= SLOTS) out.push({ n: i, id: spare, c: null });
-    }
-    extra.forEach(function (c) { out.push({ n: out.length + 1, id: Number(c.profileId) || 0, c: c }); });
+    list.forEach(function (c) { out.push({ n: out.length + 1, id: Number(c.profileId) || 0, c: c }); });
+    while (out.length < SLOTS) out.push({ n: out.length + 1, id: spare, c: null });
     return out;
   }
 
