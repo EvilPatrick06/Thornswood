@@ -194,8 +194,12 @@ if (-not $Now) {
                 $(if ($Minutes -eq 1) { 'minute' } else { 'minutes' }))
     $ask = Join-Path $Here 'Request-Restart.ps1'
     if (Test-Path -LiteralPath $ask) {
+      # -RestartFollows because this script stops and starts the task a few
+      # lines below. Request-Restart refuses a kicking mode without it, and
+      # that refusal is the point: a kick with no restart behind it is what
+      # leaves people in an empty world.
       & $ask -Minutes $Minutes -Mode $Mode -Why $Why -Vps $Vps -User $User `
-             -Data "$Root/data"
+             -Data "$Root/data" -RestartFollows
     } else {
       Write-Host '  Request-Restart.ps1 is missing, warning nobody' -ForegroundColor Yellow
     }
