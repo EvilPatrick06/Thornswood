@@ -42,11 +42,26 @@ namespace Thornswood
         {
             var l = new List<Rule>();
 
-            // Skyrim Souls keeps the world running while a menu is open. Two of
-            // its menus break badly in this build: the favourites list crashes
-            // the game through Inventory Interface Information Injector, and
-            // the Tab menu locks up with no cursor and no way out.
-            l.Add(new Rule(P("SkyrimSoulsRE.ini"), "bFavoritesMenu", "false", "the favourites menu crash"));
+            // Skyrim Souls keeps the world running while a menu is open, which
+            // is the point of it here: everybody else's world keeps running
+            // whatever your menu is doing.
+            //
+            // The favourites list was pinned back to paused to stop it crashing
+            // through Inventory Interface Information Injector. It did not. All
+            // seven crash logs from 18 and 19 Sep were taken with this set to
+            // false and the fault is identical in every one, so it bought
+            // nothing and cost a pause nobody asked for, which is what Patrick
+            // reported when the Q menu froze the world around him.
+            //
+            // The library is the real fix and OwnGame.Skip now keeps it out of
+            // the folder, so this goes back to unpaused. It has to be written
+            // rather than dropped: Skyrim Souls writes its own ini back on the
+            // way out, so removing the rule would leave our false in the file
+            // for good.
+            //
+            // The Tab menu stays paused. That one locks up with no cursor and
+            // no way out, and nothing here has changed about it.
+            l.Add(new Rule(P("SkyrimSoulsRE.ini"), "bFavoritesMenu", "true", "the favourites menu pausing the world for nothing"));
             l.Add(new Rule(P("SkyrimSoulsRE.ini"), "bTweenMenu",     "false", "the Tab menu locking up"));
 
             // Open Animation Replacer draws two things over the main menu and
