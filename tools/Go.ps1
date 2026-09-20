@@ -104,6 +104,18 @@ if (Test-Path -LiteralPath $uiSrc) {
     Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
     Note $f.Name
   }
+  # The page itself. The front's zip above carries the plain one; ours is
+  # the same page plus the two lines that draw the character choice before
+  # any plugin runs, and it has to land after the zip or the zip's copy wins.
+  # Until 20 September it never landed at all: the overlays loop took *.js
+  # and the page sat in the repo with nothing carrying it.
+  $page = Join-Path $uiSrc 'index.html'
+  if (Test-Path -LiteralPath $page) {
+    Copy-Item -LiteralPath $page -Destination (Join-Path $ui 'index.html') -Force
+    Note 'index.html (ours, over the front''s)'
+  } else {
+    Bad 'ts-ui\index.html is missing, so the menu choice cannot draw before the plugin runs'
+  }
   # The dev test track lives beside the overlays. It goes into the game
   # folder like them; whether it leaves the machine is Ship-Rules' call, and
   # a main pack never carries it.
