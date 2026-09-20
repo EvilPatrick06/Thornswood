@@ -87,9 +87,11 @@ before code; a Claude does not settle it for them.
   requests sat blocked until he overrode it with `--admin`. This makes the
   real practice the written one.
 - Djinn's work still goes on a branch: `git checkout -b djinn/what-it-is`.
-  Small commits, plain messages. Push the branch and open a pull request
-  (`gh pr create --fill`). Patrick reads it; it is merged into main from
-  GitHub, never pushed over main.
+  Small commits, plain messages. Push the branch and open a pull request,
+  standing on the branch, not on main:
+  `git checkout djinn/what-it-is; git push -u origin djinn/what-it-is; gh pr create --fill`.
+  Patrick reads it; it is merged into main from GitHub, never pushed over
+  main.
   The branches opened before 17 Sep use a `gavin/` prefix; they are the same
   person and were left alone rather than renamed under open pull requests.
 - One fix per commit either way. Going straight to main is not permission to
@@ -156,6 +158,40 @@ Show the command; let them run it. Never start the launcher or the game.
 Measure before claiming a cause: read Profile\launcher.log, look at the file,
 check timestamps, say what you saw. When the doc and the machine disagree,
 say so and ask.
+
+### Every reply ends with the commands, in order, and what each one is for
+
+Asked for by Patrick on 19 Sep, after four pushes went out and not one pull
+request was created, because the commands in the reply were missing a
+`git checkout` and nobody could tell from reading them.
+
+So a reply that leaves anything for a person to run ends with a block of the
+exact commands, in the order they are run, each with a line saying what it
+does and what it should print when it worked. No "then open a pull request",
+no "deploy it": the literal line, copy and paste, from whatever directory the
+reply says to start in. If a command needs a different directory, the `cd` is
+one of the commands. If one of them is Patrick's rather than Djinn's, say so
+on that line, because the two of them run different halves.
+
+Say which commands change something outside this machine, since those are
+the ones that cannot be taken back: a push, a pull request, any Deploy-*,
+Publish-*, Request-Restart, or Ship.
+
+Run the whole block yourself in your head before you write it, against what
+`git status` and `git branch --show-current` actually say right now. A
+command that assumes a branch is checked out when it is not is the failure
+this section exists for.
+
+### Traps in the commands themselves
+
+- `gh pr create` reads the CHECKED OUT branch as the head of the pull
+  request. `git push -u origin <branch>` pushes the branch and does not
+  check it out, so `git push -u origin <branch> && gh pr create --fill`
+  run from main fails with "head branch main is the same as base branch
+  main". Check the branch out first, or pass `--head <branch>`.
+- `gh pr create --fill` also warns about uncommitted changes and carries on.
+  `Claude outputs\` and `art-latest.txt` are untracked here and show up in
+  that warning every time; they are not part of the pull request.
 
 ## Where things are
 
