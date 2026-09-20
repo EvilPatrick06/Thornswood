@@ -65,3 +65,24 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "  server told: $what" -ForegroundColor Green
+
+# The kick is only half of it, and the missing half is not obvious from here.
+#
+# 'update' and 'restart' both end in everybody being disconnected. A kick with
+# no process restart behind it leaves the kicked character in a state where the
+# reconnecting client is never sent the world: they come back to an empty
+# Skyrim with no NPCs in it, and they stay that way until the process is
+# bounced. gamemode.js records 13 reconnects like that on 17 September, and it
+# was reported again on 20 September.
+#
+# Deploy-Server.ps1 calls this and then stops and starts the task, so it is
+# fine. Running it by hand is where the half happens, which is why this says so
+# rather than assuming whoever typed it knows.
+if ($Mode -ne 'notice') {
+  Write-Host ''
+  Write-Host '  This mode ends in a kick, and a kick on its own is not enough.' -ForegroundColor Yellow
+  Write-Host '  Anybody kicked without the process being restarted comes back to' -ForegroundColor Yellow
+  Write-Host '  an empty world with no NPCs and stays that way. Follow it with:' -ForegroundColor Yellow
+  Write-Host '      .\tools\Restart-Server.ps1' -ForegroundColor Yellow
+  Write-Host '  unless you are running Deploy-Server.ps1, which does it for you.' -ForegroundColor Yellow
+}

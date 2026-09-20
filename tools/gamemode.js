@@ -1069,6 +1069,45 @@ function chargenTick() {
   for (const actorId of online) {
     if (!firstSeen.has(actorId)) {
       firstSeen.set(actorId, now);
+
+      /*
+        Somebody who arrives inside a restart window is probably standing in an
+        empty world, and until now nothing said so.
+
+        A kick with no process restart behind it leaves the actor in a state
+        where the reconnecting client is never sent the world. That is written
+        out in full down in clearTheServer(), from 17 September: one character,
+        13 reconnects, every one of them dead with no hits and no deaths and
+        all the NPCs gone, and the same character fine after the 01:00 process
+        restart. It was reported again on 20 September, and that session's log
+        has the server says it is restarting, staying put immediately after
+        ready, so the person had joined during the countdown. The site reported
+        the server up with nobody online while he was standing in it.
+
+        Joining during the window is a second way into the same state and the
+        comment down there does not cover it. The server cannot refuse the
+        connection from here, because there is no login hook to refuse it in,
+        and it must not kick: a kick is the thing that causes this. So it says
+        so, which is the difference between a broken evening and a known one.
+
+        The same test the online writer uses, deliberately, so the two cannot
+        disagree about whether a restart is happening. at covers the countdown
+        and the tick after it, went covers the rest.
+      */
+      try {
+        const r = globalThis.__thornswoodRestart;
+        const inWindow = !!(r && ((r.at && now - r.at < 180000) ||
+                                  (r.went && now - r.went < 180000)));
+        if (inWindow) {
+          log('login', actorId.toString(16),
+              'arrived inside a restart window: if the world is empty this is why');
+          say(actorId,
+              'The server was restarting as you arrived. If nobody is about and ' +
+              'the world looks empty, quit to the launcher and come back in a ' +
+              'minute. It is not your game.');
+        }
+      } catch (e) { }
+
       /*
         Somebody who arrives already dead still gets a temple.
 
