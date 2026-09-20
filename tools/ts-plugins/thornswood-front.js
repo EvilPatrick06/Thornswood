@@ -1323,6 +1323,8 @@
   let ownedAt = 0;           // last heartbeat that put the character back
   let saidIsNpc = false;     // each of these is worth saying once, not every tick
   let saidSprintGate = false;
+  let saidNpcStuck = false;  // the readback disagreeing with the write
+  let saidNpcThrew = false;
 
   function probeStart(kind, name) {
     return kind === 'jump' ? /^Jump(Standing|Directional)Start/i.test(name) : name === 'SprintStart';
@@ -1455,6 +1457,45 @@
     } catch (e) { }
   }
 
+  /**
+   * Clear IsNPC on the frame the graph reads it, rather than every two seconds.
+   *
+   * ownTheCharacter() above already clears this on the heartbeat and that is
+   * not enough. On 20 September seven presses in a row were refused with
+   * IsNPC reading yes, in the same session whose log says the heartbeat had
+   * already found it set and cleared it. So it comes back, and a clear that
+   * runs up to two seconds before the press is a clear that is not there when
+   * it counts.
+   *
+   * This is the same reason bSprintOK is held every frame just above rather
+   * than polled: the graph reads the variable on the frame it handles the
+   * event. A variable the graph reads on the event frame has to be written on
+   * the event frame.
+   *
+   * The readback is the measurement the last session could not make, and it
+   * splits the two remaining answers without anybody having to be in the
+   * world twice. If it reads true immediately after being written false, the
+   * write is not taking and no amount of timing will help. If it reads false
+   * here and yes again at the press, something re-sets it in between and the
+   * question becomes what.
+   */
+  function holdNpcClear(pc) {
+    if (!varBool(pc, 'IsNPC')) { return; }
+    try {
+      pc.setAnimationVariableBool('IsNPC', false);
+      if (!saidNpcStuck && varBool(pc, 'IsNPC')) {
+        saidNpcStuck = true;
+        say('jump and sprint: IsNPC was written false and read back true on the same frame. ' +
+            'The write is not taking, so this is not the heartbeat being too slow.');
+      }
+    } catch (e) {
+      if (!saidNpcThrew) {
+        saidNpcThrew = true;
+        say('jump and sprint: clearing IsNPC threw, which the heartbeat has been swallowing: ' + e);
+      }
+    }
+  }
+
   function probeState() {
     let pc = null;
     try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
@@ -1530,6 +1571,14 @@
     if (!e.isDown || e.isUp) return;
     // The chat or the wheel has the keyboard, or a menu does: not a jump.
     if (anyClaim() || busyMenuOpen()) return;
+
+    // The earliest point in the frame this file gets. buttonEvent runs from
+    // the input handler, before the graph updates, so a flag cleared here is
+    // clear when the graph reads it. The heartbeat two seconds ago was not.
+    try {
+      const pressPc = sp.Game.getPlayer();
+      if (pressPc) { holdNpcClear(pressPc); }
+    } catch (e2) { }
     const now = Date.now();
     if (now - probeLast[kind] < PROBE_GAP_MS) return;
     probeLast[kind] = now;
@@ -1566,6 +1615,11 @@
       // Every frame, but only while the key is down: the graph reads the gate
       // on the frame it handles the event, so a timer would miss it.
       holdSprintGate(pc);
+      // Same reasoning, and this block only runs on a frame that already has
+      // the character in hand: a heartbeat, a held sprint key, or a press
+      // still being resolved. Sprint is a hold, so the frame the graph acts
+      // on is not always the frame the key arrived.
+      holdNpcClear(pc);
     }
 
     if (!probePresses.length) return;
