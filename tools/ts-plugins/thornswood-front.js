@@ -101,8 +101,18 @@
   let fsm = null;
   try { fsm = require('fs'); fsm.writeFileSync(LOG_FILE, ''); } catch (e) { fsm = null; }
 
+  // Every line carries the clock, because a report that the K panel opened
+  // late after the face (20 September) had nothing in this log to measure it
+  // against: the server's log is timed and this one was not.
+  function clock() {
+    const d = new Date();
+    const two = function (n) { return (n < 10 ? '0' : '') + n; };
+    return two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()) + '.' +
+           ('00' + d.getMilliseconds()).slice(-3);
+  }
+
   function log() {
-    const line = '[front] ' + Array.prototype.slice.call(arguments).join(' ');
+    const line = '[front] ' + clock() + ' ' + Array.prototype.slice.call(arguments).join(' ');
     try { sp.printConsole(line); } catch (e) { }
     if (fsm) { try { fsm.appendFileSync(LOG_FILE, line + '\n'); } catch (e) { fsm = null; } }
   }
