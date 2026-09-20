@@ -132,11 +132,11 @@ nav.top a:hover{color:var(--page)}
 
   ridge.svg is still in this folder. Putting it back is one line here.
 
-  The banner ships as banner.jpg rather than the 3 MB source PNG in
-  tools/art: at quality 82 it is 465 KB for the same 1672 by 941, which is
-  most of the weight gone and no visible cost on a dark image that sits under
-  a grain overlay. It is still thirty times the file the ridgeline was, so it
-  is worth not adding a second one.
+  The loop ships at 1600 by 900, 24 frames a second, 3.1 MB, with its first
+  frame beside it as the poster. Three times the launcher strip it replaced
+  and two hundred times the ridgeline, which is the price of the picture
+  moving at the size the hero actually is. It is worth not adding a second
+  one.
 */
 .hero{position:relative;min-height:min(84vh,780px);display:grid;align-items:center;
   padding:84px 0 96px;text-align:center;overflow:hidden;isolation:isolate}
@@ -400,14 +400,16 @@ try {
     the first paint is a picture rather than black, and it is what stays on
     screen for anybody who has asked their machine for less motion.
 
-    Both files are copies of what the launcher embeds and nothing else:
-    banner.mp4 is tools/launcher-header.mp4 and banner.jpg is
-    tools/launcher-header.jpg, its own first frame. The poster was once
-    built from tools/art/thornswood-banner-1672.png instead, which is a
-    different picture in a different shape, 1672x941 against the video's
-    1536x300. While the video was unplayable that poster was the whole
-    hero, so the front page showed art nobody had asked for and showed it
-    still. If either file is replaced, take it from the launcher's.
+    Both files are the whole painting, not the launcher's strip.
+    banner.mp4 is the 24 second v4 loop at 1600x900 and banner.jpg is its
+    own first frame. Until 20 September they were copies of
+    tools/launcher-header.mp4 and .jpg, which are 1536 by 300: a band cut
+    out of the middle of this same painting for a title bar 135 pixels
+    high. Covering an 84vh hero with that band meant stretching 300 rows to
+    about 780 and throwing away the sky, the lake and the foreground, so the
+    front page ran a soft, cropped version of a picture it could have run
+    whole. If either file is replaced, take it from the render the launcher
+    strip is cut from, not from the strip.
   -->
   <video class="art" autoplay muted loop playsinline preload="metadata"
          poster="/banner.jpg" aria-hidden="true" tabindex="-1">
