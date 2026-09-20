@@ -253,6 +253,8 @@ function Get-SkyrimPath {
 function Get-ReferenceInServerOrder([string]$src) {
     $url = Get-LoadOrderManifestUrl $Root
     $manifest = Get-LoadOrderManifest $url
+    $script:serverManifest = $manifest
+    $script:referenceList = $src
     if ($null -eq $manifest) {
         Die "The server at $url did not answer with its manifest, so the reference plugin list cannot be put into its order. Start the server, or check the address and port in $Root\config.json, then publish again."
     }
@@ -1241,60 +1243,50 @@ if ($blank.Count) {
 if ($profileChanged.Count) {
     Head 'The server needs this too'
 
-    # The same default Deploy-Gamemode.ps1 carries. Absent on a machine that
-    # does not build the server, which is fine: the advice still stands.
-    $serverDist = 'C:\Thornswood-Dev\skymp\build\dist\server'
-    $serverSettings = Join-Path $serverDist 'server-settings.json'
-    $profileList = Join-Path $ProfileDir 'Default\loadorder.txt'
-
-    Say '  The plugin list moved, so the server is now configured for the old one.' 'Yellow'
-
-    if (Test-Path -LiteralPath $serverSettings) {
-        $settingsAt = (Get-Item -LiteralPath $serverSettings).LastWriteTimeUtc
-        $profileAt = if (Test-Path -LiteralPath $profileList) {
-            (Get-Item -LiteralPath $profileList).LastWriteTimeUtc
-        } else { [DateTime]::MinValue }
-
-        if ($profileAt -gt $settingsAt) {
-            Say ("  STALE. The server's list was written {0:yyyy-MM-dd HH:mm} and the plugin list changed {1:yyyy-MM-dd HH:mm}." -f $settingsAt, $profileAt) 'Yellow'
-        } else {
-            Say ("  The server's list was written {0:yyyy-MM-dd HH:mm}, after the plugin list. It may already be right." -f $settingsAt) 'Gray'
-        }
-
-        # A plugin the server still expects that is no longer in the profile is
-        # a definite fault in the dangerous direction, and it needs no cascade
-        # logic to spot. The other direction cannot be judged from here,
-        # because a plugin missing from the server's list may have been dropped
-        # on purpose for being light.
-        try {
-            $cfg = Get-Content -LiteralPath $serverSettings -Raw | ConvertFrom-Json
-            $have = @{}
-            foreach ($line in (Get-Content -LiteralPath $profileList -EA SilentlyContinue)) {
-                $n = $line.Trim()
-                if ($n -and -not $n.StartsWith('#')) { $have[$n.TrimStart('*')] = $true }
-            }
-            $gone = @()
-            foreach ($entry in @($cfg.loadOrder)) {
-                $leaf = [IO.Path]::GetFileName(([string]$entry).Replace('/', '\'))
-                if ($leaf -and -not $have.ContainsKey($leaf)) { $gone += $leaf }
-            }
-            if ($gone.Count) {
-                Say "  The server is configured for $($gone.Count) plugin(s) that are no longer in the list:" 'Red'
-                foreach ($g in $gone | Select-Object -First 8) { Say "    $g" 'Red' }
-                if ($gone.Count -gt 8) { Say "    and $($gone.Count - 8) more" 'Red' }
-            }
-        } catch {
-            Say "  Could not read the server's list to compare: $_" 'DarkGray'
-        }
-    } else {
-        Say "  No server build on this machine to check against ($serverDist)." 'DarkGray'
+    # Not by dates any more. The pack's plugin list goes out in the server's
+    # order (Get-ReferenceInServerOrder), so the order can never be what the
+    # server lacks; what it can lack is a plugin. A full plugin the list
+    # enables that the manifest does not name is one the server has to be
+    # given, and until it is, every client that follows the server's order
+    # carries it as an extra and is refused at connect. The old check
+    # compared file dates and told Patrick to run Deploy-Gamemode on
+    # 20 September when the only change was LOOT re-sorting the list; that
+    # deploy would have re-keyed the world.
+    $manifest = $script:serverManifest
+    if ($null -eq $manifest) {
+        try { $manifest = Get-LoadOrderManifest (Get-LoadOrderManifestUrl $Root) } catch { $manifest = $null }
     }
-
-    Say '  Put it right with, in this order:' 'Yellow'
-    Say '      .\tools\Deploy-Gamemode.ps1' 'Yellow'
-    Say '      .\tools\Publish-Server.ps1 "the load order moved"' 'Yellow'
-    Say '  Deploy-Gamemode recomputes the list AND the start point new characters' 'Yellow'
-    Say '  spawn at, which is a raw form id that rots whenever the order moves.' 'Yellow'
+    if ($null -eq $manifest) {
+        Say '  The server did not answer with its manifest, so this cannot be checked.' 'DarkGray'
+    } else {
+        $refPath = if ($script:referenceList) { $script:referenceList } else { Join-Path $ProfileDir 'Default\plugins.txt' }
+        $refData = Join-Path $GameDir 'Data'
+        $enabled = @()
+        foreach ($line in (Get-Content -LiteralPath $refPath -EA SilentlyContinue)) {
+            $n = Get-LoadOrderEnabledName $line
+            if ($n) { $enabled += $n }
+        }
+        $isLightOrMissing = { param($n) $f = Join-Path $refData $n; (-not (Test-Path -LiteralPath $f)) -or (Test-LoadOrderLight $f) }
+        $exists = { param($n) Test-Path -LiteralPath (Join-Path $refData $n) }
+        # Assigned, not wrapped in @(): the function hands back one array and
+        # @() would nest it, which read as one plugin missing on 20 September.
+        $game = Get-LoadOrderGame $enabled $isLightOrMissing @() $exists
+        $lower = @{}
+        foreach ($m in $manifest) { $lower[$m.ToLowerInvariant()] = $true }
+        $missing = @($game | Where-Object { -not $lower.ContainsKey($_.ToLowerInvariant()) })
+        if ($missing.Count) {
+            Say ("  The server does not have {0} plugin(s) this list enables:" -f $missing.Count) 'Yellow'
+            foreach ($m in $missing | Select-Object -First 8) { Say "    $m" 'Yellow' }
+            if ($missing.Count -gt 8) { Say "    and $($missing.Count - 8) more" 'Yellow' }
+            Say '  Until the server has them, everybody who follows its order carries an extra plugin and is refused.' 'Yellow'
+            Say '  Put it right with, in this order:' 'Yellow'
+            Say '      .\tools\Deploy-Gamemode.ps1' 'Yellow'
+            Say '      .\tools\Publish-Server.ps1 "the plugin list gained ' + $missing[0] + '"' 'Yellow'
+            Say '  Deploy-Gamemode keeps the order the server already runs and puts the new ones on the end.' 'Yellow'
+        } else {
+            Say ("  The server has every one of the {0} full plugins this list enables, in the order the pack ships. Nothing to deploy." -f $game.Count) 'Gray'
+        }
+    }
 }
 
 # ------------------------------------------------------------ push
