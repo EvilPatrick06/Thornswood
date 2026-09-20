@@ -117,10 +117,10 @@
     // the foot
     '#ts-select .foot{padding:16px 44px 30px}',
     '#ts-select .status{font-size:15px;color:rgba(228,217,191,.7);min-height:1.5em;margin-bottom:12px}',
-    '#ts-select .btn{display:block;width:100%;border:2px solid #e9d19b;padding:18px 20px;text-align:center;font-family:inherit;',
+    '#ts-select .playbar{display:block;width:100%;border:2px solid #e9d19b;padding:18px 20px;text-align:center;font-family:inherit;',
     'font-size:20px;letter-spacing:.3em;text-transform:uppercase;background:#c6aa6d;color:#1b1205;',
     'white-space:nowrap}',
-    '#ts-select .btn.off{opacity:.35;pointer-events:none}',
+    '#ts-select .playbar.off{opacity:.35;pointer-events:none}',
     '#ts-select .hint{font-size:13px;color:rgba(228,217,191,.45);margin-top:14px;text-align:center;letter-spacing:.06em}'
   ].join('');
   var style = document.createElement('style');
@@ -136,7 +136,7 @@
       '<div class="head"><div><div class="eyebrow">Thornswood</div><div class="title">Who are you today?</div></div>' +
       '<div class="count"></div></div>' +
       '<div class="list"></div>' +
-      '<div class="foot"><div class="status"></div><div class="btn">Play</div>' +
+      '<div class="foot"><div class="status"></div><div class="playbar">Play</div>' +
       '<div class="hint">Up and down, or a number, then Enter. Delete forgets the one that is lit.</div></div>' +
     '</div>';
   document.body.appendChild(root);
@@ -167,7 +167,7 @@
   }
   var elCount = root.querySelector('.count');
   var elStatus = root.querySelector('.status');
-  var elPlay = root.querySelector('.btn');
+  var elPlay = root.querySelector('.playbar');
 
   function fit() {
     try { elPanel.style.transform = 'scale(' + scale().toFixed(3) + ')'; } catch (e) { }
@@ -290,7 +290,7 @@
     if (!e2) elPlay.textContent = 'Play';
     else if (e2.c) elPlay.textContent = 'Play as ' + (e2.c.name || 'this character');
     else elPlay.textContent = 'Make a new character';
-    elPlay.className = 'btn' + (sent || !e2 || !e2.id ? ' off' : '');
+    elPlay.className = 'playbar' + (sent || !e2 || !e2.id ? ' off' : '');
     if (!sent) elStatus.textContent = '';
   }
 

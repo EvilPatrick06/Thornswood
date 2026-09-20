@@ -263,11 +263,19 @@
     '#ts-skills .status.ok{color:#9fcf92;font-style:normal}',
     '#ts-skills .status.no{color:#d9a27a;font-style:normal}',
     '#ts-skills .btns{flex:0 0 auto;display:flex;gap:10px;align-items:stretch}',
-    '#ts-skills .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:40px;padding:0 24px;',
+    '#ts-skills .tsbtn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:40px;padding:0 24px;',
     'border:1px solid rgba(198,170,109,.55);font-size:13px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;',
     'color:#e9d19b;background:rgba(0,0,0,.25);font-family:inherit;cursor:pointer}',
-    '#ts-skills .btn.primary{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
-    '#ts-skills .btn.primary.off{opacity:.35;pointer-events:none}',
+    '#ts-skills .tsbtn.primary{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
+    '#ts-skills .tsbtn.primary.off{opacity:.35;pointer-events:none}',
+    // The buttons are .tsbtn, not .btn, and the name matters: the front's own
+    // stylesheet (build.js, in this same document) carries an unscoped .btn
+    // rule with width 50px, height 50px and margin 20px. Our rules are scoped
+    // under #ts-skills and win on every property they set, but a property
+    // they do not set comes through from theirs, and on 20 September that
+    // gave Confirm a 50px box with five letters showing. A class name nobody
+    // else uses is the only rule that holds against a stylesheet we do not
+    // write.
     // the K, drawn as a key cap beside Close
     '#ts-skills .key{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;',
     'border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;border-radius:3px;background:rgba(0,0,0,.35);',
@@ -289,8 +297,8 @@
       '<div class="nav"></div>' +
       '<div class="body"></div>' +
       '<div class="foot"><div class="status"></div><div class="btns">' +
-        '<div class="btn ghost" data-act="close"><span>Close</span><span class="key">K</span></div>' +
-        '<div class="btn primary" data-act="confirm">Confirm</div>' +
+        '<div class="tsbtn ghost" data-act="close"><span>Close</span><span class="key">K</span></div>' +
+        '<div class="tsbtn primary" data-act="confirm">Confirm</div>' +
       '</div></div>' +
     '</div>';
   document.body.appendChild(root);
@@ -644,7 +652,7 @@
     footKey = key;
     elStatus.className = 'status' + (statusKind ? ' ' + statusKind : '');
     elStatus.textContent = line;
-    elConfirm.className = 'btn primary' + (can ? '' : ' off');
+    elConfirm.className = 'tsbtn primary' + (can ? '' : ' off');
     elConfirm.textContent = label;
     elConfirm.style.display = section === 'tree' ? 'none' : '';
   }
