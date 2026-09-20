@@ -1184,37 +1184,50 @@ function chargenTick() {
       } catch (e) { owns = 0; }
 
       /*
-        An appearance is the proof, and it is the only one that cannot be
-        wrong. Nothing writes it but the race menu closing on a finished face.
+        New or returning is decided by two physical facts, in this order, and
+        by nothing inferred.
 
-        THIS USED TO SIT BELOW THE LAUNCHER CHOICE CHECK and that was the fault
-        reported on 20 September: characters that had been played for days met
-        creation a second time, and met it in whatever inn they had last chosen
-        rather than in the hall, because the hall is Skyrim Unbound's room and
-        a second run simply happens wherever the character is standing. It
-        looked like creation had been moved somewhere and like it differed per
-        person. It had not and it did not; it was each of them being re-created
-        where they already were.
+        FIRST, THINGS IN THE PACK MEAN RETURNING, wherever they are standing.
+        Nothing hands anybody anything before this point, so nobody arrives
+        owning something unless they have played. This is the proof that
+        cannot be wrong and it goes first. 7ffe41a demoted it and that was a
+        mistake, below.
 
-        Carrying something was the guard before this, and it is not enough on
-        its own. It is proof in the right direction when it is there, and it is
-        silent when it is not: a returning character carrying nothing, or one
-        whose inventory read throws, comes out of that check looking exactly
-        like a new one. The catch below sets owns to 0, so a single failed read
-        on a joining client was all it took. The count is kept because it is
-        worth having in the log, but it no longer decides anything.
+        SECOND, WITH AN EMPTY PACK, STANDING IN UNBOUND'S HALL MEANS NEW. The
+        hall is where the server's start point puts a brand new actor and
+        nowhere else; nobody logs out there and nobody wakes up there twice.
+        Anywhere else with an empty pack is somebody returning, most often a
+        legacy character from before creation existed.
 
-        The launcher posts a choice whenever it has a trade and a town recorded
-        for a slot, and it has those for every character it has ever made, so a
-        choice waiting is not evidence of anything. It is checked below, after
-        this, and only reaches a character with no appearance at all.
+        WHY NOT THE APPEARANCE. 7ffe41a made "has a face" mean "returning", to
+        stop played characters being re-created in whatever inn they had last
+        chosen. That fixed the inn and broke the hall: on 20 September at
+        11:52:26 profile 1043928337, brand new, was logged as already having a
+        character and stamped done in the hall with no teleport and no way
+        out. SkyMP opens the race menu on spawn, before this tick ever sees
+        the actor, and confirming a face takes less than the ten second settle,
+        so a new character has an appearance by the time anyone asks. A face
+        is not evidence of anything either. Neither is a launcher choice: the
+        launcher posts one for every slot it has ever made and the voice
+        service keeps them a week, sixty five were waiting that morning.
+
+        A location read that throws counts as not in the hall. Re-creating a
+        person is the worse of the two mistakes, so the doubt goes that way.
       */
-      if (appearance) {
+      let inHall = false;
+      try {
+        inHall = mp.get(actorId, 'worldOrCellDesc') === HALL.desc;
+      } catch (e) { inHall = false; }
+
+      const returning = owns > 0 || !inHall;
+      if (returning) {
         log('chargen', actorId.toString(16), 'profile', pidNew,
             'already has a character' +
             (owns > 0 ? ' carrying ' + owns + (owns === 1 ? ' thing' : ' things')
-                      : ' and is carrying nothing'),
-            'so creation is skipped for them');
+                      : ' and is carrying nothing') +
+            (inHall ? ', in the hall' : ', not in the hall') +
+            (appearance ? ', face on' : ', no face') +
+            ', so creation is skipped for them');
         setChargen(actorId, { stage: 'done', at: now, legacy: true });
         closeRaceMenu(actorId);
         // The choice is stale the moment it turns out to belong to somebody
@@ -1228,13 +1241,12 @@ function chargenTick() {
         continue;
       }
 
-      // Genuinely new: no appearance at all, and a choice is waiting.
-      if (pidNew && launcherChoices[String(pidNew)]) {
-        log('chargen', actorId.toString(16), 'profile', pidNew,
-            'is new, the launcher has a choice waiting for them');
-        beginAppearance(actorId);
-        continue;
-      }
+      // Genuinely new: an empty pack, standing in the hall. Whether a choice
+      // is waiting only changes the log line; the flow reads it later.
+      log('chargen', actorId.toString(16), 'profile', pidNew,
+          'is new, in the hall with nothing' +
+          (appearance ? ', face already on' : '') +
+          (pidNew && launcherChoices[String(pidNew)] ? ', the launcher has a choice waiting' : ', no launcher choice'));
       beginAppearance(actorId);
       continue;
     }
