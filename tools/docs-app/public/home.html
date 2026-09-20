@@ -138,10 +138,27 @@ nav.top a:hover{color:var(--page)}
   moving at the size the hero actually is. It is worth not adding a second
   one.
 */
-.hero{position:relative;min-height:min(84vh,780px);display:grid;align-items:center;
-  padding:84px 0 96px;text-align:center;overflow:hidden;isolation:isolate}
+/*
+  Tall enough to show the painting, wide or narrow. The height used to be
+  capped at 780px with the picture pinned to its bottom edge, which on a
+  1920 wide screen showed most of it and on a 3440 wide one scaled the
+  painting to 1935 rows and showed the bottom 780: the lake, and none of the
+  title or the sky. Patrick's ultrawide, 20 September. Now the hero is as
+  tall as the picture's own shape allows (16:9 of the width) up to 84vh, and
+  the crop keeps the top, where the title is painted in.
+
+  The painting carries its own title and emblem, so the crest and the big
+  Thornswood over it went the same day: two titles on one picture. The
+  words sit at the bottom over a dark scrim instead, where they read.
+*/
+.hero{position:relative;min-height:min(84vh,56.25vw);display:grid;align-items:end;
+  padding:84px 0 64px;text-align:center;overflow:hidden;isolation:isolate}
 .hero .art{position:absolute;inset:0;z-index:-2;width:100%;height:100%;
-  object-fit:cover;object-position:50% 100%}
+  object-fit:cover;object-position:50% 25%}
+.hero::before{content:"";position:absolute;left:0;right:0;bottom:0;height:64%;z-index:-1;
+  pointer-events:none;
+  background:linear-gradient(180deg,rgba(11,9,7,0) 0%,rgba(11,9,7,.48) 40%,rgba(11,9,7,.9) 100%)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* Grain over the whole thing, because a flat gradient reads as a web page and
    a grained one reads as a place. */
 .hero::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.42;
@@ -155,16 +172,16 @@ nav.top a:hover{color:var(--page)}
   .hero .art{animation:drift 60s ease-in-out infinite alternate}
   @keyframes drift{ from{transform:scale(1.04) translateY(0)} to{transform:scale(1.09) translateY(-14px)} }
 }
-.crest{width:104px;height:104px;margin:0 auto 26px;border-radius:22px;
-  box-shadow:0 0 0 1px var(--edge2), 0 22px 60px -18px rgba(0,0,0,.9)}
 h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
   text-transform:uppercase;margin:0;text-wrap:balance;
   background:linear-gradient(180deg,#F0E6CE 12%,var(--gold) 92%);
   -webkit-background-clip:text;background-clip:text;color:transparent}
-.era{margin:20px auto 0;font:400 13px/1 var(--sans);letter-spacing:.34em;
-  text-transform:uppercase;color:var(--faint)}
-.pitch{max-width:30ch;margin:26px auto 0;font:300 clamp(19px,2.3vw,25px)/1.5 var(--serif);
-  color:var(--page);text-wrap:balance}
+/* Over the painting rather than over the dark page, so lighter than the
+   page's own faint and with a shadow behind, or the sky eats them. */
+.era{margin:0 auto;font:400 13px/1 var(--sans);letter-spacing:.34em;
+  text-transform:uppercase;color:rgba(240,230,206,.78);text-shadow:0 1px 10px rgba(0,0,0,.8)}
+.pitch{max-width:30ch;margin:18px auto 0;font:300 clamp(19px,2.3vw,25px)/1.5 var(--serif);
+  color:#F5EEDD;text-wrap:balance;text-shadow:0 2px 14px rgba(0,0,0,.75)}
 .pitch em{font-style:italic;color:var(--gold)}
 .acts{display:flex;gap:13px;justify-content:center;flex-wrap:wrap;margin-top:38px}
 .btn{display:inline-block;padding:15px 34px;border-radius:2px;
@@ -176,8 +193,8 @@ h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
 .btn.ghost{border-color:var(--edge2);color:var(--page)}
 .btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
 .live{margin-top:30px;font:400 13px/1 var(--sans);letter-spacing:.1em;
-  text-transform:uppercase;color:var(--quiet);display:flex;gap:9px;
-  align-items:center;justify-content:center}
+  text-transform:uppercase;color:rgba(240,230,206,.7);display:flex;gap:9px;
+  align-items:center;justify-content:center;text-shadow:0 1px 8px rgba(0,0,0,.8)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
 .dot.on{background:#79B05F;box-shadow:0 0 0 4px rgba(121,176,95,.16)}
 
@@ -416,8 +433,9 @@ try {
     <source src="/banner.mp4" type="video/mp4">
   </video>
   <div class="wrap">
-    <img class="crest" src="/logo.png" alt="">
-    <h1>Thornswood</h1>
+    <!-- The painting carries the title and the emblem; the page's h1 stays
+         for readers and search, unseen. -->
+    <h1 class="sr">Thornswood</h1>
     <div class="era">Fourth Era &middot; Year 252</div>
     <p class="pitch">Skyrim, fifty years after the war. Free, cold, and
       <em>still full of people</em>.</p>
