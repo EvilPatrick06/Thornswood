@@ -145,12 +145,18 @@ function Test-ShipOtherServer([string]$rel) {
         if ($leaf -like 'thornswood-*.js') { return $false }
         return $true
     }
-    # Under UI only the flat files of ours belong: index.html, build.js and
-    # the thornswood-*.js overlays. Anything else there, assets folders and
-    # Vite output included, is somebody else's menu.
+    # Under UI, ours is flat: index.html, build.js, our thornswood-*.js
+    # overlays, and the front's own hashed fonts, icons and sounds beside
+    # build.js (a .ttf, .svg, .png, .wav or .mp3 named by its hash, and
+    # menu_theme.mp3). Somebody else's menu is a Vite build, which has an
+    # assets folder, an app.js and a vite.svg. The first version of this rule
+    # on 20 September whitelisted three names and called the front's own 147
+    # asset files foreign, which the dev Ship of 13:02 duly left out of the
+    # pack; a fresh installer would have shipped a front with no fonts.
     if ($rel -like 'Data\Platform\UI\*') {
-        if ($leaf -ieq 'index.html' -or $leaf -ieq 'build.js' -or $leaf -like 'thornswood-*.js') { return $false }
-        return $true
+        if ($rel -like 'Data\Platform\UI\assets\*') { return $true }
+        if ($leaf -ieq 'app.js' -or $leaf -ieq 'vite.svg') { return $true }
+        return $false
     }
     return $false
 }

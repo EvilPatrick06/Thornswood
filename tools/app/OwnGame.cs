@@ -697,11 +697,13 @@ namespace Thornswood
             {
                 if (rel.StartsWith("Data\\Platform\\UI\\assets\\", StringComparison.OrdinalIgnoreCase)) return true;
                 if (leaf.Equals("app.js", StringComparison.OrdinalIgnoreCase) || leaf.Equals("vite.svg", StringComparison.OrdinalIgnoreCase)) return true;
-                // Anything under UI that is not a flat file of ours. Ours is
-                // index.html, build.js and the thornswood-*.js overlays.
-                if (!(leaf.Equals("index.html", StringComparison.OrdinalIgnoreCase) ||
-                      leaf.Equals("build.js", StringComparison.OrdinalIgnoreCase) ||
-                      leaf.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase))) return true;
+                // Everything else flat under UI is ours: index.html, build.js,
+                // the thornswood-*.js overlays, and the front's own hashed
+                // fonts, icons and sounds beside build.js. Somebody else's menu
+                // is a Vite build, which is the assets folder and the two
+                // names above. The first version of this rule on 20 September
+                // whitelisted three names and would have left the front's 147
+                // asset files out of the next refresh.
             }
             return false;
         }
