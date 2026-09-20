@@ -270,6 +270,19 @@
   var elStatus = root.querySelector('.status');
   var elConfirm = root.querySelector('[data-act="confirm"]');
   var elClose = root.querySelector('[data-act="close"]');
+  var elPanel = root.querySelector('.panel');
+
+  /* Laid out for 1920x1080 and scaled up from there: at 3440x1440 the first
+     cut was a postage stamp. */
+  function fit() {
+    try {
+      var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+      if (!isFinite(s) || s < 1) s = 1;
+      elPanel.style.transformOrigin = 'center center';
+      elPanel.style.transform = 'scale(' + Math.min(s, 2.4).toFixed(3) + ')';
+    } catch (e) { }
+  }
+  window.addEventListener('resize', fit);
 
   function tell(what, extra) {
     try {
@@ -635,6 +648,7 @@
     open: function () {
       if (root.className !== 'gone') return;
       root.className = '';
+      fit();
       draw();
       tell('opened');
       tell('refresh');   // the server says again what this character is

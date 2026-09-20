@@ -243,7 +243,6 @@
   const CHOICE_FILE = 'Data/Platform/thornswood-choice.txt';
   const CHARACTERS_FILE = 'Data/Platform/thornswood-characters.json';
   const chooseAtMenu = !!((client.gameData || {}).chooseAtMenu);
-  let sawUpdate = false;
   let menuPhase = 0;
   let menuAt = 0;
   const loadedAt = Date.now();
@@ -253,7 +252,7 @@
   }
 
   sp.on('tick', guard('menu', () => {
-    if (!chooseAtMenu || sawUpdate || menuPhase === 9) { return; }
+    if (!chooseAtMenu || menuPhase === 9) { return; }
     const now = Date.now();
 
     if (menuPhase === 0) {
@@ -301,15 +300,40 @@
     }
 
     if (menuPhase === 2) {
-      // skymp5-client's BrowserService hides the browser whenever the main
-      // menu opens. Ours is the thing on it, so it is shown again, once a
-      // second, until the choice is made.
-      if (now - menuAt > 1000) {
+      /*
+        Held up and held focused, four times a second, until the choice is
+        made.
+
+        The first cut showed the browser once a second and never touched
+        focus, and on 20 September the page vanished the moment the mouse
+        moved and stayed gone. skymp5-client's BrowserService hides the
+        browser for every menu it calls bad, the main menu among them, and
+        shows it again only when none of them is open, which at the main
+        menu is never; anything that opens and closes a menu while the
+        choice is up leaves the browser hidden for good. Focus goes the same
+        way: its Escape handler and its own login path both drop it, and
+        without it the mouse belongs to Skyrim's menu underneath, which is
+        what a page that does not answer looks like. So both are read and
+        put back, and the log says once when either had to be.
+      */
+      if (now - menuAt > 250) {
         menuAt = now;
-        try { sp.browser.setVisible(true); } catch (e) { }
+        let vis = true, foc = true;
+        try { vis = !!sp.browser.isVisible(); } catch (e) { }
+        try { foc = !!sp.browser.isFocused(); } catch (e) { }
+        if (!vis) {
+          try { sp.browser.setVisible(true); } catch (e) { }
+          if (!menuHidTold) { menuHidTold = true; log('menu: something hid the browser while the choice was up; shown again'); }
+        }
+        if (!foc) {
+          try { sp.browser.setFocused(true); } catch (e) { }
+          if (!menuBlurTold) { menuBlurTold = true; log('menu: something took the mouse off the page while the choice was up; taken back'); }
+        }
       }
     }
   }));
+  let menuHidTold = false;
+  let menuBlurTold = false;
 
   /* The page chose. Called from the browserMessage handler below. */
   function menuChose(id) {
@@ -2069,7 +2093,6 @@
 
   sp.on('update', guard('tick', () => {
     const now = Date.now();
-    sawUpdate = true;   // there is a game; the main menu block above stands down
 
     // Not at the first tick. The Tilted backend draws through a D3D11 render
     // hook, and early on the game is still tearing its swap chain down and
@@ -2096,6 +2119,10 @@
       // that is only ever set true is a flag that lies the moment anything
       // does start reading it.
 
+      // The world is up, so the main menu block above stands down for
+      // good; it used to stand down on the first update instead, which is
+      // not the same moment and is not a moment this file can be sure of.
+      menuPhase = 9;
       phase = 1; at = now;
       try {
         sp.browser.loadUrl(UI_URL);
@@ -2432,7 +2459,9 @@
     if (a[0] !== 'thornswood-front') return;
     const what = String(a[1]);
 
-    if (what.indexOf('select:ready') === 0) { log('the character choice is on screen (' + what.slice(13) + ')'); return; }
+    // The character choice page reports in plain lines: ready, alive, the
+    // first mouse move, the music, the pick. Written as they come.
+    if (what.indexOf('select:') === 0) { log('choice page:', what.slice(7)); return; }
 
     /*
       The skills panel says when it opens and closes rather than being
