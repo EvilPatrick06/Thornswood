@@ -70,8 +70,11 @@ $ShipMachineFiles = @(
     'Data\Platform\voice-port.txt',
     'Data\Platform\voice-status.txt',
     'Data\Platform\voice-ptt.txt',
-    # Written by the game on this machine every session.
+    # Written by the game on this machine every session. The second is the
+    # light half of the same list, kept apart because the server's own list
+    # drops light plugins and the first file has to match it positionally.
     'Data\Platform\thornswood-loadorder.txt',
+    'Data\Platform\thornswood-plugins-light.txt',
     # The launcher's note to the plugins that this is our session. See Keep.cs.
     'Data\Platform\thornswood-session.txt',
     'Data\Platform\menu-music-duck.txt',

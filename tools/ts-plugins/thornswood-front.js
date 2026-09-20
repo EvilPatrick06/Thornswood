@@ -2354,23 +2354,59 @@
 
     One file, written once per session, so the two lists can be reconciled from
     ground truth instead of from a best guess.
+
+    getModCount COUNTS REGULAR PLUGINS ONLY. Light ones live in their own index
+    behind getLightModCount, and leaving them out is correct for this file,
+    because the server's list drops them too and this file has to match it
+    positionally. It was not correct for the sentence underneath, which called
+    60 of 102 plugins the real load order. On 20 September that read as a
+    collection with 42 mods missing from it and sent somebody looking through
+    Vortex for a fault that was not there: every one of the 42 was loaded and
+    light, confirmed by reading bit 0x200 out of each TES4 header.
+
+    So the light ones are written beside it rather than into it. Nothing that
+    consumes the first file sees any change, and the question "where are the
+    other 42" now has an answer sitting next to it instead of needing a header
+    parser to work out.
   */
   let dumpedOrder = false;
   sp.on('update', guard('loadorder', () => {
     if (dumpedOrder) { return; }
     dumpedOrder = true;
     try {
+      const fs = require('fs');
+
       const names = [];
       const n = sp.Game.getModCount();
       for (let i = 0; i < n; i++) {
         const name = sp.Game.getModName(i);
         if (name) { names.push(name); }
       }
-      const fs = require('fs');
       fs.writeFileSync('Data/Platform/thornswood-loadorder.txt',
                        names.join('\n') + '\n');
-      say('wrote the real load order, ' + names.length + ' plugins, to ' +
-          'Data/Platform/thornswood-loadorder.txt');
+
+      /* A build without the light index must still get the file above, so this
+         is separate and its failure is not the other one's. */
+      const light = [];
+      try {
+        const ln = sp.Game.getLightModCount();
+        for (let i = 0; i < ln; i++) {
+          const name = sp.Game.getLightModName(i);
+          if (name) { light.push(name); }
+        }
+        fs.writeFileSync('Data/Platform/thornswood-plugins-light.txt',
+                         light.join('\n') + '\n');
+      } catch (e2) {
+        log('could not write the light plugin list:', e2);
+      }
+
+      say('wrote ' + names.length + ' regular plugins, in load order, to ' +
+          'Data/Platform/thornswood-loadorder.txt, and ' + light.length +
+          ' light plugins to thornswood-plugins-light.txt. That is ' +
+          (names.length + light.length) + ' loaded in total. The first file is ' +
+          'the one the server reconciles against and it holds regular plugins ' +
+          'only, on purpose. A mod in neither file is genuinely not loaded; a ' +
+          'mod in the second one is loaded.');
     } catch (e) {
       log('could not write the load order:', e);
     }
