@@ -257,9 +257,11 @@
     const now = Date.now();
 
     if (menuPhase === 0) {
-      // Not at the first tick: the browser exists from init but the game is
-      // still settling its swap chain around the menu.
-      if (now - loadedAt < 2500) { return; }
+      // Not at the very first tick, but not long after it either: the first
+      // cut waited two and a half seconds here and another one and a half
+      // below, and the whole wait was what Patrick felt as the menu being
+      // slow to appear and the music slow to start.
+      if (now - loadedAt < 600) { return; }
       // A plugin reload mid session runs this file again; the choice on disk
       // is this session's and there is nothing to ask.
       if (chosenOnDisk()) { menuPhase = 9; log('menu: a choice is already on disk for this session'); return; }
@@ -277,7 +279,7 @@
       return;
     }
 
-    if (menuPhase === 1 && now - menuAt > 1500) {
+    if (menuPhase === 1 && now - menuAt > 700) {
       let list = null;
       try { list = JSON.parse(readText(CHARACTERS_FILE)); } catch (e) { list = null; }
       if (!list || !Array.isArray(list.characters)) {
@@ -301,6 +303,19 @@
           list.music = 'thornswood-dev-theme.mp3';
         }
       } catch (e) { }
+      // The painting behind the choice: the animated loop and its still, the
+      // site's banner copied in by Go.ps1. Asked for by Patrick on 20
+      // September, in place of the main menu's own doubled, soft backdrop
+      // (entry 83). The page uses the loop when the browser can decode it
+      // and the still when it cannot.
+      try {
+        const fs2 = require('fs');
+        if (fs2.existsSync('Data/Platform/UI/thornswood-menu.mp4')) { list.video = 'thornswood-menu.mp4'; }
+        if (fs2.existsSync('Data/Platform/UI/thornswood-menu.jpg')) { list.still = 'thornswood-menu.jpg'; }
+      } catch (e) { }
+      // The page has six seconds from here to say ready before the silence
+      // watch below counts it as gone.
+      menuBeatAt = now;
       // The list is never logged in full: it is every profile id this
       // install owns, and a profile id is a seat in the voice room.
       T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';');
@@ -327,6 +342,31 @@
         what a page that does not answer looks like. So both are read and
         put back, and the log says once when either had to be.
       */
+      /*
+        The page's own pulse, and a reload when it stops.
+
+        20 September, 14:58: the page reported healthy, said the mouse had
+        moved, and then never spoke again, with the browser still visible and
+        focused according to the plugin. No reload line, no hide line: the
+        page's process itself went down under mouse input, or its bridge to
+        us did. Either way the person was left with nothing to click. The
+        page beats every two seconds while the choice is up; six seconds of
+        silence and this loads it again from the top, three times at most,
+        and says so.
+      */
+      if (menuBeatAt && now - menuBeatAt > 6000) {
+        if (menuReloads >= 3) {
+          if (!menuGaveUp) { menuGaveUp = true; log('menu: the page went silent three times; leaving it, the client falls back to the last character'); }
+        } else {
+          menuReloads++;
+          const tries = menuReloads;
+          log('menu: the page went silent for six seconds, loading it again (' + tries + ' of 3)');
+          try { sp.browser.loadUrl(UI_URL); sp.browser.setVisible(true); sp.browser.setFocused(true); } catch (e) { }
+          menuPhase = 1; menuAt = now; menuBeatAt = 0;
+          return;
+        }
+      }
+
       if (now - menuAt > 250) {
         menuAt = now;
         let vis = true, foc = true;
@@ -345,6 +385,9 @@
   }));
   let menuHidTold = false;
   let menuBlurTold = false;
+  let menuBeatAt = 0;
+  let menuReloads = 0;
+  let menuGaveUp = false;
 
   /* The page chose. Called from the browserMessage handler below. */
   function menuChose(id) {
@@ -2483,8 +2526,13 @@
       return;
     }
     // The character choice page reports in plain lines: ready, alive, the
-    // first mouse move, the music, the pick. Written as they come.
-    if (what.indexOf('select:') === 0) { log('choice page:', what.slice(7)); return; }
+    // first mouse move, the music, the pick. Every one is a pulse for the
+    // silence watch above; the alive beats are not written down, the rest are.
+    if (what.indexOf('select:') === 0) {
+      menuBeatAt = Date.now();
+      if (what.indexOf('select:alive') !== 0) { log('choice page:', what.slice(7)); }
+      return;
+    }
 
     /*
       The skills panel says when it opens and closes rather than being

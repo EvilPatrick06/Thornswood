@@ -59,13 +59,25 @@
     return Math.min(s, 2.4);
   }
 
+  /*
+    Kept plain on purpose. No cursor rules, no transitions, no hover styles:
+    the first three cuts of this page died the moment the mouse moved over
+    them, with the browser still up according to the plugin, and hover is
+    the one thing a mouse move asks of a page. The lit slot is lit by a
+    click or a key and nothing else.
+  */
   var css = [
     '#ts-select{position:fixed;inset:0;z-index:2147483001;display:flex;align-items:center;justify-content:center;',
-    'background:radial-gradient(ellipse at center,rgba(0,0,0,.42) 0%,rgba(0,0,0,.78) 100%);',
+    'background:#0b0907;',
     'font-family:"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;color:#e4d9bf;user-select:none;pointer-events:auto}',
     '#ts-select.gone{display:none}',
     '#ts-select *{box-sizing:border-box}',
-    '#ts-select .panel{width:960px;max-height:92vh;display:flex;flex-direction:column;transform-origin:center center;',
+    // the painting behind everything: the loop when it plays, the still under it
+    '#ts-select .bg{position:absolute;inset:0;z-index:0;background:#0b0907 center/cover no-repeat}',
+    '#ts-select .bg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}',
+    '#ts-select .shade{position:absolute;inset:0;z-index:0;',
+    'background:radial-gradient(ellipse at center,rgba(0,0,0,.40) 0%,rgba(0,0,0,.76) 100%)}',
+    '#ts-select .panel{position:relative;z-index:1;width:960px;max-height:92vh;display:flex;flex-direction:column;transform-origin:center center;',
     'background:rgba(9,8,6,.96);border:2px solid rgba(198,170,109,.55);outline:1px solid rgba(198,170,109,.22);outline-offset:6px;',
     'box-shadow:0 30px 90px rgba(0,0,0,.8),inset 0 0 0 1px rgba(0,0,0,.6)}',
     '#ts-select .head{padding:32px 44px 20px;border-bottom:1px solid rgba(198,170,109,.3);display:flex;align-items:flex-end;justify-content:space-between}',
@@ -75,9 +87,8 @@
     '#ts-select .list{padding:22px 44px 8px;overflow:auto;display:grid;gap:14px}',
     // a slot
     '#ts-select .slot{position:relative;border:1px solid rgba(198,170,109,.34);background:rgba(255,255,255,.025);padding:20px 26px 20px 30px;',
-    'cursor:pointer;transition:background 80ms linear,border-color 80ms linear;min-height:132px}',
+    'min-height:132px}',
     '#ts-select .slot::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:transparent}',
-    '#ts-select .slot:hover{border-color:rgba(233,209,155,.7);background:rgba(120,94,44,.16)}',
     '#ts-select .slot.at{border-color:#e9d19b;background:rgba(120,94,44,.30)}',
     '#ts-select .slot.at::before{background:#e9d19b}',
     '#ts-select .slot.empty{border-style:dashed;background:rgba(0,0,0,.18)}',
@@ -93,26 +104,22 @@
     '#ts-select .make{font-size:26px;color:#e9d19b;margin-top:2px}',
     '#ts-select .sub{font-size:15px;line-height:1.5;color:rgba(228,217,191,.6);margin-top:8px;max-width:720px}',
     // the delete icon and the confirm strip
-    '#ts-select .bin{position:absolute;right:20px;top:20px;width:36px;height:36px;display:grid;place-items:center;border:1px solid transparent;',
-    'color:rgba(228,217,191,.45);cursor:pointer;transition:all 80ms linear}',
-    '#ts-select .bin:hover{color:#e9a27a;border-color:rgba(233,162,122,.6);background:rgba(120,44,44,.25)}',
+    '#ts-select .bin{position:absolute;right:20px;top:20px;width:36px;height:36px;display:grid;place-items:center;border:1px solid rgba(198,170,109,.25);',
+    'color:rgba(228,217,191,.55)}',
     '#ts-select .bin svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}',
     '#ts-select .confirm{position:absolute;inset:0;background:rgba(40,12,10,.96);display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 30px}',
     '#ts-select .confirm .q{font-size:18px;color:#f6e9c8;line-height:1.4}',
     '#ts-select .confirm .q small{display:block;font-size:13.5px;color:rgba(228,217,191,.6);margin-top:4px}',
     '#ts-select .confirm .b{display:flex;gap:10px}',
     '#ts-select .btn2{border:1px solid rgba(198,170,109,.6);padding:10px 22px;font-size:13px;letter-spacing:.2em;text-transform:uppercase;',
-    'cursor:pointer;color:#e9d19b;background:rgba(0,0,0,.3);white-space:nowrap}',
-    '#ts-select .btn2:hover{background:rgba(120,94,44,.5);color:#f6e9c8}',
-    '#ts-select .btn2.danger{border-color:#e9a27a;color:#f6c9b0}',
-    '#ts-select .btn2.danger:hover{background:rgba(160,50,40,.6)}',
+    'color:#e9d19b;background:rgba(0,0,0,.3);white-space:nowrap}',
+    '#ts-select .btn2.danger{border-color:#e9a27a;color:#f6c9b0;background:rgba(120,40,30,.45)}',
     // the foot
     '#ts-select .foot{padding:16px 44px 30px}',
     '#ts-select .status{font-size:15px;color:rgba(228,217,191,.7);min-height:1.5em;margin-bottom:12px}',
     '#ts-select .btn{display:block;width:100%;border:2px solid #e9d19b;padding:18px 20px;text-align:center;font-family:inherit;',
-    'font-size:20px;letter-spacing:.3em;text-transform:uppercase;cursor:pointer;background:#c6aa6d;color:#1b1205;',
-    'white-space:nowrap;transition:background 80ms linear}',
-    '#ts-select .btn:hover{background:#e9d19b}',
+    'font-size:20px;letter-spacing:.3em;text-transform:uppercase;background:#c6aa6d;color:#1b1205;',
+    'white-space:nowrap}',
     '#ts-select .btn.off{opacity:.35;pointer-events:none}',
     '#ts-select .hint{font-size:13px;color:rgba(228,217,191,.45);margin-top:14px;text-align:center;letter-spacing:.06em}'
   ].join('');
@@ -124,6 +131,7 @@
   var root = document.createElement('div');
   root.id = 'ts-select';
   root.innerHTML =
+    '<div class="bg"></div><div class="shade"></div>' +
     '<div class="panel">' +
       '<div class="head"><div><div class="eyebrow">Thornswood</div><div class="title">Who are you today?</div></div>' +
       '<div class="count"></div></div>' +
@@ -133,7 +141,30 @@
     '</div>';
   document.body.appendChild(root);
   var elPanel = root.querySelector('.panel');
+  var elBg = root.querySelector('.bg');
   var elList = root.querySelector('.list');
+
+  /*
+    The painting. The still goes on as the background at once; the loop is
+    laid over it and plays if this browser decodes it, and is taken away
+    again if it cannot, so what is behind the panel is the painting either
+    way and never a black box. Muted, because the music is its own element.
+  */
+  if (LIST.still) { try { elBg.style.backgroundImage = 'url("' + String(LIST.still) + '")'; } catch (e) { } }
+  if (LIST.video) {
+    try {
+      var vid = document.createElement('video');
+      vid.muted = true; vid.loop = true; vid.autoplay = true;
+      vid.setAttribute('muted', ''); vid.setAttribute('playsinline', '');
+      vid.preload = 'auto';
+      vid.onerror = function () { try { vid.remove(); } catch (e) { } tell('painting: the loop would not play here, the still stays'); };
+      vid.onplaying = function () { tell('painting: the loop is playing'); };
+      vid.src = String(LIST.video);
+      elBg.appendChild(vid);
+      var vp = vid.play();
+      if (vp && typeof vp.catch === 'function') { vp.catch(function () { }); }
+    } catch (e) { tell('painting: ' + e); }
+  }
   var elCount = root.querySelector('.count');
   var elStatus = root.querySelector('.status');
   var elPlay = root.querySelector('.btn');
@@ -357,11 +388,13 @@
     moved = true;
     tell('mouse first moved at ' + ev.clientX + ',' + ev.clientY + ' ' + seen());
   }, true);
-  var beats = 0;
+  // Every two seconds while the choice is up. The plugin reloads the page
+  // after six seconds without one, which is how a page that dies under the
+  // mouse comes back instead of leaving a blank menu.
   var beat = setInterval(function () {
-    if (sent || root.className === 'gone' || beats++ > 30) { clearInterval(beat); return; }
+    if (sent || root.className === 'gone') { clearInterval(beat); return; }
     tell('alive ' + seen());
-  }, 4000);
+  }, 2000);
 
   window.thornswoodSelect = { play: play, close: function () { root.className = 'gone'; } };
   fit();

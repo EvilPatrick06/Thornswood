@@ -111,6 +111,19 @@ if (Test-Path -LiteralPath $uiSrc) {
     Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
     Note $f.Name
   }
+  # The painting behind the main menu's character choice: the site's own
+  # banner, the loop and its first frame, copied under the page's names so
+  # the one file in the repo is the site's. Ours, flat under UI, so it ships.
+  $siteArt = Join-Path $Here 'docs-app\public'
+  foreach ($pair in @(@('banner.mp4', 'thornswood-menu.mp4'), @('banner.jpg', 'thornswood-menu.jpg'))) {
+    $src = Join-Path $siteArt $pair[0]
+    if (Test-Path -LiteralPath $src) {
+      Copy-Item -LiteralPath $src -Destination (Join-Path $ui $pair[1]) -Force
+      Note ($pair[1] + ' (from the site''s ' + $pair[0] + ')')
+    } else {
+      Bad ('the site''s ' + $pair[0] + ' is not in docs-app\public, so the menu has no painting')
+    }
+  }
 } else {
   Bad 'the ts-ui folder is not next to this script'
 }

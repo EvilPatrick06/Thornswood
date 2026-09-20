@@ -1,9 +1,9 @@
 {
-  "recordedUtc": "2026-09-20T19:36:54Z",
-  "builtUtc": "2026-09-20T19:35:06Z",
+  "recordedUtc": "2026-09-20T21:05:23Z",
+  "builtUtc": "2026-09-20T21:05:04Z",
   "fork": "https://github.com/EvilPatrick06/skymp",
   "forkBranch": "thornswood/engine-changes",
-  "forkCommit": "b950b920",
+  "forkCommit": "1c53c0aa",
   "upstreamBase": "unknown, fetch upstream to fill this in",
   "thornswoodPatchBlocks": 11,
   "files": {
@@ -24,8 +24,8 @@
       "bytes": 431616
     },
     "Data\\Platform\\Plugins\\skymp5-client.js": {
-      "sha256": "a1a5060aa18a8894e3557ef195cc1e3f82c9a66747204bec7cdd6b1253f86587",
-      "bytes": 1394005
+      "sha256": "3397d7540d47af98510c49e5b3b5a5d735af644f2393109d9fe0960bbca59417",
+      "bytes": 1394580
     },
     "Data\\Scripts\\TESModPlatform.pex": {
       "sha256": "fc02e76eb66788204908b7adda93aebcd447661ad7589c01ca2dc08e3d863137",
