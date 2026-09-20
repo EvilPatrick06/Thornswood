@@ -1144,10 +1144,37 @@ function chargenTick() {
         owns = (inv && inv.entries) ? inv.entries.length : 0;
       } catch (e) { owns = 0; }
 
-      if (appearance && owns > 0) {
+      /*
+        An appearance is the proof, and it is the only one that cannot be
+        wrong. Nothing writes it but the race menu closing on a finished face.
+
+        THIS USED TO SIT BELOW THE LAUNCHER CHOICE CHECK and that was the fault
+        reported on 20 September: characters that had been played for days met
+        creation a second time, and met it in whatever inn they had last chosen
+        rather than in the hall, because the hall is Skyrim Unbound's room and
+        a second run simply happens wherever the character is standing. It
+        looked like creation had been moved somewhere and like it differed per
+        person. It had not and it did not; it was each of them being re-created
+        where they already were.
+
+        Carrying something was the guard before this, and it is not enough on
+        its own. It is proof in the right direction when it is there, and it is
+        silent when it is not: a returning character carrying nothing, or one
+        whose inventory read throws, comes out of that check looking exactly
+        like a new one. The catch below sets owns to 0, so a single failed read
+        on a joining client was all it took. The count is kept because it is
+        worth having in the log, but it no longer decides anything.
+
+        The launcher posts a choice whenever it has a trade and a town recorded
+        for a slot, and it has those for every character it has ever made, so a
+        choice waiting is not evidence of anything. It is checked below, after
+        this, and only reaches a character with no appearance at all.
+      */
+      if (appearance) {
         log('chargen', actorId.toString(16), 'profile', pidNew,
-            'already has a character carrying', owns,
-            owns === 1 ? 'thing' : 'things,',
+            'already has a character' +
+            (owns > 0 ? ' carrying ' + owns + (owns === 1 ? ' thing' : ' things')
+                      : ' and is carrying nothing'),
             'so creation is skipped for them');
         setChargen(actorId, { stage: 'done', at: now, legacy: true });
         closeRaceMenu(actorId);
@@ -1162,29 +1189,11 @@ function chargenTick() {
         continue;
       }
 
-      // Genuinely new: a choice is waiting and there is nothing to lose.
+      // Genuinely new: no appearance at all, and a choice is waiting.
       if (pidNew && launcherChoices[String(pidNew)]) {
         log('chargen', actorId.toString(16), 'profile', pidNew,
             'is new, the launcher has a choice waiting for them');
         beginAppearance(actorId);
-        continue;
-      }
-
-      // Otherwise: somebody who was already playing before this existed keeps
-      // their character. Only a blank appearance means a genuinely new one.
-      if (appearance) {
-        // Said out loud. This branch is the whole reason creation could look
-        // broken while nothing was wrong: it is correct, it is silent, and it
-        // is what happens to anybody whose profile id already has a character
-        // on this server. Two launchers handing out the same id put two people
-        // on the same character and both landed here, and the log had nothing
-        // in it to say so.
-        let pidWas = 0;
-        try { pidWas = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pidWas = 0; }
-        log('chargen', actorId.toString(16), 'profile', pidWas,
-            'already has a character, so creation is skipped for them');
-        setChargen(actorId, { stage: 'done', at: now, legacy: true });
-        closeRaceMenu(actorId);
         continue;
       }
       beginAppearance(actorId);
