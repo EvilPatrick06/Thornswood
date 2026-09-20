@@ -41,7 +41,8 @@ param(
     [int]   $Port     = 7777,
     [switch]$MinimalLoadOrder,   # masters plus Thornswood-Content.esp only
     [switch]$FullLoadOrder,      # list everything, indices be damned. for bisecting
-    [switch]$Vortex              # read the Steam game and the active Vortex profile
+    [switch]$Vortex,             # read the Steam game and the active Vortex profile
+    [switch]$NewOrder            # take the plugin list's order as it is, for a world being wiped
 )
 
 # ---------------------------------------------------------------- -Vortex ---
@@ -171,6 +172,51 @@ if (-not $FullLoadOrder) {
 } else { $lightCount = 0 }
 
 $keep  = @($wanted | Where-Object { $info[$_] -and -not $drop.Contains($_) })
+
+# ---- the order the server already runs stays ------------------------------
+#
+# The world database keys every changed form on fileIdx * 0x01000000 plus the
+# local id, and fileIdx is the position in this list. Move a plugin and every
+# saved chest, door and body from every plugin after it points at the wrong
+# record. So the order is not this machine's plugin list's to decide once a
+# world exists: the list the server already has is kept as it is, a plugin
+# that is new goes on the end, and a plugin that is gone is said out loud,
+# because everything after it moves up one and that is the one move nothing
+# here can undo. The client follows: the launcher's LoadOrder.cs puts every
+# machine's list into the server's order, and Publish-Update.ps1 ships the
+# reference list that way. Until 20 September this took the order from the
+# plugin list every time, and LOOT re-sorting that list at 13:05 would have
+# re-keyed the whole world on the next deploy.
+#
+# -NewOrder takes the list's order as it is. That is for a world that is
+# being wiped, and for nothing else.
+$priorPath = Join-Path $Dist 'server-settings.json'
+$prior = @()
+if (-not $NewOrder -and -not $FullLoadOrder -and -not $MinimalLoadOrder -and (Test-Path -LiteralPath $priorPath)) {
+    try {
+        $prior = @((Get-Content -LiteralPath $priorPath -Raw | ConvertFrom-Json).loadOrder |
+                   ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) } |
+                   Where-Object { $_ })
+    } catch { $prior = @() }
+}
+if ($prior.Count) {
+    $keepBy = @{}
+    foreach ($k in $keep) { $keepBy[$k.ToLowerInvariant()] = $k }
+    $ordered = @(); $placed = @{}
+    foreach ($p in $prior) {
+        $lk = $p.ToLowerInvariant()
+        if ($keepBy.ContainsKey($lk) -and -not $placed.ContainsKey($lk)) { $ordered += $keepBy[$lk]; $placed[$lk] = $true }
+    }
+    $added   = @($keep  | Where-Object { -not $placed.ContainsKey($_.ToLowerInvariant()) })
+    $removed = @($prior | Where-Object { -not $keepBy.ContainsKey($_.ToLowerInvariant()) })
+    $keep = @($ordered + $added)
+    Write-Host ("  order kept from the server's own list: {0} in place, {1} new on the end, {2} gone" -f $ordered.Count, $added.Count, $removed.Count) -ForegroundColor Cyan
+    foreach ($a in $added)   { Write-Host "    + $a" -ForegroundColor Green }
+    foreach ($r in $removed) { Write-Host "    - $r   every plugin after it moves up one; the world's saved forms from those plugins are re-keyed" -ForegroundColor Yellow }
+} elseif ($NewOrder) {
+    Write-Host "  -NewOrder: the plugin list's order is taken as it is" -ForegroundColor Yellow
+}
+
 $paths = @($keep | ForEach-Object { (Join-Path $Data $_) -replace '\\', '/' })
 
 # ---- rewrite server-settings.json -----------------------------------------
