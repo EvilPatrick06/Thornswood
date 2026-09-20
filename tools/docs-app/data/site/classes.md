@@ -219,12 +219,15 @@ rather than all at once, and the part already in place is the part that matters
 most: vanilla progression is off, so nothing you do today is being spent on a
 system that is going away.
 
-Read the rest of this page as what is being built rather than what is running.
-As of 20 September the menu exists in game, on **K**, and it shows you the
-professions, the classes and the fifteen sub-skills. It does not yet keep what
-you pick. Ranks, the master perks, apprenticeship and every point in the skill
-tree are still being written, and none of them do anything in the world today.
-Nothing on this page is a promise about tonight.
+Everything on this page is the system, settled and not up for redesign. It
+arrives in pieces rather than all at once, which is worth knowing before you
+plan a character around a rank that has not landed yet.
+
+The menu is in, on **K**, and it shows you the professions, the classes and the
+fifteen sub-skills. The ranks, the master perks, apprenticeship and spending
+points in the tree are being built now. If something on this page does not do
+anything yet when you press it, that is why, and somebody will say so in the
+Discord rather than leaving you guessing.
 
 Argue about the list in the Discord. Most of what ends up in it will have come
 from somebody who was already doing the thing.
