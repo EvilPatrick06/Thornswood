@@ -34,9 +34,14 @@ are able to make at all.
 | **Tailor** | **Liverywright**, robes and faction dress, or **Haberdasher**, common and fine clothing |
 | **Woodworker** | **Charburner**, firewood through to coke, or **Woodwright**, bows, arrows and instruments |
 
-An Edgewright cannot make a cuirass. Not badly, not slowly. At all.
-If you want one you find somebody who took the other half, and that is a
-conversation rather than a menu.
+You get the **novice** work of your sister half for nothing. An Edgewright
+knows how to beat out plain iron plate, because anybody who works a forge does.
+What they cannot do is go any further than novice with it, and a real cuirass
+is not novice work. For that you find a Platewright, and that is a conversation
+rather than a menu.
+
+Everything outside your own profession you cannot do at all, unless somebody
+teaches you. There is a way to learn a little of it and it is further down.
 
 ## The Mage, which is the odd one
 
@@ -107,18 +112,85 @@ Each rank opens more of what you are able to make, inside your own half of your
 own profession and nowhere else. An Edgewright at Master still cannot make a
 cuirass.
 
+### What Master actually gets you
+
+Reaching Master opens one thing that nobody below it has. It is the reason the
+rank is worth the years rather than just a word over your head.
+
+| Profession | The Master perk |
+|---|---|
+| **Warrior** | **Warlord.** Master-tier combat maneuvers, and you can teach novice combat to people who are not warriors |
+| **Mage** | **Archmage.** A third school of magic, and the standing to apprentice non-mages |
+| **Alchemist** | **Master Chemist.** Every batch yields two instead of one |
+| **Cook** | **Grand Chef.** Every batch yields two instead of one |
+| **Smith** | **Mastercraft.** Temper to Legendary, past what the metal should take |
+| **Enchanter** | **Twin Souls.** Two enchantments on one item |
+| **Tailor** | **Master Weaver.** Your clothing carries hidden armour, or keeps the weather off, and still weighs what clothing weighs |
+| **Woodworker** | **Master Carver.** Fires and kilns you build or work give the most warmth there is |
+
 ### Taking an apprentice
 
-A Master can take on an apprentice, and it has to be somebody in the same
-profession and the same half of it. A Platewright teaches Platewrights and
-an Edgewright teaches Edgewrights. Same work, one end of it to the other.
+A Master can take on an apprentice, and there are two different things that
+can mean.
 
-While that stands the apprentice climbs faster. The same hours spent under
-somebody who already got to the top are worth more than the same hours spent
-alone, which is the whole reason to go and find one.
+**Inside the same half.** A Platewright teaching Platewrights. The apprentice
+climbs faster: the same hours spent under somebody who already got to the top
+are worth more than the same hours spent alone, which is the whole reason to go
+and find one. This is also the only way past novice in your sister half. An
+Edgewright who wants to go further than plain iron plate needs a Master
+Platewright to take them on.
+
+**Outside your profession entirely.** A Master can teach a novice's worth of
+their own work to somebody from another profession. A Master Cook can show a
+Smith how to feed themselves properly. It has to be a Master of the exact half
+you want to learn, it never goes past novice, and **you may only ever do this
+twice**. Your sister half does not count against the two.
+
+So a person can end up knowing their own trade properly, a little of the half
+next door, and a little of two other trades entirely. That is the ceiling, and
+it is deliberately low enough that you still need the room.
 
 The master decides who, and can end it. Nobody is owed an apprenticeship and
 nobody is stuck in one.
+
+## The skill tree
+
+Your profession is what you make. This is what your body and your magicka can
+take, and it is separate from all of it. Everybody has the same fifteen, and
+nobody fills more than a few of them.
+
+Points go into fifteen sub-skills under three headings. Filling one completely
+gives you its perk, and those are the ones worth planning around.
+
+### Health
+
+| Sub-skill | What it raises | Filled |
+|---|---|---|
+| **Vitality** | Your health | **Cheat Death.** Once a day, the blow that would kill you leaves you on one |
+| **Fortitude** | How fast it comes back | **Troll's Blood.** It keeps coming back during a fight |
+| **Might** | Melee damage | **Devastating Blow.** Power attacks usually put people down |
+| **Resilience** | Armour rating | **Unshakeable.** Nothing staggers you while you are blocking |
+| **Toughness** | Poison and disease | **Purified Blood.** No disease touches you, and poison barely does |
+
+### Magicka
+
+| Sub-skill | What it raises | Filled |
+|---|---|---|
+| **Capacity** | Your magicka | **Archmage's Vessel.** Drop below a tenth and it floods back |
+| **Clarity** | How fast it comes back | **Leyline Attunement.** It refills while you are still casting |
+| **Potency** | Spell damage and duration | **Overcharge.** Now and then a spell lands twice as hard or holds twice as long |
+| **Ward** | Resisting hostile magic | **Spellbreaker.** Some of what is thrown at you is swallowed and becomes your magicka |
+| **Efficiency** | What spells cost | **Font of Magic.** Once a day, fifteen seconds where nothing costs anything |
+
+### Stamina
+
+| Sub-skill | What it raises | Filled |
+|---|---|---|
+| **Endurance** | Your stamina | **Tireless.** Running and swinging cost half |
+| **Vigor** | How fast it comes back | **Second Wind.** Empty it and it fills, once every five minutes |
+| **Agility** | Speed | **Windwalker.** Faster on your feet, and falls do not hurt you |
+| **Burden** | What you can carry | **Pack Mule.** Being overloaded stops slowing you down |
+| **Precision** | Crits and bows | **Lethal Aim.** Arrows go through half of whatever armour is in the way |
 
 ## None of this is for sale
 
@@ -146,6 +218,13 @@ Character creation and the world both run now. The professions land in pieces
 rather than all at once, and the part already in place is the part that matters
 most: vanilla progression is off, so nothing you do today is being spent on a
 system that is going away.
+
+Read the rest of this page as what is being built rather than what is running.
+As of 20 September the menu exists in game, on **K**, and it shows you the
+professions, the classes and the fifteen sub-skills. It does not yet keep what
+you pick. Ranks, the master perks, apprenticeship and every point in the skill
+tree are still being written, and none of them do anything in the world today.
+Nothing on this page is a promise about tonight.
 
 Argue about the list in the Discord. Most of what ends up in it will have come
 from somebody who was already doing the thing.
