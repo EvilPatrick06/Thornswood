@@ -6,5 +6,14 @@
   <script src="thornswood-bridge.js"></script><script defer src="build.js"></script></head>
   <body>
     <div id="root"></div>
+    <!-- The character choice at the main menu, up before any plugin runs.
+         SkyrimPlatform loads this page at start, fifteen seconds before it
+         runs a plugin, and the launcher writes thornswood-characters.js
+         beside it before Play; with both here the choice draws itself and
+         the music starts with the page. The plugin's part is to show the
+         browser, give it the mouse, hear the pick and remove the list, so
+         the reload in the world does not bring the choice back. -->
+    <script src="thornswood-characters.js"></script>
+    <script src="thornswood-select.js"></script>
   </body>
 </html>

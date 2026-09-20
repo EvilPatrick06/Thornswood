@@ -256,17 +256,25 @@
     if (!chooseAtMenu || menuPhase === 9) { return; }
     const now = Date.now();
 
+    /*
+      No loadUrl here, ever. What the browser's own log showed on 20
+      September at 15:09: SkyrimPlatform loads Data/Platform/UI/index.html
+      itself at start, fifteen seconds before any plugin runs, so the page
+      is already ours and already drawing the choice from the list the
+      launcher wrote. Tilted applies a loadUrl only inside its mouse move
+      handler, so the one this block used to issue sat until the first
+      mouse move and then navigated away from the page the person was
+      looking at. That was the vanish, four times over.
+
+      So this asks the page where it is and what it has, and only fills in
+      what is missing: an index.html from before this change gets the list
+      and the script injected; a browser on some other address (none known)
+      gets a loadUrl as a last resort and the wait that comes with it.
+    */
     if (menuPhase === 0) {
-      // Not at the very first tick, but not long after it either: the first
-      // cut waited two and a half seconds here and another one and a half
-      // below, and the whole wait was what Patrick felt as the menu being
-      // slow to appear and the music slow to start.
       if (now - loadedAt < 600) { return; }
-      // A plugin reload mid session runs this file again; the choice on disk
-      // is this session's and there is nothing to ask.
       if (chosenOnDisk()) { menuPhase = 9; log('menu: a choice is already on disk for this session'); return; }
       try {
-        sp.browser.loadUrl(UI_URL);
         sp.browser.setVisible(true);
         sp.browser.setFocused(true);
       } catch (e) {
@@ -274,99 +282,55 @@
         menuPhase = 9;
         return;
       }
-      menuPhase = 1; menuAt = now;
-      log('menu: loading the page for the character choice');
+      menuPhase = 1; menuAt = now; menuAsked = 0;
+      log('menu: showing the page and asking where it is');
       return;
     }
 
-    if (menuPhase === 1 && now - menuAt > 700) {
-      let list = null;
-      try { list = JSON.parse(readText(CHARACTERS_FILE)); } catch (e) { list = null; }
-      if (!list || !Array.isArray(list.characters)) {
-        if (PROFILE > 0) {
-          T.js('try{window.skyrimPlatform.sendMessage("thornswood","select",' + PROFILE + ');}catch(e){}');
-          log('menu: no character list on disk, so joining as profile', PROFILE, 'from the settings');
-        } else {
-          log('menu: no character list on disk and no profile in the settings; the client will wait a minute and then say so');
-        }
-        try { sp.browser.setFocused(false); } catch (e) { }
-        menuPhase = 9;
-        return;
+    if (menuPhase === 1) {
+      // Ask once a second until the page answers (browserMessage below).
+      if (now - menuAsked > 1000) {
+        menuAsked = now;
+        T.js('try{window.skyrimPlatform.sendMessage("thornswood-front","where "+location.href+" "+(window.thornswoodSelect?"select":(window.THORNSWOOD_SELECT?"list":"bare")));}catch(e){}');
       }
-      // Dev only: a test track for the menu and the loading screen, 20
-      // September. The file rides in dev packs alone (Ship-Rules), and the
-      // page is told about it only when the launcher's session note names
-      // the dev build, so a main install with a stray copy stays silent.
-      try {
-        const note = String(readText('Data/Platform/thornswood-session.txt'));
-        if (/\bDev\b/.test(note) && require('fs').existsSync('Data/Platform/UI/thornswood-dev-theme.mp3')) {
-          list.music = 'thornswood-dev-theme.mp3';
-        }
-      } catch (e) { }
-      // The painting behind the choice: the animated loop and its still, the
-      // site's banner copied in by Go.ps1. Asked for by Patrick on 20
-      // September, in place of the main menu's own doubled, soft backdrop
-      // (entry 83). The page uses the loop when the browser can decode it
-      // and the still when it cannot.
-      try {
-        const fs2 = require('fs');
-        if (fs2.existsSync('Data/Platform/UI/thornswood-menu.mp4')) { list.video = 'thornswood-menu.mp4'; }
-        if (fs2.existsSync('Data/Platform/UI/thornswood-menu.jpg')) { list.still = 'thornswood-menu.jpg'; }
-      } catch (e) { }
-      // The page has six seconds from here to say ready before the silence
-      // watch below counts it as gone.
-      menuBeatAt = now;
-      // The list is never logged in full: it is every profile id this
-      // install owns, and a profile id is a seat in the voice room.
-      T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';');
-      inject('thornswood-select.js');
-      menuPhase = 2; menuAt = now;
-      log('menu: asking who to play,', list.characters.length, 'character(s) listed');
+      // Nothing back in five seconds: the page is not ours or not up. Load
+      // ours; Tilted applies it on the next mouse move, which is the wait
+      // this block otherwise avoids.
+      if (now - menuAt > 5000 && !menuLoaded) {
+        menuLoaded = true;
+        log('menu: the page did not answer in five seconds, loading ours');
+        try { sp.browser.loadUrl(UI_URL); } catch (e) { }
+        menuAt = now;
+      }
       return;
     }
 
     if (menuPhase === 2) {
       /*
-        Held up and held focused, four times a second, until the choice is
-        made.
-
-        The first cut showed the browser once a second and never touched
-        focus, and on 20 September the page vanished the moment the mouse
-        moved and stayed gone. skymp5-client's BrowserService hides the
-        browser for every menu it calls bad, the main menu among them, and
-        shows it again only when none of them is open, which at the main
-        menu is never; anything that opens and closes a menu while the
-        choice is up leaves the browser hidden for good. Focus goes the same
-        way: its Escape handler and its own login path both drop it, and
-        without it the mouse belongs to Skyrim's menu underneath, which is
-        what a page that does not answer looks like. So both are read and
-        put back, and the log says once when either had to be.
-      */
-      /*
-        The page's own pulse, and a reload when it stops.
-
-        20 September, 14:58: the page reported healthy, said the mouse had
-        moved, and then never spoke again, with the browser still visible and
-        focused according to the plugin. No reload line, no hide line: the
-        page's process itself went down under mouse input, or its bridge to
-        us did. Either way the person was left with nothing to click. The
-        page beats every two seconds while the choice is up; six seconds of
-        silence and this loads it again from the top, three times at most,
-        and says so.
+        The page's own pulse, and a reload when it stops. Kept from the
+        earlier cut as the safety net: the page beats every two seconds
+        while the choice is up; six seconds of silence and this reloads it,
+        three times at most, and says so.
       */
       if (menuBeatAt && now - menuBeatAt > 6000) {
         if (menuReloads >= 3) {
           if (!menuGaveUp) { menuGaveUp = true; log('menu: the page went silent three times; leaving it, the client falls back to the last character'); }
         } else {
           menuReloads++;
-          const tries = menuReloads;
-          log('menu: the page went silent for six seconds, loading it again (' + tries + ' of 3)');
+          log('menu: the page went silent for six seconds, loading it again (' + menuReloads + ' of 3)');
           try { sp.browser.loadUrl(UI_URL); sp.browser.setVisible(true); sp.browser.setFocused(true); } catch (e) { }
-          menuPhase = 1; menuAt = now; menuBeatAt = 0;
+          menuPhase = 1; menuAt = now; menuAsked = 0; menuBeatAt = 0; menuLoaded = true;
           return;
         }
       }
 
+      /*
+        Held up and held focused, four times a second, until the choice is
+        made. skymp5-client's BrowserService hides the browser for every
+        menu it calls bad, the main menu among them, and shows it again
+        only when none is open, which at the main menu is never; and its
+        Escape handler and login path both drop focus.
+      */
       if (now - menuAt > 250) {
         menuAt = now;
         let vis = true, foc = true;
@@ -383,6 +347,50 @@
       }
     }
   }));
+  let menuAsked = 0;
+  let menuLoaded = false;
+
+  /*
+    The page answered "where": its address and whether the choice is
+    mounted. Ours with the choice up: done, watch it. Ours without: an
+    index.html from before 20 September, so the list and the script go in
+    by hand. Anything else: load ours.
+  */
+  function menuWhere(href, has) {
+    if (menuPhase !== 1) { return; }
+    const ours = /\/Data\/Platform\/UI\/index\.html$/i.test(String(href));
+    if (!ours) {
+      if (!menuLoaded) {
+        menuLoaded = true;
+        log('menu: the browser is on', href, 'and not our page; loading ours');
+        try { sp.browser.loadUrl(UI_URL); } catch (e) { }
+      }
+      return;
+    }
+    if (has === 'select') {
+      menuPhase = 2; menuAt = Date.now(); menuBeatAt = Date.now();
+      log('menu: the page is ours and the choice is up');
+      return;
+    }
+    // Ours, but the page did not bring the choice up itself.
+    let list = null;
+    try { list = JSON.parse(readText(CHARACTERS_FILE)); } catch (e) { list = null; }
+    if (!list || !Array.isArray(list.characters)) {
+      if (PROFILE > 0) {
+        T.js('try{window.skyrimPlatform.sendMessage("thornswood","select",' + PROFILE + ');}catch(e){}');
+        log('menu: no character list on disk, so joining as profile', PROFILE, 'from the settings');
+      } else {
+        log('menu: no character list on disk and no profile in the settings; the client will wait and then say so');
+      }
+      try { sp.browser.setFocused(false); } catch (e) { }
+      menuPhase = 9;
+      return;
+    }
+    if (has !== 'list') { T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';'); }
+    inject('thornswood-select.js');
+    menuPhase = 2; menuAt = Date.now(); menuBeatAt = Date.now();
+    log('menu: the page is ours without the choice; put it in,', list.characters.length, 'character(s) listed');
+  }
   let menuHidTold = false;
   let menuBlurTold = false;
   let menuBeatAt = 0;
@@ -399,6 +407,12 @@
     }
     menuPhase = 9;
     try { sp.browser.setFocused(false); } catch (e) { }
+    // The page repeats its pick every two seconds until this says it
+    // heard, because the page can be up long before this plugin is.
+    T.js('try{window.thornswoodSelect&&window.thornswoodSelect.acked();}catch(e){}');
+    // The list the launcher wrote for the page. Gone now, so the page
+    // reload in the world (phase 0 below) does not bring the choice back.
+    try { require('fs').unlinkSync('Data/Platform/UI/thornswood-characters.js'); } catch (e) { }
     log('menu: chosen profile', id);
   }
 
@@ -2508,6 +2522,11 @@
     if (a[0] === 'thornswood' && a[1] === 'select') {
       const id = Number(a[2]) || 0;
       if (id > 0) { menuChose(id); }
+      return;
+    }
+    if (a[0] === 'thornswood-front' && String(a[1]).indexOf('where ') === 0) {
+      const parts = String(a[1]).split(/\s+/);
+      menuWhere(parts[1] || '', parts[2] || '');
       return;
     }
     if (a[0] !== 'thornswood-front') return;

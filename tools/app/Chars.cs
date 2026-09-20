@@ -541,6 +541,36 @@ namespace Thornswood
                                     ex.Message.TrimEnd('.') + "), so the game was not started. " +
                                     "Check that Data\\Platform is not read only.");
             }
+
+            // The same list as a script beside the page, so the page draws the
+            // choice the moment SkyrimPlatform loads it at start, fifteen
+            // seconds before any plugin runs (measured 20 September). The page
+            // takes music, the painting and its still from here too; the dev
+            // test track only on the dev build, the painting wherever Go.ps1
+            // put it. The plugin deletes this file once the pick is made, so
+            // the page's reload in the world does not bring the choice back.
+            try
+            {
+                string ui = Path.Combine(Paths.Game, "Data\\Platform\\UI");
+                string json = sb.ToString();
+                var extra = new StringBuilder();
+                if (cfg != null && cfg.IsDev && File.Exists(Path.Combine(ui, "thornswood-dev-theme.mp3")))
+                    extra.Append(",\"music\":\"thornswood-dev-theme.mp3\"");
+                if (File.Exists(Path.Combine(ui, "thornswood-menu.mp4")))
+                    extra.Append(",\"video\":\"thornswood-menu.mp4\"");
+                if (File.Exists(Path.Combine(ui, "thornswood-menu.jpg")))
+                    extra.Append(",\"still\":\"thornswood-menu.jpg\"");
+                // The fields go in before the closing brace of the object.
+                if (extra.Length > 0 && json.EndsWith("}")) json = json.Substring(0, json.Length - 1) + extra.ToString() + "}";
+                Directory.CreateDirectory(ui);
+                File.WriteAllText(Path.Combine(ui, "thornswood-characters.js"),
+                                  "window.THORNSWOOD_SELECT=" + json + ";\n", new UTF8Encoding(false));
+            }
+            catch
+            {
+                // The json above is what the plugin falls back on, so this is
+                // a slower menu rather than no menu, and not worth stopping for.
+            }
         }
 
         /// <summary>ISO 8601 in UTC, or empty for a date that was never set.</summary>

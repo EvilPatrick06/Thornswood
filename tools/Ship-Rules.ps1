@@ -82,6 +82,10 @@ $ShipMachineFiles = @(
     'Data\Platform\thornswood-characters.json',
     'Data\Platform\thornswood-choice.txt',
     'Data\Platform\thornswood-forget.txt',
+    # The same list as a script beside the page (Chars.WriteCharacters), so
+    # the choice draws before any plugin runs. Every profile id the install
+    # owns, so never in a pack.
+    'Data\Platform\UI\thornswood-characters.js',
     # Written by the game on this machine every session. The second is the
     # light half of the same list, kept apart because the server's own list
     # drops light plugins and the first file has to match it positionally.

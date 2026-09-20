@@ -302,17 +302,38 @@
     draw();
   }
 
+  /*
+    The pick goes to skymp5-client, and again every two seconds until the
+    plugin says it heard. This page can be up long before any plugin runs
+    (SkyrimPlatform loads the page at start and its plugins fifteen seconds
+    later), so a pick made in that gap would otherwise be lost. The client
+    ignores the repeats once it has one.
+  */
+  var acked = false;
+  var picked = 0;
+  function sendPick() {
+    if (!picked || acked) return;
+    try { window.skyrimPlatform.sendMessage('thornswood', 'select', picked); } catch (err) { }
+  }
   function play() {
     if (sent) return;
     var list = slots();
     var e = list[at];
     if (!e || !e.id) return;
     sent = true;
+    picked = e.id;
     elStatus.textContent = e.c ? 'Joining as ' + (e.c.name || 'your character') + '. The world is loading.' : 'Off to the creation hall. The world is loading.';
     draw();
-    try { window.skyrimPlatform.sendMessage('thornswood', 'select', e.id); } catch (err) { }
+    sendPick();
     tell('picked');
-    setTimeout(function () { root.className = 'gone'; }, 1500);
+    var again = setInterval(function () {
+      if (acked) { clearInterval(again); return; }
+      sendPick();
+    }, 2000);
+  }
+  function onAcked() {
+    acked = true;
+    setTimeout(function () { root.className = 'gone'; }, 1200);
   }
 
   function onKey(ev) {
@@ -396,7 +417,7 @@
     tell('alive ' + seen());
   }, 2000);
 
-  window.thornswoodSelect = { play: play, close: function () { root.className = 'gone'; } };
+  window.thornswoodSelect = { play: play, acked: onAcked, close: function () { root.className = 'gone'; } };
   fit();
   draw();
   tell('ready ' + slots().length + ' slots ' + seen());
