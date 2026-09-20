@@ -76,6 +76,11 @@ $ShipMachineFiles = @(
     # carry it. Sixty minute life, so a stale one opens nothing, but a token is
     # a token.
     'Data\Platform\voice-token.txt',
+    # The main menu character choice, 20 September: the launcher writes the
+    # list before Play and the plugin writes the pick. Both are one machine's,
+    # and the list is every profile id the install owns.
+    'Data\Platform\thornswood-characters.json',
+    'Data\Platform\thornswood-choice.txt',
     # Written by the game on this machine every session. The second is the
     # light half of the same list, kept apart because the server's own list
     # drops light plugins and the first file has to match it positionally.

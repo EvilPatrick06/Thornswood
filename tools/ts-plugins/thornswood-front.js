@@ -207,7 +207,122 @@
     }
     return '';
   }
-  const PROFILE = Number((client.gameData || {}).profileId) || 0;
+  // Whose session this is. From the settings file until 20 September; now the
+  // settings hold the last one played and the real answer comes from the main
+  // menu (the block below), so this is reassigned when the choice is made.
+  let PROFILE = Number((client.gameData || {}).profileId) || 0;
+
+  // ------------------------------------------------- the main menu choice --
+  /*
+    Who you are is chosen at the game's main menu, not in the launcher.
+
+    Asked for by Patrick on 20 September. The launcher writes the list of this
+    install's characters to thornswood-characters.json and sets
+    gameData.chooseAtMenu in the client settings; our fork of skymp5-client
+    then waits at the menu instead of logging in as gameData.profileId. This
+    block loads the page into the browser at the menu, hands the list to
+    thornswood-select.js, and the page's pick goes straight to the client as
+
+        sendMessage('thornswood', 'select', profileId)
+
+    which the client hears (it is a browserMessage like any other) and logs in
+    as. This plugin hears the same message, remembers the profile for the
+    voice join and the chat, and writes it to thornswood-choice.txt for the
+    launcher, which fetches the voice token for that profile and keeps the
+    books.
+
+    It runs on tick and not on update, because update does not fire at the
+    main menu (it needs the Papyrus VM, which needs a game). Nothing here
+    calls into the game, only the browser and the disk, which is what tick is
+    allowed. The rest of this file waits for update as before and finds the
+    page already loaded, which it handles the same way it handles a reload.
+
+    With no list on disk (an older launcher) the settings' profileId is sent
+    as the choice at once, so nobody sits at a menu that asks nothing.
+  */
+  const CHOICE_FILE = 'Data/Platform/thornswood-choice.txt';
+  const CHARACTERS_FILE = 'Data/Platform/thornswood-characters.json';
+  const chooseAtMenu = !!((client.gameData || {}).chooseAtMenu);
+  let sawUpdate = false;
+  let menuPhase = 0;
+  let menuAt = 0;
+  const loadedAt = Date.now();
+
+  function chosenOnDisk() {
+    try { return !!readText(CHOICE_FILE).trim(); } catch (e) { return false; }
+  }
+
+  sp.on('tick', guard('menu', () => {
+    if (!chooseAtMenu || sawUpdate || menuPhase === 9) { return; }
+    const now = Date.now();
+
+    if (menuPhase === 0) {
+      // Not at the first tick: the browser exists from init but the game is
+      // still settling its swap chain around the menu.
+      if (now - loadedAt < 2500) { return; }
+      // A plugin reload mid session runs this file again; the choice on disk
+      // is this session's and there is nothing to ask.
+      if (chosenOnDisk()) { menuPhase = 9; log('menu: a choice is already on disk for this session'); return; }
+      try {
+        sp.browser.loadUrl(UI_URL);
+        sp.browser.setVisible(true);
+        sp.browser.setFocused(true);
+      } catch (e) {
+        log('menu: no browser backend:', e);
+        menuPhase = 9;
+        return;
+      }
+      menuPhase = 1; menuAt = now;
+      log('menu: loading the page for the character choice');
+      return;
+    }
+
+    if (menuPhase === 1 && now - menuAt > 1500) {
+      let list = null;
+      try { list = JSON.parse(readText(CHARACTERS_FILE)); } catch (e) { list = null; }
+      if (!list || !Array.isArray(list.characters)) {
+        if (PROFILE > 0) {
+          T.js('try{window.skyrimPlatform.sendMessage("thornswood","select",' + PROFILE + ');}catch(e){}');
+          log('menu: no character list on disk, so joining as profile', PROFILE, 'from the settings');
+        } else {
+          log('menu: no character list on disk and no profile in the settings; the client will wait a minute and then say so');
+        }
+        try { sp.browser.setFocused(false); } catch (e) { }
+        menuPhase = 9;
+        return;
+      }
+      // The list is never logged in full: it is every profile id this
+      // install owns, and a profile id is a seat in the voice room.
+      T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';');
+      inject('thornswood-select.js');
+      menuPhase = 2; menuAt = now;
+      log('menu: asking who to play,', list.characters.length, 'character(s) listed');
+      return;
+    }
+
+    if (menuPhase === 2) {
+      // skymp5-client's BrowserService hides the browser whenever the main
+      // menu opens. Ours is the thing on it, so it is shown again, once a
+      // second, until the choice is made.
+      if (now - menuAt > 1000) {
+        menuAt = now;
+        try { sp.browser.setVisible(true); } catch (e) { }
+      }
+    }
+  }));
+
+  /* The page chose. Called from the browserMessage handler below. */
+  function menuChose(id) {
+    PROFILE = id;
+    try {
+      require('fs').writeFileSync(CHOICE_FILE, id + ' ' + Date.now() + '\n');
+    } catch (e) {
+      log('menu: could not write the choice for the launcher:', e);
+    }
+    menuPhase = 9;
+    try { sp.browser.setFocused(false); } catch (e) { }
+    log('menu: chosen profile', id);
+  }
 
   // ---------------------------------------------------------------- focus --
   // One arbiter, because focus is the thing that kept going wrong.
@@ -1954,6 +2069,7 @@
 
   sp.on('update', guard('tick', () => {
     const now = Date.now();
+    sawUpdate = true;   // there is a game; the main menu block above stands down
 
     // Not at the first tick. The Tilted backend draws through a D3D11 render
     // hook, and early on the game is still tearing its swap chain down and
@@ -2040,6 +2156,11 @@
       T.ready = true;
       T.js('try{window.thornswoodChat&&window.thornswoodChat.show();}catch(e){}');
       log('ready');
+      // Anything queued for the server before ready, which is always the
+      // skills panel's '/pick refresh' (the panel mounts before this line),
+      // goes now rather than on the next pick. Until 20 September it sat in
+      // the queue and a person who never picked never saw their own state.
+      tellServer('');
       return;
     }
 
@@ -2301,8 +2422,17 @@
 
   sp.on('browserMessage', guard('browserMessage', (event) => {
     const a = event.arguments;
-    if (!a || a[0] !== 'thornswood-front') return;
+    if (!a) return;
+    // The main menu's pick, addressed to skymp5-client and overheard here.
+    if (a[0] === 'thornswood' && a[1] === 'select') {
+      const id = Number(a[2]) || 0;
+      if (id > 0) { menuChose(id); }
+      return;
+    }
+    if (a[0] !== 'thornswood-front') return;
     const what = String(a[1]);
+
+    if (what.indexOf('select:ready') === 0) { log('the character choice is on screen (' + what.slice(13) + ')'); return; }
 
     /*
       The skills panel says when it opens and closes rather than being
@@ -2312,11 +2442,12 @@
     */
     if (what === 'skills:opened') { T.claimFocus('skills', true); return; }
     if (what === 'skills:closed') { T.claimFocus('skills', false); return; }
-    if (what === 'skills:ready') {
-      log('the skills panel is in');
+    if (what === 'skills:ready' || what === 'skills:refresh') {
+      if (what === 'skills:ready') { log('the skills panel is in'); }
       // The panel mounts after the first property write of the session, so
-      // it asks the server to say again what this character already is. The
-      // answer comes back through the property's own updateOwner script.
+      // it asks the server to say again what this character already is, and
+      // asks again every time it opens. The answer comes back through the
+      // property's own updateOwner script.
       tellServer('/pick refresh');
       return;
     }

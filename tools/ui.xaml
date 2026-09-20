@@ -642,15 +642,9 @@
               </Grid>
             </Border>
 
-            <Border x:Name="CharBar" Grid.Row="2" Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}"
-                    BorderThickness="1" CornerRadius="2" Padding="20,16" Margin="36,0,36,16" Visibility="Collapsed">
-              <StackPanel>
-                <TextBlock Style="{StaticResource Eyebrow}" Text="Who are you playing"/>
-                <StackPanel x:Name="CharRow" Margin="0,10,0,0"/>
-                <TextBlock x:Name="TxtCharNote" Style="{StaticResource Small}" Margin="0,12,0,0"
-                           Text="Skyrim goes straight into whoever you pick. Hold Shift on the way in if you ever want its own menu back."/>
-              </StackPanel>
-            </Border>
+            <!-- CharBar, the two character slots that opened under Play, sat here
+                 until 20 September. You pick your character at the game's main
+                 menu now, so Play starts the game. -->
 
             <Border x:Name="DowngradeBar" Grid.Row="2" Background="{DynamicResource Card}" BorderBrush="{DynamicResource Accent}"
                     BorderThickness="1" CornerRadius="2" Padding="20,16" Margin="36,0,36,16" Visibility="Collapsed">
@@ -738,7 +732,7 @@
                 <TextBlock Text="What the server keeps" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
                 <Border Style="{StaticResource Slab}">
                   <StackPanel>
-                    <TextBlock Style="{StaticResource Body}" Text="Your character. Not your save file, your character: the server holds your body, your face, your inventory and where you are stood, and hands them back when you connect. That is why New Game in Skyrim&apos;s own menu gives you the same person again, and why a new one has to come from the character picker here rather than from the game. The save file on this machine is scratch, and deleting it changes nothing about who you are on the server."/>
+                    <TextBlock Style="{StaticResource Body}" Text="Your character. Not your save file, your character: the server holds your body, your face, your inventory and where you are stood, and hands them back when you connect. That is why New Game in Skyrim&apos;s own menu gives you the same person again, and why a new one comes from the character list on the game&apos;s main menu, which this launcher writes before Play. The save file on this machine is scratch, and deleting it changes nothing about who you are on the server."/>
                     <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,15,0,15"/>
                     <TextBlock Style="{StaticResource Body}" Text="It does check your mod list. If yours does not match what this build shipped with, the server refuses the connection rather than letting you desync everyone. That check is the reason the launcher will not let you press Play with a broken list."/>
                   </StackPanel>
@@ -1078,17 +1072,9 @@
         </Grid>
       </Border>
 
-      <!-- ================= in window dialogs =================
-           Character creation used to be its own top level window. That is a
-           second thing to alt tab past, it lands wherever Windows decides,
-           and anybody capturing the launcher window rather than the whole
-           screen loses the entire of character creation off their stream.
-           It goes in here instead, over everything including the title bar.
-           ============================================================== -->
-      <Grid x:Name="Overlay" Grid.RowSpan="3" Panel.ZIndex="99" Visibility="Collapsed"
-            Background="#D00A0807">
-        <Border x:Name="OverlayHost"/>
-      </Grid>
+      <!-- The Overlay and OverlayHost that held the trade and town dialog over
+           the whole window were here until 20 September. There is no dialog:
+           you pick your character at the game's main menu. -->
 
     </Grid>
   </Border>

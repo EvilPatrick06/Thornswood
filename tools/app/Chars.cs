@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 
 namespace Thornswood
 {
-    // Two characters, and what actually keeps them apart is the profile id.
+    // The character list, and what actually keeps characters apart is the
+    // profile id.
     //
     // Under SkyMP a character is not a save file. It is a change form held by
     // the server, and which one you get is decided by gameData.profileId in
@@ -14,35 +15,34 @@ namespace Thornswood
     // back profile 1's body, inventory and face, whatever Skyrim's own menu
     // says. That is why New Game never produced a new character.
     //
-    // So a slot owns a profile id. Playing slot two writes that slot's id into
-    // the client settings before the game starts. Making a new character takes
-    // an id nobody has used, which the server has never seen, so it runs
-    // creation from the top. Nothing has to be deleted anywhere and nothing on
-    // the server has to be reachable for any of it, which matters because the
-    // server is not on this machine.
+    // Until 20 September the launcher chose the id. Play opened a bar with two
+    // slots, each slot owned an id, and a slot's button wrote that id into the
+    // client settings before the game started; an empty slot took an id nobody
+    // had used and a trade and town dialog ran first. All of that is gone.
+    // Play means Play: the person picks their character at the game's own
+    // main menu, which our plugin draws from a file this class writes
+    // (Data\Platform\thornswood-characters.json) and answers with one line in
+    // Data\Platform\thornswood-choice.txt, which Shell polls while the game
+    // runs. The client settings carry chooseAtMenu = true and the id played
+    // last, so the client waits at the menu rather than connecting as anybody.
     //
-    // The save folder still gets swapped per slot. SkyrimPlatform writes its
-    // own .ess as it works and there is no reason for two characters to share
-    // one pile of them.
+    // What stays here is the list itself, profiles.txt: one row per id this
+    // install has played, plus one spare row on slot 0 holding the id the
+    // menu's New character will use. Ids are never reused inside one install.
     //
-    // Skyrim has no command line that says "load this save", so the launcher
-    // cannot reach past the main menu on its own. What it can do is make the
-    // choice before the game starts: swap in one character's saves, then let
-    // Start On Save walk in and load the newest one. Starting fresh is the
-    // same trick with an empty folder, which leaves nothing to load and sends
-    // the game into character creation instead.
-    // partial only so that Sync lives in CharSync.cs, which keeps the file
-    // that holds everything else out of the blast radius.
-    static partial class Chars
+    // The save folder is still redirected, to one folder for the whole install
+    // rather than one per slot. SkyrimPlatform writes its own .ess as it works
+    // and there is no reason for them to land among somebody's own saves.
+    static class Chars
     {
-        public const int Slots = 2;
-
         public static string Home { get { return Path.Combine(Paths.ProfileDir, "Characters"); } }
-        public static string SlotDir(int slot) { return Path.Combine(Home, slot.ToString()); }
-        static string Bin { get { return Path.Combine(Home, "_deleted"); } }
-        static string ActiveFile { get { return Path.Combine(Home, "active.txt"); } }
 
-        // One line per slot:
+        // One saves folder for the whole install, where a folder per slot was
+        // until 20 September. Nothing on this disk decides who the character
+        // is (see WriteStartIni), so there is nothing to keep apart.
+        static string SavesDir { get { return Path.Combine(Home, "saves"); } }
+
+        // One line per character, and one for the spare:
         //
         //     slot  profileId  lastPlayedTicks  playedSeconds  trade  town
         //
@@ -53,142 +53,48 @@ namespace Thornswood
         // so a file written before a field existed still reads.
         //
         // A dash stands for an empty trade or town. Space separated fields and
-        // empty strings do not mix.
+        // empty strings do not mix. Nothing reads the trade or the town any
+        // more (the launcher stopped asking on 20 September); they are carried
+        // so a file written before that still reads and writes back the same.
+        //
+        // Slot 0 is the spare: an id minted and written down before the game
+        // starts, never played, so the site's allowed list can carry it before
+        // anybody picks New character at the menu. Any other slot number is a
+        // character. New rows take the next free number; there is no longer a
+        // limit of two.
         static string ProfileFile { get { return Path.Combine(Home, "profiles.txt"); } }
         static string StartIni
         {
             get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\po3_StartOnSave.ini"); }
         }
 
+        // The two files the plugin and the launcher pass between them at the
+        // main menu. Both in Data\Platform, the one folder each end finds
+        // without knowing anything about the other (see Voice.ChannelDirs).
+        static string CharactersFile
+        {
+            get { return Path.Combine(Paths.Game, "Data\\Platform\\thornswood-characters.json"); }
+        }
+        static string ChoiceFile
+        {
+            get { return Path.Combine(Paths.Game, "Data\\Platform\\thornswood-choice.txt"); }
+        }
+
+        // Read used to fill this from the newest save's header as well. That
+        // went with the per slot folders on 20 September: one shared folder
+        // has no save that belongs to any one character, and under SkyMP the
+        // header was scaffolding anyway (see Scrub).
         public class Who
         {
             public int Slot;
             public bool Empty = true;
-            public string Name = "";
-            public string Race = "";
-            public int Level;
-            public string Played = "";
-            public DateTime When;
-            public int Saves;
             public int ProfileId;
             public DateTime LastPlayed;
-            // Seconds this slot has actually been in the game, added up by
-            // the launcher across every session. Skyrim keeps its own figure
+            // Seconds this character has actually been in the game, added up
+            // by the launcher across every session. Skyrim keeps its own figure
             // but it is inside the save, and under SkyMP the character is on
             // the server, so there is often no save here to read it out of.
             public long PlaySeconds;
-            // What was picked in the launcher when this character was made.
-            // Gamemode keys, not labels. The server is the authority on this
-            // once somebody has played; this is what to show before then.
-            public string Trade = "";
-            public string Town = "";
-        }
-
-        // ------------------------------------------------------------ reading
-
-        /*
-          The header of a Skyrim save is a fixed run of fields before anything
-          compressed starts, so the interesting parts can be read without
-          unpacking the save itself.
-
-          Except that on this build they are not the character's. Every save in
-          these folders is written by SkyrimPlatform as scaffolding, named
-          TESMODPLATFORM-<guid>.ess, and its header is filled in with the
-          defaults SkyMP ships rather than anything about the person playing:
-
-              name     CF EB E5 ED ED E8 EA   "Пленник" in Windows-1251,
-                                              Russian for Prisoner
-              level    1
-              location "Солстейм", Solstheim
-
-          Read as UTF-8 that name comes out as seven replacement characters,
-          which is how a card that said "Patrick" started saying ???????: the
-          moment a save existed, this header was preferred over the server,
-          and the server is the only thing here that actually knows.
-
-          So a synthetic save contributes nothing but its timestamp. The race
-          is kept because NordRace in that header did match, and it is the one
-          field SkyMP writes from the real character.
-        */
-        static Who Header(string file, int slot)
-        {
-            var w = new Who();
-            w.Slot = slot;
-            bool synthetic = System.IO.Path.GetFileName(file)
-                .StartsWith("TESMODPLATFORM", StringComparison.OrdinalIgnoreCase);
-            using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            using (var br = new BinaryReader(fs, Encoding.UTF8))
-            {
-                byte[] magic = br.ReadBytes(13);
-                if (Encoding.ASCII.GetString(magic) != "TESV_SAVEGAME") throw new Exception("not a Skyrim save");
-                br.ReadUInt32();              // header size
-                br.ReadUInt32();              // save format version
-                br.ReadUInt32();              // save number
-                string name = Str(br);
-                int level = (int)br.ReadUInt32();
-                Str(br);                      // location, shown in game but not here
-                string played = Str(br);      // in game date, however the game chose to write it
-                string race = Pretty(Str(br));
-
-                if (!synthetic)
-                {
-                    w.Name = name;
-                    w.Level = level;
-                    w.Played = played;
-                }
-                w.Race = race;
-            }
-            w.Empty = false;
-            w.When = File.GetLastWriteTime(file);
-            return w;
-        }
-
-        /*
-          Strings in a save header are length prefixed bytes with no encoding
-          recorded anywhere, and they are not always UTF-8. SkyMP's scaffolding
-          saves carry Windows-1251, so decoding everything as UTF-8 turned a
-          name into a row of replacement characters rather than failing in any
-          way that could be noticed.
-
-          Strict UTF-8 first, so anything genuinely UTF-8 is read correctly.
-          Windows-1252 second, because it maps every byte to something and can
-          therefore never produce a replacement character. Better a name that
-          is transliterated oddly than one that is seven black diamonds.
-        */
-        static readonly Encoding StrictUtf8 = new UTF8Encoding(false, true);
-        static Encoding fallback;
-
-        static string Str(BinaryReader br)
-        {
-            int n = br.ReadUInt16();
-            if (n <= 0 || n > 4096) return "";
-            byte[] raw = br.ReadBytes(n);
-
-            try { return StrictUtf8.GetString(raw); }
-            catch (DecoderFallbackException) { }
-
-            if (fallback == null)
-            {
-                try { fallback = Encoding.GetEncoding(1252); }
-                catch { fallback = Encoding.Default; }
-            }
-            try { return fallback.GetString(raw); }
-            catch { return ""; }
-        }
-
-        // Race ids read like NordRace or HighElfRace. Nobody says that out loud.
-        static string Pretty(string editorId)
-        {
-            if (string.IsNullOrEmpty(editorId)) return "";
-            string s = editorId;
-            if (s.EndsWith("Race", StringComparison.OrdinalIgnoreCase)) s = s.Substring(0, s.Length - 4);
-            var sb = new StringBuilder();
-            for (int i = 0; i < s.Length; i++)
-            {
-                if (i > 0 && char.IsUpper(s[i]) && !char.IsUpper(s[i - 1])) sb.Append(' ');
-                sb.Append(s[i]);
-            }
-            return sb.ToString();
         }
 
         // ------------------------------------------------------- profile ids
@@ -263,11 +169,35 @@ namespace Thornswood
             return null;
         }
 
-        /// <summary>The profile id a slot plays as, or 0 when it has none yet.</summary>
-        public static int ProfileOf(int slot)
+        static Row FindId(List<Row> rows, int profileId)
         {
-            Row r = Find(Rows(), slot);
-            return r == null ? 0 : r.Id;
+            foreach (Row r in rows) if (r.Id == profileId) return r;
+            return null;
+        }
+
+        /// <summary>The next free slot number, 1 on an empty list.</summary>
+        static int NextSlot(List<Row> rows)
+        {
+            int high = 0;
+            foreach (Row r in rows) if (r.Slot > high) high = r.Slot;
+            return high + 1;
+        }
+
+        /// <summary>
+        /// The rows that are characters, in slot order. Slot 0 is the spare
+        /// and a row nobody has played is not a character either; the old
+        /// two slot picker treated it as an empty slot for the same reason.
+        /// </summary>
+        static List<Row> Characters(List<Row> rows)
+        {
+            var l = new List<Row>();
+            foreach (Row r in rows)
+            {
+                if (r.Slot <= 0 || r.Id <= 0 || r.Played == DateTime.MinValue) continue;
+                l.Add(r);
+            }
+            l.Sort(delegate (Row a, Row b) { return a.Slot.CompareTo(b.Slot); });
+            return l;
         }
 
         /// <summary>
@@ -319,33 +249,56 @@ namespace Thornswood
             return high + 1;
         }
 
-        static int Claim(int slot, bool fresh)
+        /// <summary>
+        /// The id the menu's New character will use, minted and written down
+        /// before the game starts so the site's allowed list can carry it.
+        /// Lives on slot 0, unplayed, which Read and the json both treat as no
+        /// character. Saves the file only when it had to mint one, and reads
+        /// the list back off disk for that so the new id is checked against
+        /// everything already written.
+        /// </summary>
+        static int EnsureSpare(List<Row> rows)
         {
-            List<Row> rows = Rows();
-            Row r = Find(rows, slot);
-
-            if (r == null)
+            Row sp = Find(rows, 0);
+            if (sp != null && sp.Id > 0) return sp.Id;
+            if (sp == null)
             {
-                r = new Row();
-                r.Slot = slot;
-                // Always a new id. This used to hand slot one profile 1 when it
-                // had no row, meaning "whoever has been playing up to now", and
-                // that is how every fresh install with old single player saves
-                // logged in as one shared character (17 Sep): Adopt moved the
-                // saves into slot one, the card read them as a character and
-                // said Play, and Claim(1, false) returned 1. Nobody legitimate
-                // is on profile 1; it is the stale shared character.
-                r.Id = NextProfileId();
-                rows.Add(r);
+                sp = new Row();
+                sp.Slot = 0;
+                rows.Add(sp);
             }
-            else if (fresh)
-            {
-                r.Id = NextProfileId();
-            }
-
-            r.Played = DateTime.Now;
+            sp.Id = NextProfileId();
+            sp.Played = DateTime.MinValue;
             Save(rows);
-            return r.Id;
+            return sp.Id;
+        }
+
+        /// <summary>The id played most recently, or 0 when nothing has been.</summary>
+        static int LastPlayedId(List<Row> rows)
+        {
+            int id = 0;
+            DateTime best = DateTime.MinValue;
+            foreach (Row r in Characters(rows))
+            {
+                if (r.Played > best) { best = r.Played; id = r.Id; }
+            }
+            return id;
+        }
+
+        /// <summary>
+        /// Every id the site should hear about before the game starts: the
+        /// characters in slot order, then the spare. Discord.Join goes out once
+        /// for each, so the server's door knows all of them before the menu
+        /// has been answered.
+        /// </summary>
+        public static List<int> KnownIds()
+        {
+            var l = new List<int>();
+            List<Row> rows = Rows();
+            foreach (Row r in Characters(rows)) l.Add(r.Id);
+            Row sp = Find(rows, 0);
+            if (sp != null && sp.Id > 0 && !l.Contains(sp.Id)) l.Add(sp.Id);
+            return l;
         }
 
         public static Who Read(int slot)
@@ -354,73 +307,33 @@ namespace Thornswood
             w.Slot = slot;
 
             Row row = Find(Rows(), slot);
-            if (row != null)
-            {
-                w.ProfileId = row.Id;
-                w.LastPlayed = row.Played;
-                w.PlaySeconds = row.Seconds;
-                w.Trade = row.Trade;
-                w.Town = row.Town;
-                // A slot that has been played has a character on the server
-                // even when there is no save file here to read, which is the
-                // normal case after a fresh install or on somebody else's
-                // machine. Calling that an empty slot would quietly offer to
-                // make a second character over the top of it.
-                if (row.Played != DateTime.MinValue) w.Empty = false;
-            }
-
-            try
-            {
-                string dir = SlotDir(slot);
-                if (!Directory.Exists(dir)) return w;
-                string[] saves = Directory.GetFiles(dir, "*.ess");
-                w.Saves = saves.Length;
-                if (saves.Length == 0) return w;
-
-                string newest = saves[0];
-                DateTime best = File.GetLastWriteTime(newest);
-                for (int i = 1; i < saves.Length; i++)
-                {
-                    DateTime t = File.GetLastWriteTime(saves[i]);
-                    if (t > best) { best = t; newest = saves[i]; }
-                }
-                var got = Header(newest, slot);
-                // A save file alone is not a character. Under SkyMP the
-                // character lives on the server and the profiles.txt row is
-                // what says a slot has one. A slot with saves and no row is
-                // holding somebody's old single player saves, and calling
-                // that a character is what put Play over them.
-                if (row == null) got.Empty = true;
-                got.Saves = saves.Length;
-                got.ProfileId = w.ProfileId;
-                got.LastPlayed = w.LastPlayed;
-                got.PlaySeconds = w.PlaySeconds;
-                got.Trade = w.Trade;
-                got.Town = w.Town;
-                return got;
-            }
-            catch { return w; }
-        }
-
-        public static List<Who> All()
-        {
-            var l = new List<Who>();
-            for (int i = 1; i <= Slots; i++) l.Add(Read(i));
-            return l;
+            if (row == null) return w;
+            w.ProfileId = row.Id;
+            w.LastPlayed = row.Played;
+            w.PlaySeconds = row.Seconds;
+            // A row that has been played has a character on the server even
+            // when there is no save file here to read, which is the normal
+            // case after a fresh install or on somebody else's machine. Slot 0
+            // is the spare and has never been played by definition.
+            if (slot > 0 && row.Played != DateTime.MinValue) w.Empty = false;
+            return w;
         }
 
         /// <summary>
-        /// Add a finished session to a slot's total.
+        /// Add a finished session to a character's total.
         ///
         /// Counted here rather than read out of the save, because under SkyMP
         /// the character lives on the server and there is frequently no save on
         /// this machine at all. Anything under a minute is dropped: a launch
         /// that crashed on the way in is not play time, and the crash log folder
         /// says there have been a few of those.
+        ///
+        /// By profile id since 20 September, because the id is what the menu
+        /// hands back; the slot number is only this file's own line number.
         /// </summary>
-        public static void AddPlaytime(int slot, TimeSpan span)
+        public static void AddPlaytime(int profileId, TimeSpan span)
         {
-            if (slot <= 0) return;
+            if (profileId <= 0) return;
             long secs = (long)span.TotalSeconds;
             if (secs < 60) return;
             // A session longer than a day is a clock change or a launcher left
@@ -428,21 +341,10 @@ namespace Thornswood
             if (secs > 86400) return;
 
             List<Row> rows = Rows();
-            Row r = Find(rows, slot);
+            Row r = FindId(rows, profileId);
             if (r == null) return;
             r.Seconds += secs;
             r.Played = DateTime.Now;
-            Save(rows);
-        }
-
-        /// <summary>Remember what the launcher asked for when this character was made.</summary>
-        public static void SetChoice(int slot, string trade, string town)
-        {
-            List<Row> rows = Rows();
-            Row r = Find(rows, slot);
-            if (r == null) return;
-            r.Trade = trade ?? "";
-            r.Town = town ?? "";
             Save(rows);
         }
 
@@ -456,49 +358,179 @@ namespace Thornswood
             return m + "m played";
         }
 
-        public static int Active()
+        // --------------------------------------------------------- the menu
+
+        /// <summary>
+        /// The id in Data\Platform\thornswood-choice.txt, or 0 when there is no
+        /// file or nothing worth reading in it yet. The plugin writes one line,
+        /// "profileId unixMs", when the person picks at the menu; only the
+        /// first half matters here. A read that lands mid write answers 0 and
+        /// the next tick reads it whole.
+        /// </summary>
+        public static int ReadChoice()
         {
-            try { if (File.Exists(ActiveFile)) return int.Parse(File.ReadAllText(ActiveFile).Trim()); }
-            catch { }
-            return 0;
+            try
+            {
+                if (!File.Exists(ChoiceFile)) return 0;
+                string text = File.ReadAllText(ChoiceFile).Trim();
+                if (text.Length == 0) return 0;
+                string[] p = text.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                int id;
+                if (p.Length == 0 || !int.TryParse(p[0], out id)) return 0;
+                return id > 0 ? id : 0;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// The plugin says who was picked at the menu. Shell calls this once
+        /// for each new id it sees in the choice file while the game runs.
+        ///
+        /// The spare becomes a played row on the next free slot and a fresh
+        /// spare is minted behind it, so the next New character gets an id the
+        /// server has never seen. A known id has its date moved. An id this
+        /// file has never heard of is written down as a new row, because the
+        /// person is playing it and the next json has to list it.
+        /// </summary>
+        public static void Chose(int profileId)
+        {
+            if (profileId <= 0) return;
+            List<Row> rows = Rows();
+            Row r = FindId(rows, profileId);
+            if (r == null)
+            {
+                r = new Row();
+                r.Id = profileId;
+                rows.Add(r);
+            }
+            bool fromSpare = r.Slot <= 0;
+            if (fromSpare) r.Slot = NextSlot(rows);
+            r.Played = DateTime.Now;
+            Save(rows);
+            if (fromSpare) EnsureSpare(rows);
+        }
+
+        /// <summary>
+        /// Data\Platform\thornswood-characters.json, what the plugin draws the
+        /// menu from. Written on every Prepare, UTF-8 without a byte order
+        /// mark, in exactly this shape:
+        ///
+        ///     {"v":1,"last":0,"spare":0,"characters":[
+        ///       {"profileId":0,"name":"","race":"","trade":"","town":"",
+        ///        "where":"","played":"","lastPlayed":""}]}
+        ///
+        /// The characters are this file's rows in slot order. The name, race,
+        /// trade, town and where come from the server's roster when it has the
+        /// character and are empty when it does not; the played text and the
+        /// date are the launcher's own. Throws when the file cannot be written,
+        /// because a menu drawn from a stale list offers last session's spare
+        /// and misses whoever was made since.
+        /// </summary>
+        static void WriteCharacters(Config cfg, List<Row> rows, int last, int spare)
+        {
+            // The roster first, so the names are as fresh as the server can
+            // make them. Its own two and a half second timeout, and a server
+            // that does not answer costs the names and nothing else.
+            try { Roster.Refresh(cfg); } catch { }
+
+            var sb = new StringBuilder();
+            sb.Append("{\"v\":1,\"last\":").Append(last)
+              .Append(",\"spare\":").Append(spare)
+              .Append(",\"characters\":[");
+            bool first = true;
+            foreach (Row r in Characters(rows))
+            {
+                Roster.Row who = null;
+                try { who = Roster.For(r.Id); } catch { who = null; }
+                if (!first) sb.Append(',');
+                first = false;
+                sb.Append("{\"profileId\":").Append(r.Id)
+                  .Append(",\"name\":\"").Append(Json(who == null ? "" : who.Name))
+                  .Append("\",\"race\":\"").Append(Json(who == null ? "" : who.Race))
+                  .Append("\",\"trade\":\"").Append(Json(who == null ? "" : who.Trade))
+                  .Append("\",\"town\":\"").Append(Json(who == null ? "" : who.Town))
+                  .Append("\",\"where\":\"").Append(Json(who == null ? "" : who.Where))
+                  .Append("\",\"played\":\"").Append(Json(PlayedText(r.Seconds)))
+                  .Append("\",\"lastPlayed\":\"").Append(Iso(r.Played))
+                  .Append("\"}");
+            }
+            sb.Append("]}");
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(CharactersFile));
+                File.WriteAllText(CharactersFile, sb.ToString(), new UTF8Encoding(false));
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("The character list could not be written for the game's menu (" +
+                                    ex.Message.TrimEnd('.') + "), so the game was not started. " +
+                                    "Check that Data\\Platform is not read only.");
+            }
+        }
+
+        /// <summary>ISO 8601 in UTC, or empty for a date that was never set.</summary>
+        static string Iso(DateTime t)
+        {
+            if (t == DateTime.MinValue) return "";
+            try
+            {
+                // Ticks in profiles.txt came from DateTime.Now and lost their
+                // kind on the way through the file, so they are local time.
+                return DateTime.SpecifyKind(t, DateTimeKind.Local).ToUniversalTime()
+                               .ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+            }
+            catch { return ""; }
+        }
+
+        /// <summary>Quote anything that would end a JSON string early, or break its line.</summary>
+        static string Json(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var b = new StringBuilder(s.Length + 8);
+            foreach (char c in s)
+            {
+                if (c == '"' || c == '\\') { b.Append('\\').Append(c); }
+                else if (c == '\n') b.Append("\\n");
+                else if (c == '\r') b.Append("\\r");
+                else if (c == '\t') b.Append("\\t");
+                else if (c < ' ') b.Append("\\u").Append(((int)c).ToString("x4"));
+                else b.Append(c);
+            }
+            return b.ToString();
         }
 
         // ------------------------------------------------------------ moving
 
         static bool IsLink(string p) { return Junction.IsLink(p); }
 
-        /// <summary>
-        /// First run on a build that already has saves in it. Those belong to
-        /// somebody, so they become character one rather than being stranded.
-        /// </summary>
-        public static void Adopt()
-        {
-            // Only the slot folders are made here now. This used to move the
-            // saves in the real Saves folder into character one so they would
-            // not be stranded, which was right when a save was the character.
-            // Under SkyMP a save on this disk is nobody's character, and moving
-            // somebody's single player saves into slot one made the card read
-            // them as a Thornswood character (see Read and Claim). Use sets the
-            // real folder aside whole instead, and nothing is moved into a slot.
-            Directory.CreateDirectory(Home);
-            for (int i = 1; i <= Slots; i++) Directory.CreateDirectory(SlotDir(i));
-        }
+        // Adopt and Delete lived here until 20 September. Adopt made the two
+        // slot folders on every start; Delete moved a slot's saves into
+        // Profile\Characters\_deleted and dropped its row. There are no slot
+        // folders now and nothing in the launcher deletes a character: the
+        // list is only ever added to, and the server holds the characters.
 
         /// <summary>
-        /// Point Skyrim's save folder at one character and tell Start On Save
-        /// what to do. Returns a line for the log when the folder could not be
-        /// pointed and the plain one is in use instead, otherwise null.
+        /// Everything the game folder needs before Skyrim starts, now that the
+        /// character is picked at the game's own main menu rather than here.
+        /// Replaced Use(slot, fresh) on 20 September.
         ///
-        /// This used to throw, and Play stopped, with one line in the log and
-        /// no reason (a tester on 1.1.36: "Could not point the save folder at
-        /// character 1."). Under SkyMP nothing on this disk decides who the
-        /// character is (see WriteStartIni), so a save folder that cannot be
-        /// redirected is not a reason to keep anybody out of the game.
+        /// Returns a line for the log when the save folder could not be
+        /// pointed and the plain one is in use instead, otherwise null. Throws
+        /// when the client settings or the character list could not be
+        /// written, and Play stops on that: a settings file still saying
+        /// connect as the last id would walk past the menu as that character.
+        ///
+        /// The save folder half used to throw too, and Play stopped, with one
+        /// line in the log and no reason (a tester on 1.1.36: "Could not point
+        /// the save folder at character 1."). Under SkyMP nothing on this disk
+        /// decides who the character is (see WriteStartIni), so a save folder
+        /// that cannot be redirected is not a reason to keep anybody out.
         /// </summary>
-        public static string Use(int slot, bool fresh)
+        public static string Prepare(Config cfg)
         {
             Directory.CreateDirectory(Home);
-            Directory.CreateDirectory(SlotDir(slot));
+            Directory.CreateDirectory(SavesDir);
 
             string live = Files.SaveDir;
             Directory.CreateDirectory(Path.GetDirectoryName(live));
@@ -543,49 +575,49 @@ namespace Thornswood
 
             string note = null;
             string why = null;
-            bool linked = trouble == null && Junction.Create(live, SlotDir(slot), out why);
+            bool linked = trouble == null && Junction.Create(live, SavesDir, out why);
             if (linked)
             {
-                Scrub(SlotDir(slot));
+                Scrub(SavesDir);
             }
             else
             {
                 try { Directory.CreateDirectory(live); } catch { }
                 Scrub(live);
-                note = "Could not point the save folder at character " + slot + ": " + (trouble ?? why) +
+                note = "Could not point the save folder at Thornswood's own saves folder: " + (trouble ?? why) +
                        ". Skyrim is using the ordinary Saves folder on this computer instead. Your character lives on the server, so nothing is lost." +
                        (live.IndexOf("\\OneDrive", StringComparison.OrdinalIgnoreCase) >= 0 ? " (That folder is inside OneDrive.)" : "");
             }
 
-            // The part that actually decides who you are. Everything above this
-            // line only moves save files about.
-            int id = Claim(slot, fresh);
-            AutoJoin.SetProfileId(id);
+            // The part that decides what the client does at the menu.
+            // Everything above this line only moves save files about.
+            //
+            // Until 20 September this claimed a slot's id and wrote it in, and
+            // the client connected as that character the moment it loaded.
+            // Now it is told to wait at the menu, with the id played last (or
+            // the spare, on an install that has played nobody) as the one to
+            // offer first. SetChooseAtMenu reads the file back and throws when
+            // it does not say what was written, which is what stops Play.
+            List<Row> rows = Rows();
+            int spare = EnsureSpare(rows);
+            int last = LastPlayedId(rows);
+            int point = last > 0 ? last : spare;
+            AutoJoin.SetChooseAtMenu(point);
 
-            // Read it back rather than trust the write. SetProfileId answers
-            // false both when it could not write the file and when the file
-            // already held this id, so its answer cannot tell those apart, and
-            // the file is the only thing that decides which character the
-            // client asks the server for. A read only settings file, or one
-            // holding the id as "3" in quotes where the edit does not match it,
-            // keeps the number the last slot left there and the game walks in
-            // as that character. Stop here instead: StartAs logs this and never
-            // reaches Play, which beats handing somebody another character.
-            int wrote = AutoJoin.GetProfileId();
-            if (wrote != id)
-                throw new Exception(
-                    "Character " + slot + "'s id could not be written into the client settings: they still say " +
-                    (wrote > 0 ? "profile " + wrote : "no profile") + " instead of profile " + id + ". " +
-                    "Skyrim would have connected as the character before this one, so it was not started. " +
-                    "Check that Data\\Platform\\Plugins\\skymp5-client-settings.txt is not read only.");
+            WriteStartIni();
+            WriteBrowserBackend();
 
             // Voice read the old id out of the settings file at startup and has
-            // been using it ever since. The line above just changed it.
-            Voice.Reconfigure();
+            // been using it ever since. The write above just changed it, and
+            // Shell hands voice the chosen id again once the menu answers.
+            Voice.Reconfigure(point);
 
-            try { File.WriteAllText(ActiveFile, slot.ToString()); } catch { }
-            WriteStartIni(fresh);
-            WriteBrowserBackend();
+            WriteCharacters(cfg, rows, last, spare);
+
+            // A choice left over from the last session would be read as this
+            // session's the moment the game was up.
+            try { if (File.Exists(ChoiceFile)) File.Delete(ChoiceFile); } catch { }
+
             if (setAside != null) note = (note == null ? "" : note + " ") + setAside;
             return note;
         }
@@ -684,7 +716,10 @@ namespace Thornswood
         // the save's character has to carry that exact name. No save does
         // carry the one below, so nothing qualifies and nothing is loaded,
         // whatever is in the folder.
-        static void WriteStartIni(bool fresh)
+        //
+        // The bool it took until 20 September said whether the slot was fresh
+        // and had not been read since the day this stopped starting new games.
+        static void WriteStartIni()
         {
             try
             {
@@ -825,35 +860,6 @@ namespace Thornswood
                 File.WriteAllText(PlatformIni, next, new UTF8Encoding(true));
             }
             catch { }
-        }
-
-        /// <summary>Moves a character aside rather than destroying them.</summary>
-        public static string Delete(int slot)
-        {
-            string dir = SlotDir(slot);
-            if (!Directory.Exists(dir)) return null;
-
-            Directory.CreateDirectory(Bin);
-            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-            string dest = Path.Combine(Bin, slot + "-" + stamp);
-
-            // If this character is the one currently linked, let go first.
-            string live = Files.SaveDir;
-            if (IsLink(live) && Active() == slot) { try { Directory.Delete(live); } catch { } }
-
-            Directory.Move(dir, dest);
-            Directory.CreateDirectory(dir);
-
-            // Forget the profile id too, or the slot would come back looking
-            // empty and then reconnect as the character that was just deleted.
-            // The id itself is retired rather than freed: NextProfileId only
-            // ever counts upwards.
-            List<Row> rows = Rows();
-            Row r = Find(rows, slot);
-            if (r != null) { rows.Remove(r); Save(rows); }
-
-            if (Active() == slot) { try { File.Delete(ActiveFile); } catch { } }
-            return dest;
         }
     }
 }

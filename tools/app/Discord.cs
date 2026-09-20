@@ -285,13 +285,6 @@ namespace Thornswood
         // allowed in, and the password to connect with if they are.
         public static Standing Join()
         {
-            var st = new Standing();
-            if (!Linked)
-            {
-                st.Why = "link";
-                st.Message = "This copy is not linked to a Discord account yet.";
-                return st;
-            }
             // The profile id goes with the check in. The site keeps it against
             // the Discord account, and the game server's door reads that list
             // to decide who it lets connect. Without it the server has no way
@@ -299,6 +292,29 @@ namespace Thornswood
             // only a profile number.
             int pid = 0;
             try { pid = AutoJoin.GetProfileId(); } catch { pid = 0; }
+            return Join(pid);
+        }
+
+        /// <summary>
+        /// The same check in, for one particular id.
+        ///
+        /// Since 20 September the person picks their character at the game's
+        /// menu, so before the game starts Shell checks in once for every id
+        /// this install could pick, characters and the spare alike, and once
+        /// more with the one that was picked. The version above sends whatever
+        /// the settings file says, which is the id played last and no longer
+        /// the whole story.
+        /// </summary>
+        public static Standing Join(int profileId)
+        {
+            var st = new Standing();
+            if (!Linked)
+            {
+                st.Why = "link";
+                st.Message = "This copy is not linked to a Discord account yet.";
+                return st;
+            }
+            int pid = profileId;
             string body = "{\"ticket\":\"" + Escape(Ticket) + "\"" +
                           (pid > 0 ? ",\"profileId\":" + pid : "") +
                           (string.IsNullOrEmpty(Channel) ? "" : ",\"channel\":\"" + Escape(Channel) + "\"") + "}";

@@ -68,10 +68,11 @@ namespace Thornswood
         static readonly List<string> packBusy = new List<string>();
         static DispatcherTimer timer;
 
-        static Border charBar;
-        static StackPanel charRow;
-        static TextBlock txtCharNote;
-        static bool charPickerOpen;
+        // The character bar (charBar, charRow, txtCharNote, charPickerOpen)
+        // went on 20 September; the person picks at the game's main menu.
+        // This is who they picked, read out of the plugin's choice file while
+        // the game runs, and 0 until they have.
+        static int chosenId;
 
         static TextBlock txtServer, txtPing, txtStatus, txtStatusRight, txtVersion, txtBuildLine,
                          txtUpdateTitle, txtUpdateNote, txtModCount, txtUpdateSource,
@@ -313,38 +314,13 @@ namespace Thornswood
                     win.Dispatcher.BeginInvoke((Action)delegate { Log("Shortcut icon brought up to date."); });
             });
 
-            // Anyone upgrading has saves sitting in the old shared folder.
-            // They belong to a person, so they become character one rather
-            // than being stranded behind a link.
-            try { Chars.Adopt(); } catch { }
-
-            // Which characters are yours used to live in one fifty byte file in
-            // this folder, so a reinstall lost it and the launcher made you a
-            // stranger. The characters themselves were never here: they are on
-            // the server. This asks the server which ones belong to this Steam
-            // account and puts the list back.
-            //
-            // Off the UI thread and never waited on. It talks to the VPS, and
-            // the server having a bad night must not be the reason somebody is
-            // looking at a frozen launcher.
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                string said = null;
-                try { said = Chars.Sync(cfg); } catch { }
-                if (string.IsNullOrEmpty(said)) return;
-                try
-                {
-                    win.Dispatcher.BeginInvoke((Action)delegate
-                    {
-                        Log(said);
-                        // Redrawn, because the slots were built from the list
-                        // before this had anything to add to it.
-                        try { BuildChars(); } catch { }
-                        try { DrawStatus(); } catch { }
-                    });
-                }
-                catch { }
-            });
+            // Chars.Adopt and Chars.Sync ran here until 20 September. Adopt
+            // made the two slot folders on every start; Sync asked the voice
+            // service which characters this Steam account owned, off the UI
+            // thread, and always came back with nothing, because that route
+            // wants the server secret and the launcher never sent one. The
+            // list lives in Profile\Characters\profiles.txt and the person
+            // picks at the game's main menu now.
             try
             {
                 int named = Files.FixPresetNames();
@@ -505,8 +481,6 @@ namespace Thornswood
             helpList = F<StackPanel>("HelpList");
             boxSearch = F<TextBox>("BoxSearch"); boxAddress = F<TextBox>("BoxAddress"); boxPort = F<TextBox>("BoxPort");
             btnShowServer = F<Button>("BtnShowServer");
-            charBar = F<Border>("CharBar"); charRow = F<StackPanel>("CharRow");
-            txtCharNote = F<TextBlock>("TxtCharNote");
             chkAutoUpdate = F<CheckBox>("ChkAutoUpdate");
             updateBar = F<Border>("UpdateBar"); titleBar = F<Grid>("TitleBar");
             downgradeBar = F<Border>("DowngradeBar"); txtDowngradeNote = F<TextBlock>("TxtDowngradeNote"); btnDowngrade = F<Button>("BtnDowngrade");
@@ -955,14 +929,11 @@ namespace Thornswood
             };
             btnPlay.Click += delegate
             {
-                // Play used to launch straight into whatever save happened to
-                // be newest, which on a shared save folder meant whoever
-                // played last. Now it asks first.
+                // Play means Play. Until 20 September this opened a bar of two
+                // character slots and the slot's own button started the game;
+                // the person picks at the game's main menu now.
                 if (playing) { Play(); return; }
-                charPickerOpen = !charPickerOpen;
-                if (charPickerOpen) BuildChars();
-                charBar.Visibility = charPickerOpen ? Visibility.Visible : Visibility.Collapsed;
-                btnPlay.Content = charPickerOpen ? "Not yet" : "Play";
+                StartPlay();
             };
             if (buttonDiscord != null) buttonDiscord.Click += delegate { ConnectDiscord(); };
             if (buttonDiscordForget != null)
@@ -1317,6 +1288,9 @@ namespace Thornswood
                 if (!playing) return;
                 if (Checks.GameRunning())
                 {
+                    // Who was picked at the game's menu, every tick. One file
+                    // read, and nothing when the file says what it said last.
+                    PollChoice();
                     // Every sixtieth two second tick, so every two minutes.
                     if (++inPlayTicks >= 60) { inPlayTicks = 0; CheckUpdatesInPlay(); }
                     return;
@@ -1344,7 +1318,9 @@ namespace Thornswood
                 // own play time inside the save, and under SkyMP the character
                 // is a change form on the server with often no save here at all,
                 // so the launcher is the only thing in a position to count.
-                try { Chars.AddPlaytime(Chars.Active(), DateTime.Now - playStartedAt); } catch { }
+                // The character is whoever the menu's choice file named this
+                // session; 0 when it never did, and then nothing is counted.
+                try { Chars.AddPlaytime(chosenId, DateTime.Now - playStartedAt); } catch { }
                 BuildStatRow();
                 btnPlay.Content = "PLAY";
                 btnQuitGame.Visibility = Visibility.Collapsed;
@@ -1660,21 +1636,11 @@ namespace Thornswood
             {
                 btnPlay.Content = "PREPARING THE GAME FOLDER";
                 btnPlay.ToolTip = "Thornswood's own Skyrim folder is being brought up to date from Vortex. Play comes back when it is done.";
-                if (charPickerOpen)
-                {
-                    charPickerOpen = false;
-                    charBar.Visibility = Visibility.Collapsed;
-                }
             }
             else if (collectionBarUp && !playing)
             {
                 btnPlay.Content = "INSTALL THE MODS FIRST";
                 btnPlay.ToolTip = "Open the collection from the card above, then come back.";
-                if (charPickerOpen)
-                {
-                    charPickerOpen = false;
-                    charBar.Visibility = Visibility.Collapsed;
-                }
             }
             else if (updatePending && !playing)
             {
@@ -1682,11 +1648,6 @@ namespace Thornswood
                 btnPlay.ToolTip = updateAnswered
                     ? "There is an update waiting. Install it and Play comes back."
                     : "Checking for updates before letting anybody in. A moment.";
-                if (charPickerOpen)
-                {
-                    charPickerOpen = false;
-                    charBar.Visibility = Visibility.Collapsed;
-                }
             }
             else if (wrongBuild && !playing && !collectionBarUp)
             {
@@ -1694,16 +1655,11 @@ namespace Thornswood
                 btnPlay.ToolTip = ModsMissing()
                     ? "This Skyrim is not build 1.6.1170. The card above puts it right; the mods come after that."
                     : "This Skyrim is not build 1.6.1170. The card above puts it right.";
-                if (charPickerOpen)
-                {
-                    charPickerOpen = false;
-                    charBar.Visibility = Visibility.Collapsed;
-                }
             }
             else if (!playing)
             {
                 btnPlay.ToolTip = null;
-                if (!charPickerOpen) btnPlay.Content = "PLAY";
+                btnPlay.Content = "PLAY";
             }
             return all;
         }
@@ -3495,10 +3451,11 @@ namespace Thornswood
         {
             try
             {
-                // The button is not the only way in here. The character cards
-                // and a session coming back call this too, and greying out
-                // btnPlay does nothing for those, so the three things the
-                // button is disabled for are checked again on the way in. The
+                // The button is not the only way in here. StartPlay, after the
+                // Discord check, and a session coming back call this too, and
+                // greying out btnPlay does nothing for those, so the three
+                // things the button is disabled for are checked again on the
+                // way in. The
                 // one that bites is updatePending: the game closes for an
                 // update, the pack is being fetched, and a press in that gap
                 // starts Skyrim on a half extracted build.
@@ -3723,62 +3680,30 @@ namespace Thornswood
         }
 
         // ------------------------------------------------------------- characters
-        /// <summary>The name on a slot, or null. Chars keeps them in its list.</summary>
-        /// <summary>
-        /// What to call this character, from wherever the name actually is.
-        ///
-        /// The save header first, because that is the character as this
-        /// machine last saw it. Then the server's roster, and that is the one
-        /// that matters: under SkyMP the character is a change form the server
-        /// holds and the local saves are scaffolding, so these folders are
-        /// routinely empty and the header has nothing in it to read. That is
-        /// why every card said "Character 1" no matter what anybody named
-        /// themselves.
-        ///
-        /// The slot number is the last resort rather than the default.
-        /// </summary>
-        static string NameOf(Chars.Who w)
-        {
-            if (w == null) return "Character";
-            if (!string.IsNullOrEmpty(w.Name)) return w.Name;
-            try
-            {
-                Roster.Row r = Roster.For(w.ProfileId);
-                if (r != null && !string.IsNullOrEmpty(r.Name)) return r.Name;
-            }
-            catch { }
-            return "Character " + w.Slot;
-        }
-
-        static string SlotName(int slot)
-        {
-            try
-            {
-                foreach (Chars.Who w in Chars.All())
-                {
-                    if (w.Slot != slot) continue;
-                    if (!string.IsNullOrEmpty(w.Name)) return w.Name;
-                    try
-                    {
-                        Roster.Row r = Roster.For(w.ProfileId);
-                        if (r != null && !string.IsNullOrEmpty(r.Name)) return r.Name;
-                    }
-                    catch { }
-                    return null;
-                }
-            }
-            catch { }
-            return null;
-        }
+        //
+        // Until 20 September this was the character picker: NameOf, SlotName,
+        // StartAs(slot, fresh), ForgetChar, DescribeChar, RefreshRoster and
+        // BuildChars drew two slot cards under Play, each with its own Play or
+        // Make a character button and a Delete. The person picks at the game's
+        // own main menu now, from a list Chars.Prepare writes into
+        // Data\Platform, and the plugin writes the answer to a file the two
+        // second tick reads. Nothing here draws a character any more.
 
         // A Discord check is out and the game starts on its answer. Only
-        // btnPlay was ever switched off while it was, and the slot cards sit
+        // btnPlay was ever switched off while it was, and the slot cards sat
         // on their own bar: two presses on a slot's Play sent two checks, both
         // came back allowed, and the second start found the first Skyrim
-        // already up, closed it as a stuck one, and started again.
+        // already up, closed it as a stuck one, and started again. The cards
+        // are gone; the flag stays, because a press that lands while the site
+        // is still thinking is the same race.
         static bool doorCheckOut = false;
 
-        static void StartAs(int slot, bool fresh)
+        /// <summary>
+        /// Play, from the button. Door.Check first, exactly as StartAs did,
+        /// then Chars.Prepare, then a check in with the site for every id this
+        /// install could pick, then Play().
+        /// </summary>
+        static void StartPlay()
         {
             // Discord decides who gets in, and it is asked here rather than
             // inside Play() because Play() is also the path a game already
@@ -3790,10 +3715,6 @@ namespace Thornswood
                 if (doorCheckOut) { Log("Still asking Discord. One moment."); return; }
                 doorCheckOut = true;
                 btnPlay.IsEnabled = false;
-                // The cards go with it. They are the only other way into here
-                // and they are not on the Play button.
-                charBar.IsEnabled = false;
-                int s2 = slot; bool f2 = fresh;
                 Door.Check(win, Log,
                     delegate (Standing st)
                     {
@@ -3805,15 +3726,14 @@ namespace Thornswood
                         Door.Explain(win, st, delegate { ShowPage(PagePlay); });
                     },
                     // Cleared before the start, because this goes straight back
-                    // into StartAs and the whole launch runs inside that call.
+                    // into StartPlay and the whole launch runs inside that call.
                     // Door holds the yes for a few minutes, so the second pass
                     // takes the path below rather than sending another check.
-                    delegate { doorCheckOut = false; StartAs(s2, f2); },
+                    delegate { doorCheckOut = false; StartPlay(); },
                     delegate
                     {
                         doorCheckOut = false;
                         btnPlay.IsEnabled = true;
-                        charBar.IsEnabled = true;
                         RefreshDiscord();
                         DrawStatus();
                         DrawDevBuild();
@@ -3821,258 +3741,88 @@ namespace Thornswood
                 return;
             }
 
-            // A new character picks a trade and a town here, before anything
-            // else happens. This used to be two message boxes inside the game,
-            // fed by books the server put in your pack, and it depended on the
-            // client and the server numbering their plugins identically. When
-            // that slipped, which was often, you got a room with no menus and
-            // no way out of it. Asked here it can be checked before the game
-            // even starts.
-            // Four answers now: the profession, which half of it, the class
-            // that decides where material comes from, and where they wake up.
-            string trade = null, half = null, cls = null, town = null;
-            if (fresh)
-            {
-                if (!Creation.Ask(win, SlotName(slot), out trade, out half, out cls, out town)) return;
-            }
+            // A Skyrim somebody started by hand after the launcher opened is
+            // not 'playing' to this window, and Prepare below rewrites the
+            // client settings, which SkyrimPlatform answers with a reload of
+            // every plugin in the running game. So a running game goes the
+            // way a running game always went, through Play() and its own
+            // checks, and nothing under Data is touched first.
+            if (Checks.GameRunning()) { Play(); return; }
 
-            // No wait for the character list here any more. It waited on
-            // Chars.Sync, and Sync asks the voice service for /whoami, which
-            // tools\voice\voice-server.js does not serve: its routes are
-            // /positions, /choose, /choices, /claimed, /commands, /say, /health
-            // and the page. The POST comes back 404, Account.Whoami is always
-            // empty, and on a blank machine Sync returns having changed
-            // nothing, so seven seconds of frozen window on a first Play bought
-            // an answer that never arrives. Claim takes a fresh id now rather
-            // than handing out profile 1, which is what the wait was guarding
-            // against. If the voice service ever serves /whoami and /claim, the
-            // wait comes back with them.
-
+            // The save folder, the client settings, the menu's character list
+            // and voice. Off the window's thread under the wait cursor, because
+            // it asks the server for the roster on the way and that is up to
+            // two and a half seconds of nothing drawing otherwise. A throw
+            // here is the settings file or the list refusing to be written,
+            // and the game is not started on either.
+            string saveNote = null;
             try
             {
-                string saveNote = Chars.Use(slot, fresh);
-                if (saveNote != null) Log(saveNote);
+                Waiting(delegate { saveNote = Chars.Prepare(cfg); });
             }
             catch (Exception ex) { Log(ex.Message); return; }
+            if (saveNote != null) Log(saveNote);
 
-            // The Discord check above went out carrying whichever profile id
-            // was written last time. This slot has its own id now, so check in
-            // again in the background: the site keeps the id against the
-            // account, and the game server's door reads that list. Without
-            // this a brand new character reaches the server before the site
-            // has ever heard its number.
-            ThreadPool.QueueUserWorkItem(delegate { try { Discord.Join(); } catch { } });
-
-            if (fresh)
+            // The Discord check above went out carrying the id the settings
+            // file held, which is one of several now. Check in again for every
+            // id this install could pick at the menu, characters and spare,
+            // so the site's allowed list carries them all before anybody logs
+            // in: the site keeps the ids against the account and the game
+            // server's door reads that list. In the background, and a failure
+            // is a line in the log and nothing more; the game still starts.
+            List<int> ids = Chars.KnownIds();
+            ThreadPool.QueueUserWorkItem(delegate
             {
-                int id = 0;
-                try { id = Chars.ProfileOf(slot); } catch { }
-                try { Chars.SetChoice(slot, trade, town); } catch { }
-                // Five seconds on the connection and five more on the read, so
-                // the POST goes off this thread. The name is worked out here
-                // first, because SlotName reads the character list and the
-                // roster and that belongs on the thread that owns them.
-                string who = SlotName(slot);
-                string why = null;
-                Waiting(delegate { why = Creation.Send(cfg, id, trade, half, cls, town, who); });
-                if (why == null)
-                {
-                    Log("You are starting as a " + trade + " in " + town + ".");
-                }
-                else
-                {
-                    // Not fatal. The server still has the books, so the old
-                    // flow takes over rather than nothing happening.
-                    Log("Could not tell the server your choice (" + why +
-                        "). It will ask you in game instead.");
-                }
-            }
+                foreach (int id in ids) CheckIn(id);
+            });
 
-            charPickerOpen = false;
-            charBar.Visibility = Visibility.Collapsed;
-            btnPlay.Content = "Play";
-            Log(fresh ? "Starting a new character in slot " + slot + "."
-                      : "Loading character " + slot + ".");
+            chosenId = 0;
+            Log("Starting. You pick your character at the game's main menu.");
             Play();
         }
 
-        static void ForgetChar(int slot, Chars.Who who)
+        /// <summary>
+        /// One check in with the site for one id, from a pool thread. What
+        /// went wrong goes to the log; nothing here stops anything.
+        /// </summary>
+        static void CheckIn(int id)
         {
-            // Said in a box, not only in the log. A line at the bottom of the
-            // window was the whole answer, so pressing Delete looked like
-            // pressing nothing: ten presses in the log on 16 Sep.
-            if (playing || Checks.GameRunning())
-            {
-                string still = Checks.StuckReport();
-                Log("Close Skyrim before deleting a character. " + still);
-                MessageBox.Show("Close Skyrim before deleting a character. Its saves are in use while the game runs.\n\n" + still,
-                                "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            string name = string.IsNullOrEmpty(who.Name) ? "this character" : who.Name;
-            var answer = MessageBox.Show(
-                "Delete " + name + "?\n\n" +
-                who.Saves + (who.Saves == 1 ? " save" : " saves") + " will be moved into Profile\\Characters\\_deleted.\n" +
-                "Nothing is destroyed, so this can be undone by hand if you change your mind.",
-                "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (answer != MessageBoxResult.Yes) return;
-
             try
             {
-                string moved = Chars.Delete(slot);
-                Log(moved == null ? "That slot was already empty."
-                                  : name + " moved to " + System.IO.Path.GetFileName(moved) + ".");
+                Standing st = Discord.Join(id);
+                if (st.Ok) return;
+                string why = st.Message != null && st.Message.Length > 0 ? st.Message : st.Why;
+                PresenceLog("Could not check profile " + id + " in with thornswood.net: " + why);
             }
-            catch (Exception ex) { Log("Could not delete that character: " + ex.Message); }
-            BuildChars();
+            catch (Exception ex)
+            {
+                PresenceLog("Could not check profile " + id + " in with thornswood.net: " + ex.Message);
+            }
         }
 
         /// <summary>
-        /// The line under a character's name.
+        /// Who the person picked at the game's menu, while the game runs.
         ///
-        /// Three sources, in order of how much they know. The server holds the
-        /// race, the sex and the trade, because all three are settled after the
-        /// game has started and the character is a change form up there rather
-        /// than a file down here. The launcher holds the trade and the town it
-        /// asked for, which is what to show before the first session has been
-        /// played. A local save, when there is one, holds a race and a level.
-        ///
-        /// The profile id is last and quiet. It is the thing that actually picks
-        /// the character so it is worth being able to read, but on its own it
-        /// told nobody anything, which is what this is fixing.
+        /// The plugin writes Data\Platform\thornswood-choice.txt when they
+        /// pick, and the two second tick reads it. Each new id is written down
+        /// (Chars.Chose), voice and the site are told, and the id is kept for
+        /// the play time count at close. The settings file is never touched
+        /// here: a write to it hot reloads every plugin under the running game.
         /// </summary>
-        static string DescribeChar(Chars.Who w, bool isActive)
+        static void PollChoice()
         {
-            var bits = new List<string>();
-
-            Roster.Row r = null;
-            try { r = Roster.For(w.ProfileId); } catch { }
-
-            string fromServer = Roster.Describe(r);
-            if (fromServer.Length > 0)
-            {
-                bits.Add(fromServer);
-            }
-            else
-            {
-                // Nothing from the server yet. Everything that is known here.
-                if (!string.IsNullOrEmpty(w.Race)) bits.Add(w.Race);
-                string trade = Creation.LabelOf(Creation.Trades, w.Trade);
-                string town = Creation.LabelOf(Creation.Towns, w.Town);
-                if (trade.Length > 0 && town.Length > 0) bits.Add(trade + " in " + town);
-                else if (trade.Length > 0) bits.Add(trade);
-                else if (town.Length > 0) bits.Add("started in " + town);
-            }
-
-            if (w.Level > 0) bits.Add("level " + w.Level);
-
-            string played = Chars.PlayedText(w.PlaySeconds);
-            if (played.Length > 0) bits.Add(played);
-            else if (bits.Count > 0) bits.Add("not played yet");
-
-            // The profile id is deliberately not here.
-            //
-            // It is the one thing on the card that means nothing to the person
-            // reading it: "profile 1298059814" is not a fact about a character,
-            // it is a key from the machinery underneath. It still exists in
-            // Profile\Characters\profiles.txt, in the server's character book,
-            // and in the register, which is where it is useful and where it is
-            // looked up when something has gone wrong.
-
-            if (bits.Count == 0) return "on the server, nothing known here yet";
-
-            string line = string.Join(",  ", bits.ToArray());
-            if (isActive) line += "   ·   last played";
-            return line;
-        }
-
-        // Asked when the cards are drawn rather than on a timer. The answer only
-        // changes when somebody plays, and a launcher sitting open all evening
-        // has no reason to keep asking.
-        static void RefreshRoster()
-        {
-            if (Roster.Fresh) return;
+            int id = 0;
+            try { id = Chars.ReadChoice(); } catch { id = 0; }
+            if (id <= 0 || id == chosenId) return;
+            chosenId = id;
+            try { Chars.Chose(id); }
+            catch (Exception ex) { Log("Could not write that choice down: " + ex.Message); }
+            Log("chose character " + id);
             ThreadPool.QueueUserWorkItem(delegate
             {
-                bool moved = false;
-                try { moved = Roster.Refresh(cfg); } catch { }
-                if (!moved) return;
-                try
-                {
-                    win.Dispatcher.BeginInvoke(new Action(delegate { BuildChars(); }));
-                }
-                catch { }
+                try { Voice.Reconfigure(id); } catch { }
+                CheckIn(id);
             });
-        }
-
-        static void BuildChars()
-        {
-            if (charRow == null) return;
-            RefreshRoster();
-            charRow.Children.Clear();
-
-            int active = Chars.Active();
-            if (txtCharNote != null)
-            {
-                txtCharNote.Text =
-                    "Skyrim opens on its own menu and then walks in by itself once the server has your character. " +
-                    "That takes a few seconds. Nothing to press.";
-            }
-            foreach (Chars.Who w in Chars.All())
-            {
-                int slot = w.Slot;
-                Chars.Who who = w;
-
-                var card = new Border();
-                card.Style = (Style)win.Resources["Slab"];
-                card.Padding = new Thickness(18, 14, 18, 14);
-                card.Margin = new Thickness(0, 0, 0, 10);
-
-                var row = new StackPanel();
-                row.Orientation = Orientation.Horizontal;
-
-                var left = new StackPanel();
-                left.MinWidth = 320;
-
-                var title = new TextBlock();
-                title.Text = w.Empty ? "Empty slot" : NameOf(w);
-                title.FontSize = 15;
-                title.FontWeight = FontWeights.SemiBold;
-                title.Foreground = Res(w.Empty ? "Faint" : "Ink");
-                left.Children.Add(title);
-
-                var sub = new TextBlock();
-                sub.Text = w.Empty ? "Nobody here yet" : DescribeChar(w, slot == active);
-                sub.FontSize = 11.5;
-                sub.Foreground = Res("Muted");
-                sub.TextWrapping = TextWrapping.Wrap;
-                sub.Margin = new Thickness(0, 3, 0, 0);
-                left.Children.Add(sub);
-
-                row.Children.Add(left);
-
-                var go = new Button();
-                go.Style = (Style)win.Resources["Solid"];
-                go.Content = w.Empty ? "Make a character" : "Play";
-                go.Margin = new Thickness(18, 0, 0, 0);
-                bool fresh = w.Empty;
-                go.Click += delegate { StartAs(slot, fresh); };
-                row.Children.Add(go);
-
-                if (!w.Empty)
-                {
-                    var del = new Button();
-                    del.Style = (Style)win.Resources["Ghost"];
-                    del.Content = "Delete";
-                    del.Margin = new Thickness(8, 0, 0, 0);
-                    del.Click += delegate { ForgetChar(slot, who); };
-                    row.Children.Add(del);
-                }
-
-                card.Child = row;
-                charRow.Children.Add(card);
-            }
         }
 
         // The address, port and password sit behind one toggle. Hidden is the

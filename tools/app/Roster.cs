@@ -187,8 +187,12 @@ namespace Thornswood
             else who = r.Female ? "woman" : "";
             if (who.Length > 0) bits.Add(who);
 
-            string trade = Creation.LabelOf(Creation.Trades, r.Trade);
-            string town = Creation.LabelOf(Creation.Towns, r.Town);
+            // The raw gamemode keys with a capital, "Smith" and "Riften".
+            // Until 20 September these went through the creation dialog's
+            // option lists to become labels; that dialog is gone and the
+            // keys read well enough on their own.
+            string trade = Cap(r.Trade);
+            string town = Cap(r.Town);
             bool somewhere = !string.IsNullOrEmpty(r.Where);
 
             // The town somebody started in stops being worth saying the moment
@@ -205,6 +209,14 @@ namespace Thornswood
             if (somewhere) bits.Add("last seen in " + r.Where);
 
             return string.Join(",  ", bits.ToArray());
+        }
+
+        /// <summary>"smith" as "Smith". Empty stays empty.</summary>
+        static string Cap(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return "";
+            if (key.Length == 1) return key.ToUpperInvariant();
+            return char.ToUpperInvariant(key[0]) + key.Substring(1);
         }
     }
 }

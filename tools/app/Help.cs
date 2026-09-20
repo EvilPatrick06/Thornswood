@@ -11,17 +11,17 @@ namespace Thornswood
         public static readonly HelpItem[] Items = new HelpItem[]
         {
             // ===================================================== joining
-            new HelpItem("Joining", "1.  Make a character, named after yourself",
-                "The multiplayer client reads the name off your character when you connect, and that is what everyone else sees floating above you. It is set when you create the character, so changing it later means starting a new one."),
+            new HelpItem("Joining", "1.  You pick your character at the game's main menu",
+                "Press Play and Skyrim opens on its own menu with your characters listed, and New character under them. Name a new one after yourself: the multiplayer client reads the name off your character when you connect, and that is what everyone else sees floating above you. It is set when you create the character, so changing it later means starting a new one."),
 
             new HelpItem("Joining", "2.  Three choices and nothing else",
-                "There is no cart ride and no Helgen. You wake in a shut room with nothing in it but you. The appearance menu opens on its own: build your face and close it. A moment later you are asked what you do for a living, sixteen trades over two pages, and then where you want to wake up, ten places over two pages. That is the whole of it, and the room empties as soon as you have answered."),
+                "There is no cart ride and no Helgen. You wake in a shut room, the creation hall, with nothing in it but you and whoever else is being made that day. The appearance menu opens on its own: build your face and close it. A moment later the character panel opens on its own: your class, your profession and the half of it you will make your own, and the town you wake up in. Take them in any order and confirm each. The third one sends you to your inn, wearing the shift and carrying nothing. Nothing else is decided in the hall."),
 
             new HelpItem("Joining", "2a.  The world options are set for everyone",
-                "Dragons, the main quest, the clock and the season belong to the server, not to you, so they are not on offer. What is yours to pick still is: sixteen trades, any hold in Skyrim and Raven Rock, and a face of your own."),
+                "Dragons, the main quest, the clock and the season belong to the server, not to you, so they are not on offer. What is yours to pick still is: one of five classes, one of eight professions, nine towns, and a face of your own."),
 
-            new HelpItem("Joining", "2b.  If the questions do not appear",
-                "They are two message boxes and they can be beaten to the punch by another menu. There is a key on the Controls page, under Thornswood, that brings the pending one back up by hand. It does nothing once you have answered. The writs and passages in your pack are the same choices as books, for the same reason: read one and it counts."),
+            new HelpItem("Joining", "2b.  If the panel does not appear",
+                "Press K. That is the same panel you use for the rest of your character's life, for the skill tree, and the server reminds you in chat every half minute while the choices are still open. If K does nothing, the chat may have the keyboard: press Enter to close it and try again. A refusal from the server shows under the panel and in the chat, with the reason."),
 
             new HelpItem("Joining", "3.  You do not need to save first",
                 "Skyrim Together would not accept a connection from an unsaved game and this one does not care. The client loads you into the world itself. Saving is still worth doing out of habit, but nothing here depends on it."),
@@ -208,7 +208,7 @@ new HelpItem("Emotes", "It will not open over a menu",
                 "A long wait, a black screen, and then you are standing in Skyrim on your own with no menus and nobody else about. That is not a crash. Nothing was answering at the server address, so nothing ever created a character for you. The launcher checks before it starts the game now and says so rather than letting you find out twenty minutes in. If the server runs on your own machine, press Play and it starts it for you."),
 
             new HelpItem("If it breaks", "You keep getting yesterday's character",
-                "Your character is not a save file here. It lives on the server, and which one you get is decided by the slot you picked on the Play page, so starting a new game in Skyrim's own menu hands you the same body, the same inventory and the same face back. A genuinely new character comes from the character picker: press Play, pick an empty slot, and creation runs from the top.")
+                "Your character is not a save file here. It lives on the server, and which one you get is decided by what you pick at the game's main menu, so loading a save from Skyrim's own load menu hands you the same body, the same inventory and the same face back. A genuinely new character is New character on that menu, and creation runs from the top.")
         };
     }
 }

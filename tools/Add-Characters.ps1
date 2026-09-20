@@ -1,14 +1,15 @@
 <#
   Add-Characters.ps1
 
-  Turns Play into a character screen. Two slots, each with its own save
-  folder, and Skyrim walks straight into whoever you pick.
+  Installs Start On Save into the build.
 
-  Skyrim has no command line that says "load this save", so the launcher
-  cannot reach past the main menu on its own. Start On Save does that part:
-  it loads the newest save it can see, and starts a new game when it cannot
-  see any. The launcher decides what it can see by pointing the save folder
-  at one character before the game starts.
+  Until 20 September this was what turned Play into a character screen: two
+  slots, each with its own save folder, and Start On Save walked straight
+  into whoever you picked, because Skyrim has no command line that says
+  "load this save". The launcher tells the mod to stand still now
+  (Chars.WriteStartIni, rewritten on every Play) and you pick your character
+  at the game's main menu. The build still ships the mod and Verify checks
+  its file, so this is still how the dll gets into a build.
 
       .\tools\Add-Characters.ps1
 
@@ -23,7 +24,7 @@ param(
     # one, so this was the only script that could not find the game.
     [string]$Root      = 'C:\Thornswood',
     [string]$Downloads = "$env:USERPROFILE\Downloads",
-    [string]$Notes = "Play now asks who you are`n- two character slots, each with their own saves, so nobody loads into somebody else's game`n- each slot shows the name, race, level and in game time read out of the save itself`n- picking one walks straight past Skyrim's main menu, hold Shift on the way in if you want it back`n- an empty slot starts a new character, and characters can be deleted without destroying the saves",
+    [string]$Notes = "Start On Save is in the build`n- the launcher tells it to load nothing, and you pick your character at the game's main menu",
     [switch]$NoShip,
     [switch]$NoPause
 )
@@ -101,13 +102,10 @@ Say '  untouched, Start On Save ships no plugin' 'DarkGray'
 Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 
 Head 'Your existing saves'
-$chars = Join-Path $Root 'Profile\Characters'
-if (Test-Path (Join-Path $chars '1')) {
-    Say '  character slots already exist, leaving them alone' 'DarkGray'
-} else {
-    Say '  the launcher moves whatever is in your save folder into slot one' 'Gray'
-    Say '  the first time it starts, so nothing gets stranded' 'Gray'
-}
+# The two slot folders under Profile\Characters went on 20 September. The
+# launcher points the Saves folder at Profile\Characters\saves on every Play
+# and sets a real Saves folder aside whole; nothing here has to check.
+Say '  untouched, the launcher redirects the Saves folder on every Play' 'DarkGray'
 
 if ($NoShip) {
     Head 'Done'

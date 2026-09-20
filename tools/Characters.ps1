@@ -14,18 +14,19 @@
 
   What a wipe actually does, said plainly, because it is not a delete:
 
-    The register entry is removed. The next time that person opens the
-    launcher it finds nothing on the server and nothing in their profiles.txt
-    is restored, so when they press Play the launcher rolls a new profile id
-    the game server has never seen, and they go through creation from the top
-    with an empty character.
+    The register entry is removed. That is all. Since 20 September the
+    launcher neither reads nor writes the register (the sync that did was
+    deleted; it never got an answer, because it sent no password), so a wipe
+    changes nothing on the person's machine: their profiles.txt still lists
+    their ids and the game's main menu still offers them. Nothing feeds the
+    register any more either, so what this lists is what launchers claimed
+    before that date.
 
-    The old change form stays in the world file, unreachable. That is on
-    purpose. A profile id is the only handle anything has on a character, and
-    a wipe that also reached into the world would be a wipe you could not take
-    back if you typed the wrong Steam id. The register keeps a history of
-    every id it has seen for an account, so a wipe done by mistake can be
-    undone by hand. Run with -History to see them.
+    The change forms stay in the world file. That is on purpose. A profile
+    id is the only handle anything has on a character, and a wipe that also
+    reached into the world would be a wipe you could not take back if you
+    typed the wrong Steam id. The register keeps a history of every id it
+    has seen for an account. Run with -History to see them.
 
     If you want the world file itself emptied, that is a different and much
     bigger thing: stop the server, move C:\Thornswood-Server\world aside, and
@@ -75,8 +76,8 @@ if ($Wipe) {
 
     Head 'Wiping'
     Say "  Steam account $Wipe" 'Yellow'
-    Say '  Their next launch starts a new character from creation.' 'Yellow'
-    Say '  The old one stays in the world file, unreachable but not destroyed.' 'DarkGray'
+    Say '  Only the register entry goes. Their launcher still lists their ids' 'Yellow'
+    Say '  and the game menu still offers them; the world file is not touched.' 'DarkGray'
     Write-Host ''
     $sure = Read-Host 'Type the last four digits of that Steam id to go ahead'
     if ($sure -ne $Wipe.Substring($Wipe.Length - 4)) { Die 'Not confirmed, nothing was changed.' }

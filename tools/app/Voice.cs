@@ -489,9 +489,19 @@ namespace Thornswood
         /// The profile id has to be the one the game uses or nobody is matched
         /// to their own character, so it is read from the same file the game
         /// reads rather than worked out again here.
+        ///
+        /// Unless Reconfigure(int) has said otherwise. Since 20 September the
+        /// settings file holds the id played last and the person picks at the
+        /// game's menu, so once the choice file names somebody the file is
+        /// stale and the number Shell hands over is the truth. The file is
+        /// never rewritten while the game runs (it hot reloads every plugin),
+        /// which is why this cannot simply read it again.
         /// </summary>
+        static long profileOverride;
+
         static long ProfileId()
         {
+            if (profileOverride > 0) return profileOverride;
             try
             {
                 string f = Path.Combine(Paths.Game, "Data\\Platform\\Plugins\\skymp5-client-settings.txt");
@@ -701,13 +711,17 @@ namespace Thornswood
             // Fetched here rather than in the page, because the ticket lives in
             // this process and has no business being handed to a browser.
             string token = FetchToken(host, port, profile, Say);
-            if (token.Length > 0)
-            {
-                tokenGot = DateTime.UtcNow;
-                tokenHost = host;
-                tokenPort = port;
-                tokenProfile = profile;
-            }
+
+            // What the renewal fetches for, whether or not this fetch worked.
+            // These used to move only on success, so a config for a new id
+            // whose first fetch failed left the renewal minting tokens for the
+            // previous id, and voice-token.txt with them. A failed fetch is
+            // dated so the renewal tries again in five minutes rather than
+            // thirty.
+            tokenHost = host;
+            tokenPort = port;
+            tokenProfile = profile;
+            tokenGot = token.Length > 0 ? DateTime.UtcNow : DateTime.UtcNow.AddMinutes(-25);
 
             // The game's overlay joins the same room on its own socket and holds
             // no ticket, so it reads the token out of the folder the two already
@@ -740,17 +754,23 @@ namespace Thornswood
         /// matched to their own character. The launch at 2026-09-16 02:25 had
         /// voice on 950724594 while the game was handed 579810940.
         ///
-        /// Chars.Use calls this the moment the id changes. Safe to call before
+        /// Chars.Prepare calls this before the game starts with the id played
+        /// last, and Shell calls it again with whoever the person picked at
+        /// the game's menu (20 September; until then Chars.Use called the
+        /// parameterless version the moment a slot's id was written). The id
+        /// is passed rather than read back out of the settings file because
+        /// the file is not rewritten while the game runs. Safe to call before
         /// the page exists: Post does nothing without a view, and Configure
-        /// says so and returns when the settings file has no id in it yet.
+        /// says so and returns when there is no id yet.
         ///
         /// A config the page already has is not sent twice. Every one it is
         /// handed opens a socket, and the service keeps a peer per socket, so a
         /// second Play on the same character used to leave a ghost peer behind
         /// announcing the previous slot.
         /// </summary>
-        public static void Reconfigure()
+        public static void Reconfigure(int profileId)
         {
+            if (profileId > 0) profileOverride = profileId;
             try { Configure(null, false); } catch { }
         }
 

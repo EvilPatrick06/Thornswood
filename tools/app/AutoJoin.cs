@@ -270,6 +270,73 @@ namespace Thornswood
             catch { return false; }
         }
 
+        /// <summary>
+        /// Tell the client to wait at the main menu and let the person pick,
+        /// rather than connecting as one id the moment it loads.
+        ///
+        /// Since 20 September the launcher has no character picker of its
+        /// own. gameData.chooseAtMenu = true is what our fork of the client
+        /// reads to hold at the menu, and gameData.profileId still carries a
+        /// number, the id played last (or the spare on an install that has
+        /// played nobody), so the menu has something to offer first and an
+        /// older client that does not know the flag still walks in as
+        /// somebody rather than showing the login box (see SetProfileId for
+        /// why the number has to be inside gameData).
+        ///
+        /// Same edit style as SetProfileId: one key put inside gameData when
+        /// it is not there, every copy in the file brought to the same value,
+        /// the shape checked, and the write under Hold.Around. Then the file
+        /// is read back and this throws when it does not say what was
+        /// written, because a write that quietly failed leaves the client
+        /// connecting as whoever the last session left there. Play stops on
+        /// the throw. Never called while the game runs: a write to this file
+        /// hot reloads every plugin.
+        /// </summary>
+        public static void SetChooseAtMenu(int lastProfileId)
+        {
+            string file = SettingsFile;
+            Ensure(null);
+            if (!File.Exists(file))
+                throw new Exception("SkyMP's client settings file is missing and could not be made, so the game was not started.");
+
+            string before = File.ReadAllText(file);
+            string after = EnsureInGameData(before, "profileId", lastProfileId.ToString());
+            after = SetEveryNumber(after, "profileId", lastProfileId);
+            after = EnsureInGameData(after, "chooseAtMenu", "true");
+            after = SetEveryBool(after, "chooseAtMenu", true);
+
+            if (!string.Equals(before, after, StringComparison.Ordinal))
+            {
+                if (!LooksLikeJson(after))
+                    throw new Exception("Left the client settings alone: the edit would have broken the file, " +
+                                        "and a broken one stops SkyrimPlatform loading any plugin at all. The game was not started.");
+                string changed = after;
+                Hold.Around(file, delegate { File.WriteAllText(file, changed, new UTF8Encoding(false)); });
+            }
+
+            int wrote = GetProfileId();
+            bool menu = GetChooseAtMenu();
+            if (wrote != lastProfileId || !menu)
+                throw new Exception(
+                    "The client settings could not be written: they say " +
+                    (wrote > 0 ? "profile " + wrote : "no profile") + " instead of profile " + lastProfileId +
+                    (menu ? "" : " and do not ask for the menu") + ". " +
+                    "Skyrim would have connected as whoever the last session left there, so it was not started. " +
+                    "Check that Data\\Platform\\Plugins\\skymp5-client-settings.txt is not read only.");
+        }
+
+        /// <summary>True when the file asks the client to wait at the menu.</summary>
+        static bool GetChooseAtMenu()
+        {
+            try
+            {
+                string file = SettingsFile;
+                if (!File.Exists(file)) return false;
+                return Regex.IsMatch(File.ReadAllText(file), "\"chooseAtMenu\"\\s*:\\s*true");
+            }
+            catch { return false; }
+        }
+
         // ------------------------------------------------------------ text edits
         // Replace the value of an existing key, or add the key if it is absent.
         // Absent is worth handling: an older settings file predates some of
@@ -336,6 +403,13 @@ namespace Thornswood
         {
             var rx = new Regex("(\"" + Regex.Escape(key) + "\"\\s*:\\s*)(-?\\d+(?:\\.\\d+)?|null)");
             return rx.Replace(json, "${1}" + value.ToString());
+        }
+
+        /// <summary>The same, for a key whose value is true or false.</summary>
+        static string SetEveryBool(string json, string key, bool value)
+        {
+            var rx = new Regex("(\"" + Regex.Escape(key) + "\"\\s*:\\s*)(true|false|null)");
+            return rx.Replace(json, "${1}" + (value ? "true" : "false"));
         }
 
         static string SetString(string json, string key, string value)
