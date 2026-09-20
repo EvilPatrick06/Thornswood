@@ -948,7 +948,19 @@ if (Test-Path $cfgPath) {
         # back once they have all been pointed at Caddy. Writing it always is
         # what makes that one release rather than one per machine.
         if ($cfg.PSObject.Properties.Name -contains 'VoiceUrl') {
-            Set-Prop $doc 'voiceUrl' ([string]$cfg.VoiceUrl)
+            $vu = [string]$cfg.VoiceUrl
+            # The dev channel talks to the dev voice service. Caddy carries
+            # /voice/ to the live service and /voice-dev/ to the dev one, and
+            # the dev gamemode collects chat commands from the dev one only.
+            # Until 20 Sep the dev feed carried main's address, so every slash
+            # line from a dev session, /pick among them, went to the live
+            # service and was answered by the live gamemode. Empty stays
+            # empty: that is the raw port, and voicePort says which one.
+            if ($Dev -and $vu.Trim().Length -gt 0 -and $vu.TrimEnd('/') -notmatch '-dev$') {
+                $vu = $vu.TrimEnd('/') + '-dev'
+                Say "  voiceUrl $vu (the dev service behind Caddy)" 'Green'
+            }
+            Set-Prop $doc 'voiceUrl' $vu
         }
 
         # How many the room holds. A number, not a string, because the launcher

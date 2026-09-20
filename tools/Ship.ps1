@@ -641,8 +641,8 @@ if (-not $DryRun -and -not $NoAnnounce) {
 # ------------------------------------------------------- dev follows main
 # Everything on dev was in this release, because a main pack is the difference
 # from main's last release and the dev changes are part of that. So the dev
-# feed is set to exactly what main now has, with the dev ports kept, and the
-# dev baseline becomes main's. Dev launchers take the main pack and the main
+# feed is set to exactly what main now has, with the dev ports and the dev
+# voice address kept, and the dev baseline becomes main's. Dev launchers take the main pack and the main
 # launcher version, and the next Ship -Channel dev starts at .1 again.
 if (-not $DryRun -and -not $Dev) {
     $devRel = Join-Path (Split-Path -Parent $MainReleaseDir) 'Thornswood-Releases-dev'
@@ -651,7 +651,7 @@ if (-not $DryRun -and -not $Dev) {
         try {
             $mainDoc = Get-Content (Join-Path $MainReleaseDir 'version.json') -Raw | ConvertFrom-Json
             $devDoc  = Get-Content (Join-Path $devRel 'version.json') -Raw | ConvertFrom-Json
-            foreach ($keep in 'serverPort', 'voicePort') {
+            foreach ($keep in 'serverPort', 'voicePort', 'voiceUrl') {
                 if ($devDoc.PSObject.Properties[$keep]) {
                     if ($mainDoc.PSObject.Properties[$keep]) { $mainDoc.$keep = $devDoc.$keep }
                     else { $mainDoc | Add-Member -NotePropertyName $keep -NotePropertyValue $devDoc.$keep }

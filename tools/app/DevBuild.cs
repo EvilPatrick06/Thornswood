@@ -26,6 +26,25 @@ namespace Thornswood
         public const string DevPort = "7787";
         public const string DevVoicePort = "7789";
 
+        /// <summary>
+        /// The dev voice service's address behind Caddy, from the main one.
+        /// Caddy carries /voice/ to the live service and /voice-dev/ to the
+        /// dev one (tools\Caddyfile), and the dev gamemode collects chat
+        /// commands from the dev service only. Until 20 September the dev
+        /// build kept the main address, so its chat lines, /pick among them,
+        /// went to the live service and were answered by the live gamemode,
+        /// which had never heard of the command. Empty stays empty: that is
+        /// the raw port, and VoicePort already says which one.
+        /// </summary>
+        public static string DevVoiceUrl(string mainUrl)
+        {
+            string u = mainUrl == null ? "" : mainUrl.Trim();
+            while (u.EndsWith("/")) { u = u.Substring(0, u.Length - 1); }
+            if (u.Length == 0) return "";
+            if (u.EndsWith("-dev", StringComparison.OrdinalIgnoreCase)) return u;
+            return u + "-dev";
+        }
+
         /// <summary>Beside the main install: C:\Thornswood becomes C:\Thornswood-DevBuild.</summary>
         public static string Root
         {
@@ -76,12 +95,13 @@ namespace Thornswood
                 if (File.Exists(src)) File.Copy(src, Path.Combine(root, "Profile", n), true);
             }
 
-            // The config, with the four things that make it the dev build.
+            // The config, with the five things that make it the dev build.
             Config dev = Config.Load(Paths.CfgFile);
             dev.Channel = "dev";
             dev.UpdateBranch = "dev";
             dev.ServerPort = DevPort;
             dev.VoicePort = DevVoicePort;
+            dev.VoiceUrl = DevVoiceUrl(dev.VoiceUrl);
             dev.Save(Path.Combine(root, "config.json"));
 
             try
