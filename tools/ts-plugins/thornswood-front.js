@@ -1261,12 +1261,23 @@
    * line now carries bIsInMT, IsFirstPerson, bAttached and currentDefaultState,
    * the four things the shipped graph uses to decide which branch is live.
    *
-   * One thing that has been ruled out cheaply and is worth not repeating: the
-   * behaviour files in the Thornswood game folder are byte for byte the ones
-   * in the Steam copy Vortex deploys into. So this is not the folder the
-   * launcher builds, and it should fail in plain single player Skyrim too.
-   * Somebody trying that settles whether this is the mod list or this server
-   * in about two minutes, which is cheaper than anything else left.
+   * One thing ruled out cheaply and worth not repeating: the behaviour files
+   * in the Thornswood game folder are byte for byte the ones in the Steam copy
+   * Vortex deploys into, so this is not the folder the launcher builds.
+   *
+   * That does NOT mean go and try it in Skyrim through Steam. Steam updates
+   * its copy on launch and every one of these servers runs a downgraded exe,
+   * so that test costs the install, a re-downgrade and an Anniversary upgrade
+   * nobody asked for. It was suggested here once and it was wrong.
+   *
+   * The four variables above answer the same question from an ordinary
+   * session. bIsInMT reading no while running means the character is not in
+   * the branch that holds jump and sprint, which makes this the graph. All
+   * four reading normal while both events are still refused means the graph is
+   * in the right place and something between the key and the graph is doing
+   * it, which makes it this server. If an offline run is ever genuinely
+   * needed, it is this folder's own skse64_loader.exe with MpClientPlugin.dll
+   * moved aside under Checks.OffSuffix, and never Steam's copy.
    *
    * bSprintOK is held open separately, while the sprint key is down and
    * Skyrim's own rule says it should be: it is the whole of the game's
