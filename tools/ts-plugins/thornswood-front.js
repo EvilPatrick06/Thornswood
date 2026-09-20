@@ -1480,6 +1480,15 @@
    * question becomes what.
    */
   function holdNpcClear(pc) {
+    /* The same three ownTheCharacter refuses on, and for the same reasons. The
+       first one matters most here: race creation hands the character over on
+       purpose, and this runs on every heartbeat frame rather than only while
+       somebody is asking to jump, so without it this would be writing to the
+       graph all the way through a face being made. Nobody jumps while dead,
+       sitting or mounted either, so none of them costs a press. */
+    if (busyMenuOpen()) { return; }
+    if (notOurs()) { return; }
+    try { if (pc.isOnMount()) { return; } } catch (e) { }
     if (!varBool(pc, 'IsNPC')) { return; }
     try {
       pc.setAnimationVariableBool('IsNPC', false);
