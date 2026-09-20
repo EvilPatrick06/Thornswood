@@ -471,11 +471,28 @@ function body(req, cap) {
   });
 }
 
+/*
+  What each extension is served as. Anything not named here falls through to
+  text/plain, which is right for robots.txt and wrong for everything binary.
+
+  .jpg and .mp4 were both missing on 20 September and both were needed the same
+  day: the front page's hero became a video with a still as its poster, and the
+  site served them as text/plain. A browser will not play a video it is told is
+  text, so the hero was simply blank and the reasonable reading from the outside
+  was that the wrong picture had been published. It had not; it was unplayable.
+
+  Wrong Content-Type is a bad failure because nothing errors. The file arrives,
+  200, the right bytes, and the browser quietly declines to do anything with it.
+*/
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon'
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
+  '.gif': 'image/gif', '.avif': 'image/avif',
+  '.mp4': 'video/mp4', '.webm': 'video/webm', '.m4v': 'video/mp4',
+  '.woff2': 'font/woff2', '.woff': 'font/woff'
 };
 
 const origin = (req) => {
@@ -1189,7 +1206,52 @@ async function handle(req, res) {
   if (req.method === 'GET' && /^\/[A-Za-z0-9._-]+$/.test(p)) {
     const file = path.join(PUBLIC, p.slice(1));
     if (file.startsWith(PUBLIC + path.sep) && fs.existsSync(file)) {
-      return send(res, 200, fs.readFileSync(file), TYPES[path.extname(file)] || 'text/plain');
+      const type = TYPES[path.extname(file).toLowerCase()] || 'text/plain';
+      /*
+        A byte range when one is asked for, because video needs it.
+
+        Safari and iOS do not play a video from a plain 200 with the whole file
+        in it: they ask for a range first and give up if the answer ignores the
+        header. Chrome tolerates it, which is exactly how this ships broken for
+        half the people and fine for whoever tested it.
+
+        Everything else is unaffected. No Range header means the old path, byte
+        for byte, with Accept-Ranges added so a client knows it may ask.
+      */
+      const range = req.headers.range;
+      const m = range && /^bytes=(\d*)-(\d*)$/.exec(String(range).trim());
+      if (m) {
+        const size = fs.statSync(file).size;
+        let start = m[1] === '' ? null : parseInt(m[1], 10);
+        let end = m[2] === '' ? null : parseInt(m[2], 10);
+        // bytes=-500 means the LAST 500, not "from 0 to 500".
+        if (start === null && end !== null) { start = Math.max(0, size - end); end = size - 1; }
+        if (start !== null && end === null) { end = size - 1; }
+        if (start === null || start > end || start >= size) {
+          res.writeHead(416, {
+            'content-range': 'bytes */' + size,
+            'accept-ranges': 'bytes',
+            'cache-control': 'no-store',
+            'x-content-type-options': 'nosniff'
+          });
+          res.end();
+          return;
+        }
+        end = Math.min(end, size - 1);
+        res.writeHead(206, {
+          'content-type': type,
+          'content-range': 'bytes ' + start + '-' + end + '/' + size,
+          'content-length': (end - start) + 1,
+          'accept-ranges': 'bytes',
+          // send() puts these on every other answer; a range must not be the
+          // one reply that quietly goes out without them.
+          'cache-control': 'no-store',
+          'x-content-type-options': 'nosniff'
+        });
+        fs.createReadStream(file, { start: start, end: end }).pipe(res);
+        return;
+      }
+      return send(res, 200, fs.readFileSync(file), type, { 'Accept-Ranges': 'bytes' });
     }
   }
 
