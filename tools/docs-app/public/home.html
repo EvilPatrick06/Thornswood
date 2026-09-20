@@ -122,9 +122,21 @@ nav.top a:hover{color:var(--page)}
 /*
   The hero is a drawn landscape, not a photograph and not an empty field. Every
   other server puts a screenshot here; we have none worth using yet and a fake
-  one would be worse than none. This is midpoint-displacement ridgelines, an
-  aurora, and a hundred and fifty stars, generated once and served as a file.
-  It weighs fifteen kilobytes and it is sharp on any screen.
+  one would be worse than none.
+
+  It was midpoint-displacement ridgelines, an aurora and a hundred and fifty
+  stars, generated once and served as a fifteen kilobyte file. Replaced on 20
+  September with the painted banner, asked for by Patrick, because the same
+  picture now wants to be on the site, the game's main menu and its loading
+  screens, and a generated ridgeline cannot be any of the other two.
+
+  ridge.svg is still in this folder. Putting it back is one line here.
+
+  The banner ships as banner.jpg rather than the 3 MB source PNG in
+  tools/art: at quality 82 it is 465 KB for the same 1672 by 941, which is
+  most of the weight gone and no visible cost on a dark image that sits under
+  a grain overlay. It is still thirty times the file the ridgeline was, so it
+  is worth not adding a second one.
 */
 .hero{position:relative;min-height:min(84vh,780px);display:grid;align-items:center;
   padding:84px 0 96px;text-align:center;overflow:hidden;isolation:isolate}
@@ -354,7 +366,7 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
 
 <div id="landing">
 <div class="hero">
-  <img class="art" src="/ridge.svg" alt="">
+  <img class="art" src="/banner.jpg" alt="" fetchpriority="high" decoding="async">
   <div class="wrap">
     <img class="crest" src="/logo.png" alt="">
     <h1>Thornswood</h1>
