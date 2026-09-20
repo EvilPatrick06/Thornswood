@@ -3906,7 +3906,7 @@ namespace Thornswood
             try
             {
                 Standing st = Discord.Join(id);
-                if (st.Ok) return;
+                if (st.Ok) { Log("checked character " + id + " in with thornswood.net"); return; }
                 string why = st.Message != null && st.Message.Length > 0 ? st.Message : st.Why;
                 PresenceLog("Could not check profile " + id + " in with thornswood.net: " + why);
             }
