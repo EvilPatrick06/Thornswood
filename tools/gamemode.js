@@ -2066,7 +2066,55 @@ log('gamemode loaded:',
     try {
       fs.writeFileSync(FILE, JSON.stringify({ at: Date.now(), who: book }));
     } catch (e) { }
+    push();
   }
+
+  /*
+    The same book, to the site.
+
+    The launcher used to read characters.json straight off the resource port.
+    On 18 September the file moved into the private folder (it names people
+    and where they stand), the port has answered 404 since, and every card in
+    the launcher, and now the game's own menu, has been nameless. The site is
+    the one thing the launcher can prove itself to, so the book goes there
+    with the door's key, and the site hands each person their own rows and
+    nobody else's (POST /api/play/roster with the Discord ticket). Sent when
+    the book changes, and once after a start so a restart is not a blank.
+  */
+  var pushSaid = false;
+  function push() {
+    var conf;
+    try {
+      conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8').replace(/^﻿/, ''));
+    } catch (e) { return; }
+    if (!conf || !conf.site || !conf.key) return;
+    var https;
+    try { https = require('https'); } catch (e) { return; }
+    var u;
+    try { u = new URL(String(conf.site).replace(/\/+$/, '') + '/api/roster'); } catch (e) { return; }
+    var body = JSON.stringify({ key: String(conf.key), who: book });
+    try {
+      var req = https.request({
+        host: u.hostname, port: u.port || 443, path: u.pathname, method: 'POST', timeout: 5000,
+        headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }
+      }, function (resp) {
+        resp.resume();
+        if (resp.statusCode !== 200 && !pushSaid) {
+          pushSaid = true;
+          console.log('[thornswood] the site answered ' + resp.statusCode + ' to the roster; names will be missing from the menu');
+        }
+      });
+      req.on('error', function (e) {
+        if (!pushSaid) {
+          pushSaid = true;
+          console.log('[thornswood] could not send the roster to the site: ' + (e && e.message ? e.message : e));
+        }
+      });
+      req.on('timeout', function () { req.destroy(); });
+      req.end(body);
+    } catch (e) { }
+  }
+  setTimeout(push, 15000);
 
   var dirty = false;
 

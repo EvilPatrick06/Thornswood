@@ -77,23 +77,24 @@ namespace Thornswood
         /// </summary>
         public static bool Refresh(Config cfg)
         {
-            if (cfg == null || string.IsNullOrEmpty(cfg.ServerAddress)) return false;
+            if (cfg == null) return false;
             lock (gate) { triedAt = DateTime.UtcNow; }
 
+            // From the site, with the Discord ticket, since 20 September. This
+            // used to GET characters.json off the game server's resource port,
+            // and that has been a 404 since the file moved into the private
+            // folder on the 18th (it names people and where they stand), so no
+            // card has had a name since. The gamemode pushes its book to the
+            // site and the site answers with this account's own rows only.
             string text = null;
             try
             {
-                string url = "http://" + cfg.ServerAddress + ":" + SkyMp.ResourcePortFor(cfg) + "/characters.json";
-                using (var q = new Quick())
-                {
-                    q.Ms = 2500;
-                    q.Headers["User-Agent"] = "ThornswoodLauncher/" + Updater.Version;
-                    byte[] raw = q.DownloadData(url);
-                    if (raw == null || raw.Length == 0) return false;
-                    int at = 0;
-                    if (raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF) at = 3;
-                    text = System.Text.Encoding.UTF8.GetString(raw, at, raw.Length - at);
-                }
+                if (!Discord.Linked) return false;
+                string reply;
+                int code = Discord.PostJson(Discord.Site + "/api/play/roster",
+                                            "{\"ticket\":\"" + Discord.Escape(Discord.Ticket) + "\"}", out reply);
+                if (code != 200 || string.IsNullOrEmpty(reply)) return false;
+                text = reply;
             }
             catch { return false; }
 

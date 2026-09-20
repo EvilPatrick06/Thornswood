@@ -41,6 +41,9 @@ namespace Thornswood
         // Allowed on the dev build. The site decides: the Owner and Dev
         // roles unless its config widens it.
         public bool Dev;
+        // Character slots at the game's main menu. Two, or three for a
+        // Patreon tier or a Gamemaster; the site decides from the roles.
+        public int Slots = 2;
     }
 
     public static class Discord
@@ -338,6 +341,8 @@ namespace Thornswood
             st.Invite   = Field(reply, "invite");
             st.Admin    = Field(reply, "admin") == "true";
             st.Dev      = Field(reply, "dev") == "true";
+            int slots;
+            if (int.TryParse(Field(reply, "slots"), out slots) && slots > 0) st.Slots = slots;
             // Only an answer that carried the flag moves it. An older site
             // that says nothing about dev leaves the last answer standing.
             if (reply.Contains("\"dev\"")) NoteDev(st.Dev);
@@ -347,7 +352,7 @@ namespace Thornswood
             return st;
         }
 
-        static int PostJson(string url, string json, out string reply)
+        public static int PostJson(string url, string json, out string reply)
         {
             reply = "";
             try
@@ -428,7 +433,7 @@ namespace Thornswood
             return json.Substring(i, end - i).Trim();
         }
 
-        static string Escape(string s)
+        public static string Escape(string s)
         {
             return (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
         }

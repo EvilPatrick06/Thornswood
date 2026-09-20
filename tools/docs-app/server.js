@@ -97,6 +97,12 @@ cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // Who may use the dev build and join the dev server. Left out of config.json
 // it is the admin roles, Owner and Dev. Add role names here to widen it.
 if (!Array.isArray(cfg.access.dev)) cfg.access.dev = cfg.access.admin.slice();
+// Who gets a third character slot at the game's main menu. Everybody gets
+// two; a Patreon tier or a Gamemaster gets three, and so do the admin roles.
+// Decided by Patrick on 20 September. The tier names are Build-Discord.py's.
+if (!Array.isArray(cfg.access.slots3)) {
+  cfg.access.slots3 = ['Thalmor Boot-Licker', 'Talos Worshiper', 'Milk Drinker', 'Gamemaster'];
+}
 cfg.admins  = Array.isArray(cfg.admins) ? cfg.admins.map(String) : [];
 
 /* Signs the admin cookie. Kept apart from the password so changing the
@@ -582,6 +588,18 @@ async function roleNames() {
 }
 
 const LINKED = path.join(DATA, 'linked.json');
+// The game server's character roster, pushed here by the gamemode with the
+// door key (POST /api/roster) and handed back per person (POST /api/play/roster).
+// Keyed by profile id; live and dev both push into it, their ids never meet.
+const ROSTER = path.join(DATA, 'roster.json');
+
+/* How many character slots this person gets at the game's main menu. */
+function slotsFor(st) {
+  if (!st) return 2;
+  if (st.admin || st.dev) return 3;
+  const roles = Array.isArray(st.roles) ? st.roles : [];
+  return (cfg.access.slots3 || []).some((n) => roles.indexOf(n) >= 0) ? 3 : 2;
+}
 
 /* Every attempt to sign in, whether it worked or not.
  *
@@ -1406,8 +1424,65 @@ async function handle(req, res) {
       name: st.name || t.n,
       admin: st.admin,
       dev: !!st.dev,
-      roles: st.roles
+      roles: st.roles,
+      slots: slotsFor(st)
     });
+  }
+
+  /*
+    The character roster, in from the game server and out to each person.
+
+    In: the gamemode posts its whole book with the door key whenever it
+    changes, {key, who: {"<profileId>": {name, race, female, trade, town,
+    where, at}}}. Merged by profile id, so the live and the dev server share
+    the file without treading on each other.
+
+    Out: a launcher posts its ticket and gets the rows for the profile ids
+    linked to that Discord account, and no others. This is how a card at the
+    game's main menu knows its own name; until 20 September the launcher read
+    characters.json off the resource port, which has been a 404 since the
+    file moved into the private folder on the 18th.
+  */
+  if (p === '/api/roster' && req.method === 'POST') {
+    if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 4 * 1024 * 1024)) || {}; } catch (e) { }
+    if (!sameSecret(String(o.key || ''), String(cfg.botKey))) return sendJson(res, 401, { error: 'no' });
+    const who = (o.who && typeof o.who === 'object') ? o.who : {};
+    const store = jsonFile(ROSTER, { who: {} });
+    if (!store.who || typeof store.who !== 'object') store.who = {};
+    let n = 0;
+    for (const pid of Object.keys(who)) {
+      if (!/^\d+$/.test(pid)) continue;
+      const row = who[pid];
+      if (!row || typeof row !== 'object') continue;
+      store.who[pid] = {
+        name: String(row.name || '').slice(0, 64), race: String(row.race || '').slice(0, 32),
+        female: !!row.female, trade: String(row.trade || '').slice(0, 32),
+        town: String(row.town || '').slice(0, 32), where: String(row.where || '').slice(0, 80),
+        at: Number(row.at) || Date.now()
+      };
+      n++;
+    }
+    store.at = Date.now();
+    putJson(ROSTER, store);
+    return sendJson(res, 200, { ok: true, merged: n, total: Object.keys(store.who).length });
+  }
+
+  if (p === '/api/play/roster' && req.method === 'POST') {
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const t = readTicket(o.ticket);
+    if (!t) return sendJson(res, 401, { ok: false, why: 'link' });
+    const linked = jsonFile(LINKED, {});
+    const mine = ((linked[t.d] || {}).profiles || []).map(Number).filter((x) => x > 0);
+    const store = jsonFile(ROSTER, { who: {} });
+    const rows = {};
+    for (const pid of mine) {
+      const row = store.who && store.who[String(pid)];
+      if (row) rows[String(pid)] = row;
+    }
+    return sendJson(res, 200, { ok: true, rows });
   }
 
   /*
