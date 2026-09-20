@@ -99,6 +99,23 @@ $ShipMachineFiles = @(
     'Data\SKSE\Plugins\CrashLogger.ini'
 )
 
+# Dev only. A path here rides in dev packs and never in a main pack or the
+# installer, whatever else goes to main. The one entry is the test track for
+# the launcher, the main menu and the loading screen, 20 September: the
+# artist has not signed it off, so it stays on dev out of respect for them
+# until they do. The launcher and the plugin also refuse to play it on
+# anything but the dev build, so a stray copy on a main install is silent.
+$ShipDevOnlyFiles = @(
+    'Data\Platform\UI\thornswood-dev-theme.mp3'
+)
+
+function Test-ShipDevOnly([string]$rel) {
+    foreach ($f in $ShipDevOnlyFiles) {
+        if ($rel -eq $f) { return $true }
+    }
+    return $false
+}
+
 function Test-ShipRuntime([string]$rel) {
     foreach ($d in $ShipRuntimeDirs) {
         if ($rel.StartsWith($d, 'OrdinalIgnoreCase')) { return $true }

@@ -821,6 +821,61 @@ namespace Thornswood
             page.IsVisibleChanged += delegate { decide(); };
         }
 
+        /// <summary>
+        /// A test track, dev build only. Asked for by Patrick on 20 September
+        /// for the launcher, the game's main menu and the loading screen, and
+        /// only on dev even when everything around it goes to main, out of
+        /// respect for the artist: the track is not the final one. So it plays
+        /// from the same file the game's menu plays, Data\Platform\UI\
+        /// thornswood-dev-theme.mp3, which dev packs carry and main packs and
+        /// the installer never do (Ship-Rules), and this refuses to play it on
+        /// anything but the dev build even when a copy is lying about.
+        ///
+        /// On a loop while the launcher is open and the game is not running:
+        /// the game's own menu takes over the moment Play is pressed, and the
+        /// launcher picks it up again when the game closes. Paused while the
+        /// window is minimised, because music from a window nobody can see is
+        /// a puzzle rather than a mood.
+        /// </summary>
+        static MediaPlayer music;
+        static void StartMenuMusic()
+        {
+            if (cfg == null || !cfg.IsDev) return;
+            string file = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-dev-theme.mp3");
+            if (!File.Exists(file)) return;
+            try
+            {
+                music = new MediaPlayer();
+                music.Volume = 0.45;
+                music.MediaEnded += delegate
+                {
+                    try { music.Position = TimeSpan.Zero; music.Play(); } catch { }
+                };
+                music.MediaFailed += delegate(object s, ExceptionEventArgs e)
+                {
+                    Stamp("Menu music: did not play (" + (e.ErrorException == null ? "no reason given" : e.ErrorException.Message) + ")");
+                    music = null;
+                };
+                music.Open(new Uri(file));
+                MusicDecide();
+                win.StateChanged += delegate { MusicDecide(); };
+                Stamp("Menu music: the dev test track is on, from " + file);
+            }
+            catch (Exception ex)
+            {
+                Stamp("Menu music: " + ex.Message);
+                music = null;
+            }
+        }
+
+        /// <summary>Plays or pauses the test track for the moment: not while the game runs, not while minimised.</summary>
+        static void MusicDecide()
+        {
+            if (music == null) return;
+            bool want = !playing && win.WindowState != WindowState.Minimized;
+            try { if (want) music.Play(); else music.Pause(); } catch { }
+        }
+
         static void Wire()
         {
             // The Play page names the server rather than addressing it. See the
@@ -893,6 +948,7 @@ namespace Thornswood
                 if (band != null && picture != null) { picture.Background = headerArt; band.Visibility = Visibility.Visible; }
                 StartHeaderVideo();
             }
+            StartMenuMusic();
 
             titleBar.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
             {
@@ -1297,6 +1353,7 @@ namespace Thornswood
                 }
                 playing = false;
                 inPlayTicks = 0;
+                MusicDecide();
                 // An update was seen during the session and they quit before
                 // the five minutes were up. The clock goes, the fact does not:
                 // it is fetched now, the same as it would have been had the
@@ -3582,6 +3639,7 @@ namespace Thornswood
                 Log("Pointing Skyrim settings and saves at this build.");
                 Swap.Apply();
                 playing = true;
+                MusicDecide();
                 btnPlay.IsEnabled = false;
                 btnPlay.Content = "RUNNING";
                 btnQuitGame.Visibility = Visibility.Visible;

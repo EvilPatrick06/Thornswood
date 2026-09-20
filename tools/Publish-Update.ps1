@@ -384,6 +384,8 @@ foreach ($f in (Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)) {
     if (Test-Vanilla $rel) { continue }
     if (Test-Runtime $rel) { continue }
     if (Test-Machine $rel) { continue }
+    # Dev only files ride in dev packs and never in a main one (Ship-Rules).
+    if (-not $Dev -and (Test-ShipDevOnly $rel)) { continue }
     if ($f.Extension -in '.pdb', '.log') { continue }
     $now[$rel] = ('{0}:{1}' -f $f.Length, $f.LastWriteTimeUtc.Ticks)
 }

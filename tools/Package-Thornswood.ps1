@@ -318,6 +318,8 @@ foreach ($f in $all) {
     if (Test-Vanilla $rel) { $skipBytes += $f.Length; continue }
     if (Test-Runtime $rel) { $skipBytes += $f.Length; continue }
     if (Test-ShipMachine $rel) { $skipBytes += $f.Length; $machineCount++; continue }
+    # The installer is main. Dev only files never go in it (Ship-Rules).
+    if (Test-ShipDevOnly $rel) { $skipBytes += $f.Length; continue }
     if (Test-Optional $rel) { $optionalBytes += $f.Length; $optionalCount++; continue }
     if (Test-FromCollection $rel) { $collectionBytes += $f.Length; $collectionCount++; continue }
     if ($f.Extension -in '.pdb', '.log') { $skipBytes += $f.Length; continue }

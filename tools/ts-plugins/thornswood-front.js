@@ -290,6 +290,16 @@
         menuPhase = 9;
         return;
       }
+      // Dev only: a test track for the menu and the loading screen, 20
+      // September. The file rides in dev packs alone (Ship-Rules), and the
+      // page is told about it only when the launcher's session note names
+      // the dev build, so a main install with a stray copy stays silent.
+      try {
+        const note = String(readText('Data/Platform/thornswood-session.txt'));
+        if (/\bDev\b/.test(note) && require('fs').existsSync('Data/Platform/UI/thornswood-dev-theme.mp3')) {
+          list.music = 'thornswood-dev-theme.mp3';
+        }
+      } catch (e) { }
       // The list is never logged in full: it is every profile id this
       // install owns, and a profile id is a seat in the voice room.
       T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';');

@@ -104,6 +104,13 @@ if (Test-Path -LiteralPath $uiSrc) {
     Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
     Note $f.Name
   }
+  # The dev test track lives beside the overlays. It goes into the game
+  # folder like them; whether it leaves the machine is Ship-Rules' call, and
+  # a main pack never carries it.
+  foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.mp3) {
+    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    Note $f.Name
+  }
 } else {
   Bad 'the ts-ui folder is not next to this script'
 }
