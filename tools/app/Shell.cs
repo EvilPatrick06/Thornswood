@@ -84,6 +84,7 @@ namespace Thornswood
                           firstRunCard, quickKeysCard, quickKeys;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
+        static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
         static CheckBox chkKeepSaves;
         static CheckBox chkDeleteMods;
         static Button btnVoiceTest;
@@ -474,6 +475,7 @@ namespace Thornswood
             btnSaveDisplay = F<Button>("BtnSaveDisplay");
             btnQuitGame = F<Button>("BtnQuitGame");
             chkLockRes = F<CheckBox>("ChkLockRes");
+            chkMusic = F<CheckBox>("ChkMusic"); sldMusic = F<Slider>("SldMusic"); txtMusic = F<TextBlock>("TxtMusic");
             dotServer = F<Ellipse>("DotServer"); dotVerify = F<Ellipse>("DotVerify");
             mineCard = F<Border>("MineCard");
             statusList = F<StackPanel>("StatusList"); modList = F<StackPanel>("ModList");
@@ -870,7 +872,7 @@ namespace Thornswood
             try
             {
                 music = new MediaPlayer();
-                music.Volume = 0.45;
+                music.Volume = Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
                 music.MediaEnded += delegate
                 {
                     try { music.Position = TimeSpan.Zero; music.Play(); } catch { }
@@ -892,12 +894,28 @@ namespace Thornswood
             }
         }
 
-        /// <summary>Plays or pauses the test track for the moment: not while the game runs, not while minimised.</summary>
+        /// <summary>
+        /// Plays or pauses the track for the moment: not when it is switched off
+        /// in Settings, not while the game runs, not while minimised. The volume
+        /// is the Settings slider, 0 to 100.
+        /// </summary>
         static void MusicDecide()
         {
             if (music == null) return;
-            bool want = !playing && win.WindowState != WindowState.Minimized;
-            try { if (want) music.Play(); else music.Pause(); } catch { }
+            bool want = cfg.MusicOn && cfg.MusicVolume > 0 && !playing && win.WindowState != WindowState.Minimized;
+            try
+            {
+                music.Volume = Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
+                if (want) music.Play(); else music.Pause();
+            }
+            catch { }
+        }
+
+        static void MusicLabel()
+        {
+            if (txtMusic == null) return;
+            int v = Math.Max(0, Math.Min(100, cfg.MusicVolume));
+            txtMusic.Text = v == 0 ? "silent" : v + "%";
         }
 
         static void Wire()
@@ -925,6 +943,9 @@ namespace Thornswood
             DrawBuildLine();
             txtStatusRight.Text = Paths.Root;
             chkKeepOpen.IsChecked = cfg.KeepLauncherOpen;
+            if (chkMusic != null) chkMusic.IsChecked = cfg.MusicOn;
+            if (sldMusic != null) sldMusic.Value = Math.Max(0, Math.Min(100, cfg.MusicVolume));
+            MusicLabel();
             // The address, the port, the update source and the voice port are
             // not on this page any more. They are not settings: they are facts
             // about the server everybody connects to, they arrive in the update
@@ -1041,6 +1062,19 @@ namespace Thornswood
                 RunUpdate();
             };
 
+            if (chkMusic != null) chkMusic.Click += delegate
+            {
+                cfg.MusicOn = chkMusic.IsChecked == true;
+                cfg.Save(Paths.CfgFile);
+                MusicDecide();
+            };
+            if (sldMusic != null) sldMusic.ValueChanged += delegate
+            {
+                cfg.MusicVolume = (int)Math.Round(sldMusic.Value);
+                MusicLabel();
+                MusicDecide();
+                cfg.Save(Paths.CfgFile);
+            };
             chkKeepOpen.Click += delegate
             {
                 cfg.KeepLauncherOpen = chkKeepOpen.IsChecked == true;

@@ -193,6 +193,12 @@ namespace Thornswood
         // at something other than what the monitor is set to.
         [DataMember] public bool LockResolution = false;
 
+        // The launcher's music: off, or a volume from 0 to 100. Asked for by
+        // Patrick on 20 September, the day the dev test track went in
+        // (Shell.StartMenuMusic). Nothing plays on the main build yet.
+        [DataMember] public bool MusicOn = true;
+        [DataMember] public int MusicVolume = 45;
+
         // The Skyrim folder Vortex deploys into, which Thornswood's own folder is
         // made from (see OwnGame). Blank means the Steam copy. Set it when Vortex
         // has been moved to a folder of its own so the Steam copy can stay clean.
