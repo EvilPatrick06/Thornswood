@@ -84,6 +84,75 @@ if ((Test-Path -LiteralPath $gmSrc) -and (Test-Path -LiteralPath $Dist)) {
     }
 }
 
+# --------------------------------------------------- where new characters go --
+# The start point is a raw form id, and a raw form id rots when the load order
+# moves. SkyMP resolves it as fileIdx * 0x01000000 + shortFormId, where fileIdx
+# is the load order's own index, so moving one plugin above Skyrim Unbound
+# points every new character at a completely different record.
+#
+# It has rotted before. The id said index 57 while Unbound had drifted to 59,
+# so everybody spawned at whatever sat at 0x19BAD4 in a body morph plugin. The
+# gamemode noticed they were not in the creation hall and teleported them, and
+# from a chair that is character creation starting in a tavern and then
+# dragging through a load screen into the hall. Testers reported exactly that
+# on 20 September, as creation happening in the Riften inn.
+#
+# Deploy-Gamemode.ps1 computes this correctly. This script never checked it, so
+# a publish that skipped Deploy-Gamemode shipped whatever was last written and
+# nothing said a word. The gamemode logs START POINT IS WRONG on boot, to a
+# file on the VPS that nobody reads.
+#
+# Checked rather than recomputed, on purpose. The file being read is the one
+# about to be zipped, and a publish that quietly rewrites its own input is
+# worse than one that stops and names the command that fixes it.
+$settingsPath = Join-Path $Dist 'server-settings.json'
+if (Test-Path -LiteralPath $settingsPath) {
+    Head 'Where new characters start'
+    $hallPlugin = 'Skyrim Unbound.esp'
+    $hallLocal = 0x19BAD4                     # SkyrimUnboundRoom01
+    $gate = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+
+    $order = @($gate.loadOrder)
+    $hallIdx = -1
+    for ($i = 0; $i -lt $order.Count; $i++) {
+        $leaf = [IO.Path]::GetFileName(([string]$order[$i]).Replace('/', '\'))
+        if ($leaf -ieq $hallPlugin) { $hallIdx = $i; break }
+    }
+
+    # Written as '0x3A19BAD4' by Deploy-Gamemode, but a hand edit could leave a
+    # bare number or bare hex, and reading it wrong would fail this for the
+    # wrong reason.
+    $have = -1
+    $pts = @($gate.startPoints)
+    if ($pts.Count -and $null -ne $pts[0].worldOrCell) {
+        $raw = ([string]$pts[0].worldOrCell).Trim()
+        try {
+            if ($raw -match '^0[xX][0-9a-fA-F]+$') { $have = [Convert]::ToInt64($raw.Substring(2), 16) }
+            elseif ($raw -match '^[0-9]+$')        { $have = [Convert]::ToInt64($raw, 10) }
+            elseif ($raw -match '^[0-9a-fA-F]+$')  { $have = [Convert]::ToInt64($raw, 16) }
+        } catch { $have = -1 }
+    }
+
+    if ($hallIdx -lt 0) {
+        Say "$hallPlugin is not in the load order, so the Whiterun gate fallback applies" 'Yellow'
+        Say '  Creation still runs, in a less tidy place. Nothing to fix here.' 'Yellow'
+    } elseif ($have -lt 0) {
+        Say 'server-settings.json has no readable startPoints entry.' 'Yellow'
+        Die 'Run .\tools\Deploy-Gamemode.ps1 first, then publish again.'
+    } else {
+        $want = ($hallIdx * 0x01000000) + $hallLocal
+        if ($have -eq $want) {
+            Say ("correct: $hallPlugin at index $hallIdx, form 0x{0:X8}" -f $want) 'Green'
+        } else {
+            Say ("server-settings.json says 0x{0:X8}, and $hallPlugin is at index $hallIdx, which is 0x{1:X8}." -f $have, $want) 'Yellow'
+            Say '  Publishing this would put every NEW character in the wrong cell. The' 'Yellow'
+            Say '  gamemode would notice and teleport them, which from a chair is' 'Yellow'
+            Say '  character creation starting in a tavern instead of the creation hall.' 'Yellow'
+            Die 'Run .\tools\Deploy-Gamemode.ps1 first, then publish again.'
+        }
+    }
+}
+
 # ---------------------------------------------------------------- build ------
 if (-not $SkipBuild) {
     Head 'Packing the payload'
