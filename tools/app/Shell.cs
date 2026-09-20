@@ -841,8 +841,32 @@ namespace Thornswood
         static void StartMenuMusic()
         {
             if (cfg == null || !cfg.IsDev) return;
-            string file = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-dev-theme.mp3");
-            if (!File.Exists(file)) return;
+            string src = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-dev-theme.mp3");
+            if (!File.Exists(src)) return;
+
+            // Played from a copy under Profile, never from the game folder. A
+            // MediaPlayer holds its file open, and the first dev pack that
+            // carried this track could not be installed over the copy the
+            // launcher was playing: "being used by another process", 20
+            // September 14:27, four times in a row, Play switched off. The copy
+            // is refreshed from the game folder on every start, so an updated
+            // track is heard the next time the launcher opens.
+            string file;
+            try
+            {
+                string dir = Path.Combine(Paths.ProfileDir, "Music");
+                Directory.CreateDirectory(dir);
+                file = Path.Combine(dir, "thornswood-dev-theme.mp3");
+                var a = new FileInfo(src);
+                var b = new FileInfo(file);
+                if (!b.Exists || b.Length != a.Length || b.LastWriteTimeUtc != a.LastWriteTimeUtc)
+                    File.Copy(src, file, true);
+            }
+            catch (Exception ex)
+            {
+                Stamp("Menu music: could not copy the track out of the game folder (" + ex.Message + ")");
+                return;
+            }
             try
             {
                 music = new MediaPlayer();
