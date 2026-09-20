@@ -583,7 +583,50 @@ namespace Thornswood
             if (rel.Equals("Data\\Platform\\thornswood-session.txt", StringComparison.OrdinalIgnoreCase)) return "session note";
             if (Foreign(rel)) return "another server's";
             if (UnwantedCreation(rel)) return "a Creation Club plugin the server does not load";
+            if (CrashesUs(rel)) return "it crashes the quick favourites menu";
             return null;
+        }
+
+        /// <summary>
+        /// Deployed by Vortex, deliberately kept out of Thornswood's folder.
+        /// </summary>
+        /// <remarks>
+        /// Not clutter and not another server's. Somebody chose this mod, so it
+        /// gets a reason and a date and comes back the day the reason goes.
+        ///
+        /// Inventory Interface Information Injector (InventoryInjector.dll,
+        /// v1.1.1, its last release, 2023). Choose a favourite, press Q again,
+        /// the game is gone. Seven crash logs across 18 and 19 Sep are the same
+        /// crash down to the address: EXCEPTION_ACCESS_VIOLATION executing
+        /// 0x656D6167, which is the four characters "game" being called as code.
+        /// The return address on the stack is InventoryInjector.dll+0x3AA85 and
+        /// R13 holds its own Hooks::IconSetter::ProcessListFunc, with
+        /// FavoritesMenu and MagicFavorites beside them; the 21:51 log even has
+        /// the source path and "Running IconSetter.processList hook" on the
+        /// stack. It calls through a freed pointer while building that list.
+        ///
+        /// What frees it is this server. SkyMP rebuilds the character's
+        /// inventory from the server's copy after an equip, and the Papyrus VM
+        /// in every one of those logs has a TESModPlatform.Add queued at the
+        /// moment of the fault.
+        ///
+        /// Taken out rather than worked around: it is the code that faults, it
+        /// is not built here, and no other script extender plugin names it, so
+        /// nothing else in the build depends on it. What goes with it is the
+        /// icons its JSON files put on inventory rows. I4IconAddon.esp stays
+        /// loaded and inert, so no plugin is enabled or disabled and the load
+        /// order does not move.
+        ///
+        /// Djinn, 19 Sep. This is the launcher's own folder build, which is what
+        /// makes Thornswood\Game. New-GameFolder.ps1 is the same job for
+        /// Keizaal and Daedric and is not where this belongs: their folders are
+        /// their business.
+        /// </remarks>
+        static bool CrashesUs(string rel)
+        {
+            if (rel.Equals("Data\\SKSE\\Plugins\\InventoryInjector.dll", StringComparison.OrdinalIgnoreCase)) return true;
+            if (rel.StartsWith("Data\\SKSE\\Plugins\\InventoryInjector\\", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
 
         /// <summary>

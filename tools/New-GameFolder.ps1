@@ -264,44 +264,6 @@ function Test-Clutter([string]$rel) {
     return $false
 }
 
-<#
-.SYNOPSIS
-    Deployed by Vortex, deliberately not put in Thornswood's game folder.
-.DESCRIPTION
-    Not clutter. These are mods somebody chose, and each one is here because it
-    crashes this server rather than because it is unwanted, so each gets a
-    reason and a date and comes back out when the reason does.
-
-    Inventory Interface Information Injector (InventoryInjector.dll, v1.1.1,
-    the last release). It crashes the game on the quick favourites menu:
-    choose a favourite, press Q again, gone, every time. Six crash logs in
-    Profile\MyGames\SKSE from 18 and 19 September are the same down to the
-    faulting address, EXCEPTION_ACCESS_VIOLATION executing 0x656D6167, which
-    is the four characters "game" being called as code. The return address on
-    the stack is InventoryInjector.dll+0x3AA85 and R13 holds its own
-    Hooks::IconSetter::ProcessListFunc, with FavoritesMenu and MagicFavorites
-    live beside them: the call it makes while building the favourites list
-    goes through a pointer that has been freed.
-
-    It is taken out rather than worked around because it is the code that
-    faults, it is not built here, and its last version is from 2023. Nothing
-    else in the build asks for it: InventoryInjector appears as a string in no
-    other SKSE plugin, moreHUD, moreHUD Inventory Edition, Crafting Categories
-    and QuickLoot IE included. What goes with it is the icons its JSON files
-    add to inventory rows, which is the I4 Icon Addon and nothing else. No
-    plugin is enabled or disabled by this, so the load order does not move and
-    the server manifest is untouched.
-
-    Djinn, 19 September 2026. If the bundle is ever rebuilt from Thornswood's
-    own source (WORKING-NOTES entry 215) and the inventory stops being rebuilt
-    under an open menu, put it back and see.
-#>
-function Test-KeptOut([string]$rel) {
-    if ($rel -ieq 'Data\SKSE\Plugins\InventoryInjector.dll') { return $true }
-    if ($rel -like 'Data\SKSE\Plugins\InventoryInjector\*') { return $true }
-    return $false
-}
-
 $replaced = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
 foreach ($b in @(Get-ChildItem -LiteralPath $Source -Directory -Filter 'keizaal-backup-*' -ErrorAction SilentlyContinue)) {
     foreach ($f in @(Get-ChildItem -LiteralPath $b.FullName -Recurse -File -Force -ErrorAction SilentlyContinue)) {
@@ -354,9 +316,6 @@ foreach ($f in Get-ChildItem -LiteralPath $Source -Recurse -File -Force -ErrorAc
     if ($n % 5000 -eq 0) { Say ("  {0:n0} files looked at" -f $n) 'DarkGray' }
 
     if (Test-Clutter $rel) { continue }
-    # Named in the list, not passed over quietly: somebody chose this mod and
-    # is entitled to see it said out loud that the build leaves it behind.
-    if (Test-KeptOut $rel) { $left.Add("$rel  (kept out on purpose, see Test-KeptOut)"); continue }
     $origin = if ($deployed.Contains($rel)) { 'V' } else { 'O' }
     $take = $false
     if ($origin -eq 'V') { $take = $true }
