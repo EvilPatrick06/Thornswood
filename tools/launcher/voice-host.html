@@ -56,13 +56,19 @@ var UNITS_PER_METRE = 70;
     level  how loud the mode is at all, because a yell across a square is
            louder than a whisper in your ear and not only further
 
-  Skyrim is 70 units to the metre, so whisper reaches about 350 units, local
-  about 1260 and yell about 3150.
+  Brought in on 19 September, heard in game rather than worked out here: the
+  first set carried too far in all three. Whisper is cut to a third of what it
+  was, local and yell to two thirds, which is what Djinn asked for after
+  listening to it. The levels are untouched; it was the distance that was
+  wrong, not the loudness.
+
+  Skyrim is 70 units to the metre, so a whisper now dies by about 120 units,
+  local by about 840 and a yell by about 2100.
 */
 var RANGE = {
-  whisper: { full: 1.5, quiet: 5,  level: 0.85 },
-  local:   { full: 4,   quiet: 18, level: 1.0  },
-  yell:    { full: 8,   quiet: 45, level: 1.35 }
+  whisper: { full: 0.5, quiet: 1.7, level: 0.85 },
+  local:   { full: 2.7, quiet: 12,  level: 1.0  },
+  yell:    { full: 5.3, quiet: 30,  level: 1.35 }
 };
 
 // How far through the fade they are, the mode's level at the near edge and
