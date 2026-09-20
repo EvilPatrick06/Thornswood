@@ -757,6 +757,15 @@ globalThis.__thornswoodChargen = {
     const st = chargenOf(actorId);
     return !!(st && st.stage === 'choosing');
   },
+  /** The plugin saw the race menu close. Only means something while the face is awaited. */
+  faceDone: function (actorId) {
+    const st = chargenOf(actorId);
+    if (!st || st.stage !== 'appearance') { return false; }
+    st.faceDone = Date.now();
+    setChargen(actorId, st);
+    log('chargen', actorId.toString(16), 'the plugin says the race menu closed');
+    return true;
+  },
   arrive: arriveAt
 };
 
@@ -868,7 +877,11 @@ function beginAppearance(actorId) {
   let was = '';
   try { was = faceMark(mp.get(actorId, 'appearance')); } catch (e) { was = ''; }
 
-  const state = { stage: 'appearance', at: Date.now(), faceWas: was };
+  // seenAt is the first sight recorded by the tick, so the reconnect check
+  // does not read a brand new arrival as somebody coming back (it did, on
+  // 20 September, half a second after every arrival: a wrong line and the
+  // grace paid twice).
+  const state = { stage: 'appearance', at: Date.now(), faceWas: was, seenAt: firstSeen.get(actorId) || 0 };
 
   // Moved first, asked second, and the asking happens on a later tick.
   //
@@ -1279,6 +1292,16 @@ function chargenTick() {
 
       if (faceIsNew) {
         beginChoosing(actorId, state, 'the face arrived');
+        continue;
+      }
+
+      // The plugin says the race menu closed (/face done, over the chat
+      // socket). That is the fact the mark above is only a proxy for: a face
+      // confirmed unchanged, or a name kept, changes no mark, and until 20
+      // September the only way on from there was to walk (below). The menu
+      // closing is enough on its own.
+      if (state.faceDone) {
+        beginChoosing(actorId, state, 'the race menu closed');
         continue;
       }
 
@@ -3435,6 +3458,17 @@ log('gamemode loaded:',
     var parts = String(cmd.text || '').trim().split(/\s+/);
     var word = parts[0].toLowerCase();
     var arg = (parts[1] || '').toLowerCase();
+
+    // The plugin, not a person: the race menu just closed on this client.
+    // Answered with nothing, whatever the state, and never echoed.
+    if (word === '/face') {
+      try {
+        var cg = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodChargen;
+        var faceActor = actorOf(profileId);
+        if (cg && cg.faceDone && faceActor) { cg.faceDone(faceActor); }
+      } catch (eFace) { log('/face failed:', eFace); }
+      return;
+    }
 
     /*
       A missing character no longer refuses every command.

@@ -1146,6 +1146,25 @@
     }
   }
 
+  /*
+    The race menu closing, told to the server as a line. The server waits
+    for the face to arrive on the change form and reads it as new when its
+    mark changed; a face confirmed as it was, or a name kept, changes no
+    mark, and until 20 September that left people standing until they
+    walked. The menu closing is the fact itself, and this is the one place
+    that can see it.
+  */
+  let raceWasOpen = false;
+  sp.on('update', guard('race', () => {
+    const open = raceMenuOpen();
+    if (open === raceWasOpen) { return; }
+    raceWasOpen = open;
+    if (!open) {
+      log('the race menu closed, telling the server');
+      tellServer('/face done');
+    }
+  }));
+
   sp.on('update', guard('console', () => {
     let open = '';
     for (const name of CONSOLE_MENUS) {
