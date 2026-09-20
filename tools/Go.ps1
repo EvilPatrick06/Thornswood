@@ -128,6 +128,30 @@ if (Test-Path -LiteralPath $uiSrc) {
   Bad 'the ts-ui folder is not next to this script'
 }
 
+# ------------------------------------------------------ the menu backdrop --
+# The two logo meshes and the wallpaper texture behind Skyrim's main menu,
+# from tools\art\menu (entry 83: the second mesh used to be a copy of the
+# first, so the menu drew the backdrop twice, and the texture had one mip
+# level of the old art). The destination is removed before the copy: in an
+# own game folder these can be hard links into the Steam copy, and writing
+# through a link would change the Steam copy too.
+Head 'Menu backdrop'
+$menuSrc = Join-Path $Here 'art\menu'
+$menuPairs = @(
+  @('logo.nif',               'Data\meshes\interface\logo\logo.nif'),
+  @('logo01ae.nif',           'Data\meshes\interface\logo\logo01ae.nif'),
+  @('Mainmenuwallpaper.dds',  'Data\textures\interface\objects\Mainmenuwallpaper.dds')
+)
+foreach ($pair in $menuPairs) {
+  $src = Join-Path $menuSrc $pair[0]
+  $dst = Join-Path $Game $pair[1]
+  if (-not (Test-Path -LiteralPath $src)) { Bad ($pair[0] + ' is not in tools\art\menu'); continue }
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+  if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
+  Copy-Item -LiteralPath $src -Destination $dst -Force
+  Note $pair[1]
+}
+
 # ----------------------------------------------------------------- plugins --
 Head 'Plugins'
 $plSrc = Join-Path $Here 'ts-plugins'
