@@ -160,6 +160,28 @@ if (block !== null) {
   }
 }
 
+// ------------------------------------------------------- the clock is real
+//
+// PROVED IN A TESTER'S LOG, 21 September: the resends ran from 17:35:55 to
+// 17:38:01, which is 126 seconds, and the ninety second give up never fired.
+// Every resend asks the page to send again, that arrives back as another
+// menuChose, and menuChose was restarting the clock each time, so it was
+// reset two seconds before it was ever due. The same shape as the chargen
+// nudge that sat unreachable behind its own guard, written the same evening.
+{
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ');
+  yes('the clock is only started when the choice is new',
+      /if \(menuChosenId !== id\)/.test(code));
+  const guard = code.indexOf('if (menuChosenId !== id)');
+  const at = code.indexOf('menuChosenAt = Date.now()');
+  yes('THE BUG: nothing restarts the clock outside that guard',
+      guard > 0 && at > guard);
+  yes('and the clock is set in exactly one place',
+      (code.match(/menuChosenAt = Date\.now\(\)/g) || []).length === 1);
+}
+
 // ---------------------------------------------------------------- structure
 //
 // The repeat has to run after menuChose parks the phase at 9, so the tick

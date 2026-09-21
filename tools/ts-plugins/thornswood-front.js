@@ -522,10 +522,25 @@
     // that repeat, so this plugin takes it over in the same breath rather
     // than leaving nobody saying it: see keepSayingChoice above for what
     // happened when nobody did.
-    menuChosenId = id;
-    menuChosenAt = Date.now();
-    menuSaidAt = Date.now();
-    menuSaidTimes = 0;
+    /*
+      ONLY THE FIRST TIME STARTS THE CLOCK, and that is not a detail.
+
+      Every resend asks the page to send its pick again, the page does, and
+      that arrives back here as another call to this function. Setting the
+      clock on each one meant the ninety second give up could never expire
+      while the retry was doing its job: it was reset two seconds before it
+      was due, for ever. Exactly the shape of the chargen nudge that sat
+      unreachable behind its own guard.
+
+      PROVED IN A TESTER'S LOG, 21 September: the resends ran from 17:35:55 to
+      17:38:01, which is 126 seconds, and nothing gave up at 90.
+    */
+    if (menuChosenId !== id) {
+      menuChosenId = id;
+      menuChosenAt = Date.now();
+      menuSaidAt = Date.now();
+      menuSaidTimes = 0;
+    }
     T.js('try{window.thornswoodSelect&&window.thornswoodSelect.acked();}catch(e){}');
     // The list the launcher wrote for the page. Gone now, so the page
     // reload in the world (phase 0 below) does not bring the choice back.
