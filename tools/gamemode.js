@@ -2105,6 +2105,27 @@ function giveShift(actorId) {
     added++;
   }
   if (added) { mp.set(actorId, 'inventory', { entries: entries }); }
+
+  /*
+    SAID OUT LOUD, because "people are not loading in with their clothes on"
+    was reported on 21 September and nothing anywhere could answer it.
+
+    This is the only thing that dresses anybody, and it ran silently, so there
+    was no way to tell apart: the shift was never handed over, the shift was
+    handed over and something took it off afterwards, or the shift is in the
+    pack and the client is not wearing it. Three different faults, one symptom,
+    no evidence.
+
+    What goes down is what was decided and what the pack looks like after it,
+    which separates the first two. A character who was skipped past creation
+    never reaches this function at all, and the absence of this line for them
+    is itself the answer.
+  */
+  let wearing = 0;
+  for (const e of entries) { if (e && e.worn) { wearing++; } }
+  log('chargen', actorId.toString(16), 'shift:', added, 'handed over,',
+      (SHIFT.length - added), 'already there,', entries.length,
+      'thing(s) in the pack,', wearing, 'worn');
 }
 
 /**
