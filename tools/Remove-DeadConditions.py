@@ -273,6 +273,25 @@ def main():
           % (len(records), len(after)))
     print('  ok    %d record(s) edited, every other byte untouched' % len(edited))
 
+    # This script adds and removes no records, so the header's count cannot have
+    # gone wrong here. It is still checked, because the count HAD been wrong in
+    # this file since before any of these scripts existed and nothing ever looked
+    # at it. Every script that touches the plugin says what the count is now.
+    out = bytearray(out)
+    hedr = out.find(b'HEDR')
+    if hedr < 0:
+        print('  STOP. no HEDR in the header. Nothing was written.')
+        return 1
+    at = hedr + 6 + 4
+    claimed = struct.unpack_from('<i', out, at)[0]
+    if claimed != len(after):
+        struct.pack_into('<i', out, at, len(after))
+        print('  ok    the header said %d records and the file holds %d. Set to %d.'
+              % (claimed, len(after), len(after)))
+    else:
+        print('  ok    the header record count reads %d, which is what is in the file' % claimed)
+    out = bytes(out)
+
     open(path, 'wb').write(out)
     print('')
     print('  %s bytes -> %s bytes' % (format(len(raw), ','), format(len(out), ',')))

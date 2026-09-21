@@ -264,6 +264,35 @@ for ($i = 0; $i -lt $expected.Count; $i++) {
 Ok ("{0} records kept, every one byte for byte as it was, in the same order" -f $expected.Count)
 Ok ("{0} records removed" -f ($orig.Count - $expected.Count))
 
+<#
+  THE HEADER'S RECORD COUNT, which this used to leave alone and should not have.
+
+  HEDR carries the number of records in the file after a version float. Deleting
+  sixteen records without changing it leaves the file saying it holds sixteen
+  more than it does. Measured 21 September: the header had said 408 since before
+  this script existed while the file held 392, so the rename before it and this
+  script after it had both walked past a number that was already wrong, and the
+  trim made it worse. The engine plainly does not read it, because the plugin has
+  been shipping and working in that state, but a wrong number in a file is a
+  thing somebody trusts later.
+
+  So it is written from what is actually there, every time, rather than adjusted
+  by however many went. Adjusting a wrong number keeps it wrong.
+#>
+$hedr = -1
+for ($i = 24; $i -lt (24 + 100) -and $i + 4 -le $result.Length; $i++) {
+    if ([System.Text.Encoding]::ASCII.GetString($result, $i, 4) -eq 'HEDR') { $hedr = $i; break }
+}
+if ($hedr -lt 0) { Die 'no HEDR in the header, so the record count cannot be set' }
+$countAt = $hedr + 6 + 4
+$claimed = [BitConverter]::ToInt32($result, $countAt)
+[Array]::Copy([BitConverter]::GetBytes([int]$afterFlat.Count), 0, $result, $countAt, 4)
+if ($claimed -ne $afterFlat.Count) {
+    Ok ("the header said {0} records and the file holds {1}. Set to {1}." -f $claimed, $afterFlat.Count)
+} else {
+    Ok ("the header record count reads {0}, which is what is in the file" -f $afterFlat.Count)
+}
+
 Head 'Writing'
 $backup = $path + '.before-trim-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
 [System.IO.File]::WriteAllBytes($backup, $bytes)
