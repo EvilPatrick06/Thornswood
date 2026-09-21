@@ -550,7 +550,7 @@
       "why": "its produce is a LVLI, which is a list of things rather than one thing, and carries no price"
     },
     "dbf8b3:Thornswood-Content.esp": {
-      "editorId": "KzlFloraBeehive",
+      "editorId": "ThornswoodFloraBeehive",
       "name": "Beehive",
       "produce": "b08c5:Skyrim.esm",
       "produceName": "Honeycomb",

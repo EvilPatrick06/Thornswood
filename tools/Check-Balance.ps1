@@ -98,12 +98,25 @@ function Load($name) {
 }
 
 # Counts a map of rows by their rank field and reports the shape.
-function Ladder($what, $map, $who) {
+#
+# $notIn is another map out of the same file whose keys this class is refused.
+# The gatherer is the one that needs it: bb947 Tundra Cotton and bb953 Wheat sit
+# in the harvests map and in the crops map at once, because their produce is an
+# INGR and the food rule that moved the other crops out of the plant table never
+# touched them. tools\gamemode.js harvest() opens with `if (isCrop(baseDesc))
+# return null;` and onActivate sends a crop base to farmActivate, so a gatherer
+# gets nothing at either plant at any rank. Counting them on the gatherer's
+# ladder is counting work nobody can do. It is 2 of 109 rows on this build and
+# moves no rung off empty, which is exactly why it would have sat there.
+function Ladder($what, $map, $who, $notIn = $null) {
     if (-not $map) { return }
+    $refused = @{}
+    if ($notIn) { foreach ($k in $notIn.PSObject.Properties.Name) { $refused[$k] = $true } }
     $by = @{}
     foreach ($r in $RANKS) { $by[$r] = 0 }
     $n = 0
     foreach ($k in $map.PSObject.Properties.Name) {
+        if ($refused.ContainsKey($k)) { continue }
         $row = $map.$k
         $rank = [string]$row.rank
         if (-not $rank) { continue }
@@ -141,10 +154,30 @@ $hunts    = Load 'hunts.json'
 
 $shape = @{}
 if ($ores)     { $shape['miner']    = Ladder 'Miner, ore veins'      $ores.ores      'miner' }
-if ($harvests) { $shape['gatherer'] = Ladder 'Gatherer, plants'      $harvests.harvests 'gatherer' }
+if ($harvests) { $shape['gatherer'] = Ladder 'Gatherer, plants'      $harvests.harvests 'gatherer' $harvests.crops }
 if ($harvests) { $shape['farmer']   = Ladder 'Farmer, crops'         $harvests.crops 'farmer' }
 if ($harvests -and $harvests.PSObject.Properties.Name -contains 'fish') {
                  $shape['fisher']   = Ladder 'Fisher, water'         $harvests.fish  'fisher' }
+# THE HUNTER HAS TWO LADDERS AND THIS SCRIPT READ ONE. The food split of
+# 21 September invented harvests.json's game map, seven hanging-game rows taken
+# off the gatherer because a gatherer gathers reagents, and gated in
+# tools\gamemode.js game() on the hunter's own rank. It was the only producing
+# map in the repository with no empty-rung rule anywhere over it:
+# tools\Build-HarvestTable.ps1 covers its novice rung the way it covers the
+# fish, and the fish are laddered here while the game was not.
+#
+# What that let through, measured by doing it: move CharredSkeever03 from
+# advanced to expert in GAME_RANK_BY_EDITOR_ID and rebuild, and the map becomes
+# novice 4, advanced 0, expert 3. The novice check in the builder still sees 4
+# and passes, this script printed no line for the map at all, and the run exited
+# 0 on an advanced hunter who reaches a rank that opens no new rack with two
+# rows sitting above it. That is the exact shape the rule above exists to fail
+# on.
+#
+# Its own key in $shape, because the lopsided check reads one entry per ladder
+# and the bodies are a different ladder from the racks.
+if ($harvests -and $harvests.PSObject.Properties.Name -contains 'game') {
+                 $shape['hunter, hanging game'] = Ladder 'Hunter, hanging game' $harvests.game 'hunter' }
 if ($hunts)    { $shape['hunter']   = Ladder 'Hunter, animals'       $hunts.hunts    'hunter' }
 
 Head 'What consumes'
@@ -220,21 +253,51 @@ if ($recipes) {
                 $known = [string]$hv.rungsNobodyCanGatherFor
             }
         }
+        # THE ROWS ON A RUNG DO NOT HAVE TO AGREE, AND ON THIS BUILD THEY DO NOT.
+        # This line used to take the requirement off the FIRST row that failed
+        # and print it as 'every one wanting X', which was a claim of uniformity
+        # nothing had measured, and it reported the nearest wall rather than the
+        # worst. Measured against the committed tools\recipes.json: the novice
+        # Confectioner rung is 7 rows, 5 of them wanting advanced work from a
+        # gatherer and 2 of them, both named Apple Dumpling, wanting expert work
+        # from a farmer. The old line said the rung was one rung and one class
+        # away from standable when two of its seven rows are two rungs away and
+        # behind a different class. recipes.json's own generated
+        # rungsNobodyCanGatherFor for that half gets it right, so the script was
+        # less accurate than the table it reads.
+        #
+        # Both ends are named now: the nearest, which is what somebody would have
+        # to reach for the rung to open at all, and the worst, which is what they
+        # would have to reach for all of it. Where every row on the rung really
+        # does want the same thing the two are equal and the line says so.
         $unstandable = @()
         foreach ($r in $RANKS) {
             $on = 0
             $can = 0
-            $need = ''
+            $nearAt = 99
+            $nearWhat = ''
+            $farAt = -1
+            $farWhat = ''
+            $wants = @{}
             foreach ($row in $rowsOf[$half]) {
                 if ([string]$row.rank -ne $r) { continue }
                 $on++
                 $ir = [string]$row.inputRank
                 if (-not $ir) { $can++; continue }
                 if ([array]::IndexOf($RANKS, $ir) -le [array]::IndexOf($RANKS, $r)) { $can++; continue }
-                if (-not $need) { $need = $ir + ' work from a ' + [string]$row.inputRankWho }
+                $at = [array]::IndexOf($RANKS, $ir)
+                $what = $ir + ' work from a ' + [string]$row.inputRankWho
+                $wants[$what] = $true
+                if ($at -lt $nearAt) { $nearAt = $at; $nearWhat = $what }
+                if ($at -gt $farAt) { $farAt = $at; $farWhat = $what }
             }
             if ($on -eq 0 -or $can -gt 0) { continue }
-            $unstandable += ('{0} ({1} recipe(s), every one wanting {2})' -f $r, $on, $need)
+            if ($wants.Count -le 1) {
+                $unstandable += ('{0} ({1} recipe(s), every one wanting {2})' -f $r, $on, $nearWhat)
+            } else {
+                $unstandable += ('{0} ({1} recipe(s) wanting {2} different things, the nearest {3} and the furthest {4})' -f `
+                                 $r, $on, $wants.Count, $nearWhat, $farWhat)
+            }
         }
         # One line per half and not one per rung. The Bladebinder fails on three
         # rungs for the same reason and printing that reason three times buries
@@ -594,12 +657,37 @@ if ($recipes) {
 Head 'What this still cannot answer'
 Say '  What a thing costs when nobody makes it and nobody digs it up. The hop closed the'
 Say '  smelter and the tanning rack: Steel Ingot, Leather and Leather Strips all carry a'
-Say '  class now, and 5711 of the 6708 input entries in the table are supplied by one.'
-Say '  The 997 that are left are bought, looted or dropped, led by Dragon Bone on 138'
-Say '  rows, Linen Wrap on 106, Dwarven Metal Ingot on 103, Firewood on 78 and Butter'
-Say '  on 46. Those rows keep the price rank and say so in rankFrom. Firewood and Butter'
-Say '  are the two worth somebody deciding about: a woodcutter''s verb and a churn would'
-Say '  put both of them on a class, and the kiln already reads out of gamemode.js.'
+Say '  class now. What is left is bought, looted or dropped, and those rows keep the price'
+Say '  rank and say so in rankFrom.'
+# THE NUMBERS ARE COUNTED AND NOT TYPED. They were typed into this block until
+# 21 September, and by the time anybody read them again they were wrong: the
+# block still said 5711 of 6708 entries supplied and named Butter on 46 rows as
+# one of the two worth deciding about, when the run that printed it had 5687 and
+# Butter was no longer in the first five. A hardcoded measurement in a script
+# that runs every build is a sentence somebody reads instead of the output, which
+# is the same trap the green line at the bottom of this file was rewritten over.
+if ($recipes) {
+    $entries = 0
+    $supplied = 0
+    $loose = @{}
+    foreach ($k in $recipes.recipes.PSObject.Properties.Name) {
+        foreach ($it in $recipes.recipes.$k.inputItems) {
+            $entries++
+            if ($it.PSObject.Properties.Name -contains 'suppliedBy' -and $it.suppliedBy) { $supplied++; continue }
+            $nm = [string]$it.name
+            if (-not $loose.ContainsKey($nm)) { $loose[$nm] = 0 }
+            $loose[$nm]++
+        }
+    }
+    Say ('  {0} of the {1} input entries in the table are supplied by a class. The {2} that are' -f `
+         $supplied, $entries, ($entries - $supplied))
+    Say '  left are led by:'
+    foreach ($nm in ($loose.Keys | Sort-Object { -$loose[$_] } | Select-Object -First 6)) {
+        Say ('    {0,5} entries  {1}' -f $loose[$nm], $nm)
+    }
+    Say '  A woodcutter''s verb and a churn would put Firewood and Butter on a class, and the'
+    Say '  charcoal kiln already reads out of gamemode.js, so the shape of that work is known.'
+}
 
 Write-Host ''
 if ($script:fail -gt 0) {

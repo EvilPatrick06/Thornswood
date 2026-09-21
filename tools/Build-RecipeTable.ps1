@@ -177,7 +177,7 @@
   5116 COBJ records, not one of them names an alchemy bench keyword. Skyrim's
   alchemy is not a recipe system: potions are worked out from the effects the
   ingredients share, in the alchemy menu, and no COBJ record is involved.
-  Thornswood-Content.esp already defines a keyword called KzlCraftingAlchemy
+  Thornswood-Content.esp already defines a keyword called ThornswoodCraftingAlchemy
   and nothing in the build points a recipe at it.
 
   There are no enchanting recipes either, with one exception. The only
@@ -222,7 +222,7 @@
   HALVES_NOBODY_CAN_START with the measured reason, which they are, because the
   answer to both is a decision somebody has to make rather than a line of code.
 
-  The Charburner's other three want a book: KzlWoodcutterAdvanced, Expert and
+  The Charburner's other three want a book: ThornswoodWoodcutterAdvanced, Expert and
   Master, out of Thornswood-Content.esp, which is this repo's own plugin. The
   search under 'what hands out the items these recipes ask for' went through
   all 101 plugins for a placed reference, a container or inventory line and a
@@ -329,6 +329,17 @@
   and put 1301 of the Platewright's 2015 rows on novice. They are recognised by
   their shape, a MISC out of an ARMO, WEAP or AMMO, and HOP_THROUGH_A_FINISHED_GOOD
   is where that is argued and where it can be turned back on.
+
+  A TEMPERING ROW IS NOT A SOURCE EITHER, and that one hid a year longer, because
+  the only exclusion the hop had was the breakdown shape and tempering is the
+  opposite shape. TemperArmorIronCuirass says Iron Armor out of one iron ingot,
+  on the armour table, and the armour table improves a piece already in the pack:
+  nobody has ever obtained an Iron Armor by tempering one. Read as a source it
+  settled Iron Armor at novice for a MINER and ranked a 100 gold Robed Iron Armor
+  novice against a price rank of advanced. 14 of the 43 supply routes in that
+  build were tempering rows, placing 11 items and ranking 16 owned rows. They are
+  recognised by their bench, the same two the engine throws out before it looks
+  at a recipe, and HOP_THROUGH_A_TEMPER is where that is argued.
 
   THE OWNERSHIP RULE
 
@@ -676,19 +687,52 @@ $RANK_SHARE = @(
 #
 # THE ORDER OF THIS LIST IS THE TIE BREAK AND IT DECIDES REAL ATTRIBUTIONS.
 # Lowest wins, and where two classes get the same item at the same rank nothing
-# in the rule separates them, so the table read first takes it. harvests is read
-# before crops, so every base that is in both maps at the same rank reads
-# gatherer. Wheat is the one that matters: advanced in both, so it reads
-# gatherer, and the Sack of Flour a smelter-style recipe makes out of it reads
-# gatherer too, which is 36 of the Cook's input entries. Measured on
-# 21 September, the farmer supplies the Cook 52 entries and the gatherer 157,
-# and the wheat tie is the single biggest piece of that gap. Put the crops line
-# above the harvests line and the farmer takes every tie instead. That is a
-# decision about the world rather than about this script, so the run prints
-# every tie by name and this list is left in the order it was in.
+# in the rule separates them, so the table read first takes it. The run names
+# every tie it resolved that way, and names every item a later table's class
+# has to climb higher for as well, because those two together are the whole of
+# what the order of this list does to the output.
+#
+# NotAlsoIn: A BASE THE SERVER REFUSES THIS CLASS IS NOT THIS CLASS'S LADDER,
+# whatever rank the table puts on it. Added 21 September, and it is the fix for
+# the wrong half of the food split rather than a tidying.
+#
+# PATRICK, 21 September: "The farmer grows the crops? Those crops should be
+# used to make food, why is a gatherer giving them all the food ingredient when
+# they gather herbs and things".
+#
+# Two bases sit in the harvests map and in the crops map at once, on purpose:
+# bb947 Tundra Cotton and bb953 Wheat. Their produce is an INGR and not a food,
+# so the food rule in tools\Build-HarvestTable.ps1 that moved the other eleven
+# crops out of the plant table never touches them, and CROP_BY_EDITOR_ID there
+# names them as crops by hand. tools\Build-HarvestTable.ps1 leaving them in both
+# maps is correct and this list reading both is what was wrong.
+#
+# The server does not let a gatherer near either of them. tools\gamemode.js
+# harvest() opens with `if (isCrop(baseDesc)) return null;`, and onActivate
+# sends a crop base to farmActivate before it ever offers it to the plants. So
+# a gatherer pressing a wheat plant gets nothing, at any rank, and the only way
+# anybody in this world obtains Wheat or Tundra Cotton is a farmer at advanced.
+#
+# WHAT READING THEM AS THE GATHERER'S COST, measured off tools\recipes.json as
+# it stood before this line existed. Sack of Flour read suppliedBy gatherer on
+# 36 Cook input entries plus 1 raw Wheat entry, and Thread read suppliedBy
+# gatherer on 188 Tailor entries plus 1 raw Tundra Cotton entry: 226 of the 820
+# supplied input entries the Cook and the Tailor ask for, credited to a class
+# that cannot pick either plant. It is what made Check-Balance report
+# 'farmer to Cook: DOES NOT HOLD. The farmer supplies 52 of 360 supplied input
+# entries, 14%'. It also set the shipped rank on 105 rows of RECIPES_BY_ID that
+# the craft gate reads, 63 of them Tailor and Haberdasher novice rows resting on
+# Thread at novice, which rests on Tundra Cotton read as a novice gatherer's
+# when the only way to hold one is a farmer at advanced.
+#
+# It is written as the name of another map in the same file rather than as a
+# list of two descriptors, so that a crop added to harvests.json tomorrow is
+# taken off the gatherer by the same line and nobody has to remember this one.
 $PRODUCER_TABLES = @(
     @{ File = 'ores.json';     Map = 'ores';     Who = 'miner';    Item = 'ore';     List = ''      },
-    @{ File = 'harvests.json'; Map = 'harvests'; Who = 'gatherer'; Item = 'produce'; List = ''      },
+    @{ File = 'harvests.json'; Map = 'harvests'; Who = 'gatherer'; Item = 'produce'; List = '';
+       NotAlsoIn = 'crops';
+       NotAlsoWhy = 'tools\gamemode.js harvest() refuses a crop base outright and onActivate routes it to farmActivate, so a gatherer gets nothing from it at any rank' },
     @{ File = 'harvests.json'; Map = 'crops';    Who = 'farmer';   Item = 'produce'; List = ''      },
     @{ File = 'harvests.json'; Map = 'fish';     Who = 'fisher';   Item = 'produce'; List = ''      },
     # The hunter has two tables and not one, as of 21 September. hunts.json is
@@ -966,6 +1010,48 @@ $HOP_THROUGH_A_FINISHED_GOOD = $false
 # recipe in this build makes.
 $STOCK_TYPE = 'MISC'
 $FINISHED_GOOD_TYPES = @('ARMO', 'WEAP', 'AMMO')
+
+# WHETHER A TEMPERING ROW MAY SET WHAT A THING COSTS. INVENTED in the same sense
+# as the knob above: classes.md says nothing about it, and the question only
+# exists because the hop walks every COBJ in the load order.
+#
+# A TEMPERING ROW CREATES NOTHING. TemperArmorIronCuirass carries CNAM = Iron
+# Armor and one CNTO, 1 Iron Ingot, on the armour table. Read as a recipe that
+# is 'Iron Armor out of an iron ingot', which is exactly what the record looks
+# like and is not what it does: the armour table improves a piece you are
+# already holding, and Skyrim will not offer the row to somebody with no iron
+# armour in their pack. Nobody has ever obtained an Iron Armor by tempering one.
+#
+# WHAT READING THEM AS SOURCES COST, measured off tools\recipes.json before this
+# knob existed. Iron Armor settled at cost 0 and was recorded as 'miner, novice,
+# hops 2, via TemperArmorIronCuirass'. 002RecipeCommonArmor10 in
+# CommonClothes.esp asks for 1 Iron Armor, 1 Leather and 2 Leather Strips, is
+# worth 100 gold, and came out rank novice against rankByValue advanced, with
+# whyThatRank reading 'the dearest thing it asks for is Iron Armor, which a
+# miner gets at novice'. 14 of the 43 distinct supply routes in that build were
+# tempering rows, placing 11 distinct input items, and 16 owned rows were ranked
+# off one of them, every one of them reporting inputsWithNoProducer 0 when the
+# true figure was higher.
+#
+# THE ROWS ARE RECOGNISED BY THEIR BENCH AND NEVER BY THEIR NAME, the same way
+# the engine recognises them: CraftService::RecipeItemsMatch in the fork throws
+# out the armour table and the sharpening wheel before it looks at a recipe at
+# all, which is $BENCHES_THE_SERVER_NEVER_SEES above, read out of the fork. A
+# name list would catch TemperArmorIronCuirass and miss whatever the next
+# armour mod calls its own.
+#
+# The script already models these two benches as not-a-craft in three other
+# places: $BENCHES_THE_SERVER_NEVER_SEES, the $fires = $false that marks an
+# owned row as one the server is never asked about, and the block comment on
+# the gamemode table saying a tempering recipe never reaches onCraft. The hop
+# was the one place that did not apply it.
+#
+# $false  IN USE. Tempering is not a source. An Iron Armor costs what making an
+#         Iron Armor costs, and where nothing makes one it is unplaced, which
+#         UNPLACED_INPUT_RULE already knows how to answer.
+# $true   read them like any other recipe. The run prints how many items move
+#         either way every time, so this is a number and not a preference.
+$HOP_THROUGH_A_TEMPER = $false
 
 # THE SECOND RULE, for a half the first two rules leave with an empty rung.
 # INVENTED. classes.md does not set it, and it is here rather than in the code
@@ -1413,7 +1499,16 @@ $BENCH_OWNER = [ordered]@{
     'CraftingCookpot'         = @{ Owner = 'Cook';       Why = 'a cooking pot' }
     'BYOHCraftingOven'        = @{ Owner = 'Cook';       Why = 'the HearthFires oven' }
     'isGrainMill'             = @{ Owner = 'Cook';       Why = 'a grain mill, which makes the flour a kitchen runs on' }
-    'KzlCraftingCharcoalKiln' = @{ Owner = 'Woodworker'; Half = 'Charburner'; Why = 'the charcoal kiln Thornswood-Content.esp already ships. classes.md gives the Charburner firewood through to coke in as many words, and this bench is that chain.' }
+    # Renamed from KzlCraftingCharcoalKiln by tools\Rename-ContentRecords.ps1 on
+    # 21 September, which took another server's prefix off 33 records of
+    # Thornswood-Content.esp. That commit said no generated table moved, and
+    # this one did: the bench is matched here by its editor id, so from the
+    # rename until 21 September the kiln stopped being the Charburner's bench
+    # and all four charcoal rows fell through to 'a MISC off a bench nobody has
+    # claimed'. The build failed on it the first time the table was rebuilt,
+    # with 'Woodworker/Charburner owns no recipes at all', and refused to write
+    # tools\recipes.json, which is the check doing its job.
+    'ThornswoodCraftingCharcoalKiln' = @{ Owner = 'Woodworker'; Half = 'Charburner'; Why = 'the charcoal kiln Thornswood-Content.esp already ships. classes.md gives the Charburner firewood through to coke in as many words, and this bench is that chain.' }
     'MCE_CraftingLoom'        = @{ Owner = 'Tailor';     Why = 'a loom, from MoreCraftableEquipment' }
     'DLC2StaffEnchanter'      = @{ Owner = 'Enchanter';  Half = 'Bladebinder'; Why = 'the Dragonborn staff enchanter. Every one of its recipes outputs a staff, and a staff is a weapon, so it is the Bladebinder''s by the same rule that gives him swords.' }
     'CraftingSmelter'         = @{ Owner = '';           Why = 'a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Left open to everybody on purpose.' }
@@ -1908,17 +2003,34 @@ function InputsJson($r) {
         if ($producer.ContainsKey($i.Desc)) {
             $line += ', "producedBy": ' + (JsonStr $producer[$i.Desc].Who) +
                      ', "producedAt": ' + (JsonStr $producer[$i.Desc].Rank)
-            # THE CLASSES THAT HAVE TO CLIMB FURTHER FOR THE SAME THING, and
-            # only those: a class producing it at the same rank or lower is
-            # already answered by producedAt. This is the field Patrick's
-            # cross-tier question is read off, and without it the farmer is
-            # invisible in this whole file, because every crop is also a plant a
-            # gatherer picks at the same rank or lower.
+            # EVERY OTHER CLASS THAT PRODUCES THE SAME THING, at the rank it
+            # produces it at. This is the field Patrick's cross-tier question is
+            # read off, and without it the farmer is invisible in this whole
+            # file, because every crop is also a plant a gatherer picks at the
+            # same rank or lower.
+            #
+            # A CLASS THAT TIES THE WINNER BELONGS IN HERE, and it did not until
+            # 21 September: the test was 'dearer than the winner', so a tied
+            # class was dropped from the file altogether and every consumer of
+            # it was blind to that class for that item. Measured that day, wheat
+            # was advanced in the harvests map and advanced in the crops map, so
+            # the farmer tied the gatherer and not one of the 36 Sack of Flour
+            # input entries named the farmer anywhere: Check-Balance could report
+            # the tundra cotton chain, where the ranks differ, and could not
+            # report the wheat chain at all. The winner is still the only answer
+            # producedBy gives, which is what a recipe costs; this says who else
+            # is standing there.
+            #
+            # The winner's own class is left out whatever rank it appears at,
+            # because producedAt has already answered for it and a second line
+            # saying the same class reaches the same item higher up some other
+            # ladder is noise rather than a cross-class fact.
             $dearer = @()
             $seen = @{}
             if ($producerAll.ContainsKey($i.Desc)) {
                 foreach ($pz in $producerAll[$i.Desc]) {
-                    if ($pz.At -le $producer[$i.Desc].At) { continue }
+                    if ($pz.Who -eq $producer[$i.Desc].Who) { continue }
+                    if ($pz.At -lt $producer[$i.Desc].At) { continue }
                     $k = $pz.Who + '/' + $pz.Rank
                     if ($seen.ContainsKey($k)) { continue }
                     $seen[$k] = $true
@@ -3087,20 +3199,49 @@ foreach ($t in $PRODUCER_TABLES) {
         continue
     }
     $map = $tab.($t.Map)
+    # THE BASES THIS CLASS IS REFUSED, read off another map of the same file.
+    # Argued for at PRODUCER_TABLES under NotAlsoIn: a base the server hands to
+    # a different verb is not this class's work at whatever rank this map puts
+    # on it, and crediting it here is what put 226 Cook and Tailor input entries
+    # on a gatherer who cannot pick either plant.
+    $refused = @{}
+    if ($t.ContainsKey('NotAlsoIn') -and $t.NotAlsoIn) {
+        if (-not ($tab.PSObject.Properties.Name -contains $t.NotAlsoIn)) {
+            Bad ("{0} has no '{1}' map in it, and the {2}'s ladder is read as everything in '{3}' that is NOT in it. Without that map every base in '{3}' would be credited to the {2}, so nothing was read off it." -f `
+                 $t.File, $t.NotAlsoIn, $t.Who, $t.Map)
+            continue
+        }
+        foreach ($rk in $tab.($t.NotAlsoIn).PSObject.Properties.Name) { $refused[$rk] = $true }
+    }
     $rows = 0
     $addedHere = 0
     $lostHere = 0
+    $skippedHere = New-Object 'System.Collections.Generic.List[string]'
     # THE ORDER OF PRODUCER_TABLES IS THE TIE BREAK, and it decides real
-    # attributions rather than nothing. Wheat is one base record that is in the
-    # harvests map and in the crops map at the same rank, advanced, so lowest
-    # wins cannot separate them and the table read first takes it. Counted and
-    # named here instead of being left to whoever reads the order of a list.
+    # attributions rather than nothing. Where two classes get the same item at
+    # the same rank, lowest wins cannot separate them and the table read first
+    # takes it. Counted and named here instead of being left to whoever reads
+    # the order of a list.
     $tiedHere = New-Object 'System.Collections.Generic.List[string]'
+    # AND WHERE THIS TABLE'S CLASS LOSES ON RANK RATHER THAN ON ORDER, which is
+    # the other way an item ends up attributed to somebody, and it went unprinted
+    # until 21 September while the comment above claimed every one was named.
+    # Measured that day: Tundra Cotton was novice in the harvests map and advanced
+    # in the crops map, so it was never a tie, the equal-rank test never matched,
+    # and the run said nothing at all about 189 input entries of Thread and raw
+    # cotton hanging off it. That is five times the 37 wheat entries the tie test
+    # did catch, so the case the old comment called the one that matters was the
+    # smaller of the two. Both are printed now.
+    $dearerHere = New-Object 'System.Collections.Generic.List[string]'
     foreach ($k in $map.PSObject.Properties.Name) {
         $row = $map.$k
         $rank = [string]$row.rank
         $at = RankAt $rank
         if ($at -lt 0) { continue }
+        if ($refused.ContainsKey($k)) {
+            $skippedHere.Add([string]$row.name)
+            continue
+        }
         $rows++
         # An ore vein or a plant hands over one item and names it in a field of
         # its own. An animal hands over a list, because a mudcrab gives legs
@@ -3118,8 +3259,13 @@ foreach ($t in $PRODUCER_TABLES) {
             if ($d) { $gives += @{ Desc = $d; Name = [string]$row.name } }
         }
         foreach ($g in $gives) {
-            if ($producer.ContainsKey($g.Desc) -and $producer[$g.Desc].At -eq $at -and $producer[$g.Desc].Who -ne $t.Who) {
-                $tiedHere.Add(('{0} with the {1}' -f $g.Name, $producer[$g.Desc].Who))
+            if ($producer.ContainsKey($g.Desc) -and $producer[$g.Desc].Who -ne $t.Who) {
+                if ($producer[$g.Desc].At -eq $at) {
+                    $tiedHere.Add(('{0} with the {1}' -f $g.Name, $producer[$g.Desc].Who))
+                } elseif ($producer[$g.Desc].At -lt $at) {
+                    $dearerHere.Add(('{0}, which a {1} has at {2} and this table puts at {3}' -f `
+                                     $g.Name, $producer[$g.Desc].Who, $producer[$g.Desc].Rank, $rank))
+                }
             }
             if (RememberProducer $g.Desc $rank $at $t.Who $g.Name ($t.File + ' ' + $t.Map)) {
                 $addedHere++
@@ -3139,11 +3285,26 @@ foreach ($t in $PRODUCER_TABLES) {
         Note ("{0} {1}: {2} ranked row(s) read, {3} item(s) it is the first to name, {4} an earlier table already had at the same rank or lower" -f `
               $t.File, $t.Map, $rows, $addedHere, $lostHere)
     }
+    if ($skippedHere.Count -gt 0) {
+        $skipNames = @{}
+        foreach ($sn in $skippedHere) { $skipNames[$sn] = $true }
+        Note ("  {0} row(s) of it were left out because they are also in the '{1}' map: {2}. {3}" -f `
+              $skipNames.Count, $t.NotAlsoIn, (($skipNames.Keys | Sort-Object) -join ', '), $t.NotAlsoWhy)
+    }
     if ($tiedHere.Count -gt 0) {
         $tieNames = @{}
         foreach ($tn in $tiedHere) { $tieNames[$tn] = $true }
         Note ("  {0} of them tie at exactly the same rank and the {1} lost the tie only because its table is read later in PRODUCER_TABLES: {2}" -f `
               $tieNames.Count, $t.Who, (($tieNames.Keys | Sort-Object) -join ', '))
+    }
+    if ($dearerHere.Count -gt 0) {
+        $dearNames = @{}
+        foreach ($dn in $dearerHere) { $dearNames[$dn] = $true }
+        $dearList = @($dearNames.Keys | Sort-Object)
+        Note ("  {0} of them the {1} has to climb higher for than the class already holding them, so the {1} sets no rank on them and the order of PRODUCER_TABLES had nothing to do with it:" -f `
+              $dearList.Count, $t.Who)
+        foreach ($dn in ($dearList | Select-Object -First 8)) { Note ('    ' + $dn) }
+        if ($dearList.Count -gt 8) { Note ("    ... and {0} more" -f ($dearList.Count - 8)) }
     }
 }
 
@@ -3322,11 +3483,28 @@ foreach ($rd in $recipes.Keys) {
         if ($FINISHED_GOOD_TYPES -contains $items[$i.Desc].Type) { $breakdownRows[$rd] = $true; break }
     }
 }
+# THE TEMPERING ROWS, FOUND BY THEIR BENCH AND NOT BY THEIR NAME. Argued for at
+# HOP_THROUGH_A_TEMPER. A row on the armour table or the sharpening wheel
+# improves something already in the pack and creates nothing, so it is not a
+# source of the thing it names as its output. The two benches come from the
+# fork, out of CraftService, and are the same two the owned rows already read to
+# set fires = false.
+$temperRows = @{}
+foreach ($rd in $recipes.Keys) {
+    foreach ($b in $BENCHES_THE_SERVER_NEVER_SEES) {
+        if ($recipes[$rd].BenchDesc -eq $b) { $temperRows[$rd] = $true; break }
+    }
+}
+
 $hopSkip = @{}
-if (-not $HOP_THROUGH_A_FINISHED_GOOD) { $hopSkip = $breakdownRows }
+if (-not $HOP_THROUGH_A_FINISHED_GOOD) { foreach ($rd in $breakdownRows.Keys) { $hopSkip[$rd] = $true } }
+if (-not $HOP_THROUGH_A_TEMPER) { foreach ($rd in $temperRows.Keys) { $hopSkip[$rd] = $true } }
 Note ("{0} of the {1} recipe(s) in the load order turn a finished good back into stock. HOP_THROUGH_A_FINISHED_GOOD is {2}, so the hop {3}." -f `
       $breakdownRows.Count, $recipes.Count, $HOP_THROUGH_A_FINISHED_GOOD, `
       $(if ($HOP_THROUGH_A_FINISHED_GOOD) { 'reads them like any other recipe' } else { 'does not let one of them set what anything costs' }))
+Note ("{0} of them are tempering, on the armour table or the sharpening wheel. HOP_THROUGH_A_TEMPER is {1}, so the hop {2}." -f `
+      $temperRows.Count, $HOP_THROUGH_A_TEMPER, `
+      $(if ($HOP_THROUGH_A_TEMPER) { 'reads them like any other recipe' } else { 'does not let one of them say it is where an item comes from' }))
 
 $made = @{}
 $supply = @{}
@@ -3453,8 +3631,16 @@ if (-not $FOLLOW_THE_HOP) {
     Note ("MADE_COST_NEEDS_EVERY_INPUT is {0}. With it off the hop would place {1} more item(s), each of them priced off the part of its own shopping list anybody could see." -f `
           $MADE_COST_NEEDS_EVERY_INPUT, $looseOnly)
     if ($breakdownRows.Count -gt 0) {
+        # ONE KNOB AT A TIME. The skip set the run is using holds both kinds of
+        # row, so the alternative has to start from that set and turn over only
+        # the breakdown rows, or the number would be the two knobs together and
+        # would be read as this one's.
         $other = @{}
-        if ($HOP_THROUGH_A_FINISHED_GOOD) { $other = $breakdownRows }
+        foreach ($rd in $hopSkip.Keys) { $other[$rd] = $true }
+        foreach ($rd in $breakdownRows.Keys) {
+            if ($HOP_THROUGH_A_FINISHED_GOOD) { $other[$rd] = $true } else { $other.Remove($rd) }
+        }
+        if (-not $HOP_THROUGH_A_TEMPER) { foreach ($rd in $temperRows.Keys) { $other[$rd] = $true } }
         $alt = HopFixpoint $producer $recipes $other $MADE_COST_NEEDS_EVERY_INPUT $HOP_ROUND_LIMIT $HOP_MAY_UNDERCUT_A_CLASS
         $moved = 0
         $cheaperThere = 0
@@ -3465,6 +3651,26 @@ if (-not $FOLLOW_THE_HOP) {
         foreach ($d in $alt.Costs.Keys) { if (-not $costs.ContainsKey($d)) { $moved++ } }
         Note ("HOP_THROUGH_A_FINISHED_GOOD is {0}. Turning it the other way moves {1} item(s), {2} of them to a cheaper rank." -f `
               $HOP_THROUGH_A_FINISHED_GOOD, $moved, $cheaperThere)
+    }
+    # AND THE SAME NUMBER FOR THE TEMPERING KNOB, so that it costs a measurement
+    # every run rather than resting on the one taken the day it was written.
+    if ($temperRows.Count -gt 0) {
+        $otherT = @{}
+        foreach ($rd in $hopSkip.Keys) { $otherT[$rd] = $true }
+        foreach ($rd in $temperRows.Keys) {
+            if ($HOP_THROUGH_A_TEMPER) { $otherT[$rd] = $true } else { $otherT.Remove($rd) }
+        }
+        if (-not $HOP_THROUGH_A_FINISHED_GOOD) { foreach ($rd in $breakdownRows.Keys) { $otherT[$rd] = $true } }
+        $altT = HopFixpoint $producer $recipes $otherT $MADE_COST_NEEDS_EVERY_INPUT $HOP_ROUND_LIMIT $HOP_MAY_UNDERCUT_A_CLASS
+        $movedT = 0
+        $cheaperT = 0
+        foreach ($d in $costs.Keys) {
+            if (-not $altT.Costs.ContainsKey($d)) { $movedT++; continue }
+            if ($altT.Costs[$d] -ne $costs[$d]) { $movedT++; if ($altT.Costs[$d] -lt $costs[$d]) { $cheaperT++ } }
+        }
+        foreach ($d in $altT.Costs.Keys) { if (-not $costs.ContainsKey($d)) { $movedT++ } }
+        Note ("HOP_THROUGH_A_TEMPER is {0}. Turning it the other way moves {1} item(s), {2} of them to a cheaper rank, and every one of those is an item somebody would have to be holding already before the row that supposedly gives it to them could be used." -f `
+              $HOP_THROUGH_A_TEMPER, $movedT, $cheaperT)
     }
 }
 
@@ -4168,7 +4374,7 @@ $doc.Add('  "readFrom": ' + (JsonStr 'BNAM is the workbench keyword, CNAM is the
 $doc.Add('  "event": ' + (JsonStr 'mp.onCraft(actorFormId, craftedItemBaseId, count, recipeId). All four arguments are numbers. The keys of this table are desc strings, so look a row up with RECIPES_BY_ID[mp.getDescFromId(recipeId)] and never with recipeId itself, which matches nothing. Returning false refuses the craft outright: CraftEvent::OnFireSuccess is what removes the inputs and adds the output, and GameModeEvent::Fire only calls it when nobody blocked.') + ',')
 $doc.Add('  "key": ' + (JsonStr 'the recipe''s form id in lower case hex, a colon, and the file it belongs to. mp.getDescFromId turns onCraft''s fourth argument into one.') + ',')
 $doc.Add('  "rank": ' + (JsonStr 'which of classes.md''s four ranks the row asks for: novice, advanced, expert or master. Ranked by WHAT ITS INPUTS COST A PRODUCER, taking the dearest thing it asks for, because that is the rung somebody has to have reached before they could gather the makings at all. Where part of the list is produced by nobody, that dearest placed input is a FLOOR and not the answer: it can raise the row above what the output sells for and never lower it, because an item nothing produces is an unknown cost rather than a free one. A row whose inputs no class produces at all falls back to what the output sells for, ranked inside its own half. rankFrom says which of the three answered. classes.md sets no numbers for any of this and nothing in the game records ranks a recipe, so every judgement is a knob at the top of the script: RANK_FROM_INPUT_COST, PRODUCER_TABLES, SERVER_PRODUCERS, PRODUCER_RANK_IS_LOWEST, INPUT_RANK_IS_THE_DEAREST, UNPLACED_INPUT_RULE, RANK_SHARE and SECOND_RULE_KEY.') + ',')
-$doc.Add('  "inputItems": ' + (JsonStr 'every CNTO the record carried: what the recipe wants, how many, and which class produces that item at which rank. producedBy is the class that gets it at the LOWEST rank, because that is what the thing costs to get hold of; alsoProducedBy, where it is present, is every class that has to climb higher for the same item, which is where the farmer appears, since all 11 crops are also plants a gatherer picks at the same rank or lower. producedBy null means nothing in this repository hands that item over: no table in this folder and no verb in tools\gamemode.js. Read out of the recipe''s own CNTO subrecords, eight bytes each, a form id then a count.') + ',')
+$doc.Add('  "inputItems": ' + (JsonStr 'every CNTO the record carried: what the recipe wants, how many, and which class produces that item at which rank. producedBy is the class that gets it at the LOWEST rank, because that is what the thing costs to get hold of; alsoProducedBy, where it is present, is every OTHER class that produces the same item, at the rank that class produces it at, whether that is higher than producedAt or exactly level with it. A tied class was dropped from this field until 21 September, which made the farmer invisible for wheat in every consumer of this file. producedBy null means nothing in this repository hands that item over: no table in this folder and no verb in tools\gamemode.js. Read out of the recipe''s own CNTO subrecords, eight bytes each, a form id then a count.') + ',')
 $doc.Add('  "suppliedBy": ' + (JsonStr 'on each input beside producedBy, and a different question: producedBy is the class that digs it out of the ground, and suppliedBy is the class the input rests on however many benches away it is. Steel Ingot reads producedBy null and suppliedBy miner, because a smelter row makes it out of ore. hops is how many recipes stand between the class and the input, 0 for handed straight over and 1 for a smelter or a tanning rack away, and suppliedVia names the recipe of the last of those steps. suppliedBy null means nothing in this world supplies it at all, directly or through any bench: it is bought, looted or dropped. What ranks a row is suppliedAt and not producedAt.') + ',')
 $doc.Add('  "theHop": ' + (JsonStr 'how suppliedBy is worked out. An input that is itself the output of a recipe costs what that recipe''s dearest input costs, taken over all 5116 recipes and not just the 3437 with an owner, because the smelter and the tanning rack are among the 1679 nobody owns. It is a fixpoint: every item starts unknown, every recipe is asked again each round, and a cost only ever moves from unknown to a rank or from a rank to a cheaper one, so it settles, and it settles in three rounds on this build. A recipe says nothing about its output while any part of its own list is unknown, for the reason written at UNPLACED_INPUT_RULE. A row that turns a finished good back into stock, a fur hood into a Steel Ingot, is a refund and not a source and sets nothing; 1072 rows have that shape.') + ',')
 $doc.Add('  "inputsWithNoProducer": ' + (JsonStr 'how many of the row''s inputs nothing in this repository produces. Read it with inputRank: "the dearest input is novice" means one thing on a row where that is the whole list and another on a row with four unknowns beside it, and not reading it is how a 3100 gold dragonbone plate went out at novice on 21 September off one novice hunter''s fox pelt.') + ',')

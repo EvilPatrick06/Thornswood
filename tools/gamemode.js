@@ -3312,7 +3312,7 @@ const HARVESTS = {
 /**
  * True when this base is one of the ones this server puts in the world itself.
  *
- * STATIONS is generated from tools\thornswood-src\stations.json and carries
+ * STATIONS is generated from tools\stations.json and carries
  * three today: the salt quarry, the charcoal kiln and the beehive. Two of them
  * have a branch in onActivate written for them and the beehive does not, which
  * is what made this worth a function. The harvests pass reads every FLOR and
@@ -4991,7 +4991,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
      reached. Where part of the list is produced by nobody, that is a floor
      and what the output sells for can hold the row higher; where none of it
      is, the price ranks it inside its own half. On this build that is
-     1277 row(s) by what their inputs cost, 166 by price and 285 by how long
+     1263 row(s) by what their inputs cost, 180 by price and 285 by how long
      the shopping list is. That last rule is used for a whole half at a time
      and only where the first two leave a rung with nothing on it, which here
      is Cook/Confectioner, Enchanter/Bladebinder, Tailor/Liverywright. A rank there means how long the list is and
@@ -5895,8 +5895,8 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "23955:Hothtrooper44_ArmorCompilation.esp": { "out": "2394d:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Light Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "family": "Gauntlets", "open": false },
     "23956:Hothtrooper44_ArmorCompilation.esp": { "out": "2394e:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Light Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "family": "Helmets", "open": false },
     "25a35:Hothtrooper44_ArmorCompilation.esp": { "out": "238e1:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "family": "Helmets", "open": false },
-    "25a36:Hothtrooper44_ArmorCompilation.esp": { "out": "238e4:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Engraved Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "family": "Helmets", "open": false },
-    "25a37:Hothtrooper44_ArmorCompilation.esp": { "out": "238ed:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Reinforced Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Helmets", "open": false },
+    "25a36:Hothtrooper44_ArmorCompilation.esp": { "out": "238e4:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Engraved Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "family": "Helmets", "open": false },
+    "25a37:Hothtrooper44_ArmorCompilation.esp": { "out": "238ed:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Reinforced Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "family": "Helmets", "open": false },
     "2854b:Hothtrooper44_ArmorCompilation.esp": { "out": "23068:Hothtrooper44_ArmorCompilation.esp", "name": "Mantle of the Silver Hand", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "family": "Other armour and clothing", "open": false },
     "2854c:Hothtrooper44_ArmorCompilation.esp": { "out": "23069:Hothtrooper44_ArmorCompilation.esp", "name": "Mantle of the Silver Hand", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "family": "Other armour and clothing", "open": false },
     "372fe:Hothtrooper44_ArmorCompilation.esp": { "out": "372fa:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Unarmored Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "family": "Shoes and light boots", "open": false },
@@ -5980,7 +5980,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "847:MoreCraftableEquipment.esp": { "out": "10594f:Skyrim.esm", "name": "Fur Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Body armour", "open": true },
     "848:MoreCraftableEquipment.esp": { "out": "6f39b:Skyrim.esm", "name": "Fur Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Gauntlets", "open": true },
     "849:MoreCraftableEquipment.esp": { "out": "6f39e:Skyrim.esm", "name": "Fur Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Helmets", "open": true },
-    "84a:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
+    "84a:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
     "84b:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
     "84c:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
     "84d:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
@@ -6121,21 +6121,21 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "8ff:MoreCraftableEquipment.esp": { "out": "7a91a:Skyrim.esm", "name": "Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "family": "Swords", "open": false },
     "900:MoreCraftableEquipment.esp": { "out": "10c6fb:Skyrim.esm", "name": "Silver Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "family": "Greatswords", "open": false },
     "901:MoreCraftableEquipment.esp": { "out": "10aa19:Skyrim.esm", "name": "Silver Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "family": "Swords", "open": false },
-    "91f:MoreCraftableEquipment.esp": { "out": "5b6a1:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "920:MoreCraftableEquipment.esp": { "out": "5b6a0:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "921:MoreCraftableEquipment.esp": { "out": "6ff38:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "91f:MoreCraftableEquipment.esp": { "out": "5b6a1:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "920:MoreCraftableEquipment.esp": { "out": "5b6a0:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "921:MoreCraftableEquipment.esp": { "out": "6ff38:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
     "922:MoreCraftableEquipment.esp": { "out": "13106:Skyrim.esm", "name": "Ragged Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "923:MoreCraftableEquipment.esp": { "out": "13104:Skyrim.esm", "name": "Ragged Cap", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": true },
+    "923:MoreCraftableEquipment.esp": { "out": "13104:Skyrim.esm", "name": "Ragged Cap", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": true },
     "924:MoreCraftableEquipment.esp": { "out": "13105:Skyrim.esm", "name": "Ragged Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "925:MoreCraftableEquipment.esp": { "out": "5b69f:Skyrim.esm", "name": "Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "926:MoreCraftableEquipment.esp": { "out": "5b69e:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "927:MoreCraftableEquipment.esp": { "out": "6ff37:Skyrim.esm", "name": "Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "928:MoreCraftableEquipment.esp": { "out": "d1921:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "929:MoreCraftableEquipment.esp": { "out": "1bc82:Skyrim.esm", "name": "Chef's Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "92a:MoreCraftableEquipment.esp": { "out": "1bca7:Skyrim.esm", "name": "Chef's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "92b:MoreCraftableEquipment.esp": { "out": "18801:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "936:MoreCraftableEquipment.esp": { "out": "10e2dc:Skyrim.esm", "name": "College Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "937:MoreCraftableEquipment.esp": { "out": "10e2ce:Skyrim.esm", "name": "College Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "925:MoreCraftableEquipment.esp": { "out": "5b69f:Skyrim.esm", "name": "Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "926:MoreCraftableEquipment.esp": { "out": "5b69e:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "927:MoreCraftableEquipment.esp": { "out": "6ff37:Skyrim.esm", "name": "Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "928:MoreCraftableEquipment.esp": { "out": "d1921:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "929:MoreCraftableEquipment.esp": { "out": "1bc82:Skyrim.esm", "name": "Chef's Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "92a:MoreCraftableEquipment.esp": { "out": "1bca7:Skyrim.esm", "name": "Chef's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": true },
+    "92b:MoreCraftableEquipment.esp": { "out": "18801:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "936:MoreCraftableEquipment.esp": { "out": "10e2dc:Skyrim.esm", "name": "College Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "937:MoreCraftableEquipment.esp": { "out": "10e2ce:Skyrim.esm", "name": "College Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
     "938:MoreCraftableEquipment.esp": { "out": "10cee8:Skyrim.esm", "name": "Novice Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "family": "Hats and hoods", "open": true },
     "939:MoreCraftableEquipment.esp": { "out": "10d2b5:Skyrim.esm", "name": "Apprentice Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "family": "Hats and hoods", "open": false },
     "93a:MoreCraftableEquipment.esp": { "out": "10cee6:Skyrim.esm", "name": "Adept Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "family": "Hats and hoods", "open": false },
@@ -6144,90 +6144,90 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "93d:MoreCraftableEquipment.esp": { "out": "10cee3:Skyrim.esm", "name": "Adept Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
     "93e:MoreCraftableEquipment.esp": { "out": "10d662:Skyrim.esm", "name": "Expert Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
     "93f:MoreCraftableEquipment.esp": { "out": "10d664:Skyrim.esm", "name": "Master Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "940:MoreCraftableEquipment.esp": { "out": "808:MoreCraftableEquipment.esp", "name": "Shrouded Hand Wraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Gloves", "open": false },
-    "941:MoreCraftableEquipment.esp": { "out": "809:MoreCraftableEquipment.esp", "name": "Shrouded Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": false },
-    "942:MoreCraftableEquipment.esp": { "out": "80a:MoreCraftableEquipment.esp", "name": "Jester's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "943:MoreCraftableEquipment.esp": { "out": "80b:MoreCraftableEquipment.esp", "name": "Jester's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
-    "944:MoreCraftableEquipment.esp": { "out": "80c:MoreCraftableEquipment.esp", "name": "Jester's Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Gloves", "open": false },
-    "945:MoreCraftableEquipment.esp": { "out": "80d:MoreCraftableEquipment.esp", "name": "Jester's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": false },
-    "946:MoreCraftableEquipment.esp": { "out": "e0dd4:Skyrim.esm", "name": "Dark Redguard Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
-    "947:MoreCraftableEquipment.esp": { "out": "e0dd0:Skyrim.esm", "name": "Dark Hammerfell Garb", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "948:MoreCraftableEquipment.esp": { "out": "e0dd2:Skyrim.esm", "name": "Dark Alik'r Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "940:MoreCraftableEquipment.esp": { "out": "808:MoreCraftableEquipment.esp", "name": "Shrouded Hand Wraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Gloves", "open": false },
+    "941:MoreCraftableEquipment.esp": { "out": "809:MoreCraftableEquipment.esp", "name": "Shrouded Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": false },
+    "942:MoreCraftableEquipment.esp": { "out": "80a:MoreCraftableEquipment.esp", "name": "Jester's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "943:MoreCraftableEquipment.esp": { "out": "80b:MoreCraftableEquipment.esp", "name": "Jester's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "944:MoreCraftableEquipment.esp": { "out": "80c:MoreCraftableEquipment.esp", "name": "Jester's Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Gloves", "open": false },
+    "945:MoreCraftableEquipment.esp": { "out": "80d:MoreCraftableEquipment.esp", "name": "Jester's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": false },
+    "946:MoreCraftableEquipment.esp": { "out": "e0dd4:Skyrim.esm", "name": "Dark Redguard Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "947:MoreCraftableEquipment.esp": { "out": "e0dd0:Skyrim.esm", "name": "Dark Hammerfell Garb", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "948:MoreCraftableEquipment.esp": { "out": "e0dd2:Skyrim.esm", "name": "Dark Alik'r Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": false },
     "949:MoreCraftableEquipment.esp": { "out": "806:MoreCraftableEquipment.esp", "name": "Shrouded Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "94a:MoreCraftableEquipment.esp": { "out": "807:MoreCraftableEquipment.esp", "name": "Shrouded Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "94a:MoreCraftableEquipment.esp": { "out": "807:MoreCraftableEquipment.esp", "name": "Shrouded Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
     "94b:MoreCraftableEquipment.esp": { "out": "19adf:Dawnguard.esm", "name": "Vampire Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "94c:MoreCraftableEquipment.esp": { "out": "19ae1:Dawnguard.esm", "name": "Vampire Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
-    "94d:MoreCraftableEquipment.esp": { "out": "19ae3:Dawnguard.esm", "name": "Vampire Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Gloves", "open": false },
-    "94e:MoreCraftableEquipment.esp": { "out": "19ade:Dawnguard.esm", "name": "Vampire Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "94c:MoreCraftableEquipment.esp": { "out": "19ae1:Dawnguard.esm", "name": "Vampire Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "94d:MoreCraftableEquipment.esp": { "out": "19ae3:Dawnguard.esm", "name": "Vampire Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Gloves", "open": false },
+    "94e:MoreCraftableEquipment.esp": { "out": "19ade:Dawnguard.esm", "name": "Vampire Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": false },
     "94f:MoreCraftableEquipment.esp": { "out": "47d7:Dawnguard.esm", "name": "Moth Priest Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Robes and body wear", "open": false },
     "950:MoreCraftableEquipment.esp": { "out": "47d9:Dawnguard.esm", "name": "Moth Priest Sandals", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Robes and body wear", "open": false },
     "951:MoreCraftableEquipment.esp": { "out": "37b8e:Dragonborn.esm", "name": "Cultist Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Shoes and light boots", "open": false },
     "952:MoreCraftableEquipment.esp": { "out": "37b8c:Dragonborn.esm", "name": "Cultist Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Gloves", "open": false },
     "953:MoreCraftableEquipment.esp": { "out": "37b8a:Dragonborn.esm", "name": "Cultist Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "957:MoreCraftableEquipment.esp": { "out": "82c:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "958:MoreCraftableEquipment.esp": { "out": "82d:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "959:MoreCraftableEquipment.esp": { "out": "82f:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "95a:MoreCraftableEquipment.esp": { "out": "830:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "95b:MoreCraftableEquipment.esp": { "out": "831:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "95c:MoreCraftableEquipment.esp": { "out": "832:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "95d:MoreCraftableEquipment.esp": { "out": "3705a:Dragonborn.esm", "name": "Dunmer Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "957:MoreCraftableEquipment.esp": { "out": "82c:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "958:MoreCraftableEquipment.esp": { "out": "82d:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "959:MoreCraftableEquipment.esp": { "out": "82f:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "95a:MoreCraftableEquipment.esp": { "out": "830:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "95b:MoreCraftableEquipment.esp": { "out": "831:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "95c:MoreCraftableEquipment.esp": { "out": "832:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "95d:MoreCraftableEquipment.esp": { "out": "3705a:Dragonborn.esm", "name": "Dunmer Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
     "95e:MoreCraftableEquipment.esp": { "out": "39112:Dragonborn.esm", "name": "Skaal Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Armoured boots", "open": false },
     "95f:MoreCraftableEquipment.esp": { "out": "3910e:Dragonborn.esm", "name": "Skaal Coat", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Body armour", "open": false },
     "960:MoreCraftableEquipment.esp": { "out": "39110:Dragonborn.esm", "name": "Skaal Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Gauntlets", "open": false },
     "961:MoreCraftableEquipment.esp": { "out": "39114:Dragonborn.esm", "name": "Skaal Hat", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Helmets", "open": false },
     "962:MoreCraftableEquipment.esp": { "out": "834:MoreCraftableEquipment.esp", "name": "Telvanni Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "family": "Robes and body wear", "open": false },
-    "963:MoreCraftableEquipment.esp": { "out": "835:MoreCraftableEquipment.esp", "name": "Telvanni Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
-    "964:MoreCraftableEquipment.esp": { "out": "3b04b:Dragonborn.esm", "name": "Temple Priest Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
-    "965:MoreCraftableEquipment.esp": { "out": "3b04e:Dragonborn.esm", "name": "Temple Priest Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "963:MoreCraftableEquipment.esp": { "out": "835:MoreCraftableEquipment.esp", "name": "Telvanni Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "964:MoreCraftableEquipment.esp": { "out": "3b04b:Dragonborn.esm", "name": "Temple Priest Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "965:MoreCraftableEquipment.esp": { "out": "3b04e:Dragonborn.esm", "name": "Temple Priest Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": false },
     "966:MoreCraftableEquipment.esp": { "out": "9f0:MoreCraftableEquipment.esp", "name": "Temple Priest Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
     "967:MoreCraftableEquipment.esp": { "out": "15516:Skyrim.esm", "name": "Emperor's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "family": "Robes and body wear", "open": false },
-    "96b:MoreCraftableEquipment.esp": { "out": "1be1b:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "96c:MoreCraftableEquipment.esp": { "out": "209a5:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "96d:MoreCraftableEquipment.esp": { "out": "261bd:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "96e:MoreCraftableEquipment.esp": { "out": "3452f:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "96f:MoreCraftableEquipment.esp": { "out": "1be1a:Skyrim.esm", "name": "Belted Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "970:MoreCraftableEquipment.esp": { "out": "209a6:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "971:MoreCraftableEquipment.esp": { "out": "261c0:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "972:MoreCraftableEquipment.esp": { "out": "17696:Skyrim.esm", "name": "Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "973:MoreCraftableEquipment.esp": { "out": "17695:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "974:MoreCraftableEquipment.esp": { "out": "3452e:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "975:MoreCraftableEquipment.esp": { "out": "6c1d9:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "976:MoreCraftableEquipment.esp": { "out": "6c1da:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "977:MoreCraftableEquipment.esp": { "out": "6c1d8:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "978:MoreCraftableEquipment.esp": { "out": "261c1:Skyrim.esm", "name": "Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Gloves", "open": true },
-    "979:MoreCraftableEquipment.esp": { "out": "330b3:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "97a:MoreCraftableEquipment.esp": { "out": "209aa:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "97b:MoreCraftableEquipment.esp": { "out": "330bc:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "97c:MoreCraftableEquipment.esp": { "out": "86993:Skyrim.esm", "name": "Fine Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "97d:MoreCraftableEquipment.esp": { "out": "cee82:Skyrim.esm", "name": "Fine Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "97e:MoreCraftableEquipment.esp": { "out": "86991:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "97f:MoreCraftableEquipment.esp": { "out": "f8713:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "980:MoreCraftableEquipment.esp": { "out": "cee80:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "981:MoreCraftableEquipment.esp": { "out": "f8715:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "982:MoreCraftableEquipment.esp": { "out": "cee84:Skyrim.esm", "name": "Fine Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "984:MoreCraftableEquipment.esp": { "out": "5db7b:Skyrim.esm", "name": "Noble Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "985:MoreCraftableEquipment.esp": { "out": "8698c:Skyrim.esm", "name": "Fur-Trimmed Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "986:MoreCraftableEquipment.esp": { "out": "cee76:Skyrim.esm", "name": "Fine Raiment", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "987:MoreCraftableEquipment.esp": { "out": "ead49:Skyrim.esm", "name": "Embroidered Garment", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "96b:MoreCraftableEquipment.esp": { "out": "1be1b:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "96c:MoreCraftableEquipment.esp": { "out": "209a5:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "96d:MoreCraftableEquipment.esp": { "out": "261bd:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "96e:MoreCraftableEquipment.esp": { "out": "3452f:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "96f:MoreCraftableEquipment.esp": { "out": "1be1a:Skyrim.esm", "name": "Belted Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "970:MoreCraftableEquipment.esp": { "out": "209a6:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "971:MoreCraftableEquipment.esp": { "out": "261c0:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "972:MoreCraftableEquipment.esp": { "out": "17696:Skyrim.esm", "name": "Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": true },
+    "973:MoreCraftableEquipment.esp": { "out": "17695:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "974:MoreCraftableEquipment.esp": { "out": "3452e:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "975:MoreCraftableEquipment.esp": { "out": "6c1d9:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "976:MoreCraftableEquipment.esp": { "out": "6c1da:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "977:MoreCraftableEquipment.esp": { "out": "6c1d8:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "978:MoreCraftableEquipment.esp": { "out": "261c1:Skyrim.esm", "name": "Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Gloves", "open": true },
+    "979:MoreCraftableEquipment.esp": { "out": "330b3:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": true },
+    "97a:MoreCraftableEquipment.esp": { "out": "209aa:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": true },
+    "97b:MoreCraftableEquipment.esp": { "out": "330bc:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": true },
+    "97c:MoreCraftableEquipment.esp": { "out": "86993:Skyrim.esm", "name": "Fine Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "97d:MoreCraftableEquipment.esp": { "out": "cee82:Skyrim.esm", "name": "Fine Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "97e:MoreCraftableEquipment.esp": { "out": "86991:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "97f:MoreCraftableEquipment.esp": { "out": "f8713:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "980:MoreCraftableEquipment.esp": { "out": "cee80:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "981:MoreCraftableEquipment.esp": { "out": "f8715:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "982:MoreCraftableEquipment.esp": { "out": "cee84:Skyrim.esm", "name": "Fine Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": true },
+    "984:MoreCraftableEquipment.esp": { "out": "5db7b:Skyrim.esm", "name": "Noble Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "985:MoreCraftableEquipment.esp": { "out": "8698c:Skyrim.esm", "name": "Fur-Trimmed Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "986:MoreCraftableEquipment.esp": { "out": "cee76:Skyrim.esm", "name": "Fine Raiment", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "987:MoreCraftableEquipment.esp": { "out": "ead49:Skyrim.esm", "name": "Embroidered Garment", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
     "988:MoreCraftableEquipment.esp": { "out": "e84c1:Skyrim.esm", "name": "Gilded Wristguards", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "family": "Gloves", "open": false },
     "989:MoreCraftableEquipment.esp": { "out": "86990:Skyrim.esm", "name": "Fine Armguards", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Gloves", "open": false },
-    "98a:MoreCraftableEquipment.esp": { "out": "5db7e:Skyrim.esm", "name": "Fur-lined Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
-    "98b:MoreCraftableEquipment.esp": { "out": "8698e:Skyrim.esm", "name": "Pleated Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
-    "98c:MoreCraftableEquipment.esp": { "out": "cee78:Skyrim.esm", "name": "Cuffed Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "98a:MoreCraftableEquipment.esp": { "out": "5db7e:Skyrim.esm", "name": "Fur-lined Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "98b:MoreCraftableEquipment.esp": { "out": "8698e:Skyrim.esm", "name": "Pleated Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "98c:MoreCraftableEquipment.esp": { "out": "cee78:Skyrim.esm", "name": "Cuffed Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
     "98d:MoreCraftableEquipment.esp": { "out": "e84c4:Skyrim.esm", "name": "Embellished Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "family": "Robes and body wear", "open": false },
-    "98e:MoreCraftableEquipment.esp": { "out": "e84c6:Skyrim.esm", "name": "Refined Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "98f:MoreCraftableEquipment.esp": { "out": "4223d:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "990:MoreCraftableEquipment.esp": { "out": "4223c:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "991:MoreCraftableEquipment.esp": { "out": "6ff45:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "992:MoreCraftableEquipment.esp": { "out": "4223b:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "993:MoreCraftableEquipment.esp": { "out": "6b46c:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "98e:MoreCraftableEquipment.esp": { "out": "e84c6:Skyrim.esm", "name": "Refined Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "98f:MoreCraftableEquipment.esp": { "out": "4223d:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "990:MoreCraftableEquipment.esp": { "out": "4223c:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "991:MoreCraftableEquipment.esp": { "out": "6ff45:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "992:MoreCraftableEquipment.esp": { "out": "4223b:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": true },
+    "993:MoreCraftableEquipment.esp": { "out": "6b46c:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
     "994:MoreCraftableEquipment.esp": { "out": "825:MoreCraftableEquipment.esp", "name": "Archmage's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Shoes and light boots", "open": false },
     "995:MoreCraftableEquipment.esp": { "out": "828:MoreCraftableEquipment.esp", "name": "Archmage's Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Hats and hoods", "open": false },
     "996:MoreCraftableEquipment.esp": { "out": "826:MoreCraftableEquipment.esp", "name": "Archmage's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
     "997:MoreCraftableEquipment.esp": { "out": "827:MoreCraftableEquipment.esp", "name": "Hooded Archmage's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "998:MoreCraftableEquipment.esp": { "out": "80699:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "999:MoreCraftableEquipment.esp": { "out": "80697:Skyrim.esm", "name": "Miner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "99a:MoreCraftableEquipment.esp": { "out": "6ff43:Skyrim.esm", "name": "Miner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "998:MoreCraftableEquipment.esp": { "out": "80699:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "999:MoreCraftableEquipment.esp": { "out": "80697:Skyrim.esm", "name": "Miner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "99a:MoreCraftableEquipment.esp": { "out": "6ff43:Skyrim.esm", "name": "Miner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
     "99b:MoreCraftableEquipment.esp": { "out": "bacd7:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Shoes and light boots", "open": true },
     "99c:MoreCraftableEquipment.esp": { "out": "bacf3:Skyrim.esm", "name": "Monk Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Robes and body wear", "open": true },
     "99d:MoreCraftableEquipment.esp": { "out": "10cfef:Skyrim.esm", "name": "Brown Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Robes and body wear", "open": true },
@@ -6244,8 +6244,8 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "9a8:MoreCraftableEquipment.esp": { "out": "10cfeb:Skyrim.esm", "name": "Hooded Red Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Robes and body wear", "open": false },
     "9a9:MoreCraftableEquipment.esp": { "out": "839:MoreCraftableEquipment.esp", "name": "Monk Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "family": "Hats and hoods", "open": true },
     "9aa:MoreCraftableEquipment.esp": { "out": "107106:Skyrim.esm", "name": "Hooded Monk Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "9ab:MoreCraftableEquipment.esp": { "out": "646ab:Skyrim.esm", "name": "Mourner's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "9ac:MoreCraftableEquipment.esp": { "out": "646a7:Skyrim.esm", "name": "Mourner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "9ab:MoreCraftableEquipment.esp": { "out": "646ab:Skyrim.esm", "name": "Mourner's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": true },
+    "9ac:MoreCraftableEquipment.esp": { "out": "646a7:Skyrim.esm", "name": "Mourner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
     "9ad:MoreCraftableEquipment.esp": { "out": "b1460:Skyrim.esm", "name": "Mythic Dawn Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Shoes and light boots", "open": false },
     "9ae:MoreCraftableEquipment.esp": { "out": "b145b:Skyrim.esm", "name": "Mythic Dawn Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Gloves", "open": false },
     "9af:MoreCraftableEquipment.esp": { "out": "842:MoreCraftableEquipment.esp", "name": "Mythic Dawn Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "family": "Hats and hoods", "open": false },
@@ -6255,16 +6255,16 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "9b3:MoreCraftableEquipment.esp": { "out": "829:MoreCraftableEquipment.esp", "name": "Necromancer Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Robes and body wear", "open": true },
     "9b4:MoreCraftableEquipment.esp": { "out": "83f:MoreCraftableEquipment.esp", "name": "Necromancer Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "family": "Hats and hoods", "open": true },
     "9b5:MoreCraftableEquipment.esp": { "out": "82a:MoreCraftableEquipment.esp", "name": "Hooded Necromancer Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9b6:MoreCraftableEquipment.esp": { "out": "8f19a:Skyrim.esm", "name": "Ragged Trousers", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "9b7:MoreCraftableEquipment.esp": { "out": "3ca00:Skyrim.esm", "name": "Footwraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "9b8:MoreCraftableEquipment.esp": { "out": "3c9fe:Skyrim.esm", "name": "Roughspun Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "9b6:MoreCraftableEquipment.esp": { "out": "8f19a:Skyrim.esm", "name": "Ragged Trousers", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "9b7:MoreCraftableEquipment.esp": { "out": "3ca00:Skyrim.esm", "name": "Footwraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "9b8:MoreCraftableEquipment.esp": { "out": "3c9fe:Skyrim.esm", "name": "Roughspun Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
     "9b9:MoreCraftableEquipment.esp": { "out": "65b9b:Skyrim.esm", "name": "Psijic Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Shoes and light boots", "open": false },
     "9ba:MoreCraftableEquipment.esp": { "out": "65b9d:Skyrim.esm", "name": "Psijic Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Gloves", "open": false },
     "9bb:MoreCraftableEquipment.esp": { "out": "65b99:Skyrim.esm", "name": "Psijic Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Hats and hoods", "open": false },
     "9bc:MoreCraftableEquipment.esp": { "out": "65b94:Skyrim.esm", "name": "Psijic Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9bd:MoreCraftableEquipment.esp": { "out": "7bc15:Skyrim.esm", "name": "Redguard Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
-    "9be:MoreCraftableEquipment.esp": { "out": "7bc19:Skyrim.esm", "name": "Hammerfell Garb", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
-    "9c0:MoreCraftableEquipment.esp": { "out": "7bc1a:Skyrim.esm", "name": "Alik'r Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "9bd:MoreCraftableEquipment.esp": { "out": "7bc15:Skyrim.esm", "name": "Redguard Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "9be:MoreCraftableEquipment.esp": { "out": "7bc19:Skyrim.esm", "name": "Hammerfell Garb", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "9c0:MoreCraftableEquipment.esp": { "out": "7bc1a:Skyrim.esm", "name": "Alik'r Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": false },
     "9c1:MoreCraftableEquipment.esp": { "out": "106661:Skyrim.esm", "name": "Black Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": true },
     "9c2:MoreCraftableEquipment.esp": { "out": "83e:MoreCraftableEquipment.esp", "name": "Black Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "family": "Hats and hoods", "open": true },
     "9c3:MoreCraftableEquipment.esp": { "out": "107108:Skyrim.esm", "name": "Hooded Black Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
@@ -6274,39 +6274,33 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "9c7:MoreCraftableEquipment.esp": { "out": "824:MoreCraftableEquipment.esp", "name": "Greybeard's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Shoes and light boots", "open": false },
     "9c8:MoreCraftableEquipment.esp": { "out": "823:MoreCraftableEquipment.esp", "name": "Greybeard's Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "family": "Hats and hoods", "open": false },
     "9c9:MoreCraftableEquipment.esp": { "out": "822:MoreCraftableEquipment.esp", "name": "Greybeard's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9ca:MoreCraftableEquipment.esp": { "out": "65bac:Skyrim.esm", "name": "Thalmor Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
-    "9cb:MoreCraftableEquipment.esp": { "out": "65bb3:Skyrim.esm", "name": "Thalmor Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Gloves", "open": false },
-    "9cc:MoreCraftableEquipment.esp": { "out": "821:MoreCraftableEquipment.esp", "name": "Thalmor Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "9ca:MoreCraftableEquipment.esp": { "out": "65bac:Skyrim.esm", "name": "Thalmor Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "9cb:MoreCraftableEquipment.esp": { "out": "65bb3:Skyrim.esm", "name": "Thalmor Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Gloves", "open": false },
+    "9cc:MoreCraftableEquipment.esp": { "out": "821:MoreCraftableEquipment.esp", "name": "Thalmor Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Hats and hoods", "open": false },
     "9cd:MoreCraftableEquipment.esp": { "out": "81f:MoreCraftableEquipment.esp", "name": "Thalmor Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
     "9ce:MoreCraftableEquipment.esp": { "out": "820:MoreCraftableEquipment.esp", "name": "Hooded Thalmor Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9cf:MoreCraftableEquipment.esp": { "out": "88956:Skyrim.esm", "name": "Wedding Dress", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9cf:MoreCraftableEquipment.esp": { "out": "88956:Skyrim.esm", "name": "Wedding Dress", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
     "9d0:MoreCraftableEquipment.esp": { "out": "88958:Skyrim.esm", "name": "Wedding Sandals", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
     "9d1:MoreCraftableEquipment.esp": { "out": "8895a:Skyrim.esm", "name": "Wedding Wreath", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "9d2:MoreCraftableEquipment.esp": { "out": "d191f:Skyrim.esm", "name": "Tavern Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "9d2:MoreCraftableEquipment.esp": { "out": "d191f:Skyrim.esm", "name": "Tavern Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": true },
     "9dc:MoreCraftableEquipment.esp": { "out": "e739b:Skyrim.esm", "name": "Vaermina Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "family": "Robes and body wear", "open": false },
     "9dd:MoreCraftableEquipment.esp": { "out": "5cbfe:Skyrim.esm", "name": "General Tullius' Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Body armour", "open": false },
-    "9de:MoreCraftableEquipment.esp": { "out": "62303:Skyrim.esm", "name": "Ulfric's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9de:MoreCraftableEquipment.esp": { "out": "62303:Skyrim.esm", "name": "Ulfric's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
     "9df:MoreCraftableEquipment.esp": { "out": "6230b:Skyrim.esm", "name": "Ulfric's Armguards", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Gloves", "open": false },
-    "9e0:MoreCraftableEquipment.esp": { "out": "62311:Skyrim.esm", "name": "Ulfric's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "9e0:MoreCraftableEquipment.esp": { "out": "62311:Skyrim.esm", "name": "Ulfric's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Shoes and light boots", "open": false },
     "9ee:MoreCraftableEquipment.esp": { "out": "214eb:Skyrim.esm", "name": "Windhelm Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Shields", "open": false },
     "9f4:MoreCraftableEquipment.esp": { "out": "9f3:MoreCraftableEquipment.esp", "name": "Telvanni Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "family": "Robes and body wear", "open": false },
-    "9f5:MoreCraftableEquipment.esp": { "out": "c742:HearthFires.esm", "name": "Boy's Red Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
-    "9f6:MoreCraftableEquipment.esp": { "out": "c743:HearthFires.esm", "name": "Boy's Green Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
-    "9f7:MoreCraftableEquipment.esp": { "out": "c744:HearthFires.esm", "name": "Boy's Blue Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
-    "9f8:MoreCraftableEquipment.esp": { "out": "c745:HearthFires.esm", "name": "Boy's Grey Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
-    "9f9:MoreCraftableEquipment.esp": { "out": "c746:HearthFires.esm", "name": "Boy's Yellow Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
-    "9fa:MoreCraftableEquipment.esp": { "out": "d821:HearthFires.esm", "name": "Girl's Red Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
-    "9fb:MoreCraftableEquipment.esp": { "out": "d81f:HearthFires.esm", "name": "Girl's Green Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
-    "9fc:MoreCraftableEquipment.esp": { "out": "d81e:HearthFires.esm", "name": "Girl's Blue Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
-    "9fd:MoreCraftableEquipment.esp": { "out": "d820:HearthFires.esm", "name": "Girl's Grey Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
-    "9fe:MoreCraftableEquipment.esp": { "out": "d822:HearthFires.esm", "name": "Girl's Yellow Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other goods", "open": true },
+    "9f5:MoreCraftableEquipment.esp": { "out": "c742:HearthFires.esm", "name": "Boy's Red Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
+    "9f6:MoreCraftableEquipment.esp": { "out": "c743:HearthFires.esm", "name": "Boy's Green Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
+    "9f7:MoreCraftableEquipment.esp": { "out": "c744:HearthFires.esm", "name": "Boy's Blue Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
+    "9f8:MoreCraftableEquipment.esp": { "out": "c745:HearthFires.esm", "name": "Boy's Grey Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
+    "9f9:MoreCraftableEquipment.esp": { "out": "c746:HearthFires.esm", "name": "Boy's Yellow Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
+    "9fa:MoreCraftableEquipment.esp": { "out": "d821:HearthFires.esm", "name": "Girl's Red Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
+    "9fb:MoreCraftableEquipment.esp": { "out": "d81f:HearthFires.esm", "name": "Girl's Green Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
+    "9fc:MoreCraftableEquipment.esp": { "out": "d81e:HearthFires.esm", "name": "Girl's Blue Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
+    "9fd:MoreCraftableEquipment.esp": { "out": "d820:HearthFires.esm", "name": "Girl's Grey Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
+    "9fe:MoreCraftableEquipment.esp": { "out": "d822:HearthFires.esm", "name": "Girl's Yellow Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other goods", "open": true },
     "9ff:MoreCraftableEquipment.esp": { "out": "426c8:Skyrim.esm", "name": "Shiv", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "family": "Daggers", "open": false },
-    "15480:Thornswood-Content.esp": { "out": "15481:Thornswood-Content.esp", "name": "Poor Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": true },
-    "15486:Thornswood-Content.esp": { "out": "15482:Thornswood-Content.esp", "name": "Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": false },
-    "15487:Thornswood-Content.esp": { "out": "15484:Thornswood-Content.esp", "name": "Charcoal Briquette", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": false },
-    "15488:Thornswood-Content.esp": { "out": "15485:Thornswood-Content.esp", "name": "Coke", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": false },
-    "1548d:Thornswood-Content.esp": { "out": "e3c16:Skyrim.esm", "name": "Pickaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "family": "War axes", "open": true },
-    "1548e:Thornswood-Content.esp": { "out": "2f2f4:Skyrim.esm", "name": "Woodcutter's Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "family": "Other weapons", "open": true },
     "37668:ZIA_Complete Pack.esp": { "out": "3764f:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "family": "Helmets", "open": false },
     "3766f:ZIA_Complete Pack.esp": { "out": "335a2:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "family": "Helmets", "open": false },
     "3766e:ZIA_Complete Pack.esp": { "out": "d2846:Skyrim.esm", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "family": "Helmets", "open": false },
@@ -6630,7 +6624,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "3387:CommonClothes.esp": { "out": "1873:CommonClothes.esp", "name": "Mail and Jacket", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Body armour", "open": true },
     "3388:CommonClothes.esp": { "out": "1874:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Body armour", "open": true },
     "3389:CommonClothes.esp": { "out": "1875:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Body armour", "open": true },
-    "338a:CommonClothes.esp": { "out": "1875:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Body armour", "open": true },
+    "338a:CommonClothes.esp": { "out": "1875:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Body armour", "open": true },
     "338b:CommonClothes.esp": { "out": "1877:CommonClothes.esp", "name": "Oiled Mail Hauberk", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Body armour", "open": true },
     "338c:CommonClothes.esp": { "out": "1878:CommonClothes.esp", "name": "Oiled Mail and Jacket", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Body armour", "open": true },
     "43e8:CommonClothes.esp": { "out": "187a:CommonClothes.esp", "name": "Robed Iron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Body armour", "open": true },
@@ -6723,13 +6717,13 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "94b:YokuWeapons.esp": { "out": "f29:YokuWeapons.esp", "name": "Yokudan Lion-Robes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "family": "Body armour", "open": false },
     "94d:YokuWeapons.esp": { "out": "f3e:YokuWeapons.esp", "name": "Yokudan Brave-Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "family": "Helmets", "open": false },
     "92d4:FishingInSkyrim.esp": { "out": "92d3:FishingInSkyrim.esp", "name": "Dwemer Fire Paste", "type": "INGR", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "master", "family": "Ingredients", "open": true },
-    "800:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "12c7:Cloaks&Capes.esp", "name": "Linen Cape (Red)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "801:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2887:Cloaks&Capes.esp", "name": "Linen Cape (Blue)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "802:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2888:Cloaks&Capes.esp", "name": "Linen Cape (Green)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "803:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2889:Cloaks&Capes.esp", "name": "Linen Cape (Purple)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "804:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dec:Cloaks&Capes.esp", "name": "Linen Cape (Yellow)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "805:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dee:Cloaks&Capes.esp", "name": "Linen Cape (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "806:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2ded:Cloaks&Capes.esp", "name": "Linen Cape (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "800:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "12c7:Cloaks&Capes.esp", "name": "Linen Cape (Red)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "801:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2887:Cloaks&Capes.esp", "name": "Linen Cape (Blue)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "802:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2888:Cloaks&Capes.esp", "name": "Linen Cape (Green)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "803:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2889:Cloaks&Capes.esp", "name": "Linen Cape (Purple)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "804:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dec:Cloaks&Capes.esp", "name": "Linen Cape (Yellow)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "805:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dee:Cloaks&Capes.esp", "name": "Linen Cape (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "806:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2ded:Cloaks&Capes.esp", "name": "Linen Cape (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other armour and clothing", "open": false },
     "807:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "1d8e:Cloaks&Capes.esp", "name": "Fur Cloak (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "family": "Other armour and clothing", "open": false },
     "808:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2883:Cloaks&Capes.esp", "name": "Fur Cloak (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "family": "Other armour and clothing", "open": false },
     "809:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2884:Cloaks&Capes.esp", "name": "Fur Cloak (Brown)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "family": "Other armour and clothing", "open": false },
@@ -6744,12 +6738,18 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "813:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df7:Cloaks&Capes.esp", "name": "Stormcloak Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Other armour and clothing", "open": false },
     "814:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df8:Cloaks&Capes.esp", "name": "Winterhold Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Other armour and clothing", "open": false },
     "815:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df9:Cloaks&Capes.esp", "name": "Dawngaurd Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "816:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dfa:Cloaks&Capes.esp", "name": "College of Winterhold Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "816:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dfa:Cloaks&Capes.esp", "name": "College of Winterhold Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Other armour and clothing", "open": false },
     "817:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dfb:Cloaks&Capes.esp", "name": "Dark Brotherhood Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "family": "Other armour and clothing", "open": false },
     "818:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2def:Cloaks&Capes.esp", "name": "Leather Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "family": "Other armour and clothing", "open": false },
     "2de5:PlayFluteLuteDrum.esp": { "out": "287f:PlayFluteLuteDrum.esp", "name": "Drum", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "family": "Other weapons", "open": true },
     "1838:PlayFluteLuteDrum.esp": { "out": "d62:PlayFluteLuteDrum.esp", "name": "Flute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "family": "Other weapons", "open": true },
-    "2de4:PlayFluteLuteDrum.esp": { "out": "1d9b:PlayFluteLuteDrum.esp", "name": "Lute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "family": "Other weapons", "open": true }
+    "2de4:PlayFluteLuteDrum.esp": { "out": "1d9b:PlayFluteLuteDrum.esp", "name": "Lute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "family": "Other weapons", "open": true },
+    "15480:Thornswood-Content.esp": { "out": "15481:Thornswood-Content.esp", "name": "Poor Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": true },
+    "15486:Thornswood-Content.esp": { "out": "15482:Thornswood-Content.esp", "name": "Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": false },
+    "15487:Thornswood-Content.esp": { "out": "15484:Thornswood-Content.esp", "name": "Charcoal Briquette", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": false },
+    "15488:Thornswood-Content.esp": { "out": "15485:Thornswood-Content.esp", "name": "Coke", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": false },
+    "1548d:Thornswood-Content.esp": { "out": "e3c16:Skyrim.esm", "name": "Pickaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "family": "War axes", "open": true },
+    "1548e:Thornswood-Content.esp": { "out": "2f2f4:Skyrim.esm", "name": "Woodcutter's Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "family": "Other weapons", "open": true }
   };
 
   // ==== end RECIPES_BY_ID ====
@@ -10718,11 +10718,11 @@ log('gamemode loaded:',
       if (!row || typeof row !== 'object') { continue; }
       var half = String(row.half || '').toLowerCase();
       if (!half) { continue; }
-      if (!P.has(out, half)) { out[half] = { total: 0, byRank: {}, families: [], famAt: {} }; }
+      if (!P.has(out, half)) { out[half] = { total: 0, byRank: {}, openByRank: {}, families: [], famAt: {} }; }
       var h = out[half];
       var fam = String(row.family || '') || HALF_MAKES_NOTHING_UNKNOWN;
       if (!P.has(h.famAt, fam)) {
-        h.famAt[fam] = { name: fam, total: 0, byRank: {} };
+        h.famAt[fam] = { name: fam, total: 0, byRank: {}, openByRank: {} };
         h.families.push(h.famAt[fam]);
       }
       var f = h.famAt[fam];
@@ -10732,6 +10732,39 @@ log('gamemode loaded:',
       f.total++;
       h.byRank[rk] = (P.has(h.byRank, rk) ? h.byRank[rk] : 0) + 1;
       f.byRank[rk] = (P.has(f.byRank, rk) ? f.byRank[rk] : 0) + 1;
+      /*
+        AND THE SAME COUNT AGAIN OVER THE ROWS SKYRIM WILL ACTUALLY LIST. Added
+        21 September. Every row above carries open, written by
+        tools\Build-RecipeTable.ps1 and documented in the block header: open is
+        true when the recipe carries no condition of its own, and a row with
+        open false needs an item, a spell or a vanilla perk first, which
+        Skyrim's own crafting menu decides on the machine in front of the
+        person before the server is ever asked. This loop ignored it, and the
+        panel's "open to you right now" was counting rows nobody will ever be
+        offered.
+
+        Measured against the shipped table on 21 September, joined to the needs
+        lists in tools\recipes.json:
+          a fresh Hearthcook at novice: 49 rows at or under the rank, 48 of
+            them behind a HasPerk condition for a perk nobody here can hold,
+            so 1 is real and the bar read 49
+          a Cook/Confectioner at novice: 7 rows, all 7 behind two vanilla
+            perks, so 0 are real and the column read 7 of 28
+          an Enchanter/Bladebinder at master: 161 rows, 160 behind a HasSpell
+            the server itself evaluates and 1 behind the Aetherium Crest, so 0
+            are real and the column read 161 of 161
+        tools\recipes.json already said all three in as many words under
+        behindAVanillaPerk and nothingToMakeOnDayOne. The panel was the only
+        thing disagreeing with it.
+
+        byRank is kept beside it rather than replaced, because the difference
+        between the two is what is waiting on a condition, and that number is
+        worth a sentence on the page instead of a silence.
+      */
+      if (row.open === true) {
+        h.openByRank[rk] = (P.has(h.openByRank, rk) ? h.openByRank[rk] : 0) + 1;
+        f.openByRank[rk] = (P.has(f.openByRank, rk) ? f.openByRank[rk] : 0) + 1;
+      }
     }
     bookIndex = out;
     return out;
@@ -10780,23 +10813,47 @@ log('gamemode loaded:',
     var idx = recipeIndex() || {};
     var got = P.has(idx, key) ? idx[key] : null;
     var out = { key: key, name: nameOf(key), how: how, rank: rank,
-                open: 0, total: got ? got.total : 0, families: [] };
+                open: 0, locked: 0, total: got ? got.total : 0, families: [] };
     if (!got || !got.total) {
       out.why = P.has(HALF_MAKES_NOTHING, key) ? HALF_MAKES_NOTHING[key] : HALF_MAKES_NOTHING_UNKNOWN;
       return out;
     }
-    out.open = openUpTo(got.byRank, rank);
+    /*
+      TWO NUMBERS AND NOT ONE. open is what the crafting menu will list for
+      somebody standing at this rank: rows at or under the rank that carry no
+      condition. locked is the rest of what the rank reaches, every one of them
+      waiting on an item, a spell or a vanilla perk that Skyrim checks before
+      the server is asked. Counting the two together as open is what made the
+      panel promise a new Hearthcook 49 recipes when 1 of them could be made.
+    */
+    out.open = openUpTo(got.openByRank, rank);
+    out.locked = openUpTo(got.byRank, rank) - out.open;
     for (var i = 0; i < got.families.length; i++) {
       var f = got.families[i];
-      var open = openUpTo(f.byRank, rank);
+      var open = openUpTo(f.openByRank, rank);
       if (!open) { continue; }
-      out.families.push({ name: f.name, open: open, total: f.total });
+      out.families.push({ name: f.name, open: open, total: f.total,
+                          locked: openUpTo(f.byRank, rank) - open });
     }
     out.families.sort(function (a, b) { return b.open - a.open; });
     if (!out.open) {
-      var rung = lowestRungWithWork(got.byRank);
-      out.why = 'Nothing in this half is open to you yet. The cheapest thing it makes is ' +
-                rankName(rung) + ' work, and rank comes from doing the work.';
+      /*
+        WHICH OF THE TWO WALLS IT IS, because they are not the same answer and
+        the old sentence gave the rank one to both. A Confectioner at novice has
+        7 rows on their own rung and cannot make one of them: telling that
+        person the cheapest thing their half makes is novice work, and that rank
+        comes from doing the work, is telling them to climb a ladder that is not
+        in their way.
+      */
+      if (out.locked > 0) {
+        out.why = 'Your rank reaches ' + out.locked + ' of these and Skyrim will not list one of them. ' +
+                  'Each carries a condition of its own, a perk or a spell or something you have to be ' +
+                  'holding, and the crafting menu decides that before the server is asked.';
+      } else {
+        var rung = lowestRungWithWork(got.byRank);
+        out.why = 'Nothing in this half is open to you yet. The cheapest thing it makes is ' +
+                  rankName(rung) + ' work, and rank comes from doing the work.';
+      }
     }
     return out;
   }

@@ -387,7 +387,7 @@ $PRODUCE_A_SCRIPT_MUST_OPEN = ' \(\d+\)$'
 # Thornswood placed for them. Nobody decided that. This is the check that stops
 # the next FLOR or TREE this server places from being reclassified the same
 # quiet way.
-$STATIONS_FILE = Join-Path $PSScriptRoot 'thornswood-src\stations.json'
+$STATIONS_FILE = Join-Path $PSScriptRoot 'stations.json'
 #
 # ------------------------------------------------------ the fish knobs ------
 #

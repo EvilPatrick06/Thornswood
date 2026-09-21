@@ -241,7 +241,15 @@
     */
     recipes: {
       title: 'Recipe book',
-      lead: 'What you can make right now, by the kind of thing it is. Your own half up to your rank, the novice work of your sister half, and the novice work of anything a Master taught you.',
+      /*
+        The lead names the rule and not a rank. It said "the novice work of
+        your sister half" until 21 September, which is the same wrong copy
+        howYouHoldIt was keeping: a sister half climbs when a Master of it
+        takes somebody on, and the server sends the rank it actually holds
+        them at. Each column says how far its own half goes, read off what
+        arrived, so this line has no business naming a rung.
+      */
+      lead: 'What you can make right now, by the kind of thing it is. Your own half, your sister half, and anything a Master taught you, each as far as your rank in it reaches. Recipes Skyrim keeps behind a perk, a spell or something you have to be holding are not counted as open.',
       rows: []   // the server sends the halves and their families
     },
     home: {
@@ -597,14 +605,41 @@
     return out;
   }
   /*
-    The one line under a half's name saying why it is yours, and what that
-    costs. The two novice ceilings are the rulebook's and are said out loud,
-    because "24 of 302" under a sister half with no explanation reads as a
-    page that is broken rather than a rule that is working.
+    The one line under a half's name saying why it is yours, and how far it
+    goes. "24 of 302" under a sister half with no explanation reads as a page
+    that is broken rather than a rule that is working, so the rule is said.
+
+    IT READS THE RANK THE SERVER SENT AND NEVER A CEILING OF ITS OWN. Until
+    21 September this said "Its novice work is yours for nothing, and no
+    further" whatever the server sent, which was a second copy of a rule the
+    server deliberately refused to keep. tools\gamemode.js bookView sends each
+    half at P.rankOf, and the comment over that line says why in as many words:
+    rankUp lets a sister half climb when a Master of it takes the person on, so
+    writing novice into the reader would be wrong for the one character the
+    rule was written for. The client kept the copy anyway.
+
+    What it looked like: a Smith/Edgewright whose Master Platewright took them
+    on has ranks.platewright advanced, and the server sends
+    { how: 'sister', rank: 'advanced', open: 415, total: 771 }. The column drew
+    the tag "Advanced", then "Its novice work is yours for nothing, and no
+    further", then "415 of 771 open", three lines in a row that cannot all be
+    true, and the middle one told somebody who had earned advanced sister work
+    that they did not have it.
   */
-  function howYouHoldIt(how) {
-    if (how === 'sister') { return 'Your sister half. Its novice work is yours for nothing, and no further.'; }
-    if (how === 'taught') { return 'Taught to you by a Master of another profession. Novice work, and it never goes past it.'; }
+  function howYouHoldIt(how, rank) {
+    var at = RANK_NAMES[rank] || (rank ? cap(String(rank)) : 'Novice');
+    if (how === 'sister') {
+      if (rank && rank !== 'novice') {
+        return 'Your sister half. A Master of it took you on, so it is yours up to ' + at + '.';
+      }
+      return 'Your sister half. Its novice work is yours for nothing, and it goes further only if a Master of it takes you on.';
+    }
+    if (how === 'taught') {
+      if (rank && rank !== 'novice') {
+        return 'Taught to you by a Master of another profession, and yours up to ' + at + '.';
+      }
+      return 'Taught to you by a Master of another profession. Novice work, and it never goes past it.';
+    }
     return 'Your own half. It opens as your rank climbs.';
   }
 
@@ -1238,13 +1273,28 @@
     }
     // The one line over the columns: what the whole book adds up to. A person
     // opening this wants the number before they want the breakdown.
-    var open = 0, total = 0;
-    halves.forEach(function (h) { open += Number(h.open) || 0; total += Number(h.total) || 0; });
+    var open = 0, total = 0, locked = 0;
+    halves.forEach(function (h) {
+      open += Number(h.open) || 0;
+      total += Number(h.total) || 0;
+      locked += Number(h.locked) || 0;
+    });
     var bar = el('div', 'spellbar');
     bar.appendChild(el('div', 'spellpts', total
       ? open + ' of ' + total + ' open to you right now'
       : 'Nothing in your halves is made from a recipe'));
-    bar.appendChild(el('div', 'spellnote', 'Rank comes from doing the work.'));
+    /*
+      The rows your rank reaches that Skyrim will not list, said out loud. The
+      server counts them as locked: a recipe carrying a perk, a spell or an
+      item condition of its own, which the crafting menu evaluates on this
+      machine before the server is ever asked. Without this line a new
+      Hearthcook sees "1 of 112" with nothing saying where the other 48 rows
+      on their own rung went, and reads the page as broken.
+    */
+    bar.appendChild(el('div', 'spellnote', locked
+      ? 'Rank comes from doing the work. ' + locked +
+        ' more are at your rank and held behind a perk, a spell or something you have to be holding.'
+      : 'Rank comes from doing the work.'));
     elBody.appendChild(bar);
 
     var cols = el('div', 'cols bookcols' + (halves.length > 2 ? ' wide' : ''));
@@ -1255,7 +1305,7 @@
       // same place the spell book puts a school's rank.
       if (h.rank) head.appendChild(el('span', 'tag dim', RANK_NAMES[h.rank] || cap(h.rank)));
       col.appendChild(head);
-      col.appendChild(el('div', 'bookhow', howYouHoldIt(String(h.how || 'own'))));
+      col.appendChild(el('div', 'bookhow', howYouHoldIt(String(h.how || 'own'), String(h.rank || ''))));
       var fams = Array.isArray(h.families) ? h.families : [];
       if (!fams.length) {
         col.appendChild(el('p', 'bookwhy', h.why ||
