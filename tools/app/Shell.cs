@@ -64,7 +64,7 @@ namespace Thornswood
         static DateTime playStartedAt;
 
         // An update published while the game runs. The check that runs every
-        // two minutes during play notices it; five minutes after it is first
+        // thirty seconds during play notices it; four and a half minutes after it is first
         // seen the game is closed so the launcher can install it, which is
         // what the server's own five minute warning has been counting down
         // to. The server's kick by itself did nothing: the client reconnects
@@ -1417,8 +1417,11 @@ namespace Thornswood
                     // Who was picked at the game's menu, every tick. One file
                     // read, and nothing when the file says what it said last.
                     PollChoice();
-                    // Every sixtieth two second tick, so every two minutes.
-                    if (++inPlayTicks >= 60) { inPlayTicks = 0; CheckUpdatesInPlay(); }
+                    // Every fifteenth two second tick, so every thirty
+                    // seconds: a pack is seen within half a minute of going
+                    // out, and the close below lands on the server's own
+                    // countdown rather than minutes after it.
+                    if (++inPlayTicks >= 15) { inPlayTicks = 0; CheckUpdatesInPlay(); }
                     return;
                 }
                 playing = false;
@@ -4252,10 +4255,16 @@ namespace Thornswood
                         if (updateSeenAt == DateTime.MinValue)
                         {
                             updateSeenAt = DateTime.Now;
-                            Log("An update went out while you were playing (" + what + "). The server is telling everybody the same. In five minutes the game closes so the launcher can install it.");
+                            Log("An update went out while you were playing (" + what + "). The server is telling everybody the same. When its countdown ends, in about four and a half minutes, the game closes so the launcher can install it.");
                             return;
                         }
-                        if ((DateTime.Now - updateSeenAt).TotalMinutes < 5) return;
+                        // Ship tells the server five minutes right after the
+                        // pack goes out, and the pack is seen within thirty
+                        // seconds of that, so four and a half minutes from
+                        // first sight is the server's zero, give or take the
+                        // poll. Nobody is left in a world the room has moved
+                        // past: the server says out, and the game goes.
+                        if ((DateTime.Now - updateSeenAt).TotalMinutes < 4.5) return;
                         if (!Checks.GameRunning()) return;
                         closedForUpdate = true;
                         Log("Closing the game for the update (" + what + ").");
