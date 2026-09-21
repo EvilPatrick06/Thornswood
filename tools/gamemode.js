@@ -1794,6 +1794,89 @@ function mineOre(actorId, refrId, baseDesc) {
  * rank now, where it used to be the woodcutting manual's tier. 'Each rank
  * opens more of what you are able to make.'
  */
+/*
+  THE CHOPPING BLOCKS. THE WOODWRIGHT'S VERB, AND THE ONLY ONE THEY HAVE.
+
+  Patrick, 21 September, correcting an earlier attempt of mine that overrode all
+  three of these records into crafting benches: "The chopping block shouldn't be
+  a bench just for getting the firewood and not usable by non woodworkers and
+  also have the animation script". So the plugin does not touch them at all, the
+  records stay Bethesda's, and the whole of this is server side.
+
+  THE THREE RECORDS, read out of Skyrim.esm on 21 September rather than
+  remembered. All three are FURN with WBDT 00ff, which is 'not a bench', which is
+  why standing at one has never opened anything:
+
+    0x07022E  WoodChoppingBlock          the common one
+    0x0A91BF  WoodChoppingBlockSnow      the same block in the snow regions
+    0x10F575  WoodChoppingBlockCOPY0000  a stray duplicate, and the one that is
+                                         missing FurnitureWoodChoppingBlock
+
+  All three are here because a person cannot tell one chopping block from
+  another, which is the same reason TOOLS.farmer accepts both shovels.
+
+  WHY IT IS THE WOODWRIGHT'S AND NOT THE WOODWORKER'S. The kiln gates on
+  'charburner' and a Woodwright gets its novice grade for nothing, because 'you
+  get the novice work of your sister half for nothing'. This is that rule the
+  other way round: the block is the Woodwright's and a Charburner may chop at
+  novice. Until today the Woodwright had no verb and no bench in the entire load
+  order, so half of the Woodworker was a title with nothing behind it.
+*/
+const CHOPPING_BLOCKS = ['7022e:Skyrim.esm', 'a91bf:Skyrim.esm', '10f575:Skyrim.esm'];
+
+/** True when this base is one of the three chopping blocks. */
+function isChoppingBlock(baseDesc) {
+  for (let i = 0; i < CHOPPING_BLOCKS.length; i++) {
+    if (CHOPPING_BLOCKS[i] === baseDesc) { return true; }
+  }
+  return false;
+}
+
+/**
+ * A chopping block: firewood out, and nothing in. The Woodwright's verb.
+ *
+ * NOT a bench and not a crafting menu. Patrick, 21 September: it is "just for
+ * getting the firewood and not usable by non woodworkers". So it is answered
+ * here the way the quarry and the kiln are, and the three records in Skyrim.esm
+ * are left exactly as Bethesda wrote them. See CHOPPING_BLOCKS.
+ *
+ * THE YIELD RISES WITH THE RANK, the same shape mineSalt uses, because the whole
+ * of the wood chain hangs off this: firewood is what the kiln burns and what a
+ * handle is cut from, so a Master Woodwright supplying a village has to be worth
+ * more per swing than a novice. One to two at novice, up to one to five at
+ * Master.
+ *
+ * THE AXE IS ASKED FOR under the profession rather than the half, which is what
+ * the kiln does and for the same reason: both halves of the Woodworker are
+ * woodworkers and neither of them chops wood without an axe. It also means the
+ * axe wears here, which is the point of a tool that breaks: the trade that uses
+ * it hardest is the one that buys the most of them.
+ */
+function chopWood(actorId, refrId) {
+  const half = halfGate(actorId, 'woodwright', 'novice',
+    'A chopping block is a woodworker\'s. Only a woodworker who took Woodwright can ' +
+    'work one, and a charburner gets the novice yield. Ask one.');
+  if (half) return half;
+
+  const tool = toolGate(actorId, 'woodworker');
+  if (tool) return tool;
+
+  const wait = cooldownLeft(actorId, refrId);
+  if (wait > 0) return 'You have only just worked this block. ' + wait + ' seconds.';
+
+  const step = rankStep(actorId, 'woodwright');
+  const yielded = randInt(1, 2 + step);
+  if (!addItem(actorId, ITEMS.firewood, yielded)) {
+    return 'The block gives up firewood and there is nothing in this load order to ' +
+           'put in your hands. Say so in the dev channel.';
+  }
+  stampCooldown(actorId, refrId);
+  const rank = creditWork(actorId, 'woodwright');
+  const worn = wearTool(actorId, 'woodworker');
+  return 'You split ' + yielded + ' firewood.' + (rank ? ' ' + rank : '') +
+         (worn ? ' ' + worn : '');
+}
+
 function burnCharcoal(actorId, refrId) {
   const half = halfGate(actorId, 'charburner', 'novice',
     'A kiln is a charburner\'s. Only a woodworker who took Charburner can run one, ' +
@@ -4808,6 +4891,11 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   let message = null;
   if (baseDesc === STATIONS.saltQuarry) message = mineSalt(casterRefrId, refrId);
   else if (baseDesc === STATIONS.charcoalKiln) message = burnCharcoal(casterRefrId, refrId);
+  // The three chopping blocks. Before the STATIONS branches would not matter,
+  // because these are not ours, but before the FURN fallthrough further down
+  // very much does: a chopping block is a FURN, and a FURN that reaches
+  // ProcessActivateNormal sits the person down on it.
+  else if (isChoppingBlock(baseDesc)) message = chopWood(casterRefrId, refrId);
   else if (SHRINES[baseDesc]) message = bless(casterRefrId, baseDesc);
   // A crop always falls through to the return false at the bottom, whatever
   // farmActivate answered. ProcessActivateNormal in the engine reads the produce
