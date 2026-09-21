@@ -3968,7 +3968,24 @@ namespace Thornswood
             try
             {
                 Standing st = Discord.Join(id);
-                if (st.Ok) { Log("checked character " + id + " in with thornswood.net"); return; }
+                // PresenceLog and not Log, and the difference is the whole bug.
+                //
+                // This runs on a pool thread. Log writes txtStatus.Text
+                // straight, which is a WPF object, so off the window's thread
+                // it throws "The calling thread cannot access this object
+                // because a different thread owns it". PresenceLog is the same
+                // line put through win.Dispatcher, which is why the other two
+                // calls below use it.
+                //
+                // WHAT A PLAYTESTER SAW, 21 September: the throw landed in the
+                // catch below, and the catch reports with PresenceLog, which
+                // works. So the status bar read "Could not check profile
+                // 1893288986 in with thornswood.net: The calling thread cannot
+                // access this object because a different thread owns it" on a
+                // check in that had SUCCEEDED. st.Ok was true and the site had
+                // said yes. The launcher was telling somebody it had failed to
+                // do the thing it had just done.
+                if (st.Ok) { PresenceLog("checked character " + id + " in with thornswood.net"); return; }
                 string why = st.Message != null && st.Message.Length > 0 ? st.Message : st.Why;
                 PresenceLog("Could not check profile " + id + " in with thornswood.net: " + why);
             }
