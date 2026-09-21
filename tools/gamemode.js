@@ -12200,6 +12200,77 @@ log('gamemode loaded:',
     What the panel is told. Not the whole state: the panel marks what is
     yours and shows rank and points, and nothing on the client needs more.
   */
+  /*
+    THE PROPERTY PAGE, and it only exists once somebody has something on it.
+
+    Patrick, 21 September: "for non stewards once they claim a house or have a
+    key to a house a property button should appear in the K menu that lists the
+    Properties and wether they own them or not".
+
+    So it is two lists in one, and the row says which it is. A place you hold is
+    yours; a place you carry a key to is not, and saying so plainly is the point
+    of the page. Somebody with neither gets no page at all, which is what makes
+    the button appear rather than sit there empty.
+
+    A KEY IS READ OUT OF THE PACK, not out of a register, because there is no
+    register of keys and deliberately so: keys are given away and pickpocketed
+    with nobody telling the server. That means this walks the pack once per
+    draw, which is why it stops at the first page's worth: somebody carrying
+    forty keys is a locksmith, and a list of forty is not a page anybody reads.
+
+    STEWARDS ARE NOT HERE. Patrick said "for non stewards", and an office holder
+    seeing every property in their hold is a different page with a different
+    question behind it. It is on the list and it is not this.
+  */
+  var PROPERTY_PAGE_MAX = 24;
+
+  function propertyView(actorId, profileId) {
+    var W = g.__thornswoodProperty;
+    if (!W || !W.holderOf) { return null; }
+    var rows = [], seen = {};
+    try {
+      var claims = W.claims();
+      for (var b in claims) {
+        if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+        var held = W.holderOf(b);
+        if (!held || held.by !== profileId) { continue; }
+        seen[b] = true;
+        rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked,
+                    keyed: W.holdsKey(actorId, b) });
+      }
+      // Then the places somebody let you into. A key to a building you already
+      // hold is not a second row: it is the same house and the row above says
+      // you carry a key to it.
+      var inv = null;
+      try { inv = mp.get(actorId, 'inventory'); } catch (e) { inv = null; }
+      var entries = (inv && inv.entries) || [];
+      var keyId = idOf(W.KEY);
+      for (var i = 0; i < entries.length && rows.length < PROPERTY_PAGE_MAX; i++) {
+        var e = entries[i];
+        if (!e || !(e.count > 0) || e.baseId !== keyId) { continue; }
+        var label = String(e.name || '');
+        for (var b2 in BUILDING_NAME) {
+          if (!Object.prototype.hasOwnProperty.call(BUILDING_NAME, b2)) { continue; }
+          if (label !== W.keyLabel(b2) || seen[b2]) { continue; }
+          seen[b2] = true;
+          var h2 = W.holderOf(b2);
+          rows.push({ name: W.nameOf(b2), mine: false, locked: !!(h2 && h2.locked),
+                      keyed: true, by: h2 ? h2.name : null });
+          break;
+        }
+      }
+    } catch (e) {
+      clog('the property page threw, so it is left off:', e);
+      return null;
+    }
+    if (!rows.length) { return null; }
+    rows.sort(function (a, b) {
+      if (a.mine !== b.mine) { return a.mine ? -1 : 1; }
+      return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+    });
+    return rows;
+  }
+
   function forPanel(s, creating) {
     if (!s) { return null; }
     var chargen = g.__thornswoodChargen;
@@ -12349,6 +12420,18 @@ log('gamemode loaded:',
     // Both travel in the one property so the panel never sees a half state.
     var chargen = g.__thornswoodChargen;
     var view = forPanel(s, !!(chargen && chargen.isChoosing(actorId)));
+    /*
+      The property page needs the actor and the profile, which forPanel is not
+      handed: it is given the rules state and the rules know nothing about
+      buildings. So it is added here, where both are in hand, and left off
+      entirely when there is nothing on it.
+    */
+    if (view && !view.creating) {
+      var pid = 0;
+      try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+      var held = propertyView(actorId, pid);
+      if (held) { view.property = held; }
+    }
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
     if (sending) {

@@ -971,6 +971,9 @@
     // Nothing in the recipe book is picked, marked or sent, so there is no
     // row for the arrow keys to walk. Left and right still move sections.
     if (section === 'recipes') return 0;
+    // Nothing on the property page is picked, marked or sent either. It is a
+    // list of what is already true.
+    if (section === 'property') return 0;
     return rows().length + (laterOffered(section) ? 1 : 0);
   }
   /* Another section: the top row, and the status line back to the hint. */
@@ -1019,6 +1022,15 @@
       The server sends nothing while creating, so the section is the world's.
     */
     if (recipeBook()) sections.splice(isMage() ? 2 : 1, 0, 'recipes');
+    /*
+      Property, last, and only once there is something on it. Patrick,
+      21 September: "once they claim a house or have a key to a house a property
+      button should appear in the K menu that lists the Properties and wether
+      they own them or not". The server leaves the page off entirely when
+      somebody holds nothing and carries no key, so the button appearing IS the
+      server having something to say. Nothing here decides it.
+    */
+    if (propertyRows().length) sections.push('property');
     if (sections.indexOf(section) < 0) section = sections[0];
     var n = countRows();
     if (rowAt >= n) rowAt = n ? n - 1 : 0;
@@ -1103,6 +1115,20 @@
       var m = markedCount();
       return { t: sp ? sp + ' to spend' : (m ? m + ' marked' : 'nothing yet'), c: sp ? 'need' : '' };
     }
+    if (sec === 'property') {
+      // Named pRows and pHeld rather than rows and mine on purpose: both of
+      // those are the module's own, var is hoisted to the top of the function,
+      // and a local of either name blanks out the line above that reads
+      // mine['class'] for every other section as well.
+      var pRows = propertyRows();
+      var pHeld = 0;
+      for (var pi = 0; pi < pRows.length; pi++) if (pRows[pi].mine) pHeld++;
+      var pKeys = pRows.length - pHeld;
+      if (!pRows.length) return { t: 'nothing yet', c: '' };
+      return { t: pHeld ? pHeld + ' held' + (pKeys ? ', ' + pKeys + ' keyed' : '')
+                        : pKeys + (pKeys === 1 ? ' key' : ' keys'),
+               c: pHeld ? 'set' : '' };
+    }
     if (sec === 'recipes') {
       // How many things you can make, added up over every half you stand in.
       // One number, because the section list is one line per section and the
@@ -1153,6 +1179,7 @@
     else if (section === 'home') drawHome();
     else if (section === 'spells') drawSpells();
     else if (section === 'recipes') drawRecipes();
+    else if (section === 'property') drawProperty();
     else if (section === 'review') drawReview();
     else drawTree();
   }
@@ -1263,6 +1290,67 @@
     Confectioner can bake nothing at all yet, so the server sends why and
     this draws it. Every one of those sentences is the server's.
   */
+  /*
+    THE PROPERTY PAGE.
+
+    Patrick, 21 September: it "lists the Properties and wether they own them or
+    not". So the row says which of the two it is in words rather than by a
+    colour somebody has to learn, and the ones you hold come first because they
+    are the ones you came here to look at.
+
+    Nothing on this page is picked and nothing is sent. It is a list of what is
+    already true, the same as the recipe book, so Confirm stays hidden and the
+    keyboard has no rows to walk.
+
+    THE SERVER DECIDES WHETHER THIS PAGE EXISTS AT ALL. It leaves the list off
+    when somebody holds nothing and carries no key, and the button in the nav is
+    drawn from whether the list arrived. There is nothing here that can put an
+    empty page in front of anybody.
+  */
+  function propertyRows() {
+    var rows = DATA && DATA.property;
+    return (rows && rows.length) ? rows : [];
+  }
+
+  function drawProperty() {
+    var pRows = propertyRows();
+    if (!pRows.length) {
+      elBody.appendChild(el('p', 'lead',
+        'You hold nothing and carry no keys. Open a door and say /claim: it costs nothing.'));
+      return;
+    }
+    var pHeld = 0;
+    for (var i = 0; i < pRows.length; i++) if (pRows[i].mine) pHeld++;
+    var pKeys = pRows.length - pHeld;
+
+    var bar = el('div', 'spellbar');
+    bar.appendChild(el('div', 'spellpts',
+      (pHeld ? pHeld + (pHeld === 1 ? ' property held' : ' properties held') : 'Nothing held') +
+      (pKeys ? ', ' + pKeys + (pKeys === 1 ? ' key carried' : ' keys carried') : '')));
+    bar.appendChild(el('div', 'spellnote',
+      'A place stays yours while you keep going into it. A key opens a door and ' +
+      'nothing more: it is the deed that says a place is yours, and whoever is ' +
+      'carrying that holds it.'));
+    elBody.appendChild(bar);
+
+    var wrap = el('div', 'cards');
+    pRows.forEach(function (r) {
+      var card = el('div', 'card' + (r.mine ? ' mine' : ' off'));
+      var name = el('div', 'name', String(r.name || 'somewhere'));
+      name.appendChild(el('span', 'tag', r.mine ? 'yours' : 'key only'));
+      card.appendChild(name);
+      card.appendChild(el('div', 'desc', r.mine
+        ? (r.locked ? 'Locked. Anybody without a key has to pick it.'
+                    : 'Unlocked. Say /lock at the door to turn it.') +
+          (r.keyed ? ' You are carrying a key to it as well.' : '')
+        : (r.by ? 'Held by ' + r.by + '. ' : 'Nobody holds it. ') +
+          (r.locked ? 'Your key opens the door.'
+                    : 'It is not locked, so your key is not needed yet.')));
+      wrap.appendChild(card);
+    });
+    elBody.appendChild(wrap);
+  }
+
   function drawRecipes() {
     var book = recipeBook();
     var halves = recipeHalves();
@@ -1560,7 +1648,8 @@
     var label = (!cr && section === 'spells') ? 'Learn' : 'Confirm';
     // The recipe book sends nothing, the same way the tree's plus buttons are
     // the tree's own sending, so neither carries a Confirm.
-    var showConfirm = cr ? section === 'review' : (section !== 'tree' && section !== 'recipes');
+    var showConfirm = cr ? section === 'review'
+      : (section !== 'tree' && section !== 'recipes' && section !== 'property');
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr]);
     if (key === footKey) return;
     footKey = key;
