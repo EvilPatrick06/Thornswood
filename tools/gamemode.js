@@ -13678,6 +13678,10 @@ log('gamemode loaded:',
         '/where prints your cell, position and facing. ' +
         '/plot says what is in the ground in front of you and whose farm it is, ' +
         '/plant sows it, and /claim takes the farm around the plot in front of you. ' +
+        'At a door you have just opened, /claim takes the building instead and hands ' +
+        'you the deed; /deed lists what you hold; /lock and /unlock turn the lock on ' +
+        'a place of yours. A smith says /mold at a door with the holder standing ' +
+        'there, and /key at a forge with the mold in hand. ' +
         '/roll is in the chat itself.' +
         (isPlaytester(profileId)
           ? ' /tp <place> moves you, and /tp on its own lists the places (' +
@@ -13701,7 +13705,8 @@ log('gamemode loaded:',
     // server at all, which means the voice service in front of it is not
     // holding slash lines back, which means the copy running up there is old.
     toProfile(profileId, 'No command called ' + word + '. ' +
-              'There is /ooc, /where, /plot, /plant, /claim, /tp <place> and /help.');
+              'There is /ooc, /where, /plot, /plant, /claim, /deed, /lock, /unlock, ' +
+              '/mold, /key, /tp <place> and /help.');
   }
 
   /*
