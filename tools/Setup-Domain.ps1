@@ -28,7 +28,16 @@ param(
   [string]$User = 'Administrator',
   [string]$Root = 'C:/Thornswood-Docs',
   [string]$CaddyDir = 'C:/Thornswood-Caddy',
-  [switch]$SkipDnsCheck
+  [switch]$SkipDnsCheck,
+  # Only register the Thornswood Web task and restart Caddy. Nothing is
+  # downloaded, no Caddyfile is written, no firewall rule is touched and the
+  # docs site is left alone.
+  #
+  # This exists because the task is registered only when it does not already
+  # exist, so changing the settings above in this file does nothing at all to
+  # a box that is already set up, and running the whole script to fix a task
+  # redoes the certificate and the firewall for no reason.
+  [switch]$TaskOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -73,7 +82,7 @@ function Remote($script) {
 }
 
 # ------------------------------------------------------------------- dns --
-if (-not $SkipDnsCheck) {
+if (-not $SkipDnsCheck -and -not $TaskOnly) {
   Write-Host "Checking where $Domain points..."
   $ips = @()
   foreach ($name in @($Domain, "www.$Domain")) {
@@ -96,6 +105,12 @@ if (-not $SkipDnsCheck) {
 $caddyWin = $CaddyDir.Replace('/','\')
 $rootWin  = $Root.Replace('/','\')
 $emailLine = if ($Email) { "`n`temail $Email" } else { '' }
+
+# Everything from here to the task block is the one time setup: fetching caddy,
+# writing the Caddyfile, opening 80 and 443, and moving the docs site onto
+# loopback. None of it needs doing again to change how the task is registered,
+# so -TaskOnly skips the lot.
+if (-not $TaskOnly) {
 
 Write-Host ''
 Write-Host 'Setting up Caddy on the VPS...'
@@ -163,6 +178,8 @@ Start-ScheduledTask -TaskName 'Thornswood Docs' -EA SilentlyContinue
 'docs restarted on loopback'
 "@ | ForEach-Object { "  $_" }
 
+}
+
 Write-Host ''
 Write-Host 'Starting Caddy...'
 Remote @"
@@ -170,17 +187,68 @@ Remote @"
 `$dir = '$caddyWin'
 `$exe = Join-Path `$dir 'caddy.exe'
 
+Stop-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue
 Get-Process caddy -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
 
+`$a = New-ScheduledTaskAction -Execute `$exe ``
+      -Argument 'run --config Caddyfile' -WorkingDirectory `$dir
+
+# TWO TRIGGERS. At startup, as before, and again every five minutes.
+#
+# On 21 September the site was down and stayed down. The task was Status Ready
+# with no caddy.exe at all, so nothing was crashing in a loop: it had stopped
+# and nothing was ever going to start it again, because a startup trigger fires
+# at startup. Nobody knew until two testers reported it as launcher faults,
+# because the launcher checks people in through the site and voice runs on the
+# same hostname.
+#
+# MultipleInstances IgnoreNew is what makes the five minute trigger safe: while
+# caddy is up the trigger does nothing at all, and it starts it when it is not.
+# Without it a second caddy is launched every five minutes and cannot have 443.
+#
+# RepetitionDuration is ten years rather than [TimeSpan]::MaxValue. MaxValue is
+# documented to mean indefinitely and is refused outright by some builds, and a
+# trigger that failed to register is exactly the silence this is fixing.
+`$boot  = New-ScheduledTaskTrigger -AtStartup
+`$again = New-ScheduledTaskTrigger -Once -At (Get-Date) ``
+      -RepetitionInterval (New-TimeSpan -Minutes 5) ``
+      -RepetitionDuration (New-TimeSpan -Days 3650)
+
+# The same settings the docs task beside this one already has, and for the
+# reasons written out in Deploy-Docs.ps1. THE EXECUTION TIME LIMIT IS THE ONE
+# THAT MATTERS and it is almost certainly why caddy stopped: the default stops
+# a task after three days, caddy is meant to run until the box goes down, and a
+# task the scheduler ends looks exactly like what was found, Ready with no
+# process and nothing in any crash log. Ten restarts rather than three for the
+# same reason the docs task has ten.
+`$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ``
+      -DontStopIfGoingOnBatteries -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 1) ``
+      -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable ``
+      -MultipleInstances IgnoreNew
+
 if (-not (Get-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue)) {
-  `$a = New-ScheduledTaskAction -Execute `$exe ``
-        -Argument 'run --config Caddyfile' -WorkingDirectory `$dir
-  `$t = New-ScheduledTaskTrigger -AtStartup
-  `$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ``
-        -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
-  Register-ScheduledTask -TaskName 'Thornswood Web' -Action `$a -Trigger `$t ``
+  Register-ScheduledTask -TaskName 'Thornswood Web' -Action `$a -Trigger @(`$boot, `$again) ``
     -Settings `$s -RunLevel Highest -User 'SYSTEM' | Out-Null
   'scheduled task created'
+} else {
+  # -Trigger and -Settings as well as -Action. An existing task keeps whatever
+  # it was first registered with, which is how this one kept three restarts and
+  # a three day limit through every run of this script that was meant to change
+  # them. Deploy-Docs.ps1 learned the same thing on its own task.
+  Set-ScheduledTask -TaskName 'Thornswood Web' -Action `$a -Trigger @(`$boot, `$again) ``
+    -Settings `$s | Out-Null
+  'scheduled task updated'
+}
+
+# Read back rather than assumed. Set-ScheduledTask is quiet about settings it
+# did not apply.
+`$chk = (Get-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue)
+if (`$chk) {
+  'task settings: restart count ' + `$chk.Settings.RestartCount +
+  ', execution time limit ' + (`$(if (`$chk.Settings.ExecutionTimeLimit -eq 'PT0S') { 'none' } else { `$chk.Settings.ExecutionTimeLimit })) +
+  ', multiple instances ' + `$chk.Settings.MultipleInstances
+  'triggers: ' + (`$chk.Triggers.Count) + ', repeating every ' +
+    (`$(if (`$chk.Triggers.Repetition.Interval) { `$chk.Triggers.Repetition.Interval -join ' ' } else { 'never' }))
 }
 
 Start-ScheduledTask -TaskName 'Thornswood Web'
