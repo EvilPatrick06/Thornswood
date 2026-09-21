@@ -8157,6 +8157,11 @@ log('gamemode loaded:',
     try { restartTick(); } catch (e) { log('restart tick threw:', e); }
   }, 1500);
 
-  console.log('[thornswood] chat commands running: /ooc, /where, /tp, /help, /restart, /pick, /spend');
+  // Typed out rather than derived, so it drifts. It had drifted: /plant,
+  // /claim and /plot were live and this line had never heard of them, and
+  // the one place anybody looks to see what a build answers to is this line
+  // in the log.
+  console.log('[thornswood] chat commands running: /ooc, /where, /tp, /help,',
+              '/restart, /pick, /spend, /plant, /claim, /plot');
 })();
 // ==== end thornswood chat commands ====
