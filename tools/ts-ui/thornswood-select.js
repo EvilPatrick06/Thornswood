@@ -111,7 +111,7 @@
     '#ts-select .make{font-size:26px;color:#e9d19b;margin-top:2px}',
     '#ts-select .sub{font-size:15px;line-height:1.5;color:rgba(228,217,191,.6);margin-top:8px;max-width:720px}',
     // the delete icon and the confirm strip
-    '#ts-select .bin{position:absolute;right:20px;top:20px;width:36px;height:36px;display:grid;place-items:center;border:1px solid rgba(198,170,109,.25);',
+    '#ts-select .bin{position:absolute;right:16px;top:16px;width:48px;height:48px;display:grid;place-items:center;border:1px solid rgba(198,170,109,.25);',
     'color:rgba(228,217,191,.55)}',
     '#ts-select .bin svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}',
     '#ts-select .confirm{position:absolute;inset:0;background:rgba(40,12,10,.96);display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 30px}',
@@ -247,6 +247,36 @@
 
   var BIN = '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 
+  /*
+    What the click meant is decided by where the mouse went DOWN, not by what
+    the click landed on.
+
+    Stopping the click at the bin is not enough, and Patrick found that the
+    hard way on 20 September: the delete icon stopped working and a press on
+    it played the character instead. A browser fires click on the nearest
+    common ancestor of what the mouse went down on and what it came up on, so
+    a press that starts on the bin's icon and ends one pixel outside it fires
+    the click on the slot, the bin's own handler never runs, and the slot
+    plays. The icon is 36 pixels of a card the size of the panel, the cursor
+    in the main menu is drawn by the game rather than by the page, and the
+    browser only hears about the pointer when it moves, so a press that drifts
+    is the normal case there rather than the odd one.
+
+    So every press through the page records where it started, and the slot
+    asks that question before it plays. Nothing here restyles on a mouse move,
+    which is the rule this page keeps: it listens, it does not paint.
+  */
+  var downOn = '';       // 'bin', 'confirm' or ''
+  var downSlot = -1;     // which slot the press started in
+
+  function partOf(node, cls) {
+    while (node && node !== root) {
+      if (node.className && (' ' + node.className + ' ').indexOf(' ' + cls + ' ') >= 0) return true;
+      node = node.parentNode;
+    }
+    return false;
+  }
+
   function draw() {
     elList.textContent = '';
     var list = slots();
@@ -274,7 +304,8 @@
         var bin = el('div', 'bin');
         bin.title = 'Forget this character';
         bin.innerHTML = BIN;
-        bin.onclick = function (ev) { ev.stopPropagation(); at = i; asking = e.id; draw(); };
+        bin.onmousedown = function (ev) { downOn = 'bin'; downSlot = i; if (ev.stopPropagation) ev.stopPropagation(); };
+        bin.onclick = function (ev) { if (ev.stopPropagation) ev.stopPropagation(); ask(i, e.id); };
         card.appendChild(bin);
         if (asking === e.id) {
           var strip = el('div', 'confirm');
@@ -283,12 +314,15 @@
           strip.appendChild(q);
           var b = el('div', 'b');
           var yes = el('div', 'btn2 danger', 'Forget');
-          yes.onclick = function (ev) { ev.stopPropagation(); forget(e.id); };
+          yes.onmousedown = function (ev) { downOn = 'confirm'; downSlot = i; if (ev.stopPropagation) ev.stopPropagation(); };
+          yes.onclick = function (ev) { if (ev.stopPropagation) ev.stopPropagation(); forget(e.id); };
           var no2 = el('div', 'btn2', 'Keep');
-          no2.onclick = function (ev) { ev.stopPropagation(); asking = 0; draw(); };
+          no2.onmousedown = function (ev) { downOn = 'confirm'; downSlot = i; if (ev.stopPropagation) ev.stopPropagation(); };
+          no2.onclick = function (ev) { if (ev.stopPropagation) ev.stopPropagation(); asking = 0; draw(); };
           b.appendChild(yes); b.appendChild(no2);
           strip.appendChild(b);
-          strip.onclick = function (ev) { ev.stopPropagation(); };
+          strip.onmousedown = function (ev) { downOn = 'confirm'; downSlot = i; if (ev.stopPropagation) ev.stopPropagation(); };
+          strip.onclick = function (ev) { if (ev.stopPropagation) ev.stopPropagation(); };
           card.appendChild(strip);
         }
       } else {
@@ -297,12 +331,33 @@
           ? 'A fresh face. You will wake in the creation hall and choose your class, your profession and your home there.'
           : 'The launcher minted no id for a new character. Press Play in the launcher again.'));
       }
-      // The click is the choice. The bin and the confirm strip stop the
-      // click before it gets here, so forgetting never plays.
-      card.onclick = function () { at = i; asking = 0; draw(); play(); };
+      /*
+        The click is the choice, unless the press started on the bin or in
+        the confirm strip. It can land here even then: see the note on
+        downOn at the top of the file.
+      */
+      card.onmousedown = function () { if (downOn === '') downSlot = i; };
+      card.onclick = function () {
+        var was = downOn, wasSlot = downSlot;
+        downOn = ''; downSlot = -1;
+        if (was === 'confirm') { return; }
+        if (was === 'bin') { ask(wasSlot < 0 ? i : wasSlot, null); return; }
+        at = i; asking = 0; draw(); play();
+      };
       elList.appendChild(card);
     });
     if (!sent) elStatus.textContent = '';
+  }
+
+  /* Put the confirm strip up on a slot, by index, and by id when it is known. */
+  function ask(i, id) {
+    var list = slots();
+    if (i < 0 || i >= list.length) return;
+    var e = list[i];
+    if (!e || !e.c) return;
+    at = i;
+    asking = id === null || id === undefined ? Number(e.c.profileId) || 0 : id;
+    draw();
   }
 
   function forget(id) {
