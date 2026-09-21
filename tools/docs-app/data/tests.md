@@ -50,8 +50,23 @@ Pass if you see townsfolk, wildlife, bandits or animals. Named quest characters 
 4. Equip a shield.
 5. Equip a cloak if you have one.
 6. Open your inventory and check everything is still worn.
+7. Quit all the way out to the desktop. Not to the main menu, all the way out.
+8. Start the launcher again, play, and load the same character.
+9. Before you touch anything, look at what you are wearing.
+10. Open your inventory and count what is in it.
 
-Pass if each piece went on and nothing came off by itself. If it fails, note which two items you were wearing, whether everything came off or some of it, and whether you could put it back on.
+Pass if each piece went on, nothing came off by itself, and you came back wearing
+exactly what you logged out in.
+
+Steps 7 to 10 are the ones that matter and this test went months without them. On
+20 September somebody rejoined, watched a stream of items appear in the corner as
+if they were being handed over, opened the pack and found it empty, and was
+standing there with no clothes on. Every step above 6 passed that day. A test that
+never logs out cannot see any of it, because the whole failure happens in the first
+second and a half after a character loads.
+
+If it fails, say which of the two it was: nothing worn, or nothing in the pack at
+all. Both are worth knowing separately.
 
 Grab `thornswood-front.log`.
 
@@ -61,6 +76,11 @@ Grab `thornswood-front.log`.
 2. Equip the spell.
 3. Cast it.
 4. Wait ten seconds and check it is still in your hand.
+5. Quit out to the desktop, come back in, and check it is still learned.
+
+Step 5 for the same reason as TEST 4: a spell the server did not itself grant used
+to be taken straight back off your hand, and the only way to see it is to leave and
+return.
 
 If it fails, name the spell and the mod.
 
