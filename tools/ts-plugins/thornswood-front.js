@@ -294,6 +294,7 @@
   let menuChosenId = 0;
   let menuChosenAt = 0;
   let menuSaidAt = 0;
+  let menuSaidTimes = 0;
   let menuGiveUpTold = false;
 
   function keepSayingChoice(now) {
@@ -316,6 +317,17 @@
     }
     if (now - menuSaidAt < MENU_SAY_EVERY) { return; }
     menuSaidAt = now;
+    menuSaidTimes++;
+    /*
+      Said out loud the first time and then every ten, because this log is the
+      only place anybody can see this working. On a machine where the client
+      was ready the choice is taken at once and none of these ever appear, so
+      a run that shows them is a run that would have been stuck before.
+    */
+    if (menuSaidTimes === 1 || menuSaidTimes % 10 === 0) {
+      log('menu: the client has not taken profile', menuChosenId, 'yet, saying it again',
+          '(' + menuSaidTimes + ')');
+    }
     T.js('try{window.skyrimPlatform.sendMessage("thornswood","select",' +
          menuChosenId + ');}catch(e){}');
   }
@@ -489,6 +501,7 @@
     menuChosenId = id;
     menuChosenAt = Date.now();
     menuSaidAt = Date.now();
+    menuSaidTimes = 0;
     T.js('try{window.thornswoodSelect&&window.thornswoodSelect.acked();}catch(e){}');
     // The list the launcher wrote for the page. Gone now, so the page
     // reload in the world (phase 0 below) does not bring the choice back.

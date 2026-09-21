@@ -134,6 +134,24 @@ if (block !== null) {
     yes('S4 a flag that throws still leaves it saying the choice',
         h.still() === 9);
   }
+
+  // S5: the retries are visible in the log, because that log is the only place
+  //     anybody can watch this work. A run where the client was ready shows
+  //     none of them at all, so a run that shows them is one that would have
+  //     been stuck before the fix.
+  {
+    const h = harness();
+    const t0 = 5000000;
+    h.chose(11, t0);
+    h.say(t0 + h.every + 1);
+    yes('S5 the first retry says so in the log',
+        h.logs.join(' ').indexOf('saying it again') !== -1);
+    const first = h.logs.length;
+    for (let i = 2; i <= 9; i++) { h.say(t0 + h.every * i + i); }
+    yes('S5 and the next eight stay quiet', h.logs.length === first);
+    h.say(t0 + h.every * 10 + 10);
+    yes('S5 and the tenth speaks up again', h.logs.length === first + 1);
+  }
 }
 
 // ---------------------------------------------------------------- structure
