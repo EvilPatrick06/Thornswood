@@ -41,12 +41,26 @@ namespace Thornswood
           So the question is no longer "has an update been found" but "has
           anything told us it is safe to play yet", and the answer starts as no.
           updateAnswered is what turns CHECKING into either PLAY or UPDATE
-          FIRST, and a check that cannot reach the source says so out loud and
-          then lets the game start, because a launcher that bricks itself when
-          GitHub hiccups is a worse failure than a launcher one release behind.
+          FIRST.
+
+          Decided by Patrick on 20 September: nobody plays on a build that is
+          not known to be current, on main or on dev. A check that cannot reach
+          the source used to say so and let the game start, on the argument
+          that a launcher that bricks itself when GitHub hiccups is worse than
+          one a release behind. It is the other way round for a playtest: a
+          release behind reports bugs fixed hours ago and desyncs everybody,
+          so the button stays shut with the reason on it and the check runs
+          again every thirty seconds until the source answers. Automatic
+          updates being off no longer skips the check either; it only means
+          the pack waits for the Install button instead of going in on its own.
+          The one case that still frees Play without an answer is a launcher
+          with no update source configured at all, which is a developer's own
+          build and never a tester's.
         */
         static bool updatePending = true;
         static bool updateAnswered;
+        static bool checkFailed;
+        static bool retryQueued;
         static DateTime playStartedAt;
 
         // An update published while the game runs. The check that runs every
@@ -368,12 +382,10 @@ namespace Thornswood
             if (DrawStatus()) Log("Ready."); else Log("Something needs attention before you can play.");
             AutoDisplayOnce();
             StartPing();
-            if (cfg.AutoUpdate && Updater.Enabled(cfg))
+            if (Updater.Enabled(cfg))
                 ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
             else
-                Unblock(Updater.Enabled(cfg)
-                        ? "automatic updates are switched off"
-                        : "there is no update source configured");
+                Unblock("there is no update source configured");
 
             /*
               Voice comes up with the launcher, not with the game.
@@ -1759,8 +1771,11 @@ namespace Thornswood
             }
             else if (updatePending && !playing)
             {
-                btnPlay.Content = updateAnswered ? "UPDATE FIRST" : "CHECKING...";
-                btnPlay.ToolTip = updateAnswered
+                btnPlay.Content = checkFailed ? "NO ANSWER FROM THE UPDATE SOURCE"
+                                : updateAnswered ? "UPDATE FIRST" : "CHECKING...";
+                btnPlay.ToolTip = checkFailed
+                    ? "The update source did not answer, so it is not known whether this build is current. Play stays shut until it answers; the check runs again every 30 seconds."
+                    : updateAnswered
                     ? "There is an update waiting. Install it and Play comes back."
                     : "Checking for updates before letting anybody in. A moment.";
             }
@@ -3736,7 +3751,19 @@ namespace Thornswood
                 // mod file, to everybody. Nothing here has to know about it.
                 psi.UseShellExecute = true;
                 Process.Start(psi);
-                Log("Starting the game.");
+                // Which pack this game runs on, in the line everybody pastes.
+                // Play is shut while a pack waits, but a feed that cannot be
+                // reached frees it (Unblock), so "on the right update" was a
+                // question until now and this makes it a line in the log.
+                string onPack = "no pack";
+                try
+                {
+                    var ids = new List<string>(Updater.Applied());
+                    ids.Sort(StringComparer.Ordinal);
+                    if (ids.Count > 0) onPack = "pack " + ids[ids.Count - 1];
+                }
+                catch { }
+                Log("Starting the game on launcher " + Updater.Version + ", " + onPack + ".");
 
                 // "Playing Thornswood" in Discord, with the headcount and the
                 // Download and Discord buttons, for as long as the game runs.
@@ -3987,17 +4014,36 @@ namespace Thornswood
             try
             {
                 VersionDoc v = Updater.Check(cfg);
-                if (v == null) { win.Dispatcher.BeginInvoke(new Action(delegate { Unblock("the update source had nothing to say"); })); return; }
+                if (v == null) { win.Dispatcher.BeginInvoke(new Action(delegate { CheckFailed("the update source had nothing to say"); })); return; }
                 win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); }));
             }
             catch (Exception ex)
             {
-                win.Dispatcher.BeginInvoke(new Action(delegate
-                {
-                    Log("Update check failed: " + ex.Message);
-                    Unblock("the check could not be made");
-                }));
+                string why = ex.Message;
+                win.Dispatcher.BeginInvoke(new Action(delegate { CheckFailed(why); }));
             }
+        }
+
+        /// <summary>
+        /// The source did not answer, so it is not known whether this build is
+        /// current, and Play stays shut with the reason on the button. One
+        /// retry is queued at a time, thirty seconds out.
+        /// </summary>
+        static void CheckFailed(string why)
+        {
+            checkFailed = true;
+            updatePending = true;
+            updateAnswered = true;
+            Log("Could not check for updates: " + why + ". Play stays shut until the update source answers; trying again in 30 seconds.");
+            DrawStatus();
+            if (retryQueued) return;
+            retryQueued = true;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                Thread.Sleep(30000);
+                retryQueued = false;
+                CheckUpdatesBackground(false);
+            });
         }
 
         /// <summary>
@@ -4016,6 +4062,7 @@ namespace Thornswood
 
         static void OnVersionDoc(VersionDoc v, bool loud)
         {
+            checkFailed = false;
             pendingDoc = v;
             bool install = installWhenSeen;
             installWhenSeen = false;
