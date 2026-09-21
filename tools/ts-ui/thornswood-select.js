@@ -12,7 +12,14 @@
   by default, three for a Patreon tier or a Gamemaster (the site decides and
   the launcher passes "slots"). A taken slot is the character's name, big,
   and under it the last location, the hours played and the last time, with a
-  delete icon. An empty slot prompts to make a new character. Then Play.
+  delete icon. An empty slot prompts to make a new character.
+
+  CLICK MEANS GO, Patrick later the same day: "if you click on one that's the
+  one you go to and doesn't require a confirm button at the bottom". A click
+  on a taken slot plays that character at once and a click on an empty slot
+  makes a new one at once; there is no Play bar. The keys stay: up, down or
+  a number lights a slot, Enter plays the lit one, Delete asks to forget it.
+  The slots are fixed by number too, see slots() below.
 
   The pick is one message, to skymp5-client rather than to our plugin:
 
@@ -116,12 +123,8 @@
     '#ts-select .btn2.danger{border-color:#e9a27a;color:#f6c9b0;background:rgba(120,40,30,.45)}',
     // the foot
     '#ts-select .foot{padding:16px 44px 30px}',
-    '#ts-select .status{font-size:15px;color:rgba(228,217,191,.7);min-height:1.5em;margin-bottom:12px}',
-    '#ts-select .playbar{display:block;width:100%;border:2px solid #e9d19b;padding:18px 20px;text-align:center;font-family:inherit;',
-    'font-size:20px;letter-spacing:.3em;text-transform:uppercase;background:#c6aa6d;color:#1b1205;',
-    'white-space:nowrap}',
-    '#ts-select .playbar.off{opacity:.35;pointer-events:none}',
-    '#ts-select .hint{font-size:13px;color:rgba(228,217,191,.45);margin-top:14px;text-align:center;letter-spacing:.06em}'
+    '#ts-select .status{font-size:15px;color:rgba(228,217,191,.7);min-height:1.5em;margin-bottom:12px;text-align:center}',
+    '#ts-select .hint{font-size:13px;color:rgba(228,217,191,.45);margin-top:4px;text-align:center;letter-spacing:.06em}'
   ].join('');
   var style = document.createElement('style');
   style.id = 'ts-select-css';
@@ -136,8 +139,8 @@
       '<div class="head"><div><div class="eyebrow">Thornswood</div><div class="title">Who are you today?</div></div>' +
       '<div class="count"></div></div>' +
       '<div class="list"></div>' +
-      '<div class="foot"><div class="status"></div><div class="playbar">Play</div>' +
-      '<div class="hint">Up and down, or a number, then Enter. Delete forgets the one that is lit.</div></div>' +
+      '<div class="foot"><div class="status"></div>' +
+      '<div class="hint">Click a character to play. Click an empty slot for a new character. Delete forgets the one that is lit.</div></div>' +
     '</div>';
   document.body.appendChild(root);
   var elPanel = root.querySelector('.panel');
@@ -167,7 +170,6 @@
   }
   var elCount = root.querySelector('.count');
   var elStatus = root.querySelector('.status');
-  var elPlay = root.querySelector('.playbar');
 
   function fit() {
     try { elPanel.style.transform = 'scale(' + scale().toFixed(3) + ')'; } catch (e) { }
@@ -200,31 +202,46 @@
   }
 
   /*
-    The slots, in order. A character sits in the slot the launcher numbered
-    it with; anything past the allowance still shows, because a character
-    that exists is not hidden over a role change. Empty slots up to the
-    allowance offer a new character.
-  */
-  /*
-    The stored slot number only orders the list. What is drawn is 1 to n for
-    the characters there are, then an empty card for each place left under
-    the allowance, and nothing past it. Drawing by the stored number showed
-    "1 empty, 2 empty, 3, 4, 5" on 20 September once two characters had been
-    forgotten and three new ones made, and offered a fourth and a fifth
-    character to an account with three slots.
+    The slots, fixed by the stored number. Slot n is the character the
+    launcher numbered n; every number from 1 to the allowance with nobody in
+    it is an empty card offering a new character; a character numbered past
+    the allowance is drawn after them, in number order, because a character
+    that exists is never hidden over a role change. Nothing is compacted or
+    renumbered here.
+
+    Patrick, 20 September: "when I deleted a character the slots moved, I
+    want each slot to stay as is and so slot 1 and 3 could have things in
+    them and slot 2 says make a new character". This page had switched to
+    drawing 1 to n for the characters there are, in slot order, earlier the
+    same day, because the stored numbers had climbed past the allowance (1
+    empty, 2 empty, 3, 4, 5 on a three slot account) and the page was
+    offering a fourth and a fifth. That is closed on the launcher side now:
+    NextSlot hands out the lowest free number and Slots.Tidy moves a
+    character down from above the allowance whenever a number under it is
+    free, before this list is written. A character with no number, or one
+    whose number another already holds, is drawn in the first empty slot
+    rather than lost; the launcher has written a number since the day the
+    file existed, so that is a hand edited file and nothing more.
   */
   function slots() {
-    var list = chars.slice();
-    list.sort(function (a, b) {
-      var sa = Number(a.slot) || 0, sb = Number(b.slot) || 0;
-      if (sa && sb && sa !== sb) return sa - sb;
-      if (sa && !sb) return -1;
-      if (!sa && sb) return 1;
-      return String(b.lastPlayed || '') < String(a.lastPlayed || '') ? -1 : 1;
+    var held = {};
+    var loose = [];
+    chars.forEach(function (c) {
+      var n = Number(c.slot) || 0;
+      if (n >= 1 && !held[n]) held[n] = c;
+      else loose.push(c);
     });
     var out = [];
-    list.forEach(function (c) { out.push({ n: out.length + 1, id: Number(c.profileId) || 0, c: c }); });
-    while (out.length < SLOTS) out.push({ n: out.length + 1, id: spare, c: null });
+    var n;
+    for (n = 1; n <= SLOTS; n++) {
+      var c = held[n] || loose.shift() || null;
+      out.push({ n: n, id: c ? (Number(c.profileId) || 0) : spare, c: c });
+    }
+    var beyond = [];
+    for (var k in held) { if (held.hasOwnProperty(k) && Number(k) > SLOTS) beyond.push(Number(k)); }
+    beyond.sort(function (a, b) { return a - b; });
+    beyond.forEach(function (m) { out.push({ n: m, id: Number(held[m].profileId) || 0, c: held[m] }); });
+    loose.forEach(function (c) { out.push({ n: out.length + 1, id: Number(c.profileId) || 0, c: c }); });
     return out;
   }
 
@@ -233,6 +250,7 @@
   function draw() {
     elList.textContent = '';
     var list = slots();
+    if (at >= list.length) at = Math.max(0, list.length - 1);
     var taken = list.filter(function (e) { return !!e.c; }).length;
     elCount.textContent = taken + ' of ' + SLOTS + ' slots';
     list.forEach(function (e, i) {
@@ -279,15 +297,11 @@
           ? 'A fresh face. You will wake in the creation hall and choose your class, your profession and your home there.'
           : 'The launcher minted no id for a new character. Press Play in the launcher again.'));
       }
-      card.onclick = function () { at = i; asking = 0; draw(); };
-      card.ondblclick = function () { at = i; play(); };
+      // The click is the choice. The bin and the confirm strip stop the
+      // click before it gets here, so forgetting never plays.
+      card.onclick = function () { at = i; asking = 0; draw(); play(); };
       elList.appendChild(card);
     });
-    var e2 = list[at];
-    if (!e2) elPlay.textContent = 'Play';
-    else if (e2.c) elPlay.textContent = 'Play as ' + (e2.c.name || 'this character');
-    else elPlay.textContent = 'Make a new character';
-    elPlay.className = 'playbar' + (sent || !e2 || !e2.id ? ' off' : '');
     if (!sent) elStatus.textContent = '';
   }
 
@@ -357,7 +371,6 @@
   }
   window.addEventListener('keydown', onKey, true);
   window.addEventListener('resize', fit);
-  elPlay.onclick = play;
 
   // ----------------------------------------------------------------- music --
   var audio = null;
