@@ -3766,7 +3766,12 @@ namespace Thornswood
                     if (ids.Count > 0) onPack = "pack " + ids[ids.Count - 1];
                 }
                 catch { }
-                Log("Starting the game on launcher " + Updater.Version + ", " + onPack + ".");
+                // The display mode rides along because Skyrim itself is known to
+                // go down on alt tab in exclusive fullscreen, and a crash report
+                // with no crash log needs this line to say which mode it was.
+                string mode = "";
+                try { mode = ", " + Display.Mode.ToLowerInvariant(); } catch { }
+                Log("Starting the game on launcher " + Updater.Version + ", " + onPack + mode + ".");
 
                 // "Playing Thornswood" in Discord, with the headcount and the
                 // Download and Discord buttons, for as long as the game runs.
