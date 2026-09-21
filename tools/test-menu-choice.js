@@ -146,6 +146,12 @@ if (block !== null) {
     h.say(t0 + h.every + 1);
     yes('S5 the first retry says so in the log',
         h.logs.join(' ').indexOf('saying it again') !== -1);
+    // The two flags remoteServer decides on are the whole diagnosis, so they
+    // have to be in the line somebody will be reading.
+    yes('S5 and the line carries the in-world flag',
+        h.logs.join(' ').indexOf('inWorld=') !== -1);
+    yes('S5 and the uncaused load count that the guard actually reads',
+        h.logs.join(' ').indexOf('uncausedLoads=') !== -1);
     const first = h.logs.length;
     for (let i = 2; i <= 9; i++) { h.say(t0 + h.every * i + i); }
     yes('S5 and the next eight stay quiet', h.logs.length === first);

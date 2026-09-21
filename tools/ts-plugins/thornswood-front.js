@@ -325,8 +325,32 @@
       a run that shows them is a run that would have been stuck before.
     */
     if (menuSaidTimes === 1 || menuSaidTimes % 10 === 0) {
+      /*
+        THE TWO FLAGS ARE THE WHOLE DIAGNOSIS, so they go in the line.
+
+        remoteServer.ts decides whether to load the world with
+        `alreadyInAGame = __thornswoodInWorld || __thornswoodUncausedLoad > 0`,
+        and when that is true it stands down and leaves the moving to the
+        other spawn path. At a real main menu there is no other path, so
+        nothing happens at all and the person sits there.
+
+        21 September: a tester picked a character, the server logged him
+        connected and put him in the creation hall correctly, and his own
+        machine never left the main menu. Everything up to that point was
+        provable from the server log and this one. That decision was not,
+        because nothing wrote either flag down.
+
+        uncaused is the count of game loads SkyrimPlatform did not ask for,
+        and po3_StartOnSave makes one on every launch that has a save to
+        load. If it reads above zero here, at a main menu, that guard is why
+        the world never came.
+      */
+      let inWorld = '?', uncaused = '?';
+      try { inWorld = String(!!globalThis.__thornswoodInWorld); } catch (e) { }
+      try { uncaused = String(Number(globalThis.__thornswoodUncausedLoad) || 0); } catch (e) { }
       log('menu: the client has not taken profile', menuChosenId, 'yet, saying it again',
-          '(' + menuSaidTimes + ')');
+          '(' + menuSaidTimes + ').',
+          'inWorld=' + inWorld, 'uncausedLoads=' + uncaused);
     }
     T.js('try{window.skyrimPlatform.sendMessage("thornswood","select",' +
          menuChosenId + ');}catch(e){}');
