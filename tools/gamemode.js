@@ -331,10 +331,20 @@ function resolveArrival(site) {
 }
 
 // ---------------------------------------------------------------------------
-// skill tracks
+// skill tracks, retired 20 September
 //
 // The manuals are plain BOOK records with no script attached, so reading one is
-// only a signal. The tier it grants is stored per person and gates yields.
+// only a signal. That signal used to be a tier per person per track, and the
+// tier gated the salt yield and the charcoal grade: a second progression system
+// running beside the rulebook's own ranks, for the same work, with different
+// numbers. classes.md has one ladder, 'rank comes from doing the work', so the
+// tiers no longer gate anything.
+//
+// What is left is the record of which manuals somebody has read, which is all
+// setSkill is for now: it answers 'is this the first time', so a manual counts
+// its hours once however often the book is opened. Nothing reads the number
+// back, which is why tierOf is gone. Reading a manual goes to the character
+// block, which counts it as work in the ladder the manual is about.
 // ---------------------------------------------------------------------------
 
 const SKILL_PROPERTY = 'thornswoodSkills';
@@ -369,17 +379,13 @@ function getSkills(actorId) {
   return s;
 }
 
+/** True the first time this manual is read, false every time after. */
 function setSkill(actorId, track, tier) {
   const s = getSkills(actorId);
-  if ((s[track] || 0) >= tier) return false;
+  if ((Object.prototype.hasOwnProperty.call(s, track) ? s[track] : 0) >= tier) return false;
   s[track] = tier;
   mp.set(actorId, SKILL_PROPERTY, s);
   return true;
-}
-
-function tierOf(actorId, track) {
-  const s = getSkills(actorId);
-  return s[track] || 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -436,30 +442,140 @@ function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-/** Salt quarry: tier gates the yield and the chance of the rarer salts. */
+// ---------------------------------------------------------------------------
+// the class and profession gates
+//
+// classes.md: each class owns a verb that nobody else in the game has, and
+// 'those are exclusive, not preferential'. Until 20 September nothing asked:
+// canDo existed in the rules block and not one caller called it, so a miner
+// picked flowers and a hunter worked a seam. Every place below that hands out
+// a yield asks first, and says who can when the answer is no.
+//
+// The three wrappers go through the character block rather than the rules
+// directly, because the character block is the only reader and writer of the
+// state. When that block is missing, which means the file loaded broken, the
+// gate is OPEN and says so in the log: a rules block that failed to register
+// must not be the reason nobody in the world can pick a flower.
+// ---------------------------------------------------------------------------
+
+/** null when this person may do that class verb, otherwise what to tell them. */
+function classGate(actorId, verb) {
+  const c = globalThis.__thornswoodCharacter;
+  if (!c || !c.gate) {
+    log('the character block is not loaded, so the', verb, 'gate is open');
+    return null;
+  }
+  try {
+    return c.gate(actorId, verb);
+  } catch (e) {
+    log('the', verb, 'gate threw, so it is open:', e);
+    return null;
+  }
+}
+
+/** The same for one half of a profession, at a rank. */
+function halfGate(actorId, half, rank, refusal) {
+  const c = globalThis.__thornswoodCharacter;
+  if (!c || !c.gateHalf) {
+    log('the character block is not loaded, so the', half, 'gate is open');
+    return null;
+  }
+  try {
+    return c.gateHalf(actorId, half, rank, refusal);
+  } catch (e) {
+    log('the', half, 'gate threw, so it is open:', e);
+    return null;
+  }
+}
+
+/**
+ * A yield has been handed out: count the work, and hand back the line about a
+ * new rank when one was reached. Anything going wrong here costs a count, not
+ * somebody's salt, so it is swallowed.
+ */
+function creditWork(actorId, key) {
+  const c = globalThis.__thornswoodCharacter;
+  if (!c || !c.credit) { return null; }
+  try {
+    return c.credit(actorId, key);
+  } catch (e) {
+    log('could not count', key, 'work for', actorId.toString(16) + ':', e);
+    return null;
+  }
+}
+
+/**
+ * The rank somebody holds in one class, half or school, as a step: 0 for a
+ * novice, 3 for a Master, and 0 when they hold nothing at all. The two
+ * stations size their yield by this now rather than by a manual tier.
+ */
+function rankStep(actorId, key) {
+  const c = globalThis.__thornswoodCharacter;
+  if (!c || !c.rankOf) return 0;
+  try {
+    const ranks = ['novice', 'advanced', 'expert', 'master'];
+    const at = ranks.indexOf(c.rankOf(actorId, key));
+    return at < 0 ? 0 : at;
+  } catch (e) {
+    log('could not read the', key, 'rank for', actorId.toString(16) + ':', e);
+    return 0;
+  }
+}
+
+/**
+ * Salt quarry: the miner's verb, and the miner's RANK sizes the yield.
+ *
+ * The mining manual used to gate this and set the yield. That was a second
+ * progression system beside the rulebook's own, and classes.md has only one:
+ * the class owns the verb and the rank comes from doing the work. So the
+ * manual no longer stands between anybody and a seam, and how much salt comes
+ * away follows the Miner rank that the seam itself is raising.
+ */
 function mineSalt(actorId, refrId) {
-  const tier = tierOf(actorId, 'mining');
-  if (tier < 1) return 'You need the Novice mining manual before you can work a quarry.';
+  // The class first, and before the cooldown: somebody who is not a miner is
+  // never going to work this seam, and a refusal that starts a cooldown is
+  // telling them the wrong thing about why.
+  const mine = classGate(actorId, 'mine');
+  if (mine) return mine;
+
+  const step = rankStep(actorId, 'miner');
 
   const wait = cooldownLeft(actorId, refrId);
   if (wait > 0) return 'The seam needs ' + wait + ' more seconds to be worth striking.';
 
-  const yielded = randInt(1, 1 + tier);
+  const yielded = randInt(1, 2 + step);
   if (!addItem(actorId, ITEMS.saltPile, yielded)) return 'The seam yields nothing you can carry.';
   stampCooldown(actorId, refrId);
   let extra = '';
-  if (tier >= 3 && Math.random() < 0.12 * (tier - 2)) {
+  if (step >= 2 && Math.random() < 0.12 * (step - 1)) {
     const rare = [ITEMS.fireSalts, ITEMS.frostSalts, ITEMS.voidSalts][randInt(0, 2)];
     addItem(actorId, rare, 1);
     extra = ' Something rarer came away with it.';
   }
-  return 'You work ' + yielded + ' salt from the seam.' + extra;
+  const rank = creditWork(actorId, 'mine');
+  return 'You work ' + yielded + ' salt from the seam.' + extra + (rank ? ' ' + rank : '');
 }
 
-/** Charcoal kiln: firewood in, graded charcoal out. Tier sets the grade. */
+/**
+ * Charcoal kiln: firewood in, graded charcoal out. The Charburner RANK sets
+ * the grade.
+ *
+ * NOT a class verb, and this is the one gate that is a profession's rather
+ * than a class's. classes.md gives the five classes loot, fish, gather, mine
+ * and farm, and nothing else; the kiln takes firewood somebody already has and
+ * turns it into charcoal, which is making rather than producing, and the
+ * rulebook puts it under Woodworker: 'Charburner, firewood through to coke'.
+ * So the question is canWork('charburner'), not canDo. A Woodwright answers
+ * yes at novice, because 'you get the novice work of your sister half for
+ * nothing', and gets the plain grade for the same reason: the grade is the
+ * rank now, where it used to be the woodcutting manual's tier. 'Each rank
+ * opens more of what you are able to make.'
+ */
 function burnCharcoal(actorId, refrId) {
-  const tier = tierOf(actorId, 'woodcutter');
-  if (tier < 1) return 'You need the Novice woodcutting manual before you can run a kiln.';
+  const half = halfGate(actorId, 'charburner', 'novice',
+    'A kiln is a charburner\'s. Only a woodworker who took Charburner can run one, ' +
+    'and a woodwright gets the plain grade. Ask one.');
+  if (half) return half;
 
   const wait = cooldownLeft(actorId, refrId);
   if (wait > 0) return 'The kiln is still burning. ' + wait + ' seconds.';
@@ -468,10 +584,12 @@ function burnCharcoal(actorId, refrId) {
   if (!takeItem(actorId, ITEMS.firewood, cost)) {
     return 'The kiln needs ' + cost + ' firewood.';
   }
-  const grade = ['charcoalT1', 'charcoalT1', 'charcoalT2', 'charcoalT3', 'charcoalT4'][tier] || 'charcoalT1';
+  const grade = ['charcoalT1', 'charcoalT2', 'charcoalT3', 'charcoalT4'][rankStep(actorId, 'charburner')] || 'charcoalT1';
   addItem(actorId, ITEMS[grade], 1);
   stampCooldown(actorId, refrId);
-  return 'The kiln yields ' + grade.replace('charcoalT', 'grade ') + ' charcoal.';
+  const rank = creditWork(actorId, 'charburner');
+  return 'The kiln yields ' + grade.replace('charcoalT', 'grade ') + ' charcoal.' +
+         (rank ? ' ' + rank : '');
 }
 
 // ---------------------------------------------------------------------------
@@ -1021,6 +1139,29 @@ function chargenTick() {
           log('login', actorId.toString(16), 'could not set a spawn point:', e);
         }
       }
+
+      /*
+        Every spell they have learned, back onto the character.
+
+        A blessing survives logging out because Actor.AddSpell records it on
+        the server and the list is re-sent on every spawn. A spell learned
+        through the panel is the same call and survives the same way, so this
+        is not what keeps it: this is what puts back the ones that were
+        learned on a build with no form id for them, and the ones lost with a
+        change form. AddSpell on a spell somebody already has does nothing, so
+        the cost is a call per spell per session.
+
+        This is the one per-session hook there is. It rides on the chargen
+        tick, so it goes with it if "thornswoodChargen": false is ever set in
+        server-settings.json; that is written down rather than worked around,
+        because a second timer over the same list is worse.
+      */
+      try {
+        const c = globalThis.__thornswoodCharacter;
+        if (c && c.grantKnown) { c.grantKnown(actorId); }
+      } catch (e) {
+        log('login', actorId.toString(16), 'could not put the known spells back:', e);
+      }
     }
     if (now - firstSeen.get(actorId) < SETTLE_MS) {
       continue;
@@ -1476,15 +1617,28 @@ mp.onRespawn = guard('onRespawn', function (actorId) {
 });
 
 /**
- * Reading a manual raises the track. Books are not consumed, so re-reading is
- * harmless and grants nothing twice.
+ * Reading a manual counts as hours in the ladder the manual is about. Books
+ * are not consumed, so re-reading is harmless and counts nothing twice: the
+ * old tier is kept only to answer 'is this the first time'.
+ *
+ * A manual about work this character does not do is simply read, and the
+ * character block says nothing. That is the honest answer to a mining book in
+ * the hands of somebody who is not a miner, and it is the whole of what the
+ * retired tier system does now.
  */
 mp.onReadBook = guard('onReadBook', function (actorId, baseId) {
   for (const d in MANUALS) {
     if (idOf(d) !== baseId) continue;
     const m = MANUALS[d];
-    if (setSkill(actorId, m.track, m.tier)) {
-      log('skill', actorId, m.track, '-> tier', m.tier);
+    if (!setSkill(actorId, m.track, m.tier)) return;
+    log('manual', actorId, m.track, 'read for the first time');
+    const c = globalThis.__thornswoodCharacter;
+    if (!c || !c.manual) return;
+    try {
+      const line = c.manual(actorId, m.track);
+      if (line) { notify(actorId, line); say(actorId, line); }
+    } catch (e) {
+      log('could not count the', m.track, 'manual for', actorId.toString(16) + ':', e);
     }
     return;
   }
@@ -1549,6 +1703,236 @@ const SHRINES = {
 };
 
 const HARVEST_COOLDOWN_MS = 600000;   // ten minutes, roughly a vanilla reloot
+
+/*
+  THE CROPS A FARM IS MADE OF, IN TWO HALVES: what the game files say, and what
+  this server decides. They were one table until 20 September and that is what
+  went wrong with it, which is written out below rather than left to be found.
+
+  THE FIRST HALF IS MEASURED, AND IT IS GENERATED. Everything between the two
+  markers below is written by the crops pass in tools\Build-HarvestTable.ps1,
+  out of the same FLOR and TREE records that built tools\harvests.json. DO NOT
+  HAND EDIT IT. The next run of that script replaces every line between the
+  markers, and a correction made there goes with it and leaves no trace that it
+  was ever made. Same arrangement as SPELL_IDS further down, for the same
+  reason.
+
+  The markers said CROPS and end CROPS until 20 September, and the script has
+  always looked for a block called CROPS_BY_BASE: the crops pass matches
+  ^([ \t]*)(var|const|let)[ \t]+CROPS_BY_BASE[ \t]*=[ \t]*\{ and then takes
+  everything down to the end marker that names the same block. Measured by
+  running it: the regex missed, IndexOf answered -1, and the script printed
+  'gamemode.js has no CROPS_BY_BASE block yet, so the crops were NOT written into
+  it' and exited 0 having touched nothing, while this comment told the next
+  person the table was generated and must not be corrected by hand. So the table
+  was frozen and unowned at the same time. The names match now, so the pass
+  writes here.
+
+  NOTHING ABOVE MAY SPELL THE END MARKER OUT. The script takes the FIRST
+  IndexOf of it in the whole file and then refuses when that lands above the
+  declaration line, so one quotation of it in a comment is enough to turn the
+  pass back into the no-op it was. Measured on 20 September: quoting it here put
+  the first hit at 149688 and the declaration at 152381, and the pass reported no
+  block. That is why this paragraph talks around it.
+
+  Each generated row says what the record says, and nothing else:
+
+    produce      the item that comes off the plant, and also the item that is
+                 sown, because a reference's base cannot be changed by the
+                 server: a cabbage plot grows cabbages and nothing else. That is
+                 why the /plant command takes no argument. See the farming
+                 block.
+    name         what a person is told they sowed or brought in.
+    rank         THE GATHERER'S LADDER, not the farmer's. harvests.json ranks by
+                 the gold value of the produce, and ten of the eleven produce
+                 something worth one gold, so ten of the eleven come out
+                 Advanced and the apples land beside the cabbages. It is kept
+                 because the pass writes it and it says something true about the
+                 produce. It is not what gates a Farmer. CROP_RULES below is.
+    growMinutes  HARVESTS.JSON'S OWN ARITHMETIC, which is 'base + the produce
+                 value in gold x perGold, capped at max, and never under base,
+                 which is the hour the engine reloots a FLOR or TREE in on its
+                 own', with base 60. So it is never under an hour by
+                 construction: 75 minutes for ten of these and 135 for Wheat.
+                 That is the opposite invariant to the one farming needs, for
+                 the reason set out in the farming block: the server owns the
+                 rule and not the look, so a wait longer than the engine's hour
+                 means the model regrows while the rule still says growing.
+                 CROP_RULES below sets the wait that is used and caps it under
+                 the hour.
+
+  THE SECOND HALF IS THE RULE, AND IT IS OURS. A rule written into the generated
+  block would be gone the next time the pass ran, silently, which is exactly the
+  trap the marker mismatch was hiding. So the rank a crop asks of a Farmer and
+  the time it takes to come up live in CROP_RULES, by hand, and mergeCrops puts
+  the two halves together into CROPS. The pass stays what it is, which is a
+  reader of the game files.
+*/
+// ==== CROPS_BY_BASE, generated ====
+var CROPS_BY_BASE = {
+  "18d5d7:JK's Whiterun's Outskirts.esp": { "produce": "64b42:Skyrim.esm", "name": "Tomato", "rank": "advanced", "growMinutes": 75 },
+  "206e8:Dragonborn.esm": { "produce": "206e7:Dragonborn.esm", "name": "Ash Yam", "rank": "advanced", "growMinutes": 75 },
+  "2493e:JKs Skyrim.esp": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "novice", "growMinutes": 75 },
+  "2c91:JKs Skyrim.esp": { "produce": "64b2e:Skyrim.esm", "name": "Red Apple", "rank": "expert", "growMinutes": 75 },
+  "3274:JKs Skyrim.esp": { "produce": "64b2f:Skyrim.esm", "name": "Green Apple", "rank": "expert", "growMinutes": 75 },
+  "bb947:Skyrim.esm": { "produce": "3f7f8:Skyrim.esm", "name": "Tundra Cotton", "rank": "advanced", "growMinutes": 75 },
+  "bb952:Skyrim.esm": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "novice", "growMinutes": 75 },
+  "bb953:Skyrim.esm": { "produce": "4b0ba:Skyrim.esm", "name": "Wheat", "rank": "advanced", "growMinutes": 135 },
+  "bcf47:Skyrim.esm": { "produce": "64b41:Skyrim.esm", "name": "Potato", "rank": "novice", "growMinutes": 75 },
+  "bcf48:Skyrim.esm": { "produce": "64b3f:Skyrim.esm", "name": "Cabbage", "rank": "novice", "growMinutes": 75 },
+  "be3e6:Skyrim.esm": { "produce": "10d666:Skyrim.esm", "name": "Gourd", "rank": "novice", "growMinutes": 75 }
+};
+
+// ==== end CROPS_BY_BASE ====
+
+/*
+  THE HOUR THE ENGINE OWNS.
+
+  MpObjectReference::GetRelootTime in the fork at C:\Thornswood-Dev\skymp
+  returns a hardcoded std::chrono::hours(1) for FLOR and for TREE, and there is
+  no property binding that lets the server change it per reference: the whole
+  list is in
+  skymp5-server\cpp\addon\property_bindings\PropertyBindingFactory.cpp and
+  neither isHarvested nor a reloot time is among them. So the model comes back
+  after an hour whatever the rule says, and a wait longer than that is a plot
+  standing there looking ripe and answering 'still growing' to every press.
+
+  Every wait in CROP_RULES is therefore capped five minutes under that hour by
+  mergeCrops rather than by anybody remembering to. The cap is arithmetic on the
+  measured hour and not another invented number.
+*/
+var ENGINE_RELOOT_MINUTES = 60;
+var CROP_GROW_MINUTES_MAX = ENGINE_RELOOT_MINUTES - 5;
+
+/*
+  WHAT A FARMER MAY GROW, AND HOW LONG IT TAKES. INVENTED, ALL OF IT.
+
+  tools\docs-app\data\site\classes.md, 'What you are allowed to grow', publishes
+  the ladder and not the crops in it: Novice the common field crops, Advanced
+  the crops worth more than those, Expert the orchard, Master everything. Which
+  crop sits on which rung is the part nobody has written down, so it is decided
+  here and it is decided once.
+
+  It cannot be decided by the gold value, which is what the generated rank does.
+  Measured in tools\harvests.json on 20 September: Cabbage, Leek, Potato, Gourd,
+  Tomato, Ash Yam, Tundra Cotton and both apples all produce something worth
+  exactly 1 gold, and Wheat is worth 5. A ladder built on that has four rungs
+  and puts ten things on one of them. So the split is by what the produce is
+  for, which is the thing the site's words are already about:
+
+    novice     the common field crops, the vegetables anybody eats and the ones
+               a new Farmer is handed. Cabbage, Leek, Potato, Gourd and Carrot.
+    advanced   what a trade buys rather than what a person eats. Wheat for the
+               cook, Tundra Cotton for the tailor, and the Ash Yam and Tomato,
+               which grow in one corner of the map each and are worth the walk.
+    expert     the orchard, which is the site's own word for it. Both apple
+               trees, in both plugins that have a pair.
+    master     everything, which is the site's word again, and it means a Master
+               is refused nothing rather than that some crop is held back for
+               them. Nothing sits on this rung and the table says so here rather
+               than by being silently short of one.
+
+  growMinutes is sown to ripe for a Novice, before the multiplier in
+  TUNING.farming.growByRank, and every one of them is under the engine's hour
+  above. A vegetable is quicker than a tree, wheat is the slowest thing in a
+  field, and that is the whole of the reasoning. These are first numbers for the
+  dev server, not a decision.
+
+  THE FOUR BASES THE CROPS PASS DOES NOT LIST carry their own produce and name,
+  because the pass takes TREE records and these four are FLOR:
+  XJKWOTreeAppleRed, XJKWOTreeAppleGreen, XJKWOCarrotPlant and
+  XJKcarrotplantflora, all read out of tools\harvests.json .detail on
+  20 September. They are here because a crop this table leaves out is a crop
+  mp.onActivate falls straight through, and the engine then hands the produce to
+  whoever pressed it every hour for nothing, which is the one thing the farming
+  block exists to stop. That also answers the question the old comment left
+  open, which was whether to take the JK's Skyrim apples or the JK's Whiterun's
+  Outskirts pair: both. A base whose plugin is not in the load order never
+  matches a reference in the world and costs nothing but the line.
+*/
+var CROP_RULES = {
+  'bcf48:Skyrim.esm': { rank: 'novice', growMinutes: 20 },
+  'bb952:Skyrim.esm': { rank: 'novice', growMinutes: 20 },
+  'bcf47:Skyrim.esm': { rank: 'novice', growMinutes: 20 },
+  'be3e6:Skyrim.esm': { rank: 'novice', growMinutes: 25 },
+  '2493e:JKs Skyrim.esp': { rank: 'novice', growMinutes: 20 },
+  '2493d:JKs Skyrim.esp': { rank: 'novice', growMinutes: 20,
+                            produce: '64b40:Skyrim.esm', name: 'Carrot' },
+  '1503ff:JK\'s Whiterun\'s Outskirts.esp': { rank: 'novice', growMinutes: 20,
+                            produce: '64b40:Skyrim.esm', name: 'Carrot' },
+  'bb953:Skyrim.esm': { rank: 'advanced', growMinutes: 45 },
+  'bb947:Skyrim.esm': { rank: 'advanced', growMinutes: 30 },
+  '206e8:Dragonborn.esm': { rank: 'advanced', growMinutes: 25 },
+  '18d5d7:JK\'s Whiterun\'s Outskirts.esp': { rank: 'advanced', growMinutes: 25 },
+  '2c91:JKs Skyrim.esp': { rank: 'expert', growMinutes: 40 },
+  '3274:JKs Skyrim.esp': { rank: 'expert', growMinutes: 40 },
+  '141081:JK\'s Whiterun\'s Outskirts.esp': { rank: 'expert', growMinutes: 40,
+                            produce: '64b2e:Skyrim.esm', name: 'Red Apple' },
+  '141088:JK\'s Whiterun\'s Outskirts.esp': { rank: 'expert', growMinutes: 40,
+                            produce: '64b2f:Skyrim.esm', name: 'Green Apple' }
+};
+
+/*
+  The two halves put together, once, when the file loads.
+
+  A base the crops pass found and nobody has ranked asks for a Master. That is
+  the safe direction and it is deliberate: the alternative defaults are a free
+  crop for everybody or a crash on the first press, and a refusal that names a
+  rank nobody has yet is at least a refusal. It is said in the log with the
+  descriptor in it, so the next run of the pass adding a crop to the game leaves
+  a line telling somebody to put it on a rung.
+
+  hasOwnProperty throughout, and '__proto__' skipped by name, for the reason
+  own() in the progression block was written: these keys are descriptors, they
+  come out of a generated file, and a key of '__proto__' assigned to a plain
+  object sets the prototype rather than a member.
+*/
+function mergeCrops() {
+  var out = {};
+  var d;
+  for (d in CROPS_BY_BASE) {
+    if (!Object.prototype.hasOwnProperty.call(CROPS_BY_BASE, d)) { continue; }
+    if (d === '__proto__') { continue; }
+    var m = CROPS_BY_BASE[d];
+    if (!m || typeof m.produce !== 'string' || typeof m.name !== 'string') { continue; }
+    out[d] = { produce: m.produce, name: m.name,
+               rank: 'master', growMinutes: CROP_GROW_MINUTES_MAX };
+  }
+  for (d in CROP_RULES) {
+    if (!Object.prototype.hasOwnProperty.call(CROP_RULES, d)) { continue; }
+    if (d === '__proto__') { continue; }
+    var r = CROP_RULES[d];
+    if (!Object.prototype.hasOwnProperty.call(out, d)) {
+      if (typeof r.produce !== 'string' || typeof r.name !== 'string') {
+        log('crops: the rule for', d, 'names no produce and the crops pass does',
+            'not list it, so it is not a crop on this server');
+        continue;
+      }
+      out[d] = { produce: r.produce, name: r.name,
+                 rank: 'master', growMinutes: CROP_GROW_MINUTES_MAX };
+    }
+    out[d].rank = r.rank;
+    out[d].growMinutes = Math.max(1, Math.min(r.growMinutes, CROP_GROW_MINUTES_MAX));
+  }
+  for (d in out) {
+    if (!Object.prototype.hasOwnProperty.call(out, d)) { continue; }
+    if (!Object.prototype.hasOwnProperty.call(CROP_RULES, d)) {
+      log('crops:', d, 'came out of the crops pass with no rule beside it, so it',
+          'asks for a Master until somebody puts it on a rung in CROP_RULES');
+    }
+  }
+  return out;
+}
+
+var CROPS = mergeCrops();
+
+/** True when this base is one of the crops above. Never a bare lookup: the
+ *  descriptor arrives from a reference in the world, and '__proto__' finding
+ *  something on Object.prototype is the hole the progression block's own()
+ *  was written for. */
+function isCrop(baseDesc) {
+  return Object.prototype.hasOwnProperty.call(CROPS, baseDesc);
+}
 
 /**
  * Add or remove an ability on somebody's character.
@@ -1621,13 +2005,45 @@ function bless(actorId, baseDesc) {
 function harvest(actorId, refrId, baseDesc) {
   const plant = HARVESTS[baseDesc];
   if (!plant) return null;
+  // The gatherer's verb. Asked before the cooldown so that somebody who is
+  // not a gatherer gets the same answer at every plant, every time, rather
+  // than 'this one has already been picked' at one they never picked.
+  const mine = classGate(actorId, 'harvest');
+  if (mine) return mine;
   const prev = lastUse.get(actorId + ':' + refrId) || 0;
   if (Date.now() - prev < HARVEST_COOLDOWN_MS) {
     return 'This one has already been picked.';
   }
   if (!addItem(actorId, plant.item, 1)) return null;
   lastUse.set(actorId + ':' + refrId, Date.now());
-  return 'You pick the ' + plant.name + '.';
+  const rank = creditWork(actorId, 'harvest');
+  return 'You pick the ' + plant.name + '.' + (rank ? ' ' + rank : '');
+}
+
+/**
+ * A press on a crop, answered by the farming block further down the file.
+ *
+ * The same shape as classGate above, and for the same reason: the farming block
+ * registers itself on globalThis after the rules it depends on, so it is looked
+ * up when somebody presses E rather than when this line is read. Unlike
+ * classGate, a farming block that is missing does NOT open the gate. An open
+ * gate here would be the engine handing out a free pick every hour, which is
+ * the single thing the whole system exists to stop, so a missing block refuses
+ * and says so in the log.
+ */
+function farmActivate(actorId, refrId, baseDesc) {
+  const f = globalThis.__thornswoodFarming;
+  if (!f || !f.activate) {
+    log('the farming block is not loaded, so the crop at', refrId.toString(16),
+        'gives nothing');
+    return 'Nothing comes of it.';
+  }
+  try {
+    return f.activate(actorId, refrId, baseDesc);
+  } catch (e) {
+    log('the crop at', refrId.toString(16), 'threw:', e);
+    return 'Nothing comes of it.';
+  }
 }
 
 /**
@@ -1653,6 +2069,12 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   else if (baseDesc === STATIONS.charcoalKiln) message = burnCharcoal(casterRefrId, refrId);
   else if (SHRINES[baseDesc]) message = bless(casterRefrId, baseDesc);
   else if (HARVESTS[baseDesc]) message = harvest(casterRefrId, refrId, baseDesc);
+  // A crop always falls through to the return false at the bottom, whatever
+  // farmActivate answered. ProcessActivateNormal in the engine reads the produce
+  // straight out of the FLOR or TREE record and hands it over, and it is only
+  // an explicit false from here that stops it. Anything that reached this line
+  // and left without a false would be the free pick back.
+  else if (isCrop(baseDesc)) message = farmActivate(casterRefrId, refrId, baseDesc);
   else return;
 
   if (message) {
@@ -1691,6 +2113,11 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     add(STATIONS.charcoalKiln);
     for (var shrine in SHRINES) { add(shrine); }
     for (var crop in HARVESTS) { add(crop); }
+    // Every farm crop as well. A crop base missing from this list is pressed
+    // twice for every press: once by the person and once by the client
+    // re-activating it, so the first press brings the crop in and the second
+    // is told the plot is empty a tick later.
+    for (var cropBase in CROPS) { add(cropBase); }
 
     var fsb = require('fs');
     var pathb = require('path');
@@ -2724,6 +3151,15 @@ log('gamemode loaded:',
   and an action and hand back either a new state or a reason, and they touch
   nothing else, which is what makes them testable by lifting them out.
 
+  WHAT ARRIVED ON 20 SEPTEMBER, for the dev server. The rules used to answer
+  what somebody may pick and nothing else: canDo had no callers, no work was
+  counted anywhere, nothing raised a rank except a Master teaching, and no
+  spell could be chosen at all. So creditWork counts the work and raises the
+  rank through rankUp, every rank now gives a skill tree point because nothing
+  else in the game gives one, and pickSpell spends a spell point out of the
+  book below. The numbers none of that had, because the rulebook does not set
+  them, are together in TUNING.
+
   ON THE FLAT SIXTEEN. The old CHARGEN table has sixteen trades with a kit
   each, and five of them, bard, merchant, priest, scholar and thief, have no
   home in the rulebook. Characters exist carrying them. Nothing here deletes
@@ -2806,8 +3242,398 @@ log('gamemode loaded:',
     skillCap: 5           // NOT IN THE RULEBOOK. Placeholder, see above.
   };
 
+  /*
+    The spell book, school by school and rank by rank.
+
+    Copied from the client's own book, tools\ts-ui\thornswood-skills.js
+    (DATA.spells.schools), so the two agree about what exists and what rank it
+    is. The server's copy is the one that decides: the client draws a page and
+    the page can be edited, this cannot. Skyrim's Apprentice and Adept tiers
+    both sit under Advanced, which is the client's sorting and is kept.
+  */
+  var SPELLS = {
+    destruction: {
+      novice: ['Flames', 'Frostbite', 'Sparks'],
+      advanced: ['Firebolt', 'Ice Spike', 'Lightning Bolt', 'Fireball', 'Ice Storm', 'Chain Lightning', 'Flame Cloak', 'Frost Cloak', 'Lightning Cloak'],
+      expert: ['Incinerate', 'Icy Spear', 'Thunderbolt', 'Wall of Flames', 'Wall of Frost', 'Wall of Storms'],
+      master: ['Fire Storm', 'Blizzard', 'Lightning Storm']
+    },
+    restoration: {
+      novice: ['Healing', 'Lesser Ward'],
+      advanced: ['Healing Hands', 'Fast Healing', 'Steadfast Ward', 'Turn Undead', 'Close Wounds', 'Heal Other', 'Greater Ward', 'Repel Lesser Undead'],
+      expert: ['Grand Healing', 'Circle of Protection', 'Repel Undead', 'Turn Greater Undead'],
+      master: ['Guardian Circle', 'Bane of the Undead']
+    },
+    alteration: {
+      novice: ['Candlelight', 'Oakflesh'],
+      advanced: ['Magelight', 'Stoneflesh', 'Detect Life', 'Ironflesh', 'Telekinesis', 'Waterbreathing'],
+      expert: ['Ebonyflesh', 'Paralyze', 'Detect Dead'],
+      master: ['Dragonhide', 'Mass Paralysis']
+    },
+    conjuration: {
+      novice: ['Conjure Familiar', 'Raise Zombie', 'Bound Sword'],
+      advanced: ['Conjure Flame Atronach', 'Reanimate Corpse', 'Bound Battleaxe', 'Soul Trap', 'Conjure Frost Atronach', 'Banish Daedra', 'Revenant', 'Bound Bow'],
+      expert: ['Conjure Storm Atronach', 'Dread Zombie', 'Conjure Dremora Lord', 'Expel Daedra', 'Command Daedra'],
+      master: ['Dead Thrall', 'Flame Thrall', 'Frost Thrall', 'Storm Thrall']
+    },
+    illusion: {
+      novice: ['Courage', 'Clairvoyance', 'Fury'],
+      advanced: ['Calm', 'Fear', 'Muffle', 'Frenzy', 'Rally', 'Invisibility'],
+      expert: ['Pacify', 'Rout', 'Call to Arms'],
+      master: ['Harmony', 'Hysteria', 'Mayhem']
+    }
+  };
+
+  // ==== SPELL_IDS, generated ====
+  /*
+    Spell name -> the form id desc Actor.AddSpell takes, the same shape the
+    shrines use ('fb988:Skyrim.esm').
+
+    EMPTY ON PURPOSE. Nothing here reads the game files, and a form id guessed
+    from memory is a spell handed to somebody that is not the spell they asked
+    for. Another step fills this block by reading the SPEL records out of the
+    masters on a machine that has them, name for name against the book above,
+    and pasting what it prints between the two markers. The keys are the spell
+    names exactly as SPELLS spells them and the values are the descs
+    Actor.AddSpell takes. Until that happens a spell picked here is known
+    and simply not granted in the game. Nothing throws over a missing id: the
+    rules do not look at this table at all, and the granting side treats a name
+    that is not in it as "not yet".
+  */
+  var SPELL_IDS = {
+    "Flames": "12fcd:Skyrim.esm",
+    "Frostbite": "2b96b:Skyrim.esm",
+    "Sparks": "2dd2a:Skyrim.esm",
+    "Firebolt": "12fd0:Skyrim.esm",
+    "Ice Spike": "2b96c:Skyrim.esm",
+    "Lightning Bolt": "2dd29:Skyrim.esm",
+    "Fireball": "1c789:Skyrim.esm",
+    "Ice Storm": "45f9c:Skyrim.esm",
+    "Chain Lightning": "45f9d:Skyrim.esm",
+    "Flame Cloak": "3ae9f:Skyrim.esm",
+    "Frost Cloak": "3aea2:Skyrim.esm",
+    "Lightning Cloak": "3aea3:Skyrim.esm",
+    "Incinerate": "10f7ed:Skyrim.esm",
+    "Icy Spear": "10f7ec:Skyrim.esm",
+    "Thunderbolt": "10f7ee:Skyrim.esm",
+    "Wall of Flames": "35d7f:Skyrim.esm",
+    "Wall of Frost": "35d80:Skyrim.esm",
+    "Wall of Storms": "35d81:Skyrim.esm",
+    "Fire Storm": "7a82b:Skyrim.esm",
+    "Blizzard": "7e8e4:Skyrim.esm",
+    "Lightning Storm": "7e8e5:Skyrim.esm",
+    "Healing": "12fcc:Skyrim.esm",
+    "Lesser Ward": "13018:Skyrim.esm",
+    "Healing Hands": "4d3f2:Skyrim.esm",
+    "Fast Healing": "2f3b8:Skyrim.esm",
+    "Steadfast Ward": "211f1:Skyrim.esm",
+    "Turn Undead": "5dd5d:Skyrim.esm",
+    "Close Wounds": "b62ef:Skyrim.esm",
+    "Heal Other": "12fd2:Skyrim.esm",
+    "Greater Ward": "211f0:Skyrim.esm",
+    "Repel Lesser Undead": "4d3f8:Skyrim.esm",
+    "Grand Healing": "b62ee:Skyrim.esm",
+    "Circle of Protection": "5312d:Skyrim.esm",
+    "Repel Undead": "5dd60:Skyrim.esm",
+    "Turn Greater Undead": "5dd5e:Skyrim.esm",
+    "Guardian Circle": "e0ccf:Skyrim.esm",
+    "Bane of the Undead": "8c1ab:Skyrim.esm",
+    "Candlelight": "43324:Skyrim.esm",
+    "Oakflesh": "5ad5c:Skyrim.esm",
+    "Magelight": "43323:Skyrim.esm",
+    "Stoneflesh": "5ad5d:Skyrim.esm",
+    "Detect Life": "211ee:Skyrim.esm",
+    "Ironflesh": "51b16:Skyrim.esm",
+    "Telekinesis": "1a4cc:Skyrim.esm",
+    "Waterbreathing": "5d175:Skyrim.esm",
+    "Ebonyflesh": "5ad5e:Skyrim.esm",
+    "Paralyze": "5ad5f:Skyrim.esm",
+    "Detect Dead": "211ef:Skyrim.esm",
+    "Dragonhide": "cdb70:Skyrim.esm",
+    "Mass Paralysis": "b62e6:Skyrim.esm",
+    "Conjure Familiar": "640b6:Skyrim.esm",
+    "Raise Zombie": "7e8e1:Skyrim.esm",
+    "Bound Sword": "211eb:Skyrim.esm",
+    "Conjure Flame Atronach": "204c3:Skyrim.esm",
+    "Reanimate Corpse": "65bd7:Skyrim.esm",
+    "Bound Battleaxe": "211ec:Skyrim.esm",
+    "Soul Trap": "4dba4:Skyrim.esm",
+    "Conjure Frost Atronach": "204c4:Skyrim.esm",
+    "Banish Daedra": "6d22c:Skyrim.esm",
+    "Revenant": "96d94:Skyrim.esm",
+    "Bound Bow": "211ed:Skyrim.esm",
+    "Conjure Storm Atronach": "204c5:Skyrim.esm",
+    "Dread Zombie": "96d95:Skyrim.esm",
+    "Conjure Dremora Lord": "10ddec:Skyrim.esm",
+    "Expel Daedra": "6f952:Skyrim.esm",
+    "Command Daedra": "6f953:Skyrim.esm",
+    "Dead Thrall": "7e8df:Skyrim.esm",
+    "Flame Thrall": "7e5d5:Skyrim.esm",
+    "Frost Thrall": "7e5d6:Skyrim.esm",
+    "Storm Thrall": "7e5d7:Skyrim.esm",
+    "Courage": "4dee8:Skyrim.esm",
+    "Clairvoyance": "21143:Skyrim.esm",
+    "Fury": "4deeb:Skyrim.esm",
+    "Calm": "4dee9:Skyrim.esm",
+    "Fear": "4deea:Skyrim.esm",
+    "Muffle": "8f3eb:Skyrim.esm",
+    "Frenzy": "4deee:Skyrim.esm",
+    "Rally": "4deec:Skyrim.esm",
+    "Invisibility": "27eb6:Skyrim.esm",
+    "Pacify": "4deed:Skyrim.esm",
+    "Rout": "4deef:Skyrim.esm",
+    "Call to Arms": "7e8dd:Skyrim.esm",
+    "Harmony": "7e8db:Skyrim.esm",
+    "Hysteria": "7e8de:Skyrim.esm",
+    "Mayhem": "7e8da:Skyrim.esm"
+  };
+
+  // ==== end SPELL_IDS ====
+
+  /*
+    HOW MUCH WORK A RANK TAKES, AND WHAT A RANK GIVES. The tuning knob.
+
+    THE RULEBOOK DOES NOT SET THESE. classes.md says rank comes from doing the
+    work and nothing else moves it, and then says nothing about how much work,
+    how often, or what a rank hands you outside the mage's spell points. Every
+    number that had to be invented for progression to run at all is here, in
+    one block, so changing the pace is one edit in one place and nobody has to
+    dig a threshold out of a salt quarry.
+
+    These are first numbers for the dev server, not a decision. What they
+    should be is a thing to watch testers hit and then argue about.
+  */
+  var TUNING = {
+    /*
+      Yields handed out to climb into each rank, counted from the rank below
+      and reset on arrival. So novice -> advanced is 20 pieces of work done,
+      and the count starts again at 0 against the 50 for expert.
+    */
+    workPerRank: { advanced: 20, expert: 50, master: 120 },
+    /*
+      Skill tree points a rank gives. Nothing anywhere else awards one, so
+      without this the fifteen sub-skills on the K panel can never be spent
+      into and the whole tree is a picture. Free points: they go wherever the
+      person wants, which is what Patrick asked for on 20 September.
+    */
+    treePointsPerRank: 1,
+
+    /*
+      WHAT A SCHOOL CLIMBS ON. NOT IN THE RULEBOOK.
+
+      The server cannot see a spell being cast. This gamemode has four event
+      hooks and that is all there is: onActivate, onDeath, onReadBook and
+      onRespawn. There is no cast, no spell-fired and no magic-effect event,
+      and the only magic the server performs itself is Actor.AddSpell. So
+      casting cannot be counted, and until now nothing else counted either:
+      a mage held two novice spells for good, because a spell costs a point,
+      a point comes with a rank, and a rank came from work a mage had no way
+      to do. That circle is the defect. Two things the server does see break
+      it, and both go through creditWork, so every ceiling still holds.
+
+        perSpell  a spell learned is this much work in its own school.
+        perRank   a rank gained anywhere else, a class at the quarry or the
+                  other school, is this much work in every school a mage
+                  holds, so hours at the seam and hours at the desk are the
+                  same hours. One step only: the work a raise feeds out never
+                  feeds again, so nothing can run away.
+        perManual reading one of the old manuals is this much work in the
+                  ladder it is about, once, the first time it is read.
+
+      classes.md does not set any of these, and it does not mention the
+      College or a semester at all; LIMITS.collegeSemester came from
+      somewhere else and is about spell points, not rank.
+    */
+    study: { perSpell: 5, perRank: 10, perManual: 5 },
+
+    /*
+      THE STARTING ALLOCATION. NOT IN THE RULEBOOK. Patrick, 20 September:
+      'you should start off with points into specific things based on the
+      profession/sub/class you choose'.
+
+      These points are PLACED, not spent: they land in named sub-skills the
+      moment the pick is made, they are recorded in s.placed as well as
+      s.tree so the panel can draw them as placed, and they cannot be moved.
+      They read like the thing they are: a smith places in Might and Burden,
+      a mage in Capacity and Clarity, a hunter in Precision.
+
+      Kept small on purpose. classes.md: 'Everybody has the same fifteen, and
+      nobody fills more than a few of them.' A class places 1, a profession
+      2, a half 1 and each school of a mage 1, so nobody starts with more
+      than four placed and no single sub-skill can start anywhere near the
+      cap of five.
+    */
+    placed: {
+      classes: {
+        hunter:   { precision: 1 },
+        fisher:   { vigor: 1 },
+        gatherer: { burden: 1 },
+        miner:    { might: 1 },
+        farmer:   { endurance: 1 }
+      },
+      professions: {
+        warrior:    { vitality: 1, might: 1 },
+        mage:       { capacity: 1, clarity: 1 },
+        alchemist:  { toughness: 1, clarity: 1 },
+        cook:       { fortitude: 1, endurance: 1 },
+        smith:      { might: 1, burden: 1 },
+        enchanter:  { capacity: 1, ward: 1 },
+        tailor:     { agility: 1, efficiency: 1 },
+        woodworker: { endurance: 1, burden: 1 }
+      },
+      halves: {
+        bulwark: { resilience: 1 },   berserker: { might: 1 },
+        blightbrewer: { potency: 1 }, physicker: { clarity: 1 },
+        hearthcook: { vitality: 1 },  confectioner: { fortitude: 1 },
+        platewright: { resilience: 1 }, edgewright: { precision: 1 },
+        bladebinder: { potency: 1 },  wardweaver: { ward: 1 },
+        liverywright: { efficiency: 1 }, haberdasher: { agility: 1 },
+        charburner: { toughness: 1 }, woodwright: { precision: 1 }
+      },
+      schools: {
+        destruction: { potency: 1 },  restoration: { clarity: 1 },
+        alteration: { ward: 1 },      conjuration: { capacity: 1 },
+        illusion: { efficiency: 1 }
+      }
+    },
+
+    /*
+      WHAT ONE POINT IN A SUB-SKILL IS WORTH. NOT IN THE RULEBOOK.
+
+      classes.md says what each sub-skill raises and never says by how much.
+      The server cannot set any of it: GetBaseActorValues computes health,
+      magicka, stamina and the rest from the race record, so a base value
+      written here is overwritten the next time the client works them out.
+      So the server sends the total and the client applies it. treeApplies
+      adds this up over s.tree and sends only what is not zero, under the
+      names below; what a name means on the client is the client's half of
+      the job and is not decided here.
+
+      Three of these have no vanilla actor value behind them at all
+      (spellPowerMult, spellCostMult, critChance). They are sent because the
+      rulebook promises them, and the client decides how to land them.
+    */
+    perPoint: {
+      vitality:   { health: 10 },
+      fortitude:  { healRateMult: 10 },
+      might:      { attackDamageMult: 5 },
+      resilience: { damageResist: 10 },
+      toughness:  { poisonResist: 10, diseaseResist: 10 },
+      capacity:   { magicka: 10 },
+      clarity:    { magickaRateMult: 10 },
+      potency:    { spellPowerMult: 5 },
+      ward:       { magicResist: 5 },
+      efficiency: { spellCostMult: -3 },
+      endurance:  { stamina: 10 },
+      vigor:      { staminaRateMult: 10 },
+      agility:    { speedMult: 2 },
+      burden:     { carryWeight: 15 },
+      precision:  { critChance: 2 }
+    },
+
+    /*
+      FARMING, AND EVERY ONE OF THESE NUMBERS IS INVENTED.
+
+      Patrick, 20 September: 'there is no system for claiming plots for farming,
+      planting things, and then things growing ... I want it so you can't just
+      farm infinitely like you usually can and have it so you actually have to
+      plant and replant and wait you know'.
+
+      WHAT THE RULEBOOK NOW SETS, and it is more than it set this morning.
+      tools\docs-app\data\site\classes.md has a Farming section as of
+      20 September. It says plots start empty; that a farmer claims one farm at a
+      time and a claim lapses if the farm is left unworked; that the crop is its
+      own seed; that a higher rank shortens the wait; that what you bring in is
+      MORE than the one you put in the ground; that rank gates the crop, Novice
+      the common field crops through to Master everything; and that a farmer
+      starts with a few crops in their pack. Every one of those is a rule and
+      every one of them is enforced in the farming block below.
+
+      What it does not set is a single number, and it says so in its own words:
+      'How long a crop takes to come up, how much a harvest gives back, and how
+      long a claim survives unworked are all set on the server rather than
+      settled here.' So the numbers are invented, and they are here with the
+      rest of the invented numbers rather than scattered through the farming
+      block, for the same reason workPerRank is here rather than in a salt
+      quarry. Which crop sits on which rung is invented too, and that one lives
+      beside the crops, in CROP_RULES near the top of the file. These are first
+      numbers for the dev server, not a decision.
+
+        growByRank     what a Farmer's rank does to the wait, by rank step with
+                       novice first. A Master waits a little over half as long
+                       as a Novice, which is enough to be worth the climb and
+                       not enough to make the wait stop mattering. The base
+                       minutes are per crop, in CROP_RULES near the top of the
+                       file. The multiplier is applied once, at sowing, and the
+                       answer is kept on the plot: see writePlot.
+        yieldByRank    how many come off one plot, by the same four steps. Every
+                       rung is above the one crop sowing costs, because
+                       classes.md promises exactly that: 'What you bring in is
+                       more than the one you put in the ground, so a farm that is
+                       worked grows and a farm that nobody works stops.' It used
+                       to read [1, 1, 2, 3], which made a Novice and an Advanced
+                       Farmer break even on every plot and the first profitable
+                       bring-in the 71st, counting workPerRank above. A farm that
+                       cannot grow until the 71st harvest is not the farm the
+                       site describes. One more per rung keeps the ladder
+                       readable. Nothing here compounds by itself: the ceiling is
+                       one plot, one sowing, one wait.
+        reach          how far /plant, /plot and /claim look for a plot, in game
+                       units. Skyrim activates at about 150, so this is that plus
+                       a step and no more: a reach that crossed a garden would
+                       sow the plot behind you and tell you it had sown the one
+                       in front.
+        claimRadius    how far a claim reaches from the plot it was made at, in
+                       game units, so a farm is a circle of ground around one of
+                       its own plots. It was a 4096 unit grid square until
+                       20 September, keyed by the square the claimer was standing
+                       in, and that was wrong twice over. A Skyrim farm is
+                       roughly 1500 to 3000 units across and a 4096 grid cuts
+                       most of them in half, so the half across the line belonged
+                       to nobody and could be sown and picked by anybody; and one
+                       word took every crop in 4096 by 4096 units of ground,
+                       neighbouring farms included. 1200 is a circle 2400 across,
+                       which covers a farm from one of its rows and not the
+                       village behind it. Claims are kept from overlapping, so no
+                       plot is ever in two of them.
+        claimLapseDays a claim with nothing done on it for this long is gone.
+                       Fourteen days because a closed playtest is exactly where
+                       somebody claims a farm, stops testing, and locks that
+                       ground for everybody after them. It is refreshed every
+                       time the holder sows or brings something in, so it counts
+                       days of neglect and not days since the claim.
+        startingSeeds  how many of each starting crop a Farmer is handed.
+                       Three is enough for three plots and a mistake.
+        startingCrops  which ones: Cabbage, Leek and Potato, all three of them
+                       plain vegetables on Skyrim.esm and all three on the novice
+                       rung, because a first sowing should not depend on standing
+                       near an apple tree or on a JK plugin being in the load
+                       order.
+        seedAgainHours how long before a Farmer whose pack holds no crop at all
+                       can be handed seed again. Twelve hours. It is not a
+                       generosity, it is the only way back: seed used to be
+                       handed out once, at the class pick, so a Farmer who lost
+                       their crops was a Farmer who could never farm again, and
+                       every Farmer who picked the class before this release was
+                       born in that state. It cannot be worked for profit: it
+                       asks for an empty pack and pays about nine gold, while one
+                       plot pays more than that in half an hour.
+    */
+    farming: {
+      growByRank: [1, 0.85, 0.7, 0.55],
+      yieldByRank: [2, 3, 4, 5],
+      reach: 200,
+      claimRadius: 1200,
+      claimLapseDays: 14,
+      startingSeeds: 3,
+      startingCrops: ['bcf48:Skyrim.esm', 'bb952:Skyrim.esm', 'bcf47:Skyrim.esm'],
+      seedAgainHours: 12
+    }
+  };
+
   var TABLE = { ranks: RANKS, classes: CLASSES, schools: SCHOOLS,
-                professions: PROFESSIONS, tree: TREE, limits: LIMITS };
+                professions: PROFESSIONS, tree: TREE, limits: LIMITS,
+                spells: SPELLS, tuning: TUNING };
 
   // ------------------------------------------------------------ the state --
   /*
@@ -2826,10 +3652,19 @@ log('gamemode loaded:',
       spells     { points: 2, known: [...] }    a mage's spell points and spells
       tree       { vitality: 3, ... }           points spent per sub-skill
       points     4                              unspent tree points
+      work       { miner: 7, charburner: 2 }    yields handed out since the
+                 last rank, under the same keys as ranks: a class where the
+                 work is a class verb, a half where it is a profession's.
+                 Reset to what is left over when a rank is reached.
+      placed     { might: 1, burden: 1 }        the part of tree that was
+                 placed by the class, profession and half at creation. It is
+                 counted inside tree as well; this says how much of tree was
+                 never anybody's to move.
   */
   function fresh() {
     return { cls: null, prof: null, half: null, schools: [],
-             ranks: {}, taught: [], spells: null, tree: {}, points: 0 };
+             ranks: {}, taught: [], spells: null, tree: {}, points: 0,
+             work: {}, placed: {} };
   }
 
   function clone(s) { return JSON.parse(JSON.stringify(s || fresh())); }
@@ -2837,9 +3672,29 @@ log('gamemode loaded:',
   function no(why) { return { ok: false, why: why }; }
   function yes(state) { return { ok: true, state: state }; }
 
+  /*
+    A LOOKUP THAT TAKES A WORD FROM A PERSON IS NEVER A BARE ONE.
+
+    '/pick class __proto__' and '/pick class constructor' were both accepted,
+    because CLASSES['__proto__'] and CLASSES['constructor'] find something on
+    Object.prototype and a bare truth test cannot tell that from a class. The
+    word was then stored as the class, no other class could be picked ever
+    again, and the class gates refused gathering and mining for the life of
+    that character with no command anywhere to clear it. '/spend constructor'
+    was the same hole one floor down: the cap test passed against a function
+    and 'have + 1' wrote a function's source text into the tree, which then
+    travelled to the browser through the updateOwner script.
+
+    grantSpell in the character block already did this properly. Every table
+    below that is indexed by a word somebody typed goes through here now.
+  */
+  function own(o, k) {
+    return !!o && Object.prototype.hasOwnProperty.call(o, k);
+  }
+
   function halvesOf(prof) {
+    if (!own(PROFESSIONS, prof)) { return []; }
     var p = PROFESSIONS[prof];
-    if (!p) { return []; }
     if (p.halves) { return Object.keys(p.halves); }
     return SCHOOLS.slice();
   }
@@ -2852,14 +3707,99 @@ log('gamemode loaded:',
 
   function rankIndex(r) { return RANKS.indexOf(r); }
 
+  /** Standing in one class, half or school, or null. Never a bare lookup. */
+  function rankOf(state, key) {
+    var s = state || fresh();
+    return (s.ranks && own(s.ranks, key)) ? s.ranks[key] : null;
+  }
+
+  /** The sub-skill by key, or null. The only reader of TREE by a loose name. */
+  function treeSkill(skill) {
+    for (var attr in TREE) {
+      if (own(TREE[attr].skills, skill)) { return TREE[attr].skills[skill]; }
+    }
+    return null;
+  }
+
+  /*
+    POINTS PLACED BY A PICK. Patrick, 20 September.
+
+    A class, a profession, a half and each of a mage's schools put points
+    into named sub-skills the moment they are taken. They go into tree,
+    because that is what the tree is, and they are remembered in placed,
+    because the panel draws them as placed rather than spent and spendPoint
+    refuses to move them. s.points is not touched: a placed point was never
+    anybody's to spend, and free points come from ranks and nowhere else.
+
+    The cap is respected on the way in, so two picks that name the same
+    sub-skill can never put it over LIMITS.skillCap.
+  */
+  function place(s, where, key) {
+    var table = own(TUNING.placed, where) ? TUNING.placed[where] : null;
+    if (!own(table, key)) { return; }
+    var pts = table[key];
+    if (!s.tree) { s.tree = {}; }
+    if (!s.placed) { s.placed = {}; }
+    for (var skill in pts) {
+      if (!own(pts, skill) || !treeSkill(skill)) { continue; }
+      var was = own(s.tree, skill) ? (s.tree[skill] || 0) : 0;
+      var add = Math.min(pts[skill], LIMITS.skillCap - was);
+      if (add <= 0) { continue; }
+      s.tree[skill] = was + add;
+      s.placed[skill] = (own(s.placed, skill) ? (s.placed[skill] || 0) : 0) + add;
+    }
+  }
+
+  /** How much of a sub-skill was placed and cannot be moved. */
+  function placedIn(state, skill) {
+    var s = state || fresh();
+    return (own(s.placed, skill) ? (s.placed[skill] || 0) : 0);
+  }
+
+  /*
+    What the tree adds up to, for the client to apply.
+
+    The server cannot set any of this itself: GetBaseActorValues computes the
+    base values from the race record, so anything written here is gone the
+    next time the client works them out. So the totals are sent and the
+    client applies them. Only what is not zero travels.
+  */
+  function treeApplies(state) {
+    var s = state || fresh();
+    var out = {};
+    for (var skill in (s.tree || {})) {
+      if (!own(s.tree, skill) || !treeSkill(skill)) { continue; }
+      var n = s.tree[skill];
+      if (typeof n !== 'number' || !n) { continue; }
+      var per = own(TUNING.perPoint, skill) ? TUNING.perPoint[skill] : null;
+      for (var what in per) {
+        if (!own(per, what)) { continue; }
+        out[what] = (own(out, what) ? out[what] : 0) + per[what] * n;
+      }
+    }
+    for (var k in out) { if (own(out, k) && !out[k]) { delete out[k]; } }
+    return out;
+  }
+
   // ------------------------------------------------------------ the rules --
 
-  /** One class, from the five, and it is never changed. */
+  /**
+    One class, from the five, and it is never changed.
+
+    The class gets standing at novice the moment it is taken, under its own
+    key in ranks, because the class verb is work like any other and rank comes
+    from doing the work. That is what lets creditWork below climb it through
+    rankUp rather than around it. Nothing in the rulebook gives a class a
+    Master perk and perks() does not look here, so a Master Miner is a Master
+    Miner and nothing else.
+  */
   function pickClass(state, cls) {
     var s = clone(state);
-    if (!CLASSES[cls]) { return no('no such class'); }
+    if (!own(CLASSES, cls)) { return no('no such class'); }
     if (s.cls) { return no('you already have a class, and nobody has two'); }
     s.cls = cls;
+    s.ranks[cls] = 'novice';
+    place(s, 'classes', cls);
     return yes(s);
   }
 
@@ -2871,8 +3811,8 @@ log('gamemode loaded:',
   */
   function pickProfession(state, prof, halfOrSchools) {
     var s = clone(state);
+    if (!own(PROFESSIONS, prof)) { return no('no such profession'); }
     var p = PROFESSIONS[prof];
-    if (!p) { return no('no such profession'); }
     if (s.prof) { return no('you already have a profession, and nobody has two'); }
 
     if (prof === 'mage') {
@@ -2887,16 +3827,20 @@ log('gamemode loaded:',
       s.schools = sch;
       for (var j = 0; j < sch.length; j++) { s.ranks[sch[j]] = 'novice'; }
       s.spells = { points: LIMITS.mageStartSpells, known: [] };
+      place(s, 'professions', 'mage');
+      for (var k = 0; k < sch.length; k++) { place(s, 'schools', sch[k]); }
       return yes(s);
     }
 
     var half = String(halfOrSchools || '');
-    if (!p.halves[half]) { return no('no such half of ' + p.name); }
+    if (!own(p.halves, half)) { return no('no such half of ' + p.name); }
     s.prof = prof;
     s.half = half;
     s.ranks[half] = 'novice';
     var sister = sisterOf(prof, half);
     if (sister) { s.ranks[sister] = 'novice'; }
+    place(s, 'professions', prof);
+    place(s, 'halves', half);
     return yes(s);
   }
 
@@ -2911,7 +3855,7 @@ log('gamemode loaded:',
     if (!s.prof) { return no('choose your own profession before learning anybody else’s'); }
     var tp = teacherState && teacherState.prof;
     if (!tp || halvesOf(tp).indexOf(half) === -1) { return no('the teacher does not work that half'); }
-    if (teacherState.ranks[half] !== 'master') { return no('only a Master can teach, and they are not one in that half'); }
+    if (rankOf(teacherState, half) !== 'master') { return no('only a Master can teach, and they are not one in that half'); }
     if (halvesOf(s.prof).indexOf(half) !== -1) {
       return no('that is your own profession; a Master of it can raise your rank, not teach you the basics');
     }
@@ -2935,27 +3879,173 @@ log('gamemode loaded:',
   */
   function rankUp(state, half, masterState) {
     var s = clone(state);
-    var cur = s.ranks[half];
+    var cur = rankOf(s, half);
     if (!cur) { return no('no standing in that'); }
     if (cur === 'master') { return no('already a Master'); }
     if (s.taught.indexOf(half) !== -1) { return no('a trade learned from another profession never goes past novice'); }
 
-    var own = s.half === half || s.schools.indexOf(half) !== -1;
+    var mine = s.half === half || s.schools.indexOf(half) !== -1;
     var sister = s.prof && sisterOf(s.prof, s.half) === half;
-    if (sister && !own) {
-      var ok = masterState && masterState.ranks && masterState.ranks[half] === 'master';
+    if (sister && !mine) {
+      var ok = rankOf(masterState, half) === 'master';
       if (!ok) { return no('past novice in your sister half needs a Master of it to take you on'); }
     }
 
     var next = RANKS[rankIndex(cur) + 1];
     s.ranks[half] = next;
 
-    if (s.prof === 'mage' && own && next === 'master') {
+    /*
+      Every rank gives a skill tree point, wherever the rank came from: work
+      done alone, or hours under a Master. The rulebook does not say how many
+      (see TUNING), only that the tree is spent into, and nothing else in the
+      game hands one out. One path in and one path out: everything that raises
+      a rank comes through here, so nothing can raise one quietly.
+    */
+    s.points = (s.points || 0) + TUNING.treePointsPerRank;
+
+    if (s.prof === 'mage' && mine && next === 'master') {
       s.spells.points += LIMITS.mageMasterSpells;
-    } else if (s.prof === 'mage' && own) {
+    } else if (s.prof === 'mage' && mine) {
       s.spells.points += 1;   // one more spell point with every rank
     }
     return yes(s);
+  }
+
+  /** The class that owns a verb, or null when the verb is not a class's. */
+  var VERBS = { loot: 'hunter', fish: 'fisher', harvest: 'gatherer', mine: 'miner', farm: 'farmer' };
+  function classFor(verb) {
+    return own(VERBS, verb) ? VERBS[verb] : null;
+  }
+
+  /** Yields still to hand out before the next rank, 0 for a Master. */
+  function workNeeded(state, key) {
+    var cur = rankOf(state, key);
+    if (!cur) { return 0; }
+    var next = RANKS[rankIndex(cur) + 1];
+    if (!next) { return 0; }
+    return own(TUNING.workPerRank, next) ? (TUNING.workPerRank[next] || 0) : 0;
+  }
+
+  /** Yields handed out since the last rank in that key. */
+  function workDone(state, key) {
+    var s = state || fresh();
+    return (s.work && own(s.work, key) && s.work[key]) || 0;
+  }
+
+  /** The rank that key is climbing to, or null when it is not climbing. */
+  function nextRank(state, key) {
+    var s = state || fresh();
+    var cur = rankOf(s, key);
+    if (!cur) { return null; }
+    if ((s.taught || []).indexOf(key) !== -1) { return null; }
+    var next = RANKS[rankIndex(cur) + 1];
+    return next || null;
+  }
+
+  /*
+    The schools a mage's hours feed. Only a mage's own schools: a school
+    taught to somebody outside the profession never leaves novice, so
+    counting work against it would draw a ladder nobody can climb.
+  */
+  function schoolsFed(s) {
+    if (!s || s.prof !== 'mage') { return []; }
+    return (s.schools || []).slice();
+  }
+
+  /*
+    n pieces of work under one key, on a state that is already ours to
+    change. The one place a count is added and the one place a rank is
+    raised from work. Returns the raise, or null.
+
+    Nothing here writes s.ranks: the raise goes through rankUp, so a taught
+    trade stays at novice, a sister half waits for its Master and a Master is
+    done climbing, whichever door the work came in through.
+  */
+  function addWork(s, k, n, masterState) {
+    if (!s.work) { s.work = {}; }
+    s.work[k] = workDone(s, k) + n;
+
+    var need = workNeeded(s, k);
+    if (!need || s.work[k] < need) { return null; }
+
+    var was = rankOf(s, k);
+    var pointsWas = s.points || 0;
+    var spellsWas = (s.spells && s.spells.points) || 0;
+    var up = rankUp(s, k, masterState);
+    if (!up.ok) {
+      // Held at the ceiling. The count waits there rather than climbing
+      // forever, so nothing is lost and nothing is banked.
+      s.work[k] = need;
+      return null;
+    }
+    up.state.work[k] = s.work[k] - need;
+    // rankUp worked on a copy, so the answer is copied back onto the state
+    // the caller is holding. One state in, one state out.
+    for (var f in up.state) { if (own(up.state, f)) { s[f] = up.state[f]; } }
+    return { key: k, from: was, to: rankOf(s, k),
+             points: (s.points || 0) - pointsWas,
+             spellPoints: ((s.spells && s.spells.points) || 0) - spellsWas };
+  }
+
+  /*
+    A RANK GAINED ANYWHERE IS HOURS A MAGE CAN COUNT.
+
+    The server sees no casting (see TUNING.study), so a mage's schools have
+    to climb on something else it does see. A rank gained in anything else
+    they hold, the class at the quarry or the other school, feeds every
+    school they hold. One step only: what a raise feeds out never feeds
+    again, so a chain of raises cannot run away from the thresholds.
+  */
+  function feedSchools(s, fromKey, out) {
+    var fed = schoolsFed(s);
+    for (var i = 0; i < fed.length; i++) {
+      if (fed[i] === fromKey) { continue; }
+      var also = addWork(s, fed[i], TUNING.study.perRank, null);
+      if (also) { out.push(also); }
+    }
+  }
+
+  /**
+    Work done, counted, and the rank raised when the count is there.
+
+    'Rank comes from doing the work. Nothing else moves it.' This is the only
+    place in the server that counts the work, and it raises the rank by
+    calling rankUp, never by writing s.ranks itself, so every ceiling rankUp
+    holds is still held: a taught trade stays at novice, a sister half waits
+    for a Master, a Master is done climbing. When rankUp says no, the count
+    sits at the threshold rather than running away, so the moment the Master
+    turns up the next piece of work is the one that lands.
+
+    key is a class ('miner'), a half ('charburner') or a school, and it is
+    also allowed to be the class verb ('mine'), which is resolved to its
+    class here so a caller at a salt seam does not have to know the word.
+
+    n is how many pieces of work this is, one when it is not given. A manual
+    read is worth several at once and is still one write.
+
+    Returns { ok, state, raised, also }: raised is null or what the rank
+    gave, and also is the ranks a mage's schools took from that one.
+  */
+  function creditWork(state, key, masterState, n) {
+    var k = classFor(key) || key;
+    var s = clone(state);
+    var pieces = (typeof n === 'number' && n > 0) ? Math.floor(n) : 1;
+    /*
+      A class taken before a class had standing.
+
+      pickClass writes ranks[cls] now, and every character who chose one
+      before it did has the class and no rank under it. They would work a
+      seam forever and never be counted, silently, which is the worst shape
+      a bug like this takes. Their standing starts here, at novice, the same
+      place everybody else's did.
+    */
+    if (!rankOf(s, k) && s.cls === k) { s.ranks[k] = 'novice'; }
+    if (!rankOf(s, k)) { return no('no standing in that'); }
+
+    var out = { ok: true, state: s, raised: null, also: [] };
+    out.raised = addWork(s, k, pieces, masterState);
+    if (out.raised) { feedSchools(s, k, out.also); }
+    return out;
   }
 
   /** A mage at Master picks the third school. Once. */
@@ -2966,25 +4056,173 @@ log('gamemode loaded:',
     if (s.schools.indexOf(school) !== -1) { return no('already one of yours'); }
     if (s.schools.length >= PROFESSIONS.mage.mastered) { return no('a mage holds ' + PROFESSIONS.mage.mastered + ' schools at most'); }
     var isMaster = false;
-    for (var i = 0; i < s.schools.length; i++) { if (s.ranks[s.schools[i]] === 'master') { isMaster = true; } }
+    for (var i = 0; i < s.schools.length; i++) { if (rankOf(s, s.schools[i]) === 'master') { isMaster = true; } }
     if (!isMaster) { return no('the third school comes with Master'); }
     s.schools.push(school);
     s.ranks[school] = 'novice';
+    place(s, 'schools', school);
     return yes(s);
   }
 
-  /** One point into one sub-skill. The perk is derived, not stored. */
-  function spendPoint(state, skill) {
+  /*
+    One point into one sub-skill. The perk is derived, not stored.
+
+    ONE POINT IN, AND NOTHING EVER OUT. amount is read because the panel and
+    the chat line both hand their words straight through, and '/spend might
+    -1' used to spend a point INTO Might, the opposite of what was asked.
+    Anything but one point in is refused, which is also what stops a placed
+    point being moved: placed points are in tree, they count against the cap
+    like any other, and there is no door here that takes one back out.
+  */
+  function spendPoint(state, skill, amount) {
     var s = clone(state);
-    var found = null;
-    for (var attr in TREE) { if (TREE[attr].skills[skill]) { found = TREE[attr].skills[skill]; } }
+    var found = treeSkill(skill);
     if (!found) { return no('no such sub-skill'); }
+    if (amount !== undefined && amount !== null && Number(amount) !== 1) {
+      return no('a point goes in one at a time, and a point already placed cannot be moved');
+    }
     if (s.points <= 0) { return no('no points to spend'); }
-    var have = s.tree[skill] || 0;
+    var have = own(s.tree, skill) ? (s.tree[skill] || 0) : 0;
     if (have >= LIMITS.skillCap) { return no('that one is full'); }
     s.tree[skill] = have + 1;
     s.points -= 1;
     return yes(s);
+  }
+
+  // ------------------------------------------------------------- the book --
+
+  /** The spell by name, case and spacing as the person typed it, or null. */
+  function spellAt(name) {
+    var want = String(name || '').trim().toLowerCase();
+    if (!want) { return null; }
+    for (var school in SPELLS) {
+      if (!own(SPELLS, school)) { continue; }
+      for (var rank in SPELLS[school]) {
+        if (!own(SPELLS[school], rank)) { continue; }
+        var names = SPELLS[school][rank];
+        for (var i = 0; i < names.length; i++) {
+          if (names[i].toLowerCase() === want) {
+            return { name: names[i], school: school, rank: rank };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Does the book they already hold have anything of that rank in that school. */
+  function knowsRank(state, school, rank) {
+    var s = state || fresh();
+    var known = (s.spells && s.spells.known) || [];
+    var book = own(SPELLS, school) ? SPELLS[school] : {};
+    var names = (own(book, rank) && book[rank]) || [];
+    for (var i = 0; i < known.length; i++) {
+      for (var j = 0; j < names.length; j++) {
+        if (known[i] === names[j]) { return true; }
+      }
+    }
+    return false;
+  }
+
+  /** The schools this character may take a spell from: their own, or taught. */
+  function schoolsOf(state) {
+    var s = state || fresh();
+    if (s.prof === 'mage') { return (s.schools || []).slice(); }
+    var out = [];
+    var taught = s.taught || [];
+    for (var i = 0; i < taught.length; i++) {
+      if (SCHOOLS.indexOf(taught[i]) !== -1) { out.push(taught[i]); }
+    }
+    return out;
+  }
+
+  /**
+    Spell points to spend right now.
+
+    A mage's are stored and earned: two at the start, one with every rank,
+    two more at Master. Everybody else has no stored points and never earns
+    one, because nothing in the rulebook gives them one; what they have is
+    the cap, 'a cap on how many spells anyone can learn that way', and what
+    is left of it is what they can spend. So the same question answers both
+    kinds and the cap cannot be got round by holding points.
+  */
+  function spellPoints(state) {
+    var s = state || fresh();
+    if (s.prof === 'mage') { return (s.spells && s.spells.points) || 0; }
+    if (!schoolsOf(s).length) { return 0; }
+    var known = (s.spells && s.spells.known) || [];
+    return Math.max(0, LIMITS.outsiderSpells - known.length);
+  }
+
+  /**
+    One spell into the book, and the point it costs.
+
+    Five things have to be true, and the refusal says which one is not:
+    magic is theirs at all, the school is one of theirs, they have a point,
+    their rank in that school has reached the spell's rank, and they already
+    hold something of the rank below it. Novice has nothing below it, which
+    is where everybody starts.
+
+    This records the spell. Putting it on the character in the game is the
+    server's next step and not a rule; a spell with no form id yet is known
+    here and simply not cast until it has one.
+  */
+  function pickSpell(state, name) {
+    var s = clone(state);
+    var spell = spellAt(name);
+    if (!spell) { return no('no such spell'); }
+
+    var mine = schoolsOf(s);
+    if (!mine.length) {
+      return no(s.prof === 'mage'
+        ? 'pick your schools first'
+        : 'magic is not yours yet: a Master mage has to take you on first');
+    }
+    if (mine.indexOf(spell.school) === -1) {
+      return no(spell.school + ' is not one of your schools');
+    }
+    if (knowsSpell(s, spell.name)) { return no('you already know that one'); }
+    if (spellPoints(s) <= 0) { return no('no spell point to spend'); }
+
+    var have = rankOf(s, spell.school);
+    if (!have || rankIndex(have) < rankIndex(spell.rank)) {
+      return no(spell.rank + ' ' + spell.school + ' is above your rank in it');
+    }
+    var below = RANKS[rankIndex(spell.rank) - 1];
+    if (below && !knowsRank(s, spell.school, below)) {
+      return no('you need a ' + below + ' spell of ' + spell.school + ' first');
+    }
+
+    if (!s.spells) { s.spells = { points: 0, known: [] }; }
+    if (!s.spells.known) { s.spells.known = []; }
+    // A mage spends a stored point. Everybody else spends a place under the
+    // cap, which is the push below and nothing else.
+    if (s.prof === 'mage') { s.spells.points -= 1; }
+    s.spells.known.push(spell.name);
+
+    /*
+      A SPELL LEARNED IS HOURS IN ITS SCHOOL, and it is half of what keeps a
+      mage's ladder alive (see TUNING.study). It is counted through addWork
+      like every other hour, so if it is the piece that reaches a threshold
+      the rank goes up through rankUp and not around it. A school taught to
+      somebody outside the profession is not counted: it never leaves novice,
+      so a count against it would only draw a ladder nobody can climb.
+    */
+    var out = yes(s);
+    out.raised = null;
+    out.also = [];
+    if ((s.taught || []).indexOf(spell.school) === -1 && rankOf(s, spell.school)) {
+      out.raised = addWork(s, spell.school, TUNING.study.perSpell, null);
+      if (out.raised) { feedSchools(s, spell.school, out.also); }
+    }
+    return out;
+  }
+
+  /** Is that spell already in their book. */
+  function knowsSpell(state, name) {
+    var s = state || fresh();
+    var known = (s.spells && s.spells.known) || [];
+    return known.indexOf(name) !== -1;
   }
 
   /** Every perk this character holds right now, from state alone. */
@@ -2992,15 +4230,15 @@ log('gamemode loaded:',
     var out = [];
     var s = state || fresh();
     if (s.prof && s.ranks) {
-      var p = PROFESSIONS[s.prof];
-      var own = s.half ? [s.half] : (s.schools || []);
-      for (var i = 0; i < own.length; i++) {
-        if (s.ranks[own[i]] === 'master' && p && p.perk) { out.push(p.perk.key); break; }
+      var p = own(PROFESSIONS, s.prof) ? PROFESSIONS[s.prof] : null;
+      var mine = s.half ? [s.half] : (s.schools || []);
+      for (var i = 0; i < mine.length; i++) {
+        if (rankOf(s, mine[i]) === 'master' && p && p.perk) { out.push(p.perk.key); break; }
       }
     }
     for (var attr in TREE) {
       for (var k in TREE[attr].skills) {
-        if ((s.tree && s.tree[k]) >= LIMITS.skillCap) { out.push(TREE[attr].skills[k].perk); }
+        if ((s.tree && own(s.tree, k) && s.tree[k]) >= LIMITS.skillCap) { out.push(TREE[attr].skills[k].perk); }
       }
     }
     return out;
@@ -3012,8 +4250,7 @@ log('gamemode loaded:',
     novice; anything they have no standing in answers no.
   */
   function canWork(state, half, rank) {
-    var s = state || fresh();
-    var have = s.ranks && s.ranks[half];
+    var have = rankOf(state, half);
     if (!have) { return false; }
     return rankIndex(have) >= rankIndex(rank || 'novice');
   }
@@ -3021,19 +4258,1193 @@ log('gamemode loaded:',
   /** The class verbs. The only question the five gates ask. */
   function canDo(state, verb) {
     var s = state || fresh();
-    var by = { loot: 'hunter', fish: 'fisher', harvest: 'gatherer', mine: 'miner', farm: 'farmer' };
-    return !!s.cls && s.cls === by[verb];
+    return !!s.cls && s.cls === classFor(verb);
   }
 
   g.__thornswoodProgression = {
-    TABLE: TABLE, fresh: fresh, clone: clone,
+    TABLE: TABLE, SPELLS: SPELLS, SPELL_IDS: SPELL_IDS, TUNING: TUNING,
+    fresh: fresh, clone: clone,
     pickClass: pickClass, pickProfession: pickProfession, teach: teach,
     rankUp: rankUp, pickThirdSchool: pickThirdSchool, spendPoint: spendPoint,
     perks: perks, canWork: canWork, canDo: canDo,
-    halvesOf: halvesOf, sisterOf: sisterOf
+    halvesOf: halvesOf, sisterOf: sisterOf, classFor: classFor,
+    creditWork: creditWork, workDone: workDone, workNeeded: workNeeded,
+    nextRank: nextRank, rankOf: rankOf, treeApplies: treeApplies,
+    placedIn: placedIn, has: own,
+    pickSpell: pickSpell, spellAt: spellAt, spellPoints: spellPoints,
+    knowsSpell: knowsSpell, schoolsOf: schoolsOf
   };
 })();
 // ==== end thornswood progression ====
+
+// ==== thornswood farming ====
+/*
+  FARMING: claiming ground, sowing it, waiting, and bringing it in.
+
+  Patrick, 20 September: 'there is no system for claiming plots for farming,
+  planting things, and then things growing, currently all the farms are already
+  full but they shouldn't be and to make it so they can become full we could
+  give farmers a few starting crops or something but I want it so you can't just
+  farm infinitely like you usually can and have it so you actually have to plant
+  and replant and wait you know'.
+
+  WHAT WAS MEASURED IN THE FORK, at C:\Thornswood-Dev\skymp, because it is what
+  decided the whole shape of this:
+
+    MpObjectReference::ProcessActivateNormal treats a FLOR or TREE base as
+    pickable. It reads the produce straight out of the record, puts it in the
+    hands of whoever pressed it, calls SetHarvested(true) and RequestReloot().
+    Nobody asked anybody's permission and nobody counted anything.
+
+    MpObjectReference::Activate fires the gamemode hook FIRST. Returning false
+    from mp.onActivate blocks ProcessActivateNormal outright. That is the whole
+    lever this block stands on: the server can refuse any pick, and mp.onActivate
+    returns false for every crop base without exception.
+
+    MpObjectReference::GetRelootTime returns a hardcoded std::chrono::hours(1)
+    for FLOR and for TREE. That hour is the free infinite farming: walk a row of
+    cabbages, come back in an hour, walk it again, for ever.
+
+  THE ONE HONEST LIMIT, AND THE NEXT PERSON WILL HIT IT, so it is written down
+  in full rather than discovered.
+
+  The server owns the RULE and does not own the LOOK. There is no property
+  binding for isHarvested and none for a per-reference reloot time: the complete
+  list is in skymp5-server\cpp\addon\property_bindings\PropertyBindingFactory.cpp
+  and neither is among them. So this block can decide what a press gives and it
+  cannot touch what the plot looks like or when the engine decides to put the
+  model back. In practice that means two things, both of them visible:
+
+    A plot that is empty by the rule may still look ripe. Nothing was sown, the
+    cabbage model is standing there, and pressing it says the plot is empty.
+
+    A plot that was just brought in looks picked for an hour and then the engine
+    grows the model back on its own, with nothing sown in it. It looks ready and
+    it gives nothing.
+
+  The RULE still holds through all of that, which is the part that matters:
+  every press goes through activate() below, an unsown plot gives nothing, and
+  the engine never gets to run its own hand-out because the hook returns false
+  first. Nobody farms infinitely. They just see a plot that is lying to them
+  about which state it is in.
+
+  Two property bindings in the fork would close the gap entirely, isHarvested
+  and relootTime, and then the model would say what the record says. That is a
+  fork change, which is a few lines in the dev channel first: the problem, the
+  approach, what it touches, agreed between Patrick and Djinn before any code.
+  Until then every grow time is kept under the engine's own hour so the look and
+  the rule never drift further apart than that, and it is kept there by
+  arithmetic rather than by care: mergeCrops near the top of the file caps every
+  wait at CROP_GROW_MINUTES_MAX, which is the measured hour less five minutes.
+  That cap is not decoration. The generated half of the crop table carries
+  harvests.json's own grow times, which are 75 minutes for ten of the eleven and
+  135 for Wheat, computed by a rule that is documented never to go under the
+  hour. Without the cap, one run of the crops pass would have put every crop past
+  the reloot and left plots standing ripe and answering 'still growing'.
+
+  THE ALSO-HARVESTABLE REST OF SKYRIM IS NOT THIS BLOCK'S. tools\harvests.json
+  counted 181 FLOR and TREE bases in this load order and CROPS holds fifteen of
+  them. The other 166 are mountain flowers, thistle, mushrooms and the like, and
+  the engine still hands those out to anybody on its own hour. That is the
+  gatherer's verb rather than the farmer's, and closing it would mean deciding
+  what happens when anybody in Skyrim presses a flower, which is a change to
+  settled design and belongs in the dev channel before any code. What was closed
+  here is the farm half: every crop base a farm is made of is in the table,
+  including the four the crops pass does not list, so no plot in a farm pays out
+  for free.
+
+  FARMS START EMPTY, WITH NO STARTUP SWEEP. Patrick: 'currently all the farms
+  are already full but they shouldn't be'. A plot's state lives on the plot, as
+  a custom property on the reference, and a reference nobody has ever sown has
+  no such property at all. readPlot answers null for it, activate() says the
+  plot is empty, and that is every crop in Skyrim on the first press. There is
+  no boot pass here because there is nothing to sweep: emptiness is the absence
+  of a record rather than a record saying empty, which is also why a world save
+  restored from before this existed comes back empty rather than wrong.
+
+  A CLAIM IS A CIRCLE OF GROUND AROUND A PLOT, NOT A LIST OF PLOTS AND NOT A
+  GRID SQUARE. There is no farm object in Skyrim to claim. A farm is a fence,
+  some dirt and thirty separate references, and no record anywhere says which
+  thirty belong together. So the ground is the farm: /claim asks for the nearest
+  plot within reach, writes down the cell and the position of THAT PLOT, and
+  every crop within TUNING.farming.claimRadius of it in the same cell belongs to
+  whoever holds it. One claim per person, keyed by their profile id so that one
+  per person is the shape of the record rather than a loop that deletes the
+  others, and it lapses after TUNING.farming.claimLapseDays with nothing done on
+  it.
+
+  IT WAS A GRID SQUARE UNTIL 20 SEPTEMBER AND THAT IS WHAT WENT WRONG. The claim
+  was keyed by the 4096 unit square the CLAIMER was standing in, while /plant,
+  /plot and every press asked about the square the PLOT was standing in. The two
+  disagree for any plot within reach of a line at a multiple of 4096, which,
+  since a Skyrim farm is 1500 to 3000 units across, is most farms. Measured
+  against the block with a stubbed mp: stand at x=4000 and claim, and the claim
+  is written under square 0; the cabbage at x=4150 is 150 units away, inside the
+  200 unit reach, and stands in square 1. /plot on it answered 'Nobody holds this
+  ground', anybody could sow it and anybody could bring it in, and the holder's
+  own work on it never refreshed the claim, so a farm worked every day still
+  lapsed on the fourteenth. Nothing anywhere told a person where the line was.
+
+  A circle around a plot has no lines in it. It also stops one word taking every
+  crop in 4096 by 4096 units of ground with no plot anywhere near the claimer,
+  which is what /claim did before: it never once looked for a crop.
+
+  A CLAIM THAT CANNOT BE READ IS NOT GROUND NOBODY HOLDS. Every place that asks
+  who holds a plot reads the plot's own cell and position first, and a read that
+  fails is a refusal, not an open plot. The old code let a failed read fall
+  through to 'nobody holds this', which paid the crop out to whoever pressed it;
+  the fork's own reads throw whenever a cell has been unloaded and rebuilt, which
+  readPlot below calls the normal case rather than the strange one.
+
+  The claims live in their own small file beside the other things this server
+  publishes, rather than on a reference, because a claim belongs to a patch of
+  ground and there is no reference at the middle of a patch to hang it on.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var P = g.__thornswoodProgression;
+  if (!P) { console.log('[thornswood farming] the rules block is missing, nothing registered'); return; }
+
+  var PLOT_PROPERTY = 'thornswoodPlot';
+  var RANK_STEPS = ['novice', 'advanced', 'expert', 'master'];
+
+  function flog() {
+    var a = Array.prototype.slice.call(arguments);
+    console.log('[thornswood farming] ' + a.join(' '));
+  }
+
+  /** The invented numbers, read fresh so an edit to TUNING needs no edit here. */
+  function tuning() { return P.TABLE.tuning.farming; }
+
+  /*
+    WHERE A PLOT'S STATE LIVES: on the plot.
+
+    Not in a map in this process, which a restart empties and which would hand
+    everybody's half grown crops back as unsown ground. Not on the person, which
+    could not answer 'what is sown in the plot in front of me' without walking
+    every plot they had ever touched. On the reference, through mp.makeProperty,
+    which the world save carries across a restart. It is the only one of the
+    three where the question and the answer are in the same place.
+
+    Invisible to everybody. A plot's state is not something a client needs to
+    draw, because the client cannot draw it anyway (see the note above about the
+    look), and there is no update script for the same reason: a property with no
+    reader does not need a channel to reach it.
+  */
+  try {
+    mp.makeProperty(PLOT_PROPERTY, {
+      isVisibleByOwner: false,
+      isVisibleByNeighbors: false,
+      updateOwner: '',
+      updateNeighbor: ''
+    });
+    flog('plot property registered');
+  } catch (e) {
+    // Already made by a previous load. The same as the character property:
+    // a hot reload re-runs this file and the second make throws.
+  }
+
+  /*
+    What is sown here, or null for an empty plot. Who sowed it, what was sown,
+    when, how long it takes and what it pays.
+
+    THE WAIT AND THE YIELD ARE FACTS ABOUT THE PLOT, and they are written into it
+    at sowing. They used to be worked out at read time from the rank of whoever
+    happened to be standing there, on the reading that this rewards a Farmer who
+    ranks up while a field is growing. Measured, that reading hands somebody
+    else's crop to a higher rank before the owner's own timer has run: a Novice
+    sows Wheat at 45 minutes, a Master presses the same plot at 25 minutes and
+    growByRank[3] makes it 24.75, so it is ripe for the Master and the owner's
+    own /plot still says 20 minutes to go. The plot's state is not allowed to
+    depend on who is looking at it, and the profitable play must not be to let
+    other people sow and then walk their rows. So the multiplier is applied once,
+    at sowing, by the person who sowed it.
+
+      ms    the whole wait chosen at sowing, in milliseconds.
+      step  the rank step of whoever sowed it, which is what the yield is sized
+            by. A plot pays what the person who put the seed in the ground has
+            earned, wherever the person pressing it stands on the ladder.
+
+    A record written before those two existed has neither, and both fall back to
+    the novice reading, which is the longest wait and the smallest yield. A
+    fallback that guessed the other way would pay out early on every plot in the
+    world the moment this release went out.
+
+    Every read is wrapped. mp.get throws for a reference that is gone, and a
+    reference goes when a cell is unloaded and rebuilt, so this is the normal
+    case rather than the strange one. A throw means empty, which is the answer
+    that gives nothing away.
+
+    The crop is checked against CROPS by own property before it is believed. It
+    comes back out of the world save, which is a file on the VPS, and a saved
+    string of '__proto__' finding something on Object.prototype is the same hole
+    the progression block's own() was written for.
+  */
+  function readPlot(refrId) {
+    var v = null;
+    try { v = mp.get(refrId, PLOT_PROPERTY); } catch (e) { return null; }
+    if (!v || typeof v !== 'object') { return null; }
+    if (typeof v.crop !== 'string' || !P.has(CROPS, v.crop)) { return null; }
+    var at = Number(v.at) || 0;
+    if (at <= 0) { return null; }
+    var ms = Number(v.ms) || 0;
+    if (ms <= 0) { ms = growMs(v.crop, 0); }
+    var step = Number(v.step) || 0;
+    if (step < 0 || step > RANK_STEPS.length - 1) { step = 0; }
+    return { by: Number(v.by) || 0, crop: v.crop, at: at, ms: ms, step: step };
+  }
+
+  /*
+    HAS THE SERVER EVER WRITTEN TO THIS PLOT AT ALL.
+
+    readPlot answers null for two completely different plots: one the server has
+    never touched, and one it emptied a minute ago. clearPlot writes the empty
+    shape rather than removing the property precisely so that a plot which has
+    been worked still carries a mark, and this is the read that uses that mark.
+
+    PATRICK, 20 September: 'they cant get the crops from anwyhere so like how
+    would do that'. This is the answer, and it is the same answer as to 'all the
+    farms are already full but they shouldnt be'. Every farm in Skyrim is
+    standing there full right now, because Bethesda put a cabbage in every row.
+    A plot nobody has ever worked is holding the crop the world put there, and
+    the first bring-in off it is real and is yours. That is where the first
+    cabbage comes from, and the first wheat, and the first apple: you go and
+    find the field. After that the plot carries the mark, it is empty, and only
+    sowing fills it again.
+
+    So a farm is full exactly once, which is what an abandoned farm should be,
+    and the seed problem solves itself without a merchant, a levelled list or a
+    single new record. It is not infinite: one plot gives one free crop in the
+    life of the world, and the rank gate still decides whether you may take it,
+    so a Novice standing under an apple tree is told to come back an Expert.
+
+    A read that throws counts as never written, because a reference the property
+    binding cannot be read from is one it cannot be written to either, and the
+    clearing below refuses to pay out when the write fails. So the worst a
+    throwing reference can do is answer 'try again in a moment', not pay twice.
+  */
+  function neverWorked(refrId) {
+    var v = null;
+    try { v = mp.get(refrId, PLOT_PROPERTY); } catch (e) { return true; }
+    return !v || typeof v !== 'object';
+  }
+
+  function writePlot(refrId, by, crop, ms, step) {
+    try {
+      mp.set(refrId, PLOT_PROPERTY,
+             { by: by, crop: crop, at: Date.now(), ms: ms, step: step });
+      return true;
+    } catch (e) {
+      flog('could not sow', refrId.toString(16) + ':', e);
+      return false;
+    }
+  }
+
+  /*
+    Emptied by writing the empty shape rather than by removing the property.
+
+    A removal the binding refused, or a null the binding would not take, would
+    leave a ripe plot ripe for ever, and a ripe plot that can be pressed again
+    and again is precisely the free infinite farming this whole block exists to
+    stop. Writing { by: 0, crop: '', at: 0 } goes down the same code path a
+    sowing does, so if a sowing can be written then a clearing can be, and
+    readPlot answers null for it because '' is not a crop.
+
+    The caller checks the answer and refuses to hand anything over when it is
+    false, so a plot that could not be cleared is a plot nobody was paid for.
+  */
+  function clearPlot(refrId) {
+    try {
+      mp.set(refrId, PLOT_PROPERTY, { by: 0, crop: '', at: 0, ms: 0, step: 0 });
+      return true;
+    } catch (e) {
+      flog('could not clear', refrId.toString(16) + ':', e);
+      return false;
+    }
+  }
+
+  // --------------------------------------------------------- rank and time --
+
+  function rankPhrase(rank) {
+    var n = String(rank || '').charAt(0).toUpperCase() + String(rank || '').slice(1);
+    return (/^[aeiou]/i.test(n) ? 'an ' : 'a ') + n;
+  }
+
+  function stepOf(rank) {
+    var at = RANK_STEPS.indexOf(rank);
+    return at < 0 ? 0 : at;
+  }
+
+  /*
+    The rank this crop asks for, which is the one in CROP_RULES and nothing else.
+
+    It was clamped to TUNING.farming.demandAtMost until 20 September, and that
+    knob is gone with the reason for it. CROPS carried the rank harvests.json
+    gives a base, which is the gold value of the produce, and ten of the eleven
+    came out Advanced, which would have left a new Farmer with nothing they could
+    sow. So every crop was clamped down to novice instead, and the clamp was
+    total: rankOk became step >= 0, which is true for everybody, so the whole
+    gate was dead and its two refusals could not be printed. classes.md publishes
+    a ladder now, CROP_RULES puts each crop on a rung of it, and the gate is
+    live: a Novice is refused the orchard and told so.
+  */
+  function demanded(crop) {
+    return CROPS[crop].rank;
+  }
+
+  function rankOk(step, crop) {
+    return step >= stepOf(demanded(crop));
+  }
+
+  /*
+    How long this crop takes for somebody at this rank, in milliseconds.
+
+    Called once per sowing, by plant(), and the answer is written onto the plot.
+    See readPlot for why it is not worked out again at every read. The floor of
+    one minute is there so a multiplier edited to nothing cannot make a crop ripe
+    the instant it is sown.
+  */
+  function growMs(crop, step) {
+    var by = tuning().growByRank;
+    var mult = by[Math.max(0, Math.min(by.length - 1, step))];
+    return Math.max(60000, Math.round(CROPS[crop].growMinutes * 60000 * mult));
+  }
+
+  /*
+    Whole minutes still to wait, rounded up, and 0 when it is ready.
+
+    One argument, because there is one answer. Whoever asks, and whatever rank
+    they hold, a plot is ripe at the moment it is ripe.
+  */
+  function minutesLeft(plot) {
+    var left = (plot.at + plot.ms) - Date.now();
+    return left > 0 ? Math.ceil(left / 60000) : 0;
+  }
+
+  function minutes(n) { return n + ' minute' + (n === 1 ? '' : 's'); }
+
+  function yieldAt(step) {
+    var by = tuning().yieldByRank;
+    return by[Math.max(0, Math.min(by.length - 1, step))];
+  }
+
+  // -------------------------------------------------------------- the land --
+
+  function profileOf(actorId) {
+    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+  }
+
+  function nameOfActor(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      var n = String((ap && ap.name) || '');
+      if (n) { return n; }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  function where(actorId) {
+    try {
+      var cell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      var pos = mp.get(actorId, 'pos');
+      if (!cell || !pos) { return null; }
+      return { cell: cell, pos: pos };
+    } catch (e) { return null; }
+  }
+
+  /*
+    The ground a plot stands on: its cell and its position, or null.
+
+    Null is 'the server could not read this plot', which is a different fact from
+    'nobody holds this ground' and every caller treats it as one. mp.get throws
+    for a reference whose cell has been unloaded and rebuilt, which readPlot
+    above calls the normal case, and the old code turned that throw into an
+    unclaimed plot and paid the crop out.
+  */
+  function groundOf(refrId) {
+    try {
+      var cell = String(mp.get(refrId, 'worldOrCellDesc') || '');
+      var pos = mp.get(refrId, 'pos');
+      if (!cell || !pos) { return null; }
+      return { cell: cell, pos: pos };
+    } catch (e) { return null; }
+  }
+
+  /** Flat distance, because a farm on a slope is still one patch of ground. */
+  function flatDistance2(a, b) {
+    var dx = a[0] - b[0], dy = a[1] - b[1];
+    return dx * dx + dy * dy;
+  }
+
+  /*
+    The nearest crop reference within reach, or null.
+
+    mp.getNeighborsByPosition hands back everything in the 4096 unit grid square
+    around a position, which is a lot of doors and rocks, so it is filtered down
+    to bases that are crops and then to the nearest one inside
+    TUNING.farming.reach.
+
+    WANTEMPTY IS WHAT /PLANT ASKS FOR, and it is not a nicety. Nearest-of-all
+    meant standing between a sown plot at 50 units and an empty one at 120, both
+    within reach, answered 'Something is already sown here. Find an empty plot'
+    until the person physically walked far enough for the other one to win. That
+    is the interaction the class spends its first hours in. The empty one is
+    preferred when there is one and the nearest of all is still the answer when
+    there is not, so 'already sown here' is still said when everything in reach
+    really is sown.
+
+    WORTH KNOWING: it returns one square and not nine. Standing right on a grid
+    line, a plot one step away in the next square is not in the list at all, and
+    the honest answer to that is the one the refusal gives, which is to stand
+    closer. Widening it to the nine surrounding squares would mean nine calls
+    and a lot more references to walk on every /plant, for a case that a single
+    step fixes. A claim does not have this problem: it is read by distance from
+    the plot it was made at rather than out of a neighbour list.
+  */
+  function nearestPlot(actorId, wantEmpty) {
+    var at = where(actorId);
+    if (!at) { return null; }
+    var near = [];
+    try { near = mp.getNeighborsByPosition(at.cell, at.pos) || []; } catch (e) { return null; }
+
+    var reach = tuning().reach;
+    var best = null, bestD = reach * reach;
+    var bestEmpty = null, bestEmptyD = reach * reach;
+    for (var i = 0; i < near.length; i++) {
+      var id = near[i];
+      var base = '';
+      try { base = String(mp.get(id, 'baseDesc') || ''); } catch (e) { continue; }
+      if (!P.has(CROPS, base)) { continue; }
+      var p = null;
+      try { p = mp.get(id, 'pos'); } catch (e) { continue; }
+      if (!p) { continue; }
+      var dz = p[2] - at.pos[2];
+      var d = flatDistance2(p, at.pos) + dz * dz;
+      if (d <= bestD) { bestD = d; best = { refrId: id, base: base }; }
+      if (wantEmpty && d <= bestEmptyD && !readPlot(id)) {
+        bestEmptyD = d; bestEmpty = { refrId: id, base: base };
+      }
+    }
+    return bestEmpty || best;
+  }
+
+  // ------------------------------------------------------------- the claims --
+
+  function claimsPath() {
+    var dataDir = 'data';
+    try {
+      var cfg = JSON.parse(require('fs').readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+    } catch (e) { }
+    return require('path').join(dataDir, 'farm-claims.json');
+  }
+
+  /*
+    The record off disk, rebuilt field by field rather than trusted whole.
+
+    Nothing from the file reaches the record as it was written. Every key is
+    checked, every value is rebuilt out of a Number and a String, and anything
+    that does not answer is dropped. That is not caution about the file, which
+    only this block writes: it is that a record which goes back out through
+    JSON.stringify must not be able to carry a function, a prototype member or
+    anything else that was never a claim.
+
+    '__proto__' is skipped by name. Assigning to it on a plain object sets the
+    prototype rather than a key, which would put every later lookup on an object
+    somebody else chose. Every read below goes through P.has as well.
+
+    A CLAIM IS KEYED BY THE PROFILE THAT HOLDS IT. One claim per person is the
+    rule, so it is the shape of the record: writing a second claim for somebody
+    replaces the first by itself, rather than a loop walking every claim in the
+    file deleting the ones that match.
+
+    CLAIMS IN THE OLD SHAPE ARE DROPPED, and the log says how many. They were
+    keyed by a grid square and carried no position, and there is no honest way to
+    turn a square into the plot somebody was standing at: the middle of the
+    square is a guess, and the guess would be wrong by up to 2896 units, which is
+    a farm and a half. So they go, and the holder says /claim again, standing in
+    the farm. This is a dev server in closed playtest and the file has a handful
+    of rows in it.
+  */
+  function loadClaims() {
+    var out = {};
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(claimsPath(), 'utf8')); } catch (e) { return out; }
+    var held = (raw && typeof raw === 'object' && raw.claims && typeof raw.claims === 'object')
+      ? raw.claims : {};
+    var kept = 0, old = 0;
+    for (var k in held) {
+      if (!Object.prototype.hasOwnProperty.call(held, k)) { continue; }
+      if (k === '__proto__') { continue; }
+      var c = held[k];
+      if (!c || typeof c !== 'object') { continue; }
+      var by = Number(c.by) || 0;
+      var at = Number(c.at) || 0;
+      if (!by || !at) { continue; }
+      var cell = String(c.cell || '');
+      var x = Number(c.x), y = Number(c.y);
+      if (!cell || !isFinite(x) || !isFinite(y)) { old++; continue; }
+      out[String(by)] = { by: by, name: String(c.name || 'somebody'), at: at,
+                          cell: cell, x: x, y: y };
+      kept++;
+    }
+    flog('read', kept, 'farm claims from', claimsPath(),
+         old ? '(' + old + ' in the old grid shape were dropped, and whoever held one says /claim again)' : '');
+    return out;
+  }
+
+  /*
+    When each profile was last handed seed. See offerSeed.
+
+    It lives in the same file as the claims because it is the same kind of fact,
+    a thing this block remembers about a person across a restart, and a second
+    file for one timestamp each is a second thing to deploy and back up.
+  */
+  function loadSeeded() {
+    var out = {};
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(claimsPath(), 'utf8')); } catch (e) { return out; }
+    var was = (raw && typeof raw === 'object' && raw.seeded && typeof raw.seeded === 'object')
+      ? raw.seeded : {};
+    for (var k in was) {
+      if (!Object.prototype.hasOwnProperty.call(was, k)) { continue; }
+      if (k === '__proto__') { continue; }
+      var at = Number(was[k]) || 0;
+      if (at > 0) { out[String(k)] = at; }
+    }
+    return out;
+  }
+
+  // On globalThis so a hot reload does not drop everybody's farm and read the
+  // file again in the middle of a session. The file is the record across a
+  // restart; this is the record across a reload.
+  if (!g.__thornswoodFarmClaims) { g.__thornswoodFarmClaims = loadClaims(); }
+  var claims = g.__thornswoodFarmClaims;
+  if (!g.__thornswoodFarmSeeded) { g.__thornswoodFarmSeeded = loadSeeded(); }
+  var seeded = g.__thornswoodFarmSeeded;
+
+  function saveClaims() {
+    try {
+      require('fs').writeFileSync(claimsPath(),
+                                  JSON.stringify({ at: Date.now(), claims: claims, seeded: seeded }));
+      return true;
+    } catch (e) {
+      flog('could not write the claims file, so these claims last until the next restart:', e);
+      return false;
+    }
+  }
+
+  /*
+    Has this claim been left long enough to lapse, and if so, drop it.
+
+    Done at the moment somebody asks rather than by a timer: there is no tick
+    that would notice sooner and nothing in the world changes when a claim lapses
+    except the answer to the question.
+  */
+  function lapsed(key) {
+    var c = claims[key];
+    var days = tuning().claimLapseDays;
+    if (days > 0 && (Date.now() - c.at) > days * 86400000) {
+      delete claims[key];
+      saveClaims();
+      flog('the claim', c.name, 'held in', c.cell, 'lapsed after', days,
+           'days with nothing done on it');
+      return true;
+    }
+    return false;
+  }
+
+  /*
+    Who holds this patch of ground, or null for ground nobody holds.
+
+    ground is what groundOf answers, so a caller that could not read the plot has
+    already refused before it gets here and null never means 'the read failed'.
+
+    Every claim is walked rather than a key looked up. There is one claim per
+    person and this is a closed playtest, so the list is short, and walking it is
+    what makes a claim a circle around a plot instead of a square with lines
+    through the farm.
+  */
+  function claimCovering(ground) {
+    if (!ground) { return null; }
+    var radius = tuning().claimRadius;
+    var within = radius * radius;
+    var keys = Object.keys(claims);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (!P.has(claims, k)) { continue; }
+      var c = claims[k];
+      if (c.cell !== ground.cell) { continue; }
+      if (flatDistance2([c.x, c.y], ground.pos) > within) { continue; }
+      if (lapsed(k)) { continue; }
+      return c;
+    }
+    return null;
+  }
+
+  /*
+    The claim that would be run into by claiming here, or null.
+
+    Two claims of the same radius overlap when their middles are closer than two
+    radii, and an overlap would put one plot inside two farms with no way to say
+    whose it is. So they are kept apart, and the person is told whose ground they
+    are standing next to.
+  */
+  function claimTooClose(ground, mine) {
+    var reachOfTwo = tuning().claimRadius * 2;
+    var within = reachOfTwo * reachOfTwo;
+    var keys = Object.keys(claims);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (!P.has(claims, k)) { continue; }
+      var c = claims[k];
+      if (c.by === mine) { continue; }
+      if (c.cell !== ground.cell) { continue; }
+      if (flatDistance2([c.x, c.y], ground.pos) > within) { continue; }
+      if (lapsed(k)) { continue; }
+      return c;
+    }
+    return null;
+  }
+
+  /*
+    Work done on a farm is a visit, so the lapse counts neglect and not age.
+
+    It takes the ground the plot stands on, which is the same ground the
+    ownership was read from a few lines earlier in every caller. It used to take
+    the grid key of the square the plot was in while the claim was filed under
+    the square the claimer had been standing in, so on a farm that straddled a
+    line the refresh silently found nothing and the claim lapsed under somebody
+    who had worked it every day.
+  */
+  function touchClaim(ground, profileId) {
+    var c = claimCovering(ground);
+    if (!c || c.by !== profileId) { return; }
+    c.at = Date.now();
+    saveClaims();
+  }
+
+  // ------------------------------------------------------------ the pressing --
+
+  /*
+    Somebody pressed E on a crop. The order of the answers is the design, and
+    each one is a plain sentence saying what to do next.
+
+      not a farmer            the class refusal the other four verbs use
+      nothing sown            an empty plot, whatever the model looks like
+      sown and still growing  how long is left, in whole minutes, rounded up,
+                              and the same number for everybody
+      cannot tell who         the profile did not read, so nothing is handed over
+      cannot tell where       the plot's own ground did not read, so nothing is
+                              handed over: it is not the same fact as ground
+                              nobody holds
+      somebody else's         sown by another person on a farm another person
+                              holds, so the holder is named
+      rank too low            the rank the crop wants, named
+      ripe and yours          the produce, the work counted, the plot emptied
+
+    The class comes first, before anything about this particular plot, so that
+    somebody who is not a farmer gets the same answer at every crop in Skyrim
+    rather than 'still growing' at one and a refusal at the next. That is the
+    same ordering harvest() above settled on and for the same reason.
+
+    The panel is not rebuilt here. The work goes through creditWork, which goes
+    through the character block's credit(), which writes the state and only
+    sends the panel when the drawn signature actually changed. So a row of
+    cabbages is a row of counter writes and not a row of browser updates.
+  */
+  /*
+    THE ONE FREE CROP OFF A FIELD NOBODY HAS WORKED.
+
+    Called only from activate, and only for a plot neverWorked says the server
+    has never written to. Every gate a sown plot gets, this gets: the class is
+    already checked by the caller, and the claim and the rank are checked here
+    in the same order and with the same sentences, so walking onto a stranger's
+    farm is refused whether the row was sown by them or by Bethesda.
+
+    The plot is marked BEFORE the crop is handed over, for the same reason the
+    sown path empties before it pays: a mark that failed to write and a crop
+    that did would be a plot that pays out on every press, which is the free
+    farming this block exists to stop.
+
+    It counts as farming work, because it is. Walking a field and bringing in
+    what is standing is how a new Farmer earns the rank that opens the next
+    rung, and it is the only work available to somebody who owns no seed at all.
+  */
+  function standing(actorId, refrId, baseDesc, crop) {
+    var step = rankStep(actorId, 'farmer');
+
+    var mine = profileOf(actorId);
+    if (!mine) {
+      return 'The server cannot tell who you are right now. Give it a moment and press it again.';
+    }
+    var ground = groundOf(refrId);
+    if (!ground) {
+      return 'The server cannot tell which ground this plot stands on, so it will ' +
+             'not hand you the crop. Try it again in a moment.';
+    }
+    var held = claimCovering(ground);
+    if (held && held.by !== mine) {
+      return 'This farm is held by ' + held.name + '. Ask them for what you ' +
+             'need, or claim ground of your own with /claim.';
+    }
+
+    if (!rankOk(step, baseDesc)) {
+      return 'Bringing in ' + crop.name + ' needs ' + rankPhrase(demanded(baseDesc)) +
+             ' Farmer. Work the crops you can until you are one.';
+    }
+
+    if (!idOf(crop.produce)) {
+      return 'The ' + crop.name + ' comes up and there is nothing in this load ' +
+             'order to put in your hands. Say so in the dev channel.';
+    }
+    if (!clearPlot(refrId)) {
+      return 'The ' + crop.name + ' will not come out of the ground. Try it again in a moment.';
+    }
+
+    /*
+      One, whatever the rank. The rank multiplier is what a farmer earns on a
+      plot they sowed themselves; a row somebody else planted and walked away
+      from pays what is on it and no more.
+    */
+    addItem(actorId, crop.produce, 1);
+    touchClaim(ground, mine);
+    var rank = creditWork(actorId, 'farm');
+    flog(actorId.toString(16), 'brought in the standing', crop.name, 'at',
+         refrId.toString(16) + ', a plot nobody had worked');
+    return 'You bring in the ' + crop.name + ' that was standing here. The plot ' +
+           'is empty now, and only sowing will fill it again.' + (rank ? ' ' + rank : '');
+  }
+
+  function activate(actorId, refrId, baseDesc) {
+    if (!P.has(CROPS, baseDesc)) { return null; }
+    var here = CROPS[baseDesc];
+
+    var refused = classGate(actorId, 'farm');
+    if (refused) { return refused; }
+
+    var plot = readPlot(refrId);
+    if (!plot) {
+      /*
+        NOTHING THE SERVER SOWED. Which of the two it is decides everything.
+
+        A plot the server has written to before is empty and says so. A plot it
+        has never written to is still holding what the world put there, and that
+        first bring-in is the whole seed supply of this server. See neverWorked
+        above for why, and for why it cannot run away.
+      */
+      if (!neverWorked(refrId)) {
+        return 'Nothing is sown here. Stand close and say /plant to put ' +
+               'a ' + here.name + ' in the ground.';
+      }
+      return standing(actorId, refrId, baseDesc, here);
+    }
+
+    var crop = CROPS[plot.crop];
+    var step = rankStep(actorId, 'farmer');
+
+    var left = minutesLeft(plot);
+    if (left > 0) {
+      return 'The ' + crop.name + ' is still growing. ' + minutes(left) + ' to go.';
+    }
+
+    /*
+      Somebody else's crop, on somebody else's farm.
+
+      Both halves have to be true. A ripe crop on ground nobody has claimed is
+      open to whoever finds it, which is what makes claiming worth doing, and a
+      crop sown by a visitor on your own claimed farm is yours to bring in,
+      which is what stops a claim being worked around by sowing on it.
+
+      THE TWO READS BEFORE IT REFUSE RATHER THAN PAY OUT, and that is the whole
+      of the correction here. Not knowing who is pressing, and not knowing which
+      ground the plot stands on, are both 'the server cannot tell', and the old
+      code turned each of them into 'nobody holds this ground' and handed the
+      crop over. Measured with a stubbed mp: with mp.get(plot, 'pos') throwing,
+      a thief pressing a holder's sown plot got 'You bring in 1 Cabbage' where
+      one line earlier they had been refused by name. A profile of 0 was worse,
+      because 0 is also what plot.by falls back to, so every unreadable plot read
+      as the presser's own. Everything else in this block refuses when a read
+      fails, and so does this now.
+    */
+    var mine = profileOf(actorId);
+    if (!mine) {
+      return 'The server cannot tell who you are right now. Give it a moment and press it again.';
+    }
+    var ground = groundOf(refrId);
+    if (!ground) {
+      return 'The server cannot tell which ground this plot stands on, so it will ' +
+             'not hand you the crop. Try it again in a moment.';
+    }
+    var held = claimCovering(ground);
+    if (held && held.by !== mine && plot.by !== mine) {
+      return 'This farm is held by ' + held.name + '. Ask them for what you ' +
+             'need, or claim ground of your own with /claim.';
+    }
+
+    if (!rankOk(step, plot.crop)) {
+      return 'Bringing in ' + crop.name + ' needs ' + rankPhrase(demanded(plot.crop)) +
+             ' Farmer. Work the crops you can until you are one.';
+    }
+
+    /*
+      The produce is resolved before the plot is emptied, and the plot is
+      emptied before anything is handed over. Either order the other way round
+      loses: clearing first and failing to hand over costs somebody a crop,
+      handing over first and failing to clear leaves a ripe plot that pays out
+      on every press, which is the free farming back.
+    */
+    if (!idOf(crop.produce)) {
+      return 'The ' + crop.name + ' comes up and there is nothing in this load ' +
+             'order to put in your hands. Say so in the dev channel.';
+    }
+    if (!clearPlot(refrId)) {
+      return 'The ' + crop.name + ' will not come out of the ground. Try it again in a moment.';
+    }
+
+    /*
+      The yield is the sower's, not the presser's. A plot pays what the person
+      who put the seed in the ground had earned, which is the other half of
+      keeping the plot's state off whoever is looking at it: a Master walking a
+      Novice's row brings in a Novice's crop.
+    */
+    var n = yieldAt(plot.step);
+    addItem(actorId, crop.produce, n);
+    touchClaim(ground, mine);
+    var rank = creditWork(actorId, 'farm');
+    flog(actorId.toString(16), 'brought in', n, crop.name, 'at', refrId.toString(16));
+    return 'You bring in ' + n + ' ' + crop.name + '.' + (rank ? ' ' + rank : '');
+  }
+
+  // ----------------------------------------------------------- the commands --
+
+  /*
+    /plant takes no argument, and that is not a shortcut.
+
+    A reference's base cannot be changed by the server, so a cabbage plot is a
+    cabbage plot for ever and sowing anything else in it would mean a plot that
+    looks like cabbages and gives potatoes. What is sown is therefore whatever
+    the plot in front of you already is, and the seed is the produce itself: you
+    sow a cabbage to grow cabbages. That also means no crop name ever arrives
+    off the wire for this command, so there is no name here to be careful with.
+  */
+  function plant(actorId, profileId, toProfile) {
+    var refused = classGate(actorId, 'farm');
+    if (refused) { toProfile(profileId, refused); return; }
+
+    var mine = profileOf(actorId);
+    if (!mine) {
+      toProfile(profileId, 'The server cannot tell who you are right now. ' +
+                           'Give it a moment and say /plant again.');
+      return;
+    }
+
+    // The empty plot in reach is preferred over the nearest one. See nearestPlot.
+    var found = nearestPlot(actorId, true);
+    if (!found) {
+      toProfile(profileId, 'No plot within reach. Stand next to the ground you ' +
+                           'mean to sow and say /plant again.');
+      return;
+    }
+    var crop = CROPS[found.base];
+    var step = rankStep(actorId, 'farmer');
+
+    var plot = readPlot(found.refrId);
+    if (plot) {
+      var left = minutesLeft(plot);
+      if (left > 0) {
+        toProfile(profileId, 'Something is already sown here, with ' + minutes(left) +
+                             ' to go. Find an empty plot.');
+      } else {
+        toProfile(profileId, 'Something is already sown here and it is ready. ' +
+                             'Bring it in first.');
+      }
+      return;
+    }
+
+    if (!rankOk(step, found.base)) {
+      toProfile(profileId, 'Sowing ' + crop.name + ' needs ' + rankPhrase(demanded(found.base)) +
+                           ' Farmer. Work the crops you can until you are one.');
+      return;
+    }
+
+    var ground = groundOf(found.refrId);
+    if (!ground) {
+      toProfile(profileId, 'The server cannot tell which ground that plot stands on. ' +
+                           'Move a step and say /plant again.');
+      return;
+    }
+    var held = claimCovering(ground);
+    // Refused rather than allowed, although the brief for the command did not
+    // ask for it: sowing on ground somebody else holds would put a crop in
+    // that the sower is then refused when they come back for it, which is a
+    // trap rather than a rule.
+    if (held && held.by !== mine) {
+      toProfile(profileId, 'This farm is held by ' + held.name + '. Ask before you ' +
+                           'sow here, or claim ground of your own with /claim.');
+      return;
+    }
+
+    if (!takeItem(actorId, crop.produce, 1)) {
+      // An empty pack is where a Farmer's whole class used to end. See offerSeed.
+      var handout = offerSeed(actorId, mine);
+      if (handout) { toProfile(profileId, handout); return; }
+      toProfile(profileId, 'You have no ' + crop.name + ' to sow. Bring one and stand here again.');
+      return;
+    }
+    var ms = growMs(found.base, step);
+    if (!writePlot(found.refrId, mine, found.base, ms, step)) {
+      // The seed came out of the pack a line ago and nothing was sown with it.
+      addItem(actorId, crop.produce, 1);
+      toProfile(profileId, 'The ground would not take it. Nothing was sown and the ' +
+                           crop.name + ' is back in your pack.');
+      return;
+    }
+
+    touchClaim(ground, mine);
+    var mins = Math.ceil(ms / 60000);
+    toProfile(profileId, 'You sow the ' + crop.name + '. It will be ready in ' + minutes(mins) + '.');
+    flog(actorId.toString(16), 'sowed', crop.name, 'at', found.refrId.toString(16),
+         'for', mins, 'minutes');
+  }
+
+  /*
+    The farm around the plot in front of you, claimed. One per person.
+
+    IT ASKS FOR A PLOT, and that is the change of 20 September. The command used
+    to take the 4096 unit grid square the person was standing in and never look
+    for a crop at all, so one word anywhere in a cell took every crop reference
+    in 4096 by 4096 units of ground, neighbouring farms included, and the first
+    few testers to say it near Whiterun would have held the farm cells for a
+    fortnight. Now the claim is the ground around a plot, so claiming means
+    standing in a farm, and what is claimed is a farm rather than a district.
+
+    The boundary is a circle with nothing drawn on it, which is why the answer
+    says how to find it: /plot at any plot says whether that plot is inside.
+  */
+  function claim(actorId, profileId, toProfile) {
+    var refused = classGate(actorId, 'farm');
+    if (refused) { toProfile(profileId, refused); return; }
+
+    var mine = profileOf(actorId);
+    if (!mine) {
+      toProfile(profileId, 'The server cannot tell who you are right now. ' +
+                           'Give it a moment and say /claim again.');
+      return;
+    }
+
+    var found = nearestPlot(actorId);
+    if (!found) {
+      toProfile(profileId, 'No plot within reach, and a claim is the ground around a ' +
+                           'plot. Stand in the farm you mean to take, next to one of ' +
+                           'its crops, and say /claim again.');
+      return;
+    }
+    var ground = groundOf(found.refrId);
+    if (!ground) {
+      toProfile(profileId, 'The server cannot tell which ground that plot stands on. ' +
+                           'Move a step and say /claim again.');
+      return;
+    }
+
+    var held = claimCovering(ground);
+    if (held && held.by !== mine) {
+      toProfile(profileId, 'This ground is already held by ' + held.name + '. ' +
+                           'Find a farm nobody has claimed.');
+      return;
+    }
+    if (held) {
+      toProfile(profileId, 'You already hold this ground.');
+      return;
+    }
+    var near = claimTooClose(ground, mine);
+    if (near) {
+      toProfile(profileId, 'That would run into the farm ' + near.name + ' holds. ' +
+                           'Farms do not overlap, so take ground further from theirs.');
+      return;
+    }
+
+    // One per person, and the record is keyed by the person, so the claim they
+    // held before is replaced by this one. They are told which farm they just
+    // let go, because somebody who is not told will walk back to it and find
+    // another person standing in it.
+    var mineKey = String(mine);
+    var released = P.has(claims, mineKey) ? claims[mineKey] : null;
+
+    claims[mineKey] = { by: mine, name: nameOfActor(actorId), at: Date.now(),
+                        cell: ground.cell, x: ground.pos[0], y: ground.pos[1] };
+    saveClaims();
+    flog(actorId.toString(16), 'claimed the ground around', found.refrId.toString(16),
+         'in', ground.cell, released ? '(released the farm they held in ' + released.cell + ')' : '');
+
+    toProfile(profileId, 'You claim this farm, the ground around that plot' +
+              (released ? ', and the farm you held before is let go' : '') +
+              '. Say /plot at a plot to see whether it is inside. It is yours while ' +
+              'you work it, and it lapses after ' + tuning().claimLapseDays +
+              ' days with nothing done on it.');
+  }
+
+  /*
+    What is under your feet. Open to everybody rather than to farmers, because
+    it reports and gives nothing: somebody deciding whether to become a farmer,
+    or looking for ground nobody has taken, should be able to look.
+  */
+  function report(actorId, profileId, toProfile) {
+    var found = nearestPlot(actorId);
+    if (!found) {
+      toProfile(profileId, 'No plot within reach. Stand on the ground you mean ' +
+                           'to look at and say /plot again.');
+      return;
+    }
+    /*
+      Whose it is, said in three ways and never guessed. A claim that cannot be
+      read is its own sentence rather than 'nobody holds this ground', because
+      this is the command a person uses to find the edge of a farm and an answer
+      that says nobody holds ground that somebody holds is how a tester walks off
+      with another person's crop in good faith.
+    */
+    var ground = groundOf(found.refrId);
+    var whose;
+    if (!ground) {
+      whose = 'The server cannot tell which ground it stands on, so it cannot say whose it is.';
+    } else {
+      var held = claimCovering(ground);
+      var mine = profileOf(actorId);
+      if (held && mine && held.by === mine) { whose = 'This ground is yours.'; }
+      else if (held) { whose = 'This ground is held by ' + held.name + '.'; }
+      else { whose = 'Nobody holds this ground.'; }
+    }
+    var plot = readPlot(found.refrId);
+    if (!plot) {
+      toProfile(profileId, 'A ' + CROPS[found.base].name + ' plot, and nothing sown in it. ' + whose);
+      return;
+    }
+    var left = minutesLeft(plot);
+    if (left > 0) {
+      toProfile(profileId, CROPS[plot.crop].name + ' growing, ' + minutes(left) + ' to go. ' + whose);
+      return;
+    }
+    toProfile(profileId, CROPS[plot.crop].name + ' ready to bring in. ' + whose);
+  }
+
+  function listOf(items) {
+    if (items.length === 1) { return items[0]; }
+    return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+  }
+
+  /*
+    Seed, handed over and written down.
+
+    The sixteen starter kits went on 20 September (see PASSAGES) and nothing
+    else in the game hands anybody anything, so without this a Farmer stands in a
+    field holding nothing they can sow. The only way to get a cabbage is to bring
+    one in off a plot, and the only way to bring one in is to have sown one,
+    which is a circle with nobody in it.
+
+    A crop whose plugin is not in this load order is simply skipped: addItem
+    answers false for it and the sentence names what was actually given. The
+    moment it happened is kept against the profile so that offerSeed can hold the
+    next one off, and it is kept in the claims file rather than in this process,
+    because a restart must not be a way to ask again.
+  */
+  function giveSeeds(actorId) {
+    var t = tuning();
+    var given = [];
+    for (var i = 0; i < t.startingCrops.length; i++) {
+      var d = t.startingCrops[i];
+      if (!P.has(CROPS, d)) { continue; }
+      if (addItem(actorId, CROPS[d].produce, t.startingSeeds)) {
+        given.push(t.startingSeeds + ' ' + CROPS[d].name);
+      }
+    }
+    if (!given.length) {
+      flog('no starting seed for', actorId.toString(16) +
+           ': none of the starting crops resolved in this load order');
+      return null;
+    }
+    var who = profileOf(actorId);
+    if (who) { seeded[String(who)] = Date.now(); saveClaims(); }
+    flog(actorId.toString(16), 'was handed', given.join(', '));
+    return 'You start with ' + listOf(given) + ' to sow. Stand by a plot and say /plant.';
+  }
+
+  /** Does this pack hold anything at all that could be sown? */
+  function holdsAnySeed(actorId) {
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return true; }
+    var entries = (inv && inv.entries) || [];
+    var wanted = {};
+    for (var d in CROPS) {
+      if (!P.has(CROPS, d)) { continue; }
+      var id = idOf(CROPS[d].produce);
+      if (id) { wanted[id] = true; }
+    }
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !e.count || e.count <= 0) { continue; }
+      if (Object.prototype.hasOwnProperty.call(wanted, e.baseId)) { return true; }
+    }
+    return false;
+  }
+
+  /*
+    THE WAY BACK, and the reason it has to exist at all.
+
+    Seed used to be handed out at exactly one moment, the /pick class farmer that
+    made somebody a Farmer, and pickClass refuses a second class for the life of
+    the character. So a Farmer who lost their crops was a Farmer who could never
+    farm again: /plant costs a produce, a bring-in needs a sown plot, and
+    grepping the ten produce descriptors over this file finds them nowhere but
+    the crop table, so no kit, no station and no other verb can hand one over.
+    Worse, every Farmer who picked the class before this release is in that state
+    already, because they have a character property so migrate() never runs for
+    them and the pick they made is long past. This release blocks the engine's
+    own free pick on every crop base in Skyrim, so without a way back it would
+    have taken farming away from the people who already chose it.
+
+    The way back is asked for rather than given: it happens at /plant, which is a
+    person standing at a plot saying they want to sow, and never from a read.
+    Two conditions, and the pack one is the real one:
+
+      the pack holds no produce of any crop on this server at all, so this is
+      somebody with nothing rather than somebody topping up, and
+
+      it has been TUNING.farming.seedAgainHours since the last handout, so a
+      person cannot stand there dropping crops and asking again.
+
+    It cannot be worked for profit. It pays about nine gold and asks for an empty
+    pack; one plot pays more than that in half an hour, and the person had to
+    walk to a plot to ask.
+  */
+  function offerSeed(actorId, profileId) {
+    if (holdsAnySeed(actorId)) { return null; }
+    var hours = tuning().seedAgainHours;
+    var last = P.has(seeded, String(profileId)) ? seeded[String(profileId)] : 0;
+    if (last && hours > 0 && (Date.now() - last) < hours * 3600000) {
+      var wait = Math.ceil((hours * 3600000 - (Date.now() - last)) / 3600000);
+      return 'Your pack is empty and the last seed you were given was today. ' +
+             'There is more in ' + wait + ' hour' + (wait === 1 ? '' : 's') + '.';
+    }
+    var line = giveSeeds(actorId);
+    if (!line) { return null; }
+    return 'Nothing in your pack to sow, so here is seed. ' + line;
+  }
+
+  function command(word, parts, actorId, profileId, toProfile) {
+    if (word === '/plant') { plant(actorId, profileId, toProfile); return; }
+    if (word === '/claim') { claim(actorId, profileId, toProfile); return; }
+    if (word === '/plot') { report(actorId, profileId, toProfile); return; }
+  }
+
+  g.__thornswoodFarming = {
+    PROPERTY: PLOT_PROPERTY,
+    activate: activate, command: command, giveSeeds: giveSeeds,
+    readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf
+  };
+  flog('ready,', Object.keys(CROPS).length, 'crops and', Object.keys(claims).length, 'claims');
+})();
+// ==== end thornswood farming ====
 
 // ==== thornswood character ====
 /*
@@ -3044,6 +5455,19 @@ log('gamemode loaded:',
   stores the answer on the actor as 'thornswoodCharacter', turns a /pick or a
   /spend into a call on the rules, and tells the person why when the answer
   is no. It is the only writer of that property.
+
+  IT IS ALSO THE ONE DOOR THE WORLD KNOCKS ON. A salt seam and a nirnroot ask
+  gate() whether this person's class owns that verb, a kiln asks gateHalf()
+  about the charburner half, and each of them calls credit() once the yield is
+  in somebody's hands, which is what counts the work and raises the rank. The
+  stations hold no rules of their own: they know what was pressed and nothing
+  about who is allowed to press it.
+
+  A SPELL IS THE ONE PICK THAT LEAVES THE PROPERTY. The rules record it, and
+  then it has to be put on the character in the game, which is Actor.AddSpell
+  the same way a shrine blessing is. SPELL_IDS above is empty until another
+  step generates it, so today a spell is learned, kept and not yet cast, and
+  the log says so once per spell rather than throwing.
 
   THE CHANNEL TO THE PANEL is the property's updateOwner script, and it is the
   only one there is. A visible custom property reaches the client solely
@@ -3091,8 +5515,64 @@ log('gamemode loaded:',
   function mapHalf(h) {
     h = String(h || '').toLowerCase();
     if (!h) { return ''; }
-    if (HALF_MAP[h]) { return HALF_MAP[h]; }
+    // hasOwnProperty, not a bare lookup: '/pick profession smith constructor'
+    // would otherwise map to a function off Object.prototype.
+    if (P.has(HALF_MAP, h)) { return HALF_MAP[h]; }
     return h;   // already a rulebook name, or unknown and refused below
+  }
+
+  /** The spells in somebody's book, as the panel reads them: name -> true. */
+  function spellMap(s) {
+    var out = {};
+    var known = (s && s.spells && s.spells.known) || [];
+    for (var i = 0; i < known.length; i++) { out[known[i]] = true; }
+    return out;
+  }
+
+  /*
+    Where every rank stands and how far the work has got towards the next
+    one, under the same keys as ranks: the class, the half, the sister half,
+    each school. Both numbers, so the page can draw progress instead of
+    guessing at it, and need 0 means there is nothing left to climb.
+  */
+  function workView(s) {
+    var out = {};
+    var ranks = (s && s.ranks) || {};
+    for (var key in ranks) {
+      if (!P.has(ranks, key)) { continue; }
+      out[key] = { rank: ranks[key], done: P.workDone(s, key), need: P.workNeeded(s, key) };
+    }
+    return out;
+  }
+
+  /*
+    THE PROGRESS THE PANEL DRAWS, and the half of the contract the server
+    owes the client.
+
+      progress: { '<key>': { next: '<rank being climbed to>', done: n, need: n } }
+
+    One entry per half, school or class verb that can still climb. A key at
+    Master, or one that cannot climb at all, is left out entirely rather than
+    sent with a null, and the whole field is left out when there is nothing
+    to say. The two halves were written at the same time last round and did
+    not match: this sent work with a rank in it, the panel read progress with
+    a next in it, and so nothing drew at all. work is still sent beside it
+    because the harness pins it; progress is the one the panel reads.
+  */
+  function progressView(s) {
+    var out = {};
+    var ranks = (s && s.ranks) || {};
+    var any = false;
+    for (var key in ranks) {
+      if (!P.has(ranks, key)) { continue; }
+      var next = P.nextRank(s, key);
+      if (!next) { continue; }
+      var need = P.workNeeded(s, key);
+      if (!need) { continue; }
+      out[key] = { next: next, done: P.workDone(s, key), need: need };
+      any = true;
+    }
+    return any ? out : null;
   }
 
   /*
@@ -3102,15 +5582,39 @@ log('gamemode loaded:',
   function forPanel(s, creating) {
     if (!s) { return null; }
     var chargen = g.__thornswoodChargen;
-    return {
+    var view = {
       profession: s.prof || null,
       'class': s.cls || null,
       half: s.half || null,
       schools: s.schools || [],
       ranks: s.ranks || {},
       tree: s.tree || {},
+      // The part of tree that was placed by the class, profession and half
+      // at creation. The panel draws these as placed rather than spent, and
+      // nothing takes one back out.
+      placed: s.placed || {},
       points: s.points || 0,
       perks: P.perks(s),
+      /*
+        What the tree adds up to, for the client to apply: only the values
+        that are not zero. The server cannot set any of them itself, because
+        GetBaseActorValues computes the base values from the race record and
+        would overwrite whatever was written. The per point amounts are in
+        TUNING.perPoint.
+
+        The name is the one the game plugin already reads: thornswood-front.js
+        takes the view back off the page and looks at v.panel.effects. Both
+        halves were written at the same time last round and did not match,
+        which is the whole reason there is a contract, so this one is spelled
+        the way the reader spells it.
+      */
+      effects: P.treeApplies(s),
+      // The book and what is left to spend on it. The page reads spells by
+      // name and spellPoints as a number; both names are the client's.
+      spells: spellMap(s),
+      spellPoints: P.spellPoints(s),
+      // Rank and progress per key. See workView.
+      work: workView(s),
       home: s.home || null,
       // The last refusal, so the panel can say why under itself. The chat
       // line says the same; the panel cannot read the chat.
@@ -3120,7 +5624,48 @@ log('gamemode loaded:',
       creating: !!creating,
       towns: (creating && chargen) ? chargen.towns() : []
     };
+    // Left out entirely when there is nothing to say, per the contract.
+    var climbing = progressView(s);
+    if (climbing) { view.progress = climbing; }
+    return view;
   }
+
+  /*
+    WHAT COUNTS AS THE PANEL CHANGING, and why a flower is not it.
+
+    Every credited yield used to call writeState, which fires updateOwner,
+    which re-runs the panel's setData in that person's browser. So picking
+    one nirnroot redrew the whole panel, and a morning of picking flowers
+    redrew it a hundred times to move one number nobody was looking at.
+
+    The counters are kept: the work is the record and the record is written
+    every time. What is held back is the PANEL VIEW. This is everything the
+    panel draws except the done numbers inside progress and work, so a write
+    that only moved a counter carries no panel at all, and the updateOwner
+    script sends nothing to the browser for it. The rank, the points, the
+    spells, the tree, a note, anything else on the view: the panel goes and
+    the browser redraws. The counters catch up with the next real change, or
+    at once on /pick refresh, which asks for a redraw outright.
+  */
+  function drawn(view) {
+    if (!view) { return ''; }
+    var copy = JSON.parse(JSON.stringify(view));
+    var groups = [copy.progress, copy.work];
+    for (var i = 0; i < groups.length; i++) {
+      for (var key in groups[i]) {
+        if (P.has(groups[i], key)) { delete groups[i][key].done; }
+      }
+    }
+    return JSON.stringify(copy);
+  }
+
+  /*
+    The panel view last sent to each person, as the string above. Kept in
+    memory rather than on the property, because it is bookkeeping about what
+    the browser has already been told and not a fact about the character. An
+    empty map after a restart costs one redraw each, which is right anyway.
+  */
+  var lastDrawn = {};
 
   /*
     The client side script. It runs inside skymp5-client every time the
@@ -3136,6 +5681,9 @@ log('gamemode loaded:',
       '  try {',
       '    var v = ctx.value;',
       '    if (!v || typeof v !== "object") { return; }',
+      // No panel on the value means the write moved a counter and nothing
+      // the panel draws, so the browser is not touched at all. See drawn().
+      '    if (!v.panel) { return; }',
       '    var open = (v.panel && v.panel.creating) ? "window.thornswoodSkills.open();" : "";',
       '    var src = "try{if(window.thornswoodSkills){window.thornswoodSkills.setData(null," + JSON.stringify(v) + ");" + open + "}}catch(e){}";',
       '    ctx.sp.browser.executeJavaScript(src);',
@@ -3164,13 +5712,29 @@ log('gamemode loaded:',
     return null;
   }
 
-  function writeState(actorId, s) {
+  function writeState(actorId, s, redraw) {
     s.v = 1;
     // forPanel is what the client sees; the rules state is what is stored.
     // Both travel in the one property so the panel never sees a half state.
     var chargen = g.__thornswoodChargen;
-    s.panel = forPanel(s, !!(chargen && chargen.isChoosing(actorId)));
-    try { mp.set(actorId, CHAR_PROPERTY, s); } catch (e) { clog('could not write', actorId.toString(16), e); }
+    var view = forPanel(s, !!(chargen && chargen.isChoosing(actorId)));
+    var sig = drawn(view);
+    var sending = !!redraw || lastDrawn[actorId] !== sig;
+    if (sending) {
+      s.panel = view;
+    } else {
+      // A counter and nothing else. The record is written; the panel is not
+      // sent, so the browser is left alone. See drawn() above.
+      delete s.panel;
+    }
+    try {
+      mp.set(actorId, CHAR_PROPERTY, s);
+      // Only once it is actually written. A write that threw sent nothing,
+      // and remembering it as sent would hold the next one back as well.
+      if (sending) { lastDrawn[actorId] = sig; }
+    } catch (e) {
+      clog('could not write', actorId.toString(16), e);
+    }
     return s;
   }
 
@@ -3193,7 +5757,7 @@ log('gamemode loaded:',
         r = P.pickClass(s, gathering);
         if (r.ok) { s = r.state; } else { clog('migrate', actorId.toString(16), 'old class', gathering, 'refused:', r.why); }
       }
-      if (trade && P.TABLE.professions[trade]) {
+      if (trade && P.has(P.TABLE.professions, trade)) {
         if (trade === 'mage') {
           clog('migrate', actorId.toString(16), 'was a mage under the old keys; schools were never recorded, so they will be asked for');
         } else if (half) {
@@ -3213,6 +5777,214 @@ log('gamemode loaded:',
     return readState(actorId) || migrate(actorId);
   }
 
+  // ------------------------------------------------- gates, work, spells --
+
+  /** The rulebook's own name for a class, a half or a school. */
+  function nameOf(key) {
+    var T = P.TABLE;
+    if (P.has(T.classes, key)) { return T.classes[key].name; }
+    for (var prof in T.professions) {
+      if (!P.has(T.professions, prof)) { continue; }
+      var halves = T.professions[prof].halves;
+      if (P.has(halves, key)) { return halves[key]; }
+    }
+    return String(key).charAt(0).toUpperCase() + String(key).slice(1);
+  }
+
+  function rankName(r) {
+    return String(r || '').charAt(0).toUpperCase() + String(r || '').slice(1);
+  }
+
+  /*
+    What somebody is told when the work is not theirs.
+
+    One sentence, the class that owns it named, and what to do about it,
+    because 'you cannot do that' with no name in it is how a person ends up
+    thinking the server is broken. classes.md: the five verbs are exclusive,
+    'if you want leather you know a hunter'.
+  */
+  var VERB_REFUSAL = {
+    loot: 'Only a hunter can take anything off a carcass. Ask one.',
+    fish: 'Only a fisher can fish. Ask one.',
+    harvest: 'Only a gatherer can pull that out of the ground. Ask one.',
+    mine: 'Only a miner can work a seam. Ask one.',
+    farm: 'Only a farmer can bring a crop in. Ask one.'
+  };
+
+  var NO_CLASS = 'You have not chosen a class yet. Press K and choose one.';
+  var NO_PROFESSION = 'You have not chosen a profession yet. Press K and choose one.';
+
+  /** null when this person may do that verb, otherwise the sentence to say. */
+  function gate(actorId, verb) {
+    var s = stateOf(actorId);
+    if (!s.cls) { return NO_CLASS; }
+    if (P.canDo(s, verb)) { return null; }
+    return (P.has(VERB_REFUSAL, verb) && VERB_REFUSAL[verb]) ||
+      'That work belongs to another class. Ask somebody whose it is.';
+  }
+
+  /**
+    The same for a profession's half rather than a class verb: a kiln is
+    Charburner work, and a Woodwright gets the novice of it for nothing
+    because it is their sister half. The caller passes the sentence for
+    'you do not work that half', because only the caller knows what was
+    pressed.
+  */
+  function gateHalf(actorId, half, rank, refusal) {
+    var s = stateOf(actorId);
+    if (P.canWork(s, half, rank || 'novice')) { return null; }
+    if (!s.prof) { return NO_PROFESSION; }
+    return refusal;
+  }
+
+  /**
+    A yield was handed out, so the work is counted, and the rank goes up when
+    the count is there. Returns null, or the line to say about a new rank.
+
+    Called only after the gate above said yes, so the standing is there.
+  */
+  function raiseLine(raised) {
+    var rank = rankName(raised.to);
+    // A school is a thing you are advanced IN; a class and a half are things
+    // you ARE. Both sentences say the same fact and neither reads like a
+    // machine wrote it.
+    var line = (P.TABLE.schools.indexOf(raised.key) !== -1)
+      ? 'Your ' + nameOf(raised.key) + ' is now ' + rank + '.'
+      : 'You are now ' + (/^[aeiou]/i.test(rank) ? 'an ' : 'a ') +
+        rank + ' ' + nameOf(raised.key) + '.';
+    if (raised.points > 0) {
+      line += ' ' + raised.points + ' skill point' + (raised.points === 1 ? '' : 's') +
+              ' to spend, on K.';
+    }
+    if (raised.spellPoints > 0) {
+      line += ' ' + raised.spellPoints + ' more spell point' +
+              (raised.spellPoints === 1 ? '' : 's') + ' as well.';
+    }
+    return line;
+  }
+
+  /*
+    Every rank that came out of one action, in the order it happened: the one
+    the work was for, and then whatever a mage's schools took from it. Each
+    one is a sentence of its own rather than a list, because that is how a
+    person reads it.
+  */
+  function raiseLines(actorId, r) {
+    var raises = [];
+    if (r.raised) { raises.push(r.raised); }
+    var also = r.also || [];
+    for (var i = 0; i < also.length; i++) { raises.push(also[i]); }
+    if (!raises.length) { return null; }
+    var out = [];
+    for (var j = 0; j < raises.length; j++) {
+      out.push(raiseLine(raises[j]));
+      clog(actorId.toString(16), raises[j].key, raises[j].from, '->', raises[j].to);
+    }
+    return out.join(' ');
+  }
+
+  function credit(actorId, key) {
+    var s = stateOf(actorId);
+    var r = P.creditWork(s, key);
+    if (!r.ok) { return null; }
+    writeState(actorId, r.state);
+    return raiseLines(actorId, r);
+  }
+
+  /*
+    READING A MANUAL, AND WHAT IS LEFT OF THE OLD TIERS.
+
+    The four manual tracks were a second progression system running beside
+    this one: a tier per person per track, read off a book, gating the salt
+    yield and the charcoal grade. Two ladders for the same thing and only one
+    of them is in classes.md, which says rank comes from doing the work and
+    nothing else moves it. The tiers are retired. Nothing gates on them any
+    more, and a manual now counts as hours in the ladder it is about, once,
+    the first time it is read, through creditWork like every other hour. So a
+    manual can never hand somebody a rank they are not allowed to hold: a
+    taught trade still stops at novice and a sister half still waits for its
+    Master.
+
+    A manual about work this character does not do is simply read and nothing
+    happens, which is the honest answer to a mining book in the hands of
+    somebody who is not a miner.
+  */
+  var MANUAL_LADDER = {
+    mining:     { cls: 'miner' },
+    woodcutter: { half: 'charburner' },
+    smithing:   { prof: 'smith' },
+    alchemy:    { prof: 'alchemist' }
+  };
+
+  function manual(actorId, track) {
+    if (!P.has(MANUAL_LADDER, track)) { return null; }
+    var m = MANUAL_LADDER[track];
+    var s = stateOf(actorId);
+    var key = null;
+    if (m.cls) { key = (s.cls === m.cls) ? m.cls : null; }
+    else if (m.half) { key = P.rankOf(s, m.half) ? m.half : null; }
+    else if (m.prof) { key = (s.prof === m.prof) ? s.half : null; }
+    if (!key) { return null; }
+    var r = P.creditWork(s, key, null, P.TABLE.tuning.study.perManual);
+    if (!r.ok) { return null; }
+    writeState(actorId, r.state);
+    var climbed = raiseLines(actorId, r);
+    return climbed || 'You read it through. The hours count.';
+  }
+
+  /*
+    Putting a spell on the character in the game.
+
+    The same call the shrine blessing uses, for the same reason: Actor.AddSpell
+    takes its target from self rather than from the Papyrus stack, records the
+    spell on the server, and the list comes back on every spawn as
+    learnedSpells. So a spell learned here survives logging out.
+
+    SPELL_IDS is empty until another step fills it from the game files, and a
+    spell with no id in it is known and not granted. That is said in the log
+    and nowhere else: nothing throws, and the person keeps the spell in their
+    book for the build that can hand it to them.
+  */
+  function grantSpell(actorId, name, on) {
+    // hasOwnProperty, not a bare lookup: a spell called 'constructor' would
+    // otherwise find something on Object.prototype and hand a function to
+    // Papyrus as a form id.
+    var desc = Object.prototype.hasOwnProperty.call(P.SPELL_IDS, name)
+      ? P.SPELL_IDS[name] : null;
+    if (!desc) {
+      clog('no form id for', name, 'yet, so it is known and not granted');
+      return false;
+    }
+    try {
+      if (typeof spellOn === 'function') { return !!spellOn(actorId, desc, on); }
+      clog('no way to reach the game from here, so', name, 'is known and not granted');
+    } catch (e) {
+      clog('could not grant', name, e);
+    }
+    return false;
+  }
+
+  /**
+    Everything in somebody's book, back onto their character.
+
+    AddSpell on a spell an actor already has does nothing at all, so this
+    costs a call per spell per session and is the cheapest way to be sure a
+    reconnect, a wipe of the change form or a spell learned on a build that
+    had no form id for it all end up in the same place.
+  */
+  function grantKnown(actorId) {
+    var s = stateOf(actorId);
+    var known = (s.spells && s.spells.known) || [];
+    var n = 0;
+    for (var i = 0; i < known.length; i++) {
+      if (grantSpell(actorId, known[i], true)) { n++; }
+    }
+    if (known.length) {
+      clog('spawn:', n, 'of', known.length, 'known spells put back on', actorId.toString(16));
+    }
+    return n;
+  }
+
   /*
     The commands. Called from handle() in the chat block with the same
     arguments it has, so the profile id is the one the voice service stamped
@@ -3223,6 +5995,7 @@ log('gamemode loaded:',
       /pick profession smith platewright
       /pick profession mage destruction,restoration
       /pick town riften                  while creating, and never after
+      /pick spell Ice Spike              one spell out of the book
       /pick spend vitality               the panel's spelling of /spend
       /spend vitality
 
@@ -3235,6 +6008,34 @@ log('gamemode loaded:',
     only a second pick of either is refused. Nothing else moves anybody.
   */
   function command(word, parts, actorId, profileId, toProfile) {
+    /*
+      THE FARMING WORDS, handed straight on.
+
+      They arrive here because handle() in the chat block calls this function
+      first and every word this server answers is registered in one place. What
+      they do belongs to the farming block, which owns the plots and the claims;
+      this is the door they come in at and nothing more.
+    */
+    if (word === '/plant' || word === '/claim' || word === '/plot') {
+      if (!actorId) {
+        toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
+        return true;
+      }
+      var farm = g.__thornswoodFarming;
+      if (!farm || !farm.command) {
+        toProfile(profileId, 'Farming is not running on this server right now. Say so in the dev channel.');
+        clog('a farming word arrived and the farming block is not loaded:', word);
+        return true;
+      }
+      try {
+        farm.command(word, parts, actorId, profileId, toProfile);
+      } catch (eFarm) {
+        clog('the farming word', word, 'threw:', eFarm);
+        toProfile(profileId, 'That did not work. Say what you were standing next to in the dev channel.');
+      }
+      return true;
+    }
+
     if (word !== '/pick' && word !== '/spend') { return false; }
     if (!actorId) {
       toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
@@ -3244,22 +6045,36 @@ log('gamemode loaded:',
     var chargen = g.__thornswoodChargen;
     var creating = !!(chargen && chargen.isChoosing(actorId));
     var r = null;
+    var spellPicked = null;   // set when this command was a spell, so it can
+                              // be put on the character after the write
+    /*
+      WHICH PICK A REFUSAL ANSWERS. Part of the contract with the panel: a
+      note carries about, so the panel clears that one pick and leaves the
+      others where they are. A refusal with no name on it left the panel
+      guessing which of four buttons had just been told no.
+    */
+    var about = null;
 
     if (word === '/pick') {
       var what = String(parts[1] || '').toLowerCase();
       if (what === 'refresh') {
-        writeState(actorId, s);   // the write is what fires updateOwner
+        // A refresh asks for the panel outright, so it is sent whether
+        // anything changed or not: that is the whole point of the command.
+        writeState(actorId, s, true);   // the write is what fires updateOwner
         return true;
       }
       if (what === 'class') {
+        about = 'class';
         r = P.pickClass(s, String(parts[2] || '').toLowerCase());
       } else if (what === 'profession') {
+        about = 'profession';
         var prof = String(parts[2] || '').toLowerCase();
         var rest = String(parts[3] || '').toLowerCase();
         r = (prof === 'mage')
           ? P.pickProfession(s, prof, rest ? rest.split(',') : [])
           : P.pickProfession(s, prof, mapHalf(rest));
       } else if (what === 'town') {
+        about = 'town';
         var town = String(parts[2] || '').toLowerCase();
         if (!creating) {
           r = { ok: false, why: 'your home is already chosen' };
@@ -3270,28 +6085,94 @@ log('gamemode loaded:',
           s2.home = town;
           r = { ok: true, state: s2 };
         }
+      } else if (what === 'spell') {
+        about = 'spell';
+        // The name has spaces in it, so everything after the word is the
+        // name: 'Ice Spike', 'Bane of the Undead'. Case does not matter.
+        var wanted = parts.slice(2).join(' ');
+        r = P.pickSpell(s, wanted);
+        if (r.ok) {
+          var book = P.spellAt(wanted);
+          spellPicked = book ? book.name : null;
+        }
       } else if (what === 'spend') {
-        r = P.spendPoint(s, String(parts[2] || '').toLowerCase());
+        about = 'spend';
+        r = P.spendPoint(s, String(parts[2] || '').toLowerCase(), parts[3]);
       } else {
-        toProfile(profileId, 'Pick what? class, profession or town.');
+        toProfile(profileId, 'Pick what? class, profession, spell or town.');
         return true;
       }
     } else {
-      r = P.spendPoint(s, String(parts[1] || '').toLowerCase());
+      about = 'spend';
+      r = P.spendPoint(s, String(parts[1] || '').toLowerCase(), parts[2]);
     }
 
     if (!r.ok) {
       toProfile(profileId, 'No: ' + r.why + '.');
       // The same word to the panel, through the property, since a refusal
       // changes nothing else and the panel would otherwise sit on 'Sent'.
-      s.note = { text: r.why, at: Date.now() };
-      writeState(actorId, s);
+      // about says which pick it answers, so the panel clears that one.
+      // Always sent, even when it is the same refusal as a moment ago and the
+      // panel is already showing it: a refusal is an answer to something
+      // somebody just pressed, and an answer that arrives sometimes is worse
+      // than no answer at all.
+      s.note = { text: r.why, at: Date.now(), about: about };
+      writeState(actorId, s, true);
       clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'refused:', r.why);
       return true;
     }
     r.state.note = null;
     var st = writeState(actorId, r.state);
     clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'accepted');
+
+    /*
+      A NEW FARMER GETS SEED. Patrick, 20 September: 'to make it so they can
+      become full we could give farmers a few starting crops or something'.
+
+      Here because this is the moment the server learns that somebody has become
+      a Farmer, and it cannot run twice: this line is past the refusal above, and
+      pickClass refuses a second class for the life of the character, so nobody
+      can stand here collecting seed.
+
+      IT IS NO LONGER THE ONLY DOOR, and that is the correction of 20 September.
+      Being the only one meant two groups of Farmers could never farm: anybody
+      who picked the class on an earlier build, because they have a character
+      property so migrate() never runs for them and their pick is long past, and
+      anybody who lost the nine crops they were handed, because nothing else in
+      the server can give them one. Both of them now ask at a plot: offerSeed in
+      the farming block hands seed to a Farmer whose pack holds no produce of any
+      crop, at /plant, no more often than TUNING.farming.seedAgainHours. It is
+      still never handed out from a read, which is what migrate() would have
+      been: migrate runs inside stateOf, which every gate and every press calls,
+      and handing out inventory from a read is how a pack quietly fills up.
+    */
+    if (about === 'class' && st.cls === 'farmer') {
+      var farming = g.__thornswoodFarming;
+      if (farming && farming.giveSeeds) {
+        try {
+          var seeded = farming.giveSeeds(actorId);
+          if (seeded) { toProfile(profileId, seeded); }
+        } catch (eSeed) {
+          clog('could not give starting seed to', actorId.toString(16) + ':', eSeed);
+        }
+      }
+    }
+
+    /*
+      A spell is the one pick that has to reach the game as well as the
+      state. It is put on the character straight away rather than waiting
+      for the next spawn, and put back on every spawn after that. A spell
+      with no form id yet is in the book and not in the hands, which
+      grantSpell says in the log and nothing else notices.
+    */
+    if (spellPicked) {
+      grantSpell(actorId, spellPicked, true);
+      toProfile(profileId, 'You learn ' + spellPicked + '.');
+      // The hours a spell is worth in its school can be the ones that reach
+      // a threshold, and a rank reached is something a person is told.
+      var climbed = raiseLines(actorId, r);
+      if (climbed) { toProfile(profileId, climbed); }
+    }
 
     // The home is the one pick that ends creation. Class and profession may
     // still be unset: they are picked in the world, from the same panel, and
@@ -3314,13 +6195,20 @@ log('gamemode loaded:',
     panel opening. Nothing to decide here; the state is whatever it was.
   */
   function beginCreation(actorId) {
-    writeState(actorId, stateOf(actorId));
+    // Always a redraw. A reminder is the same state as the reminder before it,
+    // so a write that only goes out when something changed would send the
+    // first one and none of the others, and the panel would never re-open for
+    // somebody who closed it while they were still choosing.
+    writeState(actorId, stateOf(actorId), true);
   }
 
   g.__thornswoodCharacter = {
     PROPERTY: CHAR_PROPERTY, stateOf: stateOf, writeState: writeState,
     forPanel: forPanel, mapHalf: mapHalf, migrate: migrate, command: command,
-    beginCreation: beginCreation, updateOwnerScript: updateOwnerScript
+    beginCreation: beginCreation, updateOwnerScript: updateOwnerScript,
+    gate: gate, gateHalf: gateHalf, credit: credit, manual: manual,
+    grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf,
+    rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
 })();
@@ -3702,6 +6590,8 @@ log('gamemode loaded:',
       toProfile(profileId,
         '/ooc <what you meant> talks out of character to whoever is near you. ' +
         '/where prints your cell, position and facing. ' +
+        '/plot says what is in the ground in front of you and whose farm it is, ' +
+        '/plant sows it, and /claim takes the farm around the plot in front of you. ' +
         '/roll is in the chat itself.' +
         (isPlaytester(profileId)
           ? ' /tp <place> moves you, and /tp on its own lists the places (' +
@@ -3725,7 +6615,7 @@ log('gamemode loaded:',
     // server at all, which means the voice service in front of it is not
     // holding slash lines back, which means the copy running up there is old.
     toProfile(profileId, 'No command called ' + word + '. ' +
-              'There is /ooc, /where, /tp <place> and /help.');
+              'There is /ooc, /where, /plot, /plant, /claim, /tp <place> and /help.');
   }
 
   /*
