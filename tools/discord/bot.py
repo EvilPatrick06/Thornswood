@@ -8,6 +8,8 @@ What it does:
   Tickets  a panel in #tickets, one private thread per ticket, and a copy
            pushed to the site so the inbox has it whether or not anybody was
            looking at Discord
+  Watch    asks the site every five minutes over its public name, and says so
+           in #dev when it stops answering and when it comes back
 
 Everything it needs is in env:
 
@@ -19,6 +21,9 @@ Everything it needs is in env:
   TICKET_LOG       staff only channel closed tickets are recorded in
   STAFF_ROLES      comma separated, who gets pulled into every ticket thread
   CREATOR_ROLES    comma separated, added to Apply: Content Creator only
+  WATCH_CHANNEL    comma separated, where the site watcher speaks, default dev
+  WATCH_EVERY      seconds between checks, default 300
+  WATCH_MISSES     how many in a row before it says so, default 2
 
 It is written to keep going when a piece of it fails. A card that will not
 draw still gets a greeting, a site that is down still gets a thread, and a
@@ -95,6 +100,37 @@ CREATOR = [r.strip().lower() for r in
            os.environ.get('CREATOR_ROLES', 'Content Creator').split(',')
            if r.strip()]
 EXTRA_STAFF = {'creator': CREATOR}
+
+# Where the site watcher speaks. Staff, not public: an outage is something to
+# fix, not an announcement, and #general reading "the site is down" every time
+# a certificate renews badly helps nobody.
+#
+# THE NAME IS dev-notes, which is what Build-Discord.py:219 makes. A first
+# draft of this defaulted to 'dev,general' and there is no channel called dev,
+# so every outage message would have gone to the public channel by way of the
+# fallback. There is no public fallback now on purpose: a watcher with nowhere
+# staff only to speak says nothing and writes a line in the bot log saying so,
+# which is better than telling everybody.
+WATCH = [n.strip().lower() for n in
+         os.environ.get('WATCH_CHANNEL', 'dev-notes,dev').split(',')
+         if n.strip()]
+
+
+def _seconds(name, fallback):
+    """A count from env, and the default when it is missing or nonsense."""
+    try:
+        n = int(os.environ.get(name, '') or fallback)
+        return n if n > 0 else fallback
+    except ValueError:
+        return fallback
+
+
+WATCH_EVERY = _seconds('WATCH_EVERY', 300)
+# Two in a row rather than one. A single timeout is a moment of packet loss and
+# nobody wants to read about it. Two, five minutes apart, is the site being
+# down. Caddy's own repeating trigger is five minutes as well, so anything that
+# clears by itself has had a go at clearing before this says a word.
+WATCH_MISSES = _seconds('WATCH_MISSES', 2)
 
 if not TOKEN:
     raise SystemExit('No DISCORD_TOKEN. Install-Bot.ps1 sets it.')
@@ -776,8 +812,137 @@ async def ensure_panel(guild):
         log('panel failed:\n' + traceback.format_exc())
 
 
+# ----------------------------------------------------------- the watcher --
+#
+# WHY THE BOT DOES THIS AND NOT THE BOX.
+#
+# On 21 September thornswood.net was down and stayed down. Caddy, which holds
+# 443, had stopped, and the task that runs it had one startup trigger, so
+# nothing restarted it and nothing ever looked again. It surfaced hours later
+# as two testers reporting launcher faults, because the launcher checks people
+# in through the site and voice runs on the same hostname. A site that is down
+# looks to everybody like the launcher being broken, which is the worst kind of
+# outage: the reports point at the wrong thing.
+#
+# Caddy restarts itself now. This is the other half, which is somebody being
+# told.
+#
+# It lives in the bot because the bot is already running on that box, already
+# authenticated, and already written to keep going when a piece of it fails. A
+# watcher anywhere else needs a webhook put somewhere new, and the webhook
+# files are kept out of git deliberately.
+#
+# WHAT IT CANNOT CATCH is the box itself going down, which takes this with it.
+# That needs something off the machine and is not this.
+
+
+def site_answers():
+    """
+    Ask the site the way somebody's browser would.
+
+    Over the public name and the certificate, deliberately, so this fails when
+    Caddy is down and not only when node is. Asking 127.0.0.1:3001 would have
+    said the site was perfectly fine all through the outage this was written
+    for.
+
+    HEAD rather than GET: the answer is the status code, and there is no reason
+    to pull the front page down every five minutes forever.
+
+    Blocking, so it is called through an executor. Never raises.
+    """
+    req = urllib.request.Request(
+        SITE + '/', method='HEAD',
+        headers={'User-Agent': 'thornswood-watch'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            code = r.getcode()
+            if 200 <= code < 400:
+                return True, 'HTTP %d' % code
+            return False, 'HTTP %d' % code
+    except Exception as ex:
+        # The class name matters when the message is empty, which is what a
+        # bare socket timeout gives you.
+        return False, str(ex) or ex.__class__.__name__
+
+
+async def watch_say(text):
+    """Say it once in each server, in the first watch channel that exists."""
+    for g in client.guilds:
+        ch = by_name(g, WATCH)
+        if not ch:
+            log('watch: no #%s in "%s", so nothing was said there'
+                % (WATCH[0], g.name))
+            continue
+        try:
+            await ch.send(text)
+        except Exception:
+            log('watch: could not post in #%s:\n' % ch.name
+                + traceback.format_exc())
+
+
+async def watch_site():
+    """
+    Ask every WATCH_EVERY seconds, and speak only when the answer changes.
+
+    SILENCE IS THE POINT. A line every five minutes saying the site is up is a
+    channel nobody reads, and a channel nobody reads is the same as no watcher
+    at all. So it says the site went down, once, and says it came back, once.
+
+    Nothing in here is allowed to end the loop. A watcher that dies quietly is
+    worse than no watcher, because from the outside it looks exactly like
+    everything being fine.
+    """
+    await client.wait_until_ready()
+    misses = 0
+    said_down = False
+    log('watch: asking %s every %ds, speaking up after %d miss(es) in #%s'
+        % (SITE, WATCH_EVERY, WATCH_MISSES, WATCH[0]))
+
+    while not client.is_closed():
+        try:
+            ok, what = await asyncio.get_running_loop().run_in_executor(
+                None, site_answers)
+            if ok:
+                if said_down:
+                    said_down = False
+                    await watch_say('The site is answering again. %s' % what)
+                    log('watch: back up, %s' % what)
+                elif misses:
+                    log('watch: answered after %d miss(es), %s' % (misses, what))
+                misses = 0
+            else:
+                misses += 1
+                log('watch: no answer from %s, %d in a row: %s'
+                    % (SITE, misses, what))
+                if misses >= WATCH_MISSES and not said_down:
+                    said_down = True
+                    await watch_say(
+                        'The site is not answering. %d checks in a row, %d '
+                        'seconds apart, and the last one said: %s\n'
+                        'Caddy holds 443 and now restarts itself every five '
+                        'minutes, so if this does not clear on its own then it '
+                        'is the box, the certificate, or something in front of '
+                        'both. People will be told they could not be checked '
+                        'in, and voice will sit on connecting, until it does.'
+                        % (misses, WATCH_EVERY, what))
+        except Exception:
+            log('watch: the check itself failed, carrying on:\n'
+                + traceback.format_exc())
+        await asyncio.sleep(WATCH_EVERY)
+
+
+# on_ready fires again on every reconnect, and a second loop would double every
+# message this ever sends.
+_watching = False
+
+
 @client.event
 async def on_ready():
+    global _watching
+    if not _watching:
+        _watching = True
+        asyncio.create_task(watch_site())
+
     client.add_view(TicketPanel())          # so it keeps working after a restart
     client.add_view(TicketTools())          # and so does Close on every old ticket
     log('up as %s' % client.user)
@@ -848,15 +1013,22 @@ async def on_ready():
             log('join cards will go to #%s in "%s"' % (ch.name, g.name))
 
 
-try:
-    client.run(TOKEN)
-except discord.PrivilegedIntentsRequired:
-    log('Discord refused the connection because Server Members Intent is off.')
-    log('Go to discord.com/developers, open the Thornswood application, Bot in')
-    log('the left menu, switch on SERVER MEMBERS INTENT, save, then run')
-    log('Install-Bot.ps1 again.')
-    raise SystemExit(1)
-except discord.LoginFailure:
-    log('Discord rejected the bot token. Reset it on the Bot page and run')
-    log('Install-Bot.ps1 again to paste the new one.')
-    raise SystemExit(1)
+# Under a main guard, so that importing this file reads it instead of running
+# it. Without one, `import bot` connects to Discord with whatever token is in
+# env, which is why nothing in here had ever been tested: there was no way to
+# get at a function without starting a bot. Install-Bot.ps1 launches it as
+# `python bot.py`, where __name__ is __main__, so this changes nothing about
+# how it runs on the VPS.
+if __name__ == '__main__':
+    try:
+        client.run(TOKEN)
+    except discord.PrivilegedIntentsRequired:
+        log('Discord refused the connection because Server Members Intent is off.')
+        log('Go to discord.com/developers, open the Thornswood application, Bot in')
+        log('the left menu, switch on SERVER MEMBERS INTENT, save, then run')
+        log('Install-Bot.ps1 again.')
+        raise SystemExit(1)
+    except discord.LoginFailure:
+        log('Discord rejected the bot token. Reset it on the Bot page and run')
+        log('Install-Bot.ps1 again to paste the new one.')
+        raise SystemExit(1)
