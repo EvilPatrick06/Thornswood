@@ -441,8 +441,27 @@
     var p = picked.profession;
     return (creating() && p && p.row === 'mage') ? (p.subs || []).slice() : [];
   }
-  /* Spell points, from the server when it has them; until then none. */
-  function spellPoints() { return mine ? Number(mine.spellPoints) || 0 : 0; }
+  /*
+    Spell points. The server's number when it sends one; until it does, a
+    mage starts with two (Patrick, 20 September: "it should be 2"). A mark
+    costs one, so no more can be marked than there are points, and the bar
+    counts down. The real rule, points by rank and spells granted, is the
+    server's and is still to come.
+  */
+  var STARTING_SPELL_POINTS = 2;
+  function spellPoints() {
+    if (mine && mine.spellPoints !== undefined && mine.spellPoints !== null) return Number(mine.spellPoints) || 0;
+    return STARTING_SPELL_POINTS;
+  }
+  function markedCount() { var n = 0; for (var k in marked) if (marked[k]) n++; return n; }
+  function pointsLeft() { return Math.max(0, spellPoints() - markedCount()); }
+  /* Mark or unmark a spell; a mark needs a point. True when something changed. */
+  function toggleMark(name) {
+    if (marked[name]) { marked[name] = false; return true; }
+    if (pointsLeft() <= 0) { status = 'No spell points left. Unmark one to mark another.'; statusKind = 'no'; return false; }
+    marked[name] = true;
+    return true;
+  }
   function rows() { return DATA[section] ? DATA[section].rows : []; }
   function titleOf(sec) { return DATA[sec] ? DATA[sec].title : cap(sec); }
   function rowOf(sec, key) {
@@ -612,8 +631,8 @@
     }
     if (sec === 'review') return (haveHome() || softHome()) ? { t: 'ready to begin', c: 'chosen' } : { t: 'needs a home', c: 'need' };
     if (sec === 'spells') {
-      var sp = spellPoints();
-      var m = 0; for (var mk in marked) if (marked[mk]) m++;
+      var sp = pointsLeft();
+      var m = markedCount();
       return { t: sp ? sp + ' to spend' : (m ? m + ' marked' : 'nothing yet'), c: sp ? 'need' : '' };
     }
     var pts = mine ? Number(mine.points) || 0 : 0;
@@ -681,9 +700,10 @@
     }
     var pts = spellPoints();
     var have = (mine && mine.spells) || {};
-    var n = 0; for (var k in marked) if (marked[k]) n++;
+    var n = markedCount();
+    var leftPts = pointsLeft();
     var top = el('div', 'spellbar');
-    top.appendChild(el('div', 'spellpts', pts + (pts === 1 ? ' spell point' : ' spell points') + ' to spend' + (n ? ', ' + n + ' marked' : '')));
+    top.appendChild(el('div', 'spellpts', leftPts + ' of ' + pts + (pts === 1 ? ' spell point' : ' spell points') + ' left' + (n ? ', ' + n + ' marked' : '')));
     top.appendChild(el('div', 'spellnote', 'Not sent to the server yet. What you mark here stays on this page.'));
     elBody.appendChild(top);
     var cols = el('div', 'cols spellcols');
@@ -704,7 +724,7 @@
           row.appendChild(el('span', 'tag' + (got ? '' : (marked[name] ? ' gold' : ' dim')), got ? 'yours' : (marked[name] ? 'marked' : 'could take')));
           row.onclick = function () {
             rowAt = i;
-            if (!got) marked[name] = !marked[name];
+            if (!got) toggleMark(name);
             draw();
           };
           col.appendChild(row);
@@ -1078,7 +1098,7 @@
         // Enter in Review is Begin; in the world the second Enter confirms.
         if (section === 'spells') {
           var sr = bookRows()[rowAt];
-          if (sr && !((mine && mine.spells) || {})[sr.name]) { marked[sr.name] = !marked[sr.name]; draw(); }
+          if (sr && !((mine && mine.spells) || {})[sr.name]) { toggleMark(sr.name); draw(); }
           e.preventDefault(); return;
         }
         var r = section === 'home' ? ((mine && mine.towns) || [])[rowAt] : rows()[rowAt];
