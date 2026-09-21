@@ -262,9 +262,73 @@
     try { return !!readText(CHOICE_FILE).trim(); } catch (e) { return false; }
   }
 
+  /*
+    KEEP SAYING THE CHOICE UNTIL THE WORLD ACTUALLY LOADS.
+
+    The page sends its pick to skymp5-client and repeats it every two seconds
+    until something says it heard, because the page is up long before the
+    plugins are: SkyrimPlatform loads index.html at start and runs plugins
+    about fifteen seconds later. That repeat is the only thing covering the
+    gap, and menuChose below was ending it from the wrong side of the room.
+
+    This plugin is not skymp5-client. Its own browserMessage handler sees the
+    pick, writes the choice file and acks the page, which hides the menu and
+    stops the repeat. skymp5-client's AuthService only acts on that same
+    message while it is waiting for it, and it starts waiting when it gets
+    authNeeded. If the person clicked before that, AuthService's handler
+    returned early, this plugin acked anyway, the page went quiet, and the
+    pick was gone for good. No authAttempt, so no join, so the menu vanishes
+    and the main menu is where you stay. That is what a tester reported twice,
+    and what Djinn hit: "click make a new character and then are stuck on the
+    main menu with selector menu gone".
+
+    So the plugin takes the repeat over rather than ending it. A duplicate
+    costs nothing: once AuthService has taken one it clears its own wait and
+    every later copy falls to `default: break` in its switch.
+
+    __thornswoodInWorld is the flag the tick sets when the world is really
+    there, so arriving is what stops this and not a guess about timing.
+  */
+  const MENU_SAY_EVERY = 2000;
+  const MENU_SAY_FOR = 90000;
+  let menuChosenId = 0;
+  let menuChosenAt = 0;
+  let menuSaidAt = 0;
+  let menuGiveUpTold = false;
+
+  function keepSayingChoice(now) {
+    let here = false;
+    try { here = !!globalThis.__thornswoodInWorld; } catch (e) { here = false; }
+    if (here) {
+      log('menu: in the world as profile', menuChosenId, 'so the choice is done');
+      menuChosenId = 0;
+      return;
+    }
+    if (now - menuChosenAt > MENU_SAY_FOR) {
+      if (!menuGiveUpTold) {
+        menuGiveUpTold = true;
+        log('menu: said profile', menuChosenId, 'for',
+            Math.round(MENU_SAY_FOR / 1000) + 's and the world never loaded.',
+            'The client never took the choice. Nothing more this can do.');
+      }
+      menuChosenId = 0;
+      return;
+    }
+    if (now - menuSaidAt < MENU_SAY_EVERY) { return; }
+    menuSaidAt = now;
+    T.js('try{window.skyrimPlatform.sendMessage("thornswood","select",' +
+         menuChosenId + ');}catch(e){}');
+  }
+
   sp.on('tick', guard('menu', () => {
-    if (!chooseAtMenu || menuPhase === 9) { return; }
+    if (!chooseAtMenu) { return; }
     const now = Date.now();
+
+    // Before the phase check, because menuChose parks the phase at 9 and this
+    // has to go on running after it.
+    if (menuChosenId) { keepSayingChoice(now); }
+
+    if (menuPhase === 9) { return; }
 
     /*
       No loadUrl here, ever. What the browser's own log showed on 20
@@ -417,8 +481,14 @@
     }
     menuPhase = 9;
     try { sp.browser.setFocused(false); } catch (e) { }
-    // The page repeats its pick every two seconds until this says it
-    // heard, because the page can be up long before this plugin is.
+    // The page repeats its pick every two seconds until this says it heard,
+    // because the page can be up long before this plugin is. Acking stops
+    // that repeat, so this plugin takes it over in the same breath rather
+    // than leaving nobody saying it: see keepSayingChoice above for what
+    // happened when nobody did.
+    menuChosenId = id;
+    menuChosenAt = Date.now();
+    menuSaidAt = Date.now();
     T.js('try{window.thornswoodSelect&&window.thornswoodSelect.acked();}catch(e){}');
     // The list the launcher wrote for the page. Gone now, so the page
     // reload in the world (phase 0 below) does not bring the choice back.
