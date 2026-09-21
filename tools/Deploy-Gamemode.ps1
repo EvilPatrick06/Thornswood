@@ -235,6 +235,42 @@ $s | Add-Member -NotePropertyName dataDir     -NotePropertyValue 'data'      -Fo
 # bandit. On means one shared world. npcSettings stays empty, which is "no
 # per-NPC overrides", not "no NPCs".
 $s | Add-Member -NotePropertyName npcEnabled  -NotePropertyValue $true       -Force
+
+# WHAT YOU ARE WEARING STAYS ON. Measured 20 September, after Patrick rejoined
+# an existing character and arrived with nothing on.
+#
+# The server refuses an equipment update outright in two places, and on a
+# modded load order both of them fire constantly:
+#
+#   equipmentSlotCheckEnabled   the gear strip. ActionListener::OnUpdateEquipment
+#                               ORs together the biped slot flags of everything
+#                               worn and refuses the whole update the moment two
+#                               items share one bit, then sends an UnequipItem
+#                               for every item involved. Vanilla Skyrim already
+#                               uses slots 44 to 47, and every cloak, scarf and
+#                               backpack mod reaches for the same handful of
+#                               free-looking ones. It is an anti-cheat against
+#                               wearing five chest pieces and it costs far more
+#                               than it earns here.
+#   equipmentSpellCheckEnabled  a spell the server did not itself grant is
+#                               refused and a RemoveSpell is sent back. Every
+#                               spell learned from a tome in the world is one
+#                               the server never saw, so it comes straight back
+#                               off the hand.
+#
+# Both were made switchable in our own fork of the engine and both still default
+# to true in WorldState.h:277-278, because the engine change was made and the
+# last step, writing the setting, never was. So the switches have been there and
+# have never once been thrown. This throws them.
+#
+# What is worn is saved by the engine, not by the gamemode: MpChangeForm carries
+# an equipment field and MpChangeForms.cpp writes it to the world save. So
+# equipment already persists across a session, on the one condition that the
+# update was accepted in the first place. These two lines are that condition.
+# The gamemode cannot do this job instead: EquipmentBinding has a Get and no
+# Set, so the server can read what somebody is wearing and cannot write it.
+$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue $false -Force
+$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue $false -Force
 if (-not $s.PSObject.Properties.Name.Contains('npcSettings')) {
     $s | Add-Member -NotePropertyName npcSettings -NotePropertyValue ([pscustomobject]@{}) -Force
 }
@@ -278,6 +314,7 @@ $s | Add-Member -NotePropertyName startPoints -NotePropertyValue @($start) -Forc
 [IO.File]::WriteAllText($settingsPath, ($s | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding($false)))
 
 Write-Host ("server-settings.json  {0} plugins, name '{1}', port {2}, NPCs server-side" -f $paths.Count, $ServerName, $Port) -ForegroundColor Cyan
+Write-Host '  the gear strip and the spell strip are both off, so what you wear and what you have learned stay on' -ForegroundColor DarkGray
 Write-Host ("  new characters start at {0}" -f $startNote) -ForegroundColor DarkGray
 
 if ($FullLoadOrder) {

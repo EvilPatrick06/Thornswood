@@ -102,6 +102,21 @@ if (-not (Test-Path `$p)) { 'NO server-settings.json AT ' + `$p; exit 0 }
 `$s = Get-Content `$p -Raw | ConvertFrom-Json
 `$have = 0
 if (`$s.PSObject.Properties.Name -contains 'thornswoodVoicePort') { `$have = [int]`$s.thornswoodVoicePort }
+# WHAT YOU ARE WEARING STAYS ON. Measured 20 September, after Patrick rejoined
+# an existing character and arrived with nothing on. The server refuses an
+# equipment update outright in two places and on a modded load order both fire
+# constantly: the gear strip, which refuses the whole update the moment two worn
+# items share one biped slot bit and then unequips every item involved, and the
+# spell strip, which refuses any spell the server did not itself grant and sends
+# a RemoveSpell back. Both were made switchable in our own fork and both still
+# default to true in WorldState.h, so the switches were built and never thrown.
+# What is worn is saved by the engine in the change form already; it only ever
+# saves an update that was accepted, and these two lines are what lets one be.
+`$wantEquip = `$false
+foreach (`$k in 'equipmentSlotCheckEnabled','equipmentSpellCheckEnabled') {
+  if (`$s.PSObject.Properties.Name -notcontains `$k) { `$wantEquip = `$true }
+  elseif (`$s.`$k -ne `$false) { `$wantEquip = `$true }
+}
 # A byte order mark counts as needing a rewrite even when the number is
 # already right. The run on 18 September set the value AND wrote a mark, so
 # a second run that only compared the number would have said 'already 7789'
@@ -109,11 +124,13 @@ if (`$s.PSObject.Properties.Name -contains 'thornswoodVoicePort') { `$have = [in
 `$bom = `$false
 try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
-if (`$have -eq $VoicePort -and -not `$bom) {
-  'thornswoodVoicePort is already $VoicePort'
+if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip) {
+  'thornswoodVoicePort is already $VoicePort, and both equipment checks are already off'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
+  `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
+  `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
   # NOT Set-Content -Encoding UTF8. At the far end of ssh this is Windows
   # PowerShell 5.1, where that means UTF-8 WITH a byte order mark, and the
   # server reads this file with JSON.parse, which refuses one:
@@ -131,7 +148,9 @@ if (`$have -eq $VoicePort -and -not `$bom) {
     `$back = Get-Content `$p -Raw | ConvertFrom-Json
     `$b0 = [IO.File]::ReadAllBytes(`$p)[0]
     if (`$b0 -eq 0xEF) { 'WROTE A BYTE ORDER MARK. The server will not start. Put the .before- copy back.' }
-    else { 'read back fine, thornswoodVoicePort is ' + `$back.thornswoodVoicePort }
+    else { 'read back fine, thornswoodVoicePort is ' + `$back.thornswoodVoicePort +
+            ', gear strip ' + `$back.equipmentSlotCheckEnabled +
+            ', spell strip ' + `$back.equipmentSpellCheckEnabled }
   } catch {
     'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
   }
