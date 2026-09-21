@@ -113,7 +113,7 @@ if (`$s.PSObject.Properties.Name -contains 'thornswoodVoicePort') { `$have = [in
 # What is worn is saved by the engine in the change form already; it only ever
 # saves an update that was accepted, and these two lines are what lets one be.
 `$wantEquip = `$false
-foreach (`$k in 'equipmentSlotCheckEnabled','equipmentSpellCheckEnabled') {
+foreach (`$k in 'equipmentSlotCheckEnabled','equipmentSpellCheckEnabled','equipmentInventoryCheckEnabled') {
   if (`$s.PSObject.Properties.Name -notcontains `$k) { `$wantEquip = `$true }
   elseif (`$s.`$k -ne `$false) { `$wantEquip = `$true }
 }
@@ -131,6 +131,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip) {
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
+  `$s | Add-Member -NotePropertyName equipmentInventoryCheckEnabled -NotePropertyValue `$false -Force
   # NOT Set-Content -Encoding UTF8. At the far end of ssh this is Windows
   # PowerShell 5.1, where that means UTF-8 WITH a byte order mark, and the
   # server reads this file with JSON.parse, which refuses one:
@@ -150,7 +151,8 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip) {
     if (`$b0 -eq 0xEF) { 'WROTE A BYTE ORDER MARK. The server will not start. Put the .before- copy back.' }
     else { 'read back fine, thornswoodVoicePort is ' + `$back.thornswoodVoicePort +
             ', gear strip ' + `$back.equipmentSlotCheckEnabled +
-            ', spell strip ' + `$back.equipmentSpellCheckEnabled }
+            ', spell strip ' + `$back.equipmentSpellCheckEnabled +
+            ', unknown item vetoes ' + `$back.equipmentInventoryCheckEnabled }
   } catch {
     'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
   }

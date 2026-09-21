@@ -271,6 +271,16 @@ $s | Add-Member -NotePropertyName npcEnabled  -NotePropertyValue $true       -Fo
 # Set, so the server can read what somebody is wearing and cannot write it.
 $s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue $false -Force
 $s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue $false -Force
+# The third one, and the one the live log actually shows firing. Measured on
+# 20 September: 24 refusals over two days, every one of them the same item,
+# 0x13790 IronWarAxe, on every character seconds after spawning. Skyrim
+# Unbound hands out starting gear inside the client's own game and the server
+# never sees it happen, so the first equipment update a new character sends
+# names an item the server has no record of. Upstream throws the WHOLE update
+# away for that, so the equipment record stays empty all session, and on the
+# next spawn the client empties the pack and refills it from that empty record.
+# Off, the unknown item is dropped and the rest of the update is kept.
+$s | Add-Member -NotePropertyName equipmentInventoryCheckEnabled -NotePropertyValue $false -Force
 if (-not $s.PSObject.Properties.Name.Contains('npcSettings')) {
     $s | Add-Member -NotePropertyName npcSettings -NotePropertyValue ([pscustomobject]@{}) -Force
 }
