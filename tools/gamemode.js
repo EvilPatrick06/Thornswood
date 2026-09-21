@@ -2374,23 +2374,6 @@ function chargenTick() {
     }
   }
 
-  /*
-    The starting purse, here because this is the one loop that already walks
-    everybody who is online. It costs one property read per person per tick and
-    answers no on all but the first, and the reasoning for the forty is written
-    out over purse() in the spoils block.
-
-    It is outside the chargen state machine below on purpose: a character that
-    finished creation months ago still needs it, because the world they are
-    standing in no longer has a coin in it.
-  */
-  const spoilsBlock = globalThis.__thornswoodSpoils;
-  if (spoilsBlock && spoilsBlock.purse) {
-    for (const who of online) {
-      try { spoilsBlock.purse(who); } catch (e) { /* said in the spoils log */ }
-    }
-  }
-
   for (const actorId of online) {
     if (!firstSeen.has(actorId)) {
       firstSeen.set(actorId, now);
@@ -2521,14 +2504,44 @@ function chargenTick() {
         over what they were already wearing, and a trip back to the town they
         started in.
 
-        A pack with things in it is proof in the other direction and it cannot
-        be wrong, because nothing hands anybody anything before this point.
-        Nobody arrives owning something unless they have played.
+        A pack with things in it is proof in the other direction, because
+        nobody arrives owning something unless they have played.
+
+        EXCEPT GOLD, AND THAT SENTENCE USED TO READ "it cannot be wrong,
+        because nothing hands anybody anything before this point". It stopped
+        being true on 21 September, the same evening the starting purse was
+        added, and it took creation down for everybody.
+
+        The purse loop runs over everybody online a few lines above this one.
+        A brand new character arrived, was handed forty gold, and on THE SAME
+        TICK this read their pack, found one entry in it, and concluded they
+        had played before. Creation was skipped, they were stamped done, and
+        closeRaceMenu shut the menu Spawn had correctly opened for them. Three
+        sessions in a row on the live server:
+
+          15:19:54  chargen ff000058 profile 744947683 already has a character
+                    carrying 1 thing, in the hall, no face, so creation is
+                    skipped for them
+
+        In the hall, no face, and told they had done this before. Djinn
+        described it from the other side: the menu never opens after naming and
+        you are stuck in the room.
+
+        So gold does not count. The question this is asking is whether somebody
+        has PLAYED, and gold the server handed out unprompted is the one thing
+        in a pack that is no evidence of that. The purse also moved below the
+        chargen loop, so it cannot reach the same tick's decision at all; this
+        is the half that does not depend on the order being right.
       */
+      const goldId = (globalThis.__thornswoodSpoils
+                      && globalThis.__thornswoodSpoils.GOLD) || 0x0000000F;
       let owns = 0;
       try {
         const inv = mp.get(actorId, 'inventory');
-        owns = (inv && inv.entries) ? inv.entries.length : 0;
+        const entries = (inv && inv.entries) || [];
+        for (let i = 0; i < entries.length; i++) {
+          if (entries[i] && entries[i].baseId !== goldId) { owns++; }
+        }
       } catch (e) { owns = 0; }
 
       /*
@@ -2922,6 +2935,37 @@ function chargenTick() {
             'going on to the choices anyway');
         beginChoosing(actorId, state, 'no face after ' + Math.round(waited / 1000) + 's');
       }
+    }
+  }
+
+  /*
+    The starting purse, last, and the lastness is the point.
+
+    It is here rather than in a loop of its own because this is the one pass
+    that already walks everybody online. It costs a property read per person
+    per tick and answers no on all but the first, and the reasoning for the
+    forty is written out over purse() in the spoils block.
+
+    IT USED TO RUN ABOVE THE LOOP AND THAT BROKE CREATION FOR EVERYBODY. The
+    decision a hundred lines up asks whether somebody has played by looking in
+    their pack. Handing a brand new character forty gold first put a thing in
+    that pack, so they were read as a character who had already finished, had
+    creation skipped and had their race menu closed, all on the first tick they
+    were ever seen. Nothing in the log said anything was wrong; it said they
+    already had a character, which is what it was written to say.
+
+    So it goes after every decision that reads a pack. The count above also
+    ignores gold now, so this being in the wrong place again would not be
+    enough on its own to break it a second time.
+
+    It stays outside the chargen state machine on purpose: a character who
+    finished creation months ago still needs it, because the world they are
+    standing in no longer has a coin in it.
+  */
+  const spoilsBlock = globalThis.__thornswoodSpoils;
+  if (spoilsBlock && spoilsBlock.purse) {
+    for (const who of online) {
+      try { spoilsBlock.purse(who); } catch (e) { /* said in the spoils log */ }
     }
   }
 }
