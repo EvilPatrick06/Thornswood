@@ -58,6 +58,12 @@ param(
     # Write .claude\settings.json in the repo rather than your own settings.
     # That file travels on a pull, so it grants the same on Djinn's machine.
     [switch]$Project,
+    # Also allow the scripts that reach the VPS and GitHub. OFF BY DEFAULT.
+    # Asked for by Patrick on 21 September, in his own words: run it yourself so
+    # you can, I want it all done when I wake up. It is a switch rather than the
+    # default because CLAUDE.md says these are his to run, and a rule that grants
+    # them should be something somebody typed on purpose.
+    [switch]$Live,
     # Somewhere else entirely.
     [string]$SettingsPath = '',
     [switch]$NoPause
@@ -128,6 +134,28 @@ $WantAllow = @(
     @{ Script = 'Check-LiveGamemode.ps1'; Why = 'read only: is the server running what this repo has' },
     @{ Script = 'Check-Plugins.ps1';      Why = 'read only' },
     @{ Script = 'Check-VoiceInstall.ps1'; Why = 'read only' }
+)
+
+#
+# -Live ONLY. These reach the VPS or GitHub and cannot be taken back once run.
+#
+# WHAT IS DELIBERATELY NOT HERE, and should stay not here: Wipe-Saves.ps1,
+# Rotate-ServerPassword.ps1 and Clean-Everything.ps1. Those three destroy
+# something that cannot be rebuilt from this repository, and no amount of being
+# asked to work unattended makes it right for a script to hand itself the power
+# to wipe the world. If one of them is ever needed it is a person at a keyboard.
+#
+$WantLive = @(
+    @{ Script = 'Publish-Server.ps1';  Why = 'puts the built server on the LIVE box and restarts it' },
+    @{ Script = 'Deploy-Server.ps1';   Why = 'sends the gamemode and the payload to the LIVE box' },
+    @{ Script = 'Deploy-Docs.ps1';     Why = 'publishes the site' },
+    @{ Script = 'Install-Bot.ps1';     Why = 'installs the Discord bot on the VPS' },
+    @{ Script = 'Install-Voice.ps1';   Why = 'installs the voice service on the VPS' },
+    @{ Script = 'Restart-Server.ps1';  Why = 'restarts the live server' },
+    @{ Script = 'Request-Restart.ps1'; Why = 'asks the live server to restart itself' },
+    @{ Script = 'Ship.ps1';            Why = 'builds and publishes a release' },
+    @{ Script = 'Publish-Update.ps1';  Why = 'packs and publishes a game files update' },
+    @{ Script = 'Backup-Server.ps1';   Why = 'pulls a backup down from the VPS' }
 )
 
 Head 'The settings file'
@@ -208,7 +236,15 @@ foreach ($d in $WantDirs) {
 
 Head 'Scripts'
 
-foreach ($a in $WantAllow) {
+$allowList = $WantAllow
+if ($Live) {
+    $allowList = $WantAllow + $WantLive
+    Say '  -Live: the scripts that reach the VPS and GitHub are included.' 'Yellow'
+} else {
+    Say '  the scripts that reach the VPS and GitHub are NOT included. -Live adds them.'
+}
+
+foreach ($a in $allowList) {
     $s = [string]$a.Script
     $full = Join-Path $Here $s
     if (-not (Test-Path -LiteralPath $full)) {
@@ -272,7 +308,13 @@ try {
 
 Head 'One more thing'
 Say '  Claude Code reads these at start, so restart it, or run /permissions to see them.'
-Say '  Nothing here lets anything leave this machine on its own. Ship, push, Publish-Server'
-Say '  and the live Deploy scripts are all still yours to run.'
+if ($Live) {
+    Say '  -Live was used, so Ship, Publish-Server and the live Deploy scripts are now allowed.' 'Yellow'
+    Say '  Wipe-Saves, Rotate-ServerPassword and Clean-Everything are deliberately not, and should stay that way.'
+    Say '  Take any of it back by deleting the line from the allow list, or with /permissions.'
+} else {
+    Say '  Nothing here lets anything leave this machine on its own. Ship, push, Publish-Server'
+    Say '  and the live Deploy scripts are all still yours to run.'
+}
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
