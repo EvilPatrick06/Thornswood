@@ -197,22 +197,76 @@ $settingsForVps = Join-Path $env:TEMP 'thornswood-server-settings-vps.json'
 # byte order mark under Windows PowerShell 5.1, and a BOM is not JSON to node.
 [IO.File]::WriteAllText($settingsForVps, ($settings | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding($false)))
 
-$there = @(Remote "Get-ChildItem -LiteralPath '$($remotePlugins.Replace('/','\'))' -File | Select-Object -ExpandProperty Name" |
-           ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '\.es[pml]$' })
-$missingPlugins = @($pluginNames | Where-Object { $there -notcontains $_ })
+# A PLUGIN THAT CHANGED IS A PLUGIN THAT HAS TO GO UP, AND THIS ASKED THE WRONG
+# QUESTION UNTIL 21 SEPTEMBER.
+#
+# It compared NAMES. A plugin the VPS already had by name was never sent again,
+# however much its contents had moved. Thornswood-Content.esp is on that list
+# and it is the one plugin in the load order that this repo edits: on
+# 21 September alone it was renamed off another server's prefix, had sixteen
+# dead books taken out, and gained the handle, the deed, the key and the mold.
+# None of it could reach the server, and the launcher downloads the plugins from
+# the server, so none of it could reach anybody's game either. The gamemode was
+# live and calling for records that were not in the file any client had.
+#
+# So the size is asked for as well as the name. Size and not a hash because this
+# is one remote call over ssh for the whole folder either way, and a hash of 60
+# plugins is 28MB of reading on a box that is also running the server; a plugin
+# whose contents changed and whose size did not is a case this can live with,
+# and a deploy that reads every plugin twice is not.
+$thereRaw = @(Remote ("Get-ChildItem -LiteralPath '" + $remotePlugins.Replace('/','\') +
+                      "' -File | ForEach-Object { `$_.Name + '|' + `$_.Length }"))
+$thereSize = @{}
+foreach ($row in $thereRaw) {
+  $bits = "$row".Trim() -split '\|'
+  if ($bits.Count -eq 2 -and $bits[0] -match '\.es[pml]$') { $thereSize[$bits[0]] = [int64]$bits[1] }
+}
+$there = @($thereSize.Keys)
+
+# OUR OWN PLUGIN COMES FROM THE REPO, NOT FROM A GAME FOLDER.
+#
+# $Data is the Steam copy, which is right for the other 59: Vortex deploys them
+# there and that is where they live. Thornswood-Content.esp is not one of those.
+# It is built by scripts in this repo and installed into a game folder by
+# Install-ThornswoodContent.ps1, whose default target is C:\Thornswood\Game and
+# not the Steam copy at all.
+#
+# So on 21 September there were four copies of it on this machine at three
+# different sizes, and a deploy sent whichever one the Steam folder happened to
+# hold: 151,288 bytes, which was that morning's, while the repo was on 141,234
+# with the deed, the key and the mold in it. Chasing that around by hand is how
+# an evening goes missing, so the question is settled here instead. The repo is
+# where this plugin is made and the repo is what goes up.
+$ours = Join-Path $Here 'Thornswood-Content.esp'
+
 $sendPlugins = @()
-foreach ($n in $missingPlugins) {
+$changed = @()
+foreach ($n in $pluginNames) {
   $local = Join-Path $Data $n
-  if (Test-Path -LiteralPath $local) { $sendPlugins += $local }
-  else { throw "the load order names $n, the VPS does not have it, and it is not at $local either" }
+  if ($n -eq 'Thornswood-Content.esp' -and (Test-Path -LiteralPath $ours)) { $local = $ours }
+  if ($there -notcontains $n) {
+    if (Test-Path -LiteralPath $local) { $sendPlugins += $local }
+    else { throw "the load order names $n, the VPS does not have it, and it is not at $local either" }
+    continue
+  }
+  # It is there. Is it the same one? A plugin this machine does not have is left
+  # alone: the VPS's copy is then the only copy and overwriting it with nothing
+  # is the one outcome worse than it being stale.
+  if (-not (Test-Path -LiteralPath $local)) { continue }
+  $localLen = (Get-Item -LiteralPath $local).Length
+  if ($localLen -ne $thereSize[$n]) {
+    $sendPlugins += $local
+    $changed += ('{0}  {1:N0} -> {2:N0} bytes' -f $n, $thereSize[$n], $localLen)
+  }
 }
 Write-Host ''
 Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
 if ($sendPlugins.Count) {
-  Write-Host ('  {0} plugin(s) the VPS does not have yet will go up first:' -f $sendPlugins.Count) -ForegroundColor Yellow
+  Write-Host ('  {0} plugin(s) will go up before the restart:' -f $sendPlugins.Count) -ForegroundColor Yellow
   foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
+  foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
 } else {
-  Write-Host '  every plugin the load order names is already on the VPS' -ForegroundColor DarkGray
+  Write-Host '  every plugin the load order names is on the VPS at the same size' -ForegroundColor DarkGray
 }
 
 # ------------------------------------------------------------- the warning
