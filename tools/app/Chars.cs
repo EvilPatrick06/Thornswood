@@ -185,17 +185,48 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The lowest free slot number, 1 on an empty list. The number only
-        /// orders the menu's list, and a forgotten character's number is free
-        /// again. "Highest plus one" climbed past the allowance: on 20
-        /// September the menu read 1 empty, 2 empty, 3, 4, 5 for an account
-        /// with three slots and three characters.
+        /// The lowest free slot number, 1 on an empty list. The number is the
+        /// slot the menu draws the character in, fixed, and a forgotten
+        /// character's number is free again. "Highest plus one" climbed past
+        /// the allowance: on 20 September the menu read 1 empty, 2 empty, 3,
+        /// 4, 5 for an account with three slots and three characters.
         /// </summary>
         static int NextSlot(List<Row> rows)
         {
             int n = 1;
             while (Find(rows, n) != null) n++;
             return n;
+        }
+
+        /// <summary>
+        /// One tidy before the list is written for the menu: a row numbered
+        /// above the allowance moves down into a free number at or below it,
+        /// highest number first (Slots.Tidy is the rule), and the file is
+        /// saved when anything moved. Rows at or below the allowance never
+        /// move, so the menu's fixed slots stay where the person left them.
+        /// Every row with a number takes part, played or not, because
+        /// NextSlot counts them all as holding one and a move must not land
+        /// on a number another row holds. Returns a line for the log naming
+        /// what moved, or null when nothing did.
+        /// </summary>
+        static string TidySlots(List<Row> rows, int allowance)
+        {
+            var numbered = new List<Row>();
+            foreach (Row r in rows) if (r.Slot > 0) numbered.Add(r);
+            var before = new int[numbered.Count];
+            for (int i = 0; i < numbered.Count; i++) before[i] = numbered[i].Slot;
+            int[] after = Slots.Tidy(before, allowance);
+            var moved = new List<string>();
+            for (int i = 0; i < numbered.Count; i++)
+            {
+                if (after[i] == before[i]) continue;
+                numbered[i].Slot = after[i];
+                moved.Add("profile " + numbered[i].Id + " from slot " + before[i] + " to slot " + after[i]);
+            }
+            if (moved.Count == 0) return null;
+            Save(rows);
+            return "Slots tidied for an allowance of " + allowance + ": " +
+                   string.Join(", ", moved.ToArray()) + ".";
         }
 
         /// <summary>
@@ -494,14 +525,17 @@ namespace Thornswood
         ///       {"profileId":0,"slot":1,"name":"","race":"","trade":"","town":"",
         ///        "where":"","played":"","seconds":0,"lastPlayed":""}]}
         ///
-        /// The characters are this file's rows in slot order. The name, race,
-        /// trade, town and where come from the server's roster when it has the
-        /// character and are empty when it does not; the played text, the
-        /// seconds and the date are the launcher's own, and slots is how many
-        /// the menu draws (the site's answer: two, or three for a Patreon tier
-        /// or a Gamemaster). Throws when the file cannot be written, because a
-        /// menu drawn from a stale list offers last session's spare and misses
-        /// whoever was made since.
+        /// The characters are this file's rows in slot order, and the page
+        /// draws each in the slot its number says, fixed, with an empty card
+        /// for every number under the allowance nobody holds (TidySlots has
+        /// run by now, so a number above the allowance means there was no
+        /// room under it). The name, race, trade, town and where come from
+        /// the server's roster when it has the character and are empty when
+        /// it does not; the played text, the seconds and the date are the
+        /// launcher's own, and slots is how many the menu draws (the site's
+        /// answer: two, or three for a Patreon tier or a Gamemaster). Throws
+        /// when the file cannot be written, because a menu drawn from a stale
+        /// list offers last session's spare and misses whoever was made since.
         /// </summary>
         static void WriteCharacters(Config cfg, List<Row> rows, int last, int spare, int slots)
         {
@@ -725,7 +759,25 @@ namespace Thornswood
             // How many slots the menu draws: the site's answer from the door
             // check a moment ago, two when it said nothing.
             int slots = 2;
-            try { if (Door.Last != null && Door.Last.Slots > 0) slots = Door.Last.Slots; } catch { }
+            bool answered = false;
+            try
+            {
+                if (Door.Last != null && Door.Last.Slots > 0) { slots = Door.Last.Slots; answered = true; }
+            }
+            catch { }
+
+            // A character numbered above that allowance comes down into a
+            // free number under it before the list goes out, so the menu
+            // does not draw it past the fixed slots when there is room. Only
+            // on the site's own answer: the two the launcher falls back on
+            // when the site said nothing is a guess, and a three slot
+            // account's third character must not be moved on a guess during
+            // an outage. The menu still draws it, after the fixed slots.
+            string tidied = null;
+            if (answered)
+            {
+                try { tidied = TidySlots(rows, slots); } catch { tidied = null; }
+            }
             WriteCharacters(cfg, rows, last, spare, slots);
 
             // A choice or a forget left over from the last session would be
@@ -734,6 +786,9 @@ namespace Thornswood
             try { if (File.Exists(ForgetFile)) File.Delete(ForgetFile); } catch { }
 
             if (setAside != null) note = (note == null ? "" : note + " ") + setAside;
+            // Shell logs the note; its Log is its own, so the tidy's line
+            // rides along here rather than being written from this class.
+            if (tidied != null) note = (note == null ? "" : note + " ") + tidied;
             return note;
         }
 
