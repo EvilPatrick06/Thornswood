@@ -1123,6 +1123,34 @@ function takeItem(actorId, itemDesc, count) {
   return false;
 }
 
+/*
+  The same as takeItem, by form id rather than by descriptor.
+
+  wearTool already knows the id of the tool in the pack, because it had to find
+  out which of six pickaxes somebody is carrying. Turning that back into a
+  descriptor to hand to takeItem would be a round trip through
+  mp.getDescFromId for no reason, and one that can throw.
+*/
+function takeItemById(actorId, baseId, count) {
+  if (!baseId) { return false; }
+  let inv = null;
+  try {
+    inv = mp.get(actorId, 'inventory');
+  } catch (e) {
+    return false;
+  }
+  const entries = (inv && inv.entries) || [];
+  for (let i = 0; i < entries.length; i++) {
+    if (entries[i].baseId !== baseId) { continue; }
+    if (entries[i].count < count) { return false; }
+    entries[i].count -= count;
+    if (entries[i].count <= 0) { entries.splice(i, 1); }
+    mp.set(actorId, 'inventory', { entries: entries });
+    return true;
+  }
+  return false;
+}
+
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -1288,6 +1316,11 @@ function rankStep(actorId, key) {
     name    what a sentence calls it. All three take 'a' in front of them.
     where   where to get another, said in the refusal, because 'you need a
             pickaxe' with no second sentence sends somebody to the Discord.
+    broken  where to get another when the one they had just snapped, which is
+            not the same sentence. Patrick, 21 September: a broken tool is
+            replaced by "a smith making them", so the smith is named first and
+            the world is named second. Both are true and the order is the
+            point: the trade is meant to be the way back.
 */
 const TOOLS = {
   miner: {
@@ -1295,20 +1328,24 @@ const TOOLS = {
     accept: ['e3c16:Skyrim.esm', '1019d4:Skyrim.esm', '6a707:Skyrim.esm',
              '398e6:Dragonborn.esm', '206f2:Dragonborn.esm', '179c9:Dragonborn.esm'],
     name: 'pickaxe',
-    where: 'Any general goods trader sells one, and there are pickaxes lying at most mines.'
+    where: 'Any general goods trader sells one, and there are pickaxes lying at most mines.',
+    broken: 'A smith can forge you another. Failing that, a general goods trader sells one.'
   },
   woodworker: {
     give: '2f2f4:Skyrim.esm',
     accept: ['2f2f4:Skyrim.esm'],
     name: 'woodcutter\'s axe',
-    where: 'Any general goods trader sells one, and there is usually one at a mill.'
+    where: 'Any general goods trader sells one, and there is usually one at a mill.',
+    broken: 'A smith can forge you another. Failing that, a general goods trader sells one.'
   },
   farmer: {
     give: 'f5d05:Skyrim.esm',
     accept: ['f5d05:Skyrim.esm', 'f5d06:Skyrim.esm'],
     name: 'shovel',
     where: 'Skyrim has no hoe, so a shovel is the tool. There is one at most farms ' +
-           'and mills, and a general goods trader sells one.'
+           'and mills, and a general goods trader sells one.',
+    broken: 'A smith can forge you another. Failing that, there is a shovel at most ' +
+            'farms and mills.'
   }
 };
 
@@ -1328,6 +1365,31 @@ const TOOLS = {
   anywhere a person would be standing anyway.
 */
 const TOOL_AGAIN_HOURS = 12;
+
+/*
+  HOW MUCH WORK A TOOL HAS IN IT BEFORE IT BREAKS. NOT IN THE RULEBOOK.
+
+  Patrick, 21 September: axes, pickaxes and shovels "can eventually break and
+  you have to get a new one from a smith making them". So a tool stops being a
+  thing somebody owns once and becomes stock, which somebody has to make.
+
+  A hundred uses, measured against the ladder rather than picked out of the air.
+  TUNING.workPerRank adds up to 20 + 50 + 120 = 190 yields from novice to
+  Master, so one tool carries somebody a little over half the way: two tools to
+  the top, and a Master who keeps working keeps ordering. That is a standing
+  order book for the smiths without being a chore, and it is the number to move
+  if it turns out to be either.
+
+  The warning comes at fifteen left. Far enough out to finish what you are doing
+  and walk to a town, short enough to mean something.
+
+  A use is counted after the work, never before it, so a refused swing costs
+  nothing. Nothing here can take a tool somebody is not holding: if the pack
+  cannot be read, or the tool is not in it, the swing wears nothing rather than
+  breaking something at random.
+*/
+const TOOL_USES = 100;
+const TOOL_WARN_AT = 15;
 
 /*
   When each tool was last handed to this character, keyed the same way TOOLS is.
@@ -1479,6 +1541,102 @@ function toolGate(actorId, key) {
   return 'You need a ' + tool.name + ' in your pack for that. ' + tool.where;
 }
 
+/*
+  The form id of the tool of this kind actually in the pack, or 0.
+
+  holdsTool answers yes or no and that was enough while nothing ever took one
+  away. Breaking one has to know WHICH, because a miner may be carrying any of
+  six pickaxes and the Notched Pickaxe off the Throat of the World is not the
+  one to snap because it happens to be first in the accept list. So this returns
+  the one they are holding, and when they are holding more than one it returns
+  the first in accept order, which puts the plain handout ahead of the quest
+  items in every one of the three lists.
+*/
+function heldToolId(actorId, tool) {
+  let inv = null;
+  try {
+    inv = mp.get(actorId, 'inventory');
+  } catch (e) {
+    return 0;
+  }
+  const entries = (inv && inv.entries) || [];
+  for (let i = 0; i < tool.accept.length; i++) {
+    const baseId = idOf(tool.accept[i]);
+    if (!baseId) { continue; }
+    for (let j = 0; j < entries.length; j++) {
+      const e = entries[j];
+      if (e && e.count > 0 && e.baseId === baseId) { return baseId; }
+    }
+  }
+  return 0;
+}
+
+/*
+  One use off the tool. Called AFTER the work is done and the yield is handed
+  over, never before, so a refused swing costs nothing.
+
+  Returns the sentence to say, or null when there is nothing worth saying. Three
+  answers: silence, the warning near the end, and the break.
+
+  WHAT A BREAK DOES. The tool comes out of the pack and the handout clock is
+  set to now, which is the whole of the balance. TOOL_AGAIN_HOURS is twelve, so
+  for twelve hours the free replacement at the seam is not coming and the way
+  back is a smith, which is what Patrick asked for. After twelve hours the old
+  safety net is there again, because a tool that is required to work must never
+  be the reason somebody's class is over: that is the same trap offerTool and
+  offerSeed were both written to close, and breaking one must not reopen it.
+
+  The count is kept beside the handout stamps under a 'wear:' key rather than in
+  a second property. offerTool reads stamps[key] and nothing else, so a
+  'wear:miner' sitting next to 'miner' is invisible to it, every character who
+  already has stamps keeps them, and there is no migration to get wrong.
+*/
+function wearTool(actorId, key) {
+  const tool = toolFor(key);
+  if (!tool) { return null; }
+  const baseId = heldToolId(actorId, tool);
+  if (!baseId) { return null; }
+
+  const stamps = toolStamps(actorId);
+  const wearKey = 'wear:' + key;
+  const used = (Object.prototype.hasOwnProperty.call(stamps, wearKey)
+    ? (Number(stamps[wearKey]) || 0) : 0) + 1;
+
+  if (used < TOOL_USES) {
+    stamps[wearKey] = used;
+    try {
+      mp.set(actorId, TOOL_PROPERTY, stamps);
+    } catch (e) {
+      // The wear is not written down, so this swing was free. Harmless: the
+      // tool lasts longer than it should rather than breaking in their hand.
+      log('could not record', key, 'tool wear for', actorId.toString(16) + ':', e);
+      return null;
+    }
+    const left = TOOL_USES - used;
+    if (left === TOOL_WARN_AT) {
+      return 'Your ' + tool.name + ' is worn thin. It has a little work left in it.';
+    }
+    return null;
+  }
+
+  // Worn out. Take it, forget the count, and hold the free replacement off.
+  if (!takeItemById(actorId, baseId, 1)) {
+    // It could not be taken, so it is not broken. Counting it again next swing
+    // is the honest answer; snapping a tool that is still in the pack is not.
+    log('could not take the worn', tool.name, 'from', actorId.toString(16));
+    return null;
+  }
+  stamps[wearKey] = 0;
+  stamps[key] = Date.now();
+  try {
+    mp.set(actorId, TOOL_PROPERTY, stamps);
+  } catch (e) {
+    log('could not record the broken', key, 'tool for', actorId.toString(16) + ':', e);
+  }
+  log(actorId.toString(16), 'broke a', tool.name, 'after', TOOL_USES, 'uses');
+  return 'Your ' + tool.name + ' breaks. ' + tool.broken;
+}
+
 /**
  * Salt quarry: the miner's verb, and the miner's RANK sizes the yield.
  *
@@ -1514,7 +1672,9 @@ function mineSalt(actorId, refrId) {
     extra = ' Something rarer came away with it.';
   }
   const rank = creditWork(actorId, 'mine');
-  return 'You work ' + yielded + ' salt from the seam.' + extra + (rank ? ' ' + rank : '');
+  const worn = wearTool(actorId, 'miner');
+  return 'You work ' + yielded + ' salt from the seam.' + extra +
+         (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
 }
 
 /**
@@ -1614,8 +1774,9 @@ function mineOre(actorId, refrId, baseDesc) {
   }
   stampCooldown(actorId, refrId);
   const rank = creditWork(actorId, 'mine');
+  const worn = wearTool(actorId, 'miner');
   return 'You work ' + yielded + ' ' + seam.name + ' out of the seam.' +
-         (rank ? ' ' + rank : '');
+         (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
 }
 
 /**
@@ -1656,8 +1817,9 @@ function burnCharcoal(actorId, refrId) {
   addItem(actorId, ITEMS[grade], 1);
   stampCooldown(actorId, refrId);
   const rank = creditWork(actorId, 'charburner');
+  const worn = wearTool(actorId, 'woodworker');
   return 'The kiln yields ' + grade.replace('charcoalT', 'grade ') + ' charcoal.' +
-         (rank ? ' ' + rank : '');
+         (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
 }
 
 // ---------------------------------------------------------------------------
@@ -10086,8 +10248,21 @@ log('gamemode loaded:',
     addItem(actorId, crop.produce, n);
     touchClaim(ground, mine);
     var rank = creditWork(actorId, 'farm');
+    /*
+      The shovel wears here and NOT in plant(), even though turning the ground
+      is plainly shovel work too.
+
+      One use per credited yield, everywhere. A crop is one sowing and one
+      bringing in, so counting both would wear a farmer's shovel twice as fast
+      as a miner's pickaxe for the same hours at the same ladder, and the
+      farmer would be buying two shovels to the miner's one pickaxe for no
+      reason anybody could name. Wear sits next to creditWork for that reason:
+      the two count the same thing.
+    */
+    var worn = wearTool(actorId, 'farmer');
     flog(actorId.toString(16), 'brought in', n, crop.name, 'at', refrId.toString(16));
-    return 'You bring in ' + n + ' ' + crop.name + '.' + (rank ? ' ' + rank : '');
+    return 'You bring in ' + n + ' ' + crop.name + '.' + (rank ? ' ' + rank : '') +
+           (worn ? ' ' + worn : '');
   }
 
   // ----------------------------------------------------------- the commands --
