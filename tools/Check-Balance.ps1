@@ -1,4 +1,4 @@
-<#
+﻿<#
   Check-Balance.ps1
 
   Reads the five generated tables and says whether the ladders line up.
@@ -46,12 +46,14 @@
   report below is a number rather than a shape: how far each half's recipes sit
   from what their inputs cost, and every case more than one rung out.
 
-  What is still out of reach is one more hop. Leather Strips, Steel Ingot and
-  Leather are the three commonest inputs in the whole table and none of them
-  comes out of the ground: each is made at a smelter or a tanning rack, which
-  is itself a recipe, one of the 1679 nobody owns. Those rows are ranked by
-  what they sell for and say so, and the limit is printed every run rather than
-  left for somebody to discover.
+  AND IT FOLLOWS THE HOP, which it could not until 21 September. Leather Strips,
+  Steel Ingot and Leather are the three commonest inputs in the whole table and
+  none of them comes out of the ground: each is made at a smelter or a tanning
+  rack, one of the 1679 rows nobody owns. Every input now carries suppliedBy as
+  well as producedBy, the class the input rests on however many benches away,
+  so this script can say which class supplies which half as a table of counts.
+  The four pairings Patrick named are checked against it by name, one line each,
+  and a pairing that does not hold is reported as not holding.
 
   Read only. It opens five json files in this repository and writes nothing
   anywhere, and it does not touch the game folder or the VPS at all.
@@ -326,9 +328,17 @@ if ($recipes) {
             # Which input it was. The row carries inputRank as the dearest of
             # them; this finds the one that set it, so the line names a thing
             # rather than a rank.
+            # suppliedAt and not producedAt: what ranks a row is what the
+            # chain costs, and the input that set it is usually an ingot or a
+            # leather strip, which no class produces and every one of which
+            # would have read producedAt null. Matching on producedAt printed
+            # 'what it asks for' on 185 rows instead of naming the thing.
             $dearest = ''
             foreach ($it in $row.inputItems) {
-                if ([string]$it.producedAt -eq $ir) { $dearest = [string]$it.name; break }
+                $at = ''
+                if ($it.PSObject.Properties.Name -contains 'suppliedAt') { $at = [string]$it.suppliedAt }
+                if (-not $at) { $at = [string]$it.producedAt }
+                if ($at -eq $ir) { $dearest = [string]$it.name; break }
             }
             if (-not $dearest) { $dearest = 'what it asks for' }
             $which = 'above'
@@ -371,6 +381,151 @@ if ($recipes) {
         if ($far.Count -gt 10) { Note ("  ... and {0} more, every one of them in tools\recipes.json with its inputItems" -f ($far.Count - 10)) }
     } else {
         Ok 'no recipe is more than one rung away from what its inputs cost'
+    }
+}
+
+Head 'Which class supplies which half'
+
+# PATRICK, 21 September: "the farmer would supply the cook, gatherer would
+# supply tailor and alchemist, miner smith, hunter tailor and smith and so on."
+#
+# That is a claim about the whole economy and it is now countable, which it was
+# not before the hop. Every input of every owned recipe carries suppliedBy: the
+# class the input rests on, however many benches away it is. A Steel Ingot is
+# produced by nobody and supplied by a miner, one smelter away from his ore. A
+# Leather Strip is supplied by a hunter, two benches from the hide.
+#
+# WHAT IS COUNTED, SAID PLAINLY. One count per input entry: a recipe wanting
+# Leather Strips and Steel Ingot is one entry for the hunter and one for the
+# miner, and asking for four strips is still one entry, because this is a
+# question about who supplies whom and not about tonnage.
+#
+# EVERY OWNED ROW IS COUNTED AND NOT ONLY THE ONES THE SERVER IS ASKED ABOUT.
+# The ladder counts above skip tempering, because a row the gate never sees
+# cannot be in step with anything. This is a different question: somebody
+# tempering a sword really does consume the ingot, and leaving 1720 tempering
+# rows out would hide most of what the Smith buys from the Miner.
+if ($recipes) {
+    $classes = @{}
+    $supplyOf = @{}
+    $profOf = @{}
+    foreach ($k in $recipes.recipes.PSObject.Properties.Name) {
+        $row = $recipes.recipes.$k
+        $half = [string]$row.owner + '/' + [string]$row.half
+        $prof = [string]$row.owner
+        if (-not $supplyOf.ContainsKey($half)) { $supplyOf[$half] = @{} }
+        if (-not $profOf.ContainsKey($prof)) { $profOf[$prof] = @{} }
+        foreach ($it in $row.inputItems) {
+            $who = 'nobody'
+            if ($it.PSObject.Properties.Name -contains 'suppliedBy' -and $it.suppliedBy) { $who = [string]$it.suppliedBy }
+            $classes[$who] = $true
+            if (-not $supplyOf[$half].ContainsKey($who)) { $supplyOf[$half][$who] = 0 }
+            $supplyOf[$half][$who]++
+            if (-not $profOf[$prof].ContainsKey($who)) { $profOf[$prof][$who] = 0 }
+            $profOf[$prof][$who]++
+        }
+    }
+
+    if ($classes.Count -eq 0) {
+        Note 'no recipe row carries suppliedBy yet, so rebuild the table with tools\Build-RecipeTable.ps1 and run this again'
+    } else {
+        $cols = @($classes.Keys | Where-Object { $_ -ne 'nobody' } | Sort-Object) + @('nobody')
+        $head = '  ' + 'half'.PadRight(24)
+        foreach ($c in $cols) { $head += $c.PadLeft(10) }
+        $head += 'total'.PadLeft(10)
+        Say $head
+        Say ('  ' + ('-' * ($head.Length - 2)))
+        foreach ($half in ($supplyOf.Keys | Sort-Object)) {
+            $tot = 0
+            foreach ($c in $cols) { if ($supplyOf[$half].ContainsKey($c)) { $tot += $supplyOf[$half][$c] } }
+            if ($tot -eq 0) { continue }
+            $line = '  ' + $half.PadRight(24)
+            foreach ($c in $cols) {
+                $n = 0
+                if ($supplyOf[$half].ContainsKey($c)) { $n = $supplyOf[$half][$c] }
+                $line += ([string]$n).PadLeft(10)
+            }
+            $line += ([string]$tot).PadLeft(10)
+            Say $line
+        }
+    }
+}
+
+Head 'The four pairings Patrick named, against what was measured'
+
+# HIS OWN WORDS, 21 September, and each one is checked as written rather than
+# rounded up: "the farmer would supply the cook, gatherer would supply tailor
+# and alchemist, miner smith, hunter tailor and smith and so on."
+$PAIRINGS = @(
+    @{ Class = 'farmer';   Profession = 'Cook' },
+    @{ Class = 'gatherer'; Profession = 'Tailor' },
+    @{ Class = 'gatherer'; Profession = 'Alchemist' },
+    @{ Class = 'miner';    Profession = 'Smith' },
+    @{ Class = 'hunter';   Profession = 'Tailor' },
+    @{ Class = 'hunter';   Profession = 'Smith' }
+)
+
+# WHEN A PAIRING HOLDS. INVENTED: classes.md sets no number for it.
+#
+# His sentence names several suppliers for the same profession, hunter and miner
+# both for the Smith, so "is it the largest" is the wrong test and it was tried
+# first: it reported hunter to Smith as not holding on 1685 entries of hide and
+# leather, which is plainly a supply line. The test is a SHARE instead: a
+# pairing holds when that class supplies at least PAIRING_MIN_SHARE of the input
+# entries a profession asks for that anybody supplies at all. The largest
+# supplier is named on every line either way, so a pairing that holds while
+# somebody else leads reads as exactly that.
+#
+# Nothing is rounded up. Below the share, or supplying nothing, or a profession
+# with no recipes at all, is reported as DOES NOT HOLD with the number.
+#
+# The denominator is the entries some class supplies. The ones nobody supplies
+# are in the table above under "nobody" and are left out of the share, because a
+# Dragon Bone nobody hands over is not evidence about the farmer either way.
+#
+# It does NOT set the exit code. Whether the world should match the sentence, or
+# the sentence the world, is Patrick's to decide and not a script's.
+
+# A fifth. Below that a class is a minor name in that trade rather than one of
+# its supply lines, and above it the trade would notice if the class stopped.
+# No number in classes.md sets this and nothing in the records suggests one.
+$PAIRING_MIN_SHARE = 0.20
+if ($recipes -and $profOf.Count -gt 0) {
+    foreach ($pr in $PAIRINGS) {
+        $prof = $pr.Profession
+        $cls = $pr.Class
+        if (-not $profOf.ContainsKey($prof)) {
+            Note ("{0} to {1}: DOES NOT HOLD. The {1} owns no recipe in this build at all, so there is nothing for anybody to supply it." -f $cls, $prof)
+            continue
+        }
+        $by = $profOf[$prof]
+        $tot = 0
+        foreach ($c in $by.Keys) { if ($c -ne 'nobody') { $tot += $by[$c] } }
+        $mine = 0
+        if ($by.ContainsKey($cls)) { $mine = $by[$cls] }
+        $topWho = ''
+        $topN = -1
+        foreach ($c in ($by.Keys | Sort-Object)) {
+            if ($c -eq 'nobody') { continue }
+            if ($by[$c] -gt $topN) { $topN = $by[$c]; $topWho = $c }
+        }
+        if ($tot -eq 0) {
+            Note ("{0} to {1}: DOES NOT HOLD. Not one input of a {1} recipe is supplied by any class in this world." -f $cls, $prof)
+            continue
+        }
+        $share = [Math]::Round(100.0 * $mine / $tot)
+        $lead = 'the largest supplier is the ' + $topWho + ' with ' + $topN
+        if ($topWho -eq $cls) { $lead = 'no class supplies more' }
+        if ($mine -eq 0) {
+            Note ("{0} to {1}: DOES NOT HOLD. The {0} supplies nothing a {1} asks for, of {2} supplied input entries, and {3}." -f `
+                  $cls, $prof, $tot, $lead)
+        } elseif (($mine / [double]$tot) -ge $PAIRING_MIN_SHARE) {
+            Ok ("{0} to {1}: HOLDS. The {0} supplies {2} of the {3} supplied input entries a {1} asks for, {4}%, and {5}." -f `
+                $cls, $prof, $mine, $tot, $share, $lead)
+        } else {
+            Note ("{0} to {1}: DOES NOT HOLD. The {0} supplies {2} of {3} supplied input entries, {4}%, which is under the {5}% a supply line has to reach, and {6}." -f `
+                  $cls, $prof, $mine, $tot, $share, [int]($PAIRING_MIN_SHARE * 100), $lead)
+        }
     }
 }
 
@@ -437,13 +592,14 @@ if ($recipes) {
 }
 
 Head 'What this still cannot answer'
-Say '  What a smelter and a tanning rack cost. Leather Strips are wanted by 924 recipes,'
-Say '  Steel Ingot by 888 and Leather by 665, and not one of the three comes out of the'
-Say '  ground: they come out of a recipe in the same table, one of the 1679 unowned rows'
-Say '  anybody may make. Following that one extra hop is what would put the Smith''s'
-Say '  ladder against the Miner''s. Until it is done those rows are ranked by what they'
-Say '  sell for, they say so in their rankFrom field, and they are the rows counted'
-Say '  above as asking for nothing any class produces.'
+Say '  What a thing costs when nobody makes it and nobody digs it up. The hop closed the'
+Say '  smelter and the tanning rack: Steel Ingot, Leather and Leather Strips all carry a'
+Say '  class now, and 5711 of the 6708 input entries in the table are supplied by one.'
+Say '  The 997 that are left are bought, looted or dropped, led by Dragon Bone on 138'
+Say '  rows, Linen Wrap on 106, Dwarven Metal Ingot on 103, Firewood on 78 and Butter'
+Say '  on 46. Those rows keep the price rank and say so in rankFrom. Firewood and Butter'
+Say '  are the two worth somebody deciding about: a woodcutter''s verb and a churn would'
+Say '  put both of them on a class, and the kiln already reads out of gamemode.js.'
 
 Write-Host ''
 if ($script:fail -gt 0) {

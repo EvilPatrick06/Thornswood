@@ -75,22 +75,90 @@
   through mp.makeProperty and mp.set, which survives a restart in the world
   save; this script writes none of that and only says which bases are crops.
 
-  WHICH PLANTS ARE CROPS, AND HOW THAT WAS READ OFF THE DATA
+  A GATHERER GATHERS REAGENTS, AND FOOD IS SOMEBODY ELSE'S
 
-  A farm crop is a TREE record whose produce is an ALCH, which on a plant is
-  always a food. On this build that is exactly nine records: ash yam, cabbage,
-  leek, potato, gourd, green apple, red apple, JK's carrot plant and tomato.
-  Every one of them is a cultivated crop and nothing else gets through, because
-  every meat rack, fish, clam, cheese bowl and butter churn in the game is a
-  FLOR and not a TREE. The same rule read on FLOR instead would take in 27
-  records here, 23 of them salmon, pheasant, rabbit, skeever, horker meat,
-  mammoth cheese and the HearthFires butter churn. The other four are the FLOR
-  copies JKs Skyrim.esp and JK's Whiterun's Outskirts.esp also ship of their
-  apple and carrot, and the TREE copy of each is the one this takes.
+  PATRICK, 21 SEPTEMBER: 'The farmer grows the crops? Those crops should be
+  used to make food, why is a gatherer giving them all the food ingredients
+  when they gather herbs and things.' And on the shape he wants: 'the farmer
+  would supply the cook, gatherer would supply tailor and alchemist, miner
+  smith, hunter tailor and smith and so on.'
 
-  Two field crops give an INGR rather than a food, so no rule reaches them and
-  they are named one at a time in CROP_BY_EDITOR_ID below: wheat and tundra
-  cotton.
+  He is right and the table said otherwise. Measured in tools\harvests.json on
+  21 September, over the 131 rows of the harvests map, which is the gatherer's
+  table: 106 of them produce an INGR, which is an alchemy reagent and is the
+  gatherer's work exactly as he describes it. 24 produce an ALCH and 1 a MISC.
+  Counted the same day over tools\recipes.json, the gatherer supplied the Cook
+  225 of that profession's inputs and the farmer supplied the Cook none at all,
+  and the biggest of them were Butter 46, Leek 12, Potato 8, Cabbage 6, Carrot
+  6, Gourd 4, Tomato 4, Ash Yam 4, Red Apple 4, Green Apple 4 and Pheasant
+  Breast 4. A cabbage and a hanging pheasant were a gatherer's to pick.
+
+  So the rule this script sorts by is written on the produce and not on the
+  plant: A PLANT WHOSE PRODUCE IS AN ALCHEMY REAGENT IS THE GATHERER'S, AND A
+  PLANT WHOSE PRODUCE IS FOOD IS NOT. Food is read off the record rather than
+  off a list of names. An ALCH record's ENIT is the value in gold as a uint32
+  and then a flag word, and bit 0x00000002 of that flag word is the food bit.
+  That is proved in the header of tools\Build-RecipeTable.ps1 against the five
+  masters, where the flag word takes exactly five values and every record
+  carrying 0x00000002 is something eaten, and this script reads the same
+  subrecord the same way rather than inventing a second test. Measured here on
+  21 September: all 15 produce records the 24 food rows point at carry the food
+  bit, from FoodCabbage to FoodCharredSkeeverMeat.
+
+  WHERE THE FOOD GOES, WHICH IS THE OTHER HALF OF THE RULE
+
+  Taking food off the gatherer says nothing about whose it is, and a row that
+  leaves one table and joins none is work that left the game. Every one of the
+  24 goes somewhere and the run says which:
+
+    A GROWN CROP IS THE FARMER'S, thirteen rows. Both apple trees and both
+    apples again in JK's Whiterun's Outskirts, both carrots, the tomato, the
+    ash yam, leek, potato, cabbage and gourd cluster. They join the crops map.
+
+    HANGING GAME IS THE HUNTER'S, seven rows. HangingPheasant01 and 02,
+    HangingRabbit01 and 02, the two giant-skewer charred skeevers and
+    CharredSkeever03. They join a game map of their own, beside the fish,
+    because the hunter's carcass table is built out of NPC_ records and a
+    hanging pheasant is a FLOR somebody presses E on rather than an animal
+    anybody killed.
+
+    A PROP IS NOBODY'S, two rows. MammothCheese01 and BYOHButterChurn are
+    neither a plant nor an animal, so no class verb reaches them: they are left
+    out and reported by name every run, the same way the planter sacks and the
+    coin purses are. BUTTER WAS 46 OF THE COOK'S INPUTS and now has no producer
+    at all. Whether a churn becomes a farm station is a decision for Patrick
+    and Djinn and not one to make inside a sweep of the load order.
+
+    THE SOUL HUSK STAYS THE GATHERER'S, two rows, and it is the one judgement
+    in the four. DLC01SoulHusk01 and 02 carry the food bit like the rest, so
+    the rule alone would send them to the farmer. Two things were measured
+    before that was refused. They grow in the Soul Cairn, a plane of Oblivion
+    behind the Dawnguard questline, so nobody sows them and nothing bled for
+    them, and a farmer's crop list with a plot in Oblivion on it is a worse
+    answer than the one being fixed. And searched across tools\recipes.json the
+    same day, Soul Husk is an input to no recipe in this build at all, so the
+    thing Patrick is complaining about, the gatherer handing the Cook their
+    shopping list, does not touch it. It is named in FOOD_STAYS_THE_GATHERERS
+    below and the run says so.
+
+  WHICH PLANTS ARE CROPS, AND WHY THE RULE COULD ONLY BE WIDENED NOW
+
+  A farm crop was a TREE record whose produce is an ALCH, and that record type
+  test is gone. It was there because FLOR plus ALCH dragged in every meat rack,
+  clam, cheese bowl and butter churn in the game, and it cost four crops: JKs
+  Skyrim.esp and JK's Whiterun's Outskirts.esp ship FLOR copies of their apple
+  and carrot beside the TREE ones, and the FLOR copies were left in the
+  gatherer's table. A cabbage is a cabbage whichever record type it is.
+
+  Every one of the things the old rule was guarding against now has a name and
+  a home. The salmon and the clams are taken by the fish pass before this one
+  runs. The meat racks are the seven game rows. The cheese bowl and the churn
+  are the two props. So the crop rule is now the food rule with those three
+  lists subtracted: a plant, of either record type, whose produce carries the
+  food bit and which is not game, not a prop and not named as staying the
+  gatherer's. On this build that is 13 records, and two field crops give an
+  INGR rather than a food, so no rule reaches them and they are named one at a
+  time in CROP_BY_EDITOR_ID below: wheat and tundra cotton. 15 crops in all.
 
   The name in the table is the produce's name, the same as in the harvests
   table, because that is what somebody is handed. It is what the record says
@@ -104,18 +172,21 @@
     - walks the FLOR and TREE top groups of each, in that order, so a plugin
       that overrides a plant wins over the one that defined it
     - keeps every record that carries a PFIG, and resolves that form id to the
-      record it names, for its own name, its record type and its gold value
+      record it names, for its own name, its record type, its gold value and,
+      when it is an ALCH, the food bit out of its ENIT flag word
     - takes the water produce out of them first, by the list of names in the
       fish knobs below, so the plant table never carries a record that is the
       fisher's work rather than the gatherer's
+    - then takes the food out of them, by the food bit, and routes each row to
+      the farmer, to the hunter's game table or to the excluded list, except
+      the ones named as staying the gatherer's
     - sorts each plant that is left into one of classes.md's four ranks by what
       its produce is worth (see the knobs below)
-    - runs the crops pass over those same plants: takes the farm crops out of
-      them by the rule above, gives each one the rank its produce earns and a
-      grow time worked out from the same price
-    - writes tools\harvests.json, the crops and the fish beside the harvests in
-      it, and prints all three tables as JavaScript object literals, because the
-      server ships as one file and cannot read the json
+    - runs the crops pass over the rows it routed to the farmer, gives each one
+      the rank the farm ladder names and a grow time worked out from the price
+    - writes tools\harvests.json, the crops, the fish and the game beside the
+      harvests in it, and prints all four tables as JavaScript object literals,
+      because the server ships as one file and cannot read the json
 
   THE FISHER'S RECORDS, AND WHY THEY NEEDED NO NEW ONES
 
@@ -150,7 +221,12 @@
   the build, if two plants land on the same key, if a crop has no produce or no
   price, if two crops land on the same key, if a record named as water produce
   is in no plugin in this build or has no Fisher rank set for it, if no water
-  record is a novice's, or if the game folder changed underneath it.
+  record is a novice's, if a record named as hanging game is in no plugin in
+  this build or has no Hunter rank set for it, if no game record is a novice's,
+  if a row the food rule routed to the farmer did not reach the crops table, if
+  a food row is left in the gatherer's table without being named as staying
+  there, if the first rung of the gatherer's ladder or the farmer's is empty,
+  or if the game folder changed underneath it.
 #>
 param(
     [string] $Data       = 'C:\Thornswood\Game\Data',
@@ -234,6 +310,26 @@ $VALUE_RULES = @{
     'WEAP' = 'DATA0'   # DATA: value uint32, weight float, damage uint16
     'ALCH' = 'ENIT0'   # DATA is the weight alone; ENIT starts with the value
 }
+#
+# ALCH_FLAG_FOOD: the bit in an ALCH record's ENIT flag word that says the
+# thing is eaten rather than drunk for its effects. NOT A KNOB and not a
+# judgement: it is a fact about the record layout, and it is here beside
+# VALUE_RULES because it is read out of the same subrecord in the same pass.
+#
+# It is not proved a second time here on purpose. tools\Build-RecipeTable.ps1
+# proves it in its own header, by counting the flag word over the five masters:
+# it takes exactly five values, 0x00000000 is 205 potions, 0x00000001 is 7
+# potions with the no-auto-calc bit, 0x00000002 is 8 foods, 0x00000003 is 107
+# foods with that same no-auto-calc bit and 0x00020000 is 80 poisons. That
+# script gates the whole Cook and Alchemist split on it, so a second reading
+# invented here would be a second answer able to disagree with the first about
+# the same record. ENIT on an ALCH is the value in gold as a uint32 and then
+# this word, which is why VALUE_RULES already reads the first four bytes of it.
+#
+# Measured here on 21 September against this build: all 15 produce records the
+# 24 food rows of the harvests table point at carry it, including Soul Husk,
+# whose editor id is DLC1FoodSoulHusk and whose flag word is 0x00000003.
+$ALCH_FLAG_FOOD = 0x00000002
 #
 # PRODUCE_WITHOUT_A_PRICE: kinds of record that are a real answer to "what does
 # this give" but carry no single item and no price. LVLI is the one this build
@@ -368,16 +464,145 @@ $FISH_RANK_BY_EDITOR_ID = @{
     'SlaughterfishEggNest01' = 'master'
 }
 #
+# ------------------------------------------------------ the food knobs ------
+#
+# THE RULE ITSELF IS NOT A KNOB. A plant whose produce is an alchemy reagent is
+# the gatherer's and a plant whose produce is food is not, food is the ALCH
+# food bit above, and that is read off the records every run. The whole of
+# Patrick's 21 September correction is that one sentence and it is written out
+# in the header. What is below is only WHERE each food row goes, because the
+# rule can say a hanging pheasant is not a flower and it cannot say whose it is.
+#
+# All three lists are matched on the editor id exactly, the way the fish are and
+# for the same reason: a record renamed out from under this is the quiet way a
+# class loses half its work again, so every name in them is checked against the
+# build and a name nothing carries stops the run.
+#
+# GAME_BY_EDITOR_ID: hanging game, which is the hunter's. Seven records on this
+# build, read out of tools\harvests.json on 21 September rather than listed from
+# memory: every row in the harvests map whose produce carried the food bit and
+# was an animal. Two pheasants hanging by the feet, two rabbits, two charred
+# skeevers on a giant's skewer and a third charred skeever on its own.
+#
+# WHY THEY ARE NOT ROWS IN tools\hunts.json, which was the other place they
+# could have gone. That table is built by tools\Build-HuntTable.ps1 out of NPC_
+# records and the death item levelled lists they point at, and loot() in the
+# gamemode answers it only after reading the reference itself: mp.get type must
+# say MpActor and mp.get isDead must say true. A hanging pheasant is a FLOR
+# record standing in a hunter's camp. It is not an actor, it never died on this
+# server and neither of those reads would ever answer for it, so a row in
+# hunts.json would be a row nothing could reach.
+#
+# What they are is a press on a FLOR whose produce the engine hands over, which
+# is the same shape as the water produce, and the fish pass on 20 September
+# solved that problem once already: its own map in tools\harvests.json, its own
+# generated block in the gamemode, its own verb gated on its own class. This
+# follows it line for line rather than inventing a second arrangement.
+$GAME_BY_EDITOR_ID = @(
+    'HangingPheasant01', 'HangingPheasant02',
+    'HangingRabbit01', 'HangingRabbit02',
+    'GiantSkewer01CharredSkeever01', 'GiantSkewer01CharredSkeever02',
+    'CharredSkeever03'
+)
+#
+# GAME_RANK_BY_EDITOR_ID: which Hunter rank each of them asks for. INVENTED,
+# and named one at a time rather than worked out, for the same reason the fish
+# and the crops are. classes.md sets no number here. The gold rule that ranks a
+# plant cannot rank these either: measured on 21 September, the three produce
+# records are priced at 2, 3 and 4 gold, so every threshold in RANK_MAX_VALUE
+# puts all seven on one rung and the ladder does nothing.
+#
+# So the measure is where the thing hangs, which is the only question a hunter's
+# ladder can ask about a carcass somebody else strung up, and the editor ids say
+# it plainly enough to rank on:
+#
+#   novice    the rabbits and the pheasants, four of the seven. They hang
+#             outside farmhouses and at hunters' camps all over the province,
+#             which is where a new hunter already is. THE FIRST RUNG CARRIES THE
+#             MAJORITY AND NOTHING MOVES IT: an empty bottom rung is the circle
+#             this repo has now been rewritten over three times, at the plants
+#             where 33 of 50 novice rows were planter sacks, at the crops where
+#             the gold rule put ten of eleven on one rung, and at the fish. A
+#             hunter who cannot work a body cannot climb.
+#   advanced  CharredSkeever03, the plain charred skeever, which is cooking in
+#             bandit and forsworn camps rather than hanging at a farm.
+#   expert    the two on GiantSkewer01, which is a giant's own spit, and the
+#             giant is standing next to it.
+#   master    nothing yet, left open on purpose the way the farm ladder's top
+#             rung is. A record added here later lands on a rung somebody chose
+#             rather than on the highest one by default.
+$GAME_RANK_BY_EDITOR_ID = @{
+    'HangingRabbit01'               = 'novice'
+    'HangingRabbit02'               = 'novice'
+    'HangingPheasant01'             = 'novice'
+    'HangingPheasant02'             = 'novice'
+    'CharredSkeever03'              = 'advanced'
+    'GiantSkewer01CharredSkeever01' = 'expert'
+    'GiantSkewer01CharredSkeever02' = 'expert'
+}
+#
+# FOOD_PROP_BY_EDITOR_ID: food that is neither a plant anybody grows nor an
+# animal anybody took, so no class verb in classes.md reaches it. Two records
+# here and both are furniture somebody put a FLOR on:
+#   MammothCheese01  a bowl of mammoth cheese in a giant's camp. Nobody sowed
+#                    it and nothing was hunted for it.
+#   BYOHButterChurn  the churn in a HearthFires homestead. A churn is worked,
+#                    not picked, and what it wants is milk this build has no
+#                    record for.
+# They are excluded and reported by name every run, and they go in the json's
+# unranked list, the same way the planter sacks, the coin purses and the clam at
+# Oar's Rest do, rather than being dropped without a trace.
+#
+# SAY THIS OUT LOUD WHEN IT COSTS SOMETHING, AND HERE IT DOES. Counted over
+# tools\recipes.json on 21 September, Butter is 46 of the Cook's inputs, the
+# single biggest of them, and after this change nothing in the world produces
+# it. That is the honest answer rather than a wrong one: a churn is not a crop
+# and handing it to a farmer here would be this script deciding a station on its
+# own, which is the thing the beehive taught it not to do. Whether the churn
+# becomes a farm station is a few lines in #dev for Patrick and Djinn.
+$FOOD_PROP_BY_EDITOR_ID = @('MammothCheese01', 'BYOHButterChurn')
+#
+# FOOD_STAYS_THE_GATHERERS: the food rows that stay in the plant table anyway.
+# This is the one judgement in the routing and it is deliberately a short list,
+# because every name on it is the rule being overruled.
+#
+# DLC01SoulHusk01 and DLC01SoulHusk02 are the two. Their produce is
+# DLC1FoodSoulHusk, measured on 21 September at flag word 0x00000003, so the
+# food bit is set and the rule on its own would make them the farmer's. Two
+# things were measured before that was refused. They grow in the Soul Cairn, a
+# plane of Oblivion reached through the Dawnguard questline: nobody sows one,
+# nothing bled for one, and a novice farmer's crop list with a plot in Oblivion
+# on it is a worse answer than the one this change is fixing. And Soul Husk is
+# an input to no recipe in this build at all, searched across tools\recipes.json
+# the same day, so the thing Patrick is correcting, the gatherer handing the
+# Cook their shopping list, does not touch it either way.
+#
+# It is a wild plant somebody picks. That is the gatherer's verb, and the food
+# bit on it is the record saying it can be eaten rather than that it was farmed.
+$FOOD_STAYS_THE_GATHERERS = @('DLC01SoulHusk01', 'DLC01SoulHusk02')
+#
 # ------------------------------------------------------ the crop knobs ------
 #
-# CROP_RECORD_TYPE and CROP_PRODUCE_TYPE: the rule that says a plant is a farm
-# crop rather than something found in the wild. A TREE whose produce is an ALCH
-# is a cultivated food on this build and nothing else is, which was read off the
-# records and is argued out in full in the header. This is not a knob to turn on
-# a hunch: moving either of these changes which plants somebody can farm, and
-# FLOR plus ALCH in particular drags in every meat rack and clam in the game.
-$CROP_RECORD_TYPE  = 'TREE'
-$CROP_PRODUCE_TYPE = 'ALCH'
+# THERE IS NO CROP RULE OF ITS OWN ANY MORE, and that is the change of
+# 21 September rather than something left undone.
+#
+# It was $CROP_RECORD_TYPE = 'TREE' and $CROP_PRODUCE_TYPE = 'ALCH': a farm crop
+# was a TREE record whose produce was a food. The record type half of that was
+# never about farming. It was a guard, and the comment that stood here said so:
+# FLOR plus ALCH 'drags in every meat rack and clam in the game'. It cost four
+# crops to do it. JKs Skyrim.esp and JK's Whiterun's Outskirts.esp each ship a
+# FLOR copy of their apple and their carrot beside the TREE one, and measured on
+# 21 September all four FLOR copies were sitting in the gatherer's table as wild
+# plants. A cabbage is a cabbage whichever record type Bethesda or JK wrote it
+# as, and a pass that can only see one of the two is guessing.
+#
+# The guard is not needed now because everything it was guarding against has a
+# name and a home. The salmon and the clams are taken by the fish pass before
+# this one runs. The meat racks are GAME_BY_EDITOR_ID. The cheese bowl and the
+# butter churn are FOOD_PROP_BY_EDITOR_ID. So a crop is what the food rule at
+# the top routed to the farmer: a plant of either record type whose produce
+# carries the food bit and which is none of those three things. On this build
+# that is 13 records where the old rule found 9.
 #
 # CROP_BY_EDITOR_ID: the crops the rule cannot reach. Wheat and tundra cotton
 # are grown in fields all over Skyrim and are TREE records like the rest, but
@@ -462,10 +687,21 @@ $CROP_NOT_A_PLOT_PREFIX = @('BYOHHouseFlora', 'BYOHHouseIngrd')
 # list exists so that tools\harvests.json does not sit there stating a different
 # rank from the one the server enforces. THE TWO MUST AGREE: change one, change
 # the other, and the names on each rung are the same names in both.
+#
+# THE FOUR ADDED ON 21 SEPTEMBER are the FLOR copies the old record type rule
+# could not see: XJKcarrotplantflora and XJKWOCarrotPlant are the same carrot as
+# XJKcarrotplant and go on the same rung, and XJKWOTreeAppleRed and
+# XJKWOTreeAppleGreen are the same orchard as the two JKs Skyrim apple trees and
+# go on theirs. Every one of the four is already ranked exactly that way in
+# CROP_RULES in tools\gamemode.js, which is the list the server actually gates a
+# plot on, so this is the two lists being made to agree rather than a new
+# judgement: they were written there by hand when the pass could not reach them.
 $CROP_RANK_BY_EDITOR_ID = @{
     'TreeFloraCabbage01'          = 'novice'
     'TreeFloraLeek01'             = 'novice'
     'XJKcarrotplant'              = 'novice'
+    'XJKcarrotplantflora'         = 'novice'
+    'XJKWOCarrotPlant'            = 'novice'
     'TreeFloraPotatoPlant01'      = 'novice'
     'TreeGourdCluster01'          = 'novice'
     'TreeFloraWheat01'            = 'advanced'
@@ -474,6 +710,8 @@ $CROP_RANK_BY_EDITOR_ID = @{
     'DLC2TreeFloraAshYam01'       = 'advanced'
     'XJKappleGreentree'           = 'expert'
     'XJKappleredtree'             = 'expert'
+    'XJKWOTreeAppleRed'           = 'expert'
+    'XJKWOTreeAppleGreen'         = 'expert'
 }
 #
 $CROP_GROW_MINUTES_BASE     = 60
@@ -972,6 +1210,9 @@ foreach ($pl in $order) {
                     $k = 0; $over = 0
                     $edid = ''; $full = ''; $fullFrom = ''
                     $value = -1
+                    # 0 rather than -1: a record with no ENIT at all carries no
+                    # bits, and nothing here may read 'we did not look' as 'food'.
+                    $alchFlags = 0
                     $rule = ''
                     if ($VALUE_RULES.ContainsKey($type)) { $rule = $VALUE_RULES[$type] }
                     while ($k + 6 -le $rec.Length) {
@@ -994,6 +1235,16 @@ foreach ($pl in $order) {
                             $value = [int][BitConverter]::ToUInt32($rec, $k)
                         } elseif ($rule -eq 'ENIT0' -and $sub -eq 'ENIT' -and $sz -ge 4) {
                             $value = [int][BitConverter]::ToUInt32($rec, $k)
+                            # AND THE FLAG WORD BEHIND THE VALUE, which is what
+                            # tells a cabbage from a mountain flower. ENIT on an
+                            # ALCH is the value in gold and then this, and bit
+                            # ALCH_FLAG_FOOD in it is the food bit, proved in
+                            # tools\Build-RecipeTable.ps1 and quoted over that
+                            # knob at the top. Read in the same pass as the
+                            # value, off the same four bytes further along, so
+                            # there is no second walk of these records able to
+                            # come back with a different answer about one.
+                            if ($sz -ge 8) { $alchFlags = [int][BitConverter]::ToUInt32($rec, $k + 4) }
                         }
                         $k += $sz
                     }
@@ -1013,6 +1264,8 @@ foreach ($pl in $order) {
                         Full        = $full
                         FullFrom    = $fullFrom
                         Value       = $value
+                        AlchFlags   = $alchFlags
+                        IsFood      = [bool](($type -eq 'ALCH') -and ($alchFlags -band $ALCH_FLAG_FOOD))
                         SeenIn      = $pl
                         FirstValue  = $firstValue
                         FirstSeenIn = $firstSeenIn
@@ -1070,6 +1323,17 @@ $unranked = New-Object System.Collections.Specialized.OrderedDictionary
 $values   = New-Object 'System.Collections.Generic.List[int]'
 $fish     = New-Object System.Collections.Specialized.OrderedDictionary
 $fishSeen = @{}
+# the hunter's hanging game, and the rows the food rule sends to the farmer.
+# forFarmer is a set of descs rather than a table of its own: the crops pass
+# below already knows how to price a crop and time it, and this only has to say
+# which plants reached it. Every desc in here is checked against the crops table
+# afterwards, because a row that left the gatherer and joined nothing is work
+# that left the game, which is the whole failure this change is undoing.
+$game      = New-Object System.Collections.Specialized.OrderedDictionary
+$gameSeen  = @{}
+$forFarmer = New-Object System.Collections.Specialized.OrderedDictionary
+$foodRows  = 0
+$stayed    = New-Object 'System.Collections.Generic.List[string]'
 
 foreach ($d in ($plants.Keys | Sort-Object)) {
     $p = $plants[$d]
@@ -1103,6 +1367,64 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
             Rank    = [string]$FISH_RANK_BY_EDITOR_ID[[string]$p.Edid]
         }
         continue
+    }
+
+    # ---------------------------------------------------------------------
+    # AND THEN THE FOOD COMES OUT, which is Patrick's correction of
+    # 21 September and is the one rule this pass sorts by that is not a price.
+    #
+    # A GATHERER GATHERS REAGENTS. A plant whose produce is an alchemy reagent
+    # is theirs and a plant whose produce is food is not, and food is the ALCH
+    # food bit read off the record in the produce pass above, never a list of
+    # names. The whole argument is in the header and over ALCH_FLAG_FOOD.
+    #
+    # It sits here, after the fish and before anything is ranked, for the same
+    # reason the fish branch does: a row that is not the gatherer's must never
+    # be priced, ranked and written into the gatherer's table at all, rather
+    # than written and then taken out again somewhere downstream.
+    #
+    # Four ways out and every row takes one of them. The run prints the count on
+    # each and the checks below prove the sum, because the failure to fear here
+    # is not a row in the wrong table, it is a row in no table.
+    if ($q.IsFood) {
+        $foodRows++
+        if ($FOOD_STAYS_THE_GATHERERS -contains [string]$p.Edid) {
+            # The Soul Husk, and nothing else on this build. Named, argued for
+            # over FOOD_STAYS_THE_GATHERERS, and it falls through to the ranking
+            # below exactly as if the food bit had not been set. Reported by
+            # name every run because this is the rule being overruled.
+            $stayed.Add([string]$p.Edid)
+        } elseif ($GAME_BY_EDITOR_ID -contains [string]$p.Edid) {
+            $gameSeen[[string]$p.Edid] = $true
+            if (-not $GAME_RANK_BY_EDITOR_ID.ContainsKey([string]$p.Edid)) {
+                Bad ("{0} is named as hanging game and no rank is set for it in GAME_RANK_BY_EDITOR_ID" -f $p.Edid)
+                continue
+            }
+            $game[$d] = [pscustomobject]@{
+                Produce = $q.Desc
+                Name    = $q.Full
+                From    = $p.Full
+                Rank    = [string]$GAME_RANK_BY_EDITOR_ID[[string]$p.Edid]
+            }
+            continue
+        } elseif ($FOOD_PROP_BY_EDITOR_ID -contains [string]$p.Edid) {
+            $unranked[$d] = [ordered]@{
+                editorId    = $p.Edid
+                name        = $p.Full
+                produce     = $q.Desc
+                produceName = $q.Full
+                produceType = $q.Type
+                why         = 'its produce is food, so it is not the gatherer''s, and it is named in FOOD_PROP_BY_EDITOR_ID at the top of this script as a prop that is neither a plant anybody grows nor an animal anybody took, so no class verb in classes.md reaches it'
+            }
+            continue
+        } else {
+            # A grown crop. It is not written into a table here: the crops pass
+            # below reads the same plants again, and this only records that the
+            # food rule sent this one to the farmer, so the check afterwards can
+            # prove the crops pass picked every one of them up.
+            $forFarmer[$d] = [string]$p.Edid
+            continue
+        }
     }
 
     $why = ''
@@ -1196,6 +1518,44 @@ if ($unranked.Count -gt 0) {
     }
 }
 
+# --------------------------------------------------------------- the food ---
+#
+# What the food rule did, said out loud every run. This is the line somebody
+# reads when they want to know whether a plant moved and where it went, and the
+# four counts below have to add up to the number of food rows the records carry,
+# which is the arithmetic the checks make again further down.
+#
+Write-Host ''
+Write-Host 'food' -ForegroundColor Cyan
+Ok ("{0} of the plants give food, read off the ALCH food bit rather than off a list of names" -f $foodRows)
+Note ("{0,3} are a grown crop and go to the farmer" -f $forFarmer.Count)
+Note ("{0,3} are hanging game and go to the hunter" -f $game.Count)
+$propRows = 0
+foreach ($e in $FOOD_PROP_BY_EDITOR_ID) {
+    foreach ($d in $unranked.Keys) { if ([string]$unranked[$d].editorId -eq [string]$e) { $propRows++ } }
+}
+Note ("{0,3} are a prop that is neither a plant nor an animal and go nowhere: {1}" -f $propRows, ($FOOD_PROP_BY_EDITOR_ID -join ', '))
+Note ("{0,3} are named in FOOD_STAYS_THE_GATHERERS and stay in the plant table: {1}" -f $stayed.Count, ($stayed -join ', '))
+if ($forFarmer.Count -gt 0) {
+    Note 'the rows the food rule sent to the farmer, which the crops pass below has to pick up every one of:'
+    foreach ($d in $forFarmer.Keys) { Note ("  {0,-30} {1}" -f $forFarmer[$d], $d) }
+}
+# A name nobody carries in either routing list is the same fault the fish list
+# fails on: a record renamed out from under this takes work off a class quietly.
+# The game list is checked against the build below with the rest of the game
+# pass; the prop list and the stay list are checked here because neither has a
+# pass of its own.
+foreach ($e in $FOOD_PROP_BY_EDITOR_ID) {
+    $found = $false
+    foreach ($d in $plants.Keys) { if ([string]$plants[$d].Edid -eq [string]$e) { $found = $true } }
+    if (-not $found) { Bad ("{0} is named in FOOD_PROP_BY_EDITOR_ID and no plant in this build carries that editor id" -f $e) }
+}
+foreach ($e in $FOOD_STAYS_THE_GATHERERS) {
+    $found = $false
+    foreach ($d in $plants.Keys) { if ([string]$plants[$d].Edid -eq [string]$e) { $found = $true } }
+    if (-not $found) { Bad ("{0} is named in FOOD_STAYS_THE_GATHERERS and no plant in this build carries that editor id" -f $e) }
+}
+
 # --------------------------------------------------------------- the fish ---
 #
 # The water produce, pulled out of the plants above and ranked by name rather
@@ -1268,6 +1628,72 @@ if ($fishPerRank['novice'] -lt 1) {
     Bad "not one water record is a novice's, so a new fisher has nothing to work and can never leave the first rank"
 }
 
+# --------------------------------------------------------------- the game ---
+#
+# The hanging game, pulled out of the plants by the food rule above and ranked
+# by name rather than by price. The case for the list and for every rank in it
+# is in the food knobs at the top, and every check below is the one the fish
+# pass already makes, for the reason it already makes it.
+#
+Write-Host ''
+Write-Host 'game' -ForegroundColor Cyan
+$missingGame = New-Object 'System.Collections.Generic.List[string]'
+foreach ($e in $GAME_BY_EDITOR_ID) {
+    if (-not $gameSeen.ContainsKey([string]$e)) { $missingGame.Add([string]$e) }
+}
+if ($missingGame.Count -gt 0) {
+    # A named record that no plugin in this build carries, or one whose produce
+    # has stopped reading as food, is a failure and not a note. Either the build
+    # lost a plugin or a record was renamed or repriced, and every one of those
+    # takes work off the hunter quietly, which is the thing this list exists to
+    # stop happening a second time. The same check the fish list fails on.
+    Bad ("{0} of the records named in GAME_BY_EDITOR_ID are in no plugin in this build, or their produce no longer reads as food: {1}" -f `
+        $missingGame.Count, ($missingGame -join ', '))
+} else {
+    Ok ("all {0} records named as hanging game were found and their produce reads as food" -f $GAME_BY_EDITOR_ID.Count)
+}
+foreach ($e in $GAME_RANK_BY_EDITOR_ID.Keys) {
+    if (-not ($GAME_BY_EDITOR_ID -contains [string]$e)) {
+        Bad ("{0} has a Hunter rank set for it and is not named in GAME_BY_EDITOR_ID, so nothing reads that rank" -f $e)
+    }
+}
+# AND THE RANK HAS TO BE ONE OF THE FOUR, spelled the way the gamemode reads
+# them. The whole of the case is written over the same check in the fish pass
+# above: the ladder test in the gamemode is RANK_LADDER.indexOf(rank), a rank
+# that is not one of the four answers -1, and until 20 September -1 took the
+# gate away instead of closing it. game() now treats an unknown rank as the
+# strictest rank, the way fish() does, so this is the second lock on that door
+# and the one that says which knob is wrong.
+$gameRankNames = New-Object 'System.Collections.Generic.List[string]'
+foreach ($r in $RANK_MAX_VALUE) { $gameRankNames.Add([string]$r.Rank) }
+$oddGameRank = 0
+foreach ($e in $GAME_RANK_BY_EDITOR_ID.Keys) {
+    $r = [string]$GAME_RANK_BY_EDITOR_ID[[string]$e]
+    if (-not ($gameRankNames -ccontains $r)) {
+        $oddGameRank++
+        Bad ("{0} is set to the Hunter rank '{1}', which is not one of the four classes.md names ({2}). The gate in game() is the rank string, so a rank nothing recognises is a rank nothing enforces." -f `
+            $e, $r, ($gameRankNames -join ', '))
+    }
+}
+if ($oddGameRank -eq 0) {
+    Ok "every Hunter rank named in GAME_RANK_BY_EDITOR_ID is one of classes.md's four, spelled the way game() reads them"
+}
+$gamePerRank = New-Object System.Collections.Specialized.OrderedDictionary
+foreach ($r in $RANK_MAX_VALUE) { $gamePerRank[[string]$r.Rank] = 0 }
+foreach ($d in $game.Keys) { $gamePerRank[[string]$game[$d].Rank] = $gamePerRank[[string]$game[$d].Rank] + 1 }
+Ok ("{0} hanging game records are the hunter's and are out of the plant table" -f $game.Count)
+foreach ($r in $RANK_MAX_VALUE) {
+    Note ("{0,-9} {1} records" -f $r.Rank, $gamePerRank[[string]$r.Rank])
+}
+foreach ($d in $game.Keys) {
+    Note ("  {0,-24} {1,-22} -> {2,-20} {3}" -f $d, $game[$d].From, $game[$d].Name, $game[$d].Rank)
+}
+# The first rung is what a new hunter has, and a hunter who cannot work a body
+# cannot climb. This is the line that would show it emptying.
+if ($gamePerRank['novice'] -lt 1) {
+    Bad "not one hanging game record is a novice's, so a new hunter has nothing here to work and can never leave the first rank"
+}
+
 # -------------------------------------------------------------- the crops ---
 #
 # The same plants again, this time asking which of them is a plot somebody
@@ -1299,12 +1725,14 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
     # station code and not by a table built out of a sweep of the load order.
     if ($ourStations.Contains([string]$d)) { continue }
 
-    # nor is a piece of water produce. The crop rule is a TREE whose produce is
-    # an ALCH and every one of the fifteen is a FLOR, so this catches nothing
-    # today. It is here because that rule is one word away from taking in every
-    # meat rack and clam in the game, which is written out over CROP_RECORD_TYPE
-    # at the top, and a salmon that became a crop would be sown in a field.
+    # nor is a piece of water produce, nor hanging game. The food rule above
+    # already sent those somewhere else and forFarmer carries neither, so this
+    # catches nothing today. It is kept, and game is added to it, because the
+    # only line standing between this pass and a salmon or a hanging pheasant
+    # sown in a field is the routing above, and a crop these two lists would
+    # have caught is a crop somebody widened the rule into by accident.
     if ($FISH_BY_EDITOR_ID -contains [string]$p.Edid) { continue }
+    if ($GAME_BY_EDITOR_ID -contains [string]$p.Edid) { continue }
 
     $named = ($CROP_BY_EDITOR_ID -contains [string]$p.Edid)
 
@@ -1321,7 +1749,12 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
     }
     $q = $produce[$p.ProduceDesc]
 
-    $byRule = ([string]$p.Kind -eq $CROP_RECORD_TYPE -and [string]$q.Type -eq $CROP_PRODUCE_TYPE)
+    # A crop is what the food rule above routed to the farmer, and this asks
+    # forFarmer rather than re-deciding it. The two passes read the same plants
+    # and a rule written out twice is two rules able to disagree about one
+    # record, which is exactly how the FLOR apples ended up in the gatherer's
+    # table while the TREE apples were crops. One rule, one place, one answer.
+    $byRule = $forFarmer.Contains([string]$d)
     if (-not $byRule -and -not $named) { continue }
 
     # No price, no rank and no grow time, and a crop is not something to leave
@@ -1351,12 +1784,12 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
         RankFrom = $(if ($CROP_RANK_BY_EDITOR_ID.ContainsKey([string]$p.Edid)) { 'the farm ladder' } else { 'the gold rule, because the farm ladder does not name it' })
         Grow    = (Grow-Minutes ([int]$q.Value))
     }
-    $how = 'a ' + $CROP_RECORD_TYPE + ' giving an ' + $CROP_PRODUCE_TYPE
+    $how = 'a ' + $p.Kind + ' whose produce carries the ALCH food bit'
     if ($named -and -not $byRule) { $how = 'named in CROP_BY_EDITOR_ID, its produce type is ' + $q.Type }
     $cropWhy[$d] = $how
 }
 
-Ok ("{0} farm crops: {1} by the rule and {2} named by hand" -f $crops.Count, ($crops.Count - $byName), $byName)
+Ok ("{0} farm crops: {1} by the food rule and {2} named by hand" -f $crops.Count, ($crops.Count - $byName), $byName)
 foreach ($d in $crops.Keys) {
     $c = $crops[$d]
     Note ("  {0,-34} {1,-22} {2,-9} {3,4} min   {4}" -f $plants[$d].Edid, $c.Name, $c.Rank, $c.Grow, $cropWhy[$d])
@@ -1483,12 +1916,106 @@ if ($oddGrow.Count -gt 0) {
     Ok ("every crop grows in {0} to {1} minutes, never under the engine's own hour" -f $CROP_GROW_MINUTES_BASE, $CROP_GROW_MINUTES_MAX)
 }
 
-# a crop the harvests table does not carry would be a plot the gathering gate
-# never sees, so the two tables have to agree on what a plant is
-$loose = New-Object 'System.Collections.Generic.List[string]'
-foreach ($d in $crops.Keys) { if (-not $table.Contains($d)) { $loose.Add([string]$d) } }
-if ($loose.Count -gt 0) { Bad ("{0} crops are not in the harvests table: {1}" -f $loose.Count, ($loose -join ', ')) }
-else { Ok 'every crop is a plant the harvests table already carries' }
+# THIS CHECK USED TO SAY THE OPPOSITE AND IT WAS TURNED AROUND ON 21 SEPTEMBER.
+#
+# It read 'every crop is a plant the harvests table already carries', because
+# until Patrick's correction a cabbage was in both tables and a crop the plant
+# table did not carry would have been a plot the gathering gate never saw. The
+# whole of that change is that the gathering gate must not see a crop: a plant
+# whose produce is food is not the gatherer's, so a crop leaving the plant table
+# is the change working rather than a hole in it, and a check written the old
+# way would fail on every one of the thirteen.
+#
+# What still has to hold is the other direction, and it is the one that catches
+# a real fault: a crop whose produce is food must be OUT of the plant table, or
+# a gatherer could pick a cabbage after all. Wheat and tundra cotton give an
+# ingredient rather than a food, so the food rule never touches them and they
+# are in both tables on purpose; they are the two named in CROP_BY_EDITOR_ID and
+# the run says so by name rather than by a count.
+$bothTables = New-Object 'System.Collections.Generic.List[string]'
+$ingrCrops  = New-Object 'System.Collections.Generic.List[string]'
+foreach ($d in $crops.Keys) {
+    if (-not $table.Contains($d)) { continue }
+    if ($produce.ContainsKey($plants[$d].ProduceDesc) -and $produce[$plants[$d].ProduceDesc].IsFood) {
+        $bothTables.Add(("{0} ({1})" -f $plants[$d].Edid, $d))
+    } else {
+        $ingrCrops.Add([string]$plants[$d].Edid)
+    }
+}
+if ($bothTables.Count -gt 0) {
+    Bad ("{0} crop(s) give food and are still in the gatherer's table, so a gatherer can pick a crop: {1}" -f `
+        $bothTables.Count, ($bothTables -join ', '))
+} else {
+    Ok ("no crop that gives food is in the gatherer's table; the {0} still in both give an ingredient and are the ones named by hand: {1}" -f `
+        $ingrCrops.Count, ($ingrCrops -join ', '))
+}
+
+# AND NOTHING THE FOOD RULE MOVED MAY HAVE LANDED NOWHERE. This is the check
+# that the four ways out of the food branch add up. A row taken off the gatherer
+# and picked up by nobody is not a table with a wrong entry in it, it is a plant
+# that quietly left the game, and nothing else here would say so: the plant
+# table would be shorter and every other check would pass.
+$dropped = New-Object 'System.Collections.Generic.List[string]'
+foreach ($d in $forFarmer.Keys) { if (-not $crops.Contains($d)) { $dropped.Add(("{0} ({1})" -f $forFarmer[$d], $d)) } }
+if ($dropped.Count -gt 0) {
+    Bad ("{0} row(s) the food rule sent to the farmer never reached the crops table: {1}" -f $dropped.Count, ($dropped -join ', '))
+} else {
+    Ok ("every one of the {0} rows the food rule sent to the farmer is in the crops table" -f $forFarmer.Count)
+}
+
+# AND THE GATHERER'S TABLE IS REAGENTS AND NOTHING ELSE, which is the rule said
+# back to itself off the built table rather than off the pass that built it.
+# Every row left in it either gives something that is not food, or is one of the
+# few named in FOOD_STAYS_THE_GATHERERS, and the run names those out loud
+# because that list is the rule being overruled by hand.
+$foodLeft = New-Object 'System.Collections.Generic.List[string]'
+$namedLeft = 0
+foreach ($d in $table.Keys) {
+    $pd = $plants[$d].ProduceDesc
+    if (-not ($produce.ContainsKey($pd) -and $produce[$pd].IsFood)) { continue }
+    if ($FOOD_STAYS_THE_GATHERERS -contains [string]$plants[$d].Edid) { $namedLeft++; continue }
+    $foodLeft.Add(("{0} ({1}) gives {2}" -f $plants[$d].Edid, $d, $produce[$pd].Full))
+}
+if ($foodLeft.Count -gt 0) {
+    Bad ("{0} row(s) in the gatherer's table give food and are not named as staying there: {1}" -f `
+        $foodLeft.Count, ($foodLeft -join ', '))
+} else {
+    Ok ("every row in the gatherer's table gives something that is not food, but for the {0} named in FOOD_STAYS_THE_GATHERERS" -f $namedLeft)
+}
+
+# THE FIRST RUNG OF THE GATHERER'S LADDER MUST NOT BE EMPTY EITHER. The crops,
+# the fish and the game each have this check already and the plants did not,
+# because until 21 September nothing ever took rows out of the plant table in
+# bulk. Fourteen of the fifty-six novice rows are food and left in one change.
+# A gatherer who cannot pick anything cannot climb, which is the same sentence
+# three times over in this file now, and it is the same fault every time.
+$novicePlants = @($table.Keys | Where-Object { [string]$table[$_].Rank -eq 'novice' })
+if ($novicePlants.Count -eq 0) {
+    Bad "no plant asks for novice, so a new gatherer has nothing they may pick and no way to earn a rank that would let them"
+} else {
+    Ok ("{0} plant(s) a novice gatherer may pick on their first day" -f $novicePlants.Count)
+}
+
+# the game table, checked the way the fish and the crops are and for the same
+# reasons. A rank that is not a rank is a gate nothing enforces, an id that is
+# not an id matches no reference in the world, and a row with no name is a
+# sentence that reads 'You take 1  off the Hanging Pheasant.'
+if ($game.Count -eq 0) { Bad 'no hanging game at all, so the food rule found none and the game block would go out empty' }
+else { Ok ("{0} records in the game table" -f $game.Count) }
+
+$oddGame = New-Object 'System.Collections.Generic.List[string]'
+foreach ($d in $game.Keys) {
+    if ([string]$d -cnotmatch $shape) { $oddGame.Add(("the game record {0}" -f $d)) }
+    if ([string]$game[$d].Produce -cnotmatch $shape) { $oddGame.Add(("the produce of the game record {0}: {1}" -f $d, $game[$d].Produce)) }
+    if (-not [string]$game[$d].Name) { $oddGame.Add(("the game record {0} has no name for what it gives" -f $d)) }
+    if (-not [string]$game[$d].From) { $oddGame.Add(("the game record {0} has no name of its own" -f $d)) }
+    if ($ranks -notcontains [string]$game[$d].Rank) { $oddGame.Add(("the game record {0} has a rank that is not one of the four in classes.md" -f $d)) }
+    if ($table.Contains([string]$d)) { $oddGame.Add(("the game record {0} is in the gatherer's table as well" -f $d)) }
+    if ($crops.Contains([string]$d)) { $oddGame.Add(("the game record {0} is in the crops table as well" -f $d)) }
+    if ($fish.Contains([string]$d)) { $oddGame.Add(("the game record {0} is in the fish table as well" -f $d)) }
+}
+if ($oddGame.Count -gt 0) { foreach ($o in $oddGame) { Bad $o } }
+else { Ok "every game record has an id, a name, a rank that is one of classes.md's four, and no second table claiming it" }
 
 $fingerAfter = Get-FolderFingerprint $Data
 $moved = New-Object 'System.Collections.Generic.List[string]'
@@ -1519,6 +2046,9 @@ $docLines.Add('  "builtBy": ' + (JsonStr 'tools\Build-HarvestTable.ps1') + ',')
 $docLines.Add('  "source": ' + (JsonStr ('the FLOR and TREE records of ' + $order.Count + ' plugins, the 5 masters and what ' + $PluginList + ' enables')) + ',')
 $docLines.Add('  "language": ' + (JsonStr $LANGUAGE) + ',')
 $docLines.Add('  "rankedBy": ' + (JsonStr 'the gold value of the produce, the thresholds in RANK_MAX_VALUE at the top of the script') + ',')
+$docLines.Add('  "harvestsAre": ' + (JsonStr ('the plants whose produce is an alchemy reagent. A plant whose produce is food is not the gatherer''s: ' +
+    'food is bit 0x2 of an ALCH record''s ENIT flag word, proved in tools\Build-RecipeTable.ps1, and those rows are in crops, game or unranked instead, ' +
+    'but for the ones named in FOOD_STAYS_THE_GATHERERS at the top of the script')) + ',')
 $docLines.Add('  "cropsRankedBy": ' + (JsonStr ('how hard the crop is to grow, named one at a time in CROP_RANK_BY_EDITOR_ID at the top of the script, ' +
     'because the gold value is the gatherer''s ladder and ranking a farm by it put every crop at advanced and left a new farmer nothing to sow')) + ',')
 $thr = New-Object 'System.Collections.Generic.List[string]'
@@ -1542,8 +2072,8 @@ $docLines.Add('  },')
 # the crops sit beside the harvests rather than inside them: every crop is also
 # a harvest, and a reader of this file should be able to see at a glance which
 # of the plants are plots somebody farms.
-$docLines.Add('  "cropsAre": ' + (JsonStr ('a ' + $CROP_RECORD_TYPE + ' whose produce is an ' + $CROP_PRODUCE_TYPE +
-    ', which on a plant is a food, plus the ones named in CROP_BY_EDITOR_ID at the top of the script; the HearthFires planters are left out')) + ',')
+$docLines.Add('  "cropsAre": ' + (JsonStr ('a plant of either record type whose produce carries the ALCH food bit and which is not hanging game, not a prop ' +
+    'and not named as staying the gatherer''s, plus the ones named in CROP_BY_EDITOR_ID at the top of the script; the HearthFires planters are left out')) + ',')
 $docLines.Add('  "cropGrowMinutes": ' + (JsonStr ('base + the produce value in gold x perGold, capped at max, and never under base, which is the hour the engine reloots a FLOR or TREE in on its own')) + ',')
 $docLines.Add('  "cropGrowMinutesKnobs": {')
 $docLines.Add('    "base": ' + [int]$CROP_GROW_MINUTES_BASE + ',')
@@ -1583,6 +2113,28 @@ foreach ($d in $fish.Keys) {
                   ', "name": ' + (JsonStr ([string]$f.Name)) +
                   ', "from": ' + (JsonStr ([string]$f.From)) +
                   ', "rank": ' + (JsonStr ([string]$f.Rank)) + ' }' + $comma)
+}
+$docLines.Add('  },')
+# the hanging game, beside the harvests the same way the fish are. A reader of
+# this file should be able to see at a glance which records are the hunter's
+# press-E work, and the gamemode reads this map into a table of its own.
+$docLines.Add('  "gameAre": ' + (JsonStr ('the plants whose produce is food and which are named in GAME_BY_EDITOR_ID at the top of the script: hanging game, ' +
+    'which is the hunter''s work rather than the gatherer''s. They are not in tools\hunts.json because that table is built out of NPC_ records and ' +
+    'loot() only answers a reference the engine says is a dead actor, and a hanging pheasant is a FLOR standing in a camp')) + ',')
+$docLines.Add('  "gameRankedBy": ' + (JsonStr ('the Hunter rank named one at a time in GAME_RANK_BY_EDITOR_ID at the top of the script, ' +
+    'because the three produce records are priced at 2, 3 and 4 gold and the gold rule that ranks a plant puts all of them on one rung')) + ',')
+$docLines.Add('  "gameCount": ' + $game.Count + ',')
+$docLines.Add('  "game": {')
+$n = 0
+foreach ($d in $game.Keys) {
+    $n++
+    $comma = ','
+    if ($n -eq $game.Count) { $comma = '' }
+    $g = $game[$d]
+    $docLines.Add('    ' + (JsonStr ([string]$d)) + ': { "produce": ' + (JsonStr ([string]$g.Produce)) +
+                  ', "name": ' + (JsonStr ([string]$g.Name)) +
+                  ', "from": ' + (JsonStr ([string]$g.From)) +
+                  ', "rank": ' + (JsonStr ([string]$g.Rank)) + ' }' + $comma)
 }
 $docLines.Add('  },')
 $docLines.Add('  "unranked": {')
@@ -1657,9 +2209,10 @@ $literal = $lines -join [Environment]::NewLine
 $cropLines = New-Object 'System.Collections.Generic.List[string]'
 $cropLines.Add('/* Built by tools\Build-HarvestTable.ps1 out of the same records as the harvests.')
 $cropLines.Add('     ' + $crops.Count + ' farm crops, the same table as the crops map in tools\harvests.json.')
-$cropLines.Add('     A crop is a plot somebody works rather than a plant anybody finds: a ' + $CROP_RECORD_TYPE + ' whose')
-$cropLines.Add('     produce is an ' + $CROP_PRODUCE_TYPE + ', which on a plant is a food, plus wheat and tundra cotton,')
-$cropLines.Add('     which give an ingredient and are named one at a time in the script.')
+$cropLines.Add('     A crop is a plot somebody works rather than a plant anybody finds: a plant of')
+$cropLines.Add('     either record type whose produce carries the ALCH food bit and which is not')
+$cropLines.Add('     hanging game and not a prop, plus wheat and tundra cotton, which give an')
+$cropLines.Add('     ingredient and are named one at a time in the script.')
 $cropLines.Add('     growMinutes is how long after a pick the server counts the plot as grown.')
 $cropLines.Add('     The engine reloots a FLOR or TREE an hour after a pick and the gamemode cannot')
 $cropLines.Add('     set isHarvested or a reloot time, so the plant looks ready before it is: the')
@@ -1705,6 +2258,35 @@ foreach ($d in $fish.Keys) {
 }
 $fishLines.Add('  };')
 $fishLiteral = $fishLines -join [Environment]::NewLine
+
+$gameLines = New-Object 'System.Collections.Generic.List[string]'
+$gameLines.Add('/* Built by tools\Build-HarvestTable.ps1 out of the same records as the harvests.')
+$gameLines.Add('     ' + $game.Count + ' hanging game records, the same table as the game map in tools\harvests.json.')
+$gameLines.Add('     These are the hunter''s and not the gatherer''s. A plant whose produce is food is')
+$gameLines.Add('     not a thing a gatherer gathers, and these seven are the food rows that are an')
+$gameLines.Add('     animal somebody hung up rather than a crop somebody grew. They are not rows in')
+$gameLines.Add('     tools\hunts.json because that table is NPC_ records and loot() reads the')
+$gameLines.Add('     reference itself: a hanging pheasant is a FLOR and was never an actor.')
+$gameLines.Add('     "from" is what hangs in the world, "name" is what it gives.')
+$gameLines.Add('     The rank is named one at a time in GAME_RANK_BY_EDITOR_ID in the script: the')
+$gameLines.Add('     three produce records are priced at 2, 3 and 4 gold, so the gold rule that ranks')
+$gameLines.Add('     a plant puts all seven on one rung and the ladder would do nothing.')
+$gameLines.Add('     Paste it between the GAME_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$gameLines.Add('  var GAME_BY_BASE = {')
+$n = 0
+foreach ($d in $game.Keys) {
+    $n++
+    $comma = ','
+    if ($n -eq $game.Count) { $comma = '' }
+    $g = $game[$d]
+    # double quoted for the same reason as the harvests literal above
+    $gameLines.Add('    ' + (JsonStr ([string]$d)) + ': { "produce": ' + (JsonStr ([string]$g.Produce)) +
+                   ', "name": ' + (JsonStr ([string]$g.Name)) +
+                   ', "from": ' + (JsonStr ([string]$g.From)) +
+                   ', "rank": ' + (JsonStr ([string]$g.Rank)) + ' }' + $comma)
+}
+$gameLines.Add('  };')
+$gameLiteral = $gameLines -join [Environment]::NewLine
 
 # ---------------------------------------------------------------- install --
 #
@@ -1817,16 +2399,15 @@ if (-not $NoInstall -and $fail -eq 0) {
 
 # The fish block goes in the same way and under the same rules: its own markers,
 # never hand edited, and only when nothing failed. It is written separately from
-# the other two rather than inside them because it is read by a different verb:
-# the harvests answer a gatherer, the crops a farmer and these a fisher, and the
-# gamemode looks each of them up on its own.
+# the others rather than inside them because it is read by a different verb: the
+# harvests answer a gatherer, the crops a farmer, these a fisher and the game a
+# hunter, and the gamemode looks each of them up on its own.
 #
-# It is written LAST of the three on purpose. All three installs work on the
-# text of gamemode.js as it is on disk when they run, and each one re-reads the
-# file, so the order only matters if two of them could find the same markers.
-# They cannot: the three end markers are three different strings. Last is simply
-# the order they were added in, and the file is read fresh here so the harvests
-# and crops writes above are already in it.
+# All four installs work on the text of gamemode.js as it is on disk when they
+# run, and each one re-reads the file, so the order only matters if two of them
+# could find the same markers. They cannot: the four end markers are four
+# different strings. The order here is simply the order they were added in, and
+# each reads the file fresh so the writes above it are already in it.
 #
 if (-not $NoInstall -and $fail -eq 0) {
     $gm = Join-Path $PSScriptRoot 'gamemode.js'
@@ -1872,6 +2453,56 @@ if (-not $NoInstall -and $fail -eq 0) {
     }
 }
 
+# The game block, the same way and under the same rules as the other three. A
+# gamemode.js with no GAME_BY_BASE markers yet is the expected case the first
+# time this runs, the same way CROPS_BY_BASE and FISH_BY_BASE each were: the
+# block is printed, the two lines it needs are named, and the file is left
+# exactly as it was. Writing a table into a spot this script chose by itself
+# would put the hunter's second verb somewhere nobody agreed on.
+if (-not $NoInstall -and $fail -eq 0) {
+    $gm = Join-Path $PSScriptRoot 'gamemode.js'
+    if (-not (Test-Path -LiteralPath $gm)) {
+        Note "no gamemode.js beside this script, so the game was not installed"
+    } else {
+        $text = [System.IO.File]::ReadAllText($gm)
+        $close = '// ==== end GAME_BY_BASE ===='
+        $m = [regex]::Match($text, '(?m)^([ \t]*)(var|const|let)[ \t]+GAME_BY_BASE[ \t]*=[ \t]*\{')
+        $b = $text.IndexOf($close)
+        # back up to the start of that line, so the end marker keeps the indent
+        # it was written with instead of being shunted to column zero
+        while ($b -gt 0 -and $text[$b - 1] -ne "`n") { $b-- }
+        if (-not $m.Success -or $b -lt 0 -or $b -lt $m.Index) {
+            Note ("{0} has no GAME_BY_BASE block yet, so the game was NOT written into it." -f $gm)
+            Note "  It needs a declaration line and an end marker, in this order:"
+            Note "      var GAME_BY_BASE = {"
+            Note "      };"
+            Note "      // ==== end GAME_BY_BASE ===="
+            Note "  Run this again once they are there, or paste the block printed below."
+        } else {
+            $indent = $m.Groups[1].Value
+            $kw     = $m.Groups[2].Value
+            $body = New-Object 'System.Collections.Generic.List[string]'
+            $body.Add($indent + $kw + ' GAME_BY_BASE = {')
+            $k = 0
+            foreach ($d in $game.Keys) {
+                $k++
+                $comma = ','
+                if ($k -eq $game.Count) { $comma = '' }
+                $g = $game[$d]
+                $body.Add($indent + '  ' + (JsonStr ([string]$d)) + ': { "produce": ' + (JsonStr ([string]$g.Produce)) +
+                          ', "name": ' + (JsonStr ([string]$g.Name)) +
+                          ', "from": ' + (JsonStr ([string]$g.From)) +
+                          ', "rank": ' + (JsonStr ([string]$g.Rank)) + ' }' + $comma)
+            }
+            $body.Add($indent + '};')
+            $body.Add('')
+            $new = $text.Substring(0, $m.Index) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
+            Ok ("wrote {0} hanging game records into the GAME_BY_BASE block of {1}" -f $game.Count, $gm)
+        }
+    }
+}
+
 Write-Host ''
 Write-Host 'the same table, ready to paste into the gamemode:' -ForegroundColor Cyan
 Write-Host $literal
@@ -1881,12 +2512,16 @@ Write-Host $cropLiteral
 Write-Host ''
 Write-Host 'the fish, ready to paste into the gamemode:' -ForegroundColor Cyan
 Write-Host $fishLiteral
+Write-Host ''
+Write-Host 'the hanging game, ready to paste into the gamemode:' -ForegroundColor Cyan
+Write-Host $gameLiteral
 if ($JsOut) {
-    # all three blocks, in the order they are read in the gamemode. -JsOut is
+    # all four blocks, in the order they are read in the gamemode. -JsOut is
     # the paste file and a block left out of it would be a table somebody had
     # to go back to the console for.
     $both = $literal + [Environment]::NewLine + [Environment]::NewLine + $cropLiteral +
-            [Environment]::NewLine + [Environment]::NewLine + $fishLiteral
+            [Environment]::NewLine + [Environment]::NewLine + $fishLiteral +
+            [Environment]::NewLine + [Environment]::NewLine + $gameLiteral
     [System.IO.File]::WriteAllText($JsOut, $both, (New-Object System.Text.UTF8Encoding($false)))
     Write-Host ''
     Ok "wrote $JsOut"
@@ -1900,3 +2535,6 @@ if ($fail) {
 Write-Host ("the table is complete: {0} plants, {1} with no price left out and listed, none doubled." -f $table.Count, $unranked.Count) -ForegroundColor Green
 Write-Host ("the crops are complete: {0} of those plants are farm plots, every one with a produce, a rank and a grow time, none doubled." -f $crops.Count) -ForegroundColor Green
 Write-Host ("the fish are complete: {0} water records are the fisher's and are out of the plant table, {1} of them a novice's." -f $fish.Count, $fishPerRank['novice']) -ForegroundColor Green
+Write-Host ("the game is complete: {0} hanging game records are the hunter's and are out of the plant table, {1} of them a novice's." -f $game.Count, $gamePerRank['novice']) -ForegroundColor Green
+Write-Host ("the food rule is complete: {0} plants give food, {1} to the farmer, {2} to the hunter, {3} excluded as props, {4} named as staying the gatherer's." -f `
+    $foodRows, $forFarmer.Count, $game.Count, $propRows, $stayed.Count) -ForegroundColor Green

@@ -7,7 +7,8 @@ in the creation hall, makes a face, and then the panel behind K opens on its
 own: your class, your profession and the half of it you will make your own,
 and the town you wake up in tomorrow. Take them in any order. The third one
 sends you to your inn. The same panel, on K, is where you spend skill points
-for the rest of your character's life. Nothing is handed out at the start but
+for the rest of your character's life, and where the recipe book tells you what
+your half can make at the rank you have reached. Nothing is handed out at the start but
 the clothes you stand in: what you carry, you earn, buy or are given.
 
 **A profession.** What you make, or how you fight.
@@ -64,6 +65,24 @@ above, and it is as far as it goes.
 Your sister half past novice, or any half that is not yours at all. It does not
 get made, and you are told whose work it is and what rank it asks for, so you
 know who to go and find.
+
+### The recipe book, on K
+
+You do not have to find the wall the hard way. Press K and there is a **Recipe
+book** beside the other sections, and it says what you can make right now: one
+column for your own half, one for your sister half, and one for each half a
+Master of another profession has taught you. Each column carries the rank you
+are at in it, the kinds of thing it makes, and how many of each kind is open to
+you out of how many there are.
+
+It lists kinds and not items, on purpose. A Tailor's half runs to hundreds of
+garments and a list of them is not an answer to "what can I make". Robes and
+body wear, hats and hoods, shoes and light boots, gloves: that is what the book
+says, with a count beside each. A mage sees their spell book here instead; a
+mage who was taught a trade sees both.
+
+The numbers move on their own as your rank climbs. Nothing in the book is
+clicked, marked or sent: it is what the server already knows about you, drawn.
 
 ### The five halves that gate nothing
 

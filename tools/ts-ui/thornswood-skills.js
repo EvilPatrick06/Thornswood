@@ -85,6 +85,15 @@
       about says which pick the refusal answers, so the panel clears that
       pick and only that one. A note with no about is still shown.
 
+    book: { halves: [ { key, name, how, rank, open, total,
+                        families: [ { name, open, total } ], why } ],
+            none: '<sentence>' }
+      The recipe book, counted by the server out of its own recipe table. how
+      is 'own', 'sister' or 'taught'. why replaces families when there is
+      nothing open, and none replaces the halves when there are none. The
+      field is left out entirely for a mage with no craft half taught to
+      them, and while creating, and the section is not drawn without it.
+
     spells: { '<spell name>': true }     what the character actually holds
     spellPoints: <number>                what is left to spend
     tree: { '<sub-skill key>': <0..5> }  points in the tree, placed and spent
@@ -216,6 +225,24 @@
                        expert: ['Pacify', 'Rout', 'Call to Arms'],
                        master: ['Harmony', 'Hysteria', 'Mayhem'] }
       }
+    },
+    /*
+      The recipe book. Everything in it is the server's: this table holds the
+      title and the one sentence over the page and nothing else, because what
+      a half can make is read out of the game's own records by
+      tools\Build-RecipeTable.ps1 and counted by the server, and a list of
+      families typed here would be a second opinion nobody asked for.
+
+      It is counts and not a list on purpose. The server's table holds 1,728
+      recipes and this page is a browser drawn over a running Skyrim, so what
+      arrives is the families and how many of each are open. Patrick, 21
+      September: "don't be very specific because for like tailor there are
+      hundreds of clothing items".
+    */
+    recipes: {
+      title: 'Recipe book',
+      lead: 'What you can make right now, by the kind of thing it is. Your own half up to your rank, the novice work of your sister half, and the novice work of anything a Master taught you.',
+      rows: []   // the server sends the halves and their families
     },
     home: {
       title: 'Home',
@@ -409,6 +436,22 @@
     '#ts-skills .spellname{font-size:14px}',
     '#ts-skills .spell.shut .spellname{color:rgba(217,207,180,.38)}',
     '#ts-skills .spell.shut{cursor:default}',
+    // the recipe book, written against the spell book's rules above so the two
+    // sections read as one panel: the same two columns, the same column head
+    // with a rank on the right, the same row height. Nothing here is
+    // clickable, so no cursor rule and no lit row.
+    '#ts-skills .bookcols{grid-template-columns:repeat(2,minmax(0,1fr))}',
+    // Two halves is everybody; the third and fourth columns are a character a
+    // Master has taught, which the rulebook allows twice, so four is the most
+    // there can ever be and three across fits them without a second row.
+    '#ts-skills .bookcols.wide{grid-template-columns:repeat(3,minmax(0,1fr))}',
+    '#ts-skills .bookcols .colhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}',
+    '#ts-skills .bookhow{font-size:12px;font-style:italic;color:rgba(217,207,180,.58);line-height:1.45;margin:8px 0 2px}',
+    '#ts-skills .bookopen{font-size:13px;color:#e9d19b;margin:0 0 6px}',
+    '#ts-skills .bookrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 10px}',
+    '#ts-skills .bookrow .bn{font-size:14px;color:#f6e9c8}',
+    '#ts-skills .bookrow .bv{font-size:12.5px;color:rgba(217,207,180,.66);white-space:nowrap}',
+    '#ts-skills .bookwhy{font-size:12.5px;line-height:1.5;color:rgba(217,207,180,.7);margin:8px 0 0}',
     /*
       Scrollbars, here and everywhere else in this window.
 
@@ -517,6 +560,54 @@
     var p = picked.profession;
     return (creating() && p && p.row === 'mage') ? (p.subs || []).slice() : [];
   }
+  /*
+    THE RECIPE BOOK, WHICH IS THE SERVER'S ANSWER AND NOT THIS PAGE'S.
+
+    The server sends it whole, under mine.book:
+
+      book: { halves: [ { key, name, how, rank, open, total,
+                          families: [ { name, open, total } ], why } ],
+              none: '<the sentence for a character with no half at all>' }
+
+    how is 'own', 'sister' or 'taught', which is the three ways classes.md
+    lets somebody stand in a half. why is there instead of families when
+    there is nothing open, and it is the server's sentence: five of the
+    fourteen halves own no recipe in the whole game, and which five and why
+    is a fact about the build rather than an opinion of this page's.
+
+    The field is absent for a mage with no craft half taught to them, which
+    is how the section knows not to draw itself at all. Anything else, a
+    shape this page does not recognise included, reads as no book and the
+    section stays away rather than drawing a wrong one.
+  */
+  function recipeBook() {
+    var got = mine && mine.book;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) { return null; }
+    if (!Array.isArray(got.halves)) { return null; }
+    return got;
+  }
+  function recipeHalves() {
+    var book = recipeBook();
+    if (!book) { return []; }
+    var out = [];
+    for (var i = 0; i < book.halves.length; i++) {
+      var h = book.halves[i];
+      if (h && typeof h === 'object' && h.name) { out.push(h); }
+    }
+    return out;
+  }
+  /*
+    The one line under a half's name saying why it is yours, and what that
+    costs. The two novice ceilings are the rulebook's and are said out loud,
+    because "24 of 302" under a sister half with no explanation reads as a
+    page that is broken rather than a rule that is working.
+  */
+  function howYouHoldIt(how) {
+    if (how === 'sister') { return 'Your sister half. Its novice work is yours for nothing, and no further.'; }
+    if (how === 'taught') { return 'Taught to you by a Master of another profession. Novice work, and it never goes past it.'; }
+    return 'Your own half. It opens as your rank climbs.';
+  }
+
   /*
     Which spells are open to you, and why one is not.
 
@@ -842,6 +933,9 @@
     if (section === 'home') return ((mine && mine.towns) || []).length;
     if (section === 'tree') return 15;
     if (section === 'spells') return bookRows().length;
+    // Nothing in the recipe book is picked, marked or sent, so there is no
+    // row for the arrow keys to walk. Left and right still move sections.
+    if (section === 'recipes') return 0;
     return rows().length + (laterOffered(section) ? 1 : 0);
   }
   /* Another section: the top row, and the status line back to the hint. */
@@ -881,6 +975,15 @@
     // Profession card while creating. Home and Review are creation's own.
     sections = creating() ? ['profession', 'class', 'tree', 'home', 'review'] : ['profession', 'class', 'tree'];
     if (isMage()) sections.splice(1, 0, 'spells');
+    /*
+      The recipe book sits where the spell book sits, right after Profession,
+      and after the spell book when there is one. A mage gets the spell book;
+      everybody else gets this; and a mage a Master taught a craft half gets
+      both, because the server sends the book to them as well and the section
+      is drawn from whether the book arrived rather than from the profession.
+      The server sends nothing while creating, so the section is the world's.
+    */
+    if (recipeBook()) sections.splice(isMage() ? 2 : 1, 0, 'recipes');
     if (sections.indexOf(section) < 0) section = sections[0];
     var n = countRows();
     if (rowAt >= n) rowAt = n ? n - 1 : 0;
@@ -965,6 +1068,16 @@
       var m = markedCount();
       return { t: sp ? sp + ' to spend' : (m ? m + ' marked' : 'nothing yet'), c: sp ? 'need' : '' };
     }
+    if (sec === 'recipes') {
+      // How many things you can make, added up over every half you stand in.
+      // One number, because the section list is one line per section and the
+      // page behind it is where the halves are.
+      var halves = recipeHalves();
+      var open = 0;
+      for (var i = 0; i < halves.length; i++) open += Number(halves[i].open) || 0;
+      if (!halves.length) return { t: 'nothing yet', c: '' };
+      return { t: open ? open + (open === 1 ? ' thing to make' : ' things to make') : 'nothing open yet', c: open ? 'set' : '' };
+    }
     var pts = mine ? Number(mine.points) || 0 : 0;
     var spent = 0;
     if (mine && mine.tree) for (var k in mine.tree) spent += Number(mine.tree[k]) || 0;
@@ -1004,6 +1117,7 @@
     else if (section === 'profession') drawProfession();
     else if (section === 'home') drawHome();
     else if (section === 'spells') drawSpells();
+    else if (section === 'recipes') drawRecipes();
     else if (section === 'review') drawReview();
     else drawTree();
   }
@@ -1091,6 +1205,71 @@
           };
           col.appendChild(row);
         });
+      });
+      cols.appendChild(col);
+    });
+    elBody.appendChild(cols);
+  }
+
+  /*
+    The recipe book: one column per half you stand in, the families under it,
+    and beside each family how many of it are open to you out of how many the
+    half holds. Drawn the way the spell book beside it is drawn, two columns
+    with the server's rank on the right of each column head.
+
+    NOTHING HERE IS A MARK AND NOTHING IS SENT. The spell book has a Learn
+    because a spell is a pick; a recipe is not picked, it is made, at the
+    bench, and the server's craft gate is what answers for it. So this page
+    reads and draws and that is the whole of it, and the foot carries no
+    button while it is open.
+
+    A HALF WITH NOTHING OPEN GETS A SENTENCE, NOT AN EMPTY BOX. Five of the
+    fourteen halves own no recipe in the whole load order and a new
+    Confectioner can bake nothing at all yet, so the server sends why and
+    this draws it. Every one of those sentences is the server's.
+  */
+  function drawRecipes() {
+    var book = recipeBook();
+    var halves = recipeHalves();
+    if (!halves.length) {
+      elBody.appendChild(el('p', 'lead', (book && book.none) ||
+        'The server has not said what you can make yet. Give it a moment.'));
+      return;
+    }
+    // The one line over the columns: what the whole book adds up to. A person
+    // opening this wants the number before they want the breakdown.
+    var open = 0, total = 0;
+    halves.forEach(function (h) { open += Number(h.open) || 0; total += Number(h.total) || 0; });
+    var bar = el('div', 'spellbar');
+    bar.appendChild(el('div', 'spellpts', total
+      ? open + ' of ' + total + ' open to you right now'
+      : 'Nothing in your halves is made from a recipe'));
+    bar.appendChild(el('div', 'spellnote', 'Rank comes from doing the work.'));
+    elBody.appendChild(bar);
+
+    var cols = el('div', 'cols bookcols' + (halves.length > 2 ? ' wide' : ''));
+    halves.forEach(function (h) {
+      var col = el('div', 'col');
+      var head = el('div', 'colhead', String(h.name));
+      // The rank the server holds you at in this half, beside its name, the
+      // same place the spell book puts a school's rank.
+      if (h.rank) head.appendChild(el('span', 'tag dim', RANK_NAMES[h.rank] || cap(h.rank)));
+      col.appendChild(head);
+      col.appendChild(el('div', 'bookhow', howYouHoldIt(String(h.how || 'own'))));
+      var fams = Array.isArray(h.families) ? h.families : [];
+      if (!fams.length) {
+        col.appendChild(el('p', 'bookwhy', h.why ||
+          'Nothing here is open to you yet.'));
+        cols.appendChild(col);
+        return;
+      }
+      col.appendChild(el('div', 'bookopen', (Number(h.open) || 0) + ' of ' + (Number(h.total) || 0) + ' open'));
+      fams.forEach(function (f) {
+        if (!f || !f.name) return;
+        var row = el('div', 'bookrow');
+        row.appendChild(el('span', 'bn', String(f.name)));
+        row.appendChild(el('span', 'bv', (Number(f.open) || 0) + ' of ' + (Number(f.total) || 0)));
+        col.appendChild(row);
       });
       cols.appendChild(col);
     });
@@ -1329,7 +1508,9 @@
     // The spell book's own button says Learn, because what it sends is not a
     // choice about who you are: it is the spells you marked, one pick each.
     var label = (!cr && section === 'spells') ? 'Learn' : 'Confirm';
-    var showConfirm = cr ? section === 'review' : (section !== 'tree');
+    // The recipe book sends nothing, the same way the tree's plus buttons are
+    // the tree's own sending, so neither carries a Confirm.
+    var showConfirm = cr ? section === 'review' : (section !== 'tree' && section !== 'recipes');
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr]);
     if (key === footKey) return;
     footKey = key;
@@ -1343,6 +1524,14 @@
 
   function hint() {
     if (section === 'tree') return 'Press + on a skill to put a point in it.';
+    if (section === 'recipes') {
+      var halves = recipeHalves();
+      if (!halves.length) return 'Pick a profession and its half, and this fills with what that half can make.';
+      var open = 0;
+      for (var i = 0; i < halves.length; i++) open += Number(halves[i].open) || 0;
+      if (!open) return 'Nothing is open to you yet. Every column says what it is waiting on.';
+      return 'What you can make now, at a bench. Nothing here is picked or sent.';
+    }
     if (section === 'spells') {
       if (!bookSchools().length) return 'The book needs your two schools.';
       if (creating()) return 'Click a spell to mark it. Nothing is sent until Confirm in Review.';

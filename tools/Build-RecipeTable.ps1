@@ -1,4 +1,4 @@
-<#
+﻿<#
   Build-RecipeTable.ps1
 
   Builds tools\recipes.json: the table the server needs to answer "may this
@@ -277,14 +277,16 @@
   miner and so on, so there isn't an imbalance". A Cook's rungs are the
   Farmer's rungs because they are the same numbers off the same table.
 
-  THE REVERSE INDEX. ores.json, harvests.json with its three maps and
-  hunts.json are all keyed by the base that gets worked and carry the item it
-  hands over, and the salt quarry this server put in the world is in
-  tools\gamemode.js rather than in any of them, so it is named in a knob of its
-  own. This script needs the other direction, item -> rank, and it takes the
-  LOWEST rank any class gets that item at: if a novice miner can find iron
-  anywhere in Skyrim then iron costs novice, whatever some expert seam also
-  drops.
+  THE REVERSE INDEX. ores.json, harvests.json with its four maps and hunts.json
+  are all keyed by the base that gets worked and carry the item it hands over.
+  The two stations this server put in the world are in no table at all: the salt
+  quarry and the charcoal kiln are answered in tools\gamemode.js, so the items
+  and the ranks are READ out of mineSalt() and burnCharcoal() by
+  ReadStationVerbs below rather than copied into a list here, which is what
+  stops the index and the server drifting apart in silence. This script needs
+  the other direction, item -> rank, and it takes the LOWEST rank any class gets
+  that item at: if a novice miner can find iron anywhere in Skyrim then iron
+  costs novice, whatever some expert seam also drops.
 
   THE LOWEST RANK IS NOT ALWAYS THE FARMER'S, AND THE FARMER IS THE CLASS THIS
   MATTERS TO. All 11 crops of harvests.json are the same base records as rows
@@ -301,15 +303,32 @@
   the gap between the Cook and the Farmer is a number in the output instead of
   a claim in a comment.
 
-  WHAT IT CANNOT PLACE, AND THIS IS THE NEXT PIECE OF WORK RATHER THAN A BUG.
-  The owned recipes ask for 176 distinct items and 71 of them have a producer.
-  The 105 that do not are led by Leather Strips, wanted by 924 recipes, Steel
-  Ingot by 888 and Leather by 665. None of those comes out of the ground: they
-  come out of a smelter or a tanning rack, which is a recipe in this same
-  table, in the 1679 unowned rows that anybody may make. Following that one
-  extra hop is what would place the Smith's ladder against the Miner's, and it
-  is not done here. Those rows fall back to the price rule and say so in their
-  rankFrom field, so the gap is readable in the table rather than hidden.
+  THE HOP, WHICH IS WHERE MINER TO SMITH AND HUNTER TO TAILOR COME FROM. Until
+  21 September the index stopped at the ground. The owned recipes ask for 176
+  distinct items and only 73 of them came out of it: the 103 that did not were
+  led by Leather Strips, wanted by 924 recipes, Steel Ingot by 888 and Leather
+  by 665, and not one of those is in the ground. Each is one recipe back from
+  something that is: leather off a tanning rack from a hide a HUNTER skins, an
+  ingot off a smelter from ore a MINER digs, and both benches are in the 1679
+  rows nobody owns and anybody may make.
+
+  So an input that is itself made by a recipe now costs what THAT recipe's
+  dearest input costs, over all 5116 recipes and not the owned ones. It is a
+  fixpoint and not a walk, for the reason written at FOLLOW_THE_HOP, and it
+  settles in three rounds on this build. What it placed, measured the same two
+  ways the index is measured: 116 of the 176 distinct items against 73 before,
+  and 5711 of the 6708 input entries against 785 before. What is left is bought,
+  looted or dropped rather than made: Dragon Bone on 138 rows, Linen Wrap on
+  106, Dwarven Metal Ingot on 103, Firewood on 78, Butter on 46. Those rows
+  still fall back to the price rule and still say so in rankFrom.
+
+  A BREAKDOWN ROW IS NOT A SOURCE, and reading it as one undid the whole point.
+  1072 of the 5116 rows turn a finished good back into stock, a fur hood into a
+  Steel Ingot and a gemstone bow into a Ruby. Read like any other recipe they
+  made Steel Ingot novice work for a HUNTER four hops away through a fur hood,
+  and put 1301 of the Platewright's 2015 rows on novice. They are recognised by
+  their shape, a MISC out of an ARMO, WEAP or AMMO, and HOP_THROUGH_A_FINISHED_GOOD
+  is where that is argued and where it can be turned back on.
 
   THE OWNERSHIP RULE
 
@@ -352,10 +371,15 @@
   nothing at all a new character can make and is not named in
   HALVES_NOBODY_CAN_START, if a half named there turns out to have something,
   if one of the producing tables named in PRODUCER_TABLES is missing or has no
-  map of that name, if any half is left with an empty rung below a full one
+  map of that name, if a function named in STATION_VERBS is not in
+  tools\gamemode.js or hands over an item that is in no record, if that file's
+  RANK_LADDER is not this script's RANKS, if the hop does not settle inside
+  HOP_ROUND_LIMIT, if any half is left with an empty rung below a full one
   after both ranking rules have run, counting every owned row and counting only
-  the rows the server is asked about, or if the game folder changed while this
-  ran. Nothing is written unless every check passed.
+  the rows the server is asked about, if a half holds a rung nobody at that rank
+  could gather for and is not named in HALVES_WITH_AN_UNSTANDABLE_RUNG, or if
+  the game folder changed while this ran. Nothing is written unless every check
+  passed.
 #>
 param(
     # The build's Data folder. Read only.
@@ -649,60 +673,113 @@ $RANK_SHARE = @(
 # one is keyed by the base that gets worked, a vein or a plant or an animal,
 # and carries the descriptor of the ITEM it hands over. This script needs the
 # reverse of that: item -> the rank somebody has to hold to get it.
+#
+# THE ORDER OF THIS LIST IS THE TIE BREAK AND IT DECIDES REAL ATTRIBUTIONS.
+# Lowest wins, and where two classes get the same item at the same rank nothing
+# in the rule separates them, so the table read first takes it. harvests is read
+# before crops, so every base that is in both maps at the same rank reads
+# gatherer. Wheat is the one that matters: advanced in both, so it reads
+# gatherer, and the Sack of Flour a smelter-style recipe makes out of it reads
+# gatherer too, which is 36 of the Cook's input entries. Measured on
+# 21 September, the farmer supplies the Cook 52 entries and the gatherer 157,
+# and the wheat tie is the single biggest piece of that gap. Put the crops line
+# above the harvests line and the farmer takes every tie instead. That is a
+# decision about the world rather than about this script, so the run prints
+# every tie by name and this list is left in the order it was in.
 $PRODUCER_TABLES = @(
     @{ File = 'ores.json';     Map = 'ores';     Who = 'miner';    Item = 'ore';     List = ''      },
     @{ File = 'harvests.json'; Map = 'harvests'; Who = 'gatherer'; Item = 'produce'; List = ''      },
     @{ File = 'harvests.json'; Map = 'crops';    Who = 'farmer';   Item = 'produce'; List = ''      },
     @{ File = 'harvests.json'; Map = 'fish';     Who = 'fisher';   Item = 'produce'; List = ''      },
+    # The hunter has two tables and not one, as of 21 September. hunts.json is
+    # bodies, built out of NPC_ records. The game map is hanging game: seven FLOR
+    # records, a pheasant or a rabbit strung up at a camp, which the food rule in
+    # tools\Build-HarvestTable.ps1 took off the gatherer that day because a
+    # gatherer gathers reagents and those give food. They are the same shape as
+    # the fish rows, one produce each, so they are read the same way.
+    #
+    # WITHOUT THIS LINE THE CHANGE WOULD HAVE COST THE CHAIN RATHER THAN FIXED
+    # IT. Measured over tools\recipes.json on 21 September, before the food rule
+    # ran, Pheasant Breast was 4 of the Cook's inputs and came back producedBy
+    # gatherer. The rule moves that row out of the harvests map, and a producer
+    # index that only reads harvests, crops, fish and hunts would then answer
+    # producedBy null for it: an input nothing in the world hands out, which is
+    # the reverse of what the rule was for.
+    @{ File = 'harvests.json'; Map = 'game';     Who = 'hunter';   Item = 'produce'; List = ''      },
     @{ File = 'hunts.json';    Map = 'hunts';    Who = 'hunter';   Item = 'item';    List = 'gives' }
 )
 
-# THE SIXTH LADDER, AND IT IS NOT IN A JSON FILE BECAUSE THIS SERVER WROTE IT.
-# INVENTED in the sense that classes.md sets no numbers for it. Every rank in
-# it was read off tools\gamemode.js on 21 September rather than remembered, and
-# the line it was read from is written beside it.
+# THE SIXTH LADDER IS THE SERVER'S OWN STATIONS, AND IT IS READ OUT OF
+# tools\gamemode.js RATHER THAN COPIED OUT OF IT BY HAND.
 #
-# The five tables above are built from the game's own records. The salt quarry
-# is not in the game's records at all: STATIONS.saltQuarry is a base this
-# repository's own plugin put in the world, gamemode.js answers it in
-# mineSalt(), and no script writes a json table for it. So the reverse index
-# could not see it, and the whole of it was missing from the one place that
-# decides what a recipe costs.
+# PATRICK, 21 September, on the whole chain: "the farmer would supply the cook,
+# gatherer would supply tailor and alchemist, miner smith, hunter tailor and
+# smith and so on." A station this repository put in the world is one of the
+# places a class's goods come from, so it belongs in the index beside the five
+# tables or the chain has a hole in it with nothing saying so.
 #
-# WHAT THAT COST, MEASURED ON THE BUILD OF 21 SEPTEMBER before this knob
-# existed: 98 owned rows ask for a Salt Pile and 38 ask for a rare salt, 138
-# input entries in all, and every one of them came back producedBy null. Four
-# of those rows, two Bread Loaf and two Cooked Boar Meat, ask for salt and for
-# nothing else the index could place, so they carried 'nothing it asks for is
-# produced by any class in this world' while a novice miner was in fact handing
-# salt over at the quarry. The two Cooked Boar Meat rows sat at advanced on the
-# price rule and are novice work by the input rule.
+# The five tables above are built from the game's own records. The stations are
+# not in the game's records at all: STATIONS.saltQuarry and STATIONS.charcoalKiln
+# are bases this repository's own plugin put in the world, gamemode.js answers
+# them in mineSalt() and burnCharcoal(), and no script writes a json table for
+# either. So the reverse index could not see them.
 #
-# WHAT IS IN IT AND WHAT IS DELIBERATELY NOT.
-#   mineSalt() gates on classGate(actorId, 'mine') and the pickaxe and then
-#   gives randInt(1, 2 + step) Salt Pile, where step is 0 for a novice, so a
-#   novice miner works salt. Salt Pile is novice, miner.
-#   The same function rolls a rare salt only when rankStep is 2 or more, which
-#   is expert on RANK_LADDER, so Fire, Frost and Void Salts are expert, miner.
-#   The charcoal kiln is NOT here. It is a profession's verb rather than a
-#   class's, it consumes firewood somebody already has rather than producing
-#   from the world, and no recipe in this table asks for charcoal of any grade:
-#   measured over all 5116 rows, zero want 33760:Skyrim.esm or any of the four
-#   Thornswood-Content grades.
-#   The beehive is NOT here either. It hands its produce over as a FLOR like
-#   any flower and nothing in gamemode.js gives an item for it, and no row of
-#   harvests.json produces Honey, which two recipes want. That is a gap in the
-#   harvest table rather than a class ladder this script can name.
-$SERVER_PRODUCERS = @(
-    @{ Desc = '34cdf:Skyrim.esm'; Name = 'Salt Pile';   Who = 'miner'; Rank = 'novice';
-       Where = 'tools\gamemode.js mineSalt(), addItem(actorId, ITEMS.saltPile, randInt(1, 2 + step))' },
-    @{ Desc = '3ad5e:Skyrim.esm'; Name = 'Fire Salts';  Who = 'miner'; Rank = 'expert';
-       Where = 'tools\gamemode.js mineSalt(), the rare roll behind step >= 2' },
-    @{ Desc = '3ad5f:Skyrim.esm'; Name = 'Frost Salts'; Who = 'miner'; Rank = 'expert';
-       Where = 'tools\gamemode.js mineSalt(), the rare roll behind step >= 2' },
-    @{ Desc = '3ad60:Skyrim.esm'; Name = 'Void Salts';  Who = 'miner'; Rank = 'expert';
-       Where = 'tools\gamemode.js mineSalt(), the rare roll behind step >= 2' }
+# WHY IT IS READ AND NOT LISTED. Until 21 September this was a hand written list
+# of four descs with the gamemode line quoted in a comment beside each one. That
+# list is a copy, and a copy goes stale the first time somebody changes what a
+# verb hands over or what rank it hands it over at, with nothing anywhere to
+# say the table and the server now disagree. ReadStationVerbs below opens
+# tools\gamemode.js, parses its ITEMS and RANK_LADDER lines, takes the body of
+# each function named here and reads the items out of the body itself. Change
+# mineSalt and the index changes with it; rename an item and the build fails
+# saying so rather than quietly dropping a producer.
+#
+# WHAT THE READER LOOKS FOR, and all three shapes were read off the two function
+# bodies on 21 September rather than invented:
+#   an ITEMS.<key> under no rank guard          -> novice, the bottom of RANK_LADDER
+#     mineSalt: addItem(actorId, ITEMS.saltPile, randInt(1, 2 + step))
+#   an ITEMS.<key> inside a block guarded by step >= N or rankStep(...) >= N
+#     -> RANK_LADDER[N]
+#     mineSalt: the rare roll, [ITEMS.fireSalts, ITEMS.frostSalts, ITEMS.voidSalts]
+#     behind if (step >= 2 && ...), and RANK_LADDER[2] is expert
+#   a list of ITEMS keys indexed by rankStep -> element i is RANK_LADDER[i]
+#     burnCharcoal: ['charcoalT1','charcoalT2','charcoalT3','charcoalT4'][rankStep(actorId, 'charburner')]
+#   an ITEMS.<key> that is only ever taken is CONSUMED and is not produced
+#     burnCharcoal: takeItem(actorId, ITEMS.firewood, cost), which is what the
+#     kiln eats rather than what it hands over
+#
+# WHAT THE SALT QUARRY COST WHEN IT WAS MISSING ENTIRELY, measured on the build
+# of 21 September: 98 owned rows ask for a Salt Pile and 38 ask for a rare salt,
+# 138 input entries in all, and every one came back producedBy null. Two Cooked
+# Boar Meat rows sat at advanced on the price rule and are novice work by the
+# input rule.
+#
+# THE KILN IS IN THIS LIST NOW AND IT WAS ARGUED OUT OF IT BEFORE. The old
+# comment kept it out on two grounds: it is a profession's verb rather than a
+# class's, and no recipe in the table asks for charcoal of any grade. The first
+# is true and is not a reason: Patrick's sentence is about professions supplying
+# professions, and a Woodworker handing a Smith a sack of coke is exactly the
+# shape of it. The second is measured again every run under the hop below and
+# printed, so if it stays at zero the run says so instead of a comment claiming
+# it. Who it belongs to is the half that runs it, because the grade is the
+# charburner's rank: rankStep(actorId, 'charburner') is the index into the list.
+#
+# The beehive is NOT here, and that is still right. It is in STATIONS and has no
+# branch in onActivate at all, so nothing in gamemode.js gives an item for it and
+# there is nothing to read. No row of harvests.json produces Honey either, which
+# two recipes want. That is a gap in the harvest table rather than a ladder this
+# script can name, and it is named again in the hop's leftovers.
+$STATION_VERBS = @(
+    @{ Fn = 'mineSalt';     Who = 'miner';
+       What = 'the salt quarry, STATIONS.saltQuarry, which is a miner''s verb: classGate(actorId, ''mine'')' },
+    @{ Fn = 'burnCharcoal'; Who = 'woodworker';
+       What = 'the charcoal kiln, STATIONS.charcoalKiln, which is the Charburner half''s: halfGate(actorId, ''charburner'')' }
 )
+
+# WHERE THE STATIONS ARE READ FROM. The shipped gamemode, in this folder, which
+# is the same file Deploy-Gamemode.ps1 sends to the server, so what the index
+# believes and what the server does are one file and not two.
+$GAMEMODE_JS = Join-Path $PSScriptRoot 'gamemode.js'
 
 # LOWEST WINS IN THE REVERSE INDEX, and this is a judgement rather than an
 # obvious truth, so it is a knob with the argument written next to it.
@@ -761,6 +838,134 @@ $INPUT_RANK_IS_THE_DEAREST = $true
 #            and keeps the price rank. Honest, and it throws away the one thing
 #            the index does know about 301 rows.
 $UNPLACED_INPUT_RULE = 'floor'
+
+# THE HOP: AN INPUT THAT IS ITSELF MADE BY A RECIPE. INVENTED, in the sense that
+# classes.md sets no numbers for it, and measured in the sense that every number
+# it reads comes out of the same tables and the same COBJ records as the rest.
+#
+# THE DEFECT IT CLOSES, MEASURED ON THE BUILD OF 21 SEPTEMBER before it existed.
+# The owned recipes ask for 176 distinct items and the reverse index placed 73.
+# The 103 it could not place were led by Leather Strips, wanted by 924 recipes,
+# Steel Ingot by 888, Leather by 665, Ebony Ingot by 455 and Iron Ingot by 423.
+# Not one of those comes out of the ground, and that is why the index could not
+# see them: leather comes off a tanning rack and an ingot off a smelter, and both
+# are COBJ records in this same table. A tanning rack recipe wants a hide, which a
+# HUNTER skins. A smelter recipe wants ore, which a MINER digs. So the cost was
+# always there, one recipe further back, and the whole of miner-to-smith and
+# hunter-to-tailor was invisible because nothing followed that step.
+#
+# WHAT AN INPUT COSTS WHEN A RECIPE MAKES IT: what the dearest thing THAT recipe
+# asks for costs, which is INPUT_RANK_IS_THE_DEAREST applied one level down, for
+# the same reason. Where several recipes make the same item, the cheapest of
+# them wins, which is PRODUCER_RANK_IS_LOWEST applied one level down: if there is
+# any way to get a Steel Ingot for novice work then a Steel Ingot costs novice.
+#
+# IT WALKS ALL 5116 RECIPES AND NOT THE 3437 OWNED ONES. The smelter and the
+# tanning rack are both in the 1679 nobody owns, so a hop over owned rows alone
+# would place nothing at all. Unowned means anybody may make it, which makes
+# those rows the most available step in the whole chain rather than the least.
+#
+# IT TERMINATES BECAUSE IT IS A FIXPOINT AND NOT A WALK. A depth limit was the
+# other option and it is the wrong one here: it answers differently depending on
+# where it starts, and there is no honest number to set it to. Instead every item
+# starts at unknown, and each round recomputes every recipe's answer from what is
+# known so far. An item's cost only ever moves from unknown to a rank, or from a
+# rank to a cheaper one, and there are four ranks, so an item can change at most
+# five times and the rounds cannot go on for ever. A smelter recipe that wants
+# its own output, and there are such rows, simply never improves on itself: it
+# reads its own cost, which is unknown or already at least as dear, and nothing
+# happens. The run prints how many rounds it took and fails the build if it hits
+# HOP_ROUND_LIMIT, which is the shape of a proof rather than a claim.
+$FOLLOW_THE_HOP = $true
+
+# The round ceiling. Not a depth limit on the chain: the fixpoint above settles
+# on its own and this only exists so that a bug in a future edit cannot spin for
+# ever without the build noticing. Hitting it fails the build. Measured on this
+# data, the fixpoint settles well inside it and the run prints the number.
+$HOP_ROUND_LIMIT = 40
+
+# WHAT A RECIPE SAYS ABOUT ITS OUTPUT WHEN PART OF ITS OWN LIST IS UNKNOWN.
+# INVENTED, and it is the same question UNPLACED_INPUT_RULE answers one level up,
+# so it is answered the same way and for the same reason.
+#
+# $true   IN USE. A recipe tells you what its output costs only when every one of
+#         its inputs has a cost. One unknown and the answer is unknown, because
+#         the unknown thing could cost anything and the known things are not
+#         evidence that it is cheap. This is exactly the dragonbone defect
+#         written out at UNPLACED_INPUT_RULE, one hop further down, where it
+#         would be harder to see: an item priced off half a shopping list does
+#         not say so on the recipes that then ask for it.
+# $false  the dearest KNOWN input decides and the unknowns are ignored. The run
+#         prints what this would place, every run, so the cost of the strict rule
+#         is a number rather than a guess.
+$MADE_COST_NEEDS_EVERY_INPUT = $true
+
+# WHETHER A BENCH IS ALLOWED TO BEAT THE GROUND. INVENTED: classes.md sets
+# nothing here, and it only became a question once the hop existed.
+#
+# PRODUCER_RANK_IS_LOWEST says a recipe costs what the CHEAPEST way of getting
+# its makings costs, and the hop is that same rule with one more way of getting
+# them in it. Left alone, the two rules together say that if you can make a
+# thing more cheaply than you can dig it up, it costs what making it costs.
+#
+# WHAT THAT ACTUALLY DOES ON THIS BUILD, measured on 21 September, and it is
+# five items and no more:
+#   Emerald, Sapphire and Ruby are master work at a deposit in ores.json, and
+#   Immersive Weapons ships IWBreakdownGemstoneEmeraldBow and its two sisters,
+#   smelter recipes that break a gemstone bow back down into the stone. The bow
+#   is made from novice materials, so the stone reads novice.
+#   Gold Ore is expert at a deposit and falls out of IWBreakdownCaptainsCutlass
+#   and other breakdown rows the same way.
+#   Cooked Skeever is advanced off a hunter and novice at a cookpot, which is
+#   just cooking: a Salt Pile and some Skeever Meat.
+# Only the gem rows are arguable, and every recipe that wants those stones is in
+# the 38 rings and necklaces nobody owns, so not one owned row moves either way.
+#
+# $true   IN USE. One rule for both ways of getting a thing. Every item where the
+#         bench undercuts the ground is printed by name every run, so this cannot
+#         happen quietly.
+# $false  the ground rank wins wherever a class hands the item over at all, and a
+#         breakdown recipe can only place things no class produces. Worth setting
+#         once to see whether that list has grown past five.
+$HOP_MAY_UNDERCUT_A_CLASS = $true
+
+# WHETHER A BREAKDOWN ROW MAY SET WHAT A THING COSTS. INVENTED: classes.md says
+# nothing about it, and the question only exists because the hop follows recipes
+# and Skyrim's mods are full of rows that run the chain backwards.
+#
+# A breakdown row takes a finished good and gives stock back: a smelter row that
+# turns a fur hood into a Steel Ingot, a gemstone bow into a Ruby, a cutlass into
+# Gold Ore. Hothtrooper44_ArmorCompilation and Immersive Weapons ship hundreds of
+# them between them.
+#
+# WHY IT MATTERS, MEASURED ON THE BUILD OF 21 SEPTEMBER. With these rows reading
+# like any other recipe, a Steel Ingot came back novice, supplied by a HUNTER,
+# four hops away through IABArmorHeavyFurHoodBlack: pelts a novice hunter skins,
+# made into a fur hood, smelted down into steel. It is not a mistake in the
+# arithmetic. It is what the records say, and it is even true in the game. What
+# it is not is a source: the hood had to be made first, so the steel cost
+# whatever the hood cost plus the work, and a chain that reads it as a source
+# hands the Smith's whole ladder to the Hunter at novice. On that run 1301 of the
+# Platewright's 2015 rows landed on novice.
+#
+# The rows are recognised by their SHAPE and never by their name: the output is
+# a MISC, which is stock, and one of the inputs is an ARMO, a WEAP or an AMMO,
+# which is a finished good. STOCK_TYPE and FINISHED_GOOD_TYPES below are those
+# two ends, and both are record types out of the game's own records rather than
+# a judgement about any particular mod.
+#
+# $false  IN USE. A refund is not a source. An ingot costs what the ore costs,
+#         which is the miner's ladder, and that is the chain Patrick described.
+# $true   read them like any other recipe. The run prints how many items move
+#         either way every time, so this is a number and not a preference.
+$HOP_THROUGH_A_FINISHED_GOOD = $false
+
+# The two ends of that shape, as record types. Read off the output type census
+# this script already prints: MISC is the stock every smelter and tanning rack
+# gives back, and ARMO, WEAP and AMMO are the three kinds of finished good a
+# recipe in this build makes.
+$STOCK_TYPE = 'MISC'
+$FINISHED_GOOD_TYPES = @('ARMO', 'WEAP', 'AMMO')
 
 # THE SECOND RULE, for a half the first two rules leave with an empty rung.
 # INVENTED. classes.md does not set it, and it is here rather than in the code
@@ -830,6 +1035,7 @@ $RUNGS_MUST_BE_STANDABLE = $true
 # a check quietly passing. Any half not named here that fails the check fails
 # the build, because a rung nobody can gather for is a rank that opens nothing.
 $HALVES_WITH_AN_UNSTANDABLE_RUNG = [ordered]@{
+    'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost the 22 rows the rule reaches land 14 advanced and 14 expert and none novice, and the second rule only relabels seven of them. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from, which is the same decision HALVES_NOBODY_CAN_START is already waiting on for this half: all 28 rows are behind two vanilla perks nobody here will ever hold, so nothing is being opened to anybody at any rank yet.'
     'Enchanter/Bladebinder' = 'its novice, advanced and expert rungs are the second rule''s, not the input rule''s. 160 of its 161 rows want a Heart Stone and ores.json ranks all four Heart Stone deposits master, so every rung below master holds rows nobody at that rank can gather for. The second rule is argued for at SECOND_RULE_KEY and this is the price of it, stated rather than passed over: the half is ranked by how long a recipe''s shopping list is and the shopping list starts with a master miner''s stone either way. It closes when somebody decides where an Enchanter''s Heart Stones come from, which is the same decision HALVES_NOBODY_CAN_START is waiting on for this half.'
 }
 
@@ -1059,6 +1265,107 @@ $KW_HEAVY    = 'ArmorHeavy'
 $KW_LIGHT    = 'ArmorLight'
 $KW_CLOTHING = @('ArmorClothing', 'VendorItemClothing')
 $KW_JEWELRY  = @('ArmorJewelry', 'VendorItemJewelry')
+
+# THE FAMILY A ROW BELONGS TO, WHICH IS HOW THE RECIPE BOOK GROUPS IT.
+#
+# Patrick, 21 September, asking for the book in the K panel: "don't be very
+# specific because for like tailor there are hundreds of clothing items". So
+# the book lists families rather than items, and the family has to be read off
+# the records the way the halves are, not typed out.
+#
+# WHAT WAS TRIED FIRST AND THROWN AWAY: the last word of the output's name.
+# Counted on the 3437 owned rows of this build it gives 411 families, and the
+# fourth biggest of them is the word White, 34 rows, because the armour
+# compilations name a record 'Padded Fur Hood - White'. Blue, Black, Red,
+# Green and Vile are families under that rule as well. A list that long and
+# that wrong is exactly the "very specific" he asked against.
+#
+# WHAT IS ACTUALLY IN THE RECORDS, counted the same way: 3305 of the 3437
+# outputs carry exactly one keyword that names a KIND of thing, 68 carry two
+# and 64 carry none. The game already keeps four groups of kind keyword for
+# its own use and this reads those:
+#
+#   the weapon type keywords    WeapTypeSword, WeapTypeBow, WeapTypeStaff ...
+#   the armour slot keywords    ArmorCuirass, ArmorHelmet, ArmorGauntlets,
+#                               ArmorBoots, ArmorShield
+#   the clothing slot keywords  ClothingBody, ClothingHead, ClothingFeet,
+#                               ClothingHands, ClothingCirclet ...
+#   the food type keywords      MAG_FoodTypeStew, MAG_FoodTypeDessert ...
+#                               out of Gourmet.esp, the same mod the
+#                               Confectioner split is already read from
+#
+# TWO KINDS IS NOT A TIE TO BREAK. IT IS A RECORD THAT DOES NOT SAY. The 68
+# are led by 48 cloaks out of Cloaks&Capes.esp, which carry ArmorHelmet or
+# ArmorCuirass beside ClothingNecklace, because that mod hangs a cloak off
+# whichever slot is free. Neither keyword is what the thing is. An order
+# written here would pick one of them and file 48 cloaks under helmets with a
+# straight face, so instead a record that names two kinds names none and falls
+# through to its own record type with the 64 that name none at all. That is
+# 132 rows of the 3437 and the run prints the three counts every time.
+#
+# classes.md sets none of this. It names the professions and their halves and
+# says nothing whatever about how the work inside a half is grouped, so the
+# groups below are this script's and the words are this script's words for
+# what each keyword says. A kind keyword that is not named here still makes a
+# family of its own, named from the keyword's own words by FamilyNameOf, so a
+# mod that adds one appears in the run's family list rather than vanishing.
+$FAMILY_ARMOR_SLOTS = @('ArmorCuirass', 'ArmorHelmet', 'ArmorGauntlets', 'ArmorBoots', 'ArmorShield')
+$FAMILY_KEYWORD_PREFIXES = @('WeapType', 'MAG_FoodType', 'Clothing')
+# Clothing keywords that say how fine a garment is rather than what it is.
+# These two sit on 86 and a handful of the outputs and would otherwise split
+# every tailor's family in half along a line nobody asked for.
+$FAMILY_KEYWORD_NOT = @('ClothingRich', 'ClothingPoor')
+$FAMILY_NAMES = [ordered]@{
+    'WeapTypeSword'        = 'Swords'
+    'WeapTypeGreatsword'   = 'Greatswords'
+    'WeapTypeDagger'       = 'Daggers'
+    'WeapTypeWarAxe'       = 'War axes'
+    'WeapTypeBattleaxe'    = 'Battleaxes'
+    'WeapTypeMace'         = 'Maces'
+    'WeapTypeWarhammer'    = 'Warhammers'
+    'WeapTypeBow'          = 'Bows'
+    'WeapTypeCrossbow'     = 'Crossbows'
+    'WeapTypeStaff'        = 'Staves'
+    'ArmorCuirass'         = 'Body armour'
+    'ArmorHelmet'          = 'Helmets'
+    'ArmorGauntlets'       = 'Gauntlets'
+    'ArmorBoots'           = 'Armoured boots'
+    'ArmorShield'          = 'Shields'
+    'ClothingBody'         = 'Robes and body wear'
+    'ClothingHead'         = 'Hats and hoods'
+    'ClothingFeet'         = 'Shoes and light boots'
+    'ClothingHands'        = 'Gloves'
+    'ClothingCirclet'      = 'Circlets'
+    'ClothingNecklace'     = 'Necklaces'
+    'ClothingRing'         = 'Rings'
+    'MAG_FoodTypeStew'     = 'Stews'
+    'MAG_FoodTypeSoup'     = 'Soups'
+    'MAG_FoodTypeMeat'     = 'Meat dishes'
+    'MAG_FoodTypeFish'     = 'Fish dishes'
+    'MAG_FoodTypeCrab'     = 'Crab dishes'
+    'MAG_FoodTypeChowder'  = 'Chowders'
+    'MAG_FoodTypeCheese'   = 'Cheese'
+    'MAG_FoodTypeBread'    = 'Bread'
+    'MAG_FoodTypeVegetable' = 'Vegetable dishes'
+    'MAG_FoodTypeDessert'  = 'Desserts'
+}
+# Where the record names no kind, or names two, the record's own type is the
+# last thing it says about itself. AMMO is arrows and bolts and nothing else,
+# which is why it earns a family of its own rather than a leftovers bin.
+$FAMILY_BY_TYPE = [ordered]@{
+    'WEAP' = 'Other weapons'
+    'ARMO' = 'Other armour and clothing'
+    'AMMO' = 'Arrows and bolts'
+    'ALCH' = 'Other food and drink'
+    'INGR' = 'Ingredients'
+    'MISC' = 'Other goods'
+    'BOOK' = 'Books'
+    'SLGM' = 'Soul gems'
+}
+# A record whose type is not even in that list. Plainly named on purpose: a
+# row with nothing to say about itself is still a row somebody can make, and
+# dropping it would be the book lying about what a half can do.
+$FAMILY_OTHERWISE = 'Everything else'
 
 # THE BENCHES, by the editor id of the keyword the recipe names. Only the ones
 # that need naming are here. Everything else is decided by its output.
@@ -1306,6 +1613,155 @@ function RememberProducer([string]$desc, [string]$rank, [int]$at, [string]$who, 
     return $false
 }
 
+
+# THE STATIONS, READ OUT OF tools\gamemode.js. Argued for at STATION_VERBS: this
+# is a reader and not a copy, so the index cannot drift from what the server
+# actually hands over without the build saying so.
+#
+# It returns one row per item a named verb gives away, with the rank somebody
+# has to hold before the verb gives it, and the line it was read off. Anything
+# it cannot make sense of is returned as a complaint rather than skipped, because
+# a station that silently reads as producing nothing is the exact fault this
+# replaced: an input nothing in the world hands out, and no line anywhere saying
+# the reader lost it.
+function ReadStationVerbs([string]$path) {
+    $out = New-Object 'System.Collections.Generic.List[object]'
+    $bad = New-Object 'System.Collections.Generic.List[string]'
+    $res = [pscustomobject]@{ Rows = $out; Bad = $bad; Ladder = @() }
+
+    if (-not (Test-Path -LiteralPath $path)) {
+        $bad.Add(("{0} is not in this folder, so nothing can say what the server's own stations hand over" -f $path))
+        return $res
+    }
+    $text = Get-Content -LiteralPath $path -Raw
+
+    # ITEMS is one generated line: every item gamemode.js names, key -> desc.
+    $m = [regex]::Match($text, '(?m)^const ITEMS = (\{.*\});\s*$')
+    if (-not $m.Success) {
+        $bad.Add('tools\gamemode.js has no "const ITEMS = {...};" line, so no station item can be resolved to a record')
+        return $res
+    }
+    $itemsJs = @{}
+    $parsed = $m.Groups[1].Value | ConvertFrom-Json
+    foreach ($pn in $parsed.PSObject.Properties.Name) { $itemsJs[$pn] = [string]$parsed.$pn }
+
+    # RANK_LADDER is the gamemode's own copy of classes.md's four ranks, and the
+    # index into it is what rankStep() returns. Read rather than assumed, and
+    # checked against this script's RANKS below, because the whole reading turns
+    # on the two lists being the same list.
+    $m2 = [regex]::Match($text, '(?m)^const RANK_LADDER = \[(.*)\];\s*$')
+    if (-not $m2.Success) {
+        $bad.Add('tools\gamemode.js has no "const RANK_LADDER = [...];" line, so a rankStep index cannot be turned into a rank')
+        return $res
+    }
+    $ladder = @()
+    foreach ($lm in [regex]::Matches($m2.Groups[1].Value, "'([^']+)'")) { $ladder += $lm.Groups[1].Value }
+    $res.Ladder = $ladder
+
+    foreach ($v in $STATION_VERBS) {
+        $at = $text.IndexOf('function ' + $v.Fn + '(')
+        if ($at -lt 0) {
+            $bad.Add(("tools\gamemode.js has no function {0}(), which STATION_VERBS names as a producer" -f $v.Fn))
+            continue
+        }
+        $open = $text.IndexOf('{', $at)
+        if ($open -lt 0) { $bad.Add(("function {0}() has no body" -f $v.Fn)); continue }
+        # Brace matching over the body. Crude on purpose: a brace inside a string
+        # would throw it off, and neither of these two functions has one. The
+        # check under this loop is what catches it if that ever stops being true,
+        # because a body read short hands over fewer items than the server does.
+        $depth = 0
+        $end = -1
+        for ($i = $open; $i -lt $text.Length; $i++) {
+            $ch = $text[$i]
+            if ($ch -eq '{') { $depth++ }
+            elseif ($ch -eq '}') { $depth--; if ($depth -eq 0) { $end = $i; break } }
+        }
+        if ($end -lt 0) { $bad.Add(("function {0}() never closes its body" -f $v.Fn)); continue }
+        $body = $text.Substring($open, $end - $open + 1)
+
+        $found = 0
+        $depth = 0
+        $guards = New-Object 'System.Collections.Generic.List[object]'
+        foreach ($rawLine in ($body -split "`r?`n")) {
+            $line = $rawLine
+
+            # The rank in force on this line: the deepest step guard this line
+            # sits inside. Nothing guarded is the bottom of the ladder, which is
+            # what a novice can do, which is what rankStep returns for one.
+            $step = 0
+            foreach ($g in $guards) { if ($g.Step -gt $step) { $step = $g.Step } }
+
+            # Shape three first: a list of ITEMS keys indexed by rankStep, which
+            # is one item per rung and not one item under a guard.
+            $gm = [regex]::Match($line, "\[((?:\s*'[A-Za-z0-9_]+'\s*,)+\s*'[A-Za-z0-9_]+'\s*)\]\s*\[\s*rankStep\s*\(")
+            if ($gm.Success) {
+                $keys = @()
+                foreach ($km in [regex]::Matches($gm.Groups[1].Value, "'([^']+)'")) { $keys += $km.Groups[1].Value }
+                for ($ki = 0; $ki -lt $keys.Count; $ki++) {
+                    $k = $keys[$ki]
+                    if (-not $itemsJs.ContainsKey($k)) {
+                        $bad.Add(("{0}() hands over ITEMS.{1} and no such key is in the ITEMS line" -f $v.Fn, $k))
+                        continue
+                    }
+                    if ($ki -ge $ladder.Count) {
+                        $bad.Add(("{0}() lists {1} grades and RANK_LADDER has {2} rungs, so grade {3} sits on no rank" -f `
+                                  $v.Fn, $keys.Count, $ladder.Count, ($ki + 1)))
+                        continue
+                    }
+                    $out.Add([pscustomobject]@{
+                        Fn = $v.Fn; Who = $v.Who; Key = $k; Desc = $itemsJs[$k]
+                        Rank = $ladder[$ki]; At = $ki
+                        Where = ('tools\gamemode.js ' + $v.Fn + '(), ' + $v.What + ', grade ' + ($ki + 1) +
+                                 ' of ' + $keys.Count + ' off ' + $line.Trim())
+                    })
+                    $found++
+                }
+            }
+
+            # Shape four: what the verb EATS is not what it produces.
+            if ($line -notmatch 'takeItem\s*\(') {
+                foreach ($im in [regex]::Matches($line, 'ITEMS\.([A-Za-z_][A-Za-z0-9_]*)')) {
+                    $k = $im.Groups[1].Value
+                    if (-not $itemsJs.ContainsKey($k)) {
+                        $bad.Add(("{0}() hands over ITEMS.{1} and no such key is in the ITEMS line" -f $v.Fn, $k))
+                        continue
+                    }
+                    if ($step -ge $ladder.Count) {
+                        $bad.Add(("{0}() guards ITEMS.{1} behind step >= {2} and RANK_LADDER has {3} rungs" -f `
+                                  $v.Fn, $k, $step, $ladder.Count))
+                        continue
+                    }
+                    $out.Add([pscustomobject]@{
+                        Fn = $v.Fn; Who = $v.Who; Key = $k; Desc = $itemsJs[$k]
+                        Rank = $ladder[$step]; At = $step
+                        Where = ('tools\gamemode.js ' + $v.Fn + '(), ' + $v.What + ', off ' + $line.Trim())
+                    })
+                    $found++
+                }
+            }
+
+            # Then the braces, so that a guard opened on this line covers the
+            # lines under it and not the line itself.
+            $opens  = ([regex]::Matches($line, '\{')).Count
+            $closes = ([regex]::Matches($line, '\}')).Count
+            $depth += ($opens - $closes)
+            if ($opens -gt $closes) {
+                $sm = [regex]::Match($line, '(?:rankStep\s*\([^)]*\)|\bstep\b)\s*>=\s*(\d+)')
+                if ($sm.Success) {
+                    $guards.Add([pscustomobject]@{ Depth = $depth; Step = [int]$sm.Groups[1].Value })
+                }
+            }
+            for ($gi = $guards.Count - 1; $gi -ge 0; $gi--) {
+                if ($guards[$gi].Depth -gt $depth) { $guards.RemoveAt($gi) }
+            }
+        }
+        if ($found -eq 0) {
+            $bad.Add(("{0}() was found and read and hands over nothing this reader could see, so the station would enter the index as a producer of nothing" -f $v.Fn))
+        }
+    }
+    return $res
+}
 # How many rows of one half sit on each of the four rungs, in classes.md's
 # order, counted off the Rank that is on the rows right now.
 function CountRungs($descs) {
@@ -1433,11 +1889,13 @@ function OtherInputMeasure($row) {
 
 # The inputs of one recipe, as json. Every CNTO the record carried: the item,
 # what it is called, what kind of record it is, how many the recipe wants, and
-# which class produces it at which rank. producedBy null means no producing
-# table in this repository hands that item over, which is the case for anything
-# bought from a shop or made by an earlier recipe, and it is written down
-# rather than left out so that a reader can tell "nobody produces this" from
-# "this script did not look".
+# which class produces it at which rank, and which class SUPPLIES it once the
+# hop is followed. producedBy null means no table in this folder and no verb in
+# tools\gamemode.js hands that item over, which is the case for anything bought
+# from a shop and for everything made at a bench; suppliedBy null means nothing
+# in this world gets it to you at all, at any number of benches. Both are
+# written down rather than left out so that a reader can tell "nobody produces
+# this" from "this script did not look".
 function InputsJson($r) {
     if (-not $r.InputList -or @($r.InputList).Count -eq 0) { return '[]' }
     $bits = @()
@@ -1470,6 +1928,24 @@ function InputsJson($r) {
             if ($dearer.Count -gt 0) { $line += ', "alsoProducedBy": [' + ($dearer -join ', ') + ']' }
         } else {
             $line += ', "producedBy": null, "producedAt": null'
+        }
+        # AND WHO SUPPLIES IT IN THE END, which is a different question from who
+        # digs it up. producedBy answers only for a thing that comes out of the
+        # ground; suppliedBy follows the hop as well, so a Steel Ingot reads
+        # miner and a Leather Strip reads hunter instead of both reading null.
+        # hops is how many benches stand between the class and this input: 0 is
+        # handed straight over, 1 is a smelter or a tanning rack away, and via
+        # names the recipe that last step is.
+        if ($supply.ContainsKey($i.Desc)) {
+            $sp = $supply[$i.Desc]
+            $hops = 0
+            if ($sp.PSObject.Properties.Name -contains 'Hops') { $hops = [int]$sp.Hops }
+            $line += ', "suppliedBy": ' + (JsonStr $sp.Who) +
+                     ', "suppliedAt": ' + (JsonStr $sp.Rank) +
+                     ', "hops": ' + $hops
+            if ($hops -gt 0) { $line += ', "suppliedVia": ' + (JsonStr ([string]$sp.Via)) }
+        } else {
+            $line += ', "suppliedBy": null, "suppliedAt": null, "hops": null'
         }
         $bits += ($line + ' }')
     }
@@ -1939,6 +2415,68 @@ function MatchesWord([string]$text, $words) {
     return $false
 }
 
+# Every keyword on one output that names a KIND of thing, with no duplicates.
+# See the FAMILY knobs above for what counts as one and why. The armour slot
+# keywords are a named set rather than a prefix because ArmorHeavy,
+# ArmorLight, ArmorClothing, ArmorJewelry and the whole ArmorMaterial family
+# all begin with the same four letters and none of them says what the thing is.
+function KindKeywords($names) {
+    $out = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($n in $names) {
+        if ($out.Contains($n)) { continue }
+        $is = $false
+        foreach ($a in $FAMILY_ARMOR_SLOTS) { if ($n -eq $a) { $is = $true } }
+        if (-not $is) {
+            foreach ($p in $FAMILY_KEYWORD_PREFIXES) { if ($n.StartsWith($p)) { $is = $true } }
+            foreach ($x in $FAMILY_KEYWORD_NOT) { if ($n -eq $x) { $is = $false } }
+        }
+        if ($is) { $out.Add($n) }
+    }
+    return ,$out.ToArray()
+}
+
+# The words a person reads for one kind keyword. The knob's word where there is
+# one; otherwise the keyword's own words with the group word in front of them
+# dropped, so a WeapTypeHalberd some mod adds tomorrow reads as Halberd and
+# lands in the run's family list asking to be named properly.
+$FAMILY_GROUP_WORDS = @('Weap', 'Type', 'MAG', 'Food', 'Armor', 'Clothing')
+function FamilyNameOf([string]$kw) {
+    if ($FAMILY_NAMES.Contains($kw)) { return $FAMILY_NAMES[$kw] }
+    $words = WordsIn $kw
+    $kept = New-Object 'System.Collections.Generic.List[string]'
+    $stillLeading = $true
+    foreach ($w in $words) {
+        if ($stillLeading) {
+            $isGroup = $false
+            foreach ($g in $FAMILY_GROUP_WORDS) { if ($w -eq $g) { $isGroup = $true } }
+            if ($isGroup) { continue }
+            $stillLeading = $false
+        }
+        $kept.Add($w)
+    }
+    if ($kept.Count -eq 0) { return $kw }
+    return ($kept -join ' ')
+}
+
+# The family for one output, and the sentence saying which of the three
+# readings answered. Never a guess: where the record says nothing, or says two
+# things, the record type answers and the row says so.
+function FamilyOf($item, $names) {
+    $kinds = KindKeywords $names
+    if ($kinds.Count -eq 1) {
+        return @((FamilyNameOf $kinds[0]), ('the output carries ' + $kinds[0]), 'keyword')
+    }
+    $byType = $FAMILY_OTHERWISE
+    if ($FAMILY_BY_TYPE.Contains($item.Type)) { $byType = $FAMILY_BY_TYPE[$item.Type] }
+    if ($kinds.Count -gt 1) {
+        return @($byType, ('the output carries ' + ($kinds -join ' and ') +
+                 ', which is two kinds and so is none of them, so its ' + $item.Type +
+                 ' record type answered instead'), 'twoKinds')
+    }
+    return @($byType, ('the output carries no keyword naming a kind of thing, so its ' +
+             $item.Type + ' record type answered'), 'type')
+}
+
 # The Tailor's half. The faction keywords first because they are read out of
 # the record, then the word list, which is the judgement.
 function TailorHalf($item, $names) {
@@ -2235,10 +2773,16 @@ foreach ($desc in $recipes.Keys) {
         if ($n.ServerSees) { $serverChecks++ }
     }
 
+    # Which family the recipe book groups this row under. Read off the output
+    # record, never off the half: two halves can make the same kind of thing
+    # and a family is about what the thing is.
+    $famRead = FamilyOf $o $names
+
     $owned[$desc] = [pscustomobject]@{
         Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type
         BenchDesc = $r.BenchDesc; BenchName = $benchName
         Owner = $ownerName; Half = $half; Reason = $reason
+        Family = $famRead[0]; FamilyFrom = $famRead[1]; FamilyRead = $famRead[2]
         Count = $r.Count; Inputs = $r.Inputs; InputList = $r.InputList; Fires = $fires
         Plugin = $r.Plugin; SeenIn = $r.SeenIn; Local = $r.Local
         NameFrom = $o.NameFrom
@@ -2272,6 +2816,72 @@ if ($instrumentRows.Count -gt 0) {
 if ($tailorByName.Count -gt 0) {
     Note ("{0} Tailor row(s) went to the Liverywright on the output's name alone:" -f $tailorByName.Count)
     foreach ($t in $tailorByName) { Note ("  " + $t) }
+}
+
+# ---------------------------------------------------------- the families ---
+#
+# What the recipe book in the K panel groups by. Printed rather than asserted,
+# because a family list is the one thing in this table a person reads directly
+# and a rule that quietly stopped working would look like a book with one
+# enormous family in it.
+Write-Host ''
+Write-Host 'families' -ForegroundColor Cyan
+$famRows = @{}
+$famPerHalf = @{}
+$famPerHalfFiring = @{}
+$famReadCount = @{ 'keyword' = 0; 'twoKinds' = 0; 'type' = 0 }
+$famNameless = New-Object 'System.Collections.Generic.List[string]'
+foreach ($desc in $owned.Keys) {
+    $row = $owned[$desc]
+    if (-not $row.Family) { $famNameless.Add($desc); continue }
+    $famReadCount[$row.FamilyRead] = $famReadCount[$row.FamilyRead] + 1
+    if (-not $famRows.ContainsKey($row.Family)) { $famRows[$row.Family] = 0 }
+    $famRows[$row.Family] = $famRows[$row.Family] + 1
+    $k = $row.Owner + '/' + $row.Half
+    if (-not $famPerHalf.ContainsKey($k)) {
+        $famPerHalf[$k] = New-Object System.Collections.Specialized.OrderedDictionary
+        $famPerHalfFiring[$k] = New-Object System.Collections.Specialized.OrderedDictionary
+    }
+    if (-not $famPerHalf[$k].Contains($row.Family)) {
+        $famPerHalf[$k][$row.Family] = 0
+        $famPerHalfFiring[$k][$row.Family] = 0
+    }
+    $famPerHalf[$k][$row.Family] = $famPerHalf[$k][$row.Family] + 1
+    if ($row.Fires) { $famPerHalfFiring[$k][$row.Family] = $famPerHalfFiring[$k][$row.Family] + 1 }
+}
+if ($famNameless.Count -gt 0) {
+    Bad ("{0} owned row(s) came out with no family at all, which cannot happen while FamilyOf always answers" -f $famNameless.Count)
+    foreach ($d in ($famNameless | Select-Object -First 5)) { Note ("  " + $d) }
+} else {
+    Ok ("every one of the {0} owned rows has a family, in {1} families across the table" -f $owned.Count, $famRows.Count)
+}
+Note ("{0} row(s) read their family off one kind keyword on the output, {1} off the record type because the output named two kinds and so named none, {2} off the record type because the output named no kind at all" -f `
+      $famReadCount['keyword'], $famReadCount['twoKinds'], $famReadCount['type'])
+foreach ($f in ($famRows.Keys | Sort-Object { -$famRows[$_] })) {
+    Write-Host ("  {0,6}  {1}" -f $famRows[$f], $f)
+}
+# And the same list per half, which is the shape the book actually draws: one
+# person opens it and sees their own half's families and nobody else's.
+foreach ($k in ($famPerHalf.Keys | Sort-Object)) {
+    $bits = @()
+    foreach ($f in $famPerHalf[$k].Keys) { $bits += ("{0} {1}" -f $f, $famPerHalf[$k][$f]) }
+    Note ("{0}: {1} families, {2}" -f $k, $famPerHalf[$k].Count, ($bits -join ', '))
+}
+# The check that says the rule is still doing its job. A family holding more
+# than this share of one half's rows is the "very specific" complaint arriving
+# from the other direction: one bucket with everything in it. classes.md sets
+# no number here, so this is a knob, and it is loud rather than fatal because
+# a half with two families in it can trip it while being perfectly right.
+$FAMILY_SHARE_TO_WARN = 0.9
+foreach ($k in $famPerHalf.Keys) {
+    $total = 0
+    foreach ($f in $famPerHalf[$k].Keys) { $total += $famPerHalf[$k][$f] }
+    if ($total -lt 20) { continue }
+    foreach ($f in $famPerHalf[$k].Keys) {
+        if ($famPerHalf[$k][$f] -ge ($total * $FAMILY_SHARE_TO_WARN) -and $famPerHalf[$k].Count -gt 1) {
+            Loud ("{0}: the family {1} holds {2} of its {3} rows, so the book will read as one bucket for that half" -f $k, $f, $famPerHalf[$k][$f], $total)
+        }
+    }
 }
 
 # ------------------------------------------------------------ the conditions
@@ -2480,6 +3090,12 @@ foreach ($t in $PRODUCER_TABLES) {
     $rows = 0
     $addedHere = 0
     $lostHere = 0
+    # THE ORDER OF PRODUCER_TABLES IS THE TIE BREAK, and it decides real
+    # attributions rather than nothing. Wheat is one base record that is in the
+    # harvests map and in the crops map at the same rank, advanced, so lowest
+    # wins cannot separate them and the table read first takes it. Counted and
+    # named here instead of being left to whoever reads the order of a list.
+    $tiedHere = New-Object 'System.Collections.Generic.List[string]'
     foreach ($k in $map.PSObject.Properties.Name) {
         $row = $map.$k
         $rank = [string]$row.rank
@@ -2502,6 +3118,9 @@ foreach ($t in $PRODUCER_TABLES) {
             if ($d) { $gives += @{ Desc = $d; Name = [string]$row.name } }
         }
         foreach ($g in $gives) {
+            if ($producer.ContainsKey($g.Desc) -and $producer[$g.Desc].At -eq $at -and $producer[$g.Desc].Who -ne $t.Who) {
+                $tiedHere.Add(('{0} with the {1}' -f $g.Name, $producer[$g.Desc].Who))
+            }
             if (RememberProducer $g.Desc $rank $at $t.Who $g.Name ($t.File + ' ' + $t.Map)) {
                 $addedHere++
             } else {
@@ -2520,23 +3139,52 @@ foreach ($t in $PRODUCER_TABLES) {
         Note ("{0} {1}: {2} ranked row(s) read, {3} item(s) it is the first to name, {4} an earlier table already had at the same rank or lower" -f `
               $t.File, $t.Map, $rows, $addedHere, $lostHere)
     }
+    if ($tiedHere.Count -gt 0) {
+        $tieNames = @{}
+        foreach ($tn in $tiedHere) { $tieNames[$tn] = $true }
+        Note ("  {0} of them tie at exactly the same rank and the {1} lost the tie only because its table is read later in PRODUCER_TABLES: {2}" -f `
+              $tieNames.Count, $t.Who, (($tieNames.Keys | Sort-Object) -join ', '))
+    }
 }
 
-# The salt quarry, which is this server's own and is in no table. Read off
-# gamemode.js by hand into SERVER_PRODUCERS, with the line each rank came from
-# written beside it there.
-$serverAdded = 0
-foreach ($s in $SERVER_PRODUCERS) {
-    $at = RankAt $s.Rank
-    if ($at -lt 0) {
-        Bad ("SERVER_PRODUCERS names {0} at rank '{1}', which is not one of classes.md's four" -f $s.Name, $s.Rank)
+# The stations this repository put in the world, which are in no json table at
+# all. Read out of tools\gamemode.js by ReadStationVerbs above rather than
+# copied into a list here, argued for at STATION_VERBS.
+$stationRead = ReadStationVerbs $GAMEMODE_JS
+foreach ($b in $stationRead.Bad) { Bad $b }
+
+# The two ladders have to be the same ladder or every rankStep index read above
+# means something else here. Cheap to check and it would be silent otherwise.
+if ($stationRead.Ladder.Count -gt 0) {
+    $sameLadder = ($stationRead.Ladder.Count -eq $RANKS.Count)
+    if ($sameLadder) {
+        for ($li = 0; $li -lt $RANKS.Count; $li++) {
+            if ($stationRead.Ladder[$li] -ne $RANKS[$li]) { $sameLadder = $false }
+        }
+    }
+    if (-not $sameLadder) {
+        Bad ("tools\gamemode.js RANK_LADDER is {0} and this script's RANKS is {1}. A rankStep index cannot be turned into a rank while those disagree, so nothing was read off the stations." -f `
+             ($stationRead.Ladder -join ', '), ($RANKS -join ', '))
+        $stationRead.Rows.Clear()
+    }
+}
+
+$stationAdded = 0
+foreach ($s in $stationRead.Rows) {
+    if (-not $items.ContainsKey($s.Desc)) {
+        Bad ("{0}() hands over ITEMS.{1} ({2}) and there is no such record in the load order, so nobody could receive it" -f `
+             $s.Fn, $s.Key, $s.Desc)
         continue
     }
-    if (RememberProducer $s.Desc $s.Rank $at $s.Who $s.Name $s.Where) { $serverAdded++ }
+    $nm = $items[$s.Desc].Name
+    if (RememberProducer $s.Desc $s.Rank $s.At $s.Who $nm $s.Where) { $stationAdded++ }
+    Note ("  {0}() gives {1} ({2}) to a {3} at {4}" -f $s.Fn, $nm, $s.Desc, $s.Who, $s.Rank)
 }
-if ($SERVER_PRODUCERS.Count -gt 0) {
-    Note ("the server's own verbs: {0} item(s) named in SERVER_PRODUCERS, {1} of them the first to name the item" -f `
-          $SERVER_PRODUCERS.Count, $serverAdded)
+if ($stationRead.Rows.Count -gt 0) {
+    Note ("the server's own stations: {0} item(s) read out of tools\gamemode.js, {1} of them the first to name the item" -f `
+          $stationRead.Rows.Count, $stationAdded)
+} else {
+    Loud 'nothing was read off the server''s own stations, so the salt quarry and the charcoal kiln hand out items this table believes nobody produces'
 }
 
 $byWho = @{}
@@ -2593,6 +3241,290 @@ if ($unplaced.Count -gt 0) {
         Note ("  {0,5} recipe(s) want {1} [{2}]" -f $inputItemsSeen[$d], $nm, $d)
     }
     if ($unplaced.Count -gt 12) { Note ("  ... and {0} more" -f ($unplaced.Count - 12)) }
+}
+
+
+# ------------------------------------------------------------- the hop ------
+#
+# An input that is itself the output of a recipe costs what that recipe's
+# dearest input costs. Argued for at FOLLOW_THE_HOP, HOP_ROUND_LIMIT,
+# MADE_COST_NEEDS_EVERY_INPUT, HOP_MAY_UNDERCUT_A_CLASS and
+# HOP_THROUGH_A_FINISHED_GOOD, each with the measurement that set it.
+#
+# This is where miner-to-smith and hunter-to-tailor become visible at all. An
+# ingot is not in the ground and neither is a leather strip; both are one recipe
+# back from something that is.
+
+Write-Host ''
+Write-Host 'the hop: an input that is itself made by a recipe' -ForegroundColor Cyan
+
+# What one recipe says its output costs, given what is known so far. -1 is
+# unknown, and unknown is not free: see MADE_COST_NEEDS_EVERY_INPUT.
+function HopCost($costs, $r, [bool]$needAll) {
+    $list = @($r.InputList)
+    if ($list.Count -eq 0) { return -1 }
+    $best = -1
+    $unknown = 0
+    foreach ($i in $list) {
+        if ($costs.ContainsKey($i.Desc)) {
+            if ($costs[$i.Desc] -gt $best) { $best = $costs[$i.Desc] }
+        } else {
+            $unknown++
+        }
+    }
+    if ($unknown -gt 0 -and $needAll) { return -1 }
+    return $best
+}
+
+# The fixpoint itself. Seeded with what a class hands over, then every recipe in
+# the load order is asked what its output costs, round after round, until a round
+# changes nothing. Returns the settled map and how many rounds it took.
+function HopFixpoint($seed, $allRecipes, $skip, [bool]$needAll, [int]$limit, [bool]$mayUndercut) {
+    $costs = @{}
+    foreach ($d in $seed.Keys) { $costs[$d] = $seed[$d].At }
+    $rounds = 0
+    $changed = 1
+    while ($changed -gt 0 -and $rounds -lt $limit) {
+        $changed = 0
+        $rounds++
+        foreach ($rd in $allRecipes.Keys) {
+            if ($skip.ContainsKey($rd)) { continue }
+            $r = $allRecipes[$rd]
+            if (-not $r.OutDesc) { continue }
+            # A class already hands this over and the bench is not allowed to
+            # beat it. Argued for at HOP_MAY_UNDERCUT_A_CLASS.
+            if ($seed.ContainsKey($r.OutDesc) -and -not $mayUndercut) { continue }
+            $c = HopCost $costs $r $needAll
+            if ($c -lt 0) { continue }
+            if ((-not $costs.ContainsKey($r.OutDesc)) -or $c -lt $costs[$r.OutDesc]) {
+                $costs[$r.OutDesc] = $c
+                $changed++
+            }
+        }
+    }
+    return [pscustomobject]@{ Costs = $costs; Rounds = $rounds; Settled = ($changed -eq 0) }
+}
+
+# THE BREAKDOWN ROWS, FOUND BY THEIR SHAPE AND NOT BY THEIR NAME. Argued for at
+# HOP_THROUGH_A_FINISHED_GOOD. A row that turns a finished good back into stock
+# is a refund and not a source, and it is recognised here by what the records
+# say the two ends are: the output is a MISC and one of the inputs is an ARMO, a
+# WEAP or an AMMO. No editor id is matched, because a name list would only find
+# the mod it was written against.
+$breakdownRows = @{}
+foreach ($rd in $recipes.Keys) {
+    $r = $recipes[$rd]
+    if (-not $r.OutDesc) { continue }
+    if (-not $items.ContainsKey($r.OutDesc)) { continue }
+    if ($items[$r.OutDesc].Type -ne $STOCK_TYPE) { continue }
+    foreach ($i in @($r.InputList)) {
+        if (-not $items.ContainsKey($i.Desc)) { continue }
+        if ($FINISHED_GOOD_TYPES -contains $items[$i.Desc].Type) { $breakdownRows[$rd] = $true; break }
+    }
+}
+$hopSkip = @{}
+if (-not $HOP_THROUGH_A_FINISHED_GOOD) { $hopSkip = $breakdownRows }
+Note ("{0} of the {1} recipe(s) in the load order turn a finished good back into stock. HOP_THROUGH_A_FINISHED_GOOD is {2}, so the hop {3}." -f `
+      $breakdownRows.Count, $recipes.Count, $HOP_THROUGH_A_FINISHED_GOOD, `
+      $(if ($HOP_THROUGH_A_FINISHED_GOOD) { 'reads them like any other recipe' } else { 'does not let one of them set what anything costs' }))
+
+$made = @{}
+$supply = @{}
+$hopCheaper = New-Object 'System.Collections.Generic.List[string]'
+
+if (-not $FOLLOW_THE_HOP) {
+    Loud 'FOLLOW_THE_HOP is off, so an input made by a recipe stays unknown and the Smith is ranked by what he sells'
+    foreach ($d in $producer.Keys) { $supply[$d] = $producer[$d] }
+} else {
+    $fx = HopFixpoint $producer $recipes $hopSkip $MADE_COST_NEEDS_EVERY_INPUT $HOP_ROUND_LIMIT $HOP_MAY_UNDERCUT_A_CLASS
+    if (-not $fx.Settled) {
+        Bad ("the hop did not settle in {0} rounds, which is HOP_ROUND_LIMIT. It is a fixpoint over four ranks and it cannot honestly need that many, so something in the rule changed and the table was not written." -f $HOP_ROUND_LIMIT)
+    } else {
+        Ok ("the hop settled after {0} round(s), the last of which changed nothing. Four ranks and {1} recipe(s): an item's cost only ever moves from unknown to a rank or from a rank to a cheaper one, so it cannot go round for ever, and this is the run saying it did not." -f `
+            $fx.Rounds, $recipes.Count)
+    }
+    $costs = $fx.Costs
+
+    # WHICH recipes give each made item its cost. Every one of them and not the
+    # first, which was a defect for as long as it was the first: the walk back to
+    # a class below can come up empty on a route that goes round in a circle, and
+    # when only one route was kept the item was then dropped from the index
+    # entirely. Corundum Ingot, wanted by 402 recipes, was lost exactly that way
+    # on 21 September while its own smelter row sat in the table saying corundum
+    # ore, advanced, miner.
+    #
+    # Taken after the costs have settled and not while they were moving: the
+    # cheapest route is a fact about the settled map, and reading it mid-flight
+    # would record whichever recipe happened to be looked at first that round.
+    $makers = @{}
+    foreach ($rd in $recipes.Keys) {
+        if ($hopSkip.ContainsKey($rd)) { continue }
+        $r = $recipes[$rd]
+        if (-not $r.OutDesc) { continue }
+        if (-not $costs.ContainsKey($r.OutDesc)) { continue }
+        $c = HopCost $costs $r $MADE_COST_NEEDS_EVERY_INPUT
+        if ($c -lt 0) { continue }
+        if ($c -ne $costs[$r.OutDesc]) { continue }
+        if (-not $makers.ContainsKey($r.OutDesc)) { $makers[$r.OutDesc] = New-Object 'System.Collections.Generic.List[object]' }
+        $makers[$r.OutDesc].Add($r)
+    }
+
+    # Back to a class. The dearest input is the one that set the cost, so the
+    # class behind THAT input is the class the chain rests on: an ingot's cost
+    # is a miner's, a leather strip's is a hunter's. Ties go to the first input
+    # the record lists, which is the order the CNTO subrecords are in, so the
+    # answer is the same on every machine and every run.
+    #
+    # The visited set is not there for tidiness. There are smelter rows that take
+    # something made out of what they produce, so following the dearest input can
+    # come back to where it started, and without it this walks for ever on real
+    # data. When a route does come back on itself the next route that costs the
+    # same is tried, which is why makers is a list.
+    $chainMemo = @{}
+    function ResolveChain([string]$desc, $seen, [bool]$ignoreGround = $false) {
+        if ($producer.ContainsKey($desc) -and -not $ignoreGround) {
+            return [pscustomobject]@{ Who = $producer[$desc].Who; Hops = 0; Via = $producer[$desc].Via }
+        }
+        if ($chainMemo.ContainsKey($desc) -and -not $ignoreGround) { return $chainMemo[$desc] }
+        if (-not $makers.ContainsKey($desc)) { return $null }
+        if ($seen.ContainsKey($desc)) { return $null }
+        $seen[$desc] = $true
+        $want = $costs[$desc]
+        $answer = $null
+        foreach ($r in $makers[$desc]) {
+            # the dearest input first, then the rest, so a circle on the dearest
+            # one still names the class the rest of the list rests on
+            $ordered = @(@($r.InputList) | Where-Object { $costs.ContainsKey($_.Desc) -and $costs[$_.Desc] -eq $want }) +
+                       @(@($r.InputList) | Where-Object { $costs.ContainsKey($_.Desc) -and $costs[$_.Desc] -ne $want })
+            foreach ($i in $ordered) {
+                $up = ResolveChain $i.Desc $seen $false
+                if ($up) {
+                    $answer = [pscustomobject]@{ Who = $up.Who; Hops = ($up.Hops + 1); Via = $r.Edid }
+                    break
+                }
+            }
+            if ($answer) { break }
+        }
+        $seen.Remove($desc)
+        if ($answer) { $chainMemo[$desc] = $answer }
+        return $answer
+    }
+
+    $lost = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($d in $costs.Keys) {
+        if ($producer.ContainsKey($d) -and $producer[$d].At -le $costs[$d]) { continue }
+        # A class hands this over too and the bench is cheaper, so the answer has
+        # to come back down the recipe and not off the ground: taking the ground
+        # answer here would put a master miner's rank on an item the settled
+        # costs say is novice work at a smelter, and read as hops 0 while doing
+        # it. Argued for at HOP_MAY_UNDERCUT_A_CLASS.
+        $ch = ResolveChain $d (@{}) ($producer.ContainsKey($d))
+        $nm = $d
+        if ($items.ContainsKey($d)) { $nm = $items[$d].Name }
+        if (-not $ch) {
+            # Every route to it goes in a circle. Named rather than dropped: an
+            # item with a settled cost and no class behind it is a hole in the
+            # chain that has to be readable.
+            $lost.Add(("{0} ({1}) costs {2} by the hop and every route back to a class goes in a circle" -f $nm, $d, $RANKS[$costs[$d]]))
+            continue
+        }
+        $made[$d] = [pscustomobject]@{
+            Rank = $RANKS[$costs[$d]]; At = $costs[$d]; Who = $ch.Who; Name = $nm
+            Via = $ch.Via; Hops = $ch.Hops
+        }
+        if ($producer.ContainsKey($d)) {
+            $hopCheaper.Add(("{0} is {1} work for a {2} at a bench and {3} work off the ground for a {4}" -f `
+                             $nm, $RANKS[$costs[$d]], $ch.Who, $producer[$d].Rank, $producer[$d].Who))
+        }
+    }
+    if ($lost.Count -gt 0) {
+        Loud ("{0} item(s) have a cost and no class behind it, because every route to them comes back on itself:" -f $lost.Count)
+        foreach ($l in ($lost | Select-Object -First 6)) { Loud ('  ' + $l) }
+    }
+
+    foreach ($d in $producer.Keys) { $supply[$d] = $producer[$d] }
+    foreach ($d in $made.Keys) { $supply[$d] = $made[$d] }
+
+    # WHAT THE OTHER TWO ANSWERS WOULD HAVE PLACED, printed every run so that
+    # each rule costs a number rather than a guess.
+    $loose = HopFixpoint $producer $recipes $hopSkip $false $HOP_ROUND_LIMIT $HOP_MAY_UNDERCUT_A_CLASS
+    $looseOnly = 0
+    foreach ($d in $loose.Costs.Keys) { if (-not $costs.ContainsKey($d)) { $looseOnly++ } }
+    Note ("MADE_COST_NEEDS_EVERY_INPUT is {0}. With it off the hop would place {1} more item(s), each of them priced off the part of its own shopping list anybody could see." -f `
+          $MADE_COST_NEEDS_EVERY_INPUT, $looseOnly)
+    if ($breakdownRows.Count -gt 0) {
+        $other = @{}
+        if ($HOP_THROUGH_A_FINISHED_GOOD) { $other = $breakdownRows }
+        $alt = HopFixpoint $producer $recipes $other $MADE_COST_NEEDS_EVERY_INPUT $HOP_ROUND_LIMIT $HOP_MAY_UNDERCUT_A_CLASS
+        $moved = 0
+        $cheaperThere = 0
+        foreach ($d in $costs.Keys) {
+            if (-not $alt.Costs.ContainsKey($d)) { $moved++; continue }
+            if ($alt.Costs[$d] -ne $costs[$d]) { $moved++; if ($alt.Costs[$d] -lt $costs[$d]) { $cheaperThere++ } }
+        }
+        foreach ($d in $alt.Costs.Keys) { if (-not $costs.ContainsKey($d)) { $moved++ } }
+        Note ("HOP_THROUGH_A_FINISHED_GOOD is {0}. Turning it the other way moves {1} item(s), {2} of them to a cheaper rank." -f `
+              $HOP_THROUGH_A_FINISHED_GOOD, $moved, $cheaperThere)
+    }
+}
+
+$byHop = @{}
+foreach ($d in $made.Keys) {
+    $h = $made[$d].Hops
+    if (-not $byHop.ContainsKey($h)) { $byHop[$h] = 0 }
+    $byHop[$h] = $byHop[$h] + 1
+}
+$hopLine = @()
+foreach ($h in ($byHop.Keys | Sort-Object)) { $hopLine += ('{0} at {1} hop(s)' -f $byHop[$h], $h) }
+$madeWho = @{}
+foreach ($d in $made.Keys) {
+    $w = $made[$d].Who
+    if (-not $madeWho.ContainsKey($w)) { $madeWho[$w] = 0 }
+    $madeWho[$w] = $madeWho[$w] + 1
+}
+$madeWhoLine = @()
+foreach ($w in ($madeWho.Keys | Sort-Object)) { $madeWhoLine += ('{0} {1}' -f $w, $madeWho[$w]) }
+Ok ("the hop places {0} more item(s) that no class hands over: {1}" -f $made.Count, ($hopLine -join ', '))
+Ok ("the class behind them: {0}" -f ($madeWhoLine -join ', '))
+Ok ("what the ranking reads is now {0} item(s): {1} off the ground and {2} off a bench" -f `
+    $supply.Count, $producer.Count, $made.Count)
+if ($hopCheaper.Count -gt 0) {
+    Loud ("{0} item(s) are cheaper to make at a bench than to get off the ground, and the bench answer is the one in use because a recipe costs what the cheapest way of getting its makings costs:" -f $hopCheaper.Count)
+    foreach ($h in ($hopCheaper | Select-Object -First 6)) { Loud ('  ' + $h) }
+}
+
+# What the hop did for the recipes that have to be ranked, counted the two ways
+# the direct index is counted so the before and after are the same numbers.
+$placedNow = 0
+$entriesSeen = 0
+$entriesPlacedDirect = 0
+$entriesPlacedNow = 0
+foreach ($d in $inputItemsSeen.Keys) { if ($supply.ContainsKey($d)) { $placedNow++ } }
+foreach ($desc in $owned.Keys) {
+    foreach ($i in @($owned[$desc].InputList)) {
+        $entriesSeen++
+        if ($producer.ContainsKey($i.Desc)) { $entriesPlacedDirect++ }
+        if ($supply.ContainsKey($i.Desc)) { $entriesPlacedNow++ }
+    }
+}
+Ok ("the owned recipes ask for {0} distinct input item(s): {1} had a producer before the hop and {2} have one now, {3} still do not" -f `
+    $inputItemsSeen.Count, $placedItems, $placedNow, ($inputItemsSeen.Count - $placedNow))
+Ok ("counted as input entries rather than distinct items, {0} of {1} were placed before the hop and {2} are placed now, which leaves {3}" -f `
+    $entriesPlacedDirect, $entriesSeen, $entriesPlacedNow, ($entriesSeen - $entriesPlacedNow))
+
+$stillOut = @()
+foreach ($d in $inputItemsSeen.Keys) { if (-not $supply.ContainsKey($d)) { $stillOut += $d } }
+if ($stillOut.Count -gt 0) {
+    $stillOut = @($stillOut | Sort-Object { -$inputItemsSeen[$_] })
+    Note 'what is left after the hop, commonest first. Every one of these is bought, looted or dropped, and nothing in this repository says what it costs:'
+    foreach ($d in ($stillOut | Select-Object -First 12)) {
+        $nm = $d
+        if ($items.ContainsKey($d)) { $nm = $items[$d].Name + ' (' + $items[$d].Type + ')' }
+        Note ("  {0,5} recipe(s) want {1} [{2}]" -f $inputItemsSeen[$d], $nm, $d)
+    }
+    if ($stillOut.Count -gt 12) { Note ("  ... and {0} more" -f ($stillOut.Count - 12)) }
+} else {
+    Ok 'every input of every owned recipe has a class behind it, directly or through a bench'
 }
 
 # ------------------------------------------------------------- the ranking --
@@ -2684,9 +3616,9 @@ foreach ($p in $PROFESSIONS.Keys) {
             $nameBest = ''
             $unplaced = 0
             foreach ($i in @($owned[$d].InputList)) {
-                if (-not $producer.ContainsKey($i.Desc)) { $unplaced++; continue }
+                if (-not $supply.ContainsKey($i.Desc)) { $unplaced++; continue }
                 if (-not $RANK_FROM_INPUT_COST) { continue }
-                $pz = $producer[$i.Desc]
+                $pz = $supply[$i.Desc]
                 $better = $false
                 if ($best -lt 0) {
                     $better = $true
@@ -3237,6 +4169,8 @@ $doc.Add('  "event": ' + (JsonStr 'mp.onCraft(actorFormId, craftedItemBaseId, co
 $doc.Add('  "key": ' + (JsonStr 'the recipe''s form id in lower case hex, a colon, and the file it belongs to. mp.getDescFromId turns onCraft''s fourth argument into one.') + ',')
 $doc.Add('  "rank": ' + (JsonStr 'which of classes.md''s four ranks the row asks for: novice, advanced, expert or master. Ranked by WHAT ITS INPUTS COST A PRODUCER, taking the dearest thing it asks for, because that is the rung somebody has to have reached before they could gather the makings at all. Where part of the list is produced by nobody, that dearest placed input is a FLOOR and not the answer: it can raise the row above what the output sells for and never lower it, because an item nothing produces is an unknown cost rather than a free one. A row whose inputs no class produces at all falls back to what the output sells for, ranked inside its own half. rankFrom says which of the three answered. classes.md sets no numbers for any of this and nothing in the game records ranks a recipe, so every judgement is a knob at the top of the script: RANK_FROM_INPUT_COST, PRODUCER_TABLES, SERVER_PRODUCERS, PRODUCER_RANK_IS_LOWEST, INPUT_RANK_IS_THE_DEAREST, UNPLACED_INPUT_RULE, RANK_SHARE and SECOND_RULE_KEY.') + ',')
 $doc.Add('  "inputItems": ' + (JsonStr 'every CNTO the record carried: what the recipe wants, how many, and which class produces that item at which rank. producedBy is the class that gets it at the LOWEST rank, because that is what the thing costs to get hold of; alsoProducedBy, where it is present, is every class that has to climb higher for the same item, which is where the farmer appears, since all 11 crops are also plants a gatherer picks at the same rank or lower. producedBy null means nothing in this repository hands that item over: no table in this folder and no verb in tools\gamemode.js. Read out of the recipe''s own CNTO subrecords, eight bytes each, a form id then a count.') + ',')
+$doc.Add('  "suppliedBy": ' + (JsonStr 'on each input beside producedBy, and a different question: producedBy is the class that digs it out of the ground, and suppliedBy is the class the input rests on however many benches away it is. Steel Ingot reads producedBy null and suppliedBy miner, because a smelter row makes it out of ore. hops is how many recipes stand between the class and the input, 0 for handed straight over and 1 for a smelter or a tanning rack away, and suppliedVia names the recipe of the last of those steps. suppliedBy null means nothing in this world supplies it at all, directly or through any bench: it is bought, looted or dropped. What ranks a row is suppliedAt and not producedAt.') + ',')
+$doc.Add('  "theHop": ' + (JsonStr 'how suppliedBy is worked out. An input that is itself the output of a recipe costs what that recipe''s dearest input costs, taken over all 5116 recipes and not just the 3437 with an owner, because the smelter and the tanning rack are among the 1679 nobody owns. It is a fixpoint: every item starts unknown, every recipe is asked again each round, and a cost only ever moves from unknown to a rank or from a rank to a cheaper one, so it settles, and it settles in three rounds on this build. A recipe says nothing about its output while any part of its own list is unknown, for the reason written at UNPLACED_INPUT_RULE. A row that turns a finished good back into stock, a fur hood into a Steel Ingot, is a refund and not a source and sets nothing; 1072 rows have that shape.') + ',')
 $doc.Add('  "inputsWithNoProducer": ' + (JsonStr 'how many of the row''s inputs nothing in this repository produces. Read it with inputRank: "the dearest input is novice" means one thing on a row where that is the whole list and another on a row with four unknowns beside it, and not reading it is how a 3100 gold dragonbone plate went out at novice on 21 September off one novice hunter''s fox pelt.') + ',')
 $doc.Add('  "rankFrom": ' + (JsonStr 'which rule gave this row its rank: what its inputs cost a producer, what it sells for, or the second rule named in SECOND_RULE_KEY. The second rule is used for one half at a time and only where the first two leave a rung with nothing on it, and every use of it is printed by name when the table is built.') + ',')
 $doc.Add('  "rankByValue": ' + (JsonStr 'what the old rule would have said: the rank this row got from the price of what it makes, inside its own half. Kept on every row so the two answers can be compared rather than one of them quietly replacing the other.') + ',')
@@ -3244,6 +4178,7 @@ $doc.Add('  "inputRank": ' + (JsonStr 'the rank of the dearest input this row as
 $doc.Add('  "crossTier": ' + (JsonStr 'tools\Check-Balance.ps1 reads inputRank against rank and reports every half by how far its recipes sit from what their inputs cost, and reads alsoProducedBy to report every row ranked below a class that has to climb higher for something on its list. That is the imbalance Patrick asked about on 21 September, stated as a number. Both scripts print it; neither fails on it, because which of the two ladders should move is a decision.') + ',')
 $doc.Add('  "rungsNobodyCanGatherFor": ' + (JsonStr 'on a half: a rung that holds recipes and not one of them can be gathered for at that rank, which is an empty rung wearing a label and is what the second rule can leave behind. Build-RecipeTable.ps1 fails the build for any half that has one and is not named in its HALVES_WITH_AN_UNSTANDABLE_RUNG knob with the measured reason, so a half carrying this field is one somebody decided to live with and wrote down.') + ',')
 $doc.Add('  "rankedByInputCost": ' + (JsonStr 'on each half: how many of its rows the input cost rule could answer for and how many fell back to price, counted BEFORE any second rule ran. Where the half also carries a secondRule field, that rule then re-ranked every row of it, so read rankFrom on the row for what actually decided it.') + ',')
+$doc.Add('  "family": ' + (JsonStr 'what kind of thing the row makes, which is how the recipe book in the K panel groups a half''s work. Read off the output record and nothing else: a keyword that names a kind, which is a weapon type keyword, one of the five armour slot keywords, a clothing slot keyword or a Gourmet food type keyword. An output carrying exactly one of those takes its name from it. An output carrying two names neither, because the Cloaks&Capes cloaks carry a helmet or cuirass slot beside a necklace slot and a cloak is none of those, so two kinds falls through with no kind at all to the record''s own type: AMMO is arrows and bolts, ARMO is other armour and clothing, and so on. familyFrom on every row says which of the three readings answered. classes.md sets none of this and names no families at all, so the groups and their words are knobs at the top of the script: FAMILY_ARMOR_SLOTS, FAMILY_KEYWORD_PREFIXES, FAMILY_KEYWORD_NOT, FAMILY_NAMES, FAMILY_BY_TYPE, FAMILY_OTHERWISE and FAMILY_SHARE_TO_WARN.') + ',')
 $doc.Add('  "sisterHalf": ' + (JsonStr 'classes.md gives you the novice work of the other half of your own profession for nothing, and no further than novice. The gate can answer that because every row carries a rank.') + ',')
 $doc.Add('  "needs": ' + (JsonStr 'the recipe''s own conditions, read out of its CTDA subrecords. An empty list means anybody standing at the bench can make it. serverSees false means the fork has no function for that condition and the server answers True, so the only thing enforcing it is the crafting menu on the machine in front of the person, which hides the recipe rather than refusing it.') + ',')
 $doc.Add('  "default": ' + (JsonStr 'a recipe id this table does not carry is one nobody owns, and anybody may make it') + ',')
@@ -3327,8 +4262,22 @@ foreach ($k in $keys) {
         foreach ($rk in $RANKS) { $bits += ((JsonStr $rk) + ': ' + $rankRows[$k][$rk]) }
         $byRank = '{ ' + ($bits -join ', ') + ' }'
     }
+    # The families this half makes, biggest first, with the rows the server is
+    # actually asked about beside the rows there are. The book counts the
+    # second number and only the second number, because a tempering row never
+    # reaches onCraft and is not a thing a person opens a book to find.
+    $famTxt = '{}'
+    if ($famPerHalf.ContainsKey($k) -and $famPerHalf[$k].Count -gt 0) {
+        $bits = @()
+        foreach ($f in ($famPerHalf[$k].Keys | Sort-Object { -$famPerHalf[$k][$_] })) {
+            $bits += ((JsonStr $f) + ': { "recipes": ' + $famPerHalf[$k][$f] +
+                      ', "theServerIsAsked": ' + $famPerHalfFiring[$k][$f] + ' }')
+        }
+        $famTxt = '{ ' + ($bits -join ', ') + ' }'
+    }
     $line = '    ' + (JsonStr $k) + ': { "recipes": ' + $perHalf[$k] +
             ', "theServerIsAsked": ' + $perHalfFiring[$k] +
+            ', "families": ' + $famTxt +
             ', "canBeMadeOnDayOne": ' + $perHalfDayOne[$k] +
             ', "behindAVanillaPerk": ' + $perHalfPerk[$k] +
             ', "byRank": ' + $byRank +
@@ -3381,6 +4330,7 @@ foreach ($desc in $owned.Keys) {
              ', "bench": ' + (JsonStr $r.BenchDesc) + ', "benchName": ' + (JsonStr $r.BenchName) +
              ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
              ', "rank": ' + (JsonStr $r.Rank) +
+             ', "family": ' + (JsonStr $r.Family) + ', "familyFrom": ' + (JsonStr $r.FamilyFrom) +
              ', "fires": ' + $firesTxt + ', "canBeMadeOnDayOne": ' + $dayOneTxt +
              ', "needs": ' + $needsTxt +
              ', "plugin": ' + (JsonStr $r.Plugin) +
@@ -3436,7 +4386,8 @@ foreach ($desc in $owned.Keys) {
     $blockRows.Add('    ' + (JsonStr $desc) + ': { "out": ' + (JsonStr $r.OutDesc) + ', "name": ' + (JsonStr $r.OutName) +
                    ', "type": ' + (JsonStr $r.OutType) + ', "makes": ' + $r.Count +
                    ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
-                   ', "rank": ' + (JsonStr $r.Rank) + ', "open": ' + $dayOneTxt + ' },')
+                   ', "rank": ' + (JsonStr $r.Rank) + ', "family": ' + (JsonStr $r.Family) +
+                   ', "open": ' + $dayOneTxt + ' },')
 }
 if ($blockRows.Count -gt 0) {
     $last = $blockRows[$blockRows.Count - 1]
@@ -3502,6 +4453,16 @@ $lines.Add('     Every row carries rankFrom in tools\recipes.json saying which o
 $lines.Add('     three answered for it. Nothing in here is the script''s opinion of what a')
 $lines.Add('     thing is worth: classes.md sets no numbers for any of it, and every')
 $lines.Add('     judgement is a named knob at the top of the script that wrote this.')
+$lines.Add('')
+$lines.Add('     family is what kind of thing the row makes, and it is what the recipe')
+$lines.Add('     book in the K panel groups a half''s work by, because Patrick asked for')
+$lines.Add('     the book not to be very specific and a tailor owns hundreds of')
+$lines.Add('     garments. It is read off the output record: a weapon type keyword, one')
+$lines.Add('     of the five armour slot keywords, a clothing slot keyword or a Gourmet')
+$lines.Add('     food type keyword. An output naming two kinds names none and falls to')
+$lines.Add('     its record type with the ones naming none at all. tools\recipes.json')
+$lines.Add('     carries familyFrom on every row saying which reading answered, and')
+$lines.Add('     this build has ' + $famRows.Count + ' families across the whole table.')
 $lines.Add('')
 $lines.Add('     open is true when the recipe carries no condition of its own. A row')
 $lines.Add('     with open false needs something first, an item, a spell or a vanilla')
