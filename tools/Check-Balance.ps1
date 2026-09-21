@@ -685,8 +685,10 @@ if ($recipes) {
     foreach ($nm in ($loose.Keys | Sort-Object { -$loose[$_] } | Select-Object -First 6)) {
         Say ('    {0,5} entries  {1}' -f $loose[$nm], $nm)
     }
-    Say '  A woodcutter''s verb and a churn would put Firewood and Butter on a class, and the'
-    Say '  charcoal kiln already reads out of gamemode.js, so the shape of that work is known.'
+    Say '  Firewood came off this list on 21 September: chopWood in gamemode.js gives it to a'
+    Say '  woodworker at the three chopping blocks, and Build-RecipeTable reads that verb out of'
+    Say '  the shipped file the same way it reads the kiln. A churn would do the same for Butter,'
+    Say '  so the shape of that work is known.'
 }
 
 Write-Host ''

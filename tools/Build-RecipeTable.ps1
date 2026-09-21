@@ -817,7 +817,14 @@ $STATION_VERBS = @(
     @{ Fn = 'mineSalt';     Who = 'miner';
        What = 'the salt quarry, STATIONS.saltQuarry, which is a miner''s verb: classGate(actorId, ''mine'')' },
     @{ Fn = 'burnCharcoal'; Who = 'woodworker';
-       What = 'the charcoal kiln, STATIONS.charcoalKiln, which is the Charburner half''s: halfGate(actorId, ''charburner'')' }
+       What = 'the charcoal kiln, STATIONS.charcoalKiln, which is the Charburner half''s: halfGate(actorId, ''charburner'')' },
+    # Added 21 September, and it closes the gap this script's own closing
+    # paragraph had been printing for days: "A woodcutter's verb and a churn
+    # would put Firewood and Butter on a class". Firewood was the fifth largest
+    # unsupplied input in the table, 79 entries, and until chopWood existed
+    # nothing in this world produced a single stick of it.
+    @{ Fn = 'chopWood';     Who = 'woodworker';
+       What = 'the three chopping blocks in Skyrim.esm, which are the Woodwright half''s: halfGate(actorId, ''woodwright''). Bethesda''s records are untouched and the verb is answered server side, because Patrick said on 21 September that a chopping block is "just for getting the firewood and not usable by non woodworkers".' }
 )
 
 # WHERE THE STATIONS ARE READ FROM. The shipped gamemode, in this folder, which
@@ -1495,6 +1502,64 @@ $BENCH_UNOWNED = [ordered]@{
 $BENCH_UNOWNED_PREFIX = 'BYOHBuildingInteriorPart'
 
 # Benches that settle the profession on their own, where the output cannot.
+# ONE NAMED RECIPE, WHERE NEITHER THE BENCH NOR THE OUTPUT CAN SETTLE IT.
+#
+# Everything below decides an owner from the bench a recipe stands at and the
+# kind of thing it makes, and for 3,438 recipes that is enough. It is not enough
+# for a tool, and a tool is the one thing on this server that somebody is
+# guaranteed to need a second of.
+#
+# ThornswoodRecipeToolShovel is made at CraftingSmithingForge, which is a smith's
+# bench that does not settle ownership on its own because half the province
+# smelts and tempers there. Ownership at a forge is then settled by the output,
+# and the rule is "the output is a WEAP that is not a bow and not a staff". A
+# shovel is Shovel01, 0x0F5D05, a MISC. So it matched nothing and fell through to
+# unowned, which means anybody may make it, which would mean a farmer forging
+# their own shovel the moment the old one broke and no smith ever being asked.
+#
+# The pickaxe and the woodcutter's axe are not in this table because they do not
+# need to be: both are WEAP and the forge rule already gives them to the
+# Edgewright. The shovel is the odd one out because Bethesda made it a MISC.
+#
+# This is a knob for a recipe whose owner is a decision rather than a reading.
+# Every entry needs the measured reason it cannot be derived, and a name in here
+# that the rules WOULD have settled is worth taking out again.
+$RECIPE_OWNER = [ordered]@{
+    'ThornswoodRecipeToolShovel' = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'a shovel is a tool a smith forges, and it is here rather than derived because Shovel01 is a MISC: the forge settles ownership by the output being a WEAP, so the pickaxe and the axe are covered by that rule and the shovel is not. Patrick, 21 September: a broken tool is replaced by "a smith making them".' }
+}
+
+# FOUR NAMED RECIPES WHOSE RANK IS A DECISION RATHER THAN A READING.
+#
+# The charcoal grades. gamemode.js burnCharcoal hands over one of four grades by
+# rankStep(actorId, 'charburner'): Poor Charcoal at novice, Charcoal at advanced,
+# Charcoal Briquette at expert, Coke at master. That ladder is the design and it
+# is in the shipped file. These four COBJ records are the SAME four grades made
+# at the SAME kiln through the crafting menu, so if the rules rank them any
+# other way the server contradicts itself: the verb says a novice gets poor
+# charcoal and the menu lets the same novice make coke.
+#
+# Until 21 September a CTDA on three of them held that line, testing for the
+# woodcutter manuals. The manuals are gone, so the rank on the row has to carry
+# what the condition carried.
+#
+# It is not derivable and here is the measurement of why. All four ask for the
+# same one item, firewood, in rising amounts, and all four outputs are priced
+# the same at 2 gold. So the price rule cannot tell them apart and the input
+# cost rule cannot either: the moment chopWood gave firewood a producer, all
+# four ranked novice together, because the dearest thing any of them asks for is
+# novice work for a woodworker. Before that the second rule spread them by total
+# input count, which happened to land close and was still an accident.
+#
+# THIS IS THE LAST RESORT AND IT IS CHECKED. A named rank is applied after every
+# automatic rule and BEFORE the empty-rung and standable checks, so it cannot be
+# used to write a ladder with a hole in it.
+$RECIPE_RANK = [ordered]@{
+    'ThornswoodRecipeCharcoalTier1' = @{ Rank = 'novice';   Why = 'the first of the four charcoal grades. burnCharcoal in gamemode.js hands this one to a novice charburner, so the menu says what the verb says.' }
+    'ThornswoodRecipeCharcoalTier2' = @{ Rank = 'advanced'; Why = 'the second charcoal grade, which burnCharcoal hands to an advanced charburner.' }
+    'ThornswoodRecipeCharcoalTier3' = @{ Rank = 'expert';   Why = 'the third charcoal grade, which burnCharcoal hands to an expert charburner.' }
+    'ThornswoodRecipeCharcoalTier4' = @{ Rank = 'master';   Why = 'coke, the last charcoal grade, which burnCharcoal hands to a master charburner alone.' }
+}
+
 $BENCH_OWNER = [ordered]@{
     'CraftingCookpot'         = @{ Owner = 'Cook';       Why = 'a cooking pot' }
     'BYOHCraftingOven'        = @{ Owner = 'Cook';       Why = 'the HearthFires oven' }
@@ -2739,7 +2804,17 @@ foreach ($desc in $recipes.Keys) {
     $half = ''
     $reason = ''
 
-    if ($benchOwner -and $benchOwner.ContainsKey('Half')) {
+    # 4a. A recipe named outright, because neither its bench nor its output can
+    #     settle it. See $RECIPE_OWNER: today that is the shovel and nothing else.
+    #     It comes before the bench and the output rules so that naming a recipe
+    #     means what it says.
+    if ($RECIPE_OWNER.Contains($r.Edid)) {
+        $named = $RECIPE_OWNER[$r.Edid]
+        $ownerName = $named.Owner
+        $half = $named.Half
+        $reason = $named.Why
+    }
+    elseif ($benchOwner -and $benchOwner.ContainsKey('Half')) {
         $ownerName = $benchOwner.Owner
         $half = $benchOwner.Half
         $reason = $benchOwner.Why
@@ -3758,6 +3833,9 @@ if ($noValue.Count -gt 0) {
 # pushed past any run of rows that share the boundary price, so two recipes
 # that make things worth the same never land on different rungs.
 $promoted = New-Object 'System.Collections.Generic.List[string]'
+# Every row whose rank was named in RECIPE_RANK rather than worked out, printed
+# at the end so that naming one is never a quiet thing.
+$namedRanks = New-Object 'System.Collections.Generic.List[string]'
 $rankRows = @{}
 $rankedByInputs = @{}
 $rankedByValue = @{}
@@ -3897,6 +3975,27 @@ foreach ($p in $PROFESSIONS.Keys) {
             }
         }
 
+        # A ROW WHOSE RANK IS A DECISION RATHER THAN A READING. See $RECIPE_RANK.
+        #
+        # It is applied here, after every automatic rule has run and BEFORE the
+        # empty-rung and standable checks below, so a named rank is still held
+        # to every invariant this script enforces. A knob that skipped the
+        # checks would be a way to write a ladder with a hole in it and be told
+        # nothing.
+        foreach ($d in $sorted) {
+            $edid = [string]$owned[$d].Edid
+            if (-not $RECIPE_RANK.Contains($edid)) { continue }
+            $named = $RECIPE_RANK[$edid]
+            if ($RANKS -notcontains $named.Rank) {
+                Bad ("RECIPE_RANK names {0} as '{1}', which is not one of the four ranks" -f $edid, $named.Rank)
+                continue
+            }
+            $owned[$d].Rank = [string]$named.Rank
+            $owned[$d].RankFrom = 'named outright in RECIPE_RANK'
+            $owned[$d].RankWhy = [string]$named.Why
+            $namedRanks.Add(("{0}: {1} ({2}) is {3}. {4}" -f $key, $edid, $owned[$d].OutName, $named.Rank, $named.Why))
+        }
+
         $counts = CountRungs $sorted
         $hole = HoleIn $counts
 
@@ -3982,6 +4081,18 @@ if ($promoted.Count -gt 0) {
     foreach ($pz in $promoted) { Loud ("  " + $pz) }
 } else {
     Ok 'every half already had a reachable novice row, so nothing was moved'
+}
+
+# Naming a rank is the last resort, so it is never quiet. Every one is printed
+# with the reason it could not be worked out, and a knob that holds no names
+# says so too, because an empty one is worth noticing the day it fills up.
+if ($namedRanks.Count -gt 0) {
+    Loud ("{0} row(s) carry a rank named in RECIPE_RANK rather than worked out:" -f $namedRanks.Count)
+    foreach ($nr in $namedRanks) { Loud ("  " + $nr) }
+    Loud '  Each was applied after every automatic rule and before the empty rung and standable'
+    Loud '  checks above, so a named rank is held to the same invariants as any other.'
+} else {
+    Ok 'no row needed its rank naming outright'
 }
 
 # --------------- where a ladder sits below the class that grows what it asks --

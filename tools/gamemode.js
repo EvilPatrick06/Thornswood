@@ -5143,7 +5143,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 */
   // ==== RECIPES_BY_ID ====
   /* Built by tools\Build-RecipeTable.ps1 out of the game's own records. Do not hand edit.
-     1728 crafting recipes, out of 5116 in tools\recipes.json.
+     1730 crafting recipes, out of 5118 in tools\recipes.json.
 
      Recipe desc -> what it makes, what kind of record that is, how many it
      makes, which profession and which half of it owns the recipe, and which
@@ -5170,7 +5170,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
      reached. Where part of the list is produced by nobody, that is a floor
      and what the output sells for can hold the row higher; where none of it
      is, the price ranks it inside its own half. On this build that is
-     1263 row(s) by what their inputs cost, 180 by price and 285 by how long
+     1276 row(s) by what their inputs cost, 169 by price and 285 by how long
      the shopping list is. That last rule is used for a whole half at a time
      and only where the first two leave a rung with nothing on it, which here
      is Cook/Confectioner, Enchanter/Bladebinder, Tailor/Liverywright. A rank there means how long the list is and
@@ -5833,8 +5833,8 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "d17f:Hothtrooper44_ArmorCompilation.esp": { "out": "d172:Hothtrooper44_ArmorCompilation.esp", "name": "Spellbinder Runic Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Gauntlets", "open": false },
     "d180:Hothtrooper44_ArmorCompilation.esp": { "out": "d174:Hothtrooper44_ArmorCompilation.esp", "name": "Spellbinder Runic Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Helmets", "open": false },
     "f74d:Hothtrooper44_ArmorCompilation.esp": { "out": "f74c:Hothtrooper44_ArmorCompilation.esp", "name": "Redguard Knight Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "20dd5:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc2:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Painted Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
-    "20dd6:Hothtrooper44_ArmorCompilation.esp": { "out": "20d0c:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Painted Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
+    "20dd5:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc2:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Painted Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Shields", "open": false },
+    "20dd6:Hothtrooper44_ArmorCompilation.esp": { "out": "20d0c:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Painted Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Shields", "open": false },
     "20dd7:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc3:Hothtrooper44_ArmorCompilation.esp", "name": "Light Painted Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Shields", "open": false },
     "20dd8:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc4:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Painted Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Shields", "open": false },
     "20dd9:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc5:Hothtrooper44_ArmorCompilation.esp", "name": "Light Painted Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "family": "Shields", "open": false },
@@ -6098,10 +6098,10 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "5f8ed:Hothtrooper44_ArmorCompilation.esp": { "out": "5edd6:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Splinted Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
     "5f8ee:Hothtrooper44_ArmorCompilation.esp": { "out": "5edbc:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Splinted Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
     "5f8ef:Hothtrooper44_ArmorCompilation.esp": { "out": "5ede6:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Spiked Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
-    "5f8f0:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc6:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Spiked Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "family": "Shields", "open": false },
-    "5f8f1:Hothtrooper44_ArmorCompilation.esp": { "out": "5edb7:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Spiked Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "family": "Shields", "open": false },
+    "5f8f0:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc6:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Spiked Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
+    "5f8f1:Hothtrooper44_ArmorCompilation.esp": { "out": "5edb7:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Spiked Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
     "5f8f2:Hothtrooper44_ArmorCompilation.esp": { "out": "5edbf:Hothtrooper44_ArmorCompilation.esp", "name": "Light Splinted Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
-    "5f8f3:Hothtrooper44_ArmorCompilation.esp": { "out": "5edba:Hothtrooper44_ArmorCompilation.esp", "name": "Light Spiked Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "family": "Shields", "open": false },
+    "5f8f3:Hothtrooper44_ArmorCompilation.esp": { "out": "5edba:Hothtrooper44_ArmorCompilation.esp", "name": "Light Spiked Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
     "5f8f4:Hothtrooper44_ArmorCompilation.esp": { "out": "5ee16:Hothtrooper44_ArmorCompilation.esp", "name": "Light Splinted Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
     "5f8f5:Hothtrooper44_ArmorCompilation.esp": { "out": "5edde:Hothtrooper44_ArmorCompilation.esp", "name": "Light Splinted Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
     "5f8f6:Hothtrooper44_ArmorCompilation.esp": { "out": "5edf6:Hothtrooper44_ArmorCompilation.esp", "name": "Light Spiked Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "family": "Shields", "open": false },
@@ -6924,11 +6924,13 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "1838:PlayFluteLuteDrum.esp": { "out": "d62:PlayFluteLuteDrum.esp", "name": "Flute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "family": "Other weapons", "open": true },
     "2de4:PlayFluteLuteDrum.esp": { "out": "1d9b:PlayFluteLuteDrum.esp", "name": "Lute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "family": "Other weapons", "open": true },
     "15480:Thornswood-Content.esp": { "out": "15481:Thornswood-Content.esp", "name": "Poor Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": true },
-    "15486:Thornswood-Content.esp": { "out": "15482:Thornswood-Content.esp", "name": "Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": false },
-    "15487:Thornswood-Content.esp": { "out": "15484:Thornswood-Content.esp", "name": "Charcoal Briquette", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": false },
-    "15488:Thornswood-Content.esp": { "out": "15485:Thornswood-Content.esp", "name": "Coke", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": false },
+    "15486:Thornswood-Content.esp": { "out": "15482:Thornswood-Content.esp", "name": "Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "advanced", "family": "Other goods", "open": true },
+    "15487:Thornswood-Content.esp": { "out": "15484:Thornswood-Content.esp", "name": "Charcoal Briquette", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "expert", "family": "Other goods", "open": true },
+    "15488:Thornswood-Content.esp": { "out": "15485:Thornswood-Content.esp", "name": "Coke", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "master", "family": "Other goods", "open": true },
     "1548d:Thornswood-Content.esp": { "out": "e3c16:Skyrim.esm", "name": "Pickaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "family": "War axes", "open": true },
-    "1548e:Thornswood-Content.esp": { "out": "2f2f4:Skyrim.esm", "name": "Woodcutter's Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "family": "Other weapons", "open": true }
+    "1548e:Thornswood-Content.esp": { "out": "2f2f4:Skyrim.esm", "name": "Woodcutter's Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "family": "Other weapons", "open": true },
+    "15491:Thornswood-Content.esp": { "out": "15490:Thornswood-Content.esp", "name": "Tool Handle", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "family": "Other goods", "open": true },
+    "15492:Thornswood-Content.esp": { "out": "f5d05:Skyrim.esm", "name": "Shovel", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "family": "Other goods", "open": true }
   };
 
   // ==== end RECIPES_BY_ID ====
@@ -6989,6 +6991,35 @@ function aWord(name) {
  * ALLOWS, because a gate that cannot tell whose work this is must not be the
  * reason somebody loses their materials at a forge.
  */
+/*
+  The handle, and which recipes want one. Argued for at the call in mp.onCraft.
+
+  Keyed off the family the recipe table already puts on every owned row, so this
+  list is checked against real data rather than against a memory of what Skyrim
+  contains: crafttest.js counts the rows in each of these families and fails if
+  a family here matches nothing, because a family name that has been renamed
+  under it would turn this rule off without a word.
+*/
+const HANDLE_DESC = '15490:Thornswood-Content.esp';
+const HAFTED_FAMILIES = ['War axes', 'Battleaxes', 'Warhammers', 'Maces', 'Other weapons'];
+
+/** True when this recipe makes something fitted to a wooden handle. */
+function wantsAHandle(row) {
+  if (!row || typeof row !== 'object') { return false; }
+  // The three tools ask for a handle in the records, so the rule must not ask
+  // for a second one. Their outputs are the ones TOOLS names.
+  const out = String(row.out || '');
+  for (const key in TOOLS) {
+    if (!Object.prototype.hasOwnProperty.call(TOOLS, key)) { continue; }
+    if (TOOLS[key].give === out) { return false; }
+  }
+  const family = String(row.family || '');
+  for (let i = 0; i < HAFTED_FAMILIES.length; i++) {
+    if (HAFTED_FAMILIES[i] === family) { return true; }
+  }
+  return false;
+}
+
 function craftAnswer(actorId, row) {
   const out = { refusal: null, note: null, credit: null };
   const C = globalThis.__thornswoodCharacter;
@@ -7140,6 +7171,51 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
     notify(actorId, answer.note);
     say(actorId, answer.note);
   }
+  /*
+    THE HANDLE, AND EVERY OTHER HAFTED THING.
+
+    Patrick, 21 September: the woodworker makes handles "that the smith needs
+    for Pickaxes, Shovels, Axes and other items that have wooden handles like
+    that". The pickaxe, the axe and the shovel ask for one in the records, which
+    is where a requirement belongs. The "other items" are the problem: there are
+    Counted rather than guessed, 21 September: 277 of the 3,439 owned rows in
+    toolsecipes.json are hafted, and 126 of those are rows the server is
+    actually asked about. They come out of Bethesda's five plugins and half a
+    dozen mods.
+
+    SO IT IS A RULE HERE RATHER THAN 277 OVERRIDES. Overriding another mod's
+    COBJ records couples this plugin to their versions: Immersive Weapons owns a
+    good number of these, and an override is a copy that goes stale silently the
+    day they change one. A rule keyed off the family already on every row covers
+    the same recipes, covers anything added later with no plugin edit at all,
+    and cannot go stale against a mod it has never heard of.
+
+    WHAT IT COSTS TO DO IT THIS WAY, said out loud because it is a real gap:
+    Build-RecipeTable ranks a row by what its INPUTS cost, and it reads inputs
+    out of the records. A handle required here is not in the records, so the
+    table does not know about it and the 269 rows are ranked as though the
+    handle were free. It is worth five gold and a novice woodworker's minute, so
+    the error is small, but it is an error and not a rounding.
+
+    THE FIVE FAMILIES. A haft is a shaft you hold in two hands or one, with the
+    weight at the end: war axes, battleaxes, warhammers, maces, and the eight
+    rows the table files under Other weapons, which is where the woodcutter's
+    axe lives. Swords, greatswords and daggers are a tang and a grip rather than
+    a haft. Bows and staves are wooden through and through, which is a different
+    thing from having a handle fitted to them, and a bow that wanted a handle
+    would read as a mistake to anybody holding one.
+  */
+  if (!answer.refusal && wantsAHandle(row)) {
+    if (!takeItem(actorId, HANDLE_DESC, 1)) {
+      const no = 'A ' + String(row.name || 'that') + ' is fitted to a wooden handle and you ' +
+                 'have none. A woodworker cuts them from firewood at a kiln.';
+      notify(actorId, no);
+      say(actorId, no);
+      log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no handle');
+      return false;
+    }
+  }
+
   if (answer.credit) {
     const raised = creditWork(actorId, answer.credit);
     if (raised) {
