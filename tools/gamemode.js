@@ -2388,8 +2388,52 @@ startChargenTimer();
 /**
  * Set the arrival point at the moment of death, while we still know where the
  * body fell. The engine reads spawnPoint when the respawn timer expires.
+ *
+ * And, for an animal the hunt table answers for, set how long the body lies
+ * there before the engine stands it back up. That half runs before the people
+ * only test below, because it is the half that is about everything which is not
+ * a person.
  */
 mp.onDeath = guard('onDeath', function (actorId, killerId) {
+  /*
+    HOW LONG THE BODY LIES THERE, FOR AN ANIMAL A HUNTER CAN WORK.
+
+    Read out of the fork on 20 September rather than assumed. Every actor that
+    dies is stood back up: DeathEvent::OnFireSuccess calls
+    MpActor::RespawnWithDelay, which sets a timer of ChangeForm().spawnDelay, and
+    spawnDelay is 25.0f unless something sets it (MpChangeForms.h:109). Nothing
+    here ever set it, so a carcass was pressable for twenty five seconds and a
+    hunter who finished the fight and walked over found a live animal and got
+    silence. The number this writes is HUNT_TUNING.bodySeconds and the case for
+    it is written over that block.
+
+    THE ORDER IS WHAT MAKES THIS WORK, and it is the engine's rather than
+    anything this file arranges: GameModeEvent::Fire runs every listener, which
+    is this function, and only then calls OnFireSuccess, which is the line that
+    starts the respawn timer. GetRespawnTime is read inside that timer's setup,
+    so a spawnDelay written here is the one that death uses. Written on every
+    death rather than once, because it costs one property write and a table
+    rebuild that adds an animal must not need a hand edit anywhere else.
+
+    Animals in the table and nothing else. A bandit, a guard, a draugr and a
+    dragon keep the engine's twenty five seconds, because no hunter has a verb
+    for any of them and nothing else on this server reads spawnDelay.
+
+    Wrapped, and a throw is not a failure worth a line in the log: baseDesc
+    throws for a reference the world does not have any more, and spawnDelay
+    throws for anything that is not an MpActor, which a death event should never
+    hand us but is not this function's to prove.
+  */
+  try {
+    const dying = mp.get(actorId, 'baseDesc');
+    if (isCarcass(dying)) {
+      mp.set(actorId, 'spawnDelay', HUNT_TUNING.bodySeconds);
+    }
+  } catch (e) {
+    /* not a reference this server can read any more, so there is no body to
+       leave lying and nothing to say about it */
+  }
+
   /*
     People only.
 
@@ -2701,6 +2745,137 @@ var HARVESTS_BY_BASE = {
 // ==== end HARVESTS_BY_BASE ====
 
 /*
+  THE WATER PRODUCE, WHICH IS THE FISHER'S AND NOT THE GATHERER'S, AND IT IS
+  GENERATED.
+
+  Everything between the declaration below and the line that closes the block is
+  written by the fish pass in tools\Build-HarvestTable.ps1, out of the same FLOR
+  records the harvests pass reads, named one at a time in FISH_BY_EDITOR_ID at
+  the top of that script. DO NOT HAND EDIT IT. The next run replaces every line
+  between them and takes any correction with it. Same arrangement as
+  HARVESTS_BY_BASE above and CROPS_BY_BASE below.
+
+  WHY THERE IS A FISHER'S TABLE AT ALL, AND WHY IT NEEDED NO CREATION KIT WORK.
+  Skyrim's own fishing is a Creation Club system this build does not have, so
+  the fisher's verb looked like a thing that had to be made from nothing.
+  Measured in tools\harvests.json on 20 September: sixteen records already
+  standing in every river and on every shore are water produce, and every one of
+  them was in the plant table and gated on the Gatherer. They are the salmon,
+  the clams, the pearl oysters, the horker meat and the slaughterfish egg nest,
+  and the last one is the only record of the sixteen this table leaves out: the
+  clam at Oar's Rest, whose produce is a fake Dwemer coin the records price at
+  nothing, which is a joke item and not a catch. So the fisher's verb is the
+  water produce that was already in the world, and this server places no record
+  for it.
+
+  A row says:
+
+    produce  the item the record hands over, the same key the harvests rows use.
+    name     that item's name, so a yield can say what came away.
+    from     what the thing standing in the water is called, because a salmon
+             gives Salmon Meat and a pearl oyster gives a Pearl, and a sentence
+             that names only the produce reads as though a person picked up a
+             cut of meat off the riverbed.
+    rank     the Fisher rank the record asks for, and unlike the plants it is
+             NOT the gold value of the produce. All fifteen of these are priced
+             at 2 or 3 gold in this build, measured the same day, so the rule
+             that ranks a plant puts every one of them on one rung and the
+             ladder does nothing at all. They are named one at a time in
+             FISH_RANK_BY_EDITOR_ID at the top of the script, the way the crops
+             are and for the same reason.
+
+  THE SALMON AND THE CLAMS ARE NOVICE AND NOTHING MOVES THEM. They are eleven of
+  the fifteen rows and they are the whole of a new fisher's work: a first rung
+  with nothing on it is the circle that has already cost this repo two rewrites,
+  once at the plants, where 33 of the 50 novice rows were planter sacks nobody
+  could open, and once at the crops, where the gold rule put ten of eleven on
+  one rung. A fisher who cannot fish cannot climb.
+
+  NOTHING ABOVE MAY SPELL THE CLOSING MARKER OUT, for the reason written out at
+  length over the ore block near the top of this file: the install takes the
+  first match of it in the whole file and refuses when that lands above the
+  declaration, so one quotation in a comment turns the pass into a no-op that
+  reports no fault.
+*/
+// ==== FISH_BY_BASE, generated ====
+var FISH_BY_BASE = {
+  "108e35:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" },
+  "108e36:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" },
+  "108e37:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" },
+  "108e38:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" },
+  "176b2:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" },
+  "176cd:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" },
+  "3828c:Dragonborn.esm": { "produce": "854fe:Skyrim.esm", "name": "Pearl", "from": "Pearl Oyster", "rank": "expert" },
+  "3828d:Dragonborn.esm": { "produce": "85500:Skyrim.esm", "name": "Small Pearl", "from": "Pearl Oyster", "rank": "advanced" },
+  "38a7a:Dragonborn.esm": { "produce": "65c9b:Skyrim.esm", "name": "Horker Meat", "from": "Horker meat", "rank": "advanced" },
+  "7e8c6:Skyrim.esm": { "produce": "7e8c5:Skyrim.esm", "name": "Slaughterfish Egg", "from": "Slaughterfish Egg Nest", "rank": "master" },
+  "85f80:Skyrim.esm": { "produce": "eba03:Skyrim.esm", "name": "Clam Meat", "from": "Clam", "rank": "novice" },
+  "85f82:Skyrim.esm": { "produce": "eba03:Skyrim.esm", "name": "Clam Meat", "from": "Clam", "rank": "novice" },
+  "85f83:Skyrim.esm": { "produce": "eba03:Skyrim.esm", "name": "Clam Meat", "from": "Clam", "rank": "novice" },
+  "f5eca:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" },
+  "f5ecb:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" }
+};
+// ==== end FISH_BY_BASE ====
+
+/*
+  HOW OFTEN A PIECE OF WATER GIVES, AND HOW MUCH. THE RULEBOOK DOES NOT SET ANY
+  OF IT.
+
+  classes.md gives the fisher the verb and says rank decides which source
+  somebody may work and how much it gives. It puts no number on either. These
+  are invented, they are first numbers for the dev server, and they are here in
+  one block so that changing the pace of every river in the province is one edit
+  in one place, which is the arrangement MINE_COOLDOWN_MS near the top of this
+  file is written under.
+
+  cooldownMs, by the rank the record asks for. The plants give themselves ten
+  minutes, near enough the hour the engine reloots a FLOR in, and a salmon is a
+  FLOR like a flower is. But a river is not a flower bed: a novice fisher works
+  eleven records that all give the same 2 gold meat, and there are dozens of
+  them in one stretch of the White River, so the wait is what stands between a
+  fisher and a pack of salmon. It sits where mining put it, by what the rank is
+  worth, and every rung is longer than the twenty seconds the salt quarry runs
+  on:
+
+    novice    ten minutes, the same wait a picked plant gets. Salmon Meat and
+              Clam Meat are 2 gold, so one record is about 12 gold an hour,
+              which is the pace the plants already run at.
+    advanced  half an hour. The small pearls and the horker meat on Solstheim.
+    expert    an hour. The pearls.
+    master    four hours. The one slaughterfish egg nest record, which sits
+              underwater in water slaughterfish are in.
+
+  This map is kept in memory, in the same lastUse map the quarry and the plants
+  use, so a server restart or a hot reload of this file clears every wait in it.
+  That is true of the ten minutes on a plant as well and it is the first thing
+  to know before these numbers are argued about.
+
+  yieldByStep, the least and the most one press gives, novice first. The records
+  hand over exactly one of their produce when the engine picks them, so the
+  whole of the ladder here is invented: a novice takes the one the game would
+  have given and every rank above takes more of it. Four hundred presses of the
+  harness walk both ends of every pair.
+*/
+const FISH_TUNING = {
+  cooldownMs: {
+    novice: 600000,
+    advanced: 1800000,
+    expert: 3600000,
+    master: 14400000
+  },
+  yieldByStep: [[1, 1], [1, 2], [1, 3], [2, 4]]
+};
+
+/** True when this base is one of the water records in the generated table
+ *  above. Never a bare lookup, for the reason own() in the progression block
+ *  was written: the descriptor names a record in the world, and '__proto__'
+ *  finds something on Object.prototype that a truth test cannot tell from a
+ *  salmon. */
+function isFish(baseDesc) {
+  return Object.prototype.hasOwnProperty.call(FISH_BY_BASE, baseDesc);
+}
+
+/*
   THE PLANTS THE PASS CANNOT SEE, WHICH IS WHY THIS MAP IS STILL HERE.
 
   The pass reads FLOR and TREE. Nirnroot is neither: it is ACTI 0xE1FB2, an
@@ -2764,6 +2939,19 @@ function plantAt(baseDesc) {
   // it has no branch, by the engine doing what it already does with a FLOR. It
   // is never answered here. See isStation above for what happened when it was.
   if (isStation(baseDesc)) return null;
+  /*
+    AND WATER PRODUCE IS THE FISHER'S, NOT THE GATHERER'S.
+
+    The fish pass leaves these fifteen out of the plant table now, so on a
+    rebuilt table this finds nothing. It is here for the table that is
+    installed today: every one of them was a plant row until 20 September, both
+    passes read the same FLOR records, and a server running a gamemode built
+    before the fish pass ran would otherwise hand a gatherer the salmon and
+    refuse the fisher. Refusing here rather than trusting the branch order is
+    the same arrangement harvest() makes with the crops, and for the same
+    reason: the order in onActivate is a thing somebody can change.
+  */
+  if (isFish(baseDesc)) return null;
   if (Object.prototype.hasOwnProperty.call(HARVESTS_BY_BASE, baseDesc)) {
     return HARVESTS_BY_BASE[baseDesc];
   }
@@ -3154,6 +3342,783 @@ function harvest(actorId, refrId, baseDesc) {
 }
 
 /**
+ * A press on water produce: a salmon in a river, a clam on a shore, a pearl
+ * oyster or an egg nest under one. The fisher's verb, and the fisher's rank
+ * decides which of them answer and how much comes away.
+ *
+ * Every one of these fifteen records was a row in the plant table until now, so
+ * a gatherer picked them and a fisher walked past them, which is the whole of
+ * the fisher's work handed to the wrong class. plantAt() refuses them now and
+ * this answers them instead. The two halves of that are deliberate and both are
+ * needed: the pass stops writing them into the plant table, and plantAt refuses
+ * one a second time in case a table built before this change is still installed
+ * on a server that has not been rebuilt.
+ *
+ * The shape is harvest()'s with mineOre()'s ladder. A rank the table asks for
+ * is refused by name rather than handed a smaller catch, the wait is the
+ * record's own off FISH_TUNING.cooldownMs rather than the ten minutes every
+ * plant gets, and the count is the pair for the fisher's rank. There is no
+ * second table of thresholds: the rank on the row is the whole gate.
+ */
+function fish(actorId, refrId, baseDesc) {
+  if (!isFish(baseDesc)) return null;
+  const caught = FISH_BY_BASE[baseDesc];
+
+  // The class first, and before the cooldown, the same ordering mineSalt,
+  // mineOre and harvest() settled on and for the same reason: somebody who is
+  // not a fisher is never going to work this water, and 'it is fished out'
+  // tells them the wrong thing about why nothing happened.
+  const refusal = classGate(actorId, 'fish');
+  if (refusal) return refusal;
+
+  /*
+    The record's rank. indexOf answers 0 for a novice record, so the eleven
+    salmon and clams skip this test without a branch saying so, which is what
+    keeps the first rung of this ladder worth standing on.
+
+    A RANK THIS FILE DOES NOT KNOW IS THE STRICTEST ONE, NOT THE LOOSEST, which
+    is the line that was missing here until 20 September. indexOf answers -1 for
+    any string that is not one of the four, and -1 is not greater than 0, so the
+    whole ladder test was skipped and the record was handed to anybody: measured
+    against the real fish() with one row in the table, setting the pearl oyster's
+    knob to 'Expert' with a capital E gave a novice fisher 'You take 1 Pearl out
+    of the Pearl Oyster.' with no refusal and nothing in the log. The rank
+    reaches this file out of FISH_RANK_BY_EDITOR_ID in tools\Build-HarvestTable.ps1,
+    which is typed by hand one record at a time, so a one character difference in
+    a knob is the failure to expect, and the built table is what arrives here.
+    The wait four lines below already treats an unknown rank as the strictest
+    thing it knows; the gate now does the same, so the two cannot disagree about
+    the same row. Build-HuntTable.ps1 fails its run outright on a rank that is
+    not one of the four and Build-HarvestTable.ps1 does the same as of the same
+    day, so this is the second lock on a door rather than the only one.
+
+    The sentence names the rank being enforced rather than the string on the row,
+    because 'This Pearl Oyster takes an Expert Fisher' off a row nobody can climb
+    to is a sentence that sends somebody to earn a rank that will not open it.
+  */
+  const step = rankStep(actorId, 'fisher');
+  const named = RANK_LADDER.indexOf(caught.rank);
+  const want = named < 0 ? RANK_LADDER.length - 1 : named;
+  if (want > 0 && step < want) {
+    return 'This ' + caught.from + ' takes ' + rankWord(RANK_LADDER[want]) +
+           ' Fisher. Fish what you can until you are one.';
+  }
+
+  // The wait is the record's own. A rank the table does not name falls back to
+  // the longest wait rather than the shortest, the same way the seams do, so a
+  // row that arrives carrying a rank nobody knows cannot be the cheapest tap in
+  // the game.
+  const span = Object.prototype.hasOwnProperty.call(FISH_TUNING.cooldownMs, caught.rank)
+    ? FISH_TUNING.cooldownMs[caught.rank] : FISH_TUNING.cooldownMs.master;
+  const wait = cooldownLeft(actorId, refrId, span);
+  if (wait > 0) {
+    return 'This water is fished out for now. ' + waitWord(wait) + ' to go.';
+  }
+
+  const pair = FISH_TUNING.yieldByStep[step] || FISH_TUNING.yieldByStep[0];
+  const got = randInt(pair[0], pair[1]);
+  // addItem answers false in one case only, which is idOf returning 0 because
+  // the plugin that owns the produce is not in the load order. The same
+  // sentence the seams say for the same fault, because sending somebody off to
+  // empty their pack over a broken build is the wrong answer twice.
+  if (!addItem(actorId, caught.produce, got)) {
+    return 'There is ' + caught.name + ' here and nothing in this load order to ' +
+           'put in your hands. Say so in the dev channel.';
+  }
+  stampCooldown(actorId, refrId);
+  const rank = creditWork(actorId, 'fish');
+  /*
+    One row in fifteen is called the same thing as what it gives: the butchered
+    horker on Solstheim, DLC2HorkerMeat01, is named 'Horker meat' in the records
+    and hands over Horker Meat. Naming both would say 'You take 1 Horker Meat
+    out of the Horker meat.', so when the two read the same the sentence names
+    the produce once and says where it came from instead.
+  */
+  const doubled = String(caught.from).toLowerCase() === String(caught.name).toLowerCase();
+  const where = doubled ? 'the water' : 'the ' + caught.from;
+  return 'You take ' + got + ' ' + caught.name + ' out of ' + where + '.' +
+         (rank ? ' ' + rank : '');
+}
+
+/*
+  EVERY ANIMAL BODY THIS SERVER ANSWERS FOR, AND IT IS GENERATED.
+
+  Everything between the declaration below and the line that closes the block is
+  written by tools\Build-HuntTable.ps1, out of the NPC_ records of the load order
+  and the death item levelled lists they point at. DO NOT HAND EDIT IT. The next
+  run of that script replaces every line between them and takes any correction
+  with it. Same arrangement as ORES_BY_BASE, HARVESTS_BY_BASE, FISH_BY_BASE and
+  CROPS_BY_BASE, for the same reason.
+
+  IT IS SEEDED WITH NINE ANIMALS AND THE SCRIPT FILLS IT, which is how
+  CROPS_BY_BASE started as well. The nine were read out of the five masters on
+  20 September with a walk of their NPC_, LVLI, MISC, INGR and ALCH records, not
+  off a wiki: EncWolf is 23abe:Skyrim.esm, its INAM points at DeathItemWolf,
+  3ad9e:Skyrim.esm, and the one thing in that list that is not a coin purse is
+  MISC 3ad74:Skyrim.esm, Wolf Pelt, priced at 10 gold. Every row below was read
+  the same way.
+
+  WHY THE SERVER HAS TO HAND THE PELT OVER ITSELF, CORRECTED 20 SEPTEMBER. This
+  block used to say the death item was not on the body at all, because the client
+  resolved it. That is not true of this fork and was read out of the source
+  rather than assumed this time: MpActor::Kill ends with AddDeathItem
+  (skymp5-server/cpp/server_guest_lib/MpActor.cpp:1348), AddDeathItem calls
+  EvaluateDeathItem, and EvaluateDeathItem follows TPLT through
+  espm::NPC_::UseTraits, runs LeveledListUtils::EvaluateListRecurse on the INAM
+  record and AddItem()s every result into the dead actor's OWN inventory. So
+  mp.get(refrId, 'inventory') on a fresh carcass does carry a Wolf Pelt, and the
+  server, not the client, put it there.
+
+  The table is still the only way a hunter ever sees it, and that is the real
+  reason it exists. NOBODY CAN OPEN A BODY. ProcessActivateNormal
+  (MpObjectReference.cpp:1419) has no NPC_ branch: a body is not pickable, not a
+  DOOR, not a CONT, not an ACTI and not a FURN, so a press falls through every
+  branch and no container is ever sent. The client blocks it as well, in
+  objectReferenceEx.ts, which calls blockActivation(true) for FormType.NPC, and
+  again in movementApply.ts for every actor it applies movement to. And the pile
+  does not survive: RespawnWithDelay (MpActor.cpp:1351) replaces the corpse's
+  inventory with the few SweetCantDrop entries and the base container before it
+  stands the animal back up. So the engine's roll is created and thrown away
+  without anybody being able to reach it, and the row below is what actually
+  reaches a hunter's pack.
+
+  THAT MEANS THE YIELD IS ROLLED TWICE AND ONE OF THE TWO IS UNREACHABLE. Worth
+  knowing before anybody opens bodies up: the day a press on a carcass sends a
+  container, this table starts paying out on top of the engine's own roll, and
+  the engine's roll includes the coin purse and treasure sublists this table
+  deliberately leaves out. Whoever does that has to take one of the two away,
+  and a line in #dev comes first.
+
+  A row says:
+
+    name   what the animal is called, so a refusal and a yield can both say it.
+    rank   the Hunter rank the body asks for, which in the built table is the
+           gold value of the best thing the body gives against RANK_BANDS at
+           the top of that script: up to 10 novice, up to 25 advanced, up to 75
+           expert, anything above that master. The seed uses the same bands and
+           the same reading, off the five masters, so the fox, the wolf, the
+           goat, the deer and the elk are on the first rung, which is five of
+           the nine, because a hunter who cannot work the animals standing
+           outside every town cannot climb.
+    yield  FOUR PAIRS, novice first, the least and the most of EACH thing in
+           gives that a hunter of that rank takes. A pair of zeroes is a rank
+           that may not work that body at all, which is how the table refuses
+           without a second set of thresholds standing beside it to disagree,
+           and is the same convention ORES_BY_BASE uses. rank above is what the
+           refusal says out loud and the pair is what decides it.
+    gives  what the death item list holds for certain, each with the item
+           record, its name, and the count the list carries. The seed follows
+           no sublist at all: DeathItemDeerNew points at LItemAntlersLarge50
+           and DeathItemGoat at BYOHLItemHornGoat50, and a list with a chance
+           of giving nothing in it is a chance and not a yield. The built table
+           follows a sublist only while that sublist's LVLD is zero, which is
+           the same rule read properly, and it is what keeps the coin purse
+           list every one of these bodies also carries out of the table.
+
+  NOTHING ABOVE MAY SPELL THE CLOSING MARKER OUT, for the reason written out at
+  length over the ore block near the top of this file.
+*/
+// ==== HUNTS_BY_BASE, generated ====
+var HUNTS_BY_BASE = {
+  "eb3:Skyrim.esm": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
+  "eb2:Skyrim.esm": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
+  "10fe05:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "10fc24:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "10f7fd:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "10f2a4:Skyrim.esm": { "name": "Pit Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "10f2a3:Skyrim.esm": { "name": "Ice Wolf", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
+  "10f2a2:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "10d29c:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "10bf90:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "109e41:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "109e40:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "109e3e:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "109e3d:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "109c1d:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "109c1c:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "109ab1:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "10982b:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "10982a:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "109827:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "109823:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "109487:Skyrim.esm": { "name": "Stray Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "10929f:Skyrim.esm": { "name": "Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
+  "104f46:Skyrim.esm": { "name": "White Stag", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "102d73:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "102d72:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "102d71:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "10195b:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "101581:Skyrim.esm": { "name": "Mammoth", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "3ad6c:Skyrim.esm", "name": "Mammoth Tusk", "count": 1 }, { "item": "669a4:Skyrim.esm", "name": "Mammoth Snout", "count": 1 }] },
+  "101580:Skyrim.esm": { "name": "Mammoth", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "3ad6c:Skyrim.esm", "name": "Mammoth Tusk", "count": 1 }, { "item": "669a4:Skyrim.esm", "name": "Mammoth Snout", "count": 1 }] },
+  "fe2d6:Skyrim.esm": { "name": "Sabre Cat", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6d:Skyrim.esm", "name": "Sabre Cat Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "fdc5a:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "fa6d9:Skyrim.esm": { "name": "Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
+  "f9060:Skyrim.esm": { "name": "Spectral Warhound", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad63:Skyrim.esm", "name": "Ectoplasm", "count": 1 }] },
+  "f608c:Skyrim.esm": { "name": "Wolf Spirit", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
+  "f6089:Skyrim.esm": { "name": "Vilkas's Wolf Spirit", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
+  "f6087:Skyrim.esm": { "name": "Farkas's Wolf Spirit", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
+  "f4c90:Skyrim.esm": { "name": "Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "f077a:Skyrim.esm": { "name": "Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "ef610:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "ef607:Skyrim.esm": { "name": "Horker", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad68:Skyrim.esm", "name": "Horker Tusk", "count": 1 }, { "item": "65c9b:Skyrim.esm", "name": "Horker Meat", "count": 1 }] },
+  "ec96a:Skyrim.esm": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
+  "ec968:Skyrim.esm": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
+  "ebc2e:Skyrim.esm": { "name": "Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "dd641:Skyrim.esm": { "name": "Mammoth", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "3ad6c:Skyrim.esm", "name": "Mammoth Tusk", "count": 1 }, { "item": "669a4:Skyrim.esm", "name": "Mammoth Snout", "count": 1 }] },
+  "d0702:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "b8f25:Skyrim.esm": { "name": "Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }, { "item": "d284d:Skyrim.esm", "name": "Deer Hide", "count": 1 }] },
+  "b8eca:Skyrim.esm": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
+  "b83c1:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "b11a7:Skyrim.esm": { "name": "Pumpkin", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "d4b35:Skyrim.esm", "name": "Fox Pelt", "count": 1 }] },
+  "b076a:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "a91a0:Skyrim.esm": { "name": "Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
+  "999a5:Skyrim.esm": { "name": "Giant Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
+  "9931a:Skyrim.esm": { "name": "Alpha Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "68d72:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "68d71:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "68d6e:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "68d6d:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "68d6b:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "68d5b:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "68d07:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "68d04:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "68d03:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "68d02:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "68cfa:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "90ce2:Skyrim.esm": { "name": "White Stag", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "8553b:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "829b6:Skyrim.esm": { "name": "Snow Fox", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "d4be7:Skyrim.esm", "name": "Snow Fox Pelt", "count": 1 }] },
+  "829b3:Skyrim.esm": { "name": "Fox", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "d4b35:Skyrim.esm", "name": "Fox Pelt", "count": 1 }] },
+  "6dc9d:Skyrim.esm": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
+  "6af65:Skyrim.esm": { "name": "Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "6af5a:Skyrim.esm": { "name": "Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "6681e:Skyrim.esm": { "name": "Cow", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8f:Skyrim.esm", "name": "Cow Hide", "count": 1 }, { "item": "65c99:Skyrim.esm", "name": "Raw Beef", "count": 1 }] },
+  "5d007:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "5d006:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "5d005:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "5cfd4:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "5487e:Skyrim.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "39662:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "21875:Skyrim.esm": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 2 }] },
+  "e7eb2:Skyrim.esm": { "name": "Guardian Troll Spirit", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "e7eaf:Skyrim.esm": { "name": "Mammoth Guardian Spirit", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "3ad6c:Skyrim.esm", "name": "Mammoth Tusk", "count": 1 }, { "item": "669a4:Skyrim.esm", "name": "Mammoth Snout", "count": 1 }] },
+  "e7ead:Skyrim.esm": { "name": "Sabre Cat Guardian Spirit", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad6e:Skyrim.esm", "name": "Sabre Cat Snow Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "e7ea9:Skyrim.esm": { "name": "Ursine Guardian", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad54:Skyrim.esm", "name": "Snow Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "e662e:Skyrim.esm": { "name": "Skeever Guardian Spirit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "e662d:Skyrim.esm": { "name": "Wolf Guardian Spirit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "e4011:Skyrim.esm": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
+  "e4010:Skyrim.esm": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
+  "e1672:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "e160d:Skyrim.esm": { "name": "Pit Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "ddcd0:Skyrim.esm": { "name": "Pit Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "dc5a3:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "db2ab:Skyrim.esm": { "name": "Elk", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "d9806:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "d95e9:Skyrim.esm": { "name": "Meeko", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "d249a:Skyrim.esm": { "name": "Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "d2070:Skyrim.esm": { "name": "Elk", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "d206f:Skyrim.esm": { "name": "Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }, { "item": "d284d:Skyrim.esm", "name": "Deer Hide", "count": 1 }] },
+  "d206e:Skyrim.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "d1684:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "d08c0:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "d0872:Skyrim.esm": { "name": "Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "cf89d:Skyrim.esm": { "name": "Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }, { "item": "d284d:Skyrim.esm", "name": "Deer Hide", "count": 1 }] },
+  "cf79e:Skyrim.esm": { "name": "Pack Member", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "ce60c:Skyrim.esm": { "name": "Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "c96c4:Skyrim.esm": { "name": "Snow Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad54:Skyrim.esm", "name": "Snow Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "c96c3:Skyrim.esm": { "name": "Cave Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad53:Skyrim.esm", "name": "Cave Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "c96c2:Skyrim.esm": { "name": "Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "c96c1:Skyrim.esm": { "name": "Ice Wolf", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
+  "c96c0:Skyrim.esm": { "name": "Snowy Sabre Cat", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad6e:Skyrim.esm", "name": "Sabre Cat Snow Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "c96bf:Skyrim.esm": { "name": "Sabre Cat", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6d:Skyrim.esm", "name": "Sabre Cat Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "c96be:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "c39f1:Skyrim.esm": { "name": "Cow", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8f:Skyrim.esm", "name": "Cow Hide", "count": 1 }, { "item": "65c99:Skyrim.esm", "name": "Raw Beef", "count": 1 }] },
+  "c214e:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "c026a:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "a19ff:Skyrim.esm": { "name": "Lis", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "a19fe:Skyrim.esm": { "name": "Lis", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "8327d:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "97e1e:Skyrim.esm": { "name": "Frost", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "8cacc:Skyrim.esm": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
+  "8b5d1:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "8540e:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "85409:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "84785:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "7932f:Skyrim.esm": { "name": "Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "753ce:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "72a08:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "654e5:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "471fc:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "b9e1d:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "b70f7:Skyrim.esm": { "name": "Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "b6234:Skyrim.esm": { "name": "Mammoth", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "3ad6c:Skyrim.esm", "name": "Mammoth Tusk", "count": 1 }, { "item": "669a4:Skyrim.esm", "name": "Mammoth Snout", "count": 1 }] },
+  "b5559:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "afba2:Skyrim.esm": { "name": "Udefrykte", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "abee0:Skyrim.esm": { "name": "Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }, { "item": "d284d:Skyrim.esm", "name": "Deer Hide", "count": 1 }] },
+  "abedf:Skyrim.esm": { "name": "Elk", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "a5600:Skyrim.esm": { "name": "Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "9da4b:Skyrim.esm": { "name": "Cow", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8f:Skyrim.esm", "name": "Cow Hide", "count": 1 }, { "item": "65c99:Skyrim.esm", "name": "Raw Beef", "count": 1 }] },
+  "9d74e:Skyrim.esm": { "name": "Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "9ce28:Skyrim.esm": { "name": "Flaming Thrall", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "9ccd7:Skyrim.esm": { "name": "Shadowmere", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "9a7aa:Skyrim.esm": { "name": "Vigilance", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "8e4fc:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "8c40c:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "8c40b:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "8c40a:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "8c409:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "490f2:Skyrim.esm": { "name": "Venomfang Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "48d67:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "48d64:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "23ef1:Skyrim.esm": { "name": "Tiber", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "23eed:Skyrim.esm": { "name": "Ysgramor", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "877eb:Skyrim.esm": { "name": "Fire Storm", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "79bfd:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "59397:Skyrim.esm": { "name": "Sabre Cat", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6d:Skyrim.esm", "name": "Sabre Cat Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "58303:Skyrim.esm": { "name": "Kodlak's Wolf Spirit", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
+  "58272:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "7398a:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "73989:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "640bb:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "640ba:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "640b9:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "5f865:Skyrim.esm": { "name": "Karinda", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "54ae3:Skyrim.esm": { "name": "Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "481a0:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "4b473:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "424fb:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "424f6:Skyrim.esm": { "name": "Giant Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
+  "424f5:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "42478:Skyrim.esm": { "name": "Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "422b7:Skyrim.esm": { "name": "Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "422b5:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "422b4:Skyrim.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "422b3:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "422b2:Skyrim.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "422b1:Skyrim.esm": { "name": "Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "422af:Skyrim.esm": { "name": "Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "42265:Skyrim.esm": { "name": "Cave Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "42264:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "421ff:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "4203f:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "41fb5:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "41fb4:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "2a1dc:Skyrim.esm": { "name": "Giant Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
+  "22837:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "4359c:Skyrim.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "3d278:Skyrim.esm": { "name": "Sabre Cat", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6d:Skyrim.esm", "name": "Sabre Cat Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "3a1e0:Skyrim.esm": { "name": "Wounded Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
+  "2f442:Skyrim.esm": { "name": "Torom", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "2ebe2:Skyrim.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "1fa28:Skyrim.esm": { "name": "Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "1e62a:Skyrim.esm": { "name": "Stump", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "1cb2c:Skyrim.esm": { "name": "Gleda the Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "25d3b:Skyrim.esm": { "name": "Wolf", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
+  "23abf:Skyrim.esm": { "name": "Ice Wolf", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
+  "23abe:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "23abb:Skyrim.esm": { "name": "Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "23aba:Skyrim.esm": { "name": "Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "23ab8:Skyrim.esm": { "name": "Slaughterfish", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad70:Skyrim.esm", "name": "Slaughterfish Scales", "count": 1 }, { "item": "8ae:Gourmet.esp", "name": "Slaughterfish Meat", "count": 1 }] },
+  "23ab7:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "23ab6:Skyrim.esm": { "name": "Snowy Sabre Cat", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad6e:Skyrim.esm", "name": "Sabre Cat Snow Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "23ab5:Skyrim.esm": { "name": "Sabre Cat", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6d:Skyrim.esm", "name": "Sabre Cat Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "23ab4:Skyrim.esm": { "name": "Mammoth", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "3ad6c:Skyrim.esm", "name": "Mammoth Tusk", "count": 1 }, { "item": "669a4:Skyrim.esm", "name": "Mammoth Snout", "count": 1 }] },
+  "23ab2:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "23ab1:Skyrim.esm": { "name": "Horker", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad68:Skyrim.esm", "name": "Horker Tusk", "count": 1 }, { "item": "65c9b:Skyrim.esm", "name": "Horker Meat", "count": 1 }] },
+  "23aad:Skyrim.esm": { "name": "Giant Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
+  "23aac:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "23aab:Skyrim.esm": { "name": "Giant Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
+  "23aaa:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "23a92:Skyrim.esm": { "name": "Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "23a91:Skyrim.esm": { "name": "Elk", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "23a90:Skyrim.esm": { "name": "Cow", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8f:Skyrim.esm", "name": "Cow Hide", "count": 1 }, { "item": "65c99:Skyrim.esm", "name": "Raw Beef", "count": 1 }] },
+  "23a8f:Skyrim.esm": { "name": "Chaurus Reaper", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "23a8c:Skyrim.esm": { "name": "Snow Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad54:Skyrim.esm", "name": "Snow Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "23a8b:Skyrim.esm": { "name": "Cave Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad53:Skyrim.esm", "name": "Cave Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "23a8a:Skyrim.esm": { "name": "Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "1e7c6:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "1e7ba:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "1e7b9:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "1e7b1:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "1e7a4:Skyrim.esm": { "name": "Cave Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "1e7a1:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "1e7a0:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "3025:Update.esm": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
+  "804:Update.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "138b8:Dawnguard.esm": { "name": "Giant Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
+  "113c1:Dawnguard.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "cef3:Dawnguard.esm": { "name": "Husky", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "2b58:Dawnguard.esm": { "name": "Chaurusflyer", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "29a5:Dawnguard.esm": { "name": "Chaurusflyer", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "29a4:Dawnguard.esm": { "name": "Chaurusflyer", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "29a3:Dawnguard.esm": { "name": "Chaurusflyer", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "29a1:Dawnguard.esm": { "name": "Chaurus Hunter Fledgling", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "1aa76:Dawnguard.esm": { "name": "Sceolang", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "1aa74:Dawnguard.esm": { "name": "Bran", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "1a5c6:Dawnguard.esm": { "name": "Wounded Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
+  "19820:Dawnguard.esm": { "name": "Snow Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "1981e:Dawnguard.esm": { "name": "Armored Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "18b34:Dawnguard.esm": { "name": "Husky", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "18b30:Dawnguard.esm": { "name": "Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "163ce:Dawnguard.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "1511d:Dawnguard.esm": { "name": "Frozen Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "1511c:Dawnguard.esm": { "name": "Frozen Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "1511b:Dawnguard.esm": { "name": "Frozen Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "15119:Dawnguard.esm": { "name": "Frozen Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "15118:Dawnguard.esm": { "name": "Frozen Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "15117:Dawnguard.esm": { "name": "Frozen Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "11ba9:Dawnguard.esm": { "name": "Armored Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "117f1:Dawnguard.esm": { "name": "Snow Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "1133a:Dawnguard.esm": { "name": "Vale Sabre Cat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1199a:Dawnguard.esm", "name": "Vale Sabre Cat Hide", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "1063c:Dawnguard.esm": { "name": "Vale Sabre Cat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1199a:Dawnguard.esm", "name": "Vale Sabre Cat Hide", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "f9a9:Dawnguard.esm": { "name": "Cow", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8f:Skyrim.esm", "name": "Cow Hide", "count": 1 }, { "item": "65c99:Skyrim.esm", "name": "Raw Beef", "count": 1 }] },
+  "f798:Dawnguard.esm": { "name": "Vale Sabre Cat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1199a:Dawnguard.esm", "name": "Vale Sabre Cat Hide", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "f797:Dawnguard.esm": { "name": "Vale Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "11999:Dawnguard.esm", "name": "Vale Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "d0bc:Dawnguard.esm": { "name": "Snow Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "d0b9:Dawnguard.esm": { "name": "Armored Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "d0b8:Dawnguard.esm": { "name": "Armored Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "c21d:Dawnguard.esm": { "name": "Chaurus Hunter", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "bdd0:Dawnguard.esm": { "name": "Arvak", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "bdcf:Dawnguard.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "9d39:Dawnguard.esm": { "name": "Chaurus Hunter", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "966d:Dawnguard.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "8a6c:Dawnguard.esm": { "name": "Pack Member", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
+  "8440:Dawnguard.esm": { "name": "Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "843f:Dawnguard.esm": { "name": "Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "6d12:Dawnguard.esm": { "name": "Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "6d06:Dawnguard.esm": { "name": "Frozen Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "5204:Dawnguard.esm": { "name": "Chaurus Hunter", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "3c67:Dawnguard.esm": { "name": "Vale Sabre Cat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1199a:Dawnguard.esm", "name": "Vale Sabre Cat Hide", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "2c02:Dawnguard.esm": { "name": "Vale Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "11999:Dawnguard.esm", "name": "Vale Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "c3a:HearthFires.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "8e9:HearthFires.esm": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
+  "8e6:HearthFires.esm": { "name": "Slaughterfish", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad70:Skyrim.esm", "name": "Slaughterfish Scales", "count": 1 }, { "item": "8ae:Gourmet.esp", "name": "Slaughterfish Meat", "count": 1 }] },
+  "10fbe:HearthFires.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "10fbb:HearthFires.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "f9a8:HearthFires.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "1381b:HearthFires.esm": { "name": "Vix", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "d4be7:Skyrim.esm", "name": "Snow Fox Pelt", "count": 1 }] },
+  "1381a:HearthFires.esm": { "name": "Kit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "d4b35:Skyrim.esm", "name": "Fox Pelt", "count": 1 }] },
+  "13819:HearthFires.esm": { "name": "Biter", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "13818:HearthFires.esm": { "name": "Pincer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
+  "13817:HearthFires.esm": { "name": "Cotton", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
+  "10a47:HearthFires.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "3a9c4:Dragonborn.esm": { "name": "Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "3a9c3:Dragonborn.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "3a9c2:Dragonborn.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "30f26:Dragonborn.esm": { "name": "Ash Hopper", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1cd71:Dragonborn.esm", "name": "Ash Hopper Jelly", "count": 1 }, { "item": "2b04e:Dragonborn.esm", "name": "Chitin Plate", "count": 1 }, { "item": "3bd15:Dragonborn.esm", "name": "Ash Hopper Meat", "count": 1 }, { "item": "3d125:Dragonborn.esm", "name": "Ash Hopper Leg", "count": 1 }] },
+  "28e89:Dragonborn.esm": { "name": "Ash Hopper", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1cd71:Dragonborn.esm", "name": "Ash Hopper Jelly", "count": 1 }, { "item": "2b04e:Dragonborn.esm", "name": "Chitin Plate", "count": 1 }, { "item": "3bd15:Dragonborn.esm", "name": "Ash Hopper Meat", "count": 1 }, { "item": "3d125:Dragonborn.esm", "name": "Ash Hopper Leg", "count": 1 }] },
+  "2857f:Dragonborn.esm": { "name": "Netch Calf", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1cd72:Dragonborn.esm", "name": "Netch Jelly", "count": 1 }] },
+  "2857e:Dragonborn.esm": { "name": "Bull Netch", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1cd72:Dragonborn.esm", "name": "Netch Jelly", "count": 1 }, { "item": "1cd7c:Dragonborn.esm", "name": "Netch Leather", "count": 1 }] },
+  "26196:Dragonborn.esm": { "name": "Lord Tusk", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad68:Skyrim.esm", "name": "Horker Tusk", "count": 1 }, { "item": "65c9b:Skyrim.esm", "name": "Horker Meat", "count": 1 }] },
+  "25ae4:Dragonborn.esm": { "name": "Solstheim Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
+  "2173b:Dragonborn.esm": { "name": "Netch", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "3ad6c:Skyrim.esm", "name": "Mammoth Tusk", "count": 1 }, { "item": "669a4:Skyrim.esm", "name": "Mammoth Snout", "count": 1 }] },
+  "1dfa1:Dragonborn.esm": { "name": "Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "1d77a:Dragonborn.esm": { "name": "Old Salty", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 2 }] },
+  "1b657:Dragonborn.esm": { "name": "Ash Hopper", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1cd71:Dragonborn.esm", "name": "Ash Hopper Jelly", "count": 1 }, { "item": "2b04e:Dragonborn.esm", "name": "Chitin Plate", "count": 1 }, { "item": "3bd15:Dragonborn.esm", "name": "Ash Hopper Meat", "count": 1 }, { "item": "3d125:Dragonborn.esm", "name": "Ash Hopper Leg", "count": 1 }] },
+  "1b649:Dragonborn.esm": { "name": "Betty Netch", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1cd72:Dragonborn.esm", "name": "Netch Jelly", "count": 1 }, { "item": "1cd7c:Dragonborn.esm", "name": "Netch Leather", "count": 1 }] },
+  "1b63e:Dragonborn.esm": { "name": "Horker Youngling", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad68:Skyrim.esm", "name": "Horker Tusk", "count": 1 }, { "item": "65c9b:Skyrim.esm", "name": "Horker Meat", "count": 1 }] },
+  "19ad0:Dragonborn.esm": { "name": "Ash Hopper", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1cd71:Dragonborn.esm", "name": "Ash Hopper Jelly", "count": 1 }, { "item": "2b04e:Dragonborn.esm", "name": "Chitin Plate", "count": 1 }, { "item": "3bd15:Dragonborn.esm", "name": "Ash Hopper Meat", "count": 1 }, { "item": "3d125:Dragonborn.esm", "name": "Ash Hopper Leg", "count": 1 }] },
+  "1926c:Dragonborn.esm": { "name": "Albino Spider", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "17719:Dragonborn.esm", "name": "Albino Spider Pod", "count": 1 }, { "item": "1771f:Dragonborn.esm", "name": "Damaged Albino Spider Pod", "count": 1 }] },
+  "c0bf:JKs Skyrim.esp": { "name": "Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "d1211:JKs Skyrim.esp": { "name": "Aska", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "d6319:JKs Skyrim.esp": { "name": "Sigyn", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "d631a:JKs Skyrim.esp": { "name": "Loki", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "291791:WindhelmSSE.esp": { "name": "Karhu", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "2ba5f2:WindhelmSSE.esp", "name": "Pelt of Karhu", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 2 }, { "item": "af5fd:Skyrim.esm", "name": "Skull", "count": 1 }] },
+  "48459:WindhelmSSE.esp": { "name": "Sulvar's Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "200a46:WindhelmSSE.esp": { "name": "Hugo", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "3ee9b8:Riften Expansion.esp": { "name": "Bear Avatar", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "1b829f:Odin - Skyrim Magic Overhaul.esp": { "name": "Buried Storage", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
+  "1a5ad2:Odin - Skyrim Magic Overhaul.esp": { "name": "Familiar", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "4c36de:aaaGraniteHill.esp": { "name": "Hund", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "e0c0:aaaGraniteHill.esp": { "name": "Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
+  "1db39:SkyrimSewers.esp": { "name": "Cave Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "1ebcf:SkyrimSewers.esp": { "name": "Aldhissla", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "25af1:SkyrimSewers.esp": { "name": "Stray Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "1000:Solitude Arena.esp": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "5a8b:Solitude Arena.esp": { "name": "Big Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "5a8f:Solitude Arena.esp": { "name": "The Enchanted Woman", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "c12a:Solitude Arena.esp": { "name": "Animal Gladiator", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "c12b:Solitude Arena.esp": { "name": "Animal Gladiator", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "c12c:Solitude Arena.esp": { "name": "Animal Gladiator", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6d:Skyrim.esm", "name": "Sabre Cat Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "9d8c1:CFTO.esp": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "9d8c2:CFTO.esp": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "b6e5f:CFTO.esp": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "b6e60:CFTO.esp": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "b6e61:CFTO.esp": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "b6e62:CFTO.esp": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "ea864:ZIA_Complete Pack.esp": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
+  "ea865:ZIA_Complete Pack.esp": { "name": "Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
+  "ea866:ZIA_Complete Pack.esp": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
+  "ea867:ZIA_Complete Pack.esp": { "name": "Cow", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8f:Skyrim.esm", "name": "Cow Hide", "count": 1 }, { "item": "65c99:Skyrim.esm", "name": "Raw Beef", "count": 1 }] },
+  "ea868:ZIA_Complete Pack.esp": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "ea869:ZIA_Complete Pack.esp": { "name": "Fox", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "d4b35:Skyrim.esm", "name": "Fox Pelt", "count": 1 }] },
+  "ea86a:ZIA_Complete Pack.esp": { "name": "Snow Fox", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "d4be7:Skyrim.esm", "name": "Snow Fox Pelt", "count": 1 }] },
+  "ea86b:ZIA_Complete Pack.esp": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "ea86c:ZIA_Complete Pack.esp": { "name": "Ice Wolf", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
+  "ea86d:ZIA_Complete Pack.esp": { "name": "Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "ea86e:ZIA_Complete Pack.esp": { "name": "Cave Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad53:Skyrim.esm", "name": "Cave Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "ea86f:ZIA_Complete Pack.esp": { "name": "Snow Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad54:Skyrim.esm", "name": "Snow Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "ea870:ZIA_Complete Pack.esp": { "name": "Sabre Cat", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6d:Skyrim.esm", "name": "Sabre Cat Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "ea871:ZIA_Complete Pack.esp": { "name": "Snowy Sabre Cat", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad6e:Skyrim.esm", "name": "Sabre Cat Snow Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
+  "ea872:ZIA_Complete Pack.esp": { "name": "Deer", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad90:Skyrim.esm", "name": "Deer Hide", "count": 1 }, { "item": "669a2:Skyrim.esm", "name": "Venison", "count": 1 }] },
+  "ea874:ZIA_Complete Pack.esp": { "name": "Horker", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad68:Skyrim.esm", "name": "Horker Tusk", "count": 1 }, { "item": "65c9b:Skyrim.esm", "name": "Horker Meat", "count": 1 }] },
+  "ea875:ZIA_Complete Pack.esp": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
+  "ea877:ZIA_Complete Pack.esp": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 2 }] },
+  "ea878:ZIA_Complete Pack.esp": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
+  "ea87a:ZIA_Complete Pack.esp": { "name": "Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "ea87b:ZIA_Complete Pack.esp": { "name": "Chaurus Reaper", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "ea87c:ZIA_Complete Pack.esp": { "name": "Chaurus Hunter Fledgling", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "ea87d:ZIA_Complete Pack.esp": { "name": "Chaurus Hunter", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
+  "ea87e:ZIA_Complete Pack.esp": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "ea880:ZIA_Complete Pack.esp": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
+  "ea887:ZIA_Complete Pack.esp": { "name": "Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "ea888:ZIA_Complete Pack.esp": { "name": "Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
+  "169210:ZIA_Complete Pack.esp": { "name": "Giant Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 2 }] },
+  "e0622:ZIA_Complete Pack.esp": { "name": "Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
+  "19f7:OarsRest.esp": { "name": "Barnaby", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "4d081:OarsRest.esp": { "name": "Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
+  "4d083:OarsRest.esp": { "name": "Constipated Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
+  "60ec2:Immersive Patrols II.esp": { "name": "Dawnguard Husky", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
+  "375af:ElysiumEstateSSE.esp": { "name": "Chloe", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+  "863:YokuWeapons.esp": { "name": "Jar Bomb", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
+  "d64:FishingInSkyrim.esp": { "name": "FishingNetSlaughterfish", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad70:Skyrim.esm", "name": "Slaughterfish Scales", "count": 1 }, { "item": "8ae:Gourmet.esp", "name": "Slaughterfish Meat", "count": 1 }] }
+};
+
+// ==== end HUNTS_BY_BASE ====
+
+/*
+  HOW LONG A BODY LIES THERE AND HOW LONG IT IS DONE FOR. THE RULEBOOK SETS
+  NEITHER, AND THE FIRST OF THE TWO IS THE ENGINE'S NUMBER UNTIL THIS FILE SETS
+  IT.
+
+  THE PREMISE THIS BLOCK USED TO REST ON WAS FALSE, MEASURED IN THE FORK ON
+  20 SEPTEMBER. It said a body never comes back, lies there until the cell resets
+  and so a four hour wait per hunter per reference meant 'once'. Every dead actor
+  on this server stands back up: DeathEvent::OnFireSuccess
+  (skymp5-server/cpp/server_guest_lib/gamemode_events/DeathEvent.cpp:66) calls
+  MpActor::RespawnWithDelay for every death of every actor, RespawnWithDelay
+  (MpActor.cpp:1351) sets a timer of GetRespawnTime(), GetRespawnTime is
+  ChangeForm().spawnDelay, and spawnDelay is declared `float spawnDelay = 25.0f`
+  at MpChangeForms.h:109. Nothing in this file used to set it, so the number in
+  force was twenty five seconds and two things followed from it that nobody had
+  written down:
+
+    - The same wolf at the same reference could be killed again every twenty
+      five seconds, and the four hour wait keyed on actorId + ':' + refrId
+      refused the second body and every body after it for four hours. A hunter
+      working a patrol route was told 'There is nothing more to take off this
+      Wolf. 4 hours to go.' standing over an animal that had been alive ten
+      seconds earlier.
+    - Twenty five seconds was also the whole window in which the verb answered
+      at all, because loot() reads isDead and a respawned animal is not dead.
+      Walk over half a minute after the kill and the press did nothing, said
+      nothing and looked exactly like a server that had never heard of hunting.
+
+  SO THE BODY IS GIVEN A LENGTH AND THE WAIT IS GIVEN A LADDER, and both numbers
+  are invented, both are first numbers for the dev server, and both are here.
+
+  bodySeconds, how long a carcass lies there before the animal stands back up.
+  Five minutes. It is written onto the dying actor in mp.onDeath, which runs
+  before the engine starts the respawn timer (GameModeEvent::Fire runs every
+  listener first and only then calls OnFireSuccess), so the number this file sets
+  is the one that death uses. Five minutes is long enough to finish the fight,
+  sheathe and walk back to what fell in it, and short enough that the woods are
+  not a field of carcasses for an hour. It is set on animals in the hunt table
+  and on nothing else, so bandits, guards and dragons keep the engine's twenty
+  five seconds and no other part of the server changes pace.
+
+  cooldownMs, how long that hunter is done with that reference, by the rank the
+  body asks for. A body refills now, which is the thing that was wrong before, so
+  the wait is the pace of a source that refills and belongs on the same ladder
+  the seams and the rivers already use: ten minutes, half an hour, an hour, four
+  hours. Four hours stays at the top where it was, on the bodies worth the most,
+  and the commonest animals in Skyrim, the fox and the wolf and the goat and the
+  deer and the elk, come back on the ten minutes a picked plant gets rather than
+  locking a hunter out of the road they walk. A rank this file does not know
+  falls back to the four hours rather than the ten minutes, for the reason the
+  rivers do: a row carrying a rank nobody knows must not be the cheapest tap in
+  the game.
+
+  Kept in memory, in the same lastUse map the seams, the plants and the rivers
+  use, so a server restart or a hot reload of this file clears it. That is worth
+  knowing before the numbers are argued about: a four hour wait a restart wipes
+  is not four hours. bodySeconds is not kept there. It is written into the
+  actor's change form by the engine, so it outlives a reload and is re-set on
+  every death anyway.
+*/
+const HUNT_TUNING = {
+  bodySeconds: 300,
+  cooldownMs: {
+    novice: 600000,
+    advanced: 1800000,
+    expert: 3600000,
+    master: 14400000
+  }
+};
+
+/** True when this base is one of the animals in the generated table above.
+ *  Never a bare lookup, for the reason own() in the progression block was
+ *  written: '__proto__' finds something on Object.prototype that a truth test
+ *  cannot tell from a wolf. */
+function isCarcass(baseDesc) {
+  return Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, baseDesc);
+}
+
+/** '1 Wolf Pelt', '1 Venison and 1 Deer Hide', '1 Venison, 1 Deer Hide and 1
+ *  Large Antlers'. Written here rather than reached for because a carcass is
+ *  the only thing in this file that hands over more than one kind of thing at
+ *  once, and 'You take 1 Venison, 1 Deer Hide, off the Deer.' is not a
+ *  sentence. */
+function saidInOrder(parts) {
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  return parts.slice(0, parts.length - 1).join(', ') + ' and ' + parts[parts.length - 1];
+}
+
+/**
+ * A press on an animal body: the hunter's verb, and the hunter's rank decides
+ * which bodies answer and how much comes off them.
+ *
+ * WHAT THE SERVER CAN TELL ABOUT A BODY, read out of the fork on 20 September
+ * rather than assumed, because this is the question that held the hunter up for
+ * days:
+ *
+ *   mp.get(refrId, 'type') is the string 'MpActor' for anything that is an
+ *   actor and 'MpObjectReference' for a chest, a door, a plant or an ore vein.
+ *   TypeBinding.cpp does GetFormAt<MpObjectReference> and asks AsActor(). That
+ *   is how a body is told from a chest, and it is the only way to.
+ *
+ *   mp.get(refrId, 'isDead') is true for a corpse. IsDeadBinding.cpp does
+ *   GetFormAt<MpActor>, which THROWS for anything that is not an actor, so the
+ *   type has to be read first and every read has to be wrapped.
+ *
+ *   ProcessActivateNormal in the fork does nothing at all for an NPC_ base: it
+ *   is not pickable, not a DOOR, not a CONT, not an ACTI and not a FURN, so it
+ *   falls through every branch. Nothing of the engine's is being taken away
+ *   here.
+ *
+ *   isDead is true for a while and then it is not. Every dead actor is stood
+ *   back up: DeathEvent::OnFireSuccess calls MpActor::RespawnWithDelay for every
+ *   death and the delay is the actor's own spawnDelay, twenty five seconds
+ *   unless something sets it. mp.onDeath sets it to HUNT_TUNING.bodySeconds for
+ *   the animals in the table, so the window this function answers in is five
+ *   minutes on an animal and the engine's twenty five seconds on everything
+ *   else. Press an animal after that and it is alive again, the isDead test
+ *   below falls through, and the press is the client's business: pressing a live
+ *   animal is riding it, talking to it or nothing at all, which is why that is
+ *   silence rather than a refusal.
+ *
+ * THE ORDER OF THE CHECKS, AND THE ONE THAT IS NOT WHERE IT LOOKS LIKE IT
+ * BELONGS. Type, then dead, then the table, then the class, then the rank, then
+ * the wait. The class gate sits BELOW the table lookup, which is the opposite
+ * of where a gate usually goes and is the same order mineOre and harvest()
+ * already use. It matters here more than it does there. This function is
+ * reached by a press on anything no other branch claimed, which is every dead
+ * bandit, every dead guard, every dead draugr and every dead dragon in the
+ * game, and none of those is in the table. A gate above the table would answer
+ * all of them with 'Only a hunter can take anything off a carcass' and, because
+ * onActivate returns false for anything this file answers, would block whatever
+ * the client does with a body for everybody who is not a hunter. Below the
+ * table, a body this server does not know about is not this server's business
+ * and falls through untouched, which is what the fifth bullet of the task that
+ * asked for this says it must do.
+ */
+function loot(actorId, refrId, baseDesc) {
+  // Every read wrapped, and the type first. A throw here is a reference the
+  // world does not have any more, or one this binding cannot answer for, and
+  // the answer to both is the same: this is not ours, leave it alone. Never
+  // refuse on a read that failed and never pay out on one.
+  let type = '';
+  try {
+    type = mp.get(refrId, 'type');
+  } catch (e) {
+    return null;
+  }
+  if (type !== 'MpActor') return null;
+
+  let dead = false;
+  try {
+    dead = mp.get(refrId, 'isDead');
+  } catch (e) {
+    return null;
+  }
+  // A living animal is not a carcass. Pressing one is talking to it, riding it
+  // or nothing at all, and all three of those are somebody else's to answer.
+  if (!dead) return null;
+
+  if (!isCarcass(baseDesc)) return null;
+  const body = HUNTS_BY_BASE[baseDesc];
+
+  const refusal = classGate(actorId, 'loot');
+  if (refusal) return refusal;
+
+  /*
+    The rank, refused by name. The pair of zeroes is what decides it, not a
+    comparison against the rank on the row: the table carries one pair per rank
+    and a pair of zeroes IS 'this rank may not work this body', which is the
+    convention ORES_BY_BASE already uses and means there is no second set of
+    thresholds standing beside the table to disagree with it. The rank on the
+    row is what the sentence says out loud.
+  */
+  const step = rankStep(actorId, 'hunter');
+  const pair = (body.yield && body.yield[step]) || [0, 0];
+  if (pair[0] <= 0 && pair[1] <= 0) {
+    return 'This ' + body.name + ' takes ' + rankWord(body.rank) +
+           ' Hunter. Work the bodies you can until you are one.';
+  }
+
+  // The wait is the body's own, by the rank it asks for, because a body does
+  // grow back: the animal at this reference stands up again after the seconds
+  // HUNT_TUNING.bodySeconds writes onto it at death. A rank the table does not
+  // name falls back to the longest wait rather than the shortest, the same way
+  // the rivers and the seams do. The case for every one of the numbers is
+  // written over HUNT_TUNING.
+  const span = Object.prototype.hasOwnProperty.call(HUNT_TUNING.cooldownMs, body.rank)
+    ? HUNT_TUNING.cooldownMs[body.rank] : HUNT_TUNING.cooldownMs.master;
+  const wait = cooldownLeft(actorId, refrId, span);
+  if (wait > 0) {
+    return 'There is nothing more to take off this ' + body.name + '. ' +
+           waitWord(wait) + ' to go.';
+  }
+
+  // The pair is how many of EACH thing the body gives, rolled once for each,
+  // so a deer hands over its meat and its hide in the same press and a master
+  // takes more of both than a novice does.
+  const took = [];
+  const gives = body.gives || [];
+  let unloadable = false;
+  for (let i = 0; i < gives.length; i++) {
+    const g = gives[i];
+    const n = randInt(pair[0], pair[1]);
+    if (n <= 0) continue;
+    // addItem answers false in one case only, which is idOf returning 0 because
+    // the plugin that owns that item is not in the load order. The rest of the
+    // body still comes off; what could not be given is said at the end.
+    if (!addItem(actorId, g.item, n)) { unloadable = true; continue; }
+    took.push(n + ' ' + g.name);
+  }
+
+  if (took.length === 0) {
+    if (unloadable) {
+      return 'This ' + body.name + ' should give something and there is nothing in ' +
+             'this load order to put in your hands. Say so in the dev channel.';
+    }
+    // A row whose gives list is empty. The pass leaves a body out of the table
+    // altogether when its death item holds nothing certain, so this is a row
+    // that arrived built wrong rather than a body that has nothing on it. It is
+    // not a refusal and it is not the person's fault: say so and start no wait.
+    return 'There is nothing on this ' + body.name + ' you know how to take yet.';
+  }
+
+  stampCooldown(actorId, refrId);
+  const rank = creditWork(actorId, 'loot');
+  const short = unloadable
+    ? ' The rest of it is not in this load order. Say so in the dev channel.' : '';
+  return 'You take ' + saidInOrder(took) + ' off the ' + body.name + '.' + short +
+         (rank ? ' ' + rank : '');
+}
+
+/**
  * A press on a crop, answered by the farming block further down the file.
  *
  * The same shape as classGate above, and for the same reason: the farming block
@@ -3224,9 +4189,44 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   // refuses a crop on its own account too, so neither half of that depends on
   // this line staying where it is.
   else if (isCrop(baseDesc)) message = farmActivate(casterRefrId, refrId, baseDesc);
+  // Water produce before the plants, and it would work either way. Every one of
+  // the fifteen fish bases is still a row in the plant table that is installed
+  // today, because both passes read the same FLOR records and the fish pass has
+  // not been run against this build yet, so a plants-first order would answer a
+  // salmon as a flower for a gatherer. plantAt() refuses a fish base on its own
+  // account as well, so neither half of that depends on this line staying where
+  // it is. Same arrangement as the crops two lines up, same reason.
+  else if (isFish(baseDesc)) message = fish(casterRefrId, refrId, baseDesc);
   else if (isPlant(baseDesc)) message = harvest(casterRefrId, refrId, baseDesc);
   else if (isVein(baseDesc)) message = mineOre(casterRefrId, refrId, baseDesc);
-  else return;
+  else {
+    /*
+      A BODY IS LAST, AND IT IS THE ONLY BRANCH THAT IS NOT A TABLE LOOKUP.
+
+      Every branch above is a lookup on a string this function already has, and
+      costs nothing. This one reads the reference itself twice, over the wire
+      bindings, and one of those reads throws for anything that is not an actor,
+      so it is the only branch that can be expensive or dangerous. Last means a
+      press on anything that already has a home never pays for it.
+
+      The order is free of correctness either way, and that is worth writing
+      down rather than leaving somebody to work out. A body's base is an NPC_
+      record; every table above is built out of FLOR, TREE and ACTI records and
+      the three station bases. No base can be in both, so loot() cannot take a
+      press off a branch above it and no branch above it can take one off loot().
+
+      AND THIS BRANCH MUST NOT RETURN FALSE WHEN IT ANSWERS NOTHING. Every other
+      branch ends at the return false below, which is right for them: they were
+      reached because a table claimed the base, and blocking the engine's own
+      handover is the point. loot() is reached by every press this file has no
+      answer for at all, a door, a chest, a living animal, a dead bandit, so a
+      null out of it has to leave exactly the way a press did before any of this
+      existed. It returns undefined and the default goes ahead.
+    */
+    const off = loot(casterRefrId, refrId, baseDesc);
+    if (off === null) return;
+    message = off;
+  }
 
   if (message) {
     notify(casterRefrId, message);
@@ -3279,6 +4279,33 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     // which is the hardest kind of fault to be shown a bug report for.
     for (var plantBase in HARVESTS_BY_BASE) { add(plantBase); }
     for (var veinBase in ORES_BY_BASE) { add(veinBase); }
+    // And the water produce, which is on this list today only because every one
+    // of those fifteen bases is still a row in the plant table above. The next
+    // run of the harvests script takes them out of that table, and this line is
+    // what keeps them on the list once it has: the server answers for them
+    // either way, so the client must not activate them a second time.
+    for (var fishBase in FISH_BY_BASE) { add(fishBase); }
+    /*
+      A BODY IS NOT ON THIS LIST, AND THAT IS THE ANSWER RATHER THAN AN
+      OVERSIGHT.
+
+      This list exists for one defect: thornswood-front.js re-activates things
+      whose vanilla script never starts under SkyMP, the client forwards that
+      second activation, and the server answers the same press twice. Read the
+      client on 20 September: that handler gives up at 'if (type !== 24)
+      return', and 24 is kActivator. An animal's base record is an NPC_, which
+      is form type 43, so the client never re-activates a body and there is no
+      second press to suppress.
+
+      Putting the hunt bases on here anyway would cost something real. The seed
+      is nine animals and the built table will be every animal in the load
+      order, and every id on this list is sent to every client, to stop a
+      re-activation that cannot happen. So the bodies stay off it. If the client
+      ever starts re-activating actors, this is the line that has to change, and
+      the symptom will be the one the plants and the seams already showed: the
+      yield is right and the sentence on the screen says the body has already
+      been worked.
+    */
 
     var fsb = require('fs');
     var pathb = require('path');

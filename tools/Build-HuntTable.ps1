@@ -24,14 +24,29 @@
     - mp.get(refrId, 'baseDesc') gives the NPC_ record, which is the key of
       this table.
     - mp.get(refrId, 'inventory') gives what the body is carrying, and the
-      pelt and the meat are NOT in there. They come from the NPC record's
-      death item, a levelled list the game resolves on the client, so the
-      server has to hand the yield over itself out of a table. That is this
-      table, and it is the same arrangement mining already uses.
-    - ProcessActivateNormal does nothing at all for an NPC_ base: it is not
+      pelt and the meat ARE in there. This said the opposite until 20
+      September, when it was read instead of assumed: MpActor::Kill ends with
+      AddDeathItem (MpActor.cpp:1348), which calls EvaluateDeathItem, which
+      follows TPLT through espm::NPC_::UseTraits exactly as this script does,
+      runs LeveledListUtils::EvaluateListRecurse on the INAM record and adds
+      every result to the dead actor's own inventory. The server resolves the
+      levelled list; the client does not.
+    - Nobody can reach that inventory, which is why this table exists anyway.
+      ProcessActivateNormal does nothing at all for an NPC_ base: it is not
       pickable, not a DOOR, not a CONT, not an ACTI and not a FURN, so it
-      falls through every branch. The gamemode's mp.onActivate fires first
-      either way and returning false blocks the default.
+      falls through every branch and no container is ever sent. The client
+      blocks the press as well, in objectReferenceEx.ts, which calls
+      blockActivation(true) for FormType.NPC. And RespawnWithDelay wipes the
+      corpse inventory before it stands the animal back up. So the engine's
+      roll is made and thrown away unseen, and the row this script writes is
+      what actually reaches a hunter's pack. The gamemode's mp.onActivate
+      fires first either way and returning false blocks the default.
+    - Every dead actor stands back up. RespawnWithDelay is called for every
+      death by DeathEvent::OnFireSuccess and waits ChangeForm().spawnDelay,
+      which is 25.0f unless something sets it. gamemode.js sets it to
+      HUNT_TUNING.bodySeconds for the bases in this table, so the window a
+      hunter has to press a body is that number rather than twenty five
+      seconds, and the same reference can be killed again after it.
 
   WHICH SUBRECORD NAMES THE RACE, AND HOW THAT WAS PROVED
 
@@ -243,6 +258,15 @@ $PERSON_KEYWORD = 'ActorTypeNPC'
 # than from the record. Following it is the difference between 434 animals and
 # 1518 of them, 1084 of which are people. The header has the case.
 $USE_TRAITS_BIT = 0x0001
+#
+# USE_BASE_DATA_BIT: bit 0x0080 of the same field, and the one that carries the
+# NAME. It is not a guess about which bit does what: the fork's own reader names
+# every bit of this field in libespm/include/libespm/NPC_.h, where UseTraits is
+# 0x01 and UseBaseData is 0x80 with the comment 'including name and short name'.
+# When it is set the game ignores the record's own FULL and shows the template's,
+# so a table that stops at the record's FULL is not reading the name anybody sees.
+# The header has what that cost.
+$USE_BASE_DATA_BIT = 0x0080
 #
 # VALUE_RULES: where the gold value sits in each kind of record. Proved in the
 # header of Build-HarvestTable.ps1, against the prices these items actually
@@ -937,6 +961,69 @@ function Traits-Of([string]$desc, [int]$depth) {
     return $res
 }
 
+# THE NAME, FOLLOWED THROUGH THE TEMPLATE THE WAY THE GAME FOLLOWS IT.
+#
+# Added 20 September, after the table was found calling chickens rabbits. The
+# name used to be the NPC record's own FULL and then, if it had none, the RACE
+# record's FULL. Both of those are read here; the hop between them was missing.
+#
+# WHAT IT COST, read out of the records rather than off a wiki:
+# SnowShodFarmChicken (fa6d9:Skyrim.esm) has no FULL of its own, template flags
+# 0x1f9f, which has 0x0080 set, and TPLT 0a91a0, EncChicken, whose FULL is
+# 'Chicken'. dunTransmogrifyChicken (10929f:Skyrim.esm) is the same at 0x1fbf.
+# Vanilla ChickenRace (a919d:Skyrim.esm) carries a FULL of its own and that FULL
+# is the string 'Rabbit', which was read out of Skyrim.esm and the string table
+# in Skyrim - Interface.bsa. So the race fallback answered for both records and
+# the built table said 'Rabbit', along with GraniteHillChicken
+# (e0c0:aaaGraniteHill.esp) and ZWJ_Polymorph17_Chicken
+# (ea865:ZIA_Complete Pack.esp). A hunter over a dead farm chicken read 'You take
+# 1 Chicken Breast off the Rabbit.' The nameless check further down never caught
+# it, because the race did supply a name; it only catches a row with no name
+# anywhere.
+#
+# The walk is the base data bit's own and is separate from the traits walk above,
+# because they are separate bits that happen to point at the same TPLT: a record
+# may take its race and death item from a template and keep its own name, or keep
+# its own race and take the name. Each is followed on its own bit.
+#
+# AN LVLN ONLY ANSWERS WHEN ITS LEAVES AGREE. A template can be a levelled list
+# of NPCs, and what the spawn became is not knowable here, so a list whose leaves
+# are called two different things gives no name at all and the record falls
+# through to its own FULL and then to the race, which is the same 'the least this
+# can be' rule the yield is picked under. A list of chickens still answers
+# 'Chicken'.
+$nameCache = @{}
+function Name-Of([string]$desc, [int]$depth) {
+    if ($depth -gt 10) { return '' }
+    if ($nameCache.ContainsKey($desc)) { return $nameCache[$desc] }
+    $answer = ''
+    if ($npcs.Contains($desc)) {
+        $n = $npcs[$desc]
+        $useBaseData = (([int]$n.TemplateFlags) -band $USE_BASE_DATA_BIT) -ne 0
+        if ($useBaseData -and [string]$n.Tplt) {
+            $answer = [string](Name-Of ([string]$n.Tplt) ($depth + 1))
+        }
+        # its own name only if it has one. FullFrom says 'the editor id' for the
+        # records that have no FULL at all, and an editor id is not a name.
+        if (-not $answer -and [string]$n.FullFrom -ne 'the editor id') {
+            $answer = [string]$n.Full
+        }
+    } elseif ($lvln.ContainsKey($desc)) {
+        $leaves = @{}
+        foreach ($e in $lvln[$desc].Entries) {
+            if ([string]$e.Desc -eq $desc) { continue }
+            $leaf = [string](Name-Of ([string]$e.Desc) ($depth + 1))
+            if ($leaf) { $leaves[$leaf] = $true }
+        }
+        if ($leaves.Count -eq 1) {
+            foreach ($k in $leaves.Keys) { $answer = [string]$k }
+        }
+    }
+    # the last hop is not cached, for the reason the traits walk above says
+    if ($depth -lt 9) { $nameCache[$desc] = $answer }
+    return $answer
+}
+
 $animals = New-Object System.Collections.Specialized.OrderedDictionary
 $mixed   = New-Object 'System.Collections.Generic.List[object]'
 $naiveAnimals = 0
@@ -1087,8 +1174,13 @@ $table   = New-Object System.Collections.Specialized.OrderedDictionary
 $detail  = New-Object System.Collections.Specialized.OrderedDictionary
 $skipped = New-Object 'System.Collections.Generic.List[object]'
 $several = 0
+# bases that can spawn something whose death item gives nothing for certain, and
+# something else that does. The pick is the cheapest of the ones that do, and
+# this counts how often that rule is what kept the base in the table at all.
+$partlyCertain = 0
 
 $namedByRace = 0
+$namedByTemplate = 0
 $namedByEdid = New-Object 'System.Collections.Generic.List[string]'
 foreach ($d in $animals.Keys) {
     $a = $animals[$d]
@@ -1103,19 +1195,48 @@ foreach ($d in $animals.Keys) {
     # bear pelt off a wolf. The race comes off the same pair as the body, so the
     # row is one animal throughout rather than one animal's name over another's
     # pelt.
+    #
+    # THE LEAST OF WHAT IT CAN BE, AMONG THE BODIES THAT GIVE ANYTHING AT ALL.
+    # Corrected 20 September. Best is the gold value of the best thing a death
+    # item gives FOR CERTAIN, so a death item that is nothing but chance sublists
+    # has a Best of 0, and 0 wins a cheapest-of test against every real animal in
+    # the list. The base was then thrown out by the emptiness test below, which is
+    # the whole base gone because one leaf of it gives nothing.
+    #
+    # Measured in the run before this change: DLC2LvlAnimalForestPredator
+    # (3a9c2:Dragonborn.esm) templates from LVLN DLC2LCharAnimalForestPredator,
+    # 26 leaves, of which 8 are cave bears at 60g, 5 are bears at 50g and 5 are
+    # wolves, and 4 are DLC2EncBoarWild, whose DLC2DeathItemBoar gives nothing for
+    # certain. The boar won the pick at 0g and hunts.json skipped the base, so
+    # every bear, cave bear and wolf spawned from it in the Solstheim woods was
+    # not in the table, isCarcass answered false and a hunter standing over one
+    # got no yield, no refusal and no message at all.
+    #
+    # So a leaf with no certain yield is not a candidate for the pick. It stays in
+    # couldAlsoBe, because it is still one of the things this base can spawn and
+    # the row's rank is deliberately the least of the rest. A base ALL of whose
+    # leaves give nothing for certain is still skipped, and the reason now names
+    # every one of them rather than the cheapest.
     $pick = $null
     $pickRace = ''
     $couldBe = New-Object 'System.Collections.Generic.List[string]'
+    $noCertainYield = New-Object 'System.Collections.Generic.List[string]'
     foreach ($p in $withItem) {
         $y = $yieldOf[[string]$p.Item]
         $couldBe.Add($y.Edid)
+        if ($y.Gives.Count -eq 0) {
+            $noCertainYield.Add($(if ([string]$y.Edid) { [string]$y.Edid } else { [string]$y.Desc }))
+            continue
+        }
         if ($null -eq $pick -or $y.Best -lt $pick.Best) { $pick = $y; $pickRace = [string]$p.Race }
     }
-    if ($pick.Gives.Count -eq 0) {
-        $why = 'its death item, ' + $pick.Edid + ', is nothing but sublists that may each give nothing, so there is nothing the body gives for certain'
+    if ($null -eq $pick) {
+        $named = (($noCertainYield | Sort-Object -Unique) -join ', ')
+        $why = 'every death item its traits chain can spawn (' + $named + ') is nothing but sublists that may each give nothing, so there is nothing the body gives for certain'
         $skipped.Add([pscustomobject]@{ Desc = $d; Edid = $a.Npc.Edid; Why = $why })
         continue
     }
+    if ($noCertainYield.Count -gt 0) { $partlyCertain++ }
     if ($withItem.Count -gt 1) { $several++ }
 
     # THE NAME A PERSON READS. The NPC record's own FULL first, because a named
@@ -1128,11 +1249,23 @@ foreach ($d in $animals.Keys) {
     # RACE record's own FULL, which is read out of a record like everything else
     # here and reads Wolf, Horse, Frostbite Spider, Deer. Only if the race has no
     # name either does the editor id show up, and that is counted and reported.
+    #
+    # THE TEMPLATE COMES BETWEEN THOSE TWO, and it did not until 20 September.
+    # Name-Of above follows TPLT while the Use Base Data bit is set, which is
+    # what the game does and what the record means, and it answers before the
+    # race so that a templated chicken is called a Chicken rather than whatever
+    # its race record happens to be called. The case, and the four rows it was
+    # measured on, are written over Name-Of.
     $name = [string]$a.Npc.Full
     $nameFrom = [string]$a.Npc.FullFrom
-    if ($nameFrom -eq 'the editor id' -and $animalRaces.ContainsKey($pickRace) -and [string]$animalRaces[$pickRace].Full) {
+    $throughTemplate = [string](Name-Of ([string]$d) 0)
+    if ($throughTemplate -and ($throughTemplate -cne [string]$a.Npc.Full -or $nameFrom -eq 'the editor id')) {
+        $name = $throughTemplate
+        $nameFrom = 'the record its Use Base Data bit points at, which is where the game reads this one'
+        $namedByTemplate++
+    } elseif ($nameFrom -eq 'the editor id' -and $animalRaces.ContainsKey($pickRace) -and [string]$animalRaces[$pickRace].Full) {
         $name = [string]$animalRaces[$pickRace].Full
-        $nameFrom = 'the race record, because the NPC record has no name of its own'
+        $nameFrom = 'the race record, because neither the NPC record nor its template chain has a name of its own'
         $namedByRace++
     }
     if ($nameFrom -eq 'the editor id') { $namedByEdid.Add([string]$a.Npc.Edid) }
@@ -1164,7 +1297,11 @@ Ok ("{0} animals in the table, {1} left out and listed" -f $table.Count, $skippe
 if ($several -gt 0) {
     Note ("{0} of them take their traits from a levelled list and could be one of several bodies; each row is the least of what it can be" -f $several)
 }
-Note ("{0} of them have no name of their own and are called what their race record calls them" -f $namedByRace)
+if ($partlyCertain -gt 0) {
+    Note ("{0} of those lists can also spawn a body whose death item gives nothing for certain; the row is the least of the ones that do give something, and before 20 September every one of these bases was dropped from the table altogether" -f $partlyCertain)
+}
+Note ("{0} of them are called what the record their Use Base Data bit points at is called, which is the name the game shows over them" -f $namedByTemplate)
+Note ("{0} of them have no name of their own or in their template chain and are called what their race record calls them" -f $namedByRace)
 if ($skipped.Count -gt 0) {
     foreach ($s in $skipped) { Note ("  left out: {0,-40} {1}" -f $s.Edid, $s.Why) }
 }

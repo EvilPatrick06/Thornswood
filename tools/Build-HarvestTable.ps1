@@ -105,14 +105,34 @@
       that overrides a plant wins over the one that defined it
     - keeps every record that carries a PFIG, and resolves that form id to the
       record it names, for its own name, its record type and its gold value
-    - sorts each plant into one of classes.md's four ranks by what its produce
-      is worth (see the knobs below)
+    - takes the water produce out of them first, by the list of names in the
+      fish knobs below, so the plant table never carries a record that is the
+      fisher's work rather than the gatherer's
+    - sorts each plant that is left into one of classes.md's four ranks by what
+      its produce is worth (see the knobs below)
     - runs the crops pass over those same plants: takes the farm crops out of
       them by the rule above, gives each one the rank its produce earns and a
       grow time worked out from the same price
-    - writes tools\harvests.json, the crops beside the harvests in it, and
-      prints both tables as JavaScript object literals, because the server
-      ships as one file and cannot read the json
+    - writes tools\harvests.json, the crops and the fish beside the harvests in
+      it, and prints all three tables as JavaScript object literals, because the
+      server ships as one file and cannot read the json
+
+  THE FISHER'S RECORDS, AND WHY THEY NEEDED NO NEW ONES
+
+  Skyrim's own fishing is a Creation Club system this build does not have, so
+  the fisher's verb looked like a thing somebody had to place records for.
+  Measured in tools\harvests.json on 20 September, before any of this was
+  written: sixteen records already standing in every river and on every shore
+  are water produce, and every one of them was a row in the plant table, gated
+  on the Gatherer. The salmon, the clams, the pearl oysters, the butchered
+  horker on Solstheim and the slaughterfish egg nest. So the fisher's verb is
+  the water that was already there, and the sixteenth, the clam at Oar's Rest
+  whose produce is a fake coin worth nothing, is the one left out.
+
+  Nothing on those records says water. They are FLOR records like a flower is
+  and their produce is an ALCH or an INGR like a flower's is, so they are named
+  one at a time in FISH_BY_EDITOR_ID below rather than found by a rule, and a
+  name in that list that no plugin carries stops the run.
 
   Read only. It touches nothing in the game folder and nothing on the VPS, and
   it proves that by fingerprinting the game folder before and after and failing
@@ -128,8 +148,9 @@
   has no string table, if the stations file this server places its own bases
   from is missing or does not parse, if a plant's produce names no record in
   the build, if two plants land on the same key, if a crop has no produce or no
-  price, if two crops land on the same key, or if the game folder changed
-  underneath it.
+  price, if two crops land on the same key, if a record named as water produce
+  is in no plugin in this build or has no Fisher rank set for it, if no water
+  record is a novice's, or if the game folder changed underneath it.
 #>
 param(
     [string] $Data       = 'C:\Thornswood\Game\Data',
@@ -271,6 +292,81 @@ $PRODUCE_A_SCRIPT_MUST_OPEN = ' \(\d+\)$'
 # the next FLOR or TREE this server places from being reclassified the same
 # quiet way.
 $STATIONS_FILE = Join-Path $PSScriptRoot 'thornswood-src\stations.json'
+#
+# ------------------------------------------------------ the fish knobs ------
+#
+# FISH_BY_EDITOR_ID: the records that are water produce and therefore the
+# fisher's, named one at a time. These come out of the harvests table and go
+# into a table of their own, so the gatherer stops being handed the fisher's
+# work and the fisher stops walking past it.
+#
+# WHY THERE IS A RULE HERE AT ALL, AND WHY IT IS A LIST OF NAMES. Skyrim's own
+# fishing is a Creation Club system this build does not have, so the fisher's
+# verb looked like a thing somebody had to place records for. Measured in
+# tools\harvests.json on 20 September: sixteen records already standing in
+# every river and on every shore are water produce, and every one of them was
+# in the plant table gated on the Gatherer. So the fisher's verb needs no new
+# record and no Creation Kit work at all.
+#
+# A rule written on the records themselves cannot find them. They are FLOR
+# records like a flower is, their produce is an ALCH or an INGR like a flower's
+# is, and nothing in a salmon's record says water. Naming sixteen is honest;
+# every rule tried against them took in meat racks and cheese wheels as well.
+# A name in this list that no plugin in the build carries is a failure and
+# stops the run, because a record that has been renamed out from under this is
+# exactly the quiet way the fisher would lose half their work again.
+$FISH_BY_EDITOR_ID = @(
+    'FXAmbWaterSalmon01A', 'FXAmbWaterSalmon01B', 'FXAmbWaterSalmon02A', 'FXAmbWaterSalmon02B',
+    'DeadSalmon01', 'DeadSalmon02', 'DeadSalmon01NoNail', 'DeadSalmon02NoNail',
+    'Clam01', 'ClamThin01', 'ClamLarge01',
+    'DLC2PearlOysterLarge01', 'DLC2PearlOysterThin01',
+    'DLC2HorkerMeat01', 'SlaughterfishEggNest01',
+    'OR_Clam'
+)
+#
+# FISH_NOT_A_CATCH: the ones in that list that are water produce and still are
+# not a catch. OR_Clam is the clam at Oar's Rest, from OarsRest.esp, and what it
+# gives is OR_Clam's own MISC record, a Fake Dwemer Coin the record prices at 0
+# gold. It is a joke somebody put on a beach, not a thing a fisher works for. It
+# is reported by name every run and goes in the json's unranked list, the same
+# way the planter sacks and the coin purses do, rather than being dropped
+# without a trace.
+$FISH_NOT_A_CATCH = @('OR_Clam')
+#
+# FISH_RANK_BY_EDITOR_ID: which Fisher rank each record asks for. INVENTED, and
+# named one at a time rather than worked out, for the same reason the crops are.
+# The gold rule that ranks a plant cannot rank these: measured on 20 September,
+# all fifteen produce records in this build are priced at 2 or 3 gold, so every
+# threshold puts every one of them on the same rung and the ladder does nothing.
+#
+# THE SALMON AND THE CLAMS ARE NOVICE AND NOTHING MOVES THEM. Eleven of the
+# fifteen, and the whole of a new fisher's work. A first rung with nothing on it
+# is the circle this script has already been rewritten over twice, once when 33
+# of the 50 novice plants were planter sacks nobody could open and once when the
+# gold rule put ten of eleven crops on one rung. A fisher who cannot fish cannot
+# climb.
+#
+# The four above it are the ones somebody has to go looking for. The horker meat
+# and the small pearls are on Solstheim; the pearls are under the water there;
+# the slaughterfish egg nest sits underwater in water that has slaughterfish in
+# it, which is the one record here that can kill somebody working it.
+$FISH_RANK_BY_EDITOR_ID = @{
+    'FXAmbWaterSalmon01A'    = 'novice'
+    'FXAmbWaterSalmon01B'    = 'novice'
+    'FXAmbWaterSalmon02A'    = 'novice'
+    'FXAmbWaterSalmon02B'    = 'novice'
+    'DeadSalmon01'           = 'novice'
+    'DeadSalmon02'           = 'novice'
+    'DeadSalmon01NoNail'     = 'novice'
+    'DeadSalmon02NoNail'     = 'novice'
+    'Clam01'                 = 'novice'
+    'ClamThin01'             = 'novice'
+    'ClamLarge01'            = 'novice'
+    'DLC2HorkerMeat01'       = 'advanced'
+    'DLC2PearlOysterThin01'  = 'advanced'
+    'DLC2PearlOysterLarge01' = 'expert'
+    'SlaughterfishEggNest01' = 'master'
+}
 #
 # ------------------------------------------------------ the crop knobs ------
 #
@@ -972,11 +1068,43 @@ $table    = New-Object System.Collections.Specialized.OrderedDictionary
 $detail   = New-Object System.Collections.Specialized.OrderedDictionary
 $unranked = New-Object System.Collections.Specialized.OrderedDictionary
 $values   = New-Object 'System.Collections.Generic.List[int]'
+$fish     = New-Object System.Collections.Specialized.OrderedDictionary
+$fishSeen = @{}
 
 foreach ($d in ($plants.Keys | Sort-Object)) {
     $p = $plants[$d]
     if (-not $produce.ContainsKey($p.ProduceDesc)) { continue }
     $q = $produce[$p.ProduceDesc]
+
+    # The fisher's records come out here, before anything ranks them, so the
+    # plant table never carries one. The case for the list and for every rank
+    # in it is in the fish knobs at the top.
+    if ($FISH_BY_EDITOR_ID -contains [string]$p.Edid) {
+        $fishSeen[[string]$p.Edid] = $true
+        if ($FISH_NOT_A_CATCH -contains [string]$p.Edid) {
+            $unranked[$d] = [ordered]@{
+                editorId    = $p.Edid
+                name        = $p.Full
+                produce     = $q.Desc
+                produceName = $q.Full
+                produceType = $q.Type
+                why         = 'it is water produce, so it is the fisher''s and not the gatherer''s, and it is named in FISH_NOT_A_CATCH at the top of this script as one that is not a catch either'
+            }
+            continue
+        }
+        if (-not $FISH_RANK_BY_EDITOR_ID.ContainsKey([string]$p.Edid)) {
+            Bad ("{0} is named as water produce and no rank is set for it in FISH_RANK_BY_EDITOR_ID" -f $p.Edid)
+            continue
+        }
+        $fish[$d] = [pscustomobject]@{
+            Produce = $q.Desc
+            Name    = $q.Full
+            From    = $p.Full
+            Rank    = [string]$FISH_RANK_BY_EDITOR_ID[[string]$p.Edid]
+        }
+        continue
+    }
+
     $why = ''
     if ($ourStations.Contains([string]$d)) {
         $why = 'this server places this one itself and answers it with the station code written for it, so it is not a plant for this pass to rank'
@@ -1068,6 +1196,78 @@ if ($unranked.Count -gt 0) {
     }
 }
 
+# --------------------------------------------------------------- the fish ---
+#
+# The water produce, pulled out of the plants above and ranked by name rather
+# than by price. The case for all of it is in the fish knobs at the top.
+#
+Write-Host ''
+Write-Host 'fish' -ForegroundColor Cyan
+$missingFish = New-Object 'System.Collections.Generic.List[string]'
+foreach ($e in $FISH_BY_EDITOR_ID) {
+    if (-not $fishSeen.ContainsKey([string]$e)) { $missingFish.Add([string]$e) }
+}
+if ($missingFish.Count -gt 0) {
+    # A named record that no plugin in this build carries is a failure, not a
+    # note. Either the build lost a plugin or a record was renamed, and both of
+    # those take work off the fisher quietly, which is the thing this list was
+    # written to stop happening a second time.
+    Bad ("{0} of the records named in FISH_BY_EDITOR_ID are in no plugin in this build: {1}" -f `
+        $missingFish.Count, ($missingFish -join ', '))
+} else {
+    Ok ("all {0} records named as water produce were found" -f $FISH_BY_EDITOR_ID.Count)
+}
+foreach ($e in $FISH_RANK_BY_EDITOR_ID.Keys) {
+    if (-not ($FISH_BY_EDITOR_ID -contains [string]$e)) {
+        Bad ("{0} has a Fisher rank set for it and is not named in FISH_BY_EDITOR_ID, so nothing reads that rank" -f $e)
+    }
+}
+# AND THE RANK HAS TO BE ONE OF THE FOUR. Added 20 September, after a read of
+# fish() in tools\gamemode.js showed that a rank it does not know used to take
+# the gate away instead of closing it: the ladder test there is
+# RANK_LADDER.indexOf(rank), which answers -1 for anything that is not one of
+# the four, and -1 is not greater than 0, so the test was skipped and the record
+# was handed to a novice. Measured against the real fish() with one row in the
+# table: writing 'Expert' with a capital E here instead of 'expert' gave a novice
+# fisher 'You take 1 Pearl out of the Pearl Oyster.' with no refusal anywhere.
+# The pass above only asked ContainsKey, so the run said nothing and installed
+# the typo. These knobs are typed by hand one record at a time, which is exactly
+# the place a one character difference gets in.
+#
+# gamemode.js now treats an unknown rank as the strictest rank rather than none,
+# so the door has two locks; this is the one that says which knob is wrong and
+# stops the table being written at all, and it is the same check
+# Build-HuntTable.ps1 already fails its run on.
+$fishRankNames = New-Object 'System.Collections.Generic.List[string]'
+foreach ($r in $RANK_MAX_VALUE) { $fishRankNames.Add([string]$r.Rank) }
+$oddFishRank = 0
+foreach ($e in $FISH_RANK_BY_EDITOR_ID.Keys) {
+    $r = [string]$FISH_RANK_BY_EDITOR_ID[[string]$e]
+    if (-not ($fishRankNames -ccontains $r)) {
+        $oddFishRank++
+        Bad ("{0} is set to the Fisher rank '{1}', which is not one of the four classes.md names ({2}). The gate in fish() is the rank string, so a rank nothing recognises is a rank nothing enforces." -f `
+            $e, $r, ($fishRankNames -join ', '))
+    }
+}
+if ($oddFishRank -eq 0) {
+    Ok "every Fisher rank named in FISH_RANK_BY_EDITOR_ID is one of classes.md's four, spelled the way fish() reads them"
+}
+$fishPerRank = New-Object System.Collections.Specialized.OrderedDictionary
+foreach ($r in $RANK_MAX_VALUE) { $fishPerRank[[string]$r.Rank] = 0 }
+foreach ($d in $fish.Keys) { $fishPerRank[[string]$fish[$d].Rank] = $fishPerRank[[string]$fish[$d].Rank] + 1 }
+Ok ("{0} water records are the fisher's and are out of the plant table" -f $fish.Count)
+foreach ($r in $RANK_MAX_VALUE) {
+    Note ("{0,-9} {1} records" -f $r.Rank, $fishPerRank[[string]$r.Rank])
+}
+foreach ($d in $fish.Keys) {
+    Note ("  {0,-24} {1,-22} -> {2,-20} {3}" -f $d, $fish[$d].From, $fish[$d].Name, $fish[$d].Rank)
+}
+# The first rung is what a new fisher has, and a fisher who cannot fish cannot
+# climb. This is the line that would show it emptying.
+if ($fishPerRank['novice'] -lt 1) {
+    Bad "not one water record is a novice's, so a new fisher has nothing to work and can never leave the first rank"
+}
+
 # -------------------------------------------------------------- the crops ---
 #
 # The same plants again, this time asking which of them is a plot somebody
@@ -1098,6 +1298,13 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
     # reason written over OUR_STATIONS at the top: it is answered by the
     # station code and not by a table built out of a sweep of the load order.
     if ($ourStations.Contains([string]$d)) { continue }
+
+    # nor is a piece of water produce. The crop rule is a TREE whose produce is
+    # an ALCH and every one of the fifteen is a FLOR, so this catches nothing
+    # today. It is here because that rule is one word away from taking in every
+    # meat rack and clam in the game, which is written out over CROP_RECORD_TYPE
+    # at the top, and a salmon that became a crop would be sown in a field.
+    if ($FISH_BY_EDITOR_ID -contains [string]$p.Edid) { continue }
 
     $named = ($CROP_BY_EDITOR_ID -contains [string]$p.Edid)
 
@@ -1357,6 +1564,27 @@ foreach ($d in $crops.Keys) {
                   ', "growMinutes": ' + [int]$c.Grow + ' }' + $comma)
 }
 $docLines.Add('  },')
+# the water produce, beside the harvests rather than inside them. A reader of
+# this file should be able to see at a glance which records are the fisher's,
+# and the gamemode reads this map into a table of its own.
+$docLines.Add('  "fishAre": ' + (JsonStr ('the records named in FISH_BY_EDITOR_ID at the top of the script, which are water produce and therefore the fisher''s work rather than the gatherer''s; ' +
+    'the ones named in FISH_NOT_A_CATCH are left out and are in the unranked list instead')) + ',')
+$docLines.Add('  "fishRankedBy": ' + (JsonStr ('the Fisher rank named one at a time in FISH_RANK_BY_EDITOR_ID at the top of the script, ' +
+    'because every one of these produce records is priced at 2 or 3 gold and the gold rule that ranks a plant puts all of them on one rung')) + ',')
+$docLines.Add('  "fishCount": ' + $fish.Count + ',')
+$docLines.Add('  "fish": {')
+$n = 0
+foreach ($d in $fish.Keys) {
+    $n++
+    $comma = ','
+    if ($n -eq $fish.Count) { $comma = '' }
+    $f = $fish[$d]
+    $docLines.Add('    ' + (JsonStr ([string]$d)) + ': { "produce": ' + (JsonStr ([string]$f.Produce)) +
+                  ', "name": ' + (JsonStr ([string]$f.Name)) +
+                  ', "from": ' + (JsonStr ([string]$f.From)) +
+                  ', "rank": ' + (JsonStr ([string]$f.Rank)) + ' }' + $comma)
+}
+$docLines.Add('  },')
 $docLines.Add('  "unranked": {')
 $n = 0
 foreach ($d in $unranked.Keys) {
@@ -1452,6 +1680,31 @@ foreach ($d in $crops.Keys) {
 }
 $cropLines.Add('  };')
 $cropLiteral = $cropLines -join [Environment]::NewLine
+
+$fishLines = New-Object 'System.Collections.Generic.List[string]'
+$fishLines.Add('/* Built by tools\Build-HarvestTable.ps1 out of the same records as the harvests.')
+$fishLines.Add('     ' + $fish.Count + ' water records, the same table as the fish map in tools\harvests.json.')
+$fishLines.Add('     These are the fisher''s and not the gatherer''s, and they are named one at a time')
+$fishLines.Add('     in FISH_BY_EDITOR_ID at the top of the script because nothing in a salmon''s record')
+$fishLines.Add('     says water. "from" is what stands in the world, "name" is what it gives.')
+$fishLines.Add('     The rank is named one at a time too: every one of these produce records is priced')
+$fishLines.Add('     at 2 or 3 gold, so the gold rule that ranks a plant puts all of them on one rung.')
+$fishLines.Add('     Paste it between the FISH_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$fishLines.Add('  var FISH_BY_BASE = {')
+$n = 0
+foreach ($d in $fish.Keys) {
+    $n++
+    $comma = ','
+    if ($n -eq $fish.Count) { $comma = '' }
+    $f = $fish[$d]
+    # double quoted for the same reason as the harvests literal above
+    $fishLines.Add('    ' + (JsonStr ([string]$d)) + ': { "produce": ' + (JsonStr ([string]$f.Produce)) +
+                   ', "name": ' + (JsonStr ([string]$f.Name)) +
+                   ', "from": ' + (JsonStr ([string]$f.From)) +
+                   ', "rank": ' + (JsonStr ([string]$f.Rank)) + ' }' + $comma)
+}
+$fishLines.Add('  };')
+$fishLiteral = $fishLines -join [Environment]::NewLine
 
 # ---------------------------------------------------------------- install --
 #
@@ -1562,17 +1815,78 @@ if (-not $NoInstall -and $fail -eq 0) {
     }
 }
 
+# The fish block goes in the same way and under the same rules: its own markers,
+# never hand edited, and only when nothing failed. It is written separately from
+# the other two rather than inside them because it is read by a different verb:
+# the harvests answer a gatherer, the crops a farmer and these a fisher, and the
+# gamemode looks each of them up on its own.
+#
+# It is written LAST of the three on purpose. All three installs work on the
+# text of gamemode.js as it is on disk when they run, and each one re-reads the
+# file, so the order only matters if two of them could find the same markers.
+# They cannot: the three end markers are three different strings. Last is simply
+# the order they were added in, and the file is read fresh here so the harvests
+# and crops writes above are already in it.
+#
+if (-not $NoInstall -and $fail -eq 0) {
+    $gm = Join-Path $PSScriptRoot 'gamemode.js'
+    if (-not (Test-Path -LiteralPath $gm)) {
+        Note "no gamemode.js beside this script, so the fish were not installed"
+    } else {
+        $text = [System.IO.File]::ReadAllText($gm)
+        $close = '// ==== end FISH_BY_BASE ===='
+        $m = [regex]::Match($text, '(?m)^([ \t]*)(var|const|let)[ \t]+FISH_BY_BASE[ \t]*=[ \t]*\{')
+        $b = $text.IndexOf($close)
+        # back up to the start of that line, so the end marker keeps the indent
+        # it was written with instead of being shunted to column zero
+        while ($b -gt 0 -and $text[$b - 1] -ne "`n") { $b-- }
+        if (-not $m.Success -or $b -lt 0 -or $b -lt $m.Index) {
+            Note ("{0} has no FISH_BY_BASE block yet, so the fish were NOT written into it." -f $gm)
+            Note "  It needs a declaration line and an end marker, in this order:"
+            Note "      var FISH_BY_BASE = {"
+            Note "      };"
+            Note "      // ==== end FISH_BY_BASE ===="
+            Note "  Run this again once they are there, or paste the block printed below."
+        } else {
+            $indent = $m.Groups[1].Value
+            $kw     = $m.Groups[2].Value
+            $body = New-Object 'System.Collections.Generic.List[string]'
+            $body.Add($indent + $kw + ' FISH_BY_BASE = {')
+            $k = 0
+            foreach ($d in $fish.Keys) {
+                $k++
+                $comma = ','
+                if ($k -eq $fish.Count) { $comma = '' }
+                $f = $fish[$d]
+                $body.Add($indent + '  ' + (JsonStr ([string]$d)) + ': { "produce": ' + (JsonStr ([string]$f.Produce)) +
+                          ', "name": ' + (JsonStr ([string]$f.Name)) +
+                          ', "from": ' + (JsonStr ([string]$f.From)) +
+                          ', "rank": ' + (JsonStr ([string]$f.Rank)) + ' }' + $comma)
+            }
+            $body.Add($indent + '};')
+            $body.Add('')
+            $new = $text.Substring(0, $m.Index) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
+            Ok ("wrote {0} water records into the FISH_BY_BASE block of {1}" -f $fish.Count, $gm)
+        }
+    }
+}
+
 Write-Host ''
 Write-Host 'the same table, ready to paste into the gamemode:' -ForegroundColor Cyan
 Write-Host $literal
 Write-Host ''
 Write-Host 'the crops, ready to paste into the gamemode:' -ForegroundColor Cyan
 Write-Host $cropLiteral
+Write-Host ''
+Write-Host 'the fish, ready to paste into the gamemode:' -ForegroundColor Cyan
+Write-Host $fishLiteral
 if ($JsOut) {
-    # both blocks, in the order they are read in the gamemode. -JsOut is the
-    # paste file and a crops block left out of it would be a table somebody had
+    # all three blocks, in the order they are read in the gamemode. -JsOut is
+    # the paste file and a block left out of it would be a table somebody had
     # to go back to the console for.
-    $both = $literal + [Environment]::NewLine + [Environment]::NewLine + $cropLiteral
+    $both = $literal + [Environment]::NewLine + [Environment]::NewLine + $cropLiteral +
+            [Environment]::NewLine + [Environment]::NewLine + $fishLiteral
     [System.IO.File]::WriteAllText($JsOut, $both, (New-Object System.Text.UTF8Encoding($false)))
     Write-Host ''
     Ok "wrote $JsOut"
@@ -1585,3 +1899,4 @@ if ($fail) {
 }
 Write-Host ("the table is complete: {0} plants, {1} with no price left out and listed, none doubled." -f $table.Count, $unranked.Count) -ForegroundColor Green
 Write-Host ("the crops are complete: {0} of those plants are farm plots, every one with a produce, a rank and a grow time, none doubled." -f $crops.Count) -ForegroundColor Green
+Write-Host ("the fish are complete: {0} water records are the fisher's and are out of the plant table, {1} of them a novice's." -f $fish.Count, $fishPerRank['novice']) -ForegroundColor Green

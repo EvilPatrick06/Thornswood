@@ -23,8 +23,38 @@
   gamemode_events/CraftEvent.cpp: GetName returns "onCraft" and
   GetArgumentsJsonArray sends four numbers, in this order:
       actorFormId, craftedItemBaseId, count, recipeId
-  recipeId is the COBJ's own form id, mapped to the combined load order. That
-  is the key this table is written under.
+  recipeId is the COBJ's own form id, mapped to the combined load order.
+
+  THE FOURTH ARGUMENT IS A NUMBER AND THE KEY OF THIS TABLE IS A STRING
+
+  This is the one thing that has to be right for the gate to work at all, and
+  the header of this script said the wrong thing about it until 20 September.
+
+  CraftEvent::GetArgumentsJsonArray writes std::to_string(recipeId), and
+  CraftService.cpp builds that recipeId as
+  espm::utils::GetMappedId(recipeUsed->GetId(), *mapping). It is a uint32 and
+  it reaches the gamemode as a plain JavaScript number, 1006945 and the like.
+
+  Every key in this table, and in the RECIPES_BY_ID block, is a desc string:
+  the form id in lower case hex, a colon, and the file the record belongs to.
+  "f61:Skyrim.esm", "8a4:Gourmet.esp". That is the form the rest of this repo
+  keys everything by, and it is the only form that survives a load order
+  changing underneath it, which is why the table is written that way and not
+  as numbers.
+
+  So a gamemode CANNOT write RECIPES_BY_ID[recipeId]. That is undefined for
+  every row in the table, onCraft never returns false, and every profession
+  quietly makes everything with no error anywhere to say so. It has to convert
+  first, with the function the gamemode already uses elsewhere:
+
+      var row = RECIPES_BY_ID[mp.getDescFromId(recipeId)];
+
+  The other generated tables in the gamemode do not need this line because
+  their call sites already hold a desc: the harvest gate reads
+  mp.get(refrId, 'baseDesc') and the ore gate goes the other way with
+  mp.getIdFromDesc. onCraft is the one event that hands over a bare number, so
+  the conversion is written into the json's "event" field and into the block
+  comment rather than left for somebody to work out.
 
   gamemode_events/GameModeEvent.cpp: Fire asks every listener, and if any one
   of them answered false it calls OnFireBlocked and returns false. Only when
@@ -96,9 +126,23 @@
     dwarven scrap pile recipes read 2 and 3. So NAM1 is how many the recipe
     makes.
 
-    CTDA is 32 bytes and is the condition list. It is read here only to be
-    stepped over. The server evaluates conditions itself in
-    CraftService::EvaluateCraftRecipeConditions, so this table does not.
+    CTDA is 32 bytes and is the condition list, and it is read in full here.
+    It was stepped over until 20 September, which is how three halves came to
+    be reported as having work when they have none. The layout is
+    libespm/include/libespm/CTDA.h, read out of the fork rather than
+    remembered, and every offset below was checked against a record:
+      byte 0     the operator in the top three bits, the flags in the low
+                 five. 0x04 in the flags means the comparison value is a GLOB
+                 form id rather than a number. Operator 0 is ==, 1 is !=, 2 is
+                 >, 3 is >=, 4 is <, 5 is <=.
+      bytes 4-7  the comparison value, a float.
+      bytes 8-9  the function index, a uint16. Bytes 10 and 11 are padding and
+                 hold leftovers from the Creation Kit, not data.
+      bytes 12-15 and 16-19  the two parameters.
+      the rest   what the condition runs on, a reference, and a trailing -1.
+    Proved on TemperWeaponSkyforgeSteelSword, whose two conditions read as
+    function 659 with no form parameter, and function 448 against
+    5218e:Skyrim.esm, which resolves to a PERK record.
 
   The fork's own parser agrees, which is worth saying because it was read after
   the census rather than before it: libespm/src/COBJ.cpp maps CNTO to
@@ -142,10 +186,60 @@
   the enchanting menu, not a record.
 
   So COBJ cannot carry the Alchemist at all, and it carries only the staff half
-  of the Enchanter. Those halves are named in EMPTY_HALVES_EXPECTED below, with
-  the reason, and they are written into the json under cannotCraftYet so that
-  the panel on K can refuse to offer a half that can make nothing. Every other
-  half must come out with recipes or this build fails.
+  of the Enchanter. Those halves are named in HALVES_WITH_NO_RECIPES below,
+  with the reason, and each of them goes into the json's "halves" map with its
+  own count and a craftsAtAll flag. Every other half must come out with recipes
+  or this build fails.
+
+  NOTHING IN HERE IS A REASON TO TAKE A HALF OUT OF CHARACTER CREATION, and
+  this file said the opposite until 20 September. It wrote five half names into
+  a field called cannotCraftYet and printed, at the end of every run, that the
+  panel on K should refuse to offer them. Two of the five are Warrior/Bulwark
+  and Warrior/Berserker. Warrior has no third half, so a panel built as
+  instructed would have dropped the Warrior out of character creation
+  altogether, and the Alchemist with it, leaving five professions of the eight.
+  A half that makes nothing is a half with no crafting gate, not a half nobody
+  may be.
+
+  WHAT A CONDITION DOES TO A COUNT, AND IT IS THE FINDING OF 20 SEPTEMBER
+
+  A COBJ can carry conditions, and until this script read them it counted a
+  recipe as work whether or not anybody could reach it. The difference is not
+  small. Measured on this build, of the 1728 owned rows the server is ever
+  asked about, 1559 carry at least one condition, and 1125 of those want a
+  vanilla perk that classes.md says nobody here will ever hold.
+
+  Three numbers now come out per half instead of one: what it owns, what the
+  server is asked about, and what somebody who picked that half this morning
+  can actually make. Read down that last column and the table says something it
+  never said before:
+      Cook/Confectioner     28 recipes, 0 of them
+      Enchanter/Bladebinder 161 recipes, 0 of them
+      Cook/Hearthcook       112 recipes, 2 of them
+      Woodworker/Charburner   4 recipes, 1 of them
+      Smith/Platewright     771 recipes the server sees, 48 of them
+  The first two fail this build unless they are named in
+  HALVES_NOBODY_CAN_START with the measured reason, which they are, because the
+  answer to both is a decision somebody has to make rather than a line of code.
+
+  The Charburner's other three want a book: KzlWoodcutterAdvanced, Expert and
+  Master, out of Thornswood-Content.esp, which is this repo's own plugin. The
+  search under 'what hands out the items these recipes ask for' went through
+  all 101 plugins for a placed reference, a container or inventory line and a
+  levelled list line, found 76 of the 79 items recipes in this table ask for,
+  and did not find those three anywhere. So the Charburner is one recipe, Poor
+  Charcoal, and the rest of classes.md's "firewood through to coke" is waiting
+  on somebody putting those books in the world.
+
+  WHAT RANK A RECIPE ASKS FOR
+
+  classes.md has four ranks and says each one opens more of what you can make.
+  No row in this table carried one until 20 September, so a gate built on it
+  could only be all or nothing per half. Every row now carries a rank, worked
+  out inside its own half by what the recipe makes, and the RANK_SHARE knob is
+  where that judgement lives. It is also the only way to express the sister
+  half rule the published page promises, that an Edgewright can beat out plain
+  iron plate and no more.
 
   THE OWNERSHIP RULE
 
@@ -162,7 +256,13 @@
 
   Warriors do not craft. Bulwark and Berserker are halves of how somebody
   fights, not of what they make, and there are no warrior recipes to find. No
-  recipe is invented for them and they are named in the exempt knob.
+  recipe is invented for them, they are named in HALVES_WITH_NO_RECIPES with
+  craftsAtAll false, and the profession is offered like any other.
+
+  The Mage is in the roster too, with no halves at all, for the same reason: a
+  panel built from the professions map in this file has to be able to offer all
+  eight of classes.md's professions. What a mage knows is spells, and
+  tools\Build-SpellTable.ps1 is what writes those.
 
   Read only. It touches nothing in the game folder and nothing on the VPS, and
   it proves that with a fingerprint of the folder before and after.
@@ -175,9 +275,14 @@
 
   Exit code 1 if a recipe's output does not resolve to a real record, if an
   owner is not one of the professions in classes.md, if a half is not one of
-  its two, if a recipe is listed twice, if a half that is meant to have recipes
-  has none, if a half named as empty turns out to have some, or if the game
-  folder changed while this ran. Nothing is written unless every check passed.
+  its two, if a recipe lands on a profession that has no halves, if a recipe is
+  listed twice, if an owned recipe makes something the records put no price on
+  and so cannot be ranked, if a half that is meant to have recipes has none, if
+  a half named as empty turns out to have some, if a half with recipes has
+  nothing at all a new character can make and is not named in
+  HALVES_NOBODY_CAN_START, if a half named there turns out to have something,
+  or if the game folder changed while this ran. Nothing is written unless every
+  check passed.
 #>
 param(
     # The build's Data folder. Read only.
@@ -211,17 +316,51 @@ $LANGUAGE = 'english'
 # half must be one of that profession's two. The check at the bottom enforces
 # it, which is what stops a typo inventing a ninth trade.
 #
-# Mage is not here. classes.md says the Mage works differently: two schools and
-# two spells, no halves, and nothing a mage does is a crafting recipe. The
-# spell table is Build-SpellTable.ps1's job, not this one's.
+# THE MAGE IS IN THIS LIST WITH NO HALVES, AND THAT IS THE FIX FOR A REAL BUG.
+# It was left out of the table entirely until 20 September on the grounds that
+# a mage makes nothing a COBJ record describes, which is true and was not a
+# reason to leave it out. The professions map in recipes.json is the only
+# roster of professions this file ships, so a panel built from it offered seven
+# professions and lost the Mage, while this script's own comments called it
+# "the eight professions" over a table holding seven. classes.md's table has
+# eight rows, with Mage second, and gamemode.js already offers mage with
+# halves: null, schools: 2, mastered: 3.
+#
+# So the Mage is here, with an empty half list, and recipes.json says in as
+# many words that it has no halves and makes nothing by recipe. What a mage
+# knows is spells, and Build-SpellTable.ps1 is what writes those.
 $PROFESSIONS = [ordered]@{
     'Warrior'    = @('Bulwark', 'Berserker')
+    'Mage'       = @()
     'Alchemist'  = @('Blightbrewer', 'Physicker')
     'Cook'       = @('Hearthcook', 'Confectioner')
     'Smith'      = @('Platewright', 'Edgewright')
     'Enchanter'  = @('Bladebinder', 'Wardweaver')
     'Tailor'     = @('Liverywright', 'Haberdasher')
     'Woodworker' = @('Charburner', 'Woodwright')
+}
+
+# WHETHER A PROFESSION MAKES THINGS BY RECIPE AT ALL, and the sentence that
+# says why when it does not. Every profession above needs a line here.
+#
+# This exists because "this half owns no recipes" and "this half is broken"
+# came out of this script as the same statement, and a panel written from that
+# would drop the Warrior out of character creation. A Warrior owning no recipes
+# is classes.md working as written. A Wardweaver owning none is a gap in what
+# the records can express. Both are true, neither should stop somebody picking
+# the profession, and only the second one is ever going to be fixed.
+#
+# Crafts = $false means the crafting gate has nothing to say about this
+# profession. It does NOT mean hide it: the panel on K offers all eight.
+$PROFESSION_CRAFTS = [ordered]@{
+    'Warrior'    = @{ Crafts = $false; Why = 'warriors do not craft. classes.md gives Bulwark and Berserker combat maneuvers rather than recipes, so there is nothing in the records to find and nothing for a crafting gate to refuse. The profession is offered like any other.' }
+    'Mage'       = @{ Crafts = $false; Why = 'a mage has no halves. classes.md gives the Mage two schools and two starting spells, and none of it is a crafting recipe. What a mage knows is written by tools\Build-SpellTable.ps1.' }
+    'Alchemist'  = @{ Crafts = $true;  Why = '' }
+    'Cook'       = @{ Crafts = $true;  Why = '' }
+    'Smith'      = @{ Crafts = $true;  Why = '' }
+    'Enchanter'  = @{ Crafts = $true;  Why = '' }
+    'Tailor'     = @{ Crafts = $true;  Why = '' }
+    'Woodworker' = @{ Crafts = $true;  Why = '' }
 }
 
 # HALVES THAT ARE MEANT TO COME OUT EMPTY, each with the measured reason.
@@ -234,15 +373,32 @@ $PROFESSIONS = [ordered]@{
 # assumed. A half in this list that turns out to HAVE recipes also fails the
 # build, because then this list is out of date and somebody has to look.
 #
-# These names are written into recipes.json under cannotCraftYet. The panel on
-# K should read that and refuse to offer them, rather than letting somebody
-# spend a character on a half with nothing behind it.
-$EMPTY_HALVES_EXPECTED = [ordered]@{
-    'Warrior/Bulwark'      = 'warriors do not craft. Bulwark and Berserker are halves of how somebody fights, and classes.md gives them combat maneuvers rather than recipes. There is nothing in the records to find.'
-    'Warrior/Berserker'    = 'the same. Warrior is the one profession whose halves are not about making anything.'
-    'Alchemist/Blightbrewer' = 'Skyrim has no alchemy recipes. Not one COBJ record in the whole load order names an alchemy bench keyword: potions are worked out from the effects that the ingredients share, in the alchemy menu, and no record is involved. The poison bit that would split this half from the Physicker is proved and ready in the code above, so the moment a mod adds an alchemy bench recipe it lands here by itself.'
-    'Alchemist/Physicker'  = 'the same. There is nothing for this table to gate until alchemy is answered somewhere other than a recipe record.'
-    'Enchanter/Wardweaver' = 'the only enchanting recipes in the build are the 160 staff recipes on the Dragonborn staff enchanter, and a staff is a weapon, so they all land on the Bladebinder. Enchanting a cuirass or a robe is the enchanting menu and not a record, so the Wardweaver has nothing to own here.'
+# These halves go into recipes.json under "halves", each with its own count and
+# its own reason. WHAT THEY DO NOT DO IS COME OUT OF CHARACTER CREATION.
+#
+# Until 20 September this knob wrote its five names into a json field called
+# cannotCraftYet and this script printed, at the end of every run, that the
+# panel on K should refuse to offer them. Two of the five are Warrior/Bulwark
+# and Warrior/Berserker, and Warrior has no third half, so a panel built as
+# instructed would have dropped the whole Warrior profession out of character
+# creation, and the Alchemist with it. gamemode.js offers warrior with exactly
+# those two halves today.
+#
+# So each entry now says which of the two things is true, and the json says it
+# too, because the reason strings alone left a consumer nothing to test:
+#   Crafts = $false  the half is not about making anything. classes.md wrote it
+#                    that way. Offer it, and the crafting gate stays quiet.
+#   Crafts = $true   the half makes things and this build has no records for
+#                    them yet. Offer it, and say so where somebody picking it
+#                    can read it, because it is a gap rather than a design.
+# Nothing here is a reason to hide a half. A half nobody may pick is a
+# profession nobody may pick, and that is a bigger hole than an empty trade.
+$HALVES_WITH_NO_RECIPES = [ordered]@{
+    'Warrior/Bulwark'      = @{ Crafts = $false; Why = 'warriors do not craft. Bulwark and Berserker are halves of how somebody fights, and classes.md gives them combat maneuvers rather than recipes. There is nothing in the records to find.' }
+    'Warrior/Berserker'    = @{ Crafts = $false; Why = 'the same. Warrior is the one profession whose halves are not about making anything.' }
+    'Alchemist/Blightbrewer' = @{ Crafts = $true; Why = 'Skyrim has no alchemy recipes. Not one COBJ record in the whole load order names an alchemy bench keyword: potions are worked out from the effects that the ingredients share, in the alchemy menu, and no record is involved. The poison bit that would split this half from the Physicker is proved and ready in the code above, so the moment a mod adds an alchemy bench recipe it lands here by itself.' }
+    'Alchemist/Physicker'  = @{ Crafts = $true; Why = 'the same. There is nothing for this table to gate until alchemy is answered somewhere other than a recipe record.' }
+    'Enchanter/Wardweaver' = @{ Crafts = $true; Why = 'the only enchanting recipes in the build are the staff recipes on the Dragonborn staff enchanter, and a staff is a weapon, so they all land on the Bladebinder. Enchanting a cuirass or a robe is the enchanting menu and not a record, so the Wardweaver has nothing to own here.' }
 }
 
 # WHAT THE ENGINE NEVER ASKS ABOUT. CraftService::RecipeItemsMatch throws
@@ -252,6 +408,195 @@ $EMPTY_HALVES_EXPECTED = [ordered]@{
 # here, because it is still that half's work, but it is marked as one the
 # server is never asked about and it is left out of the gamemode block.
 $BENCHES_THE_SERVER_NEVER_SEES = @('adb78:Skyrim.esm', '88108:Skyrim.esm')
+
+# WHICH CONDITION FUNCTIONS THE SERVER CAN ACTUALLY EVALUATE. Read out of
+# C:\Thornswood-Dev\skymp on 20 September, one file per number:
+# skymp5-server/cpp/server_guest_lib/condition_functions/*.cpp, each with a
+# GetFunctionIndex that returns the number below, and
+# ConditionFunctionFactory::CreateConditionFunctions registering every one of
+# them into the map the world state holds.
+#
+# This matters because of what happens to the ones that are NOT in the map.
+# ConditionsEvaluator.cpp, the branch that runs when the map has no function
+# for an index: it logs "doesn't exist. Evaluating condition to True" and
+# returns true. So a condition the fork does not implement is not enforced by
+# the server at all: the server waves it through.
+#
+# That is not the same as the recipe being available. Skyrim's own crafting
+# menu evaluates the same CTDA list on the machine in front of the person and
+# only lists the recipes whose conditions pass. A recipe whose condition fails
+# there is never shown, so it is never asked for, so onCraft never fires and
+# the server never gets to have an opinion. A row like that is in this table,
+# owned by a half, and unreachable by anybody.
+#
+# The three SkympGetDamageSourceHasKeyword, SkympGetIsDamageSource and
+# SkympWornHasKeywordCount functions return uint16 max for their index, which
+# no CTDA carries, so they are not in this list.
+$CONDITION_FUNCTIONS_THE_SERVER_HAS = @{
+    47  = 'GetItemCount'
+    69  = 'GetIsRace'
+    101 = 'IsWeaponMagicOut'
+    182 = 'GetEquipped'
+    254 = 'GetIsPlayableRace'
+    263 = 'IsWeaponOut'
+    264 = 'HasSpell'
+    300 = 'IsInInterior'
+    569 = 'IsBlocking'
+    596 = 'SpellHasKeyword'
+    597 = 'GetEquippedItemType'
+    640 = 'GetActorValuePercent'
+    682 = 'WornHasKeyword'
+    722 = 'WornApparelHasKeywordCount'
+}
+
+# THE VANILLA PERK CONDITION. Function index 448 is not in the fork's map and
+# so is not named by it. It is named here from what its parameter resolves to
+# rather than from memory: every CTDA in this build carrying 448 resolves its
+# first parameter to a PERK record, and the count is printed every run under
+# 'conditions'. That is Skyrim's HasPerk.
+#
+# classes.md line 4: "Nothing you do raises a vanilla skill and no perk menu
+# opens when you sleep", and the page says vanilla progression being off is the
+# part already shipped. So no character on this server will ever hold a vanilla
+# perk. A recipe behind one is a recipe nobody can reach, whatever this table
+# says about who owns it, and the count of them per half is printed and written
+# into the json so that a half made entirely of them is visible rather than
+# reported as work.
+$CONDITION_VANILLA_PERK = 448
+
+# HOW A CONDITION IS READ OUT LOUD. The operator is the top three bits of the
+# CTDA's first byte, and these six are the enum in
+# libespm/include/libespm/CTDA.h.
+$CONDITION_OPERATORS = @('==', '!=', '>', '>=', '<', '<=')
+
+# ---------------------------------------------------------------- ranks ----
+#
+# THE FOUR RANKS, from classes.md's own table and in its order. A row in this
+# table carries one of these, and the gate compares it against the rank the
+# character holds in that half.
+#
+# Until 20 September no row carried a rank at all, and a gate built on the
+# table could only be all or nothing per half: either a Platewright made
+# DaedricArmor on the morning they were created or they made nothing. Both of
+# those contradict the published page. classes.md: "Each rank opens more of
+# what you are able to make", and its Novice row is "the basics of your half,
+# and not much of it".
+#
+# A rank on every row is also what makes classes.md's sister half rule
+# expressible, and it is the only thing that can: "You get the novice work of
+# your sister half for nothing. An Edgewright knows how to beat out plain iron
+# plate." The gate reads that as: your own half at your own rank, plus the
+# other half of your own profession at novice and no further. It cannot ask
+# that question of a table whose rows have no rank.
+$RANKS = @('novice', 'advanced', 'expert', 'master')
+
+# WHAT RANK A RECIPE ASKS FOR. INVENTED. classes.md sets no numbers and nothing
+# in the records ranks a recipe, so this is the judgement, in one place.
+#
+# The measure is the gold value of what the recipe makes, which is the one
+# number the records already carry about how much of a thing a thing is, and it
+# is the same measure Build-HarvestTable.ps1 ranks a plant by. What could not
+# be copied from that script is its fixed gold ceilings, and the reason is
+# printed under 'ranking' every run: the halves do not share a scale. What a
+# Confectioner makes runs from a few gold to a few tens of gold, and what a
+# Platewright makes runs to thousands. One ceiling in gold across all of them
+# would put every dessert in the game at novice and every piece of armour above
+# it, which ranks the Cook's whole trade as beginner's work and leaves a
+# Platewright with nothing to start on.
+#
+# So the split is per half: sort that half's rows by what they make, cheapest
+# first, and cut the list at these shares. Read as "novice is the cheapest
+# quarter of your own half's work". Every half gets a novice rung by
+# construction, which is the point.
+#
+# The spread each half actually has is printed every run, under 'ranking', so
+# these shares can be moved against real numbers. Measured on 20 September:
+#   Cook/Confectioner       28 rows from 6 to 14 gold
+#   Smith/Platewright     2015 rows from 2 to 24634 gold
+#   Woodworker/Woodwright  124 rows from 0 to 26305 gold
+#   Woodworker/Charburner    4 rows, all of them 2 gold
+# One gold ceiling across that is not a ladder, it is a wall with the Cook on
+# the wrong side of it.
+#
+# TWO RUNGS COME OUT EMPTY IN THIS BUILD AND THAT IS THE TIE RULE WORKING, not
+# a mistake. A cut never splits a run of rows that make things worth the same,
+# because two recipes for things of equal worth on different rungs is a rule
+# nobody could explain to the person it refuses. The Confectioner has 18 of its
+# 28 desserts priced the same, so novice takes all 18 and advanced takes none.
+# The Bladebinder has 160 staves priced at 5 gold each, because a staff's worth
+# is in its enchantment rather than its record, so 160 rows sit at novice and
+# the Aetherial Staff at 1250 sits alone at master.
+$RANK_SHARE = @(
+    @{ Rank = 'novice';   Upto = 0.25 },
+    @{ Rank = 'advanced'; Upto = 0.60 },
+    @{ Rank = 'expert';   Upto = 0.85 },
+    @{ Rank = 'master';   Upto = 1.00 }
+)
+
+# WHERE THE GOLD VALUE SITS IN EACH KIND OF RECORD. The first five were proved
+# in Build-HarvestTable.ps1 and are copied from its VALUE_RULES knob. AMMO and
+# BOOK are not in that script, because nothing a gatherer picks is either, and
+# both were measured here on 20 September against Skyrim.esm:
+#   AMMO DATA is 20 bytes and FollowerIronArrow reads 245265, 6, 8.0, 1 as the
+#   four fields, so the value is the uint32 at offset 12 and an iron arrow is
+#   worth 1 gold, which is what an iron arrow is worth.
+#   BOOK DATA is 16 bytes and SpellTomeThunderbolt reads 4, 1112046, 750, 1.0,
+#   so the value is the uint32 at offset 8 and a spell tome is worth 750.
+# A row whose output type is not in here cannot be ranked and fails the build
+# rather than being guessed at, because a rank invented without a price would
+# decide what a real person may make.
+$VALUE_RULES = [ordered]@{
+    'INGR' = @{ Sub = 'DATA'; At = 0 }
+    'MISC' = @{ Sub = 'DATA'; At = 0 }
+    'SLGM' = @{ Sub = 'DATA'; At = 0 }
+    'KEYM' = @{ Sub = 'DATA'; At = 0 }
+    'ARMO' = @{ Sub = 'DATA'; At = 0 }
+    'WEAP' = @{ Sub = 'DATA'; At = 0 }
+    'ALCH' = @{ Sub = 'ENIT'; At = 0 }
+    'AMMO' = @{ Sub = 'DATA'; At = 12 }
+    'BOOK' = @{ Sub = 'DATA'; At = 8 }
+}
+
+# THE NOVICE RUNG HAS TO BE REACHABLE ON THE DAY SOMEBODY PICKS THE HALF.
+#
+# PATRICK, 20 September, about the farming table: "they cant grow them if they
+# dont have the rank, they cant get the rank if they dont level up from growing
+# them, they cant get the rank if they cant grow them". The same circle is
+# waiting here, and it closes in a worse way, because a recipe can be gated
+# twice: by this table's rank, and by a CTDA the game's own crafting menu
+# enforces before the server sees anything.
+#
+# So after the shares above have ranked a half, the cheapest row of that half
+# that a character created this morning can actually reach, meaning it carries
+# no condition at all, is moved to novice if it is not there already. Every
+# move is printed under 'ranking' with the row it moved, so the rule is visible
+# rather than silent. Set this to $false and the shares stand as they fall,
+# which is worth doing once to see how many halves it strands.
+$NOVICE_MUST_BE_REACHABLE = $true
+
+# HALVES WHERE NOBODY CAN MAKE ANYTHING ON THE DAY THEY PICK IT, each with the
+# measured reason. The check at the bottom fails the build for any half that
+# has recipes, has rows the server is asked about, and has not one row a new
+# character can reach, unless it is named here.
+#
+# This is a different question from the empty half check above and it had to be
+# asked separately: a half can own hundreds of rows and still be empty in
+# practice, which is exactly what two of these are. The counts printed every
+# run now carry both numbers side by side for this reason.
+$HALVES_NOBODY_CAN_START = [ordered]@{
+    'Cook/Confectioner'     = 'every one of its 28 recipes carries two vanilla perk conditions, function index 448: MAG_FoodUpgradePerk03 out of Gourmet.esp on all 28, and a second perk named for the recipe itself, MAG_RecipePerkSnowberryDumpling and its like, on all 28 as well. classes.md says no perk menu opens and vanilla progression is off, so nobody here will ever hold either. The server would wave the condition through, because the fork has no function for that index, but Skyrim''s own crafting menu evaluates it first and never lists the recipe, so onCraft is not even reached. The dessert keyword split is right and the half is real; what is missing is somebody deciding what a new Confectioner starts able to bake. Four of the 28 want an item on top of the perks.'
+    'Enchanter/Bladebinder' = '160 of its 161 recipes are the Dragonborn staff enchanter''s, and every one of those 160 carries a HasSpell condition naming the staff''s own spell: Thunderbolt, Turn Undead, the Odin wall spells. That one the server really does evaluate, function index 264 against MpActor::GetSpellList in the fork, so it is refused twice over. A new Enchanter has no spells at all: classes.md gives starting spells to the Mage alone and says nothing is handed out at the start but the clothes you stand in. The 161st is DLC1LD_RecipeAetherialStaff, which wants the Aetherium Crest and is behind the Dawnguard chain that ends in one. So the half is 0 of 161 on the day somebody picks it and stays there until the apprenticeship system classes.md describes is built, or until somebody decides what spells an Enchanter starts holding.'
+}
+
+# WHEN A HALF IS THIN ENOUGH TO NAME OUT LOUD. A half with a handful of rows a
+# new character can reach passes the check above and is still worth printing
+# row by row, because the difference between four recipes and one recipe is
+# invisible in a count. The Charburner is the case this was written for.
+$THIN_HALF_ROWS = 3
+# How many of those rows to print before the rest are left to recipes.json. The
+# Hearthcook trips the rule above with 2 of 112, and 110 lines of soup buries
+# everything else in the run.
+$THIN_HALF_LINES = 6
 
 # THE ALCH FLAG BITS, proved in the header above against the records that carry
 # them. Bit 1 is a no-auto-calc bit and says nothing about what the thing is.
@@ -284,6 +629,31 @@ $WEAP_ANIM_CROSSBOW = 9
 # to $false and bows go back to the Edgewright and arrows go unowned, which is
 # the plain forge rule with no carve-out.
 $WOODWRIGHT_TAKES_BOWS_AND_ARROWS = $true
+
+# WHO OWNS AN INSTRUMENT. The same sentence of classes.md, and it was half
+# followed until 20 September: "**Woodwright**, bows, arrows and instruments".
+# The bow carve-out above tests the animation type and nothing else, so the
+# three instrument recipes in this build fell past it into the plain forge rule
+# and came out as the Edgewright's. A Woodwright could not make a flute and a
+# swordsmith could, which is the exact contradiction with the published page
+# that the bow knob was written to prevent.
+#
+# The records were read before this rule was written. RecipeWeaponFlute,
+# RecipeWeaponLute and RecipeWeaponDrum, all from PlayFluteLuteDrum.esp, all at
+# CraftingSmithingForge, output FluteWeapon, LuteWeapon and DrumWeapon. All
+# three outputs are WEAP records carrying animation byte 0, which is hand to
+# hand, and an empty keyword list. So the records themselves say these are not
+# weapons of any type, and neither the animation rule nor the keyword rule can
+# reach them.
+#
+# What is left is the name, so that is what this is, and it is a judgement
+# rather than a reading. It is matched as a whole word against the output's
+# editor id and its name, so a Drum matches and a Drumstick does not. The
+# count of what it catches is printed every run: if a mod ever adds a fourth
+# instrument, it lands here by itself, and if this rule ever catches something
+# that is not an instrument it is visible in that line.
+$WOODWRIGHT_TAKES_INSTRUMENTS = $true
+$INSTRUMENT_WORDS = @('Flute', 'Lute', 'Drum')
 
 # WHICH FOOD IS A DESSERT. This was expected to be a judgement and it is not,
 # on this build, which is worth writing down because the next person will
@@ -336,9 +706,43 @@ $NOT_COOKING_WORDS = @('Waterskin', 'WaterBottle', 'SujammaWaterBottle', 'Fishin
 # and it is a judgement rather than a reading. Matched against the output's
 # editor id and its name, case ignored. Everything that does not match is
 # common or fine clothing and goes to the Haberdasher.
+#
+# THE WORDS ARE MATCHED AS WHOLE WORDS AND THAT IS A FIX, NOT A STYLE. Until
+# 20 September the match was a plain substring, and two of the words below are
+# short enough to sit inside ordinary ones. 'Guard' matched Redguard,
+# Wristguards and Armguards; 'Cowl' matched a farm hat. Measured on the table
+# this script wrote that day, that sent eleven rows of common clothing to the
+# Liverywright: the three MCERecipeClothesRedguard rows and their three Dark
+# Brotherhood variants, IARRedguardKnightCape, and the three Jarl glove rows,
+# which are named Gilded Wristguards, Fine Armguards and Ulfric's Armguards.
+# Hammerfell garb and fine armguards are exactly the "common and fine clothing"
+# classes.md gives the Haberdasher, so a Haberdasher could not make them and a
+# Liverywright could.
+#
+# Whole word here means the way an editor id is actually written: it is split
+# where a capital letter starts a new word, so ClothesRedguardBoots reads as
+# Clothes, Redguard, Boots and none of those is Guard, while
+# ArmorWhiterunGuardCuirass reads as Armor, Whiterun, Guard, Cuirass and that
+# one is. A name is split on its spaces and punctuation the same way. A word in
+# the list with more than one word in it, and there are none today, matches a
+# run of words in order.
 $LIVERYWRIGHT_KEYWORDS = @('WAF_MaterialFaction', 'CWMission03ImperialGarb')
+#
+# 'Cowl' IS GONE FROM THE LIST, and it was measured rather than argued about.
+# Every cowl a Tailor can make in this build is already caught by its editor
+# id: the monk cowls by Monk, the coloured ones by Robes, Necromancer Cowl by
+# Necromancer. Counted on the table of 20 September, the only row 'Cowl' won on
+# its own was MCERecipeClothesFarmClothes03Hat, whose output is
+# ClothesFarmClothes03Hat and whose name is the bare word Cowl. It is a farm
+# hat. The word earned nothing and cost one row, so it is not here.
+#
+# 'Guard' stays, and whole word matching is what makes it safe. Counted on the
+# table this writes today, fourteen of the Liverywright's 96 rows have Guard as
+# a word in what they make, and every one of them is a hold guard cloak out of
+# Cloaks&Capes.esp, Pale Guard Cloak through Winterhold Guard Cloak. That is
+# faction dress by any reading of classes.md.
 $LIVERYWRIGHT_WORDS    = @(
-    'Robe', 'Vestment', 'Livery', 'Cowl',
+    'Robe', 'Vestment', 'Livery',
     'Guard', 'ThievesGuild', 'DarkBrotherhood', 'Cultist', 'MythicDawn',
     'Necromancer', 'Archmage', 'Psiijic', 'MothPriest', 'Vaermina',
     'Monk', 'Dawnguard', 'Stormcloak', 'Imperial', 'Blades'
@@ -683,7 +1087,14 @@ Write-Host 'records' -ForegroundColor Cyan
 # instead of failing the build for a missing record.
 $OUTPUT_TYPES = @('ARMO', 'WEAP', 'ALCH', 'MISC', 'INGR', 'AMMO', 'BOOK', 'SCRL', 'SLGM', 'LIGH', 'KEYM')
 # KYWD is needed for the bench and for every keyword on an output record.
-$SCAN_TYPES = @('KYWD', 'COBJ') + $OUTPUT_TYPES
+# The record types a CTDA on a recipe points its parameters at. PERK and SPEL
+# are here so that a condition can be read out as the thing it asks for rather
+# than as a number: HasPerk against MAG_FoodUpgradePerk03, HasSpell against
+# Thunderbolt. GLOB is here because a CTDA can compare against a global instead
+# of a number, which the flag bit 0x04 says. Everything else a condition can
+# name, a book or an ingot or a piece of armour, is already in $OUTPUT_TYPES.
+$CONDITION_TYPES = @('PERK', 'SPEL', 'GLOB')
+$SCAN_TYPES = @('KYWD', 'COBJ') + $OUTPUT_TYPES + $CONDITION_TYPES
 
 # desc -> the record, last one in the load order wins, because that is the
 # record the game is using
@@ -693,6 +1104,10 @@ $kwName  = @{}
 # load order, which makes a rebuild a small diff rather than a shuffle.
 $recipes = New-Object System.Collections.Specialized.OrderedDictionary
 $perPluginRecipes = @{}
+# plugin -> the master list it declares, kept so that a form id can be written
+# back into any plugin's own numbering afterwards. The search for what hands
+# out an item needs that and it runs after the scan.
+$pluginMasters = @{}
 $seenTwice = New-Object 'System.Collections.Generic.List[string]'
 
 foreach ($pl in $order) {
@@ -703,6 +1118,7 @@ foreach ($pl in $order) {
     $headerSize = [int][BitConverter]::ToUInt32($b, 4)
     $localized  = [bool]([BitConverter]::ToUInt32($b, 8) -band 0x80)
     $masters    = Get-PluginMasters $b $headerSize
+    $pluginMasters[$pl] = $masters
     $strTable = $null
     if ($tables.ContainsKey($pl)) { $strTable = $tables[$pl].Table }
 
@@ -742,7 +1158,11 @@ foreach ($pl in $order) {
                     $nam1 = 1
                     $inputs = 0
                     $coct = -1
+                    $value = -1
+                    $valueRule = $null
+                    if ($VALUE_RULES.Contains($label)) { $valueRule = $VALUE_RULES[$label] }
                     $kwds = New-Object 'System.Collections.Generic.List[string]'
+                    $conds = New-Object 'System.Collections.Generic.List[object]'
                     while ($k + 6 -le $rec.Length) {
                         $sub = [System.Text.Encoding]::ASCII.GetString($rec, $k, 4)
                         $sz  = [int][BitConverter]::ToUInt16($rec, $k + 4)
@@ -787,6 +1207,34 @@ foreach ($pl in $order) {
                             elseif ($sub -eq 'NAM1' -and $sz -eq 2) { $nam1 = [int][BitConverter]::ToUInt16($rec, $k) }
                             elseif ($sub -eq 'CNTO') { $inputs++ }
                             elseif ($sub -eq 'COCT' -and $sz -eq 4) { $coct = [int][BitConverter]::ToUInt32($rec, $k) }
+                            elseif ($sub -eq 'CTDA' -and $sz -ge 20) {
+                                # The layout is in the header, out of
+                                # libespm's CTDA.h. Only the first twenty
+                                # bytes are read: the operator, what it
+                                # compares against, which function it is, and
+                                # the two parameters. What the condition runs
+                                # on is always the person crafting here, and
+                                # the fork's own EvaluateCraftRecipeConditions
+                                # passes the same actor as both subject and
+                                # target, so there is nothing in the rest of
+                                # the subrecord this table can act on.
+                                $opByte = [int]$rec[$k]
+                                $conds.Add([pscustomobject]@{
+                                    Operator = ($opByte -shr 5)
+                                    UsesGlobal = (($opByte -band 0x04) -ne 0)
+                                    Or = (($opByte -band 0x01) -ne 0)
+                                    Value = [BitConverter]::ToSingle($rec, $k + 4)
+                                    Func = [int][BitConverter]::ToUInt16($rec, $k + 8)
+                                    Param1 = [BitConverter]::ToUInt32($rec, $k + 12)
+                                    Param2 = [BitConverter]::ToUInt32($rec, $k + 16)
+                                })
+                            }
+                        }
+                        if ($valueRule -and $sub -eq $valueRule.Sub -and $sz -ge ($valueRule.At + 4)) {
+                            # The gold value, which is what ranks the row. Where
+                            # it sits in each kind of record is the VALUE_RULES
+                            # knob, and every offset in it was measured.
+                            $value = [int64][BitConverter]::ToUInt32($rec, $k + $valueRule.At)
                         }
                         $k += $sz
                     }
@@ -810,6 +1258,7 @@ foreach ($pl in $order) {
                             Local = ($formId -band 0xFFFFFF)
                             OutDesc = $outDesc; BenchDesc = $benchDesc
                             Count = $nam1; Inputs = $inputs; Coct = $coct
+                            Conditions = $conds.ToArray(); Masters = $masters
                         }
                         $here++
                         if (-not $perPluginRecipes.ContainsKey($pl)) { $perPluginRecipes[$pl] = 0 }
@@ -819,7 +1268,7 @@ foreach ($pl in $order) {
                         $items[$desc] = [pscustomobject]@{
                             Desc = $desc; Type = $label; Edid = $edid; Name = $full; NameFrom = $fullFrom
                             AlchFlags = $alchFlags; HasEnit = $hasEnit; WeapAnim = $weapAnim
-                            Keywords = $kwds.ToArray(); SeenIn = $pl
+                            Keywords = $kwds.ToArray(); SeenIn = $pl; Value = $value
                         }
                         if ($label -eq 'KYWD') { $kwName[$desc] = $edid }
                     }
@@ -862,10 +1311,76 @@ function HasAnyKeyword($names, $wants) {
     return $false
 }
 
+# Splits an editor id or an item's name into the words a person reads in it.
+# ClothesRedguardBoots comes back as Clothes, Redguard, Boots, and
+# "Ulfric's Armguards" comes back as Ulfric, s, Armguards. A new word starts
+# where a capital follows a small letter, where a capital is followed by a
+# small letter after other capitals, and where letters meet digits. Anything
+# that is not a letter or a digit ends a word.
+function WordsIn([string]$text) {
+    $words = New-Object 'System.Collections.Generic.List[string]'
+    if (-not $text) { return ,$words.ToArray() }
+    $cur = ''
+    for ($i = 0; $i -lt $text.Length; $i++) {
+        $c = $text[$i]
+        if (-not [char]::IsLetterOrDigit($c)) {
+            if ($cur) { $words.Add($cur); $cur = '' }
+            continue
+        }
+        if ($cur.Length -gt 0) {
+            $prev = $cur[$cur.Length - 1]
+            $starts = $false
+            if ([char]::IsDigit($c) -ne [char]::IsDigit($prev)) {
+                $starts = $true
+            } elseif ([char]::IsUpper($c) -and -not [char]::IsUpper($prev)) {
+                $starts = $true
+            } elseif ([char]::IsUpper($c) -and [char]::IsUpper($prev) -and ($i + 1 -lt $text.Length) -and [char]::IsLower($text[$i + 1])) {
+                $starts = $true
+            }
+            if ($starts) { $words.Add($cur); $cur = '' }
+        }
+        $cur += $c
+    }
+    if ($cur) { $words.Add($cur) }
+    return ,$words.ToArray()
+}
+
+# One word against one word, plural included. Case is ignored, which is what
+# -eq does with two strings in PowerShell.
+#
+# The plural is not a nicety. Measured on the first run of whole word matching:
+# 'Robe' on its own caught nothing at all, because every robe in this build is
+# a record called Robes, and the Tailor's Liverywright half fell from 107 rows
+# to 69 in one go. So a word in a list matches that word, that word with an s,
+# and that word with es on the end, and nothing else.
+function SameWord([string]$have, [string]$want) {
+    if ($have -eq $want) { return $true }
+    if ($have -eq ($want + 's')) { return $true }
+    if ($have -eq ($want + 'es')) { return $true }
+    return $false
+}
+
+# True when one of $words appears in $text as a whole word, or as a run of
+# whole words in order for an entry like MothPriest. Case is ignored.
+#
+# This was a plain substring test until 20 September. See the Liverywright knob
+# for what that cost: 'Guard' inside Redguard and Armguards moved eleven rows
+# of common clothing into the wrong half of the Tailor.
 function MatchesWord([string]$text, $words) {
     if (-not $text) { return $false }
-    $lower = $text.ToLowerInvariant()
-    foreach ($w in $words) { if ($lower.Contains($w.ToLowerInvariant())) { return $true } }
+    $have = WordsIn $text
+    if ($have.Count -eq 0) { return $false }
+    foreach ($w in $words) {
+        $want = WordsIn $w
+        if ($want.Count -eq 0) { continue }
+        for ($i = 0; $i + $want.Count -le $have.Count; $i++) {
+            $all = $true
+            for ($j = 0; $j -lt $want.Count; $j++) {
+                if (-not (SameWord $have[$i + $j] $want[$j])) { $all = $false; break }
+            }
+            if ($all) { return $true }
+        }
+    }
     return $false
 }
 
@@ -874,12 +1389,72 @@ function MatchesWord([string]$text, $words) {
 function TailorHalf($item, $names) {
     if (HasAnyKeyword $names $LIVERYWRIGHT_KEYWORDS) { return @('Liverywright', 'the output carries a faction dress keyword') }
     if (MatchesWord $item.Edid $LIVERYWRIGHT_WORDS)  { return @('Liverywright', 'the output''s editor id matches the robe and faction word list') }
-    if (MatchesWord $item.Name $LIVERYWRIGHT_WORDS)  { return @('Liverywright', 'the output''s name matches the robe and faction word list') }
+    if (MatchesWord $item.Name $LIVERYWRIGHT_WORDS)  {
+        # Reported by name every run. The editor id is the modder's own filing
+        # and the name is what a person reads, and where the two disagree the
+        # name is the weaker evidence, so every row that only the name won is
+        # printed rather than buried in a count of 107.
+        $script:tailorByName.Add(("{0} ({1}), named '{2}'" -f $item.Edid, $item.Desc, $item.Name))
+        return @('Liverywright', 'the output''s name matches the robe and faction word list')
+    }
     return @('Haberdasher', 'clothing that is neither a robe nor faction dress')
+}
+
+# One condition on one recipe, read out as the question it asks. A parameter is
+# a form id for the functions that take one, numbered the way every other form
+# id in a plugin is, so DescOf resolves it against the same master list; a
+# parameter that is not a form id, an actor value index for instance, has
+# nothing to resolve to and is left as the number it is.
+#
+# ServerSees is the whole point of this. It is true when the fork has a
+# function for that index and will really evaluate the condition, and false
+# when it does not, in which case ConditionsEvaluator logs the index and
+# answers True. A false here does NOT mean the recipe is available: the
+# crafting menu in front of the person evaluates the same condition and hides
+# the recipe when it fails, so the server is never asked.
+function ConditionRead($cond, $masters, [string]$plugin) {
+    $idx = [int]$cond.Func
+    $name = 'function ' + $idx
+    $serverSees = $false
+    if ($CONDITION_FUNCTIONS_THE_SERVER_HAS.ContainsKey($idx)) {
+        $name = $CONDITION_FUNCTIONS_THE_SERVER_HAS[$idx]
+        $serverSees = $true
+    } elseif ($idx -eq $CONDITION_VANILLA_PERK) {
+        $name = 'HasPerk'
+    }
+    $what = ''
+    $whatType = ''
+    $whatDesc = ''
+    if ($cond.Param1 -ne 0 -and $cond.Param1 -ne 4294967295) {
+        $d = DescOf ([uint32]$cond.Param1) $masters $plugin
+        if ($items.ContainsKey($d)) {
+            $what = $items[$d].Edid
+            $whatType = $items[$d].Type
+            $whatDesc = $d
+        } else {
+            $what = '0x{0:x8}' -f $cond.Param1
+        }
+    }
+    $op = '?'
+    if ($cond.Operator -ge 0 -and $cond.Operator -lt $CONDITION_OPERATORS.Count) {
+        $op = $CONDITION_OPERATORS[$cond.Operator]
+    }
+    $val = '{0:0.###}' -f $cond.Value
+    if ($cond.UsesGlobal) { $val = 'the global 0x{0:x8}' -f ([uint32][math]::Round($cond.Value)) }
+    $text = $name
+    if ($what) { $text += '(' + $what + ')' }
+    $text += ' ' + $op + ' ' + $val
+    return [pscustomobject]@{
+        Func = $idx; Name = $name; Text = $text
+        Param = $what; ParamType = $whatType; ParamDesc = $whatDesc
+        ServerSees = $serverSees
+    }
 }
 
 $owned    = New-Object System.Collections.Specialized.OrderedDictionary
 $unowned  = New-Object System.Collections.Specialized.OrderedDictionary
+$instrumentRows = New-Object 'System.Collections.Generic.List[string]'
+$tailorByName   = New-Object 'System.Collections.Generic.List[string]'
 $noOutput = 0
 $unresolvedOut = New-Object 'System.Collections.Generic.List[string]'
 $namelessOut = @{}
@@ -992,7 +1567,14 @@ foreach ($desc in $recipes.Keys) {
         }
     }
     elseif ($o.Type -eq 'WEAP') {
-        if ($o.WeapAnim -eq $WEAP_ANIM_STAFF) {
+        if ($WOODWRIGHT_TAKES_INSTRUMENTS -and ((MatchesWord $o.Edid $INSTRUMENT_WORDS) -or (MatchesWord $o.Name $INSTRUMENT_WORDS))) {
+            # Before the animation rule on purpose. An instrument is a WEAP
+            # record with the animation type of a fist and no keywords at all,
+            # so nothing further down this chain can tell it from a sword.
+            $ownerName = 'Woodworker'; $half = 'Woodwright'
+            $reason = 'the output is an instrument, and classes.md gives the Woodwright bows, arrows and instruments in one sentence'
+            $instrumentRows.Add(("{0} -> {1} ({2}), animation type {3}, {4} keyword(s)" -f $r.Edid, $o.Name, $o.Edid, $o.WeapAnim, $names.Count))
+        } elseif ($o.WeapAnim -eq $WEAP_ANIM_STAFF) {
             $ownerName = 'Enchanter'; $half = 'Bladebinder'
             $reason = 'the output is a WEAP whose animation type is a staff, and a staff is an enchantment on a stick'
         } elseif ($WOODWRIGHT_TAKES_BOWS_AND_ARROWS -and ($o.WeapAnim -eq $WEAP_ANIM_BOW -or $o.WeapAnim -eq $WEAP_ANIM_CROSSBOW)) {
@@ -1080,6 +1662,24 @@ foreach ($desc in $recipes.Keys) {
         if ($r.BenchDesc -eq $b) { $fires = $false }
     }
 
+    # What the recipe asks of the person before the game will even list it.
+    # A row with nothing here is one a character created this morning, carrying
+    # nothing, can make the moment they reach the bench. Everything else needs
+    # something first, and what that something is is written out rather than
+    # counted, because "this half has 28 recipes" and "this half has 28
+    # recipes nobody on this server can reach" printed the same number until
+    # these were read.
+    $needs = New-Object 'System.Collections.Generic.List[object]'
+    foreach ($c in $r.Conditions) {
+        $needs.Add((ConditionRead $c $r.Masters $r.SeenIn))
+    }
+    $behindPerk = $false
+    $serverChecks = 0
+    foreach ($n in $needs) {
+        if ($n.Func -eq $CONDITION_VANILLA_PERK) { $behindPerk = $true }
+        if ($n.ServerSees) { $serverChecks++ }
+    }
+
     $owned[$desc] = [pscustomobject]@{
         Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type
         BenchDesc = $r.BenchDesc; BenchName = $benchName
@@ -1087,7 +1687,276 @@ foreach ($desc in $recipes.Keys) {
         Count = $r.Count; Inputs = $r.Inputs; Fires = $fires
         Plugin = $r.Plugin; SeenIn = $r.SeenIn; Local = $r.Local
         NameFrom = $o.NameFrom
+        Value = $o.Value
+        Needs = $needs.ToArray()
+        DayOne = ($needs.Count -eq 0)
+        BehindVanillaPerk = $behindPerk
+        ServerChecks = $serverChecks
+        Rank = ''
+        RankWhy = ''
     }
+}
+
+# ------------------------------------------------------- what the rules did -
+
+if ($instrumentRows.Count -gt 0) {
+    Note ("{0} recipe(s) went to the Woodwright as instruments:" -f $instrumentRows.Count)
+    foreach ($i in $instrumentRows) { Note ("  " + $i) }
+} elseif ($WOODWRIGHT_TAKES_INSTRUMENTS) {
+    Note 'no recipe in this build outputs an instrument'
+}
+if ($tailorByName.Count -gt 0) {
+    Note ("{0} Tailor row(s) went to the Liverywright on the output's name alone:" -f $tailorByName.Count)
+    foreach ($t in $tailorByName) { Note ("  " + $t) }
+}
+
+# ------------------------------------------------------------ the conditions
+
+Write-Host ''
+Write-Host 'conditions' -ForegroundColor Cyan
+
+# What the recipes in this build ask for, counted by function. This is the
+# table that says whether a half's rows are work or scenery.
+$condFuncRows = @{}
+$condPerkParamTypes = @{}
+$rowsWithConditions = 0
+foreach ($desc in $owned.Keys) {
+    $row = $owned[$desc]
+    if (-not $row.Fires) { continue }
+    if ($row.Needs.Count -gt 0) { $rowsWithConditions++ }
+    $seenHere = @{}
+    foreach ($n in $row.Needs) {
+        if (-not $seenHere.ContainsKey($n.Name)) {
+            $seenHere[$n.Name] = $true
+            if (-not $condFuncRows.ContainsKey($n.Name)) { $condFuncRows[$n.Name] = 0 }
+            $condFuncRows[$n.Name] = $condFuncRows[$n.Name] + 1
+        }
+        if ($n.Func -eq $CONDITION_VANILLA_PERK) {
+            $t = $n.ParamType
+            if (-not $t) { $t = 'not a record in this load order' }
+            if (-not $condPerkParamTypes.ContainsKey($t)) { $condPerkParamTypes[$t] = 0 }
+            $condPerkParamTypes[$t] = $condPerkParamTypes[$t] + 1
+        }
+    }
+}
+$firingOwned = 0
+foreach ($desc in $owned.Keys) { if ($owned[$desc].Fires) { $firingOwned++ } }
+Note ("{0} of the {1} owned rows the server is asked about carry at least one condition" -f $rowsWithConditions, $firingOwned)
+foreach ($f in ($condFuncRows.Keys | Sort-Object { -$condFuncRows[$_] })) {
+    $tail = 'the server evaluates this one itself'
+    if ($f -eq 'HasPerk' -or $f.StartsWith('function ')) {
+        $tail = 'the fork has no function for this index, so the server answers True and the crafting menu in front of the person is the only thing enforcing it'
+    }
+    Write-Host ("  {0,6}  {1,-28} {2}" -f $condFuncRows[$f], $f, $tail)
+}
+# The evidence for calling index 448 HasPerk, printed rather than asserted.
+if ($condPerkParamTypes.Count -gt 0) {
+    foreach ($t in ($condPerkParamTypes.Keys | Sort-Object)) {
+        Note ("function {0} carries a first parameter that resolves to {1} on {2} condition(s)" -f $CONDITION_VANILLA_PERK, $t, $condPerkParamTypes[$t])
+    }
+}
+
+# ------------------------------- what hands out the items a recipe asks for -
+#
+# A recipe gated on GetItemCount wants something in the pack before the game
+# will list it. If nothing in the whole load order ever hands that something
+# out, the recipe is not gated, it is dead, and the half that owns it is
+# smaller than its count says. The Charburner is the case: three of its four
+# recipes want a woodcutter's book.
+#
+# HOW THIS SEARCHES, AND WHAT IT CANNOT SEE. Every plugin is read again and
+# searched for the three subrecords that put an item within reach of a person:
+#   NAME of 4 bytes  a placed reference, which is an object standing in a cell
+#   CNTO of 8 bytes  a line in a container's or a character's inventory
+#   LVLO of 12 bytes a line in a levelled list
+# The form id is written into each plugin's own numbering first, out of the
+# master list that plugin declares, because the same record is a different
+# number in every file that mentions it.
+#
+# It cannot see three things, and none of them is guessed at: a record stored
+# compressed inside a plugin hides its subrecords from a byte search; a Papyrus
+# script handing over an item is not in any of these subrecords, and this
+# server does not run Papyrus anyway; and a mod that gives the item through the
+# Creation Kit's quest aliases lands in none of the three either. So a hit here
+# is proof the item is reachable, and no hit is a reason to go and look rather
+# than a proof of nothing.
+#
+# It is loud rather than fatal. The recipe belongs to whoever's plugin ships it
+# and the fix is in that plugin, not in this table, and refusing to write 5116
+# rows over a mod's dead recipe would leave the server with no table at all.
+
+Write-Host ''
+Write-Host 'what hands out the items these recipes ask for' -ForegroundColor Cyan
+
+$wantedItems = New-Object System.Collections.Specialized.OrderedDictionary
+foreach ($desc in $owned.Keys) {
+    $row = $owned[$desc]
+    if (-not $row.Fires) { continue }
+    foreach ($nd in $row.Needs) {
+        if ($nd.Name -ne 'GetItemCount') { continue }
+        $d = $nd.ParamDesc
+        if (-not $d) { continue }
+        if (-not $wantedItems.Contains($d)) {
+            $wantedItems[$d] = [pscustomobject]@{
+                Edid = $nd.Param; Type = $nd.ParamType
+                Wanters = New-Object 'System.Collections.Generic.List[string]'
+                Found = ''
+            }
+        }
+        $wantedItems[$d].Wanters.Add($row.Edid)
+    }
+}
+
+if ($wantedItems.Count -eq 0) {
+    Ok 'no recipe in this table asks for an item first'
+} else {
+    $latin1 = [System.Text.Encoding]::GetEncoding(28591)
+    foreach ($pl in $order) {
+        $left = 0
+        foreach ($d in $wantedItems.Keys) { if (-not $wantedItems[$d].Found) { $left++ } }
+        if ($left -eq 0) { break }
+        $path = Join-Path $Data $pl
+        if (-not (Test-Path -LiteralPath $path)) { continue }
+        $masters = $pluginMasters[$pl]
+        $bytes = [System.IO.File]::ReadAllBytes($path)
+        $text = $latin1.GetString($bytes)
+        foreach ($d in $wantedItems.Keys) {
+            if ($wantedItems[$d].Found) { continue }
+            $bits = $d.Split(':')
+            $localId = [uint32]('0x' + $bits[0])
+            $owner = $bits[1]
+            $index = -1
+            if ($owner -eq $pl) {
+                $index = $masters.Count
+            } else {
+                for ($m = 0; $m -lt $masters.Count; $m++) { if ($masters[$m] -eq $owner) { $index = $m; break } }
+            }
+            if ($index -lt 0) { continue }
+            $full = ([uint32]$index -shl 24) -bor ($localId -band 0xFFFFFF)
+            $idText = [string]([char]($full -band 0xFF)) + [char](($full -shr 8) -band 0xFF) +
+                      [char](($full -shr 16) -band 0xFF) + [char](($full -shr 24) -band 0xFF)
+            if ($text.IndexOf('NAME' + [char]4 + [char]0 + $idText, [StringComparison]::Ordinal) -ge 0) {
+                $wantedItems[$d].Found = 'placed in the world by ' + $pl
+                continue
+            }
+            if ($text.IndexOf('CNTO' + [char]8 + [char]0 + $idText, [StringComparison]::Ordinal) -ge 0) {
+                $wantedItems[$d].Found = 'in a container or a character''s inventory in ' + $pl
+                continue
+            }
+            $p = 0
+            while (($p = $text.IndexOf('LVLO' + [char]12 + [char]0, $p, [StringComparison]::Ordinal)) -ge 0) {
+                if ($p + 14 -le $text.Length -and $text.Substring($p + 10, 4) -ceq $idText) {
+                    $wantedItems[$d].Found = 'on a levelled list in ' + $pl
+                    break
+                }
+                $p += 6
+            }
+        }
+        $text = $null
+        $bytes = $null
+    }
+
+    $orphans = 0
+    foreach ($d in $wantedItems.Keys) {
+        $w = $wantedItems[$d]
+        if ($w.Found) { continue }
+        $orphans++
+        Loud ("nothing in the load order hands out {0} {1} ({2}), and {3} recipe(s) will not appear without it: {4}" -f `
+              $w.Type, $w.Edid, $d, $w.Wanters.Count, (($w.Wanters | Select-Object -First 4) -join ', '))
+    }
+    if ($orphans -eq 0) {
+        Ok ("all {0} item(s) these recipes ask for are handed out somewhere in the load order" -f $wantedItems.Count)
+    } else {
+        Note ("{0} of {1} wanted item(s) were found, {2} were not" -f ($wantedItems.Count - $orphans), $wantedItems.Count, $orphans)
+    }
+}
+
+# ------------------------------------------------------------- the ranking --
+
+Write-Host ''
+Write-Host 'ranking' -ForegroundColor Cyan
+
+# A row with no price cannot be ranked, and a rank guessed without one would
+# decide what a real person may make. The build fails rather than guessing.
+$noValue = New-Object 'System.Collections.Generic.List[string]'
+foreach ($desc in $owned.Keys) {
+    if ($owned[$desc].Value -lt 0) {
+        $noValue.Add(("{0} ({1}) makes {2}, a {3}, and no rule in VALUE_RULES says where that record keeps its value" -f `
+                      $owned[$desc].Edid, $desc, $owned[$desc].OutName, $owned[$desc].OutType))
+    }
+}
+if ($noValue.Count -gt 0) {
+    Bad ("{0} owned recipe(s) have no price to rank by" -f $noValue.Count)
+    foreach ($v in ($noValue | Select-Object -First 8)) { Note ("  " + $v) }
+} else {
+    Ok 'every owned recipe makes something the records put a price on'
+}
+
+# The shares, half by half. Sorted by price, cheapest first, and the cut is
+# pushed past any run of rows that share the boundary price, so two recipes
+# that make things worth the same never land on different rungs.
+$promoted = New-Object 'System.Collections.Generic.List[string]'
+$rankRows = @{}
+foreach ($p in $PROFESSIONS.Keys) {
+    foreach ($h in $PROFESSIONS[$p]) {
+        $key = $p + '/' + $h
+        $mine = New-Object 'System.Collections.Generic.List[object]'
+        foreach ($desc in $owned.Keys) {
+            if (($owned[$desc].Owner + '/' + $owned[$desc].Half) -eq $key) { $mine.Add($desc) }
+        }
+        if ($mine.Count -eq 0) { continue }
+        $sorted = @($mine | Sort-Object @{ Expression = { [int64]$owned[$_].Value } }, @{ Expression = { [string]$_ } })
+        $n = $sorted.Count
+        $at = 0
+        foreach ($s in $RANK_SHARE) {
+            $last = [int][math]::Ceiling($n * [double]$s.Upto)
+            if ($last -gt $n) { $last = $n }
+            # do not split a run of equal prices across two ranks
+            while ($last -lt $n -and [int64]$owned[$sorted[$last - 1]].Value -eq [int64]$owned[$sorted[$last]].Value) { $last++ }
+            while ($at -lt $last) {
+                $owned[$sorted[$at]].Rank = [string]$s.Rank
+                $owned[$sorted[$at]].RankWhy = ('what it makes is worth ' + $owned[$sorted[$at]].Value + ' gold, which puts it in the ' + $s.Rank + ' share of what this half makes')
+                $at++
+            }
+        }
+        while ($at -lt $n) {
+            $owned[$sorted[$at]].Rank = [string]$RANK_SHARE[$RANK_SHARE.Count - 1].Rank
+            $owned[$sorted[$at]].RankWhy = 'the dearest of what this half makes'
+            $at++
+        }
+
+        # The circle check, and the one rule that breaks it. The cheapest row
+        # of this half that a new character can actually reach is novice,
+        # whatever the share said, because a rung nobody can stand on is a rung
+        # nobody climbs off.
+        if ($NOVICE_MUST_BE_REACHABLE) {
+            $firstOpen = ''
+            foreach ($d in $sorted) {
+                if ($owned[$d].Fires -and $owned[$d].DayOne) { $firstOpen = $d; break }
+            }
+            if ($firstOpen -and $owned[$firstOpen].Rank -ne 'novice') {
+                $promoted.Add(("{0}: {1} ({2}), worth {3}, was {4} and is the cheapest row of this half anybody can reach on the day they pick it" -f `
+                               $key, $owned[$firstOpen].Edid, $owned[$firstOpen].OutName, $owned[$firstOpen].Value, $owned[$firstOpen].Rank))
+                $owned[$firstOpen].Rank = 'novice'
+                $owned[$firstOpen].RankWhy = 'the cheapest row of this half that a new character can reach, moved to novice so the half has a way in'
+            }
+        }
+
+        $counts = [ordered]@{}
+        foreach ($rk in $RANKS) { $counts[$rk] = 0 }
+        foreach ($d in $sorted) { $counts[[string]$owned[$d].Rank] = $counts[[string]$owned[$d].Rank] + 1 }
+        $rankRows[$key] = $counts
+        $lo = [int64]$owned[$sorted[0]].Value
+        $hi = [int64]$owned[$sorted[$n - 1]].Value
+        Write-Host ("  {0,-24} {1,5} rows, {2} to {3} gold, novice {4}, advanced {5}, expert {6}, master {7}" -f `
+                    $key, $n, $lo, $hi, $counts['novice'], $counts['advanced'], $counts['expert'], $counts['master'])
+    }
+}
+if ($promoted.Count -gt 0) {
+    Loud ("{0} row(s) were moved to novice so that the half has something a new character can make:" -f $promoted.Count)
+    foreach ($pz in $promoted) { Loud ("  " + $pz) }
+} else {
+    Ok 'every half already had a reachable novice row, so nothing was moved'
 }
 
 # ------------------------------------------------------------- the checks ---
@@ -1151,6 +2020,14 @@ foreach ($desc in $owned.Keys) {
         $badOwner.Add(("{0} is owned by '{1}', which is not a profession in classes.md" -f $desc, $row.Owner))
         continue
     }
+    if ($PROFESSIONS[$row.Owner].Count -eq 0) {
+        # The Mage is the only one of these. It is in the roster with no halves
+        # because the panel needs the full eight, and a recipe landing on it
+        # means a rule above sent a crafting row to a profession that does not
+        # craft. What a mage knows belongs in tools\Build-SpellTable.ps1.
+        $badOwner.Add(("{0} is owned by {1}, which has no halves and makes nothing by recipe. {2}" -f $desc, $row.Owner, $PROFESSION_CRAFTS[$row.Owner].Why))
+        continue
+    }
     if (-not ($PROFESSIONS[$row.Owner] -contains $row.Half)) {
         $badOwner.Add(("{0} is {1}/{2} and '{2}' is not one of {1}'s two halves" -f $desc, $row.Owner, $row.Half))
     }
@@ -1168,29 +2045,50 @@ Write-Host 'what each half ends up with' -ForegroundColor Cyan
 
 $perHalf  = @{}
 $perHalfFiring = @{}
+$perHalfDayOne = @{}
+$perHalfPerk   = @{}
 foreach ($p in $PROFESSIONS.Keys) {
     foreach ($h in $PROFESSIONS[$p]) {
         $perHalf[$p + '/' + $h] = 0
         $perHalfFiring[$p + '/' + $h] = 0
+        $perHalfDayOne[$p + '/' + $h] = 0
+        $perHalfPerk[$p + '/' + $h] = 0
     }
 }
 foreach ($desc in $owned.Keys) {
     $row = $owned[$desc]
     $key = $row.Owner + '/' + $row.Half
-    if (-not $perHalf.ContainsKey($key)) { $perHalf[$key] = 0; $perHalfFiring[$key] = 0 }
+    if (-not $perHalf.ContainsKey($key)) {
+        $perHalf[$key] = 0; $perHalfFiring[$key] = 0; $perHalfDayOne[$key] = 0; $perHalfPerk[$key] = 0
+    }
     $perHalf[$key] = $perHalf[$key] + 1
-    if ($row.Fires) { $perHalfFiring[$key] = $perHalfFiring[$key] + 1 }
+    if ($row.Fires) {
+        $perHalfFiring[$key] = $perHalfFiring[$key] + 1
+        if ($row.DayOne) { $perHalfDayOne[$key] = $perHalfDayOne[$key] + 1 }
+        if ($row.BehindVanillaPerk) { $perHalfPerk[$key] = $perHalfPerk[$key] + 1 }
+    }
 }
 
-Write-Host ("  {0,-14} {1,-14} {2,8}  {3,8}" -f 'profession', 'half', 'recipes', 'the server is asked about')
+# Four numbers, not two, and the last two are the ones that were missing.
+# 'asked' counts the rows that reach onCraft at all. 'open today' counts the
+# rows a character created this morning can make: no condition of any kind, so
+# nothing has to be found, learnt or earned first. 'behind a perk' counts the
+# rows gated on a vanilla perk, which classes.md says nobody on this server
+# will ever hold.
+Write-Host ("  {0,-12} {1,-14} {2,8} {3,8} {4,10} {5,14}" -f 'profession', 'half', 'recipes', 'asked', 'open today', 'behind a perk')
 foreach ($p in $PROFESSIONS.Keys) {
     $total = 0
     foreach ($h in $PROFESSIONS[$p]) { $total += $perHalf[$p + '/' + $h] }
     foreach ($h in $PROFESSIONS[$p]) {
         $key = $p + '/' + $h
-        Write-Host ("  {0,-14} {1,-14} {2,8}  {3,8}" -f $p, $h, $perHalf[$key], $perHalfFiring[$key])
+        Write-Host ("  {0,-12} {1,-14} {2,8} {3,8} {4,10} {5,14}" -f $p, $h, $perHalf[$key], $perHalfFiring[$key], $perHalfDayOne[$key], $perHalfPerk[$key])
     }
-    Note ("{0}: {1} in all" -f $p, $total)
+    if ($PROFESSIONS[$p].Count -eq 0) {
+        Write-Host ("  {0,-12} {1,-14} {2,8} {3,8} {4,10} {5,14}" -f $p, '(no halves)', 0, 0, 0, 0)
+        Note ("{0}: {1}" -f $p, $PROFESSION_CRAFTS[$p].Why)
+    } else {
+        Note ("{0}: {1} in all" -f $p, $total)
+    }
 }
 Note ("unowned: {0}, and unowned means anybody may make it" -f $unowned.Count)
 
@@ -1202,7 +2100,7 @@ $filledUnexpected = New-Object 'System.Collections.Generic.List[string]'
 foreach ($p in $PROFESSIONS.Keys) {
     foreach ($h in $PROFESSIONS[$p]) {
         $key = $p + '/' + $h
-        $expectedEmpty = $EMPTY_HALVES_EXPECTED.Contains($key)
+        $expectedEmpty = $HALVES_WITH_NO_RECIPES.Contains($key)
         if ($perHalf[$key] -eq 0 -and -not $expectedEmpty) { $emptyUnexpected.Add($key) }
         if ($perHalf[$key] -gt 0 -and $expectedEmpty) { $filledUnexpected.Add($key) }
     }
@@ -1217,13 +2115,88 @@ if ($emptyUnexpected.Count -gt 0) {
 }
 if ($filledUnexpected.Count -gt 0) {
     foreach ($k in $filledUnexpected) {
-        Bad ("{0} is named in EMPTY_HALVES_EXPECTED as having nothing, and it has {1} recipe(s). That knob is out of date and the reason written in it is no longer true." -f $k, $perHalf[$k])
+        Bad ("{0} is named in HALVES_WITH_NO_RECIPES as having nothing, and it has {1} recipe(s). That knob is out of date and the reason written in it is no longer true." -f $k, $perHalf[$k])
     }
 }
-foreach ($k in $EMPTY_HALVES_EXPECTED.Keys) {
-    Loud ("{0} owns nothing, on purpose: {1}" -f $k, $EMPTY_HALVES_EXPECTED[$k])
+foreach ($k in $HALVES_WITH_NO_RECIPES.Keys) {
+    Loud ("{0} owns nothing: {1}" -f $k, $HALVES_WITH_NO_RECIPES[$k].Why)
 }
-Loud 'those halves go into recipes.json under cannotCraftYet. The panel on K should not offer a half that can make nothing.'
+Loud 'those halves go into recipes.json under "halves", each with a craftsAtAll flag. Every one of them is still offered in character creation: a half nobody may pick is a profession nobody may pick.'
+
+# THE CHECK THAT OWNING RECIPES IS NOT THE SAME AS BEING ABLE TO WORK.
+#
+# A half can own hundreds of rows and have nothing anybody can make on the day
+# they pick it. Three halves in this build are exactly that, and every one of
+# them passed the check above, because the check above counts rows rather than
+# rows a person can reach.
+$noStart = New-Object 'System.Collections.Generic.List[string]'
+$startsFine = New-Object 'System.Collections.Generic.List[string]'
+foreach ($p in $PROFESSIONS.Keys) {
+    foreach ($h in $PROFESSIONS[$p]) {
+        $key = $p + '/' + $h
+        if ($perHalfFiring[$key] -eq 0) { continue }
+        $named = $HALVES_NOBODY_CAN_START.Contains($key)
+        if ($perHalfDayOne[$key] -eq 0 -and -not $named) { $noStart.Add($key) }
+        if ($perHalfDayOne[$key] -gt 0 -and $named) { $startsFine.Add($key) }
+        if ($perHalfDayOne[$key] -eq 0) {
+            # What that half's rows are actually waiting on, counted, so the
+            # reason in the knob can be written from the build rather than
+            # from somebody's recollection of it.
+            $asks = @{}
+            foreach ($desc in $owned.Keys) {
+                $row = $owned[$desc]
+                if (-not $row.Fires) { continue }
+                if (($row.Owner + '/' + $row.Half) -ne $key) { continue }
+                $seenHere = @{}
+                foreach ($nd in $row.Needs) {
+                    if ($seenHere.ContainsKey($nd.Name)) { continue }
+                    $seenHere[$nd.Name] = $true
+                    if (-not $asks.ContainsKey($nd.Name)) { $asks[$nd.Name] = 0 }
+                    $asks[$nd.Name] = $asks[$nd.Name] + 1
+                }
+            }
+            $bits = @()
+            foreach ($a in ($asks.Keys | Sort-Object { -$asks[$_] })) { $bits += ($asks[$a].ToString() + ' x ' + $a) }
+            Note ("{0}: all {1} row(s) the server is asked about are behind something. {2}" -f $key, $perHalfFiring[$key], ($bits -join ', '))
+        }
+        elseif ($perHalfDayOne[$key] -le $THIN_HALF_ROWS -and $perHalfFiring[$key] -gt $perHalfDayOne[$key]) {
+            # A half with almost nothing to start on. Printed row by row,
+            # because "4 recipes" and "1 recipe and three behind a book" are
+            # the same number in a table and not the same trade.
+            Loud ("{0} has {1} of {2} row(s) a new character can make. The rest:" -f $key, $perHalfDayOne[$key], $perHalfFiring[$key])
+            $shown = 0
+            $held = 0
+            foreach ($desc in $owned.Keys) {
+                $row = $owned[$desc]
+                if (-not $row.Fires) { continue }
+                if (($row.Owner + '/' + $row.Half) -ne $key) { continue }
+                if ($row.DayOne) { continue }
+                $held++
+                if ($shown -ge $THIN_HALF_LINES) { continue }
+                $shown++
+                $what = @()
+                foreach ($nd in $row.Needs) { $what += $nd.Text }
+                Loud ("  {0} makes {1} and wants {2}" -f $row.Edid, $row.OutName, ($what -join ' and '))
+            }
+            if ($held -gt $shown) { Loud ("  and {0} more, all of them in recipes.json with what each one wants" -f ($held - $shown)) }
+        }
+    }
+}
+if ($noStart.Count -gt 0) {
+    foreach ($k in $noStart) {
+        Bad ("{0} owns {1} recipe(s) the server is asked about and not one of them can be made by somebody who picked that half this morning: every one is behind a condition. That is a half that looks like work and is not. Either a rule above is wrong or somebody has to decide what a new one of these starts with." -f $k, $perHalfFiring[$k])
+    }
+} else {
+    Ok 'every half with recipes has at least one a new character can make, or is named in HALVES_NOBODY_CAN_START with the reason'
+}
+if ($startsFine.Count -gt 0) {
+    foreach ($k in $startsFine) {
+        Bad ("{0} is named in HALVES_NOBODY_CAN_START and it has {1} recipe(s) a new character can make. That knob is out of date." -f $k, $perHalfDayOne[$k])
+    }
+}
+foreach ($k in $HALVES_NOBODY_CAN_START.Keys) {
+    Loud ("{0} has nothing a new character can make: {1}" -f $k, $HALVES_NOBODY_CAN_START[$k])
+}
 
 # the unowned map, by reason, because there are too many to print one at a time
 Write-Host ''
@@ -1266,14 +2239,43 @@ $doc.Add('{')
 $doc.Add('  "builtBy": ' + (JsonStr 'tools\Build-RecipeTable.ps1') + ',')
 $doc.Add('  "source": ' + (JsonStr ('every COBJ record across ' + $order.Count + ' plugins in load order, and the records their CNAM and BNAM point at')) + ',')
 $doc.Add('  "language": ' + (JsonStr $LANGUAGE) + ',')
-$doc.Add('  "readFrom": ' + (JsonStr 'BNAM is the workbench keyword, CNAM is the output item, NAM1 is how many it makes, COCT and CNTO are the inputs, CTDA is the conditions the server evaluates itself') + ',')
-$doc.Add('  "event": ' + (JsonStr 'mp.onCraft(actorFormId, craftedItemBaseId, count, recipeId). recipeId is the key of this table. Returning false refuses the craft outright: CraftEvent::OnFireSuccess is what removes the inputs and adds the output, and GameModeEvent::Fire only calls it when nobody blocked.') + ',')
+$doc.Add('  "readFrom": ' + (JsonStr 'BNAM is the workbench keyword, CNAM is the output item, NAM1 is how many it makes, COCT and CNTO are the inputs, CTDA is the conditions, which are in every row''s needs list') + ',')
+$doc.Add('  "event": ' + (JsonStr 'mp.onCraft(actorFormId, craftedItemBaseId, count, recipeId). All four arguments are numbers. The keys of this table are desc strings, so look a row up with RECIPES_BY_ID[mp.getDescFromId(recipeId)] and never with recipeId itself, which matches nothing. Returning false refuses the craft outright: CraftEvent::OnFireSuccess is what removes the inputs and adds the output, and GameModeEvent::Fire only calls it when nobody blocked.') + ',')
+$doc.Add('  "key": ' + (JsonStr 'the recipe''s form id in lower case hex, a colon, and the file it belongs to. mp.getDescFromId turns onCraft''s fourth argument into one.') + ',')
+$doc.Add('  "rank": ' + (JsonStr 'which of classes.md''s four ranks the row asks for: novice, advanced, expert or master. Ranked inside its own half by what the recipe makes, cheapest quarter first. classes.md sets no numbers for this and nothing in the game records ranks a recipe, so the shares are this script''s judgement and they are in the RANK_SHARE knob.') + ',')
+$doc.Add('  "sisterHalf": ' + (JsonStr 'classes.md gives you the novice work of the other half of your own profession for nothing, and no further than novice. The gate can answer that because every row carries a rank.') + ',')
+$doc.Add('  "needs": ' + (JsonStr 'the recipe''s own conditions, read out of its CTDA subrecords. An empty list means anybody standing at the bench can make it. serverSees false means the fork has no function for that condition and the server answers True, so the only thing enforcing it is the crafting menu on the machine in front of the person, which hides the recipe rather than refusing it.') + ',')
 $doc.Add('  "default": ' + (JsonStr 'a recipe id this table does not carry is one nobody owns, and anybody may make it') + ',')
 $doc.Add('  "fires": ' + (JsonStr 'false means the server is never asked about this recipe. CraftService::RecipeItemsMatch throws out the armour table (adb78) and the sharpening wheel (88108) before it considers anything, so tempering never reaches onCraft.') + ',')
 $doc.Add('  "count": ' + ($owned.Count + $unowned.Count) + ',')
 $doc.Add('  "owned": ' + $owned.Count + ',')
 $doc.Add('  "unownedCount": ' + $unowned.Count + ',')
 
+# Items a recipe asks for that nothing in the load order hands out. A recipe
+# behind one of these is not gated, it is dead, and it is written down here so
+# that the next person does not have to run this script to find out.
+$doc.Add('  "itemsNothingHandsOut": {')
+$on = 0
+$orphanKeys = @()
+foreach ($d in $wantedItems.Keys) { if (-not $wantedItems[$d].Found) { $orphanKeys += $d } }
+foreach ($d in $orphanKeys) {
+    $on++
+    $comma = ','
+    if ($on -eq $orphanKeys.Count) { $comma = '' }
+    $w = $wantedItems[$d]
+    $who = @()
+    foreach ($x in $w.Wanters) { $who += (JsonStr $x) }
+    $doc.Add('    ' + (JsonStr $d) + ': { "editorId": ' + (JsonStr $w.Edid) + ', "type": ' + (JsonStr $w.Type) +
+             ', "recipesThatWantIt": [' + ($who -join ', ') + ']' +
+             ', "searched": ' + (JsonStr 'every plugin in the load order, for a placed reference, a container or character inventory line, and a levelled list line. A record stored compressed, a Papyrus script or a quest alias would not be found by that search.') + ' }' + $comma)
+}
+$doc.Add('  },')
+
+# The roster, and it is the whole roster. All eight professions of classes.md,
+# the Mage among them with no halves, because this map is the only list of
+# professions the file ships and a panel built from a list of seven would offer
+# seven. offerInCharacterCreation is true on every one of them: nothing here is
+# a reason to take a profession off the character creation panel.
 $doc.Add('  "professions": {')
 $pn = 0
 foreach ($p in $PROFESSIONS.Keys) {
@@ -1282,11 +2284,25 @@ foreach ($p in $PROFESSIONS.Keys) {
     if ($pn -eq $PROFESSIONS.Count) { $comma = '' }
     $halves = @()
     foreach ($h in $PROFESSIONS[$p]) { $halves += (JsonStr $h) }
-    $doc.Add('    ' + (JsonStr $p) + ': [' + ($halves -join ', ') + ']' + $comma)
+    $halvesTxt = 'null'
+    if ($halves.Count -gt 0) { $halvesTxt = '[' + ($halves -join ', ') + ']' }
+    $craftsTxt = 'false'
+    if ($PROFESSION_CRAFTS[$p].Crafts) { $craftsTxt = 'true' }
+    $line = '    ' + (JsonStr $p) + ': { "halves": ' + $halvesTxt +
+            ', "craftsAtAll": ' + $craftsTxt +
+            ', "offerInCharacterCreation": true'
+    if ($PROFESSION_CRAFTS[$p].Why) { $line += ', "why": ' + (JsonStr $PROFESSION_CRAFTS[$p].Why) }
+    $doc.Add($line + ' }' + $comma)
 }
 $doc.Add('  },')
 
-$doc.Add('  "counts": {')
+# One entry per half, with what it owns, what the server is asked about, what a
+# character created this morning can actually make, and how those rows split
+# across the four ranks. The counts and the cannotCraftYet map used to be two
+# separate fields and neither could tell "this half does not craft" from "this
+# half is broken", which is how a reader of the old field would have taken the
+# Warrior out of character creation.
+$doc.Add('  "halves": {')
 $cn = 0
 $keys = @()
 foreach ($p in $PROFESSIONS.Keys) { foreach ($h in $PROFESSIONS[$p]) { $keys += ($p + '/' + $h) } }
@@ -1294,17 +2310,34 @@ foreach ($k in $keys) {
     $cn++
     $comma = ','
     if ($cn -eq $keys.Count) { $comma = '' }
-    $doc.Add('    ' + (JsonStr $k) + ': { "recipes": ' + $perHalf[$k] + ', "theServerIsAsked": ' + $perHalfFiring[$k] + ' }' + $comma)
-}
-$doc.Add('  },')
-
-$doc.Add('  "cannotCraftYet": {')
-$en = 0
-foreach ($k in $EMPTY_HALVES_EXPECTED.Keys) {
-    $en++
-    $comma = ','
-    if ($en -eq $EMPTY_HALVES_EXPECTED.Count) { $comma = '' }
-    $doc.Add('    ' + (JsonStr $k) + ': ' + (JsonStr $EMPTY_HALVES_EXPECTED[$k]) + $comma)
+    $prof = $k.Split('/')[0]
+    $craftsTxt = 'true'
+    $why = ''
+    if ($HALVES_WITH_NO_RECIPES.Contains($k)) {
+        $why = $HALVES_WITH_NO_RECIPES[$k].Why
+        if (-not $HALVES_WITH_NO_RECIPES[$k].Crafts) { $craftsTxt = 'false' }
+    } elseif (-not $PROFESSION_CRAFTS[$prof].Crafts) {
+        $craftsTxt = 'false'
+        $why = $PROFESSION_CRAFTS[$prof].Why
+    }
+    $byRank = '{}'
+    if ($rankRows.ContainsKey($k)) {
+        $bits = @()
+        foreach ($rk in $RANKS) { $bits += ((JsonStr $rk) + ': ' + $rankRows[$k][$rk]) }
+        $byRank = '{ ' + ($bits -join ', ') + ' }'
+    }
+    $line = '    ' + (JsonStr $k) + ': { "recipes": ' + $perHalf[$k] +
+            ', "theServerIsAsked": ' + $perHalfFiring[$k] +
+            ', "canBeMadeOnDayOne": ' + $perHalfDayOne[$k] +
+            ', "behindAVanillaPerk": ' + $perHalfPerk[$k] +
+            ', "byRank": ' + $byRank +
+            ', "craftsAtAll": ' + $craftsTxt +
+            ', "offerInCharacterCreation": true'
+    if ($why) { $line += ', "why": ' + (JsonStr $why) }
+    if ($HALVES_NOBODY_CAN_START.Contains($k)) {
+        $line += ', "nothingToMakeOnDayOne": ' + (JsonStr $HALVES_NOBODY_CAN_START[$k])
+    }
+    $doc.Add($line + ' }' + $comma)
 }
 $doc.Add('  },')
 
@@ -1317,15 +2350,33 @@ foreach ($desc in $owned.Keys) {
     $r = $owned[$desc]
     $firesTxt = 'false'
     if ($r.Fires) { $firesTxt = 'true' }
+    $dayOneTxt = 'false'
+    if ($r.DayOne) { $dayOneTxt = 'true' }
+    $needsTxt = '[]'
+    if ($r.Needs.Count -gt 0) {
+        $bits = @()
+        foreach ($nd in $r.Needs) {
+            $sees = 'false'
+            if ($nd.ServerSees) { $sees = 'true' }
+            $bits += ('{ "asks": ' + (JsonStr $nd.Text) + ', "function": ' + $nd.Func +
+                      ', "of": ' + (JsonStr $nd.Param) + ', "ofType": ' + (JsonStr $nd.ParamType) +
+                      ', "serverSees": ' + $sees + ' }')
+        }
+        $needsTxt = '[' + ($bits -join ', ') + ']'
+    }
     $doc.Add('    ' + (JsonStr $desc) + ': { "editorId": ' + (JsonStr $r.Edid) +
              ', "out": ' + (JsonStr $r.OutDesc) + ', "name": ' + (JsonStr $r.OutName) +
              ', "type": ' + (JsonStr $r.OutType) + ', "makes": ' + $r.Count +
-             ', "inputs": ' + $r.Inputs +
+             ', "inputs": ' + $r.Inputs + ', "worth": ' + $r.Value +
              ', "bench": ' + (JsonStr $r.BenchDesc) + ', "benchName": ' + (JsonStr $r.BenchName) +
              ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
-             ', "fires": ' + $firesTxt + ', "plugin": ' + (JsonStr $r.Plugin) +
+             ', "rank": ' + (JsonStr $r.Rank) +
+             ', "fires": ' + $firesTxt + ', "canBeMadeOnDayOne": ' + $dayOneTxt +
+             ', "needs": ' + $needsTxt +
+             ', "plugin": ' + (JsonStr $r.Plugin) +
              ', "nameFrom": ' + (JsonStr $r.NameFrom) +
-             ', "why": ' + (JsonStr $r.Reason) + ' }' + $comma)
+             ', "why": ' + (JsonStr $r.Reason) +
+             ', "whyThatRank": ' + (JsonStr $r.RankWhy) + ' }' + $comma)
 }
 $doc.Add('  },')
 
@@ -1365,9 +2416,12 @@ $blockRows = New-Object 'System.Collections.Generic.List[string]'
 foreach ($desc in $owned.Keys) {
     if (-not $owned[$desc].Fires) { continue }
     $r = $owned[$desc]
+    $dayOneTxt = 'false'
+    if ($r.DayOne) { $dayOneTxt = 'true' }
     $blockRows.Add('    ' + (JsonStr $desc) + ': { "out": ' + (JsonStr $r.OutDesc) + ', "name": ' + (JsonStr $r.OutName) +
                    ', "type": ' + (JsonStr $r.OutType) + ', "makes": ' + $r.Count +
-                   ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) + ' },')
+                   ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
+                   ', "rank": ' + (JsonStr $r.Rank) + ', "open": ' + $dayOneTxt + ' },')
 }
 if ($blockRows.Count -gt 0) {
     $last = $blockRows[$blockRows.Count - 1]
@@ -1378,10 +2432,29 @@ $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('  /* Built by tools\Build-RecipeTable.ps1 out of the game''s own records. Do not hand edit.')
 $lines.Add('     ' + $blockRows.Count + ' crafting recipes, out of ' + ($owned.Count + $unowned.Count) + ' in tools\recipes.json.')
 $lines.Add('')
-$lines.Add('     Recipe id -> what it makes, what kind of record that is, how many it')
-$lines.Add('     makes, and which profession and which half of it owns the recipe. The')
-$lines.Add('     id is the fourth argument of mp.onCraft. Returning false from onCraft')
+$lines.Add('     Recipe desc -> what it makes, what kind of record that is, how many it')
+$lines.Add('     makes, which profession and which half of it owns the recipe, and which')
+$lines.Add('     of classes.md''s four ranks it asks for. Returning false from onCraft')
 $lines.Add('     refuses the craft and the person keeps their materials.')
+$lines.Add('')
+$lines.Add('     THE KEY IS A DESC AND onCraft HANDS YOU A NUMBER. All four arguments of')
+$lines.Add('     mp.onCraft(actorFormId, craftedItemBaseId, count, recipeId) are numbers,')
+$lines.Add('     and every key in here is a string like "f61:Skyrim.esm". So:')
+$lines.Add('')
+$lines.Add('         var row = RECIPES_BY_ID[mp.getDescFromId(recipeId)];')
+$lines.Add('')
+$lines.Add('     RECIPES_BY_ID[recipeId] is undefined for every row in this block, which')
+$lines.Add('     is a gate that refuses nothing and says nothing while it does it.')
+$lines.Add('')
+$lines.Add('     rank is what to compare the character''s rank in that half against.')
+$lines.Add('     classes.md also gives somebody the novice work of the other half of')
+$lines.Add('     their own profession and no further, so a row whose half is the sister')
+$lines.Add('     half passes at rank novice and nowhere above it.')
+$lines.Add('')
+$lines.Add('     open is true when the recipe carries no condition of its own. A row')
+$lines.Add('     with open false needs something first, an item, a spell or a vanilla')
+$lines.Add('     perk nobody here can hold, and Skyrim''s own crafting menu decides that')
+$lines.Add('     before the server is ever asked. tools\recipes.json says which.')
 $lines.Add('')
 $lines.Add('     A recipe id that is not in here is one nobody owns and anybody may')
 $lines.Add('     make. Tempering is not in here either: the server is never asked about')
