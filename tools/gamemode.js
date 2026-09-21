@@ -363,6 +363,15 @@ function ensureProperties() {
       updateOwner: '',
       updateNeighbor: '',
     });
+    // When each of the three tools was last handed over. Nothing on the client
+    // reads it and nobody standing next to you has any business knowing it, so
+    // it is invisible to both. See TOOL_AGAIN_HOURS.
+    mp.makeProperty(TOOL_PROPERTY, {
+      isVisibleByOwner: false,
+      isVisibleByNeighbors: false,
+      updateOwner: '',
+      updateNeighbor: '',
+    });
   } catch (e) {
     // already made, or made by a previous load. harmless.
   }
@@ -1243,6 +1252,279 @@ function rankStep(actorId, key) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// the three starting tools
+//
+// Patrick, 20 September: 'if you choose miner you should start with a pickaxe,
+// unequipped is fine just in the inventory, the woodworker needs to start with
+// an axe', and 'let's make it so to be able to farm you need a hoe so give
+// farmers a hoe'.
+//
+// SKYRIM HAS NO HOE. Measured on 20 September across the whole load order, the
+// masters and all 96 plugins after them: there is no record of any type that is
+// a hoe. The only records that match the word at all are shoes. So the farmer's
+// tool is a shovel, which is a real MISC record in Skyrim.esm and the thing
+// actually leaning against the walls of the farms people will be standing in.
+// The rulebook says so in its own words as well, on the public page, because a
+// person who reads 'you need a hoe' and then cannot find one in any shop in the
+// province has been told a lie by us and not by the game.
+//
+// The tool is IN THE PACK and nothing more. Nothing here equips anything: the
+// server can write an inventory and cannot make somebody hold a weapon, and
+// Patrick asked for unequipped anyway.
+//
+// Three verbs ask for a tool and no others. Gathering, hunting and fishing do
+// not, because Patrick named three tools and three verbs, and inventing a
+// skinning knife and a fishing rod to go with them would be a different design
+// rather than a best guess at this one.
+// ---------------------------------------------------------------------------
+
+/*
+  The tool each class or profession works with, keyed by the pick that earns it.
+
+  ONE TOOL IS HANDED OVER AND SEVERAL COUNT AS HOLDING IT, and the second half
+  of that was missing until 21 September. The first draft asked for one form id
+  per tool, which is wrong about this game in a way that bites hardest on the
+  farmer: Skyrim ships TWO shovels. Shovel01 and Shovel02 are separate MISC
+  records in Skyrim.esm with the same model, the same name in the pack and no
+  difference a person can see, and both of them sit side by side in
+  LootMiningToolRandom05 and LootToolRandom05. Every record below was read out
+  of the load order, and every count was made by walking every GRUP in every
+  plugin and counting the placed references that point at it, on 21 September:
+
+    weapPickaxe                   0x0E3C16   WEAP   Skyrim.esm      428 placed
+    dunVolunruudPickaxe           0x1019D4   WEAP   Skyrim.esm        1  the Notched Pickaxe
+    SSDRocksplinterPickaxe        0x06A707   WEAP   Skyrim.esm        0  Rocksplinter, handed out by a quest
+    DLC2AncientNordPickaxe        0x0398E6   WEAP   Dragonborn.esm    1  the one that cuts stalhrim
+    DLC2RR03NordPickaxe           0x0206F2   WEAP   Dragonborn.esm    1
+    DLC2dunKolbjornRalisPickaxe   0x179C9    WEAP   Dragonborn.esm    0
+    Axe01                         0x02F2F4   WEAP   Skyrim.esm      287 placed, the woodcutter's axe
+    Shovel01                      0x0F5D05   MISC   Skyrim.esm      338 placed
+    Shovel02                      0x0F5D06   MISC   Skyrim.esm      112 placed
+
+  So 112 of the 450 shovels lying about the province are the one the first draft
+  refused, and a farmer who lost the shovel they were handed, walked to a mill
+  and picked up the shovel leaning on the wall had a one in four chance of being
+  told they need a shovel while carrying one. Inside TOOL_AGAIN_HOURS of their
+  last handout that is a hard refusal with no way out of it. Measured in the
+  harness rather than worked out: toollens.js case G.
+
+  The pickaxes are the same shape of problem with smaller numbers. Three of the
+  six are quest items somebody may well be carrying and nothing else, and the
+  Notched Pickaxe in particular is a thing people go and fetch on purpose. All
+  six mine, so all six count.
+
+  WHAT IS NOT IN THE LISTS. The war picks out of Immersive Weapons, IWSteelWar-
+  Pick and the three beside it, are weapons shaped like a pick and are not mining
+  tools; nothing in the game lets one work a seam and neither does this. And the
+  woodcutter's axe has an accept list of one because there is only one: the whole
+  load order, masters and all 96 plugins after them, was searched for another
+  woodcutter's axe on 21 September and Axe01 is alone.
+
+  The other farm tool in the masters is Pitchfork001, 0x0F5D07, also a MISC in
+  Skyrim.esm. It is named here so that the next person to ask why the farmer
+  carries a shovel can see that the other candidate was looked at and put aside:
+  a pitchfork moves hay and a shovel turns ground, and turning ground is what
+  the hoe was going to be for. Nothing hands a pitchfork out and nothing asks
+  for one.
+
+    give    the descriptor a handout adds. One of them, the common one.
+    accept  every descriptor that counts as holding the tool, the given one
+            first. holdsTool reads this and nothing else.
+    name    what a sentence calls it. All three take 'a' in front of them.
+    where   where to get another, said in the refusal, because 'you need a
+            pickaxe' with no second sentence sends somebody to the Discord.
+*/
+const TOOLS = {
+  miner: {
+    give: 'e3c16:Skyrim.esm',
+    accept: ['e3c16:Skyrim.esm', '1019d4:Skyrim.esm', '6a707:Skyrim.esm',
+             '398e6:Dragonborn.esm', '206f2:Dragonborn.esm', '179c9:Dragonborn.esm'],
+    name: 'pickaxe',
+    where: 'Any general goods trader sells one, and there are pickaxes lying at most mines.'
+  },
+  woodworker: {
+    give: '2f2f4:Skyrim.esm',
+    accept: ['2f2f4:Skyrim.esm'],
+    name: 'woodcutter\'s axe',
+    where: 'Any general goods trader sells one, and there is usually one at a mill.'
+  },
+  farmer: {
+    give: 'f5d05:Skyrim.esm',
+    accept: ['f5d05:Skyrim.esm', 'f5d06:Skyrim.esm'],
+    name: 'shovel',
+    where: 'Skyrim has no hoe, so a shovel is the tool. There is one at most farms ' +
+           'and mills, and a general goods trader sells one.'
+  }
+};
+
+/*
+  HOW LONG BEFORE A LOST TOOL IS REPLACED. THE RULEBOOK DOES NOT SET THIS.
+
+  classes.md does not mention a tool at all, so every number about one is
+  invented. Twelve hours, which is the number TUNING.farming.seedAgainHours
+  already runs on, for exactly the same reason: a tool handed out once at the
+  pick and never again is a class somebody loses for good the first time they
+  empty their pack into a chest, and every character made before this release
+  has no tool at all because their pick is months of sessions behind them.
+
+  It cannot be worked for profit. A pickaxe, a woodcutter's axe and a shovel are
+  worth a few gold between them, the handout asks for a pack with none of that
+  tool in it, and it happens at the seam, the kiln or the plot rather than
+  anywhere a person would be standing anyway.
+*/
+const TOOL_AGAIN_HOURS = 12;
+
+/*
+  When each tool was last handed to this character, keyed the same way TOOLS is.
+  On the actor, not in memory: a restart that forgot would hand every tool out
+  again, and this is the only thing standing between the way back and a tap.
+*/
+const TOOL_PROPERTY = 'thornswoodTools';
+
+/** The tool a class or profession works with, or null when it needs none. */
+function toolFor(key) {
+  return Object.prototype.hasOwnProperty.call(TOOLS, key) ? TOOLS[key] : null;
+}
+
+/*
+  Is that tool in the pack.
+
+  EVERY DESCRIPTOR IN tool.accept, not just the one a handout gives. Skyrim has
+  two shovels and six pickaxes and a person cannot tell one shovel from the
+  other, so asking for one form id would refuse somebody holding the tool. See
+  the TOOLS block for the six counts that were walked to settle that.
+
+  TWO READS ANSWER YES RATHER THAN NO, and both are deliberate. A tool none of
+  whose descriptors resolve is a plugin missing from the load order, and an
+  inventory read that throws is the server failing to answer a question about
+  somebody who is plainly standing there. Neither of those is the person's
+  fault, and a build fault must not be the reason nobody in the world can work a
+  seam. The same choice classGate makes when the character block is missing.
+
+  A descriptor that resolves to 0 on its own is passed over rather than treated
+  as the whole tool missing. Dragonborn.esm is in this load order and is not in
+  every load order, and a miner holding the plain pickaxe must not be refused
+  because the Solstheim one could not be looked up.
+*/
+function holdsTool(actorId, tool) {
+  const wanted = [];
+  for (let i = 0; i < tool.accept.length; i++) {
+    const baseId = idOf(tool.accept[i]);
+    if (baseId) { wanted.push(baseId); }
+  }
+  if (!wanted.length) {
+    log('no', tool.name, 'in this load order, so the tool is not asked for');
+    return true;
+  }
+  let inv = null;
+  try {
+    inv = mp.get(actorId, 'inventory');
+  } catch (e) {
+    log('could not read the pack of', actorId.toString(16), 'so the tool is not asked for:', e);
+    return true;
+  }
+  const entries = (inv && inv.entries) || [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!e || !(e.count > 0)) { continue; }
+    for (let j = 0; j < wanted.length; j++) {
+      if (e.baseId === wanted[j]) { return true; }
+    }
+  }
+  return false;
+}
+
+/** When each tool was last handed over. Always an object, never a throw. */
+function toolStamps(actorId) {
+  let v = null;
+  try {
+    v = mp.get(actorId, TOOL_PROPERTY);
+  } catch (e) {
+    v = null;
+  }
+  if (!v || typeof v !== 'object') { v = {}; }
+  return v;
+}
+
+/**
+ * The tool into the pack, and the moment written down. The tool, or null when
+ * nothing reached them. Called by both doors below and by neither directly.
+ */
+function handTool(actorId, key) {
+  const tool = toolFor(key);
+  if (!tool) { return null; }
+  if (!addItem(actorId, tool.give, 1)) {
+    log('there is no', tool.name, 'in this load order, so', actorId.toString(16),
+        'was handed nothing');
+    return null;
+  }
+  const stamps = toolStamps(actorId);
+  stamps[key] = Date.now();
+  try {
+    mp.set(actorId, TOOL_PROPERTY, stamps);
+  } catch (e) {
+    // The tool is in the pack and the moment is not written down, so the way
+    // back below will hand another one over. That is the harmless direction.
+    log('could not record the', key, 'tool handout for', actorId.toString(16) + ':', e);
+  }
+  log(actorId.toString(16), 'was handed a', tool.name, 'for', key);
+  return tool;
+}
+
+/** The line to say when a pick hands the tool over, or null. */
+function giveTool(actorId, key) {
+  const tool = handTool(actorId, key);
+  if (!tool) { return null; }
+  return 'You are handed a ' + tool.name + '. Keep it in your pack: the work needs it there.';
+}
+
+/*
+  THE WAY BACK, and it is the same way back the farmer's seed has.
+
+  offerSeed in the farming block exists because seed used to be handed out at
+  exactly one moment, the pick, so a Farmer who lost their crops was a Farmer who
+  could never farm again and every Farmer who picked the class on an earlier
+  build was born in that state. A tool that is required to work is the same shape
+  of trap and it is worse, because nobody who exists today has one.
+
+  So the tool is asked for rather than given: this runs at the seam, the kiln or
+  the plot, where somebody is standing saying they want to do the work, and never
+  from a read. Two conditions, and the pack one is the real one: no tool of that
+  kind in the pack at all, and TOOL_AGAIN_HOURS since the last one.
+*/
+function offerTool(actorId, key) {
+  const stamps = toolStamps(actorId);
+  const last = Object.prototype.hasOwnProperty.call(stamps, key)
+    ? (Number(stamps[key]) || 0) : 0;
+  if (last && TOOL_AGAIN_HOURS > 0 &&
+      (Date.now() - last) < TOOL_AGAIN_HOURS * 3600000) {
+    return null;
+  }
+  const tool = handTool(actorId, key);
+  if (!tool) { return null; }
+  return 'You had no ' + tool.name + ', so here is one. Do that again now.';
+}
+
+/**
+ * null when this person is holding the tool the work needs, otherwise the
+ * sentence to say: the one handing a replacement over, or the refusal.
+ *
+ * ALWAYS AFTER THE CLASS OR HALF GATE AND BEFORE THE COOLDOWN. Somebody who is
+ * not a miner should be told they are not a miner rather than handed a pickaxe,
+ * and a refusal that started a cooldown would tell them the wrong thing about
+ * why nothing happened. That is the same ordering mineOre, harvest() and the
+ * farming block already settled on.
+ */
+function toolGate(actorId, key) {
+  const tool = toolFor(key);
+  if (!tool) { return null; }
+  if (holdsTool(actorId, tool)) { return null; }
+  const handout = offerTool(actorId, key);
+  if (handout) { return handout; }
+  return 'You need a ' + tool.name + ' in your pack for that. ' + tool.where;
+}
+
 /**
  * Salt quarry: the miner's verb, and the miner's RANK sizes the yield.
  *
@@ -1258,6 +1540,10 @@ function mineSalt(actorId, refrId) {
   // telling them the wrong thing about why.
   const mine = classGate(actorId, 'mine');
   if (mine) return mine;
+
+  // The pickaxe, after the class and before the cooldown. See toolGate.
+  const tool = toolGate(actorId, 'miner');
+  if (tool) return tool;
 
   const step = rankStep(actorId, 'miner');
 
@@ -1333,6 +1619,13 @@ function mineOre(actorId, refrId, baseDesc) {
   const mine = classGate(actorId, 'mine');
   if (mine) return mine;
 
+  // The pickaxe, after the class and before the rank and the cooldown, which is
+  // the same order the quarry uses. A miner standing at an ebony seam with no
+  // pickaxe is told about the pickaxe first, because that is the one they can
+  // do something about today.
+  const tool = toolGate(actorId, 'miner');
+  if (tool) return tool;
+
   const step = rankStep(actorId, 'miner');
   const pair = (seam.yield && seam.yield[step]) || [0, 0];
   if (pair[0] <= 0 && pair[1] <= 0) {
@@ -1391,6 +1684,12 @@ function burnCharcoal(actorId, refrId) {
     'A kiln is a charburner\'s. Only a woodworker who took Charburner can run one, ' +
     'and a woodwright gets the plain grade. Ask one.');
   if (half) return half;
+
+  // The woodcutter's axe, and it is asked for under the profession rather than
+  // the half: both halves of the Woodworker are woodworkers, a woodwright runs
+  // a kiln at the plain grade, and neither of them does it without an axe.
+  const tool = toolGate(actorId, 'woodworker');
+  if (tool) return tool;
 
   const wait = cooldownLeft(actorId, refrId);
   if (wait > 0) return 'The kiln is still burning. ' + wait + ' seconds.';
@@ -2597,10 +2896,6 @@ var HARVESTS_BY_BASE = {
   "1016a2:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
   "1016a3:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
   "1062d1:Skyrim.esm": { "produce": "23d77:Skyrim.esm", "name": "Chicken's Egg", "rank": "advanced" },
-  "108e35:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
-  "108e36:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
-  "108e37:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
-  "108e38:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
   "108ee2:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
   "10f37:Dawnguard.esm": { "produce": "b097:Dawnguard.esm", "name": "Gleamblossom", "rank": "advanced" },
   "110c8:HearthFires.esm": { "produce": "59b86:Skyrim.esm", "name": "Nirnroot", "rank": "expert" },
@@ -2612,8 +2907,6 @@ var HARVESTS_BY_BASE = {
   "16e24:Dragonborn.esm": { "produce": "16e26:Dragonborn.esm", "name": "Ashen Grass Pod", "rank": "novice" },
   "16e25:Dragonborn.esm": { "produce": "16e26:Dragonborn.esm", "name": "Ashen Grass Pod", "rank": "novice" },
   "17005:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "novice" },
-  "176b2:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
-  "176cd:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
   "17e93:Dragonborn.esm": { "produce": "17e97:Dragonborn.esm", "name": "Scathecraw", "rank": "novice" },
   "17e94:Dragonborn.esm": { "produce": "17e97:Dragonborn.esm", "name": "Scathecraw", "rank": "novice" },
   "184ef:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "novice" },
@@ -2639,14 +2932,10 @@ var HARVESTS_BY_BASE = {
   "34d2c:Skyrim.esm": { "produce": "34d32:Skyrim.esm", "name": "Frost Mirriam", "rank": "novice" },
   "34d2d:Skyrim.esm": { "produce": "34d31:Skyrim.esm", "name": "Elves Ear", "rank": "expert" },
   "34d30:Skyrim.esm": { "produce": "34d22:Skyrim.esm", "name": "Garlic", "rank": "novice" },
-  "3828c:Dragonborn.esm": { "produce": "854fe:Skyrim.esm", "name": "Pearl", "rank": "advanced" },
-  "3828d:Dragonborn.esm": { "produce": "85500:Skyrim.esm", "name": "Small Pearl", "rank": "advanced" },
-  "38a7a:Dragonborn.esm": { "produce": "65c9b:Skyrim.esm", "name": "Horker Meat", "rank": "advanced" },
   "38b0c:Skyrim.esm": { "produce": "65c9d:Skyrim.esm", "name": "Pheasant Breast", "rank": "advanced" },
   "38b0d:Skyrim.esm": { "produce": "65c9d:Skyrim.esm", "name": "Pheasant Breast", "rank": "advanced" },
   "38b0e:Skyrim.esm": { "produce": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "rank": "advanced" },
   "38b0f:Skyrim.esm": { "produce": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "rank": "advanced" },
-  "4d078:OarsRest.esp": { "produce": "4d079:OarsRest.esp", "name": "Fake Dwemer Coin", "rank": "novice" },
   "4d9ff:Skyrim.esm": { "produce": "4da00:Skyrim.esm", "name": "Fly Amanita", "rank": "advanced" },
   "4da03:Skyrim.esm": { "produce": "4da00:Skyrim.esm", "name": "Fly Amanita", "rank": "advanced" },
   "4da04:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
@@ -2666,14 +2955,10 @@ var HARVESTS_BY_BASE = {
   "775fe:Skyrim.esm": { "produce": "e8448:Skyrim.esm", "name": "Cooked Skeever", "rank": "expert" },
   "7e8b8:Skyrim.esm": { "produce": "7e8b7:Skyrim.esm", "name": "Swamp Fungal Pod", "rank": "advanced" },
   "7e8c2:Skyrim.esm": { "produce": "7e8c1:Skyrim.esm", "name": "Giant Lichen", "rank": "advanced" },
-  "7e8c6:Skyrim.esm": { "produce": "7e8c5:Skyrim.esm", "name": "Slaughterfish Egg", "rank": "advanced" },
   "7e8c9:Skyrim.esm": { "produce": "7e8c8:Skyrim.esm", "name": "Rock Warbler Egg", "rank": "advanced" },
   "7edf0:Skyrim.esm": { "produce": "669a3:Skyrim.esm", "name": "Mammoth Cheese Bowl", "rank": "expert" },
   "7edf6:Skyrim.esm": { "produce": "7edf5:Skyrim.esm", "name": "Nordic Barnacle", "rank": "advanced" },
   "7ee00:Skyrim.esm": { "produce": "7ee01:Skyrim.esm", "name": "Glowing Mushroom", "rank": "advanced" },
-  "85f80:Skyrim.esm": { "produce": "eba03:Skyrim.esm", "name": "Clam Meat", "rank": "advanced" },
-  "85f82:Skyrim.esm": { "produce": "eba03:Skyrim.esm", "name": "Clam Meat", "rank": "advanced" },
-  "85f83:Skyrim.esm": { "produce": "eba03:Skyrim.esm", "name": "Clam Meat", "rank": "advanced" },
   "8b5c4:Skyrim.esm": { "produce": "77e1c:Skyrim.esm", "name": "Blue Mountain Flower", "rank": "advanced" },
   "9748b:Skyrim.esm": { "produce": "7ee01:Skyrim.esm", "name": "Glowing Mushroom", "rank": "advanced" },
   "a24d:Dawnguard.esm": { "produce": "b097:Dawnguard.esm", "name": "Gleamblossom", "rank": "advanced" },
@@ -2737,8 +3022,6 @@ var HARVESTS_BY_BASE = {
   "ece9a:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
   "f1ce:HearthFires.esm": { "produce": "f1cc:HearthFires.esm", "name": "Hawk's Egg", "rank": "advanced" },
   "f3e57:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
-  "f5eca:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
-  "f5ecb:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
   "f675f:Skyrim.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" }
 };
 
@@ -2815,6 +3098,7 @@ var FISH_BY_BASE = {
   "f5eca:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" },
   "f5ecb:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" }
 };
+
 // ==== end FISH_BY_BASE ====
 
 /*
@@ -4323,6 +4607,2041 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   }
 })();
 
+// ---------------------------------------------------------------------------
+// crafting
+//
+// classes.md: 'Pick one, then pick one side of it. The side is not a flavour,
+// it is what you are able to make at all.' Until now a profession placed two
+// points in the skill tree and gated the charcoal kiln, and that was the whole
+// of it: an Edgewright could beat out a Daedric cuirass, a warrior could cook,
+// and the sentence on the public page was a description of nothing.
+//
+// THE HOOK. skymp5-server/cpp/server_guest_lib/CraftService.cpp builds a
+// CraftEvent named 'onCraft' with (actorFormId, craftedItemBaseId, count,
+// recipeId) and fires it. GameModeEvent::Fire returns false when any listener
+// answered false, and CraftEvent::OnFireSuccess, which is the thing that takes
+// the inputs out of the pack and puts the output in, only runs when Fire
+// succeeded. So returning false here refuses the craft outright and the person
+// keeps their materials. Read in the fork on 20 September.
+//
+// TEMPERING NEVER REACHES THIS FILE. CraftService::RecipeItemsMatch throws out
+// the armour table (keyword adb78) and the sharpening wheel (88108) before it
+// looks at any recipe at all, so a third of every COBJ record in the load order
+// never fires the event. Those rows carry "fires": false in tools\recipes.json
+// and are not in the table below. Nothing here can gate tempering, and the
+// Smith's Mastercraft perk on the public page is about tempering, so that perk
+// is not enforced by this gate and cannot be.
+// ---------------------------------------------------------------------------
+
+/*
+  EVERY CRAFTING RECIPE THE SERVER IS ACTUALLY ASKED ABOUT, AND IT IS GENERATED.
+
+  Everything between the declaration below and the line that closes the block is
+  written by tools\Build-RecipeTable.ps1, out of the COBJ records across 101
+  plugins that also built tools\recipes.json. DO NOT HAND EDIT IT. The next run
+  of that script replaces every line between them and a correction made here
+  goes with it, leaving no trace it was ever made. Same arrangement as
+  ORES_BY_BASE, HUNTS_BY_BASE and SPELL_IDS, for the same reason.
+
+  It is seeded with fourteen real rows read out of tools\recipes.json, one per
+  half per rank the gate has to tell apart, so the gate works and can be
+  measured before the script has ever been run against this build. Everything a
+  seeded row says is what the json says. A row says:
+
+    out        the record the recipe makes.
+    name       what that is called, so a refusal can name it.
+    type       what kind of record it is.
+    makes      how many one craft makes.
+    owner      the profession that owns it, as the rulebook spells it.
+    half       the half of that profession, as the rulebook spells it.
+    rank       which of classes.md's four ranks it asks for. Ranked inside its
+               own half by what the recipe makes, cheapest quarter first, which
+               is the script's judgement: classes.md sets no numbers for this
+               and nothing in the game records a rank against a recipe.
+    open       true when the recipe carries no condition of its own. A row with
+               open false needs something first, an item, a spell or a vanilla
+               perk nobody here can hold, and Skyrim's own crafting menu decides
+               that before the server is ever asked. Nothing below reads it.
+
+  THE KEY IS A DESCRIPTOR AND THE EVENT HANDS YOU A NUMBER. All four arguments
+  of onCraft are numbers and every key in here is a string like "f61:Skyrim.esm",
+  so the lookup goes through mp.getDescFromId and never through recipeId itself.
+  A lookup without it is undefined on every row in this block, on every craft,
+  which is a gate that refuses nothing and says nothing while it does it. A
+  reviewer caught that before anything was built on it and it is the one thing
+  about this table worth saying twice.
+
+  FIVE OF THE FOURTEEN HALVES OWN NOTHING HERE AND IT IS NOT AN OVERSIGHT.
+  Warrior/Bulwark and Warrior/Berserker: warriors do not craft, and classes.md
+  gives them ways of fighting rather than recipes. Alchemist/Blightbrewer and
+  Alchemist/Physicker: Skyrim has no alchemy recipes at all, not one COBJ record
+  in the load order names an alchemy bench, because a potion is worked out from
+  the effects the ingredients share inside the alchemy menu and no record is
+  involved at any point. Enchanter/Wardweaver: enchanting is the same shape, a
+  menu and not a recipe. Those five gate nothing and this gate cannot make them
+  gate anything.
+
+  A RECIPE ID THIS TABLE DOES NOT CARRY IS ONE NOBODY OWNS, AND ANYBODY MAY MAKE
+  IT. 1,679 of the recipes in the load order are in that state: smelting, tanning,
+  ingots, the stock everybody's trade needs. Refusing those would be far worse
+  than this gate is worth, so they fall straight through.
+
+  NOTHING ABOVE MAY SPELL EITHER MARKER OUT. The install half of the script takes
+  the first match of each in the whole file, so one quotation in a comment turns
+  the install into a no-op that still says nothing went wrong. That is what
+  happened to the crops block on 20 September and it cost a rewrite, so this
+  paragraph talks around them rather than quoting them.
+*/
+  var RECIPES_BY_ID = {
+    "108cfd:Skyrim.esm": { "out": "68c57:Skyrim.esm", "name": "Nord Hero Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "108cfc:Skyrim.esm": { "out": "1398d:Skyrim.esm", "name": "Orcish Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "108cfb:Skyrim.esm": { "out": "139a5:Skyrim.esm", "name": "Glass Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "108cfa:Skyrim.esm": { "out": "1399d:Skyrim.esm", "name": "Elven Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "108cf9:Skyrim.esm": { "out": "139ad:Skyrim.esm", "name": "Ebony Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "108cf8:Skyrim.esm": { "out": "13995:Skyrim.esm", "name": "Dwarven Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "108cf7:Skyrim.esm": { "out": "139b5:Skyrim.esm", "name": "Daedric Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "master", "open": false },
+    "f6f30:Skyrim.esm": { "out": "f6f24:Skyrim.esm", "name": "Steel Horned Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "f6f2e:Skyrim.esm": { "out": "f6f23:Skyrim.esm", "name": "Steel Imperial Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "f6f2c:Skyrim.esm": { "out": "f6f22:Skyrim.esm", "name": "Steel Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "f6f2a:Skyrim.esm": { "out": "f6f21:Skyrim.esm", "name": "Steel Shin Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "f46d0:Skyrim.esm": { "out": "56a9e:Skyrim.esm", "name": "Ancient Nord Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "f46cf:Skyrim.esm": { "out": "56b17:Skyrim.esm", "name": "Ancient Nord Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "f46cd:Skyrim.esm": { "out": "56a9d:Skyrim.esm", "name": "Ancient Nord Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "f46cc:Skyrim.esm": { "out": "18388:Skyrim.esm", "name": "Ancient Nord Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "f46cb:Skyrim.esm": { "out": "68c63:Skyrim.esm", "name": "Nord Hero War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "f46ca:Skyrim.esm": { "out": "68c7b:Skyrim.esm", "name": "Nord Hero Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "f46c9:Skyrim.esm": { "out": "a3115:Skyrim.esm", "name": "Nord Hero Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "f46c8:Skyrim.esm": { "out": "68c79:Skyrim.esm", "name": "Nord Hero Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "f431f:Skyrim.esm": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f431a:Skyrim.esm": { "out": "f431b:Skyrim.esm", "name": "Cabbage Potato Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f4319:Skyrim.esm": { "out": "f431e:Skyrim.esm", "name": "Vegetable Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f4318:Skyrim.esm": { "out": "f431c:Skyrim.esm", "name": "Tomato Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "f4317:Skyrim.esm": { "out": "f431d:Skyrim.esm", "name": "Venison Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "f4316:Skyrim.esm": { "out": "f4315:Skyrim.esm", "name": "Horker Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "f4313:Skyrim.esm": { "out": "f4314:Skyrim.esm", "name": "Beef Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "f4312:Skyrim.esm": { "out": "eba01:Skyrim.esm", "name": "Cabbage and Tomato Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f4311:Skyrim.esm": { "out": "722bd:Skyrim.esm", "name": "Venison Chop", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f4310:Skyrim.esm": { "out": "64b3b:Skyrim.esm", "name": "Salmon Steak", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f430f:Skyrim.esm": { "out": "722c2:Skyrim.esm", "name": "Rabbit Haunch", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f430e:Skyrim.esm": { "out": "722c7:Skyrim.esm", "name": "Pheasant Roast", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f430d:Skyrim.esm": { "out": "722bb:Skyrim.esm", "name": "Mammoth Steak", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "f430c:Skyrim.esm": { "out": "722b0:Skyrim.esm", "name": "Horse Haunch", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f430b:Skyrim.esm": { "out": "7224e:Skyrim.esm", "name": "Horker Loaf", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f430a:Skyrim.esm": { "out": "7224c:Skyrim.esm", "name": "Goat Roast", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f4309:Skyrim.esm": { "out": "721e8:Skyrim.esm", "name": "Cooked Beef", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "f4308:Skyrim.esm": { "out": "e8947:Skyrim.esm", "name": "Grilled Chicken Breast", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "a5cd6:Skyrim.esm": { "out": "13987:Skyrim.esm", "name": "Steel Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "dd996:Skyrim.esm": { "out": "1396e:Skyrim.esm", "name": "Daedric Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "dd995:Skyrim.esm": { "out": "1396d:Skyrim.esm", "name": "Daedric Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "dd994:Skyrim.esm": { "out": "1396c:Skyrim.esm", "name": "Daedric Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dd993:Skyrim.esm": { "out": "1396b:Skyrim.esm", "name": "Daedric Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "dd992:Skyrim.esm": { "out": "1396a:Skyrim.esm", "name": "Daedric Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dd991:Skyrim.esm": { "out": "13968:Skyrim.esm", "name": "Dragonplate Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "dd990:Skyrim.esm": { "out": "13969:Skyrim.esm", "name": "Dragonplate Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "dd98f:Skyrim.esm": { "out": "13967:Skyrim.esm", "name": "Dragonplate Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dd98e:Skyrim.esm": { "out": "13966:Skyrim.esm", "name": "Dragonplate Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "dd98d:Skyrim.esm": { "out": "13965:Skyrim.esm", "name": "Dragonplate Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dd98c:Skyrim.esm": { "out": "13964:Skyrim.esm", "name": "Ebony Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dd98b:Skyrim.esm": { "out": "13963:Skyrim.esm", "name": "Ebony Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dd98a:Skyrim.esm": { "out": "13962:Skyrim.esm", "name": "Ebony Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd989:Skyrim.esm": { "out": "13961:Skyrim.esm", "name": "Ebony Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "dd988:Skyrim.esm": { "out": "13960:Skyrim.esm", "name": "Ebony Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd987:Skyrim.esm": { "out": "13946:Skyrim.esm", "name": "Orcish Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dd986:Skyrim.esm": { "out": "13959:Skyrim.esm", "name": "Orcish Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dd985:Skyrim.esm": { "out": "13958:Skyrim.esm", "name": "Orcish Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd984:Skyrim.esm": { "out": "13957:Skyrim.esm", "name": "Orcish Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "dd983:Skyrim.esm": { "out": "13956:Skyrim.esm", "name": "Orcish Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd981:Skyrim.esm": { "out": "1395e:Skyrim.esm", "name": "Steel Plate Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd980:Skyrim.esm": { "out": "1395d:Skyrim.esm", "name": "Steel Plate Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd97f:Skyrim.esm": { "out": "1395c:Skyrim.esm", "name": "Steel Plate Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dd97e:Skyrim.esm": { "out": "1395b:Skyrim.esm", "name": "Steel Plate Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd97d:Skyrim.esm": { "out": "13950:Skyrim.esm", "name": "Dwarven Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd97c:Skyrim.esm": { "out": "1394f:Skyrim.esm", "name": "Dwarven Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd97b:Skyrim.esm": { "out": "1394e:Skyrim.esm", "name": "Dwarven Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dd97a:Skyrim.esm": { "out": "1394d:Skyrim.esm", "name": "Dwarven Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dd979:Skyrim.esm": { "out": "1394c:Skyrim.esm", "name": "Dwarven Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dd978:Skyrim.esm": { "out": "13955:Skyrim.esm", "name": "Steel Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd977:Skyrim.esm": { "out": "13954:Skyrim.esm", "name": "Steel Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd976:Skyrim.esm": { "out": "13953:Skyrim.esm", "name": "Steel Nordic Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dd975:Skyrim.esm": { "out": "13952:Skyrim.esm", "name": "Steel Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dd974:Skyrim.esm": { "out": "13951:Skyrim.esm", "name": "Steel Cuffed Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dca17:Skyrim.esm": { "out": "13941:Skyrim.esm", "name": "Dragonscale Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dca16:Skyrim.esm": { "out": "13940:Skyrim.esm", "name": "Dragonscale Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dca15:Skyrim.esm": { "out": "1393f:Skyrim.esm", "name": "Dragonscale Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dca14:Skyrim.esm": { "out": "1393e:Skyrim.esm", "name": "Dragonscale Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "dca13:Skyrim.esm": { "out": "1393d:Skyrim.esm", "name": "Dragonscale Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dca12:Skyrim.esm": { "out": "1393c:Skyrim.esm", "name": "Glass Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dca11:Skyrim.esm": { "out": "1393b:Skyrim.esm", "name": "Glass Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dca10:Skyrim.esm": { "out": "1393a:Skyrim.esm", "name": "Glass Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dca0f:Skyrim.esm": { "out": "13939:Skyrim.esm", "name": "Glass Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dca0e:Skyrim.esm": { "out": "13938:Skyrim.esm", "name": "Glass Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dca0a:Skyrim.esm": { "out": "1392a:Skyrim.esm", "name": "Elven Gilded Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dca08:Skyrim.esm": { "out": "1b3a1:Skyrim.esm", "name": "Scaled Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dca07:Skyrim.esm": { "out": "1b3a0:Skyrim.esm", "name": "Scaled Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dca06:Skyrim.esm": { "out": "1b3a3:Skyrim.esm", "name": "Scaled Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dca05:Skyrim.esm": { "out": "1b39f:Skyrim.esm", "name": "Scaled Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dca04:Skyrim.esm": { "out": "13922:Skyrim.esm", "name": "Leather Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "dca03:Skyrim.esm": { "out": "13921:Skyrim.esm", "name": "Leather Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "dca02:Skyrim.esm": { "out": "3619e:Skyrim.esm", "name": "Leather Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": true },
+    "dca01:Skyrim.esm": { "out": "13920:Skyrim.esm", "name": "Leather Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "dca00:Skyrim.esm": { "out": "1394b:Skyrim.esm", "name": "Banded Iron Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": true },
+    "dc9ff:Skyrim.esm": { "out": "13948:Skyrim.esm", "name": "Banded Iron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": true },
+    "dc9fe:Skyrim.esm": { "out": "1391e:Skyrim.esm", "name": "Elven Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dc9fd:Skyrim.esm": { "out": "1391d:Skyrim.esm", "name": "Elven Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dc9fc:Skyrim.esm": { "out": "1391c:Skyrim.esm", "name": "Elven Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dc9fb:Skyrim.esm": { "out": "896a3:Skyrim.esm", "name": "Elven Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dc9fa:Skyrim.esm": { "out": "1391a:Skyrim.esm", "name": "Elven Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dc9f9:Skyrim.esm": { "out": "135ba:Skyrim.esm", "name": "Imperial Heavy Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dc9f8:Skyrim.esm": { "out": "13edc:Skyrim.esm", "name": "Imperial Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dc9f7:Skyrim.esm": { "out": "136d4:Skyrim.esm", "name": "Imperial Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dc9f6:Skyrim.esm": { "out": "136d5:Skyrim.esm", "name": "Imperial Soldier's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dc9f5:Skyrim.esm": { "out": "136d6:Skyrim.esm", "name": "Imperial Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dc9f4:Skyrim.esm": { "out": "1b3a2:Skyrim.esm", "name": "Studded Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "db8c5:Skyrim.esm": { "out": "139ba:Skyrim.esm", "name": "Daedric Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "db8c4:Skyrim.esm": { "out": "139b3:Skyrim.esm", "name": "Daedric War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8c3:Skyrim.esm": { "out": "139b9:Skyrim.esm", "name": "Daedric Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8c2:Skyrim.esm": { "out": "139b8:Skyrim.esm", "name": "Daedric Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8c1:Skyrim.esm": { "out": "139b7:Skyrim.esm", "name": "Daedric Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "db8c0:Skyrim.esm": { "out": "139b6:Skyrim.esm", "name": "Daedric Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8bf:Skyrim.esm": { "out": "139b4:Skyrim.esm", "name": "Daedric Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "db8be:Skyrim.esm": { "out": "139b2:Skyrim.esm", "name": "Ebony Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8bd:Skyrim.esm": { "out": "139ab:Skyrim.esm", "name": "Ebony War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8bc:Skyrim.esm": { "out": "139b1:Skyrim.esm", "name": "Ebony Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8bb:Skyrim.esm": { "out": "139b0:Skyrim.esm", "name": "Ebony Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8ba:Skyrim.esm": { "out": "139af:Skyrim.esm", "name": "Ebony Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8b9:Skyrim.esm": { "out": "139ae:Skyrim.esm", "name": "Ebony Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8b8:Skyrim.esm": { "out": "139ac:Skyrim.esm", "name": "Ebony Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8b7:Skyrim.esm": { "out": "139aa:Skyrim.esm", "name": "Glass Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8b6:Skyrim.esm": { "out": "139a3:Skyrim.esm", "name": "Glass War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8b5:Skyrim.esm": { "out": "139a9:Skyrim.esm", "name": "Glass Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8b4:Skyrim.esm": { "out": "139a8:Skyrim.esm", "name": "Glass Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8b3:Skyrim.esm": { "out": "139a7:Skyrim.esm", "name": "Glass Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8b2:Skyrim.esm": { "out": "139a6:Skyrim.esm", "name": "Glass Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8b1:Skyrim.esm": { "out": "139a4:Skyrim.esm", "name": "Glass Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "db8b0:Skyrim.esm": { "out": "139a2:Skyrim.esm", "name": "Elven Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8af:Skyrim.esm": { "out": "1399b:Skyrim.esm", "name": "Elven War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8ae:Skyrim.esm": { "out": "139a1:Skyrim.esm", "name": "Elven Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8ad:Skyrim.esm": { "out": "139a0:Skyrim.esm", "name": "Elven Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8ac:Skyrim.esm": { "out": "1399f:Skyrim.esm", "name": "Elven Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8ab:Skyrim.esm": { "out": "1399e:Skyrim.esm", "name": "Elven Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db8aa:Skyrim.esm": { "out": "1399c:Skyrim.esm", "name": "Elven Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8a9:Skyrim.esm": { "out": "1399a:Skyrim.esm", "name": "Dwarven Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8a8:Skyrim.esm": { "out": "13993:Skyrim.esm", "name": "Dwarven War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8a7:Skyrim.esm": { "out": "13999:Skyrim.esm", "name": "Dwarven Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8a6:Skyrim.esm": { "out": "13998:Skyrim.esm", "name": "Dwarven Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8a5:Skyrim.esm": { "out": "13997:Skyrim.esm", "name": "Dwarven Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8a4:Skyrim.esm": { "out": "13996:Skyrim.esm", "name": "Dwarven Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db8a3:Skyrim.esm": { "out": "13994:Skyrim.esm", "name": "Dwarven Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8a1:Skyrim.esm": { "out": "13992:Skyrim.esm", "name": "Orcish Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db8a0:Skyrim.esm": { "out": "1398b:Skyrim.esm", "name": "Orcish War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db89f:Skyrim.esm": { "out": "13991:Skyrim.esm", "name": "Orcish Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db89e:Skyrim.esm": { "out": "1398a:Skyrim.esm", "name": "Steel Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db89d:Skyrim.esm": { "out": "13990:Skyrim.esm", "name": "Orcish Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db89c:Skyrim.esm": { "out": "1398e:Skyrim.esm", "name": "Orcish Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db89b:Skyrim.esm": { "out": "13986:Skyrim.esm", "name": "Steel Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db89a:Skyrim.esm": { "out": "1398f:Skyrim.esm", "name": "Orcish Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db899:Skyrim.esm": { "out": "1398c:Skyrim.esm", "name": "Orcish Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "db898:Skyrim.esm": { "out": "13984:Skyrim.esm", "name": "Steel Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db897:Skyrim.esm": { "out": "13983:Skyrim.esm", "name": "Steel War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db896:Skyrim.esm": { "out": "13988:Skyrim.esm", "name": "Steel Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db5d7:Skyrim.esm": { "out": "13989:Skyrim.esm", "name": "Steel Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "db5d6:Skyrim.esm": { "out": "13914:Skyrim.esm", "name": "Hide Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "db5d5:Skyrim.esm": { "out": "13913:Skyrim.esm", "name": "Hide Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "db5d4:Skyrim.esm": { "out": "13911:Skyrim.esm", "name": "Hide Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "db5d3:Skyrim.esm": { "out": "13910:Skyrim.esm", "name": "Hide Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "db293:Skyrim.esm": { "out": "12eb6:Skyrim.esm", "name": "Iron Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "db292:Skyrim.esm": { "out": "12e4d:Skyrim.esm", "name": "Iron Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "db291:Skyrim.esm": { "out": "12e49:Skyrim.esm", "name": "Iron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": true },
+    "db290:Skyrim.esm": { "out": "12e4b:Skyrim.esm", "name": "Iron Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "db28f:Skyrim.esm": { "out": "12e46:Skyrim.esm", "name": "Iron Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "db28e:Skyrim.esm": { "out": "13912:Skyrim.esm", "name": "Hide Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "da76f:Skyrim.esm": { "out": "1359d:Skyrim.esm", "name": "Iron Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "da76e:Skyrim.esm": { "out": "13980:Skyrim.esm", "name": "Iron Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "da76d:Skyrim.esm": { "out": "13981:Skyrim.esm", "name": "Iron Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "da76c:Skyrim.esm": { "out": "13790:Skyrim.esm", "name": "Iron War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "da76b:Skyrim.esm": { "out": "13982:Skyrim.esm", "name": "Iron Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "da76a:Skyrim.esm": { "out": "1397e:Skyrim.esm", "name": "Iron Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "da769:Skyrim.esm": { "out": "12eb7:Skyrim.esm", "name": "Iron Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "9d3:Update.esm": { "out": "13ab2:Skyrim.esm", "name": "Imperial Light Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "9d2:Update.esm": { "out": "13edb:Skyrim.esm", "name": "Imperial Light Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "9d1:Update.esm": { "out": "13eda:Skyrim.esm", "name": "Imperial Light Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "9d0:Update.esm": { "out": "13ed7:Skyrim.esm", "name": "Imperial Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "9cf:Update.esm": { "out": "13ed9:Skyrim.esm", "name": "Imperial Light Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "145c2:Dawnguard.esm": { "out": "12e8a:Dawnguard.esm", "name": "Shellbug Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "6928:Dawnguard.esm": { "out": "176f4:Dawnguard.esm", "name": "Dragonbone Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "3987:Dawnguard.esm": { "out": "139c0:Skyrim.esm", "name": "Daedric Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "1982a:Dawnguard.esm": { "out": "14fd0:Dawnguard.esm", "name": "Dragonbone Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "19829:Dawnguard.esm": { "out": "14fcf:Dawnguard.esm", "name": "Dragonbone War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "19828:Dawnguard.esm": { "out": "14fce:Dawnguard.esm", "name": "Dragonbone Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "19827:Dawnguard.esm": { "out": "14fcd:Dawnguard.esm", "name": "Dragonbone Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "19826:Dawnguard.esm": { "out": "14fcc:Dawnguard.esm", "name": "Dragonbone Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "19825:Dawnguard.esm": { "out": "14fcb:Dawnguard.esm", "name": "Dragonbone Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "19824:Dawnguard.esm": { "out": "176f1:Dawnguard.esm", "name": "Dragonbone Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "master", "open": false },
+    "19823:Dawnguard.esm": { "out": "14fc3:Dawnguard.esm", "name": "Dragonbone Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "f814:Dawnguard.esm": { "out": "d099:Dawnguard.esm", "name": "Dwarven Bolt", "type": "AMMO", "makes": 10, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "f813:Dawnguard.esm": { "out": "bb3:Dawnguard.esm", "name": "Steel Bolt", "type": "AMMO", "makes": 10, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "f810:Dawnguard.esm": { "out": "b647:Dawnguard.esm", "name": "Dwarven Crossbow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "f80f:Dawnguard.esm": { "out": "f19f:Dawnguard.esm", "name": "Enhanced Dwarven Crossbow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "f80e:Dawnguard.esm": { "out": "801:Dawnguard.esm", "name": "Crossbow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "f80d:Dawnguard.esm": { "out": "f19e:Dawnguard.esm", "name": "Enhanced Crossbow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "f80c:Dawnguard.esm": { "out": "f1b9:Dawnguard.esm", "name": "Exploding Dwarven Bolt of Shock", "type": "AMMO", "makes": 10, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "f80b:Dawnguard.esm": { "out": "f1b7:Dawnguard.esm", "name": "Exploding Dwarven Bolt of Ice", "type": "AMMO", "makes": 10, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "f80a:Dawnguard.esm": { "out": "f1b1:Dawnguard.esm", "name": "Exploding Dwarven Bolt of Fire", "type": "AMMO", "makes": 10, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "f809:Dawnguard.esm": { "out": "f1bc:Dawnguard.esm", "name": "Exploding Steel Bolt of Shock", "type": "AMMO", "makes": 10, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "f808:Dawnguard.esm": { "out": "f1bb:Dawnguard.esm", "name": "Exploding Steel Bolt of Ice", "type": "AMMO", "makes": 10, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "f807:Dawnguard.esm": { "out": "f1a0:Dawnguard.esm", "name": "Exploding Steel Bolt of Fire", "type": "AMMO", "makes": 10, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "b655:Dawnguard.esm": { "out": "139bd:Skyrim.esm", "name": "Elven Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "b654:Dawnguard.esm": { "out": "139bb:Skyrim.esm", "name": "Orcish Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "b653:Dawnguard.esm": { "out": "139be:Skyrim.esm", "name": "Glass Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "b652:Dawnguard.esm": { "out": "139bc:Skyrim.esm", "name": "Dwarven Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "b651:Dawnguard.esm": { "out": "139bf:Skyrim.esm", "name": "Ebony Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "b650:Dawnguard.esm": { "out": "1397f:Skyrim.esm", "name": "Steel Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "b64f:Dawnguard.esm": { "out": "1397d:Skyrim.esm", "name": "Iron Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": true },
+    "5762:Dawnguard.esm": { "out": "575e:Dawnguard.esm", "name": "Aetherial Staff", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "master", "open": false },
+    "5761:Dawnguard.esm": { "out": "5759:Dawnguard.esm", "name": "Aetherial Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "a12:HearthFires.esm": { "out": "9dc:HearthFires.esm", "name": "Garlic Bread", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "a11:HearthFires.esm": { "out": "9db:HearthFires.esm", "name": "Braided Bread", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "17ec3:HearthFires.esm": { "out": "3538:HearthFires.esm", "name": "Sack of Flour", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": true },
+    "11802:HearthFires.esm": { "out": "11801:HearthFires.esm", "name": "Snowberry Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "11800:HearthFires.esm": { "out": "117ff:HearthFires.esm", "name": "Jazbay Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "117fe:HearthFires.esm": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "expert", "open": false },
+    "117fd:HearthFires.esm": { "out": "353b:HearthFires.esm", "name": "Snowberry Crostata", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "expert", "open": false },
+    "117fc:HearthFires.esm": { "out": "3539:HearthFires.esm", "name": "Juniper Berry Crostata", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "expert", "open": false },
+    "117fb:HearthFires.esm": { "out": "64b3d:Skyrim.esm", "name": "Sweet Roll", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "117fa:HearthFires.esm": { "out": "353a:HearthFires.esm", "name": "Jazbay Crostata", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "expert", "open": false },
+    "117f9:HearthFires.esm": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "117f8:HearthFires.esm": { "out": "3537:HearthFires.esm", "name": "Potato Bread", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "117f6:HearthFires.esm": { "out": "65c97:Skyrim.esm", "name": "Bread Loaf", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "3544:HearthFires.esm": { "out": "353f:HearthFires.esm", "name": "Steamed Mudcrab Legs", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "3543:HearthFires.esm": { "out": "353e:HearthFires.esm", "name": "Clam Chowder", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "3542:HearthFires.esm": { "out": "353d:HearthFires.esm", "name": "Potato Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "3d581:Dragonborn.esm": { "out": "37564:Dragonborn.esm", "name": "Bonemold Guard Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3d2dd:Dragonborn.esm": { "out": "1cd93:Dragonborn.esm", "name": "Bonemold Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3cf54:Dragonborn.esm": { "out": "26239:Dragonborn.esm", "name": "Stalhrim Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "3cf53:Dragonborn.esm": { "out": "2623b:Dragonborn.esm", "name": "Nordic Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "3cd5d:Dragonborn.esm": { "out": "3cd5b:Dragonborn.esm", "name": "Ash Yam Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "3cd5c:Dragonborn.esm": { "out": "eba02:Skyrim.esm", "name": "Cabbage Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "3ab2c:Dragonborn.esm": { "out": "3ab24:Dragonborn.esm", "name": "Improved Bonemold Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3ab2b:Dragonborn.esm": { "out": "3ab23:Dragonborn.esm", "name": "Improved Bonemold Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3ab2a:Dragonborn.esm": { "out": "3ab22:Dragonborn.esm", "name": "Improved Bonemold Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "3ab29:Dragonborn.esm": { "out": "3ab26:Dragonborn.esm", "name": "Improved Bonemold Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3ab28:Dragonborn.esm": { "out": "3ab25:Dragonborn.esm", "name": "Improved Bonemold Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "2b085:Dragonborn.esm": { "out": "1cdb3:Dragonborn.esm", "name": "Nordic Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "2b084:Dragonborn.esm": { "out": "1cdb2:Dragonborn.esm", "name": "Nordic War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "2b083:Dragonborn.esm": { "out": "1cdb1:Dragonborn.esm", "name": "Nordic Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "2b082:Dragonborn.esm": { "out": "1cdb0:Dragonborn.esm", "name": "Nordic Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "2b081:Dragonborn.esm": { "out": "1cdaf:Dragonborn.esm", "name": "Nordic Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "2b080:Dragonborn.esm": { "out": "1cdae:Dragonborn.esm", "name": "Nordic Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "2b07f:Dragonborn.esm": { "out": "26232:Dragonborn.esm", "name": "Nordic Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "2b07e:Dragonborn.esm": { "out": "1cdad:Dragonborn.esm", "name": "Nordic Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "2b07d:Dragonborn.esm": { "out": "1cdba:Dragonborn.esm", "name": "Stalhrim Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "2b07c:Dragonborn.esm": { "out": "1cdb9:Dragonborn.esm", "name": "Stalhrim War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "2b07b:Dragonborn.esm": { "out": "1cdb8:Dragonborn.esm", "name": "Stalhrim Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "2b07a:Dragonborn.esm": { "out": "1cdb7:Dragonborn.esm", "name": "Stalhrim Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "2b079:Dragonborn.esm": { "out": "1cdb6:Dragonborn.esm", "name": "Stalhrim Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "2b078:Dragonborn.esm": { "out": "1cdb5:Dragonborn.esm", "name": "Stalhrim Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "2b077:Dragonborn.esm": { "out": "26231:Dragonborn.esm", "name": "Stalhrim Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "2b076:Dragonborn.esm": { "out": "1cdb4:Dragonborn.esm", "name": "Stalhrim Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "2b075:Dragonborn.esm": { "out": "1cda1:Dragonborn.esm", "name": "Stalhrim Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "2b072:Dragonborn.esm": { "out": "1cda0:Dragonborn.esm", "name": "Stalhrim Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2b071:Dragonborn.esm": { "out": "1cd9f:Dragonborn.esm", "name": "Stalhrim Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "2b070:Dragonborn.esm": { "out": "1cd9e:Dragonborn.esm", "name": "Stalhrim Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2b06f:Dragonborn.esm": { "out": "26237:Dragonborn.esm", "name": "Stalhrim Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2b06e:Dragonborn.esm": { "out": "1cda3:Dragonborn.esm", "name": "Stalhrim Light Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2b06d:Dragonborn.esm": { "out": "1cda5:Dragonborn.esm", "name": "Stalhrim Light Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b06c:Dragonborn.esm": { "out": "1cda2:Dragonborn.esm", "name": "Stalhrim Light Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2b06a:Dragonborn.esm": { "out": "1cd7e:Dragonborn.esm", "name": "Stalhrim Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b069:Dragonborn.esm": { "out": "1cd99:Dragonborn.esm", "name": "Nordic Carved Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2b068:Dragonborn.esm": { "out": "1cd98:Dragonborn.esm", "name": "Nordic Carved Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b067:Dragonborn.esm": { "out": "1cd97:Dragonborn.esm", "name": "Nordic Carved Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "2b066:Dragonborn.esm": { "out": "1cd96:Dragonborn.esm", "name": "Nordic Carved Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b065:Dragonborn.esm": { "out": "26236:Dragonborn.esm", "name": "Nordic Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2b05c:Dragonborn.esm": { "out": "26234:Dragonborn.esm", "name": "Bonemold Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b05b:Dragonborn.esm": { "out": "1cd95:Dragonborn.esm", "name": "Bonemold Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b05a:Dragonborn.esm": { "out": "1cd94:Dragonborn.esm", "name": "Bonemold Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "2b059:Dragonborn.esm": { "out": "37563:Dragonborn.esm", "name": "Bonemold Pauldron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b058:Dragonborn.esm": { "out": "1cd92:Dragonborn.esm", "name": "Bonemold Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "2b057:Dragonborn.esm": { "out": "1cd8b:Dragonborn.esm", "name": "Chitin Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b056:Dragonborn.esm": { "out": "1cd8a:Dragonborn.esm", "name": "Chitin Heavy Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2b055:Dragonborn.esm": { "out": "1cd82:Dragonborn.esm", "name": "Chitin Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b054:Dragonborn.esm": { "out": "1cd89:Dragonborn.esm", "name": "Chitin Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b053:Dragonborn.esm": { "out": "26235:Dragonborn.esm", "name": "Chitin Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b052:Dragonborn.esm": { "out": "1cd8c:Dragonborn.esm", "name": "Chitin Heavy Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b051:Dragonborn.esm": { "out": "1cd88:Dragonborn.esm", "name": "Chitin Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "2b050:Dragonborn.esm": { "out": "1cd87:Dragonborn.esm", "name": "Chitin Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2b04f:Dragonborn.esm": { "out": "1cd86:Dragonborn.esm", "name": "Chitin Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "17773:Dragonborn.esm": { "out": "10fcf4:Skyrim.esm", "name": "Staff of Thunderbolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17772:Dragonborn.esm": { "out": "29b87:Skyrim.esm", "name": "Staff of the Storm Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17771:Dragonborn.esm": { "out": "29b86:Skyrim.esm", "name": "Staff of the Frost Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17770:Dragonborn.esm": { "out": "29b85:Skyrim.esm", "name": "Staff of the Flame Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1776f:Dragonborn.esm": { "out": "29b94:Skyrim.esm", "name": "Minor Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1776e:Dragonborn.esm": { "out": "29b95:Skyrim.esm", "name": "Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1776d:Dragonborn.esm": { "out": "29b97:Skyrim.esm", "name": "Grand Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1776c:Dragonborn.esm": { "out": "4dee2:Skyrim.esm", "name": "Staff of Sparks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1776b:Dragonborn.esm": { "out": "be122:Skyrim.esm", "name": "Staff of Soul Trapping", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1776a:Dragonborn.esm": { "out": "29b92:Skyrim.esm", "name": "Staff of Vanquishment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17769:Dragonborn.esm": { "out": "29b7a:Skyrim.esm", "name": "Staff of Greater Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17768:Dragonborn.esm": { "out": "29b9b:Skyrim.esm", "name": "Grand Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17767:Dragonborn.esm": { "out": "29b9a:Skyrim.esm", "name": "Greater Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17766:Dragonborn.esm": { "out": "29b76:Skyrim.esm", "name": "Staff of Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17765:Dragonborn.esm": { "out": "29b8e:Skyrim.esm", "name": "Staff of Inspiration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17764:Dragonborn.esm": { "out": "29b74:Skyrim.esm", "name": "Staff of Lesser Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17763:Dragonborn.esm": { "out": "29b73:Skyrim.esm", "name": "Staff of Paralysis", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17762:Dragonborn.esm": { "out": "be121:Skyrim.esm", "name": "Staff of Magelight", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17761:Dragonborn.esm": { "out": "10fcf2:Skyrim.esm", "name": "Staff of Incineration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17760:Dragonborn.esm": { "out": "10fcf7:Skyrim.esm", "name": "Staff of Icy Spear", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1775f:Dragonborn.esm": { "out": "29b83:Skyrim.esm", "name": "Staff of Ice Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1775e:Dragonborn.esm": { "out": "4ded8:Skyrim.esm", "name": "Staff of Ice Spikes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1775d:Dragonborn.esm": { "out": "29b99:Skyrim.esm", "name": "Staff of Mending", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1775c:Dragonborn.esm": { "out": "29b93:Skyrim.esm", "name": "Staff of the Healing Hand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1775b:Dragonborn.esm": { "out": "29b89:Skyrim.esm", "name": "Staff of Fury", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1775a:Dragonborn.esm": { "out": "4dee1:Skyrim.esm", "name": "Staff of Frostbite", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17759:Dragonborn.esm": { "out": "29b8f:Skyrim.esm", "name": "Staff of Frenzy", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17758:Dragonborn.esm": { "out": "4dee0:Skyrim.esm", "name": "Staff of Flames", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17757:Dragonborn.esm": { "out": "4c6ca:Skyrim.esm", "name": "Staff of Firebolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17756:Dragonborn.esm": { "out": "29b82:Skyrim.esm", "name": "Staff of Fireballs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17755:Dragonborn.esm": { "out": "29b8c:Skyrim.esm", "name": "Staff of Fear", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17754:Dragonborn.esm": { "out": "29b7e:Skyrim.esm", "name": "Staff of Expulsion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17753:Dragonborn.esm": { "out": "29b7c:Skyrim.esm", "name": "Staff of Dread Zombies", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17752:Dragonborn.esm": { "out": "29b88:Skyrim.esm", "name": "Staff of Courage", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17751:Dragonborn.esm": { "out": "29b7d:Skyrim.esm", "name": "Staff of the Storm Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17750:Dragonborn.esm": { "out": "be120:Skyrim.esm", "name": "Staff of the Frost Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1774f:Dragonborn.esm": { "out": "29b78:Skyrim.esm", "name": "Staff of the Flame Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1774e:Dragonborn.esm": { "out": "29b75:Skyrim.esm", "name": "Staff of the Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1774d:Dragonborn.esm": { "out": "29b7b:Skyrim.esm", "name": "Staff of Daedric Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1774c:Dragonborn.esm": { "out": "29b84:Skyrim.esm", "name": "Staff of Chain Lightning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1774b:Dragonborn.esm": { "out": "29b8b:Skyrim.esm", "name": "Staff of Calm", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1774a:Dragonborn.esm": { "out": "29b79:Skyrim.esm", "name": "Staff of Banishing", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17737:Dragonborn.esm": { "out": "4dee3:Skyrim.esm", "name": "Staff of Lightning Bolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2ba5f3:WindhelmSSE.esp": { "out": "2ba5f0:WindhelmSSE.esp", "name": "Pelt of Karhu", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8a4:Gourmet.esp": { "out": "64b30:Skyrim.esm", "name": "Boiled Creme Treat", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "80e:Gourmet.esp": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "80f:Gourmet.esp": { "out": "80d:Gourmet.esp", "name": "Juniper Berry Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "811:Gourmet.esp": { "out": "810:Gourmet.esp", "name": "Mammoth Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "812:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "813:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "814:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "819:Gourmet.esp": { "out": "818:Gourmet.esp", "name": "Mammoth Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "81a:Gourmet.esp": { "out": "817:Gourmet.esp", "name": "Boar Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "81b:Gourmet.esp": { "out": "816:Gourmet.esp", "name": "Ash Hopper Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "81d:Gourmet.esp": { "out": "81c:Gourmet.esp", "name": "Goat Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "81e:Gourmet.esp": { "out": "3cf72:Dragonborn.esm", "name": "Cooked Boar Meat", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "81f:Gourmet.esp": { "out": "64b3a:Skyrim.esm", "name": "Baked Potatoes", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "820:Gourmet.esp": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "expert", "open": false },
+    "84b:Gourmet.esp": { "out": "64b3e:Skyrim.esm", "name": "Grilled Leeks", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9b4:Gourmet.esp": { "out": "64b38:Skyrim.esm", "name": "Honey Nut Treat", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "8a6:Gourmet.esp": { "out": "64b38:Skyrim.esm", "name": "Honey Nut Treat", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "8ab:Gourmet.esp": { "out": "8aa:Gourmet.esp", "name": "Cooked Dog", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "8ad:Gourmet.esp": { "out": "e8448:Skyrim.esm", "name": "Cooked Skeever", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "8af:Gourmet.esp": { "out": "64b3c:Skyrim.esm", "name": "Slaughterfish Steak", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "8b4:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "8b5:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "8ba:Gourmet.esp": { "out": "8b3:Gourmet.esp", "name": "Carrot Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "8bb:Gourmet.esp": { "out": "8b1:Gourmet.esp", "name": "Gourd Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "8e3:Gourmet.esp": { "out": "8e2:Gourmet.esp", "name": "Roasted Carrots", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "8e5:Gourmet.esp": { "out": "8e4:Gourmet.esp", "name": "Roasted Yams", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "8ec:Gourmet.esp": { "out": "8ea:Gourmet.esp", "name": "Rabbit Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "8ed:Gourmet.esp": { "out": "8eb:Gourmet.esp", "name": "Pheasant Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "8f8:Gourmet.esp": { "out": "8f5:Gourmet.esp", "name": "Mushroom Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "8f9:Gourmet.esp": { "out": "8f6:Gourmet.esp", "name": "Wild Mushroom Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "8fa:Gourmet.esp": { "out": "8f7:Gourmet.esp", "name": "Glowing Mushroom Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "904:Gourmet.esp": { "out": "901:Gourmet.esp", "name": "Roasted Mushrooms", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "905:Gourmet.esp": { "out": "902:Gourmet.esp", "name": "Roasted Wild Mushrooms", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "906:Gourmet.esp": { "out": "903:Gourmet.esp", "name": "Roasted Glowing Mushroom", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "98b:Gourmet.esp": { "out": "981:Gourmet.esp", "name": "Jelly Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "994:Gourmet.esp": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "995:Gourmet.esp": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "996:Gourmet.esp": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "expert", "open": false },
+    "997:Gourmet.esp": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "expert", "open": false },
+    "998:Gourmet.esp": { "out": "816:Gourmet.esp", "name": "Ash Hopper Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "999:Gourmet.esp": { "out": "8e4:Gourmet.esp", "name": "Roasted Yams", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "99a:Gourmet.esp": { "out": "3cd5b:Dragonborn.esm", "name": "Ash Yam Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "99b:Gourmet.esp": { "out": "721e8:Skyrim.esm", "name": "Cooked Beef", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "99c:Gourmet.esp": { "out": "f4314:Skyrim.esm", "name": "Beef Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "99d:Gourmet.esp": { "out": "3cf72:Dragonborn.esm", "name": "Cooked Boar Meat", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "99e:Gourmet.esp": { "out": "817:Gourmet.esp", "name": "Boar Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "99f:Gourmet.esp": { "out": "64b30:Skyrim.esm", "name": "Boiled Creme Treat", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "9a0:Gourmet.esp": { "out": "9db:HearthFires.esm", "name": "Braided Bread", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9a1:Gourmet.esp": { "out": "65c97:Skyrim.esm", "name": "Bread Loaf", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9a2:Gourmet.esp": { "out": "f431b:Skyrim.esm", "name": "Cabbage Potato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9a3:Gourmet.esp": { "out": "eba02:Skyrim.esm", "name": "Cabbage Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9a4:Gourmet.esp": { "out": "eba01:Skyrim.esm", "name": "Cabbage and Tomato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9a5:Gourmet.esp": { "out": "8e2:Gourmet.esp", "name": "Roasted Carrots", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9a6:Gourmet.esp": { "out": "8b3:Gourmet.esp", "name": "Carrot Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9a7:Gourmet.esp": { "out": "e8947:Skyrim.esm", "name": "Grilled Chicken Breast", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9a8:Gourmet.esp": { "out": "353e:HearthFires.esm", "name": "Clam Chowder", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "9a9:Gourmet.esp": { "out": "8aa:Gourmet.esp", "name": "Cooked Dog", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9aa:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9ab:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9ac:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9ad:Gourmet.esp": { "out": "9dc:HearthFires.esm", "name": "Garlic Bread", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9ae:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9af:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9b0:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9b1:Gourmet.esp": { "out": "7224c:Skyrim.esm", "name": "Goat Roast", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9b2:Gourmet.esp": { "out": "81c:Gourmet.esp", "name": "Goat Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "9b3:Gourmet.esp": { "out": "8b1:Gourmet.esp", "name": "Gourd Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "a09:Gourmet.esp": { "out": "722b0:Skyrim.esm", "name": "Horse Haunch", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9b5:Gourmet.esp": { "out": "7224e:Skyrim.esm", "name": "Horker Loaf", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9b6:Gourmet.esp": { "out": "353a:HearthFires.esm", "name": "Jazbay Crostata", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "expert", "open": false },
+    "9b7:Gourmet.esp": { "out": "117ff:HearthFires.esm", "name": "Jazbay Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "9b8:Gourmet.esp": { "out": "981:Gourmet.esp", "name": "Jelly Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "9b9:Gourmet.esp": { "out": "3539:HearthFires.esm", "name": "Juniper Berry Crostata", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "expert", "open": false },
+    "9ba:Gourmet.esp": { "out": "80d:Gourmet.esp", "name": "Juniper Berry Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "9bb:Gourmet.esp": { "out": "64b3e:Skyrim.esm", "name": "Grilled Leeks", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9bc:Gourmet.esp": { "out": "810:Gourmet.esp", "name": "Mammoth Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9bd:Gourmet.esp": { "out": "722bb:Skyrim.esm", "name": "Mammoth Steak", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9be:Gourmet.esp": { "out": "818:Gourmet.esp", "name": "Mammoth Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "9bf:Gourmet.esp": { "out": "353f:HearthFires.esm", "name": "Steamed Mudcrab Legs", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "9c0:Gourmet.esp": { "out": "901:Gourmet.esp", "name": "Roasted Mushrooms", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9c1:Gourmet.esp": { "out": "902:Gourmet.esp", "name": "Roasted Wild Mushrooms", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9c2:Gourmet.esp": { "out": "903:Gourmet.esp", "name": "Roasted Glowing Mushroom", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9c3:Gourmet.esp": { "out": "8f5:Gourmet.esp", "name": "Mushroom Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "9c4:Gourmet.esp": { "out": "8f6:Gourmet.esp", "name": "Wild Mushroom Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "9c5:Gourmet.esp": { "out": "8f7:Gourmet.esp", "name": "Glowing Mushroom Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "9c6:Gourmet.esp": { "out": "722c7:Skyrim.esm", "name": "Pheasant Roast", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9c7:Gourmet.esp": { "out": "8eb:Gourmet.esp", "name": "Pheasant Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "9c8:Gourmet.esp": { "out": "64b3a:Skyrim.esm", "name": "Baked Potatoes", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9c9:Gourmet.esp": { "out": "3537:HearthFires.esm", "name": "Potato Bread", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9ca:Gourmet.esp": { "out": "353d:HearthFires.esm", "name": "Potato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9cb:Gourmet.esp": { "out": "722c2:Skyrim.esm", "name": "Rabbit Haunch", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9cc:Gourmet.esp": { "out": "8ea:Gourmet.esp", "name": "Rabbit Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "9cd:Gourmet.esp": { "out": "64b3b:Skyrim.esm", "name": "Salmon Steak", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9ce:Gourmet.esp": { "out": "e8448:Skyrim.esm", "name": "Cooked Skeever", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9cf:Gourmet.esp": { "out": "64b3c:Skyrim.esm", "name": "Slaughterfish Steak", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9d0:Gourmet.esp": { "out": "353b:HearthFires.esm", "name": "Snowberry Crostata", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "expert", "open": false },
+    "9d1:Gourmet.esp": { "out": "11801:HearthFires.esm", "name": "Snowberry Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "9d2:Gourmet.esp": { "out": "64b3d:Skyrim.esm", "name": "Sweet Roll", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "rank": "novice", "open": false },
+    "9d3:Gourmet.esp": { "out": "f431c:Skyrim.esm", "name": "Tomato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "novice", "open": false },
+    "9d4:Gourmet.esp": { "out": "f431e:Skyrim.esm", "name": "Vegetable Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9d5:Gourmet.esp": { "out": "722bd:Skyrim.esm", "name": "Venison Chop", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "advanced", "open": false },
+    "9d6:Gourmet.esp": { "out": "f431d:Skyrim.esm", "name": "Venison Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "9eb:Gourmet.esp": { "out": "f4315:Skyrim.esm", "name": "Horker Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "expert", "open": false },
+    "17b5e3:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5df:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Panic", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8168:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd23:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Minor Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a817d:Odin - Skyrim Magic Overhaul.esp": { "out": "21a2f5:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Illusions", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "bae31:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eed:Odin - Skyrim Magic Overhaul.esp", "name": "Greater Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8164:Odin - Skyrim Magic Overhaul.esp": { "out": "293d23:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Corrosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8165:Odin - Skyrim Magic Overhaul.esp": { "out": "293d0c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Vulnerability", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17b5e1:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5dc:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Soothe", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17b5e2:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5dd:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Subjugation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8185:Odin - Skyrim Magic Overhaul.esp": { "out": "2a8184:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Purge Magic", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8172:Odin - Skyrim Magic Overhaul.esp": { "out": "2a305d:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Frosthand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d4350:Odin - Skyrim Magic Overhaul.esp": { "out": "d434f:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Ancestors", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "bae2f:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eeb:Odin - Skyrim Magic Overhaul.esp", "name": "Minor Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8177:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Arctic Frost", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8173:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7a4:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Ice Shards", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a816a:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd26:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a816b:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd2b:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Major Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a816c:Odin - Skyrim Magic Overhaul.esp": { "out": "1b4e31:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Ursine Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a816d:Odin - Skyrim Magic Overhaul.esp": { "out": "1b4e34:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Mourning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8180:Odin - Skyrim Magic Overhaul.esp": { "out": "23897a:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Damned", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a816f:Odin - Skyrim Magic Overhaul.esp": { "out": "26b480:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Lightning Grasp", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8169:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd2c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Feline Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8170:Odin - Skyrim Magic Overhaul.esp": { "out": "2a305c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Firehand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a817e:Odin - Skyrim Magic Overhaul.esp": { "out": "21f403:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Mute", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8166:Odin - Skyrim Magic Overhaul.esp": { "out": "293d24:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Corrosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a818b:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7b0:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Tears", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8179:Odin - Skyrim Magic Overhaul.esp": { "out": "26b485:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Shockblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8189:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7ae:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Disintegration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8187:Odin - Skyrim Magic Overhaul.esp": { "out": "21a2f6:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Shadow Legion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a816e:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47b:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Arctic Blast", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8174:Odin - Skyrim Magic Overhaul.esp": { "out": "26b481:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Charged Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e78:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47d:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Taldam's Scorcher", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17b5e4:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5e0:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Bravery", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e7d:Odin - Skyrim Magic Overhaul.esp": { "out": "26b483:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Fireblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8167:Odin - Skyrim Magic Overhaul.esp": { "out": "293d15:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Vulnerability", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8178:Odin - Skyrim Magic Overhaul.esp": { "out": "26b484:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Frostblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8171:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47e:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Flame Darts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8186:Odin - Skyrim Magic Overhaul.esp": { "out": "2100da:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Domination", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a817a:Odin - Skyrim Magic Overhaul.esp": { "out": "26b482:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Thundering Grasp", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8176:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47f:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Wildfire", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "17b5e5:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5de:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Rage", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "bae30:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eec:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8175:Odin - Skyrim Magic Overhaul.esp": { "out": "7c848:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Stormhand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a817f:Odin - Skyrim Magic Overhaul.esp": { "out": "23386b:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Illusions", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a817b:Odin - Skyrim Magic Overhaul.esp": { "out": "22963a:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Crying Eyes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a817c:Odin - Skyrim Magic Overhaul.esp": { "out": "20afcf:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2c16a7:Odin - Skyrim Magic Overhaul.esp": { "out": "2c16a6:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Hush", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a818a:Odin - Skyrim Magic Overhaul.esp": { "out": "2611f4:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8188:Odin - Skyrim Magic Overhaul.esp": { "out": "23897b:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of the Damned", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8181:Odin - Skyrim Magic Overhaul.esp": { "out": "21f40c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Wizard Rend", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "2a8163:Odin - Skyrim Magic Overhaul.esp": { "out": "293d09:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Horsemanship", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d9a:Hothtrooper44_ArmorCompilation.esp": { "out": "d62:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "d9c:Hothtrooper44_ArmorCompilation.esp": { "out": "d63:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Crown", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "d9d:Hothtrooper44_ArmorCompilation.esp": { "out": "d64:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "d9e:Hothtrooper44_ArmorCompilation.esp": { "out": "d65:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "d9f:Hothtrooper44_ArmorCompilation.esp": { "out": "d66:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "da0:Hothtrooper44_ArmorCompilation.esp": { "out": "d67:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "da1:Hothtrooper44_ArmorCompilation.esp": { "out": "d95:Hothtrooper44_ArmorCompilation.esp", "name": "Hedge Knight Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "da2:Hothtrooper44_ArmorCompilation.esp": { "out": "d96:Hothtrooper44_ArmorCompilation.esp", "name": "Hedge Knight Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "da3:Hothtrooper44_ArmorCompilation.esp": { "out": "d97:Hothtrooper44_ArmorCompilation.esp", "name": "Hedge Knight Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "da4:Hothtrooper44_ArmorCompilation.esp": { "out": "d98:Hothtrooper44_ArmorCompilation.esp", "name": "Hedge Knight Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "da5:Hothtrooper44_ArmorCompilation.esp": { "out": "d6a:Hothtrooper44_ArmorCompilation.esp", "name": "Redguard Knight Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "da6:Hothtrooper44_ArmorCompilation.esp": { "out": "d6b:Hothtrooper44_ArmorCompilation.esp", "name": "Redguard Knight Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "da7:Hothtrooper44_ArmorCompilation.esp": { "out": "8041:Hothtrooper44_ArmorCompilation.esp", "name": "Redguard Knight Heavy Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "da8:Hothtrooper44_ArmorCompilation.esp": { "out": "d69:Hothtrooper44_ArmorCompilation.esp", "name": "Redguard Knight Light Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "da9:Hothtrooper44_ArmorCompilation.esp": { "out": "d6c:Hothtrooper44_ArmorCompilation.esp", "name": "Redguard Knight Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "daa:Hothtrooper44_ArmorCompilation.esp": { "out": "d6d:Hothtrooper44_ArmorCompilation.esp", "name": "Redguard Knight Light Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "dad:Hothtrooper44_ArmorCompilation.esp": { "out": "d70:Hothtrooper44_ArmorCompilation.esp", "name": "Redguard Knight Heavy Mail", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dae:Hothtrooper44_ArmorCompilation.esp": { "out": "d71:Hothtrooper44_ArmorCompilation.esp", "name": "Redguard Knight Light Mail", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "daf:Hothtrooper44_ArmorCompilation.esp": { "out": "d7a:Hothtrooper44_ArmorCompilation.esp", "name": "Vagabond Crimson Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "db0:Hothtrooper44_ArmorCompilation.esp": { "out": "d7b:Hothtrooper44_ArmorCompilation.esp", "name": "Vagabond Leather Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "db1:Hothtrooper44_ArmorCompilation.esp": { "out": "d7c:Hothtrooper44_ArmorCompilation.esp", "name": "Vagabond Dusk Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "db2:Hothtrooper44_ArmorCompilation.esp": { "out": "d77:Hothtrooper44_ArmorCompilation.esp", "name": "Vagabond Crimson Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "db3:Hothtrooper44_ArmorCompilation.esp": { "out": "d78:Hothtrooper44_ArmorCompilation.esp", "name": "Vagabond Leather Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "db4:Hothtrooper44_ArmorCompilation.esp": { "out": "d79:Hothtrooper44_ArmorCompilation.esp", "name": "Vagabond Dusk Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "db5:Hothtrooper44_ArmorCompilation.esp": { "out": "d7d:Hothtrooper44_ArmorCompilation.esp", "name": "Vagabond Crimson Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "db6:Hothtrooper44_ArmorCompilation.esp": { "out": "d7e:Hothtrooper44_ArmorCompilation.esp", "name": "Vagabond Leather Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "db7:Hothtrooper44_ArmorCompilation.esp": { "out": "d7f:Hothtrooper44_ArmorCompilation.esp", "name": "Vagabond Dusk Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "db8:Hothtrooper44_ArmorCompilation.esp": { "out": "d80:Hothtrooper44_ArmorCompilation.esp", "name": "Vagabond Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dbb:Hothtrooper44_ArmorCompilation.esp": { "out": "d83:Hothtrooper44_ArmorCompilation.esp", "name": "Vanguard Plate Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dbc:Hothtrooper44_ArmorCompilation.esp": { "out": "d84:Hothtrooper44_ArmorCompilation.esp", "name": "Vanguard Plate Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dbd:Hothtrooper44_ArmorCompilation.esp": { "out": "d85:Hothtrooper44_ArmorCompilation.esp", "name": "Vanguard Plate Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dbe:Hothtrooper44_ArmorCompilation.esp": { "out": "d86:Hothtrooper44_ArmorCompilation.esp", "name": "Vanguard Plate Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dbf:Hothtrooper44_ArmorCompilation.esp": { "out": "d87:Hothtrooper44_ArmorCompilation.esp", "name": "Vanguard Plate Helmet Closed", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "dc0:Hothtrooper44_ArmorCompilation.esp": { "out": "d88:Hothtrooper44_ArmorCompilation.esp", "name": "Warchief Heavy Battlecrown", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dc1:Hothtrooper44_ArmorCompilation.esp": { "out": "d89:Hothtrooper44_ArmorCompilation.esp", "name": "Warchief Light Battlecrown", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dc2:Hothtrooper44_ArmorCompilation.esp": { "out": "d8a:Hothtrooper44_ArmorCompilation.esp", "name": "Warchief Heavy Bulwark", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "dc3:Hothtrooper44_ArmorCompilation.esp": { "out": "d8b:Hothtrooper44_ArmorCompilation.esp", "name": "Warchief Light Bulwark", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dc6:Hothtrooper44_ArmorCompilation.esp": { "out": "d8e:Hothtrooper44_ArmorCompilation.esp", "name": "Warchief Heavy Grips", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dc7:Hothtrooper44_ArmorCompilation.esp": { "out": "d8f:Hothtrooper44_ArmorCompilation.esp", "name": "Warchief Light Grips", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dc8:Hothtrooper44_ArmorCompilation.esp": { "out": "d90:Hothtrooper44_ArmorCompilation.esp", "name": "Warchief Heavy Headdress", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dc9:Hothtrooper44_ArmorCompilation.esp": { "out": "d91:Hothtrooper44_ArmorCompilation.esp", "name": "Warchief Light Headdress", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dca:Hothtrooper44_ArmorCompilation.esp": { "out": "d92:Hothtrooper44_ArmorCompilation.esp", "name": "Warchief Heavy Stompers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "dcb:Hothtrooper44_ArmorCompilation.esp": { "out": "d93:Hothtrooper44_ArmorCompilation.esp", "name": "Warchief Light Stompers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "12e1:Hothtrooper44_ArmorCompilation.esp": { "out": "12d2:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Plate Light Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "12e2:Hothtrooper44_ArmorCompilation.esp": { "out": "d68:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Plate Dark Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "12e5:Hothtrooper44_ArmorCompilation.esp": { "out": "12d3:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Plate Light Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "12e7:Hothtrooper44_ArmorCompilation.esp": { "out": "12d4:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Plate Light Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "182a:Hothtrooper44_ArmorCompilation.esp": { "out": "48dc:Hothtrooper44_ArmorCompilation.esp", "name": "Armored Fur Hood - White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "1d90:Hothtrooper44_ArmorCompilation.esp": { "out": "48e0:Hothtrooper44_ArmorCompilation.esp", "name": "Fur Hood - White", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "1d91:Hothtrooper44_ArmorCompilation.esp": { "out": "48df:Hothtrooper44_ArmorCompilation.esp", "name": "Padded Fur Hood - White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "22f7:Hothtrooper44_ArmorCompilation.esp": { "out": "ab63:Hothtrooper44_ArmorCompilation.esp", "name": "Paladin Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "22f8:Hothtrooper44_ArmorCompilation.esp": { "out": "48db:Hothtrooper44_ArmorCompilation.esp", "name": "Armored Fur Hood - Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "22f9:Hothtrooper44_ArmorCompilation.esp": { "out": "ab61:Hothtrooper44_ArmorCompilation.esp", "name": "Paladin Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "22fa:Hothtrooper44_ArmorCompilation.esp": { "out": "ab60:Hothtrooper44_ArmorCompilation.esp", "name": "Paladin Barbut", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "22fb:Hothtrooper44_ArmorCompilation.esp": { "out": "ab5f:Hothtrooper44_ArmorCompilation.esp", "name": "Paladin Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "22fe:Hothtrooper44_ArmorCompilation.esp": { "out": "48d9:Hothtrooper44_ArmorCompilation.esp", "name": "Fur Hood - Black", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "22ff:Hothtrooper44_ArmorCompilation.esp": { "out": "48de:Hothtrooper44_ArmorCompilation.esp", "name": "Padded Fur Hood - Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2863:Hothtrooper44_ArmorCompilation.esp": { "out": "182c:Hothtrooper44_ArmorCompilation.esp", "name": "Seadog Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2864:Hothtrooper44_ArmorCompilation.esp": { "out": "ab5e:Hothtrooper44_ArmorCompilation.esp", "name": "Seadog Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2865:Hothtrooper44_ArmorCompilation.esp": { "out": "182d:Hothtrooper44_ArmorCompilation.esp", "name": "Seadog Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "2866:Hothtrooper44_ArmorCompilation.esp": { "out": "12c7:Hothtrooper44_ArmorCompilation.esp", "name": "Seadog Tricorne", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2867:Hothtrooper44_ArmorCompilation.esp": { "out": "1d93:Hothtrooper44_ArmorCompilation.esp", "name": "Seadog Feathered Tricorne", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "286a:Hothtrooper44_ArmorCompilation.esp": { "out": "285f:Hothtrooper44_ArmorCompilation.esp", "name": "Eyepatch", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "2dd7:Hothtrooper44_ArmorCompilation.esp": { "out": "2dd5:Hothtrooper44_ArmorCompilation.esp", "name": "Seadog Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "332a:Hothtrooper44_ArmorCompilation.esp": { "out": "3329:Hothtrooper44_ArmorCompilation.esp", "name": "Apotheus Scarf", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "3886:Hothtrooper44_ArmorCompilation.esp": { "out": "3882:Hothtrooper44_ArmorCompilation.esp", "name": "Hunter Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3888:Hothtrooper44_ArmorCompilation.esp": { "out": "3885:Hothtrooper44_ArmorCompilation.esp", "name": "Hunter Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "3889:Hothtrooper44_ArmorCompilation.esp": { "out": "3884:Hothtrooper44_ArmorCompilation.esp", "name": "Hunter Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3dee:Hothtrooper44_ArmorCompilation.esp": { "out": "3ded:Hothtrooper44_ArmorCompilation.esp", "name": "Paladin Great Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "3e39:Hothtrooper44_ArmorCompilation.esp": { "out": "3e29:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Brigandine Dark Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3e3a:Hothtrooper44_ArmorCompilation.esp": { "out": "3e2a:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Brigandine Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3e3f:Hothtrooper44_ArmorCompilation.esp": { "out": "3e2d:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Brigandine Dark Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3e40:Hothtrooper44_ArmorCompilation.esp": { "out": "3e2e:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Brigandine Light Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3e49:Hothtrooper44_ArmorCompilation.esp": { "out": "3e31:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Brigandine Dark Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3e4a:Hothtrooper44_ArmorCompilation.esp": { "out": "3e32:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Brigandine Light Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3e50:Hothtrooper44_ArmorCompilation.esp": { "out": "3e35:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Brigandine Dark Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "3e51:Hothtrooper44_ArmorCompilation.esp": { "out": "3e36:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Brigandine Light Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "3ecc:Hothtrooper44_ArmorCompilation.esp": { "out": "3ec0:Hothtrooper44_ArmorCompilation.esp", "name": "Nord Mail Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3ecd:Hothtrooper44_ArmorCompilation.esp": { "out": "3ec6:Hothtrooper44_ArmorCompilation.esp", "name": "Nord Mail Hauberk", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3ece:Hothtrooper44_ArmorCompilation.esp": { "out": "3ec1:Hothtrooper44_ArmorCompilation.esp", "name": "Nord Mail Heavy Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "3ecf:Hothtrooper44_ArmorCompilation.esp": { "out": "3ec7:Hothtrooper44_ArmorCompilation.esp", "name": "Nord Mail Heavy Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3ed1:Hothtrooper44_ArmorCompilation.esp": { "out": "3ec8:Hothtrooper44_ArmorCompilation.esp", "name": "Nord Heavy Spectacle Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3ed2:Hothtrooper44_ArmorCompilation.esp": { "out": "3ec3:Hothtrooper44_ArmorCompilation.esp", "name": "Nord Mail Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "3ed3:Hothtrooper44_ArmorCompilation.esp": { "out": "3ec4:Hothtrooper44_ArmorCompilation.esp", "name": "Nord Mail Shirt", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3ed4:Hothtrooper44_ArmorCompilation.esp": { "out": "3ec5:Hothtrooper44_ArmorCompilation.esp", "name": "Nord Mail Light Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "3ed5:Hothtrooper44_ArmorCompilation.esp": { "out": "3ec9:Hothtrooper44_ArmorCompilation.esp", "name": "Nord Mail Light Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "3ed7:Hothtrooper44_ArmorCompilation.esp": { "out": "3eca:Hothtrooper44_ArmorCompilation.esp", "name": "Nord Light Spectacle Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "48b9:Hothtrooper44_ArmorCompilation.esp": { "out": "4356:Hothtrooper44_ArmorCompilation.esp", "name": "Apotheus Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "4e4e:Hothtrooper44_ArmorCompilation.esp": { "out": "ba99c:Hothtrooper44_ArmorCompilation.esp", "name": "Armored Fur Mantle", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "4f25:Hothtrooper44_ArmorCompilation.esp": { "out": "4f21:Hothtrooper44_ArmorCompilation.esp", "name": "Akaviri Samurai Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "4f26:Hothtrooper44_ArmorCompilation.esp": { "out": "4f22:Hothtrooper44_ArmorCompilation.esp", "name": "Akaviri Samurai Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "4f27:Hothtrooper44_ArmorCompilation.esp": { "out": "4f23:Hothtrooper44_ArmorCompilation.esp", "name": "Akaviri Samurai Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "4f28:Hothtrooper44_ArmorCompilation.esp": { "out": "4f24:Hothtrooper44_ArmorCompilation.esp", "name": "Akaviri Samurai Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "4f3d:Hothtrooper44_ArmorCompilation.esp": { "out": "4f38:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "4f3e:Hothtrooper44_ArmorCompilation.esp": { "out": "4f3c:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Heavy Robe", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "4f3f:Hothtrooper44_ArmorCompilation.esp": { "out": "4f39:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "4f41:Hothtrooper44_ArmorCompilation.esp": { "out": "4f3b:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Heavy Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "53b1:Hothtrooper44_ArmorCompilation.esp": { "out": "22f5:Hothtrooper44_ArmorCompilation.esp", "name": "Armored Fur Mantle - Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "53b2:Hothtrooper44_ArmorCompilation.esp": { "out": "1829:Hothtrooper44_ArmorCompilation.esp", "name": "Armored Fur Mantle - White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "53b3:Hothtrooper44_ArmorCompilation.esp": { "out": "ba99a:Hothtrooper44_ArmorCompilation.esp", "name": "Fur Mantle", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "53b4:Hothtrooper44_ArmorCompilation.esp": { "out": "ba99b:Hothtrooper44_ArmorCompilation.esp", "name": "Padded Fur Mantle", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "53b5:Hothtrooper44_ArmorCompilation.esp": { "out": "22fc:Hothtrooper44_ArmorCompilation.esp", "name": "Fur Mantle - Black", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "53b6:Hothtrooper44_ArmorCompilation.esp": { "out": "22fd:Hothtrooper44_ArmorCompilation.esp", "name": "Padded Fur Mantle - Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "53b7:Hothtrooper44_ArmorCompilation.esp": { "out": "1d8e:Hothtrooper44_ArmorCompilation.esp", "name": "Fur Mantle - White", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "53b8:Hothtrooper44_ArmorCompilation.esp": { "out": "1d8f:Hothtrooper44_ArmorCompilation.esp", "name": "Padded Fur Mantle - White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a0c:Hothtrooper44_ArmorCompilation.esp": { "out": "5a09:Hothtrooper44_ArmorCompilation.esp", "name": "Mercenary Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a0d:Hothtrooper44_ArmorCompilation.esp": { "out": "5a0a:Hothtrooper44_ArmorCompilation.esp", "name": "Mercenary Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a0e:Hothtrooper44_ArmorCompilation.esp": { "out": "5a0b:Hothtrooper44_ArmorCompilation.esp", "name": "Mercenary Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a1c:Hothtrooper44_ArmorCompilation.esp": { "out": "5a18:Hothtrooper44_ArmorCompilation.esp", "name": "Heroic Imperial Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a1d:Hothtrooper44_ArmorCompilation.esp": { "out": "5a19:Hothtrooper44_ArmorCompilation.esp", "name": "Heroic Imperial Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "5a1e:Hothtrooper44_ArmorCompilation.esp": { "out": "5a1a:Hothtrooper44_ArmorCompilation.esp", "name": "Heroic Imperial Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a2a:Hothtrooper44_ArmorCompilation.esp": { "out": "5a26:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a2b:Hothtrooper44_ArmorCompilation.esp": { "out": "5a27:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Heavy Robe", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "5a2c:Hothtrooper44_ArmorCompilation.esp": { "out": "5a28:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5a2d:Hothtrooper44_ArmorCompilation.esp": { "out": "5a29:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Heavy Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a45:Hothtrooper44_ArmorCompilation.esp": { "out": "5a3d:Hothtrooper44_ArmorCompilation.esp", "name": "Primitive Nord Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a46:Hothtrooper44_ArmorCompilation.esp": { "out": "5a3e:Hothtrooper44_ArmorCompilation.esp", "name": "Primitive Nord Heavy Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "5a47:Hothtrooper44_ArmorCompilation.esp": { "out": "5a3f:Hothtrooper44_ArmorCompilation.esp", "name": "Primitive Nord Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a48:Hothtrooper44_ArmorCompilation.esp": { "out": "5a40:Hothtrooper44_ArmorCompilation.esp", "name": "Primitive Nord Heavy Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a49:Hothtrooper44_ArmorCompilation.esp": { "out": "5a41:Hothtrooper44_ArmorCompilation.esp", "name": "Primitive Nord Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a4a:Hothtrooper44_ArmorCompilation.esp": { "out": "5a42:Hothtrooper44_ArmorCompilation.esp", "name": "Primitive Nord Light Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "5a4b:Hothtrooper44_ArmorCompilation.esp": { "out": "5a43:Hothtrooper44_ArmorCompilation.esp", "name": "Primitive Nord Light Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a4c:Hothtrooper44_ArmorCompilation.esp": { "out": "5a44:Hothtrooper44_ArmorCompilation.esp", "name": "Primitive Nord Light Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a5f:Hothtrooper44_ArmorCompilation.esp": { "out": "5a5b:Hothtrooper44_ArmorCompilation.esp", "name": "Barbarian Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5a60:Hothtrooper44_ArmorCompilation.esp": { "out": "5a5c:Hothtrooper44_ArmorCompilation.esp", "name": "Barbarian Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5a61:Hothtrooper44_ArmorCompilation.esp": { "out": "5a5d:Hothtrooper44_ArmorCompilation.esp", "name": "Barbarian Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5a62:Hothtrooper44_ArmorCompilation.esp": { "out": "5a5e:Hothtrooper44_ArmorCompilation.esp", "name": "Barbarian Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5a72:Hothtrooper44_ArmorCompilation.esp": { "out": "5a6e:Hothtrooper44_ArmorCompilation.esp", "name": "Ranger Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5a73:Hothtrooper44_ArmorCompilation.esp": { "out": "5a6f:Hothtrooper44_ArmorCompilation.esp", "name": "Ranger Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5a74:Hothtrooper44_ArmorCompilation.esp": { "out": "5a70:Hothtrooper44_ArmorCompilation.esp", "name": "Ranger Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5a75:Hothtrooper44_ArmorCompilation.esp": { "out": "5a71:Hothtrooper44_ArmorCompilation.esp", "name": "Ranger Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8042:Hothtrooper44_ArmorCompilation.esp": { "out": "803e:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Plate Dark Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "8043:Hothtrooper44_ArmorCompilation.esp": { "out": "803f:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Plate Dark Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8044:Hothtrooper44_ArmorCompilation.esp": { "out": "8040:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Plate Dark Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8045:Hothtrooper44_ArmorCompilation.esp": { "out": "12d1:Hothtrooper44_ArmorCompilation.esp", "name": "Einherjar Plate Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8b10:Hothtrooper44_ArmorCompilation.esp": { "out": "8b0e:Hothtrooper44_ArmorCompilation.esp", "name": "Gildergreen Heavy Aegis", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "ab6d:Hothtrooper44_ArmorCompilation.esp": { "out": "ab62:Hothtrooper44_ArmorCompilation.esp", "name": "Paladin Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "ab72:Hothtrooper44_ArmorCompilation.esp": { "out": "ab64:Hothtrooper44_ArmorCompilation.esp", "name": "Heroic Stormcloak Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "ab73:Hothtrooper44_ArmorCompilation.esp": { "out": "ab65:Hothtrooper44_ArmorCompilation.esp", "name": "Heroic Stormcloak Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "ab74:Hothtrooper44_ArmorCompilation.esp": { "out": "ab66:Hothtrooper44_ArmorCompilation.esp", "name": "Heroic Stormcloak Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "ab75:Hothtrooper44_ArmorCompilation.esp": { "out": "ab67:Hothtrooper44_ArmorCompilation.esp", "name": "Heroic Stormcloak Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "b651:Hothtrooper44_ArmorCompilation.esp": { "out": "b64d:Hothtrooper44_ArmorCompilation.esp", "name": "Apotheus Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "b652:Hothtrooper44_ArmorCompilation.esp": { "out": "b64e:Hothtrooper44_ArmorCompilation.esp", "name": "Apotheus Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "b653:Hothtrooper44_ArmorCompilation.esp": { "out": "b64f:Hothtrooper44_ArmorCompilation.esp", "name": "Apotheus Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "b654:Hothtrooper44_ArmorCompilation.esp": { "out": "b650:Hothtrooper44_ArmorCompilation.esp", "name": "Apotheus Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "c695:Hothtrooper44_ArmorCompilation.esp": { "out": "c691:Hothtrooper44_ArmorCompilation.esp", "name": "Witchplate Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "c696:Hothtrooper44_ArmorCompilation.esp": { "out": "c692:Hothtrooper44_ArmorCompilation.esp", "name": "Witchplate Greaves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "c697:Hothtrooper44_ArmorCompilation.esp": { "out": "c693:Hothtrooper44_ArmorCompilation.esp", "name": "Witchplate Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "c698:Hothtrooper44_ArmorCompilation.esp": { "out": "c694:Hothtrooper44_ArmorCompilation.esp", "name": "Witchplate Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "d175:Hothtrooper44_ArmorCompilation.esp": { "out": "d16e:Hothtrooper44_ArmorCompilation.esp", "name": "Spellbinder Crimson Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "d176:Hothtrooper44_ArmorCompilation.esp": { "out": "d170:Hothtrooper44_ArmorCompilation.esp", "name": "Spellbinder Crimson Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "d177:Hothtrooper44_ArmorCompilation.esp": { "out": "d16f:Hothtrooper44_ArmorCompilation.esp", "name": "Spellbinder Crimson Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "d178:Hothtrooper44_ArmorCompilation.esp": { "out": "d16d:Hothtrooper44_ArmorCompilation.esp", "name": "Spellbinder Crimson Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "d17d:Hothtrooper44_ArmorCompilation.esp": { "out": "d173:Hothtrooper44_ArmorCompilation.esp", "name": "Spellbinder Runic Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "d17e:Hothtrooper44_ArmorCompilation.esp": { "out": "d171:Hothtrooper44_ArmorCompilation.esp", "name": "Spellbinder Runic Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "d17f:Hothtrooper44_ArmorCompilation.esp": { "out": "d172:Hothtrooper44_ArmorCompilation.esp", "name": "Spellbinder Runic Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "d180:Hothtrooper44_ArmorCompilation.esp": { "out": "d174:Hothtrooper44_ArmorCompilation.esp", "name": "Spellbinder Runic Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "f74d:Hothtrooper44_ArmorCompilation.esp": { "out": "f74c:Hothtrooper44_ArmorCompilation.esp", "name": "Redguard Knight Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "20dd5:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc2:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Painted Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "20dd6:Hothtrooper44_ArmorCompilation.esp": { "out": "20d0c:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Painted Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "20dd7:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc3:Hothtrooper44_ArmorCompilation.esp", "name": "Light Painted Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "20dd8:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc4:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Painted Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "20dd9:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc5:Hothtrooper44_ArmorCompilation.esp", "name": "Light Painted Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "20ddc:Hothtrooper44_ArmorCompilation.esp": { "out": "20d0f:Hothtrooper44_ArmorCompilation.esp", "name": "Light Painted Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "21470:Hothtrooper44_ArmorCompilation.esp": { "out": "21460:Hothtrooper44_ArmorCompilation.esp", "name": "Daedric Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "21471:Hothtrooper44_ArmorCompilation.esp": { "out": "21461:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "21472:Hothtrooper44_ArmorCompilation.esp": { "out": "21462:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "21473:Hothtrooper44_ArmorCompilation.esp": { "out": "21463:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "21474:Hothtrooper44_ArmorCompilation.esp": { "out": "21464:Hothtrooper44_ArmorCompilation.esp", "name": "Glass Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "21475:Hothtrooper44_ArmorCompilation.esp": { "out": "21465:Hothtrooper44_ArmorCompilation.esp", "name": "Hide Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "21476:Hothtrooper44_ArmorCompilation.esp": { "out": "21466:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "21477:Hothtrooper44_ArmorCompilation.esp": { "out": "21467:Hothtrooper44_ArmorCompilation.esp", "name": "Iron Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "21478:Hothtrooper44_ArmorCompilation.esp": { "out": "21468:Hothtrooper44_ArmorCompilation.esp", "name": "Orcish Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "21479:Hothtrooper44_ArmorCompilation.esp": { "out": "21469:Hothtrooper44_ArmorCompilation.esp", "name": "Sithis Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2147a:Hothtrooper44_ArmorCompilation.esp": { "out": "2146a:Hothtrooper44_ArmorCompilation.esp", "name": "Steel Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "2147b:Hothtrooper44_ArmorCompilation.esp": { "out": "2146b:Hothtrooper44_ArmorCompilation.esp", "name": "Winterhold Battlemage Buckler", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2147c:Hothtrooper44_ArmorCompilation.esp": { "out": "2146c:Hothtrooper44_ArmorCompilation.esp", "name": "Buckler of Ysgramor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2147d:Hothtrooper44_ArmorCompilation.esp": { "out": "2146d:Hothtrooper44_ArmorCompilation.esp", "name": "Shield of Sithis", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2147e:Hothtrooper44_ArmorCompilation.esp": { "out": "2146e:Hothtrooper44_ArmorCompilation.esp", "name": "Winterhold Battlemage Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2147f:Hothtrooper44_ArmorCompilation.esp": { "out": "2146f:Hothtrooper44_ArmorCompilation.esp", "name": "Shield of Ysgramor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "214a2:Hothtrooper44_ArmorCompilation.esp": { "out": "21499:Hothtrooper44_ArmorCompilation.esp", "name": "Nordic Dwemer Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "214a3:Hothtrooper44_ArmorCompilation.esp": { "out": "2149a:Hothtrooper44_ArmorCompilation.esp", "name": "Nordic Ebony Light Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "214a4:Hothtrooper44_ArmorCompilation.esp": { "out": "2149b:Hothtrooper44_ArmorCompilation.esp", "name": "Nordic Ebony Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "214a5:Hothtrooper44_ArmorCompilation.esp": { "out": "2149c:Hothtrooper44_ArmorCompilation.esp", "name": "Nordic Moonstone Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "214a6:Hothtrooper44_ArmorCompilation.esp": { "out": "2149d:Hothtrooper44_ArmorCompilation.esp", "name": "Nordic Orichalcum Light Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "214a7:Hothtrooper44_ArmorCompilation.esp": { "out": "2149e:Hothtrooper44_ArmorCompilation.esp", "name": "Nordic Orichalcum Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "214a8:Hothtrooper44_ArmorCompilation.esp": { "out": "2149f:Hothtrooper44_ArmorCompilation.esp", "name": "Light Skyforge Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "214a9:Hothtrooper44_ArmorCompilation.esp": { "out": "214a0:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Skyforge Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "214aa:Hothtrooper44_ArmorCompilation.esp": { "out": "214a1:Hothtrooper44_ArmorCompilation.esp", "name": "Wolf Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "21f7f:Hothtrooper44_ArmorCompilation.esp": { "out": "21f7e:Hothtrooper44_ArmorCompilation.esp", "name": "Orcish Masked Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "21f92:Hothtrooper44_ArmorCompilation.esp": { "out": "21f8c:Hothtrooper44_ArmorCompilation.esp", "name": "Ritual Boots of Boethiah", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "21f93:Hothtrooper44_ArmorCompilation.esp": { "out": "21f8d:Hothtrooper44_ArmorCompilation.esp", "name": "Ritual Armor of Boethiah", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21f94:Hothtrooper44_ArmorCompilation.esp": { "out": "21f8e:Hothtrooper44_ArmorCompilation.esp", "name": "Ritual Gauntlets of Boethiah", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "21f95:Hothtrooper44_ArmorCompilation.esp": { "out": "21f8f:Hothtrooper44_ArmorCompilation.esp", "name": "Ritual Helm of Boethiah", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21f96:Hothtrooper44_ArmorCompilation.esp": { "out": "21f90:Hothtrooper44_ArmorCompilation.esp", "name": "Ritual Mask of Boethiah", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "21f97:Hothtrooper44_ArmorCompilation.esp": { "out": "21f91:Hothtrooper44_ArmorCompilation.esp", "name": "Ritual Shroud of Boethiah", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "21ff5:Hothtrooper44_ArmorCompilation.esp": { "out": "21fe3:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21ff6:Hothtrooper44_ArmorCompilation.esp": { "out": "21fe4:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21ff7:Hothtrooper44_ArmorCompilation.esp": { "out": "21fe5:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Breastplate", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21ff8:Hothtrooper44_ArmorCompilation.esp": { "out": "21fe6:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21ff9:Hothtrooper44_ArmorCompilation.esp": { "out": "21fe7:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21ffa:Hothtrooper44_ArmorCompilation.esp": { "out": "21fe8:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "21ffb:Hothtrooper44_ArmorCompilation.esp": { "out": "21fe9:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Stout Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21ffc:Hothtrooper44_ArmorCompilation.esp": { "out": "21fea:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Stout Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21ffd:Hothtrooper44_ArmorCompilation.esp": { "out": "21feb:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Grand Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21ffe:Hothtrooper44_ArmorCompilation.esp": { "out": "21fec:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Grand Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "21fff:Hothtrooper44_ArmorCompilation.esp": { "out": "21fed:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Horned Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "22000:Hothtrooper44_ArmorCompilation.esp": { "out": "21fee:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Horned Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "22001:Hothtrooper44_ArmorCompilation.esp": { "out": "21fef:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Classic Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "22002:Hothtrooper44_ArmorCompilation.esp": { "out": "21ff0:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Classic Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "22003:Hothtrooper44_ArmorCompilation.esp": { "out": "21ff1:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Claw Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "22004:Hothtrooper44_ArmorCompilation.esp": { "out": "21ff2:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Claw Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "22005:Hothtrooper44_ArmorCompilation.esp": { "out": "21ff3:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "22006:Hothtrooper44_ArmorCompilation.esp": { "out": "21ff4:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonbone Ebonsteel Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23062:Hothtrooper44_ArmorCompilation.esp": { "out": "23060:Hothtrooper44_ArmorCompilation.esp", "name": "Fur Collar - Loose", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "23063:Hothtrooper44_ArmorCompilation.esp": { "out": "23061:Hothtrooper44_ArmorCompilation.esp", "name": "Fur Collar - Tight", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "2308f:Hothtrooper44_ArmorCompilation.esp": { "out": "23089:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23090:Hothtrooper44_ArmorCompilation.esp": { "out": "2308b:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Light Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23091:Hothtrooper44_ArmorCompilation.esp": { "out": "2308a:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Light Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23092:Hothtrooper44_ArmorCompilation.esp": { "out": "2308c:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Light Headdress", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23093:Hothtrooper44_ArmorCompilation.esp": { "out": "2308e:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Light Mask", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23094:Hothtrooper44_ArmorCompilation.esp": { "out": "2308d:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Light Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23095:Hothtrooper44_ArmorCompilation.esp": { "out": "23083:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23096:Hothtrooper44_ArmorCompilation.esp": { "out": "23087:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Heavy Mask", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23097:Hothtrooper44_ArmorCompilation.esp": { "out": "23086:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Heavy Headdress", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23098:Hothtrooper44_ArmorCompilation.esp": { "out": "23085:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23099:Hothtrooper44_ArmorCompilation.esp": { "out": "23088:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Heavy Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2309a:Hothtrooper44_ArmorCompilation.esp": { "out": "23084:Hothtrooper44_ArmorCompilation.esp", "name": "Trollsbane Heavy Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "230b1:Hothtrooper44_ArmorCompilation.esp": { "out": "230ad:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Light Robe", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "230b2:Hothtrooper44_ArmorCompilation.esp": { "out": "230ae:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Light Cap", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "230b3:Hothtrooper44_ArmorCompilation.esp": { "out": "230b0:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Light Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "230b4:Hothtrooper44_ArmorCompilation.esp": { "out": "230af:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "230cd:Hothtrooper44_ArmorCompilation.esp": { "out": "230c4:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "230ce:Hothtrooper44_ArmorCompilation.esp": { "out": "230c5:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Heavy Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "230cf:Hothtrooper44_ArmorCompilation.esp": { "out": "230c6:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Light Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "230d1:Hothtrooper44_ArmorCompilation.esp": { "out": "230c8:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Light Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "230d2:Hothtrooper44_ArmorCompilation.esp": { "out": "230c9:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Shield Bearer's Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "230d3:Hothtrooper44_ArmorCompilation.esp": { "out": "230ca:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "230d4:Hothtrooper44_ArmorCompilation.esp": { "out": "230cb:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Heavy Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "230d5:Hothtrooper44_ArmorCompilation.esp": { "out": "230cc:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Heavy Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "230eb:Hothtrooper44_ArmorCompilation.esp": { "out": "230e7:Hothtrooper44_ArmorCompilation.esp", "name": "Barbarian Hero Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "230ec:Hothtrooper44_ArmorCompilation.esp": { "out": "230e8:Hothtrooper44_ArmorCompilation.esp", "name": "Barbarian Hero Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "230ed:Hothtrooper44_ArmorCompilation.esp": { "out": "230e9:Hothtrooper44_ArmorCompilation.esp", "name": "Barbarian Hero Circlet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "230ee:Hothtrooper44_ArmorCompilation.esp": { "out": "230ea:Hothtrooper44_ArmorCompilation.esp", "name": "Barbarian Hero Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "230fb:Hothtrooper44_ArmorCompilation.esp": { "out": "230f7:Hothtrooper44_ArmorCompilation.esp", "name": "Crimson Archer Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "230fc:Hothtrooper44_ArmorCompilation.esp": { "out": "230f8:Hothtrooper44_ArmorCompilation.esp", "name": "Crimson Archer Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "230fd:Hothtrooper44_ArmorCompilation.esp": { "out": "230f9:Hothtrooper44_ArmorCompilation.esp", "name": "Crimson Archer Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23190:Hothtrooper44_ArmorCompilation.esp": { "out": "23146:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Boots Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23191:Hothtrooper44_ArmorCompilation.esp": { "out": "23147:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Boots Blue", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23192:Hothtrooper44_ArmorCompilation.esp": { "out": "23148:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Boots Green", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23193:Hothtrooper44_ArmorCompilation.esp": { "out": "23149:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Boots Red", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23194:Hothtrooper44_ArmorCompilation.esp": { "out": "2314a:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Boots White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23195:Hothtrooper44_ArmorCompilation.esp": { "out": "2314b:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Gloves Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23196:Hothtrooper44_ArmorCompilation.esp": { "out": "2314c:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Gloves Blue", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23197:Hothtrooper44_ArmorCompilation.esp": { "out": "2314d:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Gloves Green", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23198:Hothtrooper44_ArmorCompilation.esp": { "out": "2314e:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Gloves Red", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23199:Hothtrooper44_ArmorCompilation.esp": { "out": "2314f:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Gloves White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2319a:Hothtrooper44_ArmorCompilation.esp": { "out": "23150:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Hood Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2319b:Hothtrooper44_ArmorCompilation.esp": { "out": "23151:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Hood Blue", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2319c:Hothtrooper44_ArmorCompilation.esp": { "out": "23152:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Hood Green", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2319d:Hothtrooper44_ArmorCompilation.esp": { "out": "23153:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Hood Red", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2319e:Hothtrooper44_ArmorCompilation.esp": { "out": "23154:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Hood White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2319f:Hothtrooper44_ArmorCompilation.esp": { "out": "23155:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Robe Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231a0:Hothtrooper44_ArmorCompilation.esp": { "out": "23156:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Robe Blue", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231a1:Hothtrooper44_ArmorCompilation.esp": { "out": "23157:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Robe Green", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231a2:Hothtrooper44_ArmorCompilation.esp": { "out": "23158:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Robe Red", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231a3:Hothtrooper44_ArmorCompilation.esp": { "out": "23159:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Robe White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231a4:Hothtrooper44_ArmorCompilation.esp": { "out": "2315a:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Mantle Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231a5:Hothtrooper44_ArmorCompilation.esp": { "out": "2315b:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Mantle Blue", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231a6:Hothtrooper44_ArmorCompilation.esp": { "out": "2315c:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Mantle Green", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231a7:Hothtrooper44_ArmorCompilation.esp": { "out": "2315d:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Mantle Red", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231a8:Hothtrooper44_ArmorCompilation.esp": { "out": "2315e:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Heavy Mantle White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231a9:Hothtrooper44_ArmorCompilation.esp": { "out": "2315f:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Boots Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231aa:Hothtrooper44_ArmorCompilation.esp": { "out": "23160:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Boots Blue", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231ab:Hothtrooper44_ArmorCompilation.esp": { "out": "23161:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Boots Green", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231ac:Hothtrooper44_ArmorCompilation.esp": { "out": "23162:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Boots Red", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231ad:Hothtrooper44_ArmorCompilation.esp": { "out": "23163:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Boots White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231ae:Hothtrooper44_ArmorCompilation.esp": { "out": "23164:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Gloves Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231af:Hothtrooper44_ArmorCompilation.esp": { "out": "23165:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Gloves Blue", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231b0:Hothtrooper44_ArmorCompilation.esp": { "out": "23166:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Gloves Green", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231b1:Hothtrooper44_ArmorCompilation.esp": { "out": "23167:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Gloves Red", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231b2:Hothtrooper44_ArmorCompilation.esp": { "out": "23168:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Gloves White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231b3:Hothtrooper44_ArmorCompilation.esp": { "out": "23169:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Hood Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231b4:Hothtrooper44_ArmorCompilation.esp": { "out": "2316a:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Hood Blue", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231b5:Hothtrooper44_ArmorCompilation.esp": { "out": "2316b:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Hood Green", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231b6:Hothtrooper44_ArmorCompilation.esp": { "out": "2316c:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Hood Red", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231b7:Hothtrooper44_ArmorCompilation.esp": { "out": "2316d:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Hood White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "231b8:Hothtrooper44_ArmorCompilation.esp": { "out": "2316e:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Robe Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231b9:Hothtrooper44_ArmorCompilation.esp": { "out": "2316f:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Robe Blue", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231ba:Hothtrooper44_ArmorCompilation.esp": { "out": "23170:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Robe Green", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231bb:Hothtrooper44_ArmorCompilation.esp": { "out": "23171:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Robe Red", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231bc:Hothtrooper44_ArmorCompilation.esp": { "out": "23172:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Robe White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231bd:Hothtrooper44_ArmorCompilation.esp": { "out": "23173:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Mantle Black", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231be:Hothtrooper44_ArmorCompilation.esp": { "out": "23174:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Mantle Blue", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231bf:Hothtrooper44_ArmorCompilation.esp": { "out": "23175:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Mantle Green", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231c0:Hothtrooper44_ArmorCompilation.esp": { "out": "23176:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Mantle Red", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231c1:Hothtrooper44_ArmorCompilation.esp": { "out": "23177:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Light Mantle White", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "231c6:Hothtrooper44_ArmorCompilation.esp": { "out": "2317c:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Boots Black", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "231c7:Hothtrooper44_ArmorCompilation.esp": { "out": "2317d:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Boots Blue", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "231c8:Hothtrooper44_ArmorCompilation.esp": { "out": "2317e:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Boots Green", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "231c9:Hothtrooper44_ArmorCompilation.esp": { "out": "2317f:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Boots Red", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "231ca:Hothtrooper44_ArmorCompilation.esp": { "out": "23180:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Boots White", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "231cb:Hothtrooper44_ArmorCompilation.esp": { "out": "23181:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Gloves Black", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "231cc:Hothtrooper44_ArmorCompilation.esp": { "out": "23182:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Gloves Blue", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "231cd:Hothtrooper44_ArmorCompilation.esp": { "out": "23183:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Gloves Green", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "231ce:Hothtrooper44_ArmorCompilation.esp": { "out": "23184:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Gloves Red", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "231cf:Hothtrooper44_ArmorCompilation.esp": { "out": "23185:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Gloves White", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "231d0:Hothtrooper44_ArmorCompilation.esp": { "out": "23186:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Hood Black", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "231d1:Hothtrooper44_ArmorCompilation.esp": { "out": "23187:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Hood Blue", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "231d2:Hothtrooper44_ArmorCompilation.esp": { "out": "23188:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Hood Green", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "231d3:Hothtrooper44_ArmorCompilation.esp": { "out": "23189:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Hood Red", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "231d4:Hothtrooper44_ArmorCompilation.esp": { "out": "2318a:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Hood White", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "231d5:Hothtrooper44_ArmorCompilation.esp": { "out": "2318b:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Black", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "231d6:Hothtrooper44_ArmorCompilation.esp": { "out": "2318c:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Blue", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "231d7:Hothtrooper44_ArmorCompilation.esp": { "out": "2318d:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Green", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "231d8:Hothtrooper44_ArmorCompilation.esp": { "out": "2318e:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Red", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "231d9:Hothtrooper44_ArmorCompilation.esp": { "out": "2318f:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe White", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "2326c:Hothtrooper44_ArmorCompilation.esp": { "out": "2325c:Hothtrooper44_ArmorCompilation.esp", "name": "Bandana", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "23272:Hothtrooper44_ArmorCompilation.esp": { "out": "23262:Hothtrooper44_ArmorCompilation.esp", "name": "Bandana, Tied", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "2327e:Hothtrooper44_ArmorCompilation.esp": { "out": "2327b:Hothtrooper44_ArmorCompilation.esp", "name": "Brigand Dwemer Breastplate", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2327f:Hothtrooper44_ArmorCompilation.esp": { "out": "2327c:Hothtrooper44_ArmorCompilation.esp", "name": "Highwayman Mail", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23280:Hothtrooper44_ArmorCompilation.esp": { "out": "2327d:Hothtrooper44_ArmorCompilation.esp", "name": "Brigand Plate Harness", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2328d:Hothtrooper44_ArmorCompilation.esp": { "out": "23289:Hothtrooper44_ArmorCompilation.esp", "name": "Alduin Scale Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "2328e:Hothtrooper44_ArmorCompilation.esp": { "out": "2328a:Hothtrooper44_ArmorCompilation.esp", "name": "Alduin Scale Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "2328f:Hothtrooper44_ArmorCompilation.esp": { "out": "2328b:Hothtrooper44_ArmorCompilation.esp", "name": "Alduin Scale Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23290:Hothtrooper44_ArmorCompilation.esp": { "out": "2328c:Hothtrooper44_ArmorCompilation.esp", "name": "Alduin Scale Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "2329d:Hothtrooper44_ArmorCompilation.esp": { "out": "23299:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2329e:Hothtrooper44_ArmorCompilation.esp": { "out": "2329a:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Light Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2329f:Hothtrooper44_ArmorCompilation.esp": { "out": "2329b:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Light Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "232a0:Hothtrooper44_ArmorCompilation.esp": { "out": "2329c:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Light Robe", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "232a1:Hothtrooper44_ArmorCompilation.esp": { "out": "23295:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "232a2:Hothtrooper44_ArmorCompilation.esp": { "out": "23296:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Light Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "232a3:Hothtrooper44_ArmorCompilation.esp": { "out": "23297:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Light Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "232a4:Hothtrooper44_ArmorCompilation.esp": { "out": "23298:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Light Robe", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23300:Hothtrooper44_ArmorCompilation.esp": { "out": "232df:Hothtrooper44_ArmorCompilation.esp", "name": "Boiled Chitin Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23301:Hothtrooper44_ArmorCompilation.esp": { "out": "232f4:Hothtrooper44_ArmorCompilation.esp", "name": "Boiled Chitin Heavy Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23302:Hothtrooper44_ArmorCompilation.esp": { "out": "232e0:Hothtrooper44_ArmorCompilation.esp", "name": "Boiled Chitin Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23303:Hothtrooper44_ArmorCompilation.esp": { "out": "232e1:Hothtrooper44_ArmorCompilation.esp", "name": "Boiled Chitin Heavy Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23304:Hothtrooper44_ArmorCompilation.esp": { "out": "232e2:Hothtrooper44_ArmorCompilation.esp", "name": "Boiled Chitin Heavy Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23305:Hothtrooper44_ArmorCompilation.esp": { "out": "232e3:Hothtrooper44_ArmorCompilation.esp", "name": "Glacial Crystal Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23306:Hothtrooper44_ArmorCompilation.esp": { "out": "232f6:Hothtrooper44_ArmorCompilation.esp", "name": "Glacial Crystal Heavy Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23307:Hothtrooper44_ArmorCompilation.esp": { "out": "232e4:Hothtrooper44_ArmorCompilation.esp", "name": "Glacial Crystal Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23308:Hothtrooper44_ArmorCompilation.esp": { "out": "232e5:Hothtrooper44_ArmorCompilation.esp", "name": "Glacial Crystal Heavy Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23309:Hothtrooper44_ArmorCompilation.esp": { "out": "232e6:Hothtrooper44_ArmorCompilation.esp", "name": "Glacial Crystal Heavy Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23319:Hothtrooper44_ArmorCompilation.esp": { "out": "232f0:Hothtrooper44_ArmorCompilation.esp", "name": "Ringmail Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "2331a:Hothtrooper44_ArmorCompilation.esp": { "out": "232f1:Hothtrooper44_ArmorCompilation.esp", "name": "Ringmail Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2331b:Hothtrooper44_ArmorCompilation.esp": { "out": "232f2:Hothtrooper44_ArmorCompilation.esp", "name": "Ringmail Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "2331c:Hothtrooper44_ArmorCompilation.esp": { "out": "232f3:Hothtrooper44_ArmorCompilation.esp", "name": "Ringmail Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "2331d:Hothtrooper44_ArmorCompilation.esp": { "out": "232f7:Hothtrooper44_ArmorCompilation.esp", "name": "Snow Bear Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2331e:Hothtrooper44_ArmorCompilation.esp": { "out": "232f5:Hothtrooper44_ArmorCompilation.esp", "name": "Snow Bear Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2331f:Hothtrooper44_ArmorCompilation.esp": { "out": "232f8:Hothtrooper44_ArmorCompilation.esp", "name": "Snow Bear Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23320:Hothtrooper44_ArmorCompilation.esp": { "out": "232f9:Hothtrooper44_ArmorCompilation.esp", "name": "Snow Bear Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23321:Hothtrooper44_ArmorCompilation.esp": { "out": "232fa:Hothtrooper44_ArmorCompilation.esp", "name": "Snow Bear Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23322:Hothtrooper44_ArmorCompilation.esp": { "out": "232fb:Hothtrooper44_ArmorCompilation.esp", "name": "Vvardenfell Glass Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23323:Hothtrooper44_ArmorCompilation.esp": { "out": "232fc:Hothtrooper44_ArmorCompilation.esp", "name": "Vvardenfell Glass Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23324:Hothtrooper44_ArmorCompilation.esp": { "out": "232fd:Hothtrooper44_ArmorCompilation.esp", "name": "Vvardenfell Glass Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23325:Hothtrooper44_ArmorCompilation.esp": { "out": "232fe:Hothtrooper44_ArmorCompilation.esp", "name": "Vvardenfell Glass Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23326:Hothtrooper44_ArmorCompilation.esp": { "out": "232ff:Hothtrooper44_ArmorCompilation.esp", "name": "Vvardenfell Glass Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "238fd:Hothtrooper44_ArmorCompilation.esp": { "out": "238e0:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "238fe:Hothtrooper44_ArmorCompilation.esp": { "out": "238ea:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Full Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "238ff:Hothtrooper44_ArmorCompilation.esp": { "out": "238e1:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23900:Hothtrooper44_ArmorCompilation.esp": { "out": "238e2:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23901:Hothtrooper44_ArmorCompilation.esp": { "out": "238e3:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Engraved Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23902:Hothtrooper44_ArmorCompilation.esp": { "out": "238e4:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Engraved Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23903:Hothtrooper44_ArmorCompilation.esp": { "out": "238e5:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Engraved Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23904:Hothtrooper44_ArmorCompilation.esp": { "out": "238e6:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Engraved Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23905:Hothtrooper44_ArmorCompilation.esp": { "out": "238e7:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Engraved Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23906:Hothtrooper44_ArmorCompilation.esp": { "out": "238e8:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Engraved Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23907:Hothtrooper44_ArmorCompilation.esp": { "out": "238e9:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Engraved Shoulder Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "23908:Hothtrooper44_ArmorCompilation.esp": { "out": "238eb:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23909:Hothtrooper44_ArmorCompilation.esp": { "out": "238ec:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Reinforced Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2390a:Hothtrooper44_ArmorCompilation.esp": { "out": "238ed:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Reinforced Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2390b:Hothtrooper44_ArmorCompilation.esp": { "out": "238ee:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Reinforced Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2390c:Hothtrooper44_ArmorCompilation.esp": { "out": "238ef:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Reinforced Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2390d:Hothtrooper44_ArmorCompilation.esp": { "out": "238f0:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Reinforced Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2390e:Hothtrooper44_ArmorCompilation.esp": { "out": "238f1:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "2390f:Hothtrooper44_ArmorCompilation.esp": { "out": "238f2:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23910:Hothtrooper44_ArmorCompilation.esp": { "out": "238f3:Hothtrooper44_ArmorCompilation.esp", "name": "Wild Hunt Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23911:Hothtrooper44_ArmorCompilation.esp": { "out": "238f4:Hothtrooper44_ArmorCompilation.esp", "name": "Wild Hunt Heavy Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23912:Hothtrooper44_ArmorCompilation.esp": { "out": "238f5:Hothtrooper44_ArmorCompilation.esp", "name": "Wild Hunt Heavy Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23913:Hothtrooper44_ArmorCompilation.esp": { "out": "238f6:Hothtrooper44_ArmorCompilation.esp", "name": "Wild Hunt Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23914:Hothtrooper44_ArmorCompilation.esp": { "out": "238f7:Hothtrooper44_ArmorCompilation.esp", "name": "Wild Hunt Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23915:Hothtrooper44_ArmorCompilation.esp": { "out": "238f8:Hothtrooper44_ArmorCompilation.esp", "name": "Wild Hunt Light Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23916:Hothtrooper44_ArmorCompilation.esp": { "out": "238f9:Hothtrooper44_ArmorCompilation.esp", "name": "Wild Hunt Light Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23917:Hothtrooper44_ArmorCompilation.esp": { "out": "238fa:Hothtrooper44_ArmorCompilation.esp", "name": "Wild Hunt Light Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23918:Hothtrooper44_ArmorCompilation.esp": { "out": "238fb:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Mask", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "23919:Hothtrooper44_ArmorCompilation.esp": { "out": "238fc:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Shoulder Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "2393d:Hothtrooper44_ArmorCompilation.esp": { "out": "2393a:Hothtrooper44_ArmorCompilation.esp", "name": "Daedric Lord Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "2393e:Hothtrooper44_ArmorCompilation.esp": { "out": "2393b:Hothtrooper44_ArmorCompilation.esp", "name": "Daedric Lord Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "2393f:Hothtrooper44_ArmorCompilation.esp": { "out": "2393c:Hothtrooper44_ArmorCompilation.esp", "name": "Daedric Lord Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "2394f:Hothtrooper44_ArmorCompilation.esp": { "out": "23947:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23950:Hothtrooper44_ArmorCompilation.esp": { "out": "23948:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Heavy Robe", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23951:Hothtrooper44_ArmorCompilation.esp": { "out": "23949:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Heavy Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23952:Hothtrooper44_ArmorCompilation.esp": { "out": "2394a:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Heavy Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23953:Hothtrooper44_ArmorCompilation.esp": { "out": "2394b:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "23954:Hothtrooper44_ArmorCompilation.esp": { "out": "2394c:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Light Robe", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "23955:Hothtrooper44_ArmorCompilation.esp": { "out": "2394d:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Light Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "23956:Hothtrooper44_ArmorCompilation.esp": { "out": "2394e:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Light Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "25a35:Hothtrooper44_ArmorCompilation.esp": { "out": "238e1:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "25a36:Hothtrooper44_ArmorCompilation.esp": { "out": "238e4:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Engraved Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "25a37:Hothtrooper44_ArmorCompilation.esp": { "out": "238ed:Hothtrooper44_ArmorCompilation.esp", "name": "Bosmer Reinforced Coif", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2854b:Hothtrooper44_ArmorCompilation.esp": { "out": "23068:Hothtrooper44_ArmorCompilation.esp", "name": "Mantle of the Silver Hand", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "2854c:Hothtrooper44_ArmorCompilation.esp": { "out": "23069:Hothtrooper44_ArmorCompilation.esp", "name": "Mantle of the Silver Hand", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "372fe:Hothtrooper44_ArmorCompilation.esp": { "out": "372fa:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Unarmored Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "372ff:Hothtrooper44_ArmorCompilation.esp": { "out": "372fb:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Unarmored Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "37300:Hothtrooper44_ArmorCompilation.esp": { "out": "372fc:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Unarmored Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "37301:Hothtrooper44_ArmorCompilation.esp": { "out": "372fd:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Unarmored Robe", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "37306:Hothtrooper44_ArmorCompilation.esp": { "out": "37305:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Unarmored Robe", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "37307:Hothtrooper44_ArmorCompilation.esp": { "out": "37304:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Unarmored Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "37308:Hothtrooper44_ArmorCompilation.esp": { "out": "37303:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Unarmored Gauntlets", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "37309:Hothtrooper44_ArmorCompilation.esp": { "out": "37302:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Unarmored Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "3730b:Hothtrooper44_ArmorCompilation.esp": { "out": "3730a:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Unarmored Robe", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "3730f:Hothtrooper44_ArmorCompilation.esp": { "out": "3730c:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Unarmored Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "37310:Hothtrooper44_ArmorCompilation.esp": { "out": "3730d:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Unarmored Gauntlets", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "37311:Hothtrooper44_ArmorCompilation.esp": { "out": "3730e:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonhide Unarmored Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "590d4:Hothtrooper44_ArmorCompilation.esp": { "out": "590cd:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Jorrvaskr Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5d7a7:Hothtrooper44_ArmorCompilation.esp": { "out": "5d7a0:Hothtrooper44_ArmorCompilation.esp", "name": "Light Jorrvaskr Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5f8ea:Hothtrooper44_ArmorCompilation.esp": { "out": "5ee06:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Splinted Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5f8eb:Hothtrooper44_ArmorCompilation.esp": { "out": "59137:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Target Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5f8ec:Hothtrooper44_ArmorCompilation.esp": { "out": "5e2a9:Hothtrooper44_ArmorCompilation.esp", "name": "Light Target Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5f8ed:Hothtrooper44_ArmorCompilation.esp": { "out": "5edd6:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Splinted Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5f8ee:Hothtrooper44_ArmorCompilation.esp": { "out": "5edbc:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Splinted Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5f8ef:Hothtrooper44_ArmorCompilation.esp": { "out": "5ede6:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Spiked Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5f8f0:Hothtrooper44_ArmorCompilation.esp": { "out": "5edc6:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Spiked Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "5f8f1:Hothtrooper44_ArmorCompilation.esp": { "out": "5edb7:Hothtrooper44_ArmorCompilation.esp", "name": "Heavy Spiked Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "5f8f2:Hothtrooper44_ArmorCompilation.esp": { "out": "5edbf:Hothtrooper44_ArmorCompilation.esp", "name": "Light Splinted Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5f8f3:Hothtrooper44_ArmorCompilation.esp": { "out": "5edba:Hothtrooper44_ArmorCompilation.esp", "name": "Light Spiked Kite Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "5f8f4:Hothtrooper44_ArmorCompilation.esp": { "out": "5ee16:Hothtrooper44_ArmorCompilation.esp", "name": "Light Splinted Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5f8f5:Hothtrooper44_ArmorCompilation.esp": { "out": "5edde:Hothtrooper44_ArmorCompilation.esp", "name": "Light Splinted Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5f8f6:Hothtrooper44_ArmorCompilation.esp": { "out": "5edf6:Hothtrooper44_ArmorCompilation.esp", "name": "Light Spiked Round Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5f8f7:Hothtrooper44_ArmorCompilation.esp": { "out": "5edce:Hothtrooper44_ArmorCompilation.esp", "name": "Light Spiked Body Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "62ffe:Hothtrooper44_ArmorCompilation.esp": { "out": "603c3:Hothtrooper44_ArmorCompilation.esp", "name": "Painted Spiked Targe", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "62fff:Hothtrooper44_ArmorCompilation.esp": { "out": "603c2:Hothtrooper44_ArmorCompilation.esp", "name": "Painted Hide Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "63000:Hothtrooper44_ArmorCompilation.esp": { "out": "603bf:Hothtrooper44_ArmorCompilation.esp", "name": "Painted Iron Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "6a9f4:Hothtrooper44_ArmorCompilation.esp": { "out": "6a9f2:Hothtrooper44_ArmorCompilation.esp", "name": "Stormlord Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "6a9f5:Hothtrooper44_ArmorCompilation.esp": { "out": "6a9f0:Hothtrooper44_ArmorCompilation.esp", "name": "Stormlord Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "6a9f6:Hothtrooper44_ArmorCompilation.esp": { "out": "6a9f1:Hothtrooper44_ArmorCompilation.esp", "name": "Stormlord Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "6a9f7:Hothtrooper44_ArmorCompilation.esp": { "out": "6a9f3:Hothtrooper44_ArmorCompilation.esp", "name": "Stormlord Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "6aa09:Hothtrooper44_ArmorCompilation.esp": { "out": "6aa04:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Knight Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "6aa0a:Hothtrooper44_ArmorCompilation.esp": { "out": "6aa05:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Knight Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "6aa0b:Hothtrooper44_ArmorCompilation.esp": { "out": "6aa06:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Knight Greaves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "6aa0c:Hothtrooper44_ArmorCompilation.esp": { "out": "6aa07:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Knight Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "6aa0d:Hothtrooper44_ArmorCompilation.esp": { "out": "6aa08:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Knight Vambraces", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "82ebf:Hothtrooper44_ArmorCompilation.esp": { "out": "82eb5:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Unarmored Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "82ec0:Hothtrooper44_ArmorCompilation.esp": { "out": "82eb6:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Unarmored Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "82ec1:Hothtrooper44_ArmorCompilation.esp": { "out": "82eb7:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Unarmored Cap", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "82ec2:Hothtrooper44_ArmorCompilation.esp": { "out": "82eb8:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Unarmored Robe", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "84f20:Hothtrooper44_ArmorCompilation.esp": { "out": "849b2:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Classic Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f3a:Hothtrooper44_ArmorCompilation.esp": { "out": "849b3:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Classic Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f3b:Hothtrooper44_ArmorCompilation.esp": { "out": "849b4:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Claw Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f3c:Hothtrooper44_ArmorCompilation.esp": { "out": "849b5:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Claw Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f3d:Hothtrooper44_ArmorCompilation.esp": { "out": "849b6:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Grand Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f3e:Hothtrooper44_ArmorCompilation.esp": { "out": "849b7:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Grand Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f3f:Hothtrooper44_ArmorCompilation.esp": { "out": "849b8:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Horned Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f40:Hothtrooper44_ArmorCompilation.esp": { "out": "849b9:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Horned Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f41:Hothtrooper44_ArmorCompilation.esp": { "out": "849ba:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Stout Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f42:Hothtrooper44_ArmorCompilation.esp": { "out": "849bb:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Stout Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f43:Hothtrooper44_ArmorCompilation.esp": { "out": "849bc:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f44:Hothtrooper44_ArmorCompilation.esp": { "out": "849bd:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f5c:Hothtrooper44_ArmorCompilation.esp": { "out": "84f48:Hothtrooper44_ArmorCompilation.esp", "name": "Boiled Chitin Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "84f5d:Hothtrooper44_ArmorCompilation.esp": { "out": "84f49:Hothtrooper44_ArmorCompilation.esp", "name": "Boiled Chitin Light Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "84f5e:Hothtrooper44_ArmorCompilation.esp": { "out": "84f4a:Hothtrooper44_ArmorCompilation.esp", "name": "Boiled Chitin Light Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "84f5f:Hothtrooper44_ArmorCompilation.esp": { "out": "84f4b:Hothtrooper44_ArmorCompilation.esp", "name": "Boiled Chitin Light Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "84f60:Hothtrooper44_ArmorCompilation.esp": { "out": "84f4c:Hothtrooper44_ArmorCompilation.esp", "name": "Boiled Chitin Light Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "84f61:Hothtrooper44_ArmorCompilation.esp": { "out": "84f4d:Hothtrooper44_ArmorCompilation.esp", "name": "Glacial Crystal Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "84f62:Hothtrooper44_ArmorCompilation.esp": { "out": "84f4e:Hothtrooper44_ArmorCompilation.esp", "name": "Glacial Crystal Light Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f63:Hothtrooper44_ArmorCompilation.esp": { "out": "84f4f:Hothtrooper44_ArmorCompilation.esp", "name": "Glacial Crystal Light Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "84f64:Hothtrooper44_ArmorCompilation.esp": { "out": "84f50:Hothtrooper44_ArmorCompilation.esp", "name": "Glacial Crystal Light Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "84f65:Hothtrooper44_ArmorCompilation.esp": { "out": "84f51:Hothtrooper44_ArmorCompilation.esp", "name": "Glacial Crystal Light Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "85a53:Hothtrooper44_ArmorCompilation.esp": { "out": "85a52:Hothtrooper44_ArmorCompilation.esp", "name": "Gildergreen Light Aegis", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "85fd7:Hothtrooper44_ArmorCompilation.esp": { "out": "85fd3:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Light Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "85fd8:Hothtrooper44_ArmorCompilation.esp": { "out": "85fd2:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Light Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "85fd9:Hothtrooper44_ArmorCompilation.esp": { "out": "85fd1:Hothtrooper44_ArmorCompilation.esp", "name": "Dragon Knight Light Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "8c651:Hothtrooper44_ArmorCompilation.esp": { "out": "5a1b:Hothtrooper44_ArmorCompilation.esp", "name": "Heroic Imperial Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "bc99a:Hothtrooper44_ArmorCompilation.esp": { "out": "48d8:Hothtrooper44_ArmorCompilation.esp", "name": "Fur Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "bc99b:Hothtrooper44_ArmorCompilation.esp": { "out": "48dd:Hothtrooper44_ArmorCompilation.esp", "name": "Padded Fur Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "bc99c:Hothtrooper44_ArmorCompilation.esp": { "out": "48da:Hothtrooper44_ArmorCompilation.esp", "name": "Armored Fur Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "843:MoreCraftableEquipment.esp": { "out": "6f398:Skyrim.esm", "name": "Fur Shoes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "844:MoreCraftableEquipment.esp": { "out": "6f393:Skyrim.esm", "name": "Fur Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "845:MoreCraftableEquipment.esp": { "out": "10594b:Skyrim.esm", "name": "Fur Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "846:MoreCraftableEquipment.esp": { "out": "10594d:Skyrim.esm", "name": "Fur Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "847:MoreCraftableEquipment.esp": { "out": "10594f:Skyrim.esm", "name": "Fur Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "848:MoreCraftableEquipment.esp": { "out": "6f39b:Skyrim.esm", "name": "Fur Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "849:MoreCraftableEquipment.esp": { "out": "6f39e:Skyrim.esm", "name": "Fur Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "84a:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "84b:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "84c:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "84d:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "84e:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "84f:MoreCraftableEquipment.esp": { "out": "4b288:Skyrim.esm", "name": "Blades Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "850:MoreCraftableEquipment.esp": { "out": "4b28b:Skyrim.esm", "name": "Blades Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "851:MoreCraftableEquipment.esp": { "out": "4b28d:Skyrim.esm", "name": "Blades Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "852:MoreCraftableEquipment.esp": { "out": "4b28f:Skyrim.esm", "name": "Blades Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "853:MoreCraftableEquipment.esp": { "out": "4f912:Skyrim.esm", "name": "Blades Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "854:MoreCraftableEquipment.esp": { "out": "818:MoreCraftableEquipment.esp", "name": "Dragonbone Crown", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "855:MoreCraftableEquipment.esp": { "out": "cee7c:Skyrim.esm", "name": "Wolf Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "856:MoreCraftableEquipment.esp": { "out": "cae15:Skyrim.esm", "name": "Wolf Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "857:MoreCraftableEquipment.esp": { "out": "cee7e:Skyrim.esm", "name": "Wolf Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "858:MoreCraftableEquipment.esp": { "out": "4c3d0:Skyrim.esm", "name": "Wolf Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "859:MoreCraftableEquipment.esp": { "out": "10eb5c:Skyrim.esm", "name": "Shrouded Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "85a:MoreCraftableEquipment.esp": { "out": "10eb5b:Skyrim.esm", "name": "Shrouded Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "85b:MoreCraftableEquipment.esp": { "out": "805:MoreCraftableEquipment.esp", "name": "Shrouded Short-Sleeved Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "85c:MoreCraftableEquipment.esp": { "out": "10eb5e:Skyrim.esm", "name": "Shrouded Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "85d:MoreCraftableEquipment.esp": { "out": "10eb5d:Skyrim.esm", "name": "Shrouded Cowl", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "85e:MoreCraftableEquipment.esp": { "out": "802:MoreCraftableEquipment.esp", "name": "Shrouded Masked Cowl", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "85f:MoreCraftableEquipment.esp": { "out": "14757:Dawnguard.esm", "name": "Dawnguard Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "860:MoreCraftableEquipment.esp": { "out": "f400:Dawnguard.esm", "name": "Dawnguard Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "861:MoreCraftableEquipment.esp": { "out": "f3f7:Dawnguard.esm", "name": "Dawnguard Heavy Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "862:MoreCraftableEquipment.esp": { "out": "f3fa:Dawnguard.esm", "name": "Dawnguard Heavy Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "863:MoreCraftableEquipment.esp": { "out": "f3fb:Dawnguard.esm", "name": "Dawnguard Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "864:MoreCraftableEquipment.esp": { "out": "f402:Dawnguard.esm", "name": "Dawnguard Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "865:MoreCraftableEquipment.esp": { "out": "f404:Dawnguard.esm", "name": "Dawnguard Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "866:MoreCraftableEquipment.esp": { "out": "14758:Dawnguard.esm", "name": "Dawnguard Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "867:MoreCraftableEquipment.esp": { "out": "f3fe:Dawnguard.esm", "name": "Dawnguard Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "868:MoreCraftableEquipment.esp": { "out": "50d0:Dawnguard.esm", "name": "Dawnguard Full Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "869:MoreCraftableEquipment.esp": { "out": "150b8:Dawnguard.esm", "name": "Dawnguard Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "86a:MoreCraftableEquipment.esp": { "out": "142c7:Dawnguard.esm", "name": "Vampire Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "86b:MoreCraftableEquipment.esp": { "out": "191f2:Dawnguard.esm", "name": "Vampire Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "86c:MoreCraftableEquipment.esp": { "out": "191f3:Dawnguard.esm", "name": "Vampire Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "86d:MoreCraftableEquipment.esp": { "out": "833:MoreCraftableEquipment.esp", "name": "Vampire Royal Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "86e:MoreCraftableEquipment.esp": { "out": "b5de:Dawnguard.esm", "name": "Vampire Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "86f:MoreCraftableEquipment.esp": { "out": "1a51f:Dawnguard.esm", "name": "Vampire Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "870:MoreCraftableEquipment.esp": { "out": "292ab:Dragonborn.esm", "name": "Morag Tong Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "871:MoreCraftableEquipment.esp": { "out": "292ac:Dragonborn.esm", "name": "Morag Tong Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "872:MoreCraftableEquipment.esp": { "out": "292ad:Dragonborn.esm", "name": "Morag Tong Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "873:MoreCraftableEquipment.esp": { "out": "292ae:Dragonborn.esm", "name": "Morag Tong Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "874:MoreCraftableEquipment.esp": { "out": "b83cd:Skyrim.esm", "name": "Falmer Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "87b:MoreCraftableEquipment.esp": { "out": "b83cb:Skyrim.esm", "name": "Falmer Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "87c:MoreCraftableEquipment.esp": { "out": "b83cf:Skyrim.esm", "name": "Falmer Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "87d:MoreCraftableEquipment.esp": { "out": "e8dd:Dawnguard.esm", "name": "Falmer Hardened Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "882:MoreCraftableEquipment.esp": { "out": "e8de:Dawnguard.esm", "name": "Falmer Hardened Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "883:MoreCraftableEquipment.esp": { "out": "e8df:Dawnguard.esm", "name": "Falmer Hardened Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "884:MoreCraftableEquipment.esp": { "out": "e8e0:Dawnguard.esm", "name": "Falmer Hardened Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "88c:MoreCraftableEquipment.esp": { "out": "23ef:Dawnguard.esm", "name": "Falmer Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "88d:MoreCraftableEquipment.esp": { "out": "23e9:Dawnguard.esm", "name": "Falmer Heavy Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "88e:MoreCraftableEquipment.esp": { "out": "23ed:Dawnguard.esm", "name": "Falmer Heavy Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "897:MoreCraftableEquipment.esp": { "out": "23eb:Dawnguard.esm", "name": "Falmer Heavy Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "89c:MoreCraftableEquipment.esp": { "out": "4c3cb:Skyrim.esm", "name": "Falmer Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8a9:MoreCraftableEquipment.esp": { "out": "5c06c:Skyrim.esm", "name": "Falmer Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8aa:MoreCraftableEquipment.esp": { "out": "d8d4e:Skyrim.esm", "name": "Forsworn Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8ab:MoreCraftableEquipment.esp": { "out": "d8d50:Skyrim.esm", "name": "Forsworn Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8ac:MoreCraftableEquipment.esp": { "out": "d8d55:Skyrim.esm", "name": "Forsworn Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8ad:MoreCraftableEquipment.esp": { "out": "d8d52:Skyrim.esm", "name": "Forsworn Headdress", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8ae:MoreCraftableEquipment.esp": { "out": "81d:MoreCraftableEquipment.esp", "name": "Giant Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8af:MoreCraftableEquipment.esp": { "out": "81c:MoreCraftableEquipment.esp", "name": "Giant Clothes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8b0:MoreCraftableEquipment.esp": { "out": "81e:MoreCraftableEquipment.esp", "name": "Giant Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8b1:MoreCraftableEquipment.esp": { "out": "2151e:Skyrim.esm", "name": "Falkreath Guard's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8b2:MoreCraftableEquipment.esp": { "out": "21520:Skyrim.esm", "name": "Hjaalmarch Guard's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8b3:MoreCraftableEquipment.esp": { "out": "21508:Skyrim.esm", "name": "Markarth Guard's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8b4:MoreCraftableEquipment.esp": { "out": "21507:Skyrim.esm", "name": "Riften Guard's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8b5:MoreCraftableEquipment.esp": { "out": "c7f5b:Skyrim.esm", "name": "Solitude Guard's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8b6:MoreCraftableEquipment.esp": { "out": "21525:Skyrim.esm", "name": "Pale Guard's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8b7:MoreCraftableEquipment.esp": { "out": "2150d:Skyrim.esm", "name": "Whiterun Guard's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8b8:MoreCraftableEquipment.esp": { "out": "21522:Skyrim.esm", "name": "Winterhold Guard's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8b9:MoreCraftableEquipment.esp": { "out": "21619:Skyrim.esm", "name": "Falkreath Guard's Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8ba:MoreCraftableEquipment.esp": { "out": "c7f5c:Skyrim.esm", "name": "Solitude Guard's Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8bb:MoreCraftableEquipment.esp": { "out": "2161b:Skyrim.esm", "name": "Hjaalmarch Guard's Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8bc:MoreCraftableEquipment.esp": { "out": "2161f:Skyrim.esm", "name": "Pale Guard's Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8bd:MoreCraftableEquipment.esp": { "out": "21613:Skyrim.esm", "name": "Markarth Guard's Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8be:MoreCraftableEquipment.esp": { "out": "21622:Skyrim.esm", "name": "Riften Guard's Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8bf:MoreCraftableEquipment.esp": { "out": "21615:Skyrim.esm", "name": "Whiterun Guard's Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8c0:MoreCraftableEquipment.esp": { "out": "2161d:Skyrim.esm", "name": "Winterhold Guard's Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8c1:MoreCraftableEquipment.esp": { "out": "214ed:Skyrim.esm", "name": "Falkreath Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8c2:MoreCraftableEquipment.esp": { "out": "214ef:Skyrim.esm", "name": "Hjaalmarch Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8c3:MoreCraftableEquipment.esp": { "out": "214dc:Skyrim.esm", "name": "Markarth Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8c4:MoreCraftableEquipment.esp": { "out": "214f7:Skyrim.esm", "name": "Pale Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8c5:MoreCraftableEquipment.esp": { "out": "214ba:Skyrim.esm", "name": "Riften Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8c6:MoreCraftableEquipment.esp": { "out": "214f4:Skyrim.esm", "name": "Solitude Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8c7:MoreCraftableEquipment.esp": { "out": "214e0:Skyrim.esm", "name": "Whiterun Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8c8:MoreCraftableEquipment.esp": { "out": "214f1:Skyrim.esm", "name": "Winterhold Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8c9:MoreCraftableEquipment.esp": { "out": "13ed8:Skyrim.esm", "name": "Imperial Chainmail", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8ca:MoreCraftableEquipment.esp": { "out": "9610d:Skyrim.esm", "name": "Imperial Legate Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8cb:MoreCraftableEquipment.esp": { "out": "136cf:Skyrim.esm", "name": "Imperial Captain's Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8cc:MoreCraftableEquipment.esp": { "out": "c815:Dawnguard.esm", "name": "Ancient Falmer Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8ce:MoreCraftableEquipment.esp": { "out": "c816:Dawnguard.esm", "name": "Ancient Falmer Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "8cf:MoreCraftableEquipment.esp": { "out": "c817:Dawnguard.esm", "name": "Ancient Falmer Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8d0:MoreCraftableEquipment.esp": { "out": "d3ea7:Skyrim.esm", "name": "Penitus Oculatus Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8d1:MoreCraftableEquipment.esp": { "out": "d3ea0:Skyrim.esm", "name": "Penitus Oculatus Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "8d2:MoreCraftableEquipment.esp": { "out": "d3eab:Skyrim.esm", "name": "Penitus Oculatus Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8d3:MoreCraftableEquipment.esp": { "out": "d3eaa:Skyrim.esm", "name": "Penitus Oculatus Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8d4:MoreCraftableEquipment.esp": { "out": "86981:Skyrim.esm", "name": "Stormcloak Officer Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8d5:MoreCraftableEquipment.esp": { "out": "8697e:Skyrim.esm", "name": "Stormcloak Officer Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8d6:MoreCraftableEquipment.esp": { "out": "86983:Skyrim.esm", "name": "Stormcloak Officer Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8d7:MoreCraftableEquipment.esp": { "out": "86985:Skyrim.esm", "name": "Stormcloak Officer Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8d8:MoreCraftableEquipment.esp": { "out": "a6d7f:Skyrim.esm", "name": "Fur Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8d9:MoreCraftableEquipment.esp": { "out": "a6d7b:Skyrim.esm", "name": "Stormcloak Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8da:MoreCraftableEquipment.esp": { "out": "a6d7d:Skyrim.esm", "name": "Fur Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8db:MoreCraftableEquipment.esp": { "out": "a6d79:Skyrim.esm", "name": "Stormcloak Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8dc:MoreCraftableEquipment.esp": { "out": "80f:MoreCraftableEquipment.esp", "name": "Thieves Guild Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8dd:MoreCraftableEquipment.esp": { "out": "80e:MoreCraftableEquipment.esp", "name": "Thieves Guild Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8de:MoreCraftableEquipment.esp": { "out": "810:MoreCraftableEquipment.esp", "name": "Thieves Guild Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8df:MoreCraftableEquipment.esp": { "out": "811:MoreCraftableEquipment.esp", "name": "Thieves Guild Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8e0:MoreCraftableEquipment.esp": { "out": "e35e7:Skyrim.esm", "name": "Karliah's Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8e1:MoreCraftableEquipment.esp": { "out": "e35e8:Skyrim.esm", "name": "Karliah's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8e2:MoreCraftableEquipment.esp": { "out": "e35e9:Skyrim.esm", "name": "Karliah's Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8e3:MoreCraftableEquipment.esp": { "out": "e35ea:Skyrim.esm", "name": "Karliah's Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8e4:MoreCraftableEquipment.esp": { "out": "814:MoreCraftableEquipment.esp", "name": "Guild Master's Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8e5:MoreCraftableEquipment.esp": { "out": "813:MoreCraftableEquipment.esp", "name": "Guild Master's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8e6:MoreCraftableEquipment.esp": { "out": "815:MoreCraftableEquipment.esp", "name": "Guild Master's Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8e7:MoreCraftableEquipment.esp": { "out": "816:MoreCraftableEquipment.esp", "name": "Guild Master's Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8e8:MoreCraftableEquipment.esp": { "out": "e35df:Skyrim.esm", "name": "Thieves Guild Cowl", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8e9:MoreCraftableEquipment.esp": { "out": "e35da:Skyrim.esm", "name": "Thieves Guild Gray Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8ea:MoreCraftableEquipment.esp": { "out": "e35db:Skyrim.esm", "name": "Thieves Guild Gray Sleeveless Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8eb:MoreCraftableEquipment.esp": { "out": "e35dc:Skyrim.esm", "name": "Thieves Guild Gray Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8ec:MoreCraftableEquipment.esp": { "out": "e35dd:Skyrim.esm", "name": "Thieves Guild Gray Cowl", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "8ed:MoreCraftableEquipment.esp": { "out": "81a:MoreCraftableEquipment.esp", "name": "Tsun's Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8ee:MoreCraftableEquipment.esp": { "out": "819:MoreCraftableEquipment.esp", "name": "Tsun's Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "8ef:MoreCraftableEquipment.esp": { "out": "81b:MoreCraftableEquipment.esp", "name": "Tsun's Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8f0:MoreCraftableEquipment.esp": { "out": "38341:Skyrim.esm", "name": "Falmer Arrow", "type": "AMMO", "makes": 48, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "8f1:MoreCraftableEquipment.esp": { "out": "cee9e:Skyrim.esm", "name": "Forsworn Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "8f3:MoreCraftableEquipment.esp": { "out": "3aeb9:Skyrim.esm", "name": "Blades Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "8f4:MoreCraftableEquipment.esp": { "out": "d098:Dawnguard.esm", "name": "Dawnguard War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "8f5:MoreCraftableEquipment.esp": { "out": "dd55:Dawnguard.esm", "name": "Dawnguard Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "8f6:MoreCraftableEquipment.esp": { "out": "be25e:Skyrim.esm", "name": "Headsman's Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "8f7:MoreCraftableEquipment.esp": { "out": "38340:Skyrim.esm", "name": "Falmer Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "8f8:MoreCraftableEquipment.esp": { "out": "2e6d1:Skyrim.esm", "name": "Falmer Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "8f9:MoreCraftableEquipment.esp": { "out": "302cd:Skyrim.esm", "name": "Falmer War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "8fa:MoreCraftableEquipment.esp": { "out": "cc829:Skyrim.esm", "name": "Forsworn Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "8fb:MoreCraftableEquipment.esp": { "out": "cee9b:Skyrim.esm", "name": "Forsworn Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "8fc:MoreCraftableEquipment.esp": { "out": "cade9:Skyrim.esm", "name": "Forsworn Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "8fd:MoreCraftableEquipment.esp": { "out": "13841:Skyrim.esm", "name": "Imperial Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "8fe:MoreCraftableEquipment.esp": { "out": "135b8:Skyrim.esm", "name": "Imperial Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "8ff:MoreCraftableEquipment.esp": { "out": "7a91a:Skyrim.esm", "name": "Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "900:MoreCraftableEquipment.esp": { "out": "10c6fb:Skyrim.esm", "name": "Silver Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "901:MoreCraftableEquipment.esp": { "out": "10aa19:Skyrim.esm", "name": "Silver Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "91f:MoreCraftableEquipment.esp": { "out": "5b6a1:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "920:MoreCraftableEquipment.esp": { "out": "5b6a0:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "921:MoreCraftableEquipment.esp": { "out": "6ff38:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "922:MoreCraftableEquipment.esp": { "out": "13106:Skyrim.esm", "name": "Ragged Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "923:MoreCraftableEquipment.esp": { "out": "13104:Skyrim.esm", "name": "Ragged Cap", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "924:MoreCraftableEquipment.esp": { "out": "13105:Skyrim.esm", "name": "Ragged Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "925:MoreCraftableEquipment.esp": { "out": "5b69f:Skyrim.esm", "name": "Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "926:MoreCraftableEquipment.esp": { "out": "5b69e:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "927:MoreCraftableEquipment.esp": { "out": "6ff37:Skyrim.esm", "name": "Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "928:MoreCraftableEquipment.esp": { "out": "d1921:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "929:MoreCraftableEquipment.esp": { "out": "1bc82:Skyrim.esm", "name": "Chef's Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "92a:MoreCraftableEquipment.esp": { "out": "1bca7:Skyrim.esm", "name": "Chef's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "92b:MoreCraftableEquipment.esp": { "out": "18801:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "936:MoreCraftableEquipment.esp": { "out": "10e2dc:Skyrim.esm", "name": "College Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "937:MoreCraftableEquipment.esp": { "out": "10e2ce:Skyrim.esm", "name": "College Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "938:MoreCraftableEquipment.esp": { "out": "10cee8:Skyrim.esm", "name": "Novice Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": true },
+    "939:MoreCraftableEquipment.esp": { "out": "10d2b5:Skyrim.esm", "name": "Apprentice Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "93a:MoreCraftableEquipment.esp": { "out": "10cee6:Skyrim.esm", "name": "Adept Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "93b:MoreCraftableEquipment.esp": { "out": "10d2b4:Skyrim.esm", "name": "Novice Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "93c:MoreCraftableEquipment.esp": { "out": "6b46b:Skyrim.esm", "name": "Mage Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "93d:MoreCraftableEquipment.esp": { "out": "10cee3:Skyrim.esm", "name": "Adept Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "93e:MoreCraftableEquipment.esp": { "out": "10d662:Skyrim.esm", "name": "Expert Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "93f:MoreCraftableEquipment.esp": { "out": "10d664:Skyrim.esm", "name": "Master Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "940:MoreCraftableEquipment.esp": { "out": "808:MoreCraftableEquipment.esp", "name": "Shrouded Hand Wraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "941:MoreCraftableEquipment.esp": { "out": "809:MoreCraftableEquipment.esp", "name": "Shrouded Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "942:MoreCraftableEquipment.esp": { "out": "80a:MoreCraftableEquipment.esp", "name": "Jester's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "943:MoreCraftableEquipment.esp": { "out": "80b:MoreCraftableEquipment.esp", "name": "Jester's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "master", "open": false },
+    "944:MoreCraftableEquipment.esp": { "out": "80c:MoreCraftableEquipment.esp", "name": "Jester's Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "945:MoreCraftableEquipment.esp": { "out": "80d:MoreCraftableEquipment.esp", "name": "Jester's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "946:MoreCraftableEquipment.esp": { "out": "e0dd4:Skyrim.esm", "name": "Dark Redguard Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": false },
+    "947:MoreCraftableEquipment.esp": { "out": "e0dd0:Skyrim.esm", "name": "Dark Hammerfell Garb", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "948:MoreCraftableEquipment.esp": { "out": "e0dd2:Skyrim.esm", "name": "Dark Alik'r Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": false },
+    "949:MoreCraftableEquipment.esp": { "out": "806:MoreCraftableEquipment.esp", "name": "Shrouded Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "master", "open": false },
+    "94a:MoreCraftableEquipment.esp": { "out": "807:MoreCraftableEquipment.esp", "name": "Shrouded Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "94b:MoreCraftableEquipment.esp": { "out": "19adf:Dawnguard.esm", "name": "Vampire Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "94c:MoreCraftableEquipment.esp": { "out": "19ae1:Dawnguard.esm", "name": "Vampire Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": false },
+    "94d:MoreCraftableEquipment.esp": { "out": "19ae3:Dawnguard.esm", "name": "Vampire Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": false },
+    "94e:MoreCraftableEquipment.esp": { "out": "19ade:Dawnguard.esm", "name": "Vampire Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": false },
+    "94f:MoreCraftableEquipment.esp": { "out": "47d7:Dawnguard.esm", "name": "Moth Priest Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "950:MoreCraftableEquipment.esp": { "out": "47d9:Dawnguard.esm", "name": "Moth Priest Sandals", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "951:MoreCraftableEquipment.esp": { "out": "37b8e:Dragonborn.esm", "name": "Cultist Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "952:MoreCraftableEquipment.esp": { "out": "37b8c:Dragonborn.esm", "name": "Cultist Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "open": false },
+    "953:MoreCraftableEquipment.esp": { "out": "37b8a:Dragonborn.esm", "name": "Cultist Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "open": false },
+    "957:MoreCraftableEquipment.esp": { "out": "82c:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "958:MoreCraftableEquipment.esp": { "out": "82d:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "959:MoreCraftableEquipment.esp": { "out": "82f:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "95a:MoreCraftableEquipment.esp": { "out": "830:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "95b:MoreCraftableEquipment.esp": { "out": "831:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "95c:MoreCraftableEquipment.esp": { "out": "832:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "95d:MoreCraftableEquipment.esp": { "out": "3705a:Dragonborn.esm", "name": "Dunmer Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "95e:MoreCraftableEquipment.esp": { "out": "39112:Dragonborn.esm", "name": "Skaal Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "95f:MoreCraftableEquipment.esp": { "out": "3910e:Dragonborn.esm", "name": "Skaal Coat", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "960:MoreCraftableEquipment.esp": { "out": "39110:Dragonborn.esm", "name": "Skaal Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "961:MoreCraftableEquipment.esp": { "out": "39114:Dragonborn.esm", "name": "Skaal Hat", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "962:MoreCraftableEquipment.esp": { "out": "834:MoreCraftableEquipment.esp", "name": "Telvanni Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "open": false },
+    "963:MoreCraftableEquipment.esp": { "out": "835:MoreCraftableEquipment.esp", "name": "Telvanni Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "964:MoreCraftableEquipment.esp": { "out": "3b04b:Dragonborn.esm", "name": "Temple Priest Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "965:MoreCraftableEquipment.esp": { "out": "3b04e:Dragonborn.esm", "name": "Temple Priest Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "966:MoreCraftableEquipment.esp": { "out": "9f0:MoreCraftableEquipment.esp", "name": "Temple Priest Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "967:MoreCraftableEquipment.esp": { "out": "15516:Skyrim.esm", "name": "Emperor's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "open": false },
+    "96b:MoreCraftableEquipment.esp": { "out": "1be1b:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "96c:MoreCraftableEquipment.esp": { "out": "209a5:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "96d:MoreCraftableEquipment.esp": { "out": "261bd:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "96e:MoreCraftableEquipment.esp": { "out": "3452f:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "96f:MoreCraftableEquipment.esp": { "out": "1be1a:Skyrim.esm", "name": "Belted Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "970:MoreCraftableEquipment.esp": { "out": "209a6:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "971:MoreCraftableEquipment.esp": { "out": "261c0:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "972:MoreCraftableEquipment.esp": { "out": "17696:Skyrim.esm", "name": "Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "973:MoreCraftableEquipment.esp": { "out": "17695:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "974:MoreCraftableEquipment.esp": { "out": "3452e:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "975:MoreCraftableEquipment.esp": { "out": "6c1d9:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "976:MoreCraftableEquipment.esp": { "out": "6c1da:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "977:MoreCraftableEquipment.esp": { "out": "6c1d8:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "978:MoreCraftableEquipment.esp": { "out": "261c1:Skyrim.esm", "name": "Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "979:MoreCraftableEquipment.esp": { "out": "330b3:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "97a:MoreCraftableEquipment.esp": { "out": "209aa:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "97b:MoreCraftableEquipment.esp": { "out": "330bc:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "97c:MoreCraftableEquipment.esp": { "out": "86993:Skyrim.esm", "name": "Fine Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "97d:MoreCraftableEquipment.esp": { "out": "cee82:Skyrim.esm", "name": "Fine Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "97e:MoreCraftableEquipment.esp": { "out": "86991:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": true },
+    "97f:MoreCraftableEquipment.esp": { "out": "f8713:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": true },
+    "980:MoreCraftableEquipment.esp": { "out": "cee80:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": true },
+    "981:MoreCraftableEquipment.esp": { "out": "f8715:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": true },
+    "982:MoreCraftableEquipment.esp": { "out": "cee84:Skyrim.esm", "name": "Fine Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "984:MoreCraftableEquipment.esp": { "out": "5db7b:Skyrim.esm", "name": "Noble Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "985:MoreCraftableEquipment.esp": { "out": "8698c:Skyrim.esm", "name": "Fur-Trimmed Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "986:MoreCraftableEquipment.esp": { "out": "cee76:Skyrim.esm", "name": "Fine Raiment", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "987:MoreCraftableEquipment.esp": { "out": "ead49:Skyrim.esm", "name": "Embroidered Garment", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "988:MoreCraftableEquipment.esp": { "out": "e84c1:Skyrim.esm", "name": "Gilded Wristguards", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "989:MoreCraftableEquipment.esp": { "out": "86990:Skyrim.esm", "name": "Fine Armguards", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "98a:MoreCraftableEquipment.esp": { "out": "5db7e:Skyrim.esm", "name": "Fur-lined Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "98b:MoreCraftableEquipment.esp": { "out": "8698e:Skyrim.esm", "name": "Pleated Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "98c:MoreCraftableEquipment.esp": { "out": "cee78:Skyrim.esm", "name": "Cuffed Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "98d:MoreCraftableEquipment.esp": { "out": "e84c4:Skyrim.esm", "name": "Embellished Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "open": false },
+    "98e:MoreCraftableEquipment.esp": { "out": "e84c6:Skyrim.esm", "name": "Refined Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "98f:MoreCraftableEquipment.esp": { "out": "4223d:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "990:MoreCraftableEquipment.esp": { "out": "4223c:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "991:MoreCraftableEquipment.esp": { "out": "6ff45:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "992:MoreCraftableEquipment.esp": { "out": "4223b:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "993:MoreCraftableEquipment.esp": { "out": "6b46c:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "994:MoreCraftableEquipment.esp": { "out": "825:MoreCraftableEquipment.esp", "name": "Archmage's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "995:MoreCraftableEquipment.esp": { "out": "828:MoreCraftableEquipment.esp", "name": "Archmage's Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "996:MoreCraftableEquipment.esp": { "out": "826:MoreCraftableEquipment.esp", "name": "Archmage's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "open": false },
+    "997:MoreCraftableEquipment.esp": { "out": "827:MoreCraftableEquipment.esp", "name": "Hooded Archmage's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "open": false },
+    "998:MoreCraftableEquipment.esp": { "out": "80699:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "999:MoreCraftableEquipment.esp": { "out": "80697:Skyrim.esm", "name": "Miner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "99a:MoreCraftableEquipment.esp": { "out": "6ff43:Skyrim.esm", "name": "Miner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "99b:MoreCraftableEquipment.esp": { "out": "bacd7:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "99c:MoreCraftableEquipment.esp": { "out": "bacf3:Skyrim.esm", "name": "Monk Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "99d:MoreCraftableEquipment.esp": { "out": "10cfef:Skyrim.esm", "name": "Brown Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "99e:MoreCraftableEquipment.esp": { "out": "83a:MoreCraftableEquipment.esp", "name": "Brown Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "99f:MoreCraftableEquipment.esp": { "out": "10cfe4:Skyrim.esm", "name": "Hooded Brown Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "9a0:MoreCraftableEquipment.esp": { "out": "10cff0:Skyrim.esm", "name": "Green Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9a1:MoreCraftableEquipment.esp": { "out": "83b:MoreCraftableEquipment.esp", "name": "Green Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9a2:MoreCraftableEquipment.esp": { "out": "10cfec:Skyrim.esm", "name": "Hooded Green Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "9a3:MoreCraftableEquipment.esp": { "out": "10cff1:Skyrim.esm", "name": "Grey Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9a4:MoreCraftableEquipment.esp": { "out": "83c:MoreCraftableEquipment.esp", "name": "Grey Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9a5:MoreCraftableEquipment.esp": { "out": "10cfea:Skyrim.esm", "name": "Hooded Grey Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "9a6:MoreCraftableEquipment.esp": { "out": "10cff2:Skyrim.esm", "name": "Red Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9a7:MoreCraftableEquipment.esp": { "out": "83d:MoreCraftableEquipment.esp", "name": "Red Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9a8:MoreCraftableEquipment.esp": { "out": "10cfeb:Skyrim.esm", "name": "Hooded Red Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "9a9:MoreCraftableEquipment.esp": { "out": "839:MoreCraftableEquipment.esp", "name": "Monk Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9aa:MoreCraftableEquipment.esp": { "out": "107106:Skyrim.esm", "name": "Hooded Monk Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "9ab:MoreCraftableEquipment.esp": { "out": "646ab:Skyrim.esm", "name": "Mourner's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "9ac:MoreCraftableEquipment.esp": { "out": "646a7:Skyrim.esm", "name": "Mourner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "9ad:MoreCraftableEquipment.esp": { "out": "b1460:Skyrim.esm", "name": "Mythic Dawn Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9ae:MoreCraftableEquipment.esp": { "out": "b145b:Skyrim.esm", "name": "Mythic Dawn Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9af:MoreCraftableEquipment.esp": { "out": "842:MoreCraftableEquipment.esp", "name": "Mythic Dawn Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9b0:MoreCraftableEquipment.esp": { "out": "840:MoreCraftableEquipment.esp", "name": "Mythic Dawn Hooded Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9b1:MoreCraftableEquipment.esp": { "out": "841:MoreCraftableEquipment.esp", "name": "Mythic Dawn Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9b2:MoreCraftableEquipment.esp": { "out": "c36e8:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9b3:MoreCraftableEquipment.esp": { "out": "829:MoreCraftableEquipment.esp", "name": "Necromancer Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9b4:MoreCraftableEquipment.esp": { "out": "83f:MoreCraftableEquipment.esp", "name": "Necromancer Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9b5:MoreCraftableEquipment.esp": { "out": "82a:MoreCraftableEquipment.esp", "name": "Hooded Necromancer Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "9b6:MoreCraftableEquipment.esp": { "out": "8f19a:Skyrim.esm", "name": "Ragged Trousers", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "9b7:MoreCraftableEquipment.esp": { "out": "3ca00:Skyrim.esm", "name": "Footwraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "9b8:MoreCraftableEquipment.esp": { "out": "3c9fe:Skyrim.esm", "name": "Roughspun Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "9b9:MoreCraftableEquipment.esp": { "out": "65b9b:Skyrim.esm", "name": "Psijic Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9ba:MoreCraftableEquipment.esp": { "out": "65b9d:Skyrim.esm", "name": "Psijic Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9bb:MoreCraftableEquipment.esp": { "out": "65b99:Skyrim.esm", "name": "Psijic Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9bc:MoreCraftableEquipment.esp": { "out": "65b94:Skyrim.esm", "name": "Psijic Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "open": false },
+    "9bd:MoreCraftableEquipment.esp": { "out": "7bc15:Skyrim.esm", "name": "Redguard Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": false },
+    "9be:MoreCraftableEquipment.esp": { "out": "7bc19:Skyrim.esm", "name": "Hammerfell Garb", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "9c0:MoreCraftableEquipment.esp": { "out": "7bc1a:Skyrim.esm", "name": "Alik'r Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": false },
+    "9c1:MoreCraftableEquipment.esp": { "out": "106661:Skyrim.esm", "name": "Black Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9c2:MoreCraftableEquipment.esp": { "out": "83e:MoreCraftableEquipment.esp", "name": "Black Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9c3:MoreCraftableEquipment.esp": { "out": "107108:Skyrim.esm", "name": "Hooded Black Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "9c4:MoreCraftableEquipment.esp": { "out": "a199b:Skyrim.esm", "name": "Blue Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9c5:MoreCraftableEquipment.esp": { "out": "812:MoreCraftableEquipment.esp", "name": "Blue Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": true },
+    "9c6:MoreCraftableEquipment.esp": { "out": "10710a:Skyrim.esm", "name": "Hooded Blue Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "9c7:MoreCraftableEquipment.esp": { "out": "824:MoreCraftableEquipment.esp", "name": "Greybeard's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "9c8:MoreCraftableEquipment.esp": { "out": "823:MoreCraftableEquipment.esp", "name": "Greybeard's Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "novice", "open": false },
+    "9c9:MoreCraftableEquipment.esp": { "out": "822:MoreCraftableEquipment.esp", "name": "Greybeard's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9ca:MoreCraftableEquipment.esp": { "out": "65bac:Skyrim.esm", "name": "Thalmor Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "9cb:MoreCraftableEquipment.esp": { "out": "65bb3:Skyrim.esm", "name": "Thalmor Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "9cc:MoreCraftableEquipment.esp": { "out": "821:MoreCraftableEquipment.esp", "name": "Thalmor Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "9cd:MoreCraftableEquipment.esp": { "out": "81f:MoreCraftableEquipment.esp", "name": "Thalmor Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9ce:MoreCraftableEquipment.esp": { "out": "820:MoreCraftableEquipment.esp", "name": "Hooded Thalmor Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9cf:MoreCraftableEquipment.esp": { "out": "88956:Skyrim.esm", "name": "Wedding Dress", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "9d0:MoreCraftableEquipment.esp": { "out": "88958:Skyrim.esm", "name": "Wedding Sandals", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "9d1:MoreCraftableEquipment.esp": { "out": "8895a:Skyrim.esm", "name": "Wedding Wreath", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "9d2:MoreCraftableEquipment.esp": { "out": "d191f:Skyrim.esm", "name": "Tavern Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "9dc:MoreCraftableEquipment.esp": { "out": "e739b:Skyrim.esm", "name": "Vaermina Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "9dd:MoreCraftableEquipment.esp": { "out": "5cbfe:Skyrim.esm", "name": "General Tullius' Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "9de:MoreCraftableEquipment.esp": { "out": "62303:Skyrim.esm", "name": "Ulfric's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "9df:MoreCraftableEquipment.esp": { "out": "6230b:Skyrim.esm", "name": "Ulfric's Armguards", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "9e0:MoreCraftableEquipment.esp": { "out": "62311:Skyrim.esm", "name": "Ulfric's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "9ee:MoreCraftableEquipment.esp": { "out": "214eb:Skyrim.esm", "name": "Windhelm Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "9f4:MoreCraftableEquipment.esp": { "out": "9f3:MoreCraftableEquipment.esp", "name": "Telvanni Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "expert", "open": false },
+    "9f5:MoreCraftableEquipment.esp": { "out": "c742:HearthFires.esm", "name": "Boy's Red Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "9f6:MoreCraftableEquipment.esp": { "out": "c743:HearthFires.esm", "name": "Boy's Green Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "9f7:MoreCraftableEquipment.esp": { "out": "c744:HearthFires.esm", "name": "Boy's Blue Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "9f8:MoreCraftableEquipment.esp": { "out": "c745:HearthFires.esm", "name": "Boy's Grey Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "9f9:MoreCraftableEquipment.esp": { "out": "c746:HearthFires.esm", "name": "Boy's Yellow Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "9fa:MoreCraftableEquipment.esp": { "out": "d821:HearthFires.esm", "name": "Girl's Red Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "9fb:MoreCraftableEquipment.esp": { "out": "d81f:HearthFires.esm", "name": "Girl's Green Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "novice", "open": true },
+    "9fc:MoreCraftableEquipment.esp": { "out": "d81e:HearthFires.esm", "name": "Girl's Blue Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "9fd:MoreCraftableEquipment.esp": { "out": "d820:HearthFires.esm", "name": "Girl's Grey Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "9fe:MoreCraftableEquipment.esp": { "out": "d822:HearthFires.esm", "name": "Girl's Yellow Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": true },
+    "9ff:MoreCraftableEquipment.esp": { "out": "426c8:Skyrim.esm", "name": "Shiv", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "15480:Thornswood-Content.esp": { "out": "15481:Thornswood-Content.esp", "name": "Poor Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "open": true },
+    "15486:Thornswood-Content.esp": { "out": "15482:Thornswood-Content.esp", "name": "Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "open": false },
+    "15487:Thornswood-Content.esp": { "out": "15484:Thornswood-Content.esp", "name": "Charcoal Briquette", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "open": false },
+    "15488:Thornswood-Content.esp": { "out": "15485:Thornswood-Content.esp", "name": "Coke", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "rank": "novice", "open": false },
+    "1548d:Thornswood-Content.esp": { "out": "e3c16:Skyrim.esm", "name": "Pickaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "1548e:Thornswood-Content.esp": { "out": "2f2f4:Skyrim.esm", "name": "Woodcutter's Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "37668:ZIA_Complete Pack.esp": { "out": "3764f:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "3766f:ZIA_Complete Pack.esp": { "out": "335a2:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "3766e:ZIA_Complete Pack.esp": { "out": "d2846:Skyrim.esm", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "3766d:ZIA_Complete Pack.esp": { "out": "37654:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "3766c:ZIA_Complete Pack.esp": { "out": "37650:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "3766b:ZIA_Complete Pack.esp": { "out": "335a2:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "3766a:ZIA_Complete Pack.esp": { "out": "d2846:Skyrim.esm", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "37669:ZIA_Complete Pack.esp": { "out": "37653:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "37664:ZIA_Complete Pack.esp": { "out": "3764b:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "37665:ZIA_Complete Pack.esp": { "out": "37652:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "37666:ZIA_Complete Pack.esp": { "out": "d2846:Skyrim.esm", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "37667:ZIA_Complete Pack.esp": { "out": "335a2:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "446d64:Immersive Weapons.esp": { "out": "320d63:Immersive Weapons.esp", "name": "Chakram", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "557d64:Immersive Weapons.esp": { "out": "557d63:Immersive Weapons.esp", "name": "Thresher Maul", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "79d64:Immersive Weapons.esp": { "out": "79d63:Immersive Weapons.esp", "name": "Phoenix Ninjato", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "441017:Immersive Weapons.esp": { "out": "33100e:Immersive Weapons.esp", "name": "Iron Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "441016:Immersive Weapons.esp": { "out": "33100c:Immersive Weapons.esp", "name": "Glass Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "441015:Immersive Weapons.esp": { "out": "33100a:Immersive Weapons.esp", "name": "Skull Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "44014:Immersive Weapons.esp": { "out": "331008:Immersive Weapons.esp", "name": "Falmer Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "441013:Immersive Weapons.esp": { "out": "331004:Immersive Weapons.esp", "name": "Elven Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "441012:Immersive Weapons.esp": { "out": "331006:Immersive Weapons.esp", "name": "Viking Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "441011:Immersive Weapons.esp": { "out": "331002:Immersive Weapons.esp", "name": "Executioner Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "441024:Immersive Weapons.esp": { "out": "331020:Immersive Weapons.esp", "name": "Daedric Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "441025:Immersive Weapons.esp": { "out": "331022:Immersive Weapons.esp", "name": "Nord Hero Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "3953:Immersive Weapons.esp": { "out": "3955:Immersive Weapons.esp", "name": "Warchief's Might", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "3949:Immersive Weapons.esp": { "out": "1831:Immersive Weapons.esp", "name": "Aldmeri Axestaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "394a:Immersive Weapons.esp": { "out": "1833:Immersive Weapons.esp", "name": "Ethereal Axestaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "394b:Immersive Weapons.esp": { "out": "1832:Immersive Weapons.esp", "name": "Nord Hero Axestaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "3950:Immersive Weapons.esp": { "out": "1830:Immersive Weapons.esp", "name": "Wabba Jaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "394f:Immersive Weapons.esp": { "out": "17fc3:Immersive Weapons.esp", "name": "Wabba Jackhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "2414:Immersive Weapons.esp": { "out": "3350:Immersive Weapons.esp", "name": "Ebony Dadao", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "d64:Immersive Weapons.esp": { "out": "d63:Immersive Weapons.esp", "name": "An-Xileel War Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "285e:Immersive Weapons.esp": { "out": "71d92:Immersive Weapons.esp", "name": "An-Xileel Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "58c1:Immersive Weapons.esp": { "out": "50d64:Immersive Weapons.esp", "name": "Quarterstaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "20d64:Immersive Weapons.esp": { "out": "20d63:Immersive Weapons.esp", "name": "Orcish Saber", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "90d64:Immersive Weapons.esp": { "out": "9d63:Immersive Weapons.esp", "name": "Aries Ceremonial Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "9d68:Immersive Weapons.esp": { "out": "9d67:Immersive Weapons.esp", "name": "Tombstone Ceremonial Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "12c6:Immersive Weapons.esp": { "out": "42d62:Immersive Weapons.esp", "name": "Captain's Cutlass", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "1dff:Immersive Weapons.esp": { "out": "1dfe:Immersive Weapons.esp", "name": "Ayleid Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "14d64:Immersive Weapons.esp": { "out": "14d63:Immersive Weapons.esp", "name": "Ceymallari", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "1246:Immersive Weapons.esp": { "out": "35012:Immersive Weapons.esp", "name": "Ebony Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "83fc:Immersive Weapons.esp": { "out": "83fd:Immersive Weapons.esp", "name": "Dragonsteel Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "8963:Immersive Weapons.esp": { "out": "8962:Immersive Weapons.esp", "name": "Dragonsteel Katana", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "998d:Immersive Weapons.esp": { "out": "998c:Immersive Weapons.esp", "name": "Dragonsteel Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "a455:Immersive Weapons.esp": { "out": "a454:Immersive Weapons.esp", "name": "Dragonsteel Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "c74701:Immersive Weapons.esp": { "out": "747a6:Immersive Weapons.esp", "name": "Daedric Longsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "c74703:Immersive Weapons.esp": { "out": "747aa:Immersive Weapons.esp", "name": "Ebony Longsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c74704:Immersive Weapons.esp": { "out": "747ab:Immersive Weapons.esp", "name": "Honed Silver Longsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74705:Immersive Weapons.esp": { "out": "747ac:Immersive Weapons.esp", "name": "Orcish Longsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74706:Immersive Weapons.esp": { "out": "747ad:Immersive Weapons.esp", "name": "Steel Longsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "21701:Immersive Weapons.esp": { "out": "10e6e:Immersive Weapons.esp", "name": "Knight's Claymore", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "21700:Immersive Weapons.esp": { "out": "10e6d:Immersive Weapons.esp", "name": "Knight's Broadsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216fd:Immersive Weapons.esp": { "out": "10e6c:Immersive Weapons.esp", "name": "Trident Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216fb:Immersive Weapons.esp": { "out": "10e6b:Immersive Weapons.esp", "name": "Splitter", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "216f2:Immersive Weapons.esp": { "out": "10e66:Immersive Weapons.esp", "name": "Great Riders Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216f0:Immersive Weapons.esp": { "out": "10e67:Immersive Weapons.esp", "name": "Riders Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216ee:Immersive Weapons.esp": { "out": "10e65:Immersive Weapons.esp", "name": "Pokeblade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "216ec:Immersive Weapons.esp": { "out": "10e64:Immersive Weapons.esp", "name": "Steel War Pick", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "216ea:Immersive Weapons.esp": { "out": "10e70:Immersive Weapons.esp", "name": "Ornate Maul", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "216e8:Immersive Weapons.esp": { "out": "10901:Immersive Weapons.esp", "name": "Housecarl's Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "216e6:Immersive Weapons.esp": { "out": "10900:Immersive Weapons.esp", "name": "Ebony Hammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "216e3:Immersive Weapons.esp": { "out": "10e72:Immersive Weapons.esp", "name": "Falkreath Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216e1:Immersive Weapons.esp": { "out": "fe2c:Immersive Weapons.esp", "name": "Hollow Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216df:Immersive Weapons.esp": { "out": "fe2b:Immersive Weapons.esp", "name": "Greyblade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216dd:Immersive Weapons.esp": { "out": "fe2a:Immersive Weapons.esp", "name": "Fleur De Lys", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "216db:Immersive Weapons.esp": { "out": "fe27:Immersive Weapons.esp", "name": "Daedric Crescent", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "216d9:Immersive Weapons.esp": { "out": "fe28:Immersive Weapons.esp", "name": "Great Daedric Crescent", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "216d4:Immersive Weapons.esp": { "out": "f8c0:Immersive Weapons.esp", "name": "Asuma Trench Knife", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216d2:Immersive Weapons.esp": { "out": "f8bf:Immersive Weapons.esp", "name": "Assassin Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216d0:Immersive Weapons.esp": { "out": "f8be:Immersive Weapons.esp", "name": "Arming Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216cb:Immersive Weapons.esp": { "out": "182f:Immersive Weapons.esp", "name": "Black Sting", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "216ca:Immersive Weapons.esp": { "out": "6f9f:Immersive Weapons.esp", "name": "Black Sting Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "216c9:Immersive Weapons.esp": { "out": "7a65:Immersive Weapons.esp", "name": "Black Sting Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216c8:Immersive Weapons.esp": { "out": "d99:Immersive Weapons.esp", "name": "Falkreath Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "216c7:Immersive Weapons.esp": { "out": "13f0c:Immersive Weapons.esp", "name": "Exotic Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "216c6:Immersive Weapons.esp": { "out": "76c4:Immersive Weapons.esp", "name": "Exotic Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "216c5:Immersive Weapons.esp": { "out": "5565:Immersive Weapons.esp", "name": "Black Dragon Ninjato", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "216c4:Immersive Weapons.esp": { "out": "5555:Immersive Weapons.esp", "name": "Blue Dragon Ninjato", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216c3:Immersive Weapons.esp": { "out": "747de:Immersive Weapons.esp", "name": "Antique Silver Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216c2:Immersive Weapons.esp": { "out": "747bb:Immersive Weapons.esp", "name": "Antique Honed Silver Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216c0:Immersive Weapons.esp": { "out": "747d9:Immersive Weapons.esp", "name": "Antique Iron Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "216bf:Immersive Weapons.esp": { "out": "747ba:Immersive Weapons.esp", "name": "Elven Steel Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216be:Immersive Weapons.esp": { "out": "747a7:Immersive Weapons.esp", "name": "Eastern Dwemer Longsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216bd:Immersive Weapons.esp": { "out": "747b8:Immersive Weapons.esp", "name": "Eastern Dwemer Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216bc:Immersive Weapons.esp": { "out": "747bd:Immersive Weapons.esp", "name": "Eastern Dwemer War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216ba:Immersive Weapons.esp": { "out": "80d63:Immersive Weapons.esp", "name": "Wicked Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216b9:Immersive Weapons.esp": { "out": "80d65:Immersive Weapons.esp", "name": "Wicked Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "216b8:Immersive Weapons.esp": { "out": "69173:Immersive Weapons.esp", "name": "Wraith Scythe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "216b7:Immersive Weapons.esp": { "out": "404e0:Immersive Weapons.esp", "name": "Daedric Halberd", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "216b6:Immersive Weapons.esp": { "out": "106a1:Immersive Weapons.esp", "name": "Dremora Halberd", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "c74707:Immersive Weapons.esp": { "out": "747ae:Immersive Weapons.esp", "name": "Daedric Battle Staff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c74708:Immersive Weapons.esp": { "out": "747af:Immersive Weapons.esp", "name": "Ebony Battle Staff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c74709:Immersive Weapons.esp": { "out": "747b0:Immersive Weapons.esp", "name": "Glass Battle Staff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c7470a:Immersive Weapons.esp": { "out": "747b1:Immersive Weapons.esp", "name": "Honed Silver Battle Staff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c7470b:Immersive Weapons.esp": { "out": "747b2:Immersive Weapons.esp", "name": "Steel Battle Staff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "c7470c:Immersive Weapons.esp": { "out": "747b3:Immersive Weapons.esp", "name": "Tapered Wooden Battle Staff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "c7470d:Immersive Weapons.esp": { "out": "747b4:Immersive Weapons.esp", "name": "Wooden Battle Staff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "c7470e:Immersive Weapons.esp": { "out": "747b5:Immersive Weapons.esp", "name": "Antique Daedric Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c74710:Immersive Weapons.esp": { "out": "747b9:Immersive Weapons.esp", "name": "Antique Glass Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74713:Immersive Weapons.esp": { "out": "747bc:Immersive Weapons.esp", "name": "Antique Steel Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "c74714:Immersive Weapons.esp": { "out": "747be:Immersive Weapons.esp", "name": "Honed Silver War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74715:Immersive Weapons.esp": { "out": "747bf:Immersive Weapons.esp", "name": "Honed Silver Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c74716:Immersive Weapons.esp": { "out": "747c9:Immersive Weapons.esp", "name": "Steel Cutlass", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "22ca5:Immersive Weapons.esp": { "out": "22ca8:Immersive Weapons.esp", "name": "Crow Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "22ca3:Immersive Weapons.esp": { "out": "22ca7:Immersive Weapons.esp", "name": "Crow Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "22ca0:Immersive Weapons.esp": { "out": "111000:Immersive Weapons.esp", "name": "Ebony Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "c74717:Immersive Weapons.esp": { "out": "747ca:Immersive Weapons.esp", "name": "Iron Cutlass", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "c74718:Immersive Weapons.esp": { "out": "747cb:Immersive Weapons.esp", "name": "Steel Club", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "22c9c:Immersive Weapons.esp": { "out": "22c9b:Immersive Weapons.esp", "name": "Barbarian Great Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c74719:Immersive Weapons.esp": { "out": "747cc:Immersive Weapons.esp", "name": "Iron Club", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "c7471a:Immersive Weapons.esp": { "out": "747cd:Immersive Weapons.esp", "name": "Wooden Club", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "c7471b:Immersive Weapons.esp": { "out": "747c6:Immersive Weapons.esp", "name": "Honed Silver Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c7471c:Immersive Weapons.esp": { "out": "747da:Immersive Weapons.esp", "name": "Steel Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "c7471d:Immersive Weapons.esp": { "out": "747c8:Immersive Weapons.esp", "name": "Iron Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "c7471e:Immersive Weapons.esp": { "out": "747c5:Immersive Weapons.esp", "name": "Glass Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c7471f:Immersive Weapons.esp": { "out": "747a1:Immersive Weapons.esp", "name": "Daedric Nodachi", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "c74720:Immersive Weapons.esp": { "out": "747c0:Immersive Weapons.esp", "name": "Daedric Katana", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "22c93:Immersive Weapons.esp": { "out": "22c96:Immersive Weapons.esp", "name": "Elven Great Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "22c91:Immersive Weapons.esp": { "out": "22c95:Immersive Weapons.esp", "name": "Elven Great Blood Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "22c8f:Immersive Weapons.esp": { "out": "22c94:Immersive Weapons.esp", "name": "Elven Great Wings Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "22c8d:Immersive Weapons.esp": { "out": "22c8a:Immersive Weapons.esp", "name": "Hot Blood", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c74721:Immersive Weapons.esp": { "out": "747ce:Immersive Weapons.esp", "name": "Daedric Wakizashi", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c74722:Immersive Weapons.esp": { "out": "747d3:Immersive Weapons.esp", "name": "Daedric Tanto", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c74723:Immersive Weapons.esp": { "out": "747a4:Immersive Weapons.esp", "name": "Steel Nodachi", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74724:Immersive Weapons.esp": { "out": "747c3:Immersive Weapons.esp", "name": "Steel Katana", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "23771:Immersive Weapons.esp": { "out": "84b83:Immersive Weapons.esp", "name": "Nordic War Pick", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74725:Immersive Weapons.esp": { "out": "747d1:Immersive Weapons.esp", "name": "Steel Wakizashi", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "c74726:Immersive Weapons.esp": { "out": "747d6:Immersive Weapons.esp", "name": "Steel Tanto", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "c74727:Immersive Weapons.esp": { "out": "747a5:Immersive Weapons.esp", "name": "Iron Nodachi", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": true },
+    "c74728:Immersive Weapons.esp": { "out": "747c4:Immersive Weapons.esp", "name": "Iron Katana", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "c74729:Immersive Weapons.esp": { "out": "747d2:Immersive Weapons.esp", "name": "Iron Wakizashi", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "c7472a:Immersive Weapons.esp": { "out": "747d7:Immersive Weapons.esp", "name": "Iron Tanto", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "25d24:Immersive Weapons.esp": { "out": "640d63:Immersive Weapons.esp", "name": "Dragonguard Katana", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c7472c:Immersive Weapons.esp": { "out": "747db:Immersive Weapons.esp", "name": "Ebony Cutlass", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "12c8:Immersive Weapons.esp": { "out": "12cc:Immersive Weapons.esp", "name": "Regent's Longsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "c7472d:Immersive Weapons.esp": { "out": "747b7:Immersive Weapons.esp", "name": "Imperial Ebony Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "272fd:Immersive Weapons.esp": { "out": "48e559:Immersive Weapons.esp", "name": "Sithis's Razor", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "272fc:Immersive Weapons.esp": { "out": "22c9e:Immersive Weapons.esp", "name": "Sithis's Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74734:Immersive Weapons.esp": { "out": "747dc:Immersive Weapons.esp", "name": "Silver Longsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74735:Immersive Weapons.esp": { "out": "747dd:Immersive Weapons.esp", "name": "Silver Battle Staff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74736:Immersive Weapons.esp": { "out": "747df:Immersive Weapons.esp", "name": "Silver War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74737:Immersive Weapons.esp": { "out": "747e0:Immersive Weapons.esp", "name": "Silver Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74738:Immersive Weapons.esp": { "out": "747e1:Immersive Weapons.esp", "name": "Silver Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c74739:Immersive Weapons.esp": { "out": "747a3:Immersive Weapons.esp", "name": "Silver Nodachi", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c7473a:Immersive Weapons.esp": { "out": "747c2:Immersive Weapons.esp", "name": "Silver Katana", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c7473b:Immersive Weapons.esp": { "out": "747d0:Immersive Weapons.esp", "name": "Silver Wakizashi", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "c7473c:Immersive Weapons.esp": { "out": "747d5:Immersive Weapons.esp", "name": "Silver Tanto", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "1828:Immersive Weapons.esp": { "out": "62d62:Immersive Weapons.esp", "name": "Steel Nordic Spear", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "2901:Immersive Weapons.esp": { "out": "2924:Immersive Weapons.esp", "name": "Dragonsteel Warhammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "904:Immersive Weapons.esp": { "out": "929:Immersive Weapons.esp", "name": "Dragonsteel Saber", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "906:Immersive Weapons.esp": { "out": "923:Immersive Weapons.esp", "name": "Dragonsteel Tanto", "type": "WEAP", "makes": 2, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "6908:Immersive Weapons.esp": { "out": "63a7:Immersive Weapons.esp", "name": "Dragonsteel Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "1909:Immersive Weapons.esp": { "out": "1920:Immersive Weapons.esp", "name": "Dragonsteel War Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "910:Immersive Weapons.esp": { "out": "928:Immersive Weapons.esp", "name": "Dragonsteel Anlace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "911:Immersive Weapons.esp": { "out": "922:Immersive Weapons.esp", "name": "Dragonsteel Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "7914:Immersive Weapons.esp": { "out": "7921:Immersive Weapons.esp", "name": "Dragonsteel Nodachi", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "4915:Immersive Weapons.esp": { "out": "4925:Immersive Weapons.esp", "name": "Dragonsteel Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "master", "open": false },
+    "701009:Immersive Weapons.esp": { "out": "1444:Immersive Weapons.esp", "name": "Wolf Claymore", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "77100a:Immersive Weapons.esp": { "out": "441003:Immersive Weapons.esp", "name": "Wolf Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "84100b:Immersive Weapons.esp": { "out": "44005:Immersive Weapons.esp", "name": "Wolf Dadao", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "7700c:Immersive Weapons.esp": { "out": "701007:Immersive Weapons.esp", "name": "Wolf Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "961015:Immersive Weapons.esp": { "out": "1011:Immersive Weapons.esp", "name": "Wolf Daito", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "22f0:Immersive Weapons.esp": { "out": "22ee:Immersive Weapons.esp", "name": "Iron Hunter's Spear", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": true },
+    "2857:Immersive Weapons.esp": { "out": "2856:Immersive Weapons.esp", "name": "Orcish Crippler Spear", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "285b:Immersive Weapons.esp": { "out": "22f4:Immersive Weapons.esp", "name": "Armsman's Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "3325:Immersive Weapons.esp": { "out": "3322:Immersive Weapons.esp", "name": "Captain's Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "388c:Immersive Weapons.esp": { "out": "388a:Immersive Weapons.esp", "name": "Guardian's Longsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "4341:Immersive Weapons.esp": { "out": "4340:Immersive Weapons.esp", "name": "Black Mammoth Recurve Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "48ba:Immersive Weapons.esp": { "out": "4354:Immersive Weapons.esp", "name": "Cavalry Broadsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "48bb:Immersive Weapons.esp": { "out": "4356:Immersive Weapons.esp", "name": "Soldier's Broadsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "4e22:Immersive Weapons.esp": { "out": "4e21:Immersive Weapons.esp", "name": "Guardian's Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "4e8b:Immersive Weapons.esp": { "out": "433e:Immersive Weapons.esp", "name": "White Mammoth Recurve Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "58d4:Immersive Weapons.esp": { "out": "58cd:Immersive Weapons.esp", "name": "Colovian Composite Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": true },
+    "58d0:Immersive Weapons.esp": { "out": "58ce:Immersive Weapons.esp", "name": "Colovian Dark Composite Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "7406:Immersive Weapons.esp": { "out": "692b:Immersive Weapons.esp", "name": "Duke's Longsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "740f:Immersive Weapons.esp": { "out": "740e:Immersive Weapons.esp", "name": "Duke's Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "791a:Immersive Weapons.esp": { "out": "73b4:Immersive Weapons.esp", "name": "Steel Quarterstaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "9406:Immersive Weapons.esp": { "out": "73b5:Immersive Weapons.esp", "name": "Orcish Quarterstaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "9408:Immersive Weapons.esp": { "out": "73b6:Immersive Weapons.esp", "name": "Elven Quarterstaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "940a:Immersive Weapons.esp": { "out": "73b7:Immersive Weapons.esp", "name": "Ebony Quarterstaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "940c:Immersive Weapons.esp": { "out": "6e4d:Immersive Weapons.esp", "name": "Dwarven Quarterstaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "a438:Immersive Weapons.esp": { "out": "9971:Immersive Weapons.esp", "name": "Daedric Quarterstaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "a43a:Immersive Weapons.esp": { "out": "a437:Immersive Weapons.esp", "name": "Glass Quarterstaff", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "af29:Immersive Weapons.esp": { "out": "af28:Immersive Weapons.esp", "name": "Dragonsteel Battleaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "b473:Immersive Weapons.esp": { "out": "b472:Immersive Weapons.esp", "name": "Ornate Khajiit Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "b48f:Immersive Weapons.esp": { "out": "b48e:Immersive Weapons.esp", "name": "Dragonsteel Scythe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "b9d9:Immersive Weapons.esp": { "out": "b9d7:Immersive Weapons.esp", "name": "Silver Hawk Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "216cc:Immersive Weapons.esp": { "out": "f8bd:Immersive Weapons.esp", "name": "Afterslash", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "216f8:Immersive Weapons.esp": { "out": "10e69:Immersive Weapons.esp", "name": "Spearblade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "96d64:Immersive Weapons.esp": { "out": "96d63:Immersive Weapons.esp", "name": "Executioner's Hook", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "9eda:Immersive Weapons.esp": { "out": "9977:Immersive Weapons.esp", "name": "Elven Hawk Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "ca05:Immersive Weapons.esp": { "out": "c4a0:Immersive Weapons.esp", "name": "Orsimer Cheiftan Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "32523:Immersive Weapons.esp": { "out": "48d62:Immersive Weapons.esp", "name": "BiPolar Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "38b75:Immersive Weapons.esp": { "out": "370d63:Immersive Weapons.esp", "name": "Sixth House Bell Hammer", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "3a104:Immersive Weapons.esp": { "out": "3a103:Immersive Weapons.esp", "name": "Honed Nordic War Pick", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "3abd0:Immersive Weapons.esp": { "out": "3a107:Immersive Weapons.esp", "name": "Honed Falmer Double Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "3abcf:Immersive Weapons.esp": { "out": "3abcc:Immersive Weapons.esp", "name": "Honed Steel Nordic Spear", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "961016:Immersive Weapons.esp": { "out": "1013:Immersive Weapons.esp", "name": "Wolf Katana", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "3bbfa:Immersive Weapons.esp": { "out": "f8c1:Immersive Weapons.esp", "name": "Azura's Moon", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "96101c:Immersive Weapons.esp": { "out": "4301:Immersive Weapons.esp", "name": "Noble Claymore", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "96101d:Immersive Weapons.esp": { "out": "101a:Immersive Weapons.esp", "name": "Noble Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "33d66:Immersive Weapons.esp": { "out": "33d65:Immersive Weapons.esp", "name": "Orgnum's Dagger", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "1d9a:Immersive Weapons.esp": { "out": "1d95:Immersive Weapons.esp", "name": "Sorrow Daito", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "6bf7:Immersive Weapons.esp": { "out": "6bf0:Immersive Weapons.esp", "name": "Sorrow Katana", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "4360:Immersive Weapons.esp": { "out": "435d:Immersive Weapons.esp", "name": "Sorrow Tanto", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "a1113:Immersive Weapons.esp": { "out": "a1111:Immersive Weapons.esp", "name": "Mighty Steel Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "491dc4:Immersive Weapons.esp": { "out": "1dc3:Immersive Weapons.esp", "name": "Justiciar Changdao", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "3f1ef:Immersive Weapons.esp": { "out": "cee9e:Skyrim.esm", "name": "Forsworn Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": true },
+    "3f1ee:Immersive Weapons.esp": { "out": "cab52:Skyrim.esm", "name": "Practice Arrow", "type": "AMMO", "makes": 48, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": true },
+    "491dc0:Immersive Weapons.esp": { "out": "1dbf:Immersive Weapons.esp", "name": "Justiciar Knife", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "492335:Immersive Weapons.esp": { "out": "2334:Immersive Weapons.esp", "name": "Camoran Saber", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "490d76:Immersive Weapons.esp": { "out": "60d6b:Immersive Weapons.esp", "name": "Nordic Dwemer Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "49232a:Immersive Weapons.esp": { "out": "2329:Immersive Weapons.esp", "name": "Seeker Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "2abe:Immersive Weapons.esp": { "out": "2abd:Immersive Weapons.esp", "name": "Springsteel Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "2ac2:Immersive Weapons.esp": { "out": "2ac1:Immersive Weapons.esp", "name": "Nordic Scrimshaw Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "2aca:Immersive Weapons.esp": { "out": "2ac7:Immersive Weapons.esp", "name": "Sapphire Gemstone Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "master", "open": false },
+    "2acb:Immersive Weapons.esp": { "out": "2ac8:Immersive Weapons.esp", "name": "Emerald Gemstone Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "master", "open": false },
+    "2acc:Immersive Weapons.esp": { "out": "2ac9:Immersive Weapons.esp", "name": "Ruby Gemstone Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "expert", "open": false },
+    "2ad2:Immersive Weapons.esp": { "out": "2ad1:Immersive Weapons.esp", "name": "Valenwood War Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "advanced", "open": false },
+    "490d87:Immersive Weapons.esp": { "out": "d74:Immersive Weapons.esp", "name": "Dariit Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "490d86:Immersive Weapons.esp": { "out": "4d72:Immersive Weapons.esp", "name": "Justiciar Arrow", "type": "AMMO", "makes": 24, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": false },
+    "942331:Immersive Weapons.esp": { "out": "2330:Immersive Weapons.esp", "name": "Alinor Saber", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "940d7c:Immersive Weapons.esp": { "out": "d71:Immersive Weapons.esp", "name": "Seeker Changdao", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "94185a:Immersive Weapons.esp": { "out": "1859:Immersive Weapons.esp", "name": "Justiciar Saber", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "478e7:Immersive Weapons.esp": { "out": "478d0:Immersive Weapons.esp", "name": "Nightingale Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "master", "open": false },
+    "478e4:Immersive Weapons.esp": { "out": "478cf:Immersive Weapons.esp", "name": "Nightingale Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "478e1:Immersive Weapons.esp": { "out": "478ca:Immersive Weapons.esp", "name": "Mehrunes' Razor", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "478de:Immersive Weapons.esp": { "out": "478cd:Immersive Weapons.esp", "name": "Mace of Molag Bal", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "478db:Immersive Weapons.esp": { "out": "478cb:Immersive Weapons.esp", "name": "Ebony Blade", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "478d8:Immersive Weapons.esp": { "out": "478cc:Immersive Weapons.esp", "name": "Dawnbreaker", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "478d5:Immersive Weapons.esp": { "out": "478d1:Immersive Weapons.esp", "name": "Chillrend", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "478d2:Immersive Weapons.esp": { "out": "478ce:Immersive Weapons.esp", "name": "Blade of Woe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "940d7d:Immersive Weapons.esp": { "out": "60d70:Immersive Weapons.esp", "name": "Seeker Knife", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "9412f4:Immersive Weapons.esp": { "out": "12f3:Immersive Weapons.esp", "name": "Seeker Saber", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "940d78:Immersive Weapons.esp": { "out": "d6a:Immersive Weapons.esp", "name": "Alik'r Crown Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "94289e:Immersive Weapons.esp": { "out": "289b:Immersive Weapons.esp", "name": "Stros M'Kai Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "940d79:Immersive Weapons.esp": { "out": "d6d:Immersive Weapons.esp", "name": "Ornate Alik'r Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "478ed:Immersive Weapons.esp": { "out": "478c9:Immersive Weapons.esp", "name": "Volendrung", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "master", "open": false },
+    "478ea:Immersive Weapons.esp": { "out": "478c8:Immersive Weapons.esp", "name": "Rueful Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "expert", "open": false },
+    "53c7:DIS_Heavy_Legion.esp": { "out": "13ed8:Skyrim.esm", "name": "Imperial Chainmail", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "5939:DIS_Heavy_Legion.esp": { "out": "5937:DIS_Heavy_Legion.esp", "name": "Imperial Bracer", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5941:DIS_Heavy_Legion.esp": { "out": "593f:DIS_Heavy_Legion.esp", "name": "Imperial Helmet Medium", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "5ec3:DIS_Heavy_Legion.esp": { "out": "5eb2:DIS_Heavy_Legion.esp", "name": "Old Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "5ec5:DIS_Heavy_Legion.esp": { "out": "5eb4:DIS_Heavy_Legion.esp", "name": "Old Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": true },
+    "5ec8:DIS_Heavy_Legion.esp": { "out": "5eb6:DIS_Heavy_Legion.esp", "name": "Old Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "5eca:DIS_Heavy_Legion.esp": { "out": "5ebb:DIS_Heavy_Legion.esp", "name": "Old Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "5ecc:DIS_Heavy_Legion.esp": { "out": "5ebd:DIS_Heavy_Legion.esp", "name": "Old Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": true },
+    "6eff:DIS_Heavy_Legion.esp": { "out": "5ec2:DIS_Heavy_Legion.esp", "name": "Old Captain Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "6f00:DIS_Heavy_Legion.esp": { "out": "5ebb:DIS_Heavy_Legion.esp", "name": "Old Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "d1e8e:Apocalypse - Magic of Skyrim.esp": { "out": "89702:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Skyfall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1a793f:Apocalypse - Magic of Skyrim.esp": { "out": "1a793e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Poisoned Chalice", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e71:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b8:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Honor Guard", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e6d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b6:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Cat Totem", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e6e:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Pit Fighter", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "161633:Apocalypse - Magic of Skyrim.esp": { "out": "161632:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ice Prisms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e6f:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Xivilai Sorcerer", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "10983d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ac:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Seidkona", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e72:Apocalypse - Magic of Skyrim.esp": { "out": "7a7bd:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Herne", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "10c70a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Incendiary Flows", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e78:Apocalypse - Magic of Skyrim.esp": { "out": "7c848:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Thundercracks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e79:Apocalypse - Magic of Skyrim.esp": { "out": "7a79f:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Bolides", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e7a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a1:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Electrospheres", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e7b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a0:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ice Shivs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e80:Apocalypse - Magic of Skyrim.esp": { "out": "7a797:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Silent", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e8c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b1:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Decomposition", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e7e:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a6:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Clouds", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e7f:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a5:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Bombardment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e8b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b0:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ruin", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e81:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Illusory Flames", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e82:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a8:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Mind Vision", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e8d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Nature's Balance", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e84:Apocalypse - Magic of Skyrim.esp": { "out": "7a7aa:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Shadowbond", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e85:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ab:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Empathic Agony", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e87:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ad:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e88:Apocalypse - Magic of Skyrim.esp": { "out": "7a798:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Leech Seed", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e89:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ae:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Slaying", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e8a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7af:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Death", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e99:Apocalypse - Magic of Skyrim.esp": { "out": "bb974:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Atronach Marks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e92:Apocalypse - Magic of Skyrim.esp": { "out": "896fd:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Blaze", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e70:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ba:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Champion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e90:Apocalypse - Magic of Skyrim.esp": { "out": "896fb:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Flesh", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e91:Apocalypse - Magic of Skyrim.esp": { "out": "bb97a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Summoning Runes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e97:Apocalypse - Magic of Skyrim.esp": { "out": "896fa:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Undermining", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e93:Apocalypse - Magic of Skyrim.esp": { "out": "896fe:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Shadows", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e94:Apocalypse - Magic of Skyrim.esp": { "out": "896ff:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Welling Blood", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e95:Apocalypse - Magic of Skyrim.esp": { "out": "89700:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Wilting", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e96:Apocalypse - Magic of Skyrim.esp": { "out": "974e2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Lamb", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1a792f:Apocalypse - Magic of Skyrim.esp": { "out": "1a792e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ganking", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e98:Apocalypse - Magic of Skyrim.esp": { "out": "803f7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Perilous Paths", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e67:Apocalypse - Magic of Skyrim.esp": { "out": "7a799:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Crackling", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1a7933:Apocalypse - Magic of Skyrim.esp": { "out": "1a7932:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Silvery Barbs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e9a:Apocalypse - Magic of Skyrim.esp": { "out": "bb977:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Deadeye Captain", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e9e:Apocalypse - Magic of Skyrim.esp": { "out": "bb96e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Pain", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1a7937:Apocalypse - Magic of Skyrim.esp": { "out": "1a7934:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Hrormir's Misdirection", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e9d:Apocalypse - Magic of Skyrim.esp": { "out": "bdfac:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Scorching Hands", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e9b:Apocalypse - Magic of Skyrim.esp": { "out": "896fc:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Corpse Explosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "1a793b:Apocalypse - Magic of Skyrim.esp": { "out": "1a793a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Automaton Breaking", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e83:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Whispers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e74:Apocalypse - Magic of Skyrim.esp": { "out": "7a79c:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Creeping Cold", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e8f:Apocalypse - Magic of Skyrim.esp": { "out": "896f9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Imprisonment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e7d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a4:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Sleet Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e75:Apocalypse - Magic of Skyrim.esp": { "out": "7c849:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Dragon's Teeth", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e76:Apocalypse - Magic of Skyrim.esp": { "out": "7a79d:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Fractures", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e77:Apocalypse - Magic of Skyrim.esp": { "out": "7a79e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Rift Bolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e9c:Apocalypse - Magic of Skyrim.esp": { "out": "bb97c:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Oathbound", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e9f:Apocalypse - Magic of Skyrim.esp": { "out": "bb968:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Illusory Pyres", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1ea0:Apocalypse - Magic of Skyrim.esp": { "out": "bb969:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Necroplagues", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e6c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b5:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Churl", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "161624:Apocalypse - Magic of Skyrim.esp": { "out": "161625:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Monarch Mark", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e7c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a3:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Scattershocks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e66:Apocalypse - Magic of Skyrim.esp": { "out": "7a234:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Avenging Wraith", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e73:Apocalypse - Magic of Skyrim.esp": { "out": "7a7bc:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Xivilai Lord", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e68:Apocalypse - Magic of Skyrim.esp": { "out": "7a79b:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Hailstones", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e69:Apocalypse - Magic of Skyrim.esp": { "out": "7a79a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Withering", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e6a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b3:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Entombing", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "d1e6b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b4:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Lockblasting", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "rank": "novice", "open": false },
+    "3383:CommonClothes.esp": { "out": "1870:CommonClothes.esp", "name": "Boiled Leather Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "3384:CommonClothes.esp": { "out": "1879:CommonClothes.esp", "name": "Robed Iron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": true },
+    "3385:CommonClothes.esp": { "out": "1871:CommonClothes.esp", "name": "Mail Tunic", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "3386:CommonClothes.esp": { "out": "1872:CommonClothes.esp", "name": "Mail and Surcoat", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "3387:CommonClothes.esp": { "out": "1873:CommonClothes.esp", "name": "Mail and Jacket", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "3388:CommonClothes.esp": { "out": "1874:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "3389:CommonClothes.esp": { "out": "1875:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "338a:CommonClothes.esp": { "out": "1875:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "338b:CommonClothes.esp": { "out": "1877:CommonClothes.esp", "name": "Oiled Mail Hauberk", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "338c:CommonClothes.esp": { "out": "1878:CommonClothes.esp", "name": "Oiled Mail and Jacket", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "43e8:CommonClothes.esp": { "out": "187a:CommonClothes.esp", "name": "Robed Iron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "1d5bb:CommonClothes.esp": { "out": "10f63:CommonClothes.esp", "name": "Mail and Hide Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "1d5bc:CommonClothes.esp": { "out": "10f64:CommonClothes.esp", "name": "Oiled Mail and Hide Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": true },
+    "2e00:Cloaks&Capes.esp": { "out": "2dec:Cloaks&Capes.esp", "name": "Linen Cape (Yellow)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "2dff:Cloaks&Capes.esp": { "out": "2889:Cloaks&Capes.esp", "name": "Linen Cape (Purple)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "2dfe:Cloaks&Capes.esp": { "out": "2888:Cloaks&Capes.esp", "name": "Linen Cape (Green)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "2dfd:Cloaks&Capes.esp": { "out": "2887:Cloaks&Capes.esp", "name": "Linen Cape (Blue)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "2dfc:Cloaks&Capes.esp": { "out": "12c7:Cloaks&Capes.esp", "name": "Linen Cape (Red)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "2e03:Cloaks&Capes.esp": { "out": "1d8e:Cloaks&Capes.esp", "name": "Fur Cloak (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "2e04:Cloaks&Capes.esp": { "out": "2883:Cloaks&Capes.esp", "name": "Fur Cloak (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "2e05:Cloaks&Capes.esp": { "out": "2884:Cloaks&Capes.esp", "name": "Fur Cloak (Brown)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "2e06:Cloaks&Capes.esp": { "out": "2885:Cloaks&Capes.esp", "name": "Fur Cloak (Snowy Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "2e07:Cloaks&Capes.esp": { "out": "2886:Cloaks&Capes.esp", "name": "Fur Cloak (Vale Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "2e08:Cloaks&Capes.esp": { "out": "2df0:Cloaks&Capes.esp", "name": "Pale Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "2e0a:Cloaks&Capes.esp": { "out": "2df2:Cloaks&Capes.esp", "name": "Hjaalmarch Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "2e0b:Cloaks&Capes.esp": { "out": "2df3:Cloaks&Capes.esp", "name": "Markarth Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "2e0c:Cloaks&Capes.esp": { "out": "2df4:Cloaks&Capes.esp", "name": "Riften Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "2e0d:Cloaks&Capes.esp": { "out": "2df5:Cloaks&Capes.esp", "name": "Solitude Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "2e0e:Cloaks&Capes.esp": { "out": "2df6:Cloaks&Capes.esp", "name": "Whiterun Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "2e0f:Cloaks&Capes.esp": { "out": "2df7:Cloaks&Capes.esp", "name": "Stormcloak Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "2e10:Cloaks&Capes.esp": { "out": "2df8:Cloaks&Capes.esp", "name": "Winterhold Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "2e02:Cloaks&Capes.esp": { "out": "2ded:Cloaks&Capes.esp", "name": "Linen Cape (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "55bd:Cloaks&Capes.esp": { "out": "2def:Cloaks&Capes.esp", "name": "Leather Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "2e01:Cloaks&Capes.esp": { "out": "2dee:Cloaks&Capes.esp", "name": "Linen Cape (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "55ad:Cloaks&Capes.esp": { "out": "2dfa:Cloaks&Capes.esp", "name": "College of Winterhold Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "55ae:Cloaks&Capes.esp": { "out": "2dfb:Cloaks&Capes.esp", "name": "Dark Brotherhood Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "55ac:Cloaks&Capes.esp": { "out": "2df9:Cloaks&Capes.esp", "name": "Dawngaurd Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "94f:YokuWeapons.esp": { "out": "800:YokuWeapons.esp", "name": "Light Mercenary Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "950:YokuWeapons.esp": { "out": "f2b:YokuWeapons.esp", "name": "Memnos Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "84b:YokuWeapons.esp": { "out": "809:YokuWeapons.esp", "name": "Forebears' Saber", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "84c:YokuWeapons.esp": { "out": "80c:YokuWeapons.esp", "name": "Crowns' Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "84d:YokuWeapons.esp": { "out": "829:YokuWeapons.esp", "name": "Stone Mace", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "advanced", "open": false },
+    "84e:YokuWeapons.esp": { "out": "801:YokuWeapons.esp", "name": "Corsair Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "84f:YokuWeapons.esp": { "out": "802:YokuWeapons.esp", "name": "Corsair Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "850:YokuWeapons.esp": { "out": "803:YokuWeapons.esp", "name": "Alik'r Hat", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "851:YokuWeapons.esp": { "out": "820:YokuWeapons.esp", "name": "Mahayi Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "852:YokuWeapons.esp": { "out": "821:YokuWeapons.esp", "name": "Mahayi Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "853:YokuWeapons.esp": { "out": "82d:YokuWeapons.esp", "name": "Outrunner Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": true },
+    "854:YokuWeapons.esp": { "out": "82f:YokuWeapons.esp", "name": "Outrunner Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": true },
+    "855:YokuWeapons.esp": { "out": "823:YokuWeapons.esp", "name": "Ra-Gada Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "856:YokuWeapons.esp": { "out": "822:YokuWeapons.esp", "name": "Ra-Gada Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "857:YokuWeapons.esp": { "out": "832:YokuWeapons.esp", "name": "Ra-Gada Bezubands", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "858:YokuWeapons.esp": { "out": "833:YokuWeapons.esp", "name": "Ra-Gada Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "859:YokuWeapons.esp": { "out": "82b:YokuWeapons.esp", "name": "Halendo Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "85a:YokuWeapons.esp": { "out": "827:YokuWeapons.esp", "name": "Stone Raid Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "85d:YokuWeapons.esp": { "out": "85c:YokuWeapons.esp", "name": "Alik'r Hat(No Hood)", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "novice", "open": false },
+    "884:YokuWeapons.esp": { "out": "883:YokuWeapons.esp", "name": "Kumakumi Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "88c:YokuWeapons.esp": { "out": "88b:YokuWeapons.esp", "name": "Lifida Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "89a:YokuWeapons.esp": { "out": "897:YokuWeapons.esp", "name": "Mahayi Bezubands", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "89b:YokuWeapons.esp": { "out": "896:YokuWeapons.esp", "name": "Mahayi Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "8a0:YokuWeapons.esp": { "out": "89e:YokuWeapons.esp", "name": "Outrunner Cannons", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": true },
+    "8a1:YokuWeapons.esp": { "out": "89f:YokuWeapons.esp", "name": "Outrunner Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": true },
+    "8c6:YokuWeapons.esp": { "out": "8c5:YokuWeapons.esp", "name": "Kumakumi Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "8d2:YokuWeapons.esp": { "out": "8cf:YokuWeapons.esp", "name": "Tawagiz Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "8d3:YokuWeapons.esp": { "out": "8d1:YokuWeapons.esp", "name": "Tawagiz Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "f19:YokuWeapons.esp": { "out": "f17:YokuWeapons.esp", "name": "Mahayi Armor(NoCoat)", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "910:YokuWeapons.esp": { "out": "8f4:YokuWeapons.esp", "name": "Bado Gedhay Robes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "90d:YokuWeapons.esp": { "out": "8f5:YokuWeapons.esp", "name": "Bado Gedhay Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "90e:YokuWeapons.esp": { "out": "8f6:YokuWeapons.esp", "name": "Bado Gedhay Armlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "90f:YokuWeapons.esp": { "out": "8f3:YokuWeapons.esp", "name": "Bado Gedhay Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "849:YokuWeapons.esp": { "out": "80d:YokuWeapons.esp", "name": "Mercenary Cutlass", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "84a:YokuWeapons.esp": { "out": "80b:YokuWeapons.esp", "name": "Sentinelese Nimcha", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "rank": "novice", "open": false },
+    "919:YokuWeapons.esp": { "out": "918:YokuWeapons.esp", "name": "Bado Gedhay Robes(Gray)", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "91a:YokuWeapons.esp": { "out": "912:YokuWeapons.esp", "name": "Bado Gedhay Robes(Green)", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "91b:YokuWeapons.esp": { "out": "916:YokuWeapons.esp", "name": "Bado Gedhay Robes(Purple)", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "91c:YokuWeapons.esp": { "out": "914:YokuWeapons.esp", "name": "Bado Gedhay Robes(White)", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "921:YokuWeapons.esp": { "out": "f48:YokuWeapons.esp", "name": "Mirror Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "922:YokuWeapons.esp": { "out": "f4b:YokuWeapons.esp", "name": "Mirror Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "923:YokuWeapons.esp": { "out": "f4a:YokuWeapons.esp", "name": "Mirror Bezubands", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "924:YokuWeapons.esp": { "out": "f49:YokuWeapons.esp", "name": "Mirror Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "929:YokuWeapons.esp": { "out": "f2f:YokuWeapons.esp", "name": "Gray-Scale Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "92a:YokuWeapons.esp": { "out": "f40:YokuWeapons.esp", "name": "Gray-Scale Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "92b:YokuWeapons.esp": { "out": "f31:YokuWeapons.esp", "name": "Gray-Scale Bezubands", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "92c:YokuWeapons.esp": { "out": "f30:YokuWeapons.esp", "name": "Gray-Scale Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "931:YokuWeapons.esp": { "out": "f20:YokuWeapons.esp", "name": "Serpent-Scale Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "932:YokuWeapons.esp": { "out": "f1f:YokuWeapons.esp", "name": "Serpent-Scale Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "933:YokuWeapons.esp": { "out": "f22:YokuWeapons.esp", "name": "Serpent-Scale Bezubands", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "934:YokuWeapons.esp": { "out": "f21:YokuWeapons.esp", "name": "Serpent-Scale Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "935:YokuWeapons.esp": { "out": "f34:YokuWeapons.esp", "name": "Arrow-Scale Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "93b:YokuWeapons.esp": { "out": "f39:YokuWeapons.esp", "name": "Ebon-Scale Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "93c:YokuWeapons.esp": { "out": "f42:YokuWeapons.esp", "name": "Ebon-Scale Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "93d:YokuWeapons.esp": { "out": "f3a:YokuWeapons.esp", "name": "Ebon-Scale Bezubands", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "93e:YokuWeapons.esp": { "out": "f3b:YokuWeapons.esp", "name": "Ebon-Scale Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "943:YokuWeapons.esp": { "out": "f2f:YokuWeapons.esp", "name": "Gray-Scale Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "944:YokuWeapons.esp": { "out": "f4f:YokuWeapons.esp", "name": "Alik'r Red Nomad Robes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "expert", "open": false },
+    "945:YokuWeapons.esp": { "out": "f27:YokuWeapons.esp", "name": "Alik'r Nomad Turban", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "946:YokuWeapons.esp": { "out": "f50:YokuWeapons.esp", "name": "Alik'r Red Nomad Turban", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "94b:YokuWeapons.esp": { "out": "f29:YokuWeapons.esp", "name": "Yokudan Lion-Robes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "master", "open": false },
+    "94d:YokuWeapons.esp": { "out": "f3e:YokuWeapons.esp", "name": "Yokudan Brave-Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "rank": "advanced", "open": false },
+    "92d4:FishingInSkyrim.esp": { "out": "92d3:FishingInSkyrim.esp", "name": "Dwemer Fire Paste", "type": "INGR", "makes": 2, "owner": "Cook", "half": "Hearthcook", "rank": "master", "open": true },
+    "800:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "12c7:Cloaks&Capes.esp", "name": "Linen Cape (Red)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "801:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2887:Cloaks&Capes.esp", "name": "Linen Cape (Blue)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "802:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2888:Cloaks&Capes.esp", "name": "Linen Cape (Green)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "803:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2889:Cloaks&Capes.esp", "name": "Linen Cape (Purple)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "804:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dec:Cloaks&Capes.esp", "name": "Linen Cape (Yellow)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "805:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dee:Cloaks&Capes.esp", "name": "Linen Cape (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "806:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2ded:Cloaks&Capes.esp", "name": "Linen Cape (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "807:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "1d8e:Cloaks&Capes.esp", "name": "Fur Cloak (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "808:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2883:Cloaks&Capes.esp", "name": "Fur Cloak (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "809:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2884:Cloaks&Capes.esp", "name": "Fur Cloak (Brown)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "80a:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2885:Cloaks&Capes.esp", "name": "Fur Cloak (Snowy Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "80b:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2886:Cloaks&Capes.esp", "name": "Fur Cloak (Vale Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "expert", "open": false },
+    "80c:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df0:Cloaks&Capes.esp", "name": "Pale Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "80e:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df2:Cloaks&Capes.esp", "name": "Hjaalmarch Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "80f:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df3:Cloaks&Capes.esp", "name": "Markarth Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "810:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df4:Cloaks&Capes.esp", "name": "Riften Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "811:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df5:Cloaks&Capes.esp", "name": "Solitude Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "812:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df6:Cloaks&Capes.esp", "name": "Whiterun Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "813:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df7:Cloaks&Capes.esp", "name": "Stormcloak Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "814:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df8:Cloaks&Capes.esp", "name": "Winterhold Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "815:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df9:Cloaks&Capes.esp", "name": "Dawngaurd Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "816:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dfa:Cloaks&Capes.esp", "name": "College of Winterhold Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "817:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dfb:Cloaks&Capes.esp", "name": "Dark Brotherhood Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "rank": "advanced", "open": false },
+    "818:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2def:Cloaks&Capes.esp", "name": "Leather Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "rank": "advanced", "open": false },
+    "2de5:PlayFluteLuteDrum.esp": { "out": "287f:PlayFluteLuteDrum.esp", "name": "Drum", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": true },
+    "1838:PlayFluteLuteDrum.esp": { "out": "d62:PlayFluteLuteDrum.esp", "name": "Flute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": true },
+    "2de4:PlayFluteLuteDrum.esp": { "out": "1d9b:PlayFluteLuteDrum.esp", "name": "Lute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "rank": "novice", "open": true }
+  };
+
+  // ==== end RECIPES_BY_ID ====
+
+/**
+ * True when the table above carries this recipe. Never a bare lookup, for the
+ * reason isVein was written: the key is a descriptor off the wire, and
+ * '__proto__' finds something on Object.prototype that a truth test cannot tell
+ * from a recipe row.
+ */
+function isRecipe(recipeDesc) {
+  return Object.prototype.hasOwnProperty.call(RECIPES_BY_ID, recipeDesc);
+}
+
+/*
+  Everybody who has been told once that a profession will start deciding this.
+
+  In memory rather than on the character, because it is bookkeeping about what
+  has been said in this session and not a fact about the person. A restart says
+  it to them once more, which is the right side to be wrong on: the sentence
+  exists so that a new character at a forge learns why nothing is stopping them
+  yet, and saying it twice over two evenings costs nothing while never saying it
+  costs somebody the explanation.
+*/
+var toldCraftingIsComing = {};
+
+/**
+ * What the rulebook calls a profession, or the word itself when the rules do
+ * not know it. The rules block owns these names; nothing here spells one out.
+ */
+function professionName(prof) {
+  const P = globalThis.__thornswoodProgression;
+  if (P && P.has(P.TABLE.professions, prof)) { return P.TABLE.professions[prof].name; }
+  return String(prof || '');
+}
+
+/**
+ * A name with the article that belongs in front of it: 'a Smith', 'an
+ * Alchemist'. Two of the eight professions start with a vowel and both of them
+ * would have read 'you are a Alchemist' otherwise, which is the kind of sentence
+ * that tells a person nobody read the thing before it shipped. rankWord above
+ * does the same job for a rank and capitalises as it goes; this one leaves the
+ * word exactly as the rulebook spells it.
+ */
+function aWord(name) {
+  const n = String(name || '');
+  return (/^[AEIOUaeiou]/.test(n) ? 'an ' : 'a ') + n;
+}
+
+/**
+ * Whether this person may make what this row makes, and what to say when not.
+ *
+ * Returns { refusal, note, credit }: refusal is the sentence that stops the
+ * craft, note is a sentence said while letting it through, and credit is the
+ * key the work counts under once it has gone through.
+ *
+ * THE ORDER OF THE CHECKS IS THE FEATURE. Every branch that cannot answer
+ * ALLOWS, because a gate that cannot tell whose work this is must not be the
+ * reason somebody loses their materials at a forge.
+ */
+function craftAnswer(actorId, row) {
+  const out = { refusal: null, note: null, credit: null };
+  const C = globalThis.__thornswoodCharacter;
+  const P = globalThis.__thornswoodProgression;
+  if (!C || !C.stateOf || !P) {
+    log('the character block is not loaded, so the craft gate is open');
+    return out;
+  }
+  let s = null;
+  try {
+    s = C.stateOf(actorId);
+  } catch (e) {
+    log('the craft gate threw reading the character, so it is open:', e);
+    return out;
+  }
+  if (!s) { return out; }
+
+  // The rulebook's spelling is capitalised in the table and lower case in the
+  // rules. The rules are the side that decides, so the table's words are folded
+  // to theirs and never the other way round.
+  const half = String(row.half || '').toLowerCase();
+  const owner = String(row.owner || '').toLowerCase();
+  const rank = String(row.rank || 'novice').toLowerCase();
+  const made = String(row.name || 'that');
+  const halfName = C.nameOf ? C.nameOf(half) : half;
+
+  /*
+    NOBODY IS STRANDED AT A FORGE ON THEIR FIRST EVENING. A character with no
+    profession yet is let through and told once why that will change. The
+    alternative is somebody who has not pressed K yet standing at a workbench
+    that refuses everything with no way to work out what is wrong, and creation
+    is exactly when a person is most likely to be at one.
+  */
+  if (!s.prof) {
+    if (!Object.prototype.hasOwnProperty.call(toldCraftingIsComing, actorId)) {
+      toldCraftingIsComing[actorId] = true;
+      out.note = 'You have no profession yet, so nothing is stopping you making that. ' +
+                 'Press K and pick one: from then on your half of it decides what you ' +
+                 'can make at all.';
+    }
+    return out;
+  }
+
+  /*
+    The one question every other gate in this file asks, and it answers three of
+    the allowed cases at once: your own half at or under your rank, your sister
+    half at novice, and a half a Master of another profession taught you, which
+    is also novice and never more. classes.md: 'You get the novice work of your
+    sister half for nothing. An Edgewright knows how to beat out plain iron
+    plate, because anybody who works a forge does.'
+  */
+  if (P.canWork(s, half, rank)) {
+    out.credit = half;
+    return out;
+  }
+
+  const mineName = professionName(s.prof);
+
+  // Your own half, above your rank. The rank it wants is named, because 'no' on
+  // its own is how somebody decides the server is broken.
+  if (s.half === half) {
+    const have = P.rankOf(s, half);
+    out.refusal = 'A ' + made + ' is ' + rankWord(rank) + ' ' + halfName + '\'s work' +
+                  (have ? ' and you are ' + rankWord(have) + ' ' + halfName : '') +
+                  '. Rank comes from doing the work.';
+    return out;
+  }
+
+  // Your sister half, above novice. classes.md: 'What they cannot do is go any
+  // further than novice with it ... For that you find a Platewright, and that is
+  // a conversation rather than a menu.'
+  const sister = s.half ? P.sisterOf(s.prof, s.half) : null;
+  if (sister && sister === half) {
+    out.refusal = 'A ' + made + ' is ' + halfName + ' work past novice, and ' + halfName +
+                  ' is your sister half. You get the novice of it for nothing and no ' +
+                  'further. A Master ' + halfName + ' can take you on.';
+    return out;
+  }
+
+  // A half a Master of another profession taught you. It never leaves novice,
+  // so this is a ceiling rather than a rank to climb, and the sentence says so.
+  if (P.rankOf(s, half)) {
+    out.refusal = 'A ' + made + ' is ' + halfName + ' work past novice. What a Master ' +
+                  'teaches you outside your own profession never goes further than ' +
+                  'novice, however long you spend on it.';
+    return out;
+  }
+
+  // Another profession entirely. The half that can make it and the profession
+  // that half belongs to are both named, because the answer to this one is a
+  // person and the point is to go and find them.
+  out.refusal = 'Only ' + aWord(halfName) + ' can make a ' + made + '. That is ' +
+                professionName(owner) + ' work and you are ' + aWord(mineName) + '. Ask one.';
+  return out;
+}
+
+/*
+  The craft gate.
+
+  Returning false refuses the craft and the inputs stay in the pack: CraftEvent
+  ::OnFireSuccess is what moves them, and GameModeEvent::Fire only calls it when
+  nobody answered false. Returning undefined lets it through.
+
+  A CRAFT THAT GOES THROUGH IS WORK, the same way a seam is work for a miner.
+  'Rank comes from doing the work. Nothing else moves it.' It goes through the
+  same creditWork the five class verbs go through, under the half that owns the
+  recipe, so every ceiling holds: a sister half counts hours it cannot spend
+  until a Master takes the person on, and a taught trade sits at novice.
+
+  The refusal takes the path every other refusal in this file takes, notify then
+  say, because notify resolves its actor through the Papyrus stack and therefore
+  does nothing from here, and say is the one that actually lands.
+*/
+mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId) {
+  /*
+    THE NUMBER TO THE DESCRIPTOR, AND EVERYTHING ABOUT THIS IS THE WRAP.
+    recipeId is a number and every key in the table is a string. A lookup
+    without this call in between is undefined on every craft in the game, which
+    is a gate that quietly allows everything. A call that throws or answers
+    nothing means the server does not know which recipe this was, and not
+    knowing is never a reason to take somebody's materials.
+  */
+  let desc = null;
+  try {
+    desc = mp.getDescFromId(recipeId);
+  } catch (e) {
+    log('no descriptor for recipe', recipeId, 'so the craft is allowed:', e);
+    return;
+  }
+  if (!desc || typeof desc !== 'string') {
+    log('no descriptor for recipe', recipeId, 'so the craft is allowed');
+    return;
+  }
+
+  // A recipe nobody owns. 1,679 of them, and they are the stock every trade
+  // needs: ingots, leather, tanning, smelting. Straight through.
+  if (!isRecipe(desc)) { return; }
+  const row = RECIPES_BY_ID[desc];
+  if (!row || typeof row !== 'object') { return; }
+
+  const answer = craftAnswer(actorId, row);
+  if (answer.refusal) {
+    notify(actorId, answer.refusal);
+    say(actorId, answer.refusal);
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '):', answer.refusal);
+    return false;
+  }
+  if (answer.note) {
+    notify(actorId, answer.note);
+    say(actorId, answer.note);
+  }
+  if (answer.credit) {
+    const raised = creditWork(actorId, answer.credit);
+    if (raised) {
+      notify(actorId, raised);
+      say(actorId, raised);
+    }
+  }
+  return;
+});
+
 log('gamemode loaded:',
     Object.keys(DATA.cellToHold).length + ' cells mapped,',
     Object.keys(MANUALS).length + ' manuals,',
@@ -5697,9 +8016,36 @@ log('gamemode loaded:',
       names below; what a name means on the client is the client's half of
       the job and is not decided here.
 
-      Three of these have no vanilla actor value behind them at all
-      (spellPowerMult, spellCostMult, critChance). They are sent because the
-      rulebook promises them, and the client decides how to land them.
+      TWO OF THESE NAMES WERE NOT ACTOR VALUES AND NEVER HAVE BEEN, and the
+      two sub-skills that sent them have been doing nothing at all since the
+      tree was built. Measured on 20 September, twice over: the 149 AVIF records
+      in Skyrim.esm were read, and then, because an AVIF record is not proof
+      either way, the fork's own libespm ActorValue.h. healRateMult,
+      magickaRateMult, staminaRateMult and diseaseResist ARE real engine actor
+      values that happen to share an index with a differently named AVIF record,
+      so those four are right and the AVIF list alone would have condemned them
+      wrongly. spellPowerMult and spellCostMult are not on either list. So
+      treeApplyNow in thornswood-front.js logged 'the game had no number for
+      that' and moved on, every time, and a point in Potency or Efficiency
+      bought nothing.
+
+      They are still spelled that way HERE, because this table is what one point
+      is worth and the rulebook says Potency raises spell damage and duration
+      full stop. What changed is that treeApplies no longer sends either name:
+      it spreads the total across the schools that character actually holds,
+      under the real actor values in schoolValues below. See that block and
+      treeApplies for why it has to be that way round and what somebody with no
+      school gets.
+
+      EFFICIENCY'S MINUS IS READ HERE AND TURNED OVER ON THE WAY OUT. Under the
+      name spellCostMult a minus is right: the cost falls. The value it ends up
+      on is the school's skill, where up is what makes a spell cheaper, so
+      spreadOverSchools carries sign: -1 for that half and treeApplies applies
+      it. Nothing in this table needs changing to read it; the turn is one line
+      and it is documented where it happens.
+
+      critChance is the one name left with nothing behind it. It is sent because
+      the rulebook promises it and the client decides how to land it.
     */
     perPoint: {
       vitality:   { health: 10 },
@@ -5717,6 +8063,115 @@ log('gamemode loaded:',
       agility:    { speedMult: 2 },
       burden:     { carryWeight: 15 },
       precision:  { critChance: 2 }
+    },
+
+    /*
+      THE REAL ACTOR VALUES BEHIND POTENCY AND EFFICIENCY, PER SCHOOL.
+
+      Skyrim has no one value for 'spell damage' and none for 'what spells
+      cost'. It has ten, two per school:
+
+        <School>PowerMod   how hard that school's spells land
+        <School>Mod        the skill the game works that school's cost out from
+
+      AND NOT ONE OF THEM HAS AN 'AV' IN FRONT OF IT. The first draft of this
+      table wrote all ten with that prefix, and it would have left Potency and
+      Efficiency buying exactly as little as they bought before the table
+      existed. The prefix belongs to the AVIF records in Skyrim.esm, which is
+      what that pass read, and an AVIF editor id is not what the client looks a
+      value up by. thornswood-front.js calls getBaseActorValue and setActorValue
+      with the engine's own name for the value. The fork's own
+      libespm\include\libespm\ActorValue.h is the list of those names and was
+      read again on 21 September: AlterationMod, ConjurationMod, DestructionMod,
+      IllusionMod and RestorationMod on lines 117 to 121, and
+      AlterationPowerMod through RestorationPowerMod on lines 156 to 160. No
+      prefix on any of the 164 entries. The client's own generated
+      Data\Platform\Modules\skyrimPlatform.ts says the same from the other side:
+      DestructionModifier = 110, DestructionPowerModifier = 149, and no
+      AV-prefixed name anywhere in the file. Every name in perPoint above that
+      already worked is unprefixed for the same reason, health and carryWeight
+      and the rest, while the AVIF editor ids for those two are AVHealth and
+      AVCarryWeight.
+
+      The prefix would also have been a lie about one of the ten. All 149 AVIF
+      records in Skyrim.esm were dumped on 21 September and there is no
+      AVDestructionPowerMod among them: 0x63a AVAlterationPowerMod, 0x63b
+      AVConjurationPowerMod, then 0x63d AVIllusionPowerMod with nothing at
+      0x63c. So the claim that the ten AV names were confirmed AVIF names was
+      wrong on its own terms as well as pointing at the wrong list.
+
+      It matters which way a wrong name fails, and this one failed quietly.
+      Papyrus GetBaseActorValue answers 0 for a name it cannot resolve rather
+      than refusing, so the !isFinite guard in treeApplyNow would not have
+      caught it and the log would have read 'the server's totals are on the
+      character: AVDestructionPowerMod +5 (5)' while nothing had been set.
+
+      So a point in Potency has to be spent somewhere, and the only somewhere
+      the game offers is a school. This table is the map from the school to the
+      two names, and spreadOverSchools below is which of the two each sub-skill
+      goes to.
+
+      THE RULEBOOK SETS NONE OF THIS. classes.md says Potency raises 'spell
+      damage and duration' and Efficiency 'what spells cost', and says nothing
+      about schools, because as far as a person reading that page is concerned
+      there is one magicka and one spell. The split is the game's shape showing
+      through, and it is why treeApplies splits the total rather than handing
+      the whole of it to each school: five schools each getting the full amount
+      would make one point in Potency five times the point it says it is.
+    */
+    schoolValues: {
+      destruction: { power: 'DestructionPowerMod', cost: 'DestructionMod' },
+      restoration: { power: 'RestorationPowerMod', cost: 'RestorationMod' },
+      alteration:  { power: 'AlterationPowerMod',  cost: 'AlterationMod' },
+      conjuration: { power: 'ConjurationPowerMod', cost: 'ConjurationMod' },
+      illusion:    { power: 'IllusionPowerMod',    cost: 'IllusionMod' }
+    },
+
+    /*
+      Which name out of perPoint is spread over the schools, which half of
+      schoolValues it lands in, and WHICH WAY ROUND IT GOES. Nothing else in
+      perPoint is touched: the other thirteen sub-skills name values every
+      character has whatever they do for a living, and a point in Vitality is
+      health for a smith the same as for a mage.
+
+      THE COST HALF RUNS THE OTHER WAY, which is the whole reason sign is here.
+      perPoint has efficiency at spellCostMult: -3, and under that name the
+      minus is right: what a spell costs goes down. But <School>Mod is not a
+      cost multiplier. It is the additive modifier on the school's SKILL, and
+      the game works the cost of a spell out from the skill, so more of it is
+      cheaper. Handing -3 through unturned would have taken three levels off
+      the character's Destruction and put the price of every Destruction spell
+      UP, which is the opposite of what the page sells them, with nothing in any
+      log to say so.
+
+      Measured in Skyrim.esm on 21 September rather than reasoned about. Four
+      MGEF records carry one of the two Destruction values: MG02FortifyDestruc-
+      tion, EnchFortifyDestructionConstantSelf and
+      EnchRobesFortifyDestructionConstantSelf on DestructionMod, and
+      AlchFortifyDestruction on DestructionPowerMod. 31 enchantments, potions
+      and spells use those four between them. Every single magnitude is
+      POSITIVE: 27 on DestructionMod running 3 through 25, including
+      EnchRobesFortifyDestruction01 at 12 and MGArchMageRobeHoodedEnchant at 15
+      and EnchRobesCollegeDestruction05 at 22, all of which read 'Destruction
+      spells cost X% less' in front of a person; and 4 on DestructionPowerMod at
+      20, 30, 40 and 50, which read 'spells are X% stronger'. Not one negative
+      among the 31. So up is cheaper on the cost half and up is stronger on the
+      power half, and only the cost half needs turning over.
+
+      THE TWO HALVES ARE NOT COUNTED IN THE SAME UNIT AND THE RULEBOOK SETS
+      NEITHER. perPoint's 3 was written as a percentage of cost, and
+      <School>Mod is counted in skill levels, so a point in Efficiency is worth
+      three levels of each school held rather than three percent off the price.
+      That is not a rounding of the intent, it is a different unit, and it is
+      said here so the next person does not read the table as percentages.
+      classes.md sets no number for either sub-skill, the whole of perPoint is
+      invented and says so above, and three levels a point sits inside the range
+      the game's own robes use. A first number for the dev server, like the
+      rest of them.
+    */
+    spreadOverSchools: {
+      spellPowerMult: { half: 'power', sign: 1 },
+      spellCostMult:  { half: 'cost',  sign: -1 }
     },
 
     /*
@@ -5945,12 +8400,53 @@ log('gamemode loaded:',
   }
 
   /*
+    Whole numbers that add up to total exactly, n of them, the larger ones
+    first. The remainder is handed out one at a time rather than rounded, so
+    nothing is lost and nothing is invented: three points of Potency over two
+    schools is 8 and 7, not 7 and 7 or 8 and 8. The sign is carried, because
+    Efficiency's amount is negative.
+  */
+  function splitAcross(total, n) {
+    var out = [];
+    if (!n || n < 1) { return out; }
+    var sign = total < 0 ? -1 : 1;
+    var mag = Math.abs(total);
+    var each = Math.floor(mag / n);
+    var over = mag - (each * n);
+    for (var i = 0; i < n; i++) { out.push(sign * (each + (i < over ? 1 : 0))); }
+    return out;
+  }
+
+  /*
     What the tree adds up to, for the client to apply.
 
     The server cannot set any of this itself: GetBaseActorValues computes the
     base values from the race record, so anything written here is gone the
     next time the client works them out. So the totals are sent and the
     client applies them. Only what is not zero travels.
+
+    POTENCY AND EFFICIENCY REACH THE SCHOOLS SOMEBODY HOLDS, OR THEY REACH
+    NOBODY. Those two sub-skills add up under the names perPoint gives them,
+    spellPowerMult and spellCostMult, and neither of those has ever been an
+    actor value in this game. Measured 20 September against the fork's own
+    libespm ActorValue.h: they are not on the list, and thornswood-front.js
+    logged 'the game had no number for that' and moved on every single time. So
+    the total is turned into the real per-school values here, out of
+    TUNING.schoolValues, split across the schools the character actually holds.
+
+    SOMEBODY HOLDING THOSE POINTS WITH NO SCHOOL GETS NOTHING FROM THEM, and
+    that is said out loud rather than hidden. A warrior who spends four points
+    in Potency has bought nothing, because there is no school for the game to
+    put the number on and there is no such thing as spell damage in general.
+    That is a real cost of the game's shape and not a defect in this function:
+    the alternative is inventing a value the engine does not have, which is what
+    was being sent before and is why neither sub-skill did anything. The panel
+    on K says the same in its one line about each of them, which is where
+    somebody reads it before they spend the point rather than after.
+
+    schoolsOf is the reader, not s.schools, so a non-mage who was taught a
+    school by a Master mage gets the benefit in that school. It holds their
+    magic and the rulebook lets them have it.
   */
   function treeApplies(state) {
     var s = state || fresh();
@@ -5965,6 +8461,31 @@ log('gamemode loaded:',
         out[what] = (own(out, what) ? out[what] : 0) + per[what] * n;
       }
     }
+
+    var held = schoolsOf(s);
+    for (var name in TUNING.spreadOverSchools) {
+      if (!own(TUNING.spreadOverSchools, name) || !own(out, name)) { continue; }
+      var total = out[name];
+      // The name the game has never had leaves either way, whether it was
+      // spread over schools or dropped for want of one.
+      delete out[name];
+      if (!total || !held.length) { continue; }
+      var how = TUNING.spreadOverSchools[name];
+      var which = how.half;
+      // The sign the table carries, applied before the split rather than after
+      // it, so the remainder is handed out in the direction it will land in.
+      // Efficiency's -3 a point means the price falls and the value it lands on
+      // means the skill rises, which is the same thing said the other way up.
+      // See spreadOverSchools for the 31 records that were read to settle it.
+      var parts = splitAcross(total * how.sign, held.length);
+      for (var i = 0; i < held.length; i++) {
+        var pair = own(TUNING.schoolValues, held[i]) ? TUNING.schoolValues[held[i]] : null;
+        if (!pair || !own(pair, which)) { continue; }
+        var av = pair[which];
+        out[av] = (own(out, av) ? out[av] : 0) + parts[i];
+      }
+    }
+
     for (var k in out) { if (own(out, k) && !out[k]) { delete out[k]; } }
     return out;
   }
@@ -7212,6 +9733,15 @@ log('gamemode loaded:',
     var refused = classGate(actorId, 'farm');
     if (refused) { return refused; }
 
+    /*
+      The shovel, and it stands where the class gate stands: before anything
+      about this particular plot, so a Farmer with no shovel gets the same
+      answer at every crop in Skyrim rather than 'still growing' at one and a
+      refusal at the next. Skyrim has no hoe; see TOOLS.
+    */
+    var noTool = toolGate(actorId, 'farmer');
+    if (noTool) { return noTool; }
+
     var plot = readPlot(refrId);
     if (!plot) {
       /*
@@ -7320,6 +9850,11 @@ log('gamemode loaded:',
   function plant(actorId, profileId, toProfile) {
     var refused = classGate(actorId, 'farm');
     if (refused) { toProfile(profileId, refused); return; }
+
+    // The shovel, before the plot is looked for, for the same reason the class
+    // gate is: the answer is the same wherever they are standing.
+    var noTool = toolGate(actorId, 'farmer');
+    if (noTool) { toProfile(profileId, noTool); return; }
 
     var mine = profileOf(actorId);
     if (!mine) {
@@ -8342,6 +10877,42 @@ log('gamemode loaded:',
           if (seeded) { toProfile(profileId, seeded); }
         } catch (eSeed) {
           clog('could not give starting seed to', actorId.toString(16) + ':', eSeed);
+        }
+      }
+    }
+
+    /*
+      THE TOOL THE WORK NEEDS, handed over at the pick.
+
+      Patrick, 20 September: 'if you choose miner you should start with a
+      pickaxe, unequipped is fine just in the inventory, the woodworker needs to
+      start with an axe', and 'to be able to farm you need a hoe so give farmers
+      a hoe'. Skyrim has no hoe and the farmer gets a shovel; the whole of that
+      is written out over TOOLS.
+
+      Here for the same reason the seed is here: this is the moment the server
+      learns somebody has become a Miner, a Woodworker or a Farmer, and it
+      cannot run twice, because this line is past the refusal above and neither
+      pickClass nor pickProfession will take a second one.
+
+      IT IS NOT THE ONLY DOOR, and it must not be. Every character that exists
+      today picked their class before any of this was written, so the pick is
+      long behind them and nothing here would ever reach them. toolGate at the
+      seam, the kiln and the plot is the way back, exactly as offerSeed is the
+      way back for the seed, and it is what keeps a required tool from being a
+      class taken away from the people who already chose it.
+
+      A class or a profession with no tool of its own falls straight through:
+      toolFor answers null and giveTool answers null, and nothing is said.
+    */
+    if (about === 'class' || about === 'profession') {
+      var whose = (about === 'class') ? st.cls : st.prof;
+      if (whose) {
+        try {
+          var handed = giveTool(actorId, whose);
+          if (handed) { toProfile(profileId, handed); }
+        } catch (eTool) {
+          clog('could not give the', whose, 'tool to', actorId.toString(16) + ':', eTool);
         }
       }
     }

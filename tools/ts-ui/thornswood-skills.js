@@ -169,9 +169,9 @@
         { key: 'magicka', name: 'Magicka', subs: [
             { key: 'capacity', name: 'Capacity', desc: 'Most magicka', perk: 'Archmage’s Vessel: a burst of regeneration when nearly empty.' },
             { key: 'clarity', name: 'Clarity', desc: 'Regeneration', perk: 'Leyline Attunement: full regeneration while casting.' },
-            { key: 'potency', name: 'Potency', desc: 'Spell effect', perk: 'Overcharge: one spell in seven lands double.' },
+            { key: 'potency', name: 'Potency', desc: 'Spell effect, in the schools you hold', perk: 'Overcharge: one spell in seven lands double.' },
             { key: 'ward', name: 'Ward', desc: 'Magic resistance', perk: 'Spellbreaker: one spell in four is absorbed and refills you.' },
-            { key: 'efficiency', name: 'Efficiency', desc: 'Cost', perk: 'Font of Magic: once a day, fifteen seconds of free casting.' }] },
+            { key: 'efficiency', name: 'Efficiency', desc: 'Cost, in the schools you hold', perk: 'Font of Magic: once a day, fifteen seconds of free casting.' }] },
         { key: 'stamina', name: 'Stamina', subs: [
             { key: 'endurance', name: 'Endurance', desc: 'Most stamina', perk: 'Tireless: sprinting and power attacks cost half.' },
             { key: 'vigor', name: 'Vigor', desc: 'Regeneration', perk: 'Second Wind: full stamina the instant it empties, once in five minutes.' },

@@ -46,6 +46,45 @@ rather than a menu.
 Everything outside your own profession you cannot do at all, unless somebody
 teaches you. There is a way to learn a little of it and it is further down.
 
+### What your half actually stops you making
+
+Your half decides what you are able to make, and the server holds you to it.
+Stand at any forge, oven, tanning rack or workbench in Skyrim and what you are
+about to make is either your half's work or it is not. If it is not, it does not
+get made and you keep your materials.
+
+Three answers, and every one of them names somebody.
+
+Your own half, at or under your rank. It gets made, and the hours count towards
+your next rank the same way a seam counts for a miner.
+
+Your sister half, up to novice. It gets made. That is the plain iron plate
+above, and it is as far as it goes.
+
+Your sister half past novice, or any half that is not yours at all. It does not
+get made, and you are told whose work it is and what rank it asks for, so you
+know who to go and find.
+
+### The five halves that gate nothing
+
+Five of the fourteen halves gate nothing, and that is the game rather than a
+decision anybody took.
+
+**Bulwark** and **Berserker**. Warriors do not make things. Their half is how
+they fight, and there is nothing at a workbench for it to be about.
+
+**Blightbrewer** and **Physicker**. Skyrim has no alchemy recipes. A potion is
+worked out from what your ingredients have in common, inside the alchemy menu,
+and no recipe exists anywhere for the server to hold you to. An Alchemist is
+still an Alchemist and the two halves still say what you are; there is just
+nothing at the bench to catch.
+
+**Wardweaver**. Enchanting is the same shape. A menu, not a recipe.
+
+Tempering is the other gap worth knowing about. Improving a weapon or a piece of
+armour at a grindstone or an armour table never reaches the server at all, so
+the Smith's Mastercraft is on this page and not yet in the world.
+
 ## The Mage, which is the odd one
 
 A mage picks **two schools**, then **two starting spells**.
@@ -98,6 +137,35 @@ profession. Somebody who took Miner gets nothing off a dead elk whatever they
 do for a living, and a Hunter cannot pull a flower out of the ground. If you
 want leather you know a hunter, and if you do not know one yet, that is the
 game telling you to go and meet people.
+
+## The tools
+
+Three picks need a tool in your pack before the work happens: two of the classes
+and one whole profession. In the pack is enough; nothing has to be equipped.
+
+| Who | What they carry |
+|---|---|
+| **Miner** | A pickaxe |
+| **Farmer** | A shovel |
+| **Woodworker** | A woodcutter's axe |
+
+You are handed yours the moment you pick, and if you ever end up with none, the
+seam, the plot or the kiln hands you another rather than leaving you standing
+there with a class you cannot use. It is not often and it is not much, the same
+as the seed.
+
+Any of them counts. The game has two shovels that look and read exactly alike,
+and six things it calls a pickaxe including the Notched Pickaxe and the ancient
+Nordic one that cuts stalhrim. Whichever you are carrying, the work happens. A
+war pick is a weapon and not a mining tool, so that one does not.
+
+**Skyrim has no hoe.** There is no such item in the game, and there is none in
+any of the mods we load on top of it either; every one of them was searched. So
+farming asks for a shovel, which is a real thing lying about on farms and at
+mills all over the province, and a shovel is what we mean whenever this page
+says farming needs a tool.
+
+Nothing else asks for one. Gathering, hunting and fishing need your hands.
 
 ## Farming
 
@@ -260,6 +328,12 @@ gives you its perk, and those are the ones worth planning around.
 | **Potency** | Spell damage and duration | **Overcharge.** Now and then a spell lands twice as hard or holds twice as long |
 | **Ward** | Resisting hostile magic | **Spellbreaker.** Some of what is thrown at you is swallowed and becomes your magicka |
 | **Efficiency** | What spells cost | **Font of Magic.** Once a day, fifteen seconds where nothing costs anything |
+
+Potency and Efficiency land in the schools you hold, and nowhere else. The game
+has no such thing as spell damage in general: it has destruction damage,
+restoration damage and so on, one for each school. So points in those two are
+worth nothing at all to somebody with no school, and they are the two to think
+twice about if magic is not yours.
 
 ### Stamina
 
