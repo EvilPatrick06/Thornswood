@@ -1,4 +1,4 @@
-<#
+﻿<#
   Deploy-Gamemode.ps1
 
   Puts gamemode.js into the built server and writes a server load order that
@@ -269,6 +269,48 @@ $s | Add-Member -NotePropertyName npcEnabled  -NotePropertyValue $true       -Fo
 # update was accepted in the first place. These two lines are that condition.
 # The gamemode cannot do this job instead: EquipmentBinding has a Get and no
 # Set, so the server can read what somebody is wearing and cannot write it.
+<#
+  NOTHING IN THE WORLD COMES BACK, EXCEPT THE THINGS THAT GROW.
+
+  Patrick, 21 September: "even the stuff in the containers that start in them
+  should be once only and same wih on the ground so it doesnt respawn and isnt
+  infinites (Except for the thigs that hang like the meats, garlic, elves ears,
+  etc.)".
+
+  The gamemode already refuses to hand over a weapon, a piece of armour, a tool
+  or a coin that the world placed, and empties a container of those once. What it
+  cannot do from inside is stop the ENGINE putting everything back an hour later.
+  MpObjectReference::GetRelootTime returns an hour for CONT, an hour for anything
+  espm::utils::IsItem calls an item, and an hour for FLOR and TREE. So a chest
+  emptied of its bread refills with bread at teatime, for ever, and that is an
+  infinite supply of everything the gamemode does NOT take out.
+
+  RequestReloot returns early when the base type is in forbiddenReloot, so this
+  is the switch and there is no other.
+
+  WHICH TYPES, AND THE MEASUREMENT THAT MADE THE EXCEPTION SAFE. Every
+  harvestable this server knows about was looked up by record type on
+  21 September, all 146 of them across the four tables in tools\harvests.json:
+
+      the hanging game     7 bases, every one FLOR
+      plants and harvests  109 bases, 69 FLOR and 40 TREE
+      crops                15 bases, 11 TREE and 4 FLOR
+      fish                 15 bases, every one FLOR
+
+  Not one of them is anything else. So FLOR and TREE are exactly the things
+  Patrick wants to keep coming back, and everything he wants to stop is a
+  different type. The exception is not a list of forms anybody has to maintain:
+  it is the two types left out of the line below.
+
+  The item types are the ones IsItem covers, which is what the engine itself
+  reloots on an hour, written out here rather than inferred so that a reader can
+  see what is in the list without reading espm.
+#>
+$s | Add-Member -NotePropertyName forbiddenReloot -NotePropertyValue @(
+    'CONT',
+    'WEAP', 'ARMO', 'AMMO', 'MISC', 'ALCH', 'INGR', 'BOOK', 'SLGM', 'SCRL',
+    'LIGH', 'KEYM', 'NOTE'
+) -Force
 $s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue $false -Force
 $s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue $false -Force
 # The third one, and the one the live log actually shows firing. Measured on

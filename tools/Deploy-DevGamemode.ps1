@@ -175,6 +175,15 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip) {
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentInventoryCheckEnabled -NotePropertyValue `$false -Force
+  # Nothing in the world comes back except FLOR and TREE, which is the hanging
+  # meat, the garlic, the elves ears, every plant and every crop. The argument
+  # and the census behind the exception are written out in Deploy-Gamemode.ps1;
+  # dev carries the same list so that a thing tested here behaves the same live.
+  `$s | Add-Member -NotePropertyName forbiddenReloot -NotePropertyValue @(
+      'CONT',
+      'WEAP', 'ARMO', 'AMMO', 'MISC', 'ALCH', 'INGR', 'BOOK', 'SLGM', 'SCRL',
+      'LIGH', 'KEYM', 'NOTE'
+  ) -Force
   # NOT Set-Content -Encoding UTF8. At the far end of ssh this is Windows
   # PowerShell 5.1, where that means UTF-8 WITH a byte order mark, and the
   # server reads this file with JSON.parse, which refuses one:

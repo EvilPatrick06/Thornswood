@@ -1,9 +1,35 @@
-<#
+﻿<#
   Wipe-Saves.ps1
 
       .\tools\Wipe-Saves.ps1
 
-  Empties the server's character storage, so everybody starts again.
+  Starts the world over. Everybody begins again, nothing is claimed, nothing
+  has been looted, and every container in the province is holding what
+  Bethesda put in it.
+
+  Patrick, 21 September: "we also need an easy way to start the world from
+  scratch so all of the property is unclamied, things arent looted, etc so when
+  we test things and when launch out of Alpha". This is that, and it is this
+  script rather than a second one beside it, because a second one would have
+  overlapped this by three quarters and the two would have drifted apart.
+
+  FOUR THINGS MOVE, and between them they are the whole of what the world
+  remembers:
+
+    world                    the changeform database. Every reference the
+                             server has ever written to: what is in each
+                             container, what has been picked up, which chests
+                             it emptied of weapons, who has had their starting
+                             purse. Take this away and every chest in Skyrim is
+                             full again and untouched.
+    private\characters.json  who everybody is.
+    data\property.json       who holds which building, which are locked, and
+                             the ground each one covers.
+    data\farm-claims.json    the farms on ground with no building on it.
+
+  The first two were here from the start. The last two are the gamemode's own
+  and were added on 21 September: without them a fresh world would have come
+  up with every house still claimed by somebody who no longer exists.
 
   It does NOT delete anything. It stops the server, renames the storage out of
   the way with today's date on it, and starts the server again on an empty one.
@@ -93,7 +119,7 @@ foreach (`$d in (Get-ChildItem 'C:\' -Directory -EA SilentlyContinue)) {
 if (`$roots.Count -eq 0) { 'NOROOT'; exit }
 foreach (`$r in `$roots) {
   'ROOT|' + `$r
-  foreach (`$n in @('world', 'private\characters.json')) {
+  foreach (`$n in @('world', 'private\characters.json', 'data\property.json', 'data\farm-claims.json')) {
     `$p = Join-Path `$r `$n
     if (-not (Test-Path `$p)) { 'NONE|' + `$n; continue }
     `$b = 0; `$c = 0
@@ -152,12 +178,16 @@ Head 'Moving the old storage aside'
 $moved = Remote @"
 `$ErrorActionPreference = 'Continue'
 `$r = '$root'
-foreach (`$n in @('world', 'private\characters.json')) {
+foreach (`$n in @('world', 'private\characters.json', 'data\property.json', 'data\farm-claims.json')) {
   `$p = Join-Path `$r `$n
   if (-not (Test-Path `$p)) { continue }
   `$leaf = Split-Path -Leaf `$p
   `$dir  = Split-Path -Parent `$p
-  if (`$leaf -like '*.json') { `$to = Join-Path `$dir ('characters-before-$stamp.json') }
+  if (`$leaf -like '*.json') {
+    # Each of the three json files keeps its own name, or a fresh world would
+    # come up with the property register saved as characters-before-<stamp>.
+    `$to = Join-Path `$dir ((`$leaf -replace '[.]json$', '') + '-before-$stamp.json')
+  }
   else { `$to = Join-Path `$dir ('world-before-$stamp') }
   try { Move-Item -LiteralPath `$p -Destination `$to -Force -EA Stop; 'moved  ' + `$p + '  ->  ' + `$to }
   catch { 'FAILED ' + `$p + '  ' + `$_.Exception.Message }
