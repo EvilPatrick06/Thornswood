@@ -4928,11 +4928,49 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   if (prop && prop.touched) {
     try {
       const doorDesc = mp.getDescFromId(refrId);
-      if (doorDesc) { prop.touched(casterRefrId, doorDesc); }
+      if (doorDesc) {
+        prop.touched(casterRefrId, doorDesc);
+        /*
+          THE SECOND HALF OF A LOCK, and the half that is not trusting anybody.
+
+          The first half is on the client: the server writes which doors are shut
+          to this person and a script on their machine locks them, which is what
+          makes Skyrim's own lockpicking game appear. That is the half that is
+          meant to run.
+
+          Measured in the fork on 21 September, in activationService.ts: a press
+          on a LOCKED reference is never announced to the server. So if this line
+          is reached at all for a door somebody may not pass, the door was NOT
+          locked on their client, which means the script did not run. A plugin
+          that failed to load is one reason and a client somebody has changed is
+          the other, and this cannot tell them apart and does not need to.
+
+          So the honest client gets a lock it can pick and the dishonest one gets
+          a door that does not open.
+        */
+        const shutTo = prop.buildingOf(doorDesc);
+        if (shutTo && prop.mayPass) {
+          let pid = 0;
+          try { pid = Number(mp.get(casterRefrId, 'profileId')) || 0; } catch (e) { pid = 0; }
+          if (!prop.mayPass(casterRefrId, pid, shutTo)) {
+            const no = prop.nameOf(shutTo) + ' is locked and you have no key.';
+            notify(casterRefrId, no);
+            say(casterRefrId, no);
+            log(casterRefrId.toString(16), 'was refused a locked door into',
+                prop.nameOf(shutTo), '(the client lock did not run)');
+            return false;
+          }
+        }
+      }
     } catch (e) {
       // No descriptor for this reference. Nothing about property can be said,
       // and nothing about the press changes.
     }
+  }
+  if (prop && prop.touchedBench) {
+    // Which bench they just pressed, for /key. Costs one hash lookup and is
+    // passed over inside touchedBench for anything that is not a bench.
+    try { prop.touchedBench(casterRefrId, baseDesc); } catch (e) { }
   }
 
   let message = null;
@@ -11025,6 +11063,25 @@ log('gamemode loaded:',
         updateOwner: '', updateNeighbor: ''
       });
     } catch (e) { /* already made by a previous load. harmless. */ }
+    try {
+      mp.makeProperty(BENCH_PROPERTY, {
+        isVisibleByOwner: false, isVisibleByNeighbors: false,
+        updateOwner: '', updateNeighbor: ''
+      });
+    } catch (e) { }
+    try {
+      /*
+        The one property here the client reads. Visible to its owner and to
+        nobody else: which doors are shut to you is nobody else's business, and
+        telling a neighbour would be telling them which houses you cannot get
+        into. The script cannot be changed once the property is made, so a
+        changed lockScript needs a server restart, which a deploy is.
+      */
+      mp.makeProperty(LOCK_PROPERTY, {
+        isVisibleByOwner: true, isVisibleByNeighbors: false,
+        updateOwner: lockScript(), updateNeighbor: ''
+      });
+    } catch (e) { }
   }
 
   /*
@@ -11160,9 +11217,23 @@ log('gamemode loaded:',
     } catch (e) {
       plog('could not write the door for', actorId.toString(16) + ':', e);
     }
+    /*
+      AND TELL THEM WHICH DOORS ARE SHUT TO THEM, here and not on a tick.
+
+      A door is the only place a lock matters and this runs at every one of
+      them, so somebody always has the current answer by the time they are
+      standing in front of the next door. The alternative is a timer that runs
+      for everybody all the time to catch a thing that changes a few times a day.
+
+      It is a small write, and it is the same write pushAll does when a lock is
+      turned. Between the two, a person is never more than one doorway behind.
+    */
+    var mine = 0;
+    try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
+    push(actorId, mine);
+
     var held = holderOf(building);
     if (!held) { return; }
-    var mine = 0;
     try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
     if (mine && held.by === mine && (Date.now() - held.touched) > 3600000) {
       // Once an hour at most. A door is opened a great many times and the
@@ -11235,8 +11306,13 @@ log('gamemode loaded:',
     } catch (e) { }
 
     var now = Date.now();
-    claims[building] = { by: profileId, name: who, at: now, touched: now };
+    claims[building] = { by: profileId, name: who, at: now, touched: now,
+                         locked: false };
     save();
+    // A new claim is not locked, so nothing anybody sees changes yet. The push
+    // is here anyway because the claim is the moment the building stops being
+    // nobody's, and a view that is right from the first second costs one write.
+    pushAll();
     var handed = giveDeed(actorId, building);
     plog(who, 'claimed', nameOf(building), handed ? 'and took the deed' : 'and got no deed');
     toProfile(profileId, 'You claim ' + nameOf(building) + '. ' +
@@ -11264,10 +11340,418 @@ log('gamemode loaded:',
     return true;
   }
 
+  // ------------------------------------------------------- locks and keys --
+  /*
+    THE TWO RECORDS, both named per instance the way the deed is. A key to
+    Breezehome and a key to Honeyside are the same record wearing two names.
+  */
+  var KEY = '15494:Thornswood-Content.esp';
+  var MOLD = '15495:Thornswood-Content.esp';
+
+  /* Where the bench somebody just pressed is written, the same way a door is,
+     because cutting a key happens at a forge and the engine has already said
+     which bench they touched. CraftingSmithingForge is the keyword every one of
+     our tool recipes stands on. */
+  var BENCH_PROPERTY = 'thornswoodBench';
+  var FORGE = '88105:Skyrim.esm';
+
+  /*
+    HOW A LOCK ACTUALLY WORKS HERE, because it is not what anybody would guess.
+
+    MEASURED IN THE FORK, 21 September, in activationService.ts: the client does
+    not tell the server about a press on a LOCKED reference at all. The Thornswood
+    patch there returns before it sends, on purpose, so that Skyrim keeps the
+    reference and runs its own lockpicking game. That is exactly what Patrick
+    asked for: "They should be able to pick the door still".
+
+    So a lock cannot be a thing the server does when somebody presses a door. The
+    door has to already be locked on their client before they touch it, and each
+    client has its own copy of the world, so a door can be locked for one person
+    and open for another without either of them seeing the other's version.
+
+    THAT MAKES IT TWO HALVES AND BOTH ARE HERE.
+
+    The first is the push below: the server writes, to each person, the doors
+    they should find locked, and an updateOwner script runs on their machine and
+    calls lock() on each one. That is what makes the lockpicking game appear.
+
+    The second is the refusal in onActivate. If the client half never runs, which
+    is a plugin that failed to load or a client that has been changed on purpose,
+    then the door is NOT locked there, the press DOES reach the server, and the
+    server refuses it. So the honest client gets a lock it can pick and the
+    dishonest one gets a door that does not open. Neither half is trusted to be
+    the only one.
+  */
+  var LOCK_PROPERTY = 'thornswoodLocks';
+
+  function lockScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || !v.shut) { return; }',
+      '    var sp = ctx.sp;',
+      '    for (var i = 0; i < v.shut.length; i++) {',
+      '      try {',
+      '        var r = sp.ObjectReference.from(sp.Game.getFormEx(v.shut[i]));',
+      // A door in a cell nobody has loaded does not resolve, and there is
+      // nothing to lock until it does. The tick below comes back to it.
+      '        if (r) { r.lock(true, false); }',
+      '      } catch (e) { }',
+      '    }',
+      '    for (var j = 0; j < (v.open || []).length; j++) {',
+      '      try {',
+      '        var o = sp.ObjectReference.from(sp.Game.getFormEx(v.open[j]));',
+      '        if (o) { o.lock(false, false); }',
+      '      } catch (e) { }',
+      '    }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  /*
+    Everything in this person's pack of one base with one exact name.
+
+    A key IS its name. There is no register of keys and there is deliberately
+    none: Patrick settled that a key can be given away, pickpocketed or taken out
+    of an unlocked chest, and every one of those is the item moving with nobody
+    telling the server. So the only honest question is what is in the pack now.
+  */
+  function holdsNamed(actorId, baseDesc, label) {
+    var baseId = idOf(baseDesc);
+    if (!baseId) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.count > 0 && e.baseId === baseId && String(e.name || '') === label) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function keyLabel(building) { return 'Key to ' + nameOf(building); }
+  function moldLabel(building) { return 'Key mold for ' + nameOf(building); }
+  function deedLabel(building) { return 'Deed to ' + nameOf(building); }
+
+  function holdsKey(actorId, building) { return holdsNamed(actorId, KEY, keyLabel(building)); }
+  function holdsMold(actorId, building) { return holdsNamed(actorId, MOLD, moldLabel(building)); }
+  function holdsDeed(actorId, building) { return holdsNamed(actorId, DEED, deedLabel(building)); }
+
+  /** A named item into the pack, never stacked. See giveDeed for why. */
+  function giveNamed(actorId, baseDesc, label) {
+    var baseId = idOf(baseDesc);
+    if (!baseId) {
+      plog('no', baseDesc, 'in this load order, so nothing was handed over');
+      return false;
+    }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { inv = null; }
+    var entries = (inv && inv.entries) || [];
+    entries.push({ baseId: baseId, count: 1, name: label });
+    try {
+      mp.set(actorId, 'inventory', { entries: entries });
+    } catch (e) {
+      plog('could not hand over', label + ':', e);
+      return false;
+    }
+    return true;
+  }
+
+  /*
+    May this person walk through that building's doors.
+
+    The holder always may, and a key always does. Nothing else: a building nobody
+    has claimed is open, and a claimed building that has not been locked is open,
+    because Patrick settled that "the door is only locked if the person locked
+    the door".
+
+    THE DEED IS NOT A KEY and that is deliberate. A deed in the pack is checked
+    here as well, because somebody who has just stolen one and has not yet had
+    the claim moved to them is holding the thing that says the place is theirs.
+    A stolen key gets you in; a stolen deed gets you in and eventually gets you
+    the house, and the second half of that is its own piece of work.
+  */
+  function mayPass(actorId, profileId, building) {
+    var held = holderOf(building);
+    if (!held) { return true; }
+    if (!held.locked) { return true; }
+    if (profileId && held.by === profileId) { return true; }
+    if (holdsKey(actorId, building)) { return true; }
+    if (holdsDeed(actorId, building)) { return true; }
+    return false;
+  }
+
+  /** Every door of every building this person should find locked. */
+  function shutFor(actorId, profileId) {
+    var shut = [], open = [];
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      var doors = doorsOf(b);
+      var pass = mayPass(actorId, profileId, b);
+      for (var i = 0; i < doors.length; i++) {
+        var id = idOf(doors[i]);
+        if (!id) { continue; }
+        (pass ? open : shut).push(id);
+      }
+    }
+    return { shut: shut, open: open };
+  }
+
+  /*
+    Every door of a building, worked out once and kept.
+
+    BUILDING_BY_DOOR is 4,891 rows and the question here is the other way round,
+    so walking it per push would be 4,891 comparisons per person per change. It
+    is turned round the first time it is asked for.
+  */
+  var doorIndex = null;
+  function doorsOf(building) {
+    if (!doorIndex) {
+      doorIndex = {};
+      for (var d in BUILDING_BY_DOOR) {
+        if (!Object.prototype.hasOwnProperty.call(BUILDING_BY_DOOR, d)) { continue; }
+        var b = BUILDING_BY_DOOR[d];
+        if (!Object.prototype.hasOwnProperty.call(doorIndex, b)) { doorIndex[b] = []; }
+        doorIndex[b].push(d);
+      }
+    }
+    return Object.prototype.hasOwnProperty.call(doorIndex, building) ? doorIndex[building] : [];
+  }
+
+  /** Tell one person which doors are shut to them. */
+  function push(actorId, profileId) {
+    try {
+      mp.set(actorId, LOCK_PROPERTY, shutFor(actorId, profileId));
+    } catch (e) {
+      plog('could not push the locks to', actorId.toString(16) + ':', e);
+    }
+  }
+
+  /*
+    Tell everybody, because one person locking a door changes what every other
+    person in the world sees. Done on a change rather than on a tick: a lock is
+    changed a handful of times a day and there is nothing to poll for.
+  */
+  function pushAll() {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    for (var i = 0; i < online.length; i++) {
+      var id = online[i];
+      var pid = 0;
+      try { pid = Number(mp.get(id, 'profileId')) || 0; } catch (e) { pid = 0; }
+      push(id, pid);
+    }
+  }
+
+  function setLock(actorId, profileId, toProfile, on) {
+    var building = here(actorId);
+    if (!building) {
+      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      return true;
+    }
+    var held = holderOf(building);
+    if (!held) {
+      toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is nothing to ' +
+                           (on ? 'lock' : 'unlock') + '. Say /claim: it costs nothing.');
+      return true;
+    }
+    if (held.by !== profileId && !holdsDeed(actorId, building)) {
+      toProfile(profileId, nameOf(building) + ' is held by ' + held.name +
+                           '. A lock is the holder\'s to turn.');
+      return true;
+    }
+    if (!!held.locked === !!on) {
+      toProfile(profileId, nameOf(building) + ' is already ' + (on ? 'locked' : 'unlocked') + '.');
+      return true;
+    }
+    held.locked = !!on;
+    save();
+    pushAll();
+    plog(nameOf(building), on ? 'locked' : 'unlocked', 'by', held.name);
+    toProfile(profileId, 'You ' + (on ? 'lock' : 'unlock') + ' ' + nameOf(building) + '.' +
+              (on ? ' Anybody without a key will have to pick it.' : ''));
+    return true;
+  }
+
+  /*
+    A KEY MOLD, AND THE BALANCE PATRICK ASKED FOR.
+
+    His words: "I don't want people to make new molds when somone is offline but
+    don't wan to be unrealistic so help me implement that sytem plus find a
+    balance."
+
+    THE BALANCE: the mold is made at the door, by a smith, and the person who
+    holds the place has to be STANDING THERE. That is what stops a mold being cut
+    while somebody is offline, and it is not a rule anybody has to remember,
+    because it is just the locksmith wanting the householder present.
+
+    AND THE MOLD GOES TO THE HOLDER, not to the smith. "you have a smith make you
+    a key mold for your door" is his sentence and the mold is yours. It matters
+    for more than tidiness: a smith who kept the mold could cut himself a key to
+    that house for ever afterwards, and nobody would know. The holder keeps it
+    and brings it back when they want another key cut, which is two people
+    trading and needs nothing built.
+  */
+  function mold(actorId, profileId, toProfile) {
+    var building = here(actorId);
+    if (!building) {
+      toProfile(profileId, 'Stand at the door you mean and open it, then say /mold.');
+      return true;
+    }
+    if (!isSmith(actorId)) {
+      toProfile(profileId, 'A key mold is a smith\'s work. Find one and bring them here.');
+      return true;
+    }
+    var held = holderOf(building);
+    if (!held) {
+      toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is no lock to ' +
+                           'cut a mold for. It can be claimed for nothing.');
+      return true;
+    }
+    var owner = holderNearby(actorId, building, held);
+    if (!owner) {
+      toProfile(profileId, 'Whoever holds ' + nameOf(building) + ' has to be standing here ' +
+                           'for this. A locksmith does not cut a mold for a door on somebody ' +
+                           'else\'s say so.');
+      return true;
+    }
+    if (holdsMold(owner.actorId, building)) {
+      toProfile(profileId, 'There is already a mold for ' + nameOf(building) + ' and it is ' +
+                           'in their hands. Cut the key from that.');
+      return true;
+    }
+    if (!giveNamed(owner.actorId, MOLD, moldLabel(building))) {
+      toProfile(profileId, 'The mold could not be handed over. Say so in the dev channel.');
+      return true;
+    }
+    plog('a mold for', nameOf(building), 'was cut for', held.name);
+    toProfile(profileId, 'You cut a mold for ' + nameOf(building) + ' and hand it to ' +
+                         held.name + '. Keys come off the mold at a forge.');
+    if (owner.profileId !== profileId) {
+      toProfile(owner.profileId, 'The mold for ' + nameOf(building) + ' is yours. Bring it to ' +
+                                 'a smith at a forge for as many keys as you want.');
+    }
+    return true;
+  }
+
+  /*
+    A key off the mold, at a forge, by a smith.
+
+    Whoever is holding the mold is who the key is for, which is the same shape as
+    the mold itself: the smith does the work and the other person walks away with
+    the thing. A smith cutting a key for their own house holds both and it lands
+    in their own pack, which is the same rule and not a special case.
+  */
+  function cutKey(actorId, profileId, toProfile) {
+    if (!isSmith(actorId)) {
+      toProfile(profileId, 'Cutting a key is a smith\'s work.');
+      return true;
+    }
+    if (!atForge(actorId)) {
+      toProfile(profileId, 'Stand at a forge and press it, then say /key.');
+      return true;
+    }
+    var building = moldInHand(actorId);
+    if (!building) {
+      toProfile(profileId, 'You are holding no key mold. A mold is cut at the door it is for, ' +
+                           'with whoever holds the place standing there.');
+      return true;
+    }
+    if (!giveNamed(actorId, KEY, keyLabel(building))) {
+      toProfile(profileId, 'The key could not be handed over. Say so in the dev channel.');
+      return true;
+    }
+    plog('a key to', nameOf(building), 'was cut');
+    toProfile(profileId, 'You cut a key to ' + nameOf(building) + '. It opens the door for ' +
+                         'whoever is carrying it, so hand it over yourself.');
+    return true;
+  }
+
+  /** The building whose mold is in this pack, or null. One at a time is enough. */
+  function moldInHand(actorId) {
+    var baseId = idOf(MOLD);
+    if (!baseId) { return null; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return null; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !(e.count > 0) || e.baseId !== baseId) { continue; }
+      var label = String(e.name || '');
+      for (var b in BUILDING_NAME) {
+        if (!Object.prototype.hasOwnProperty.call(BUILDING_NAME, b)) { continue; }
+        if (label === moldLabel(b)) { return b; }
+      }
+    }
+    return null;
+  }
+
+  /** Is this a smith. Both halves, because both of them work a forge. */
+  function isSmith(actorId) {
+    var C = g.__thornswoodCharacter;
+    if (!C || !C.stateOf) { return true; }
+    try {
+      var s = C.stateOf(actorId);
+      return !!s && String(s.prof || '').toLowerCase() === 'smith';
+    } catch (e) {
+      return true;
+    }
+  }
+
+  /** Are they standing at a forge. The bench tables already know which is one. */
+  function atForge(actorId) {
+    var v = null;
+    try { v = mp.get(actorId, DOOR_PROPERTY); } catch (e) { v = null; }
+    // The forge is remembered the same way a door is; see touchedBench.
+    var w = null;
+    try { w = mp.get(actorId, BENCH_PROPERTY); } catch (e) { w = null; }
+    if (!w || typeof w !== 'object') { return false; }
+    if ((Date.now() - (Number(w.at) || 0)) > DOOR_MEMORY_MS) { return false; }
+    return String(w.bench || '') === FORGE;
+  }
+
+  /** The forge they just pressed, written down the way a door is. */
+  function touchedBench(actorId, baseDesc) {
+    if (!Object.prototype.hasOwnProperty.call(BENCH_BY_BASE, baseDesc)) { return; }
+    try {
+      mp.set(actorId, BENCH_PROPERTY, { bench: BENCH_BY_BASE[baseDesc], at: Date.now() });
+    } catch (e) { }
+  }
+
+  /*
+    The holder of this building, if they are standing near this person.
+
+    'Near' is the engine's own answer: getNeighborsByPosition is what the server
+    uses everywhere else to mean 'people who can see each other'. Somebody who is
+    not online is not in it, which is the whole point.
+  */
+  function holderNearby(actorId, building, held) {
+    var near = [];
+    try { near = mp.getNeighborsByPosition(actorId) || []; } catch (e) { near = []; }
+    var all = near.slice();
+    all.push(actorId);
+    for (var i = 0; i < all.length; i++) {
+      var id = all[i];
+      var pid = 0;
+      try { pid = Number(mp.get(id, 'profileId')) || 0; } catch (e) { pid = 0; }
+      if (pid && pid === held.by) { return { actorId: id, profileId: pid }; }
+      if (holdsDeed(id, building)) { return { actorId: id, profileId: pid }; }
+    }
+    return null;
+  }
+
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
     }
+    if (word === '/lock') { return setLock(actorId, profileId, toProfile, true); }
+    if (word === '/unlock') { return setLock(actorId, profileId, toProfile, false); }
+    if (word === '/mold') { return mold(actorId, profileId, toProfile); }
+    if (word === '/key') { return cutKey(actorId, profileId, toProfile); }
     if (word === '/claim') {
       // Only when they are actually at a door. Otherwise this is farming's word
       // and farming answers it, which is what keeps /claim meaning one thing in
@@ -11282,6 +11766,13 @@ log('gamemode loaded:',
   g.__thornswoodProperty = {
     command: command, touched: touched, here: here, claim: claim, deeds: deeds,
     holderOf: holderOf, buildingOf: buildingOf, nameOf: nameOf, giveDeed: giveDeed,
+    setLock: setLock, mold: mold, cutKey: cutKey, mayPass: mayPass,
+    holdsKey: holdsKey, holdsMold: holdsMold, holdsDeed: holdsDeed,
+    giveNamed: giveNamed, doorsOf: doorsOf, shutFor: shutFor, push: push,
+    pushAll: pushAll, touchedBench: touchedBench, moldInHand: moldInHand,
+    keyLabel: keyLabel, moldLabel: moldLabel, deedLabel: deedLabel,
+    KEY: KEY, MOLD: MOLD, LOCK_PROPERTY: LOCK_PROPERTY,
+    BENCH_PROPERTY: BENCH_PROPERTY, FORGE: FORGE,
     lapseDays: lapseDays, DEED: DEED, DOOR_MEMORY_MS: DOOR_MEMORY_MS,
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; }
@@ -12116,7 +12607,8 @@ log('gamemode loaded:',
       this is the door they come in at and nothing more.
     */
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
-        word === '/deed' || word === '/deeds') {
+        word === '/deed' || word === '/deeds' || word === '/lock' ||
+        word === '/unlock' || word === '/mold' || word === '/key') {
       if (!actorId) {
         toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
         return true;
@@ -12144,7 +12636,9 @@ log('gamemode loaded:',
           return true;
         }
       }
-      if (word === '/deed' || word === '/deeds') {
+      if (word !== '/plant' && word !== '/claim' && word !== '/plot') {
+        // Every other word here is the property block's alone, so there is no
+        // farming answer to fall through to.
         toProfile(profileId, 'Property is not running on this server right now. Say so in the dev channel.');
         return true;
       }

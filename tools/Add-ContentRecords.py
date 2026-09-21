@@ -101,6 +101,23 @@ RECIPE_SHOVEL = 0x5015492
 # already reads as a plain document rather than a spell tome or a skill book.
 DEED = 0x5015493
 
+# A KEY AND A KEY MOLD, AND WHY BOTH ARE MISC RATHER THAN KEYM.
+#
+# Skyrim has a record type for keys and this does not use it. A KEYM lands in the
+# Keys tab, which is a list the game treats as yours: a vanilla key is weightless,
+# is not dropped, and is not what a pickpocket takes.
+#
+# Patrick, 21 September, on what a key is for here: it "can be given to people
+# used by you or pickpocketed or taken out of unlocked chests or lockpicked", and
+# "a stolen key only gets you in". Every one of those is a thing a MISC does and a
+# KEYM does not. So a key here is an object somebody carries and can lose, which
+# is the whole point of it, and the Keys tab is the wrong home for it.
+#
+# Both are one record for the whole game, named per instance in the pack exactly
+# as the deed is: "Key to Breezehome", "Key mold for Honeyside".
+KEY = 0x5015494
+MOLD = 0x5015495
+
 DEED_WORDS = (
     '<p align="center"><font size="30">Deed</font></p>'
     '<br><br>'
@@ -292,7 +309,9 @@ def main():
     for name, fid in (('ThornswoodMiscToolHandle', HANDLE),
                       ('ThornswoodRecipeToolHandle', RECIPE_HANDLE),
                       ('ThornswoodRecipeToolShovel', RECIPE_SHOVEL),
-                      ('ThornswoodBookDeed', DEED)):
+                      ('ThornswoodBookDeed', DEED),
+                      ('ThornswoodMiscKey', KEY),
+                      ('ThornswoodMiscKeyMold', MOLD)):
         here_already = name in by_edid
         if here_already and by_edid[name].fid != fid:
             print('')
@@ -331,6 +350,16 @@ def main():
         b'FULL': zstr('Deed'),
         b'DESC': zstr(DEED_WORDS),
     })
+    # A key and its mold, both cloned from the charcoal MISC for the same reason
+    # the handle was: it already uses a small clutter mesh, so no new art ships.
+    key = clone(misc_src, KEY, 'ThornswoodMiscKey', sets={
+        b'FULL': zstr('Key'),
+        b'DATA': struct.pack('<If', 0, 0.0),
+    })
+    mold = clone(misc_src, MOLD, 'ThornswoodMiscKeyMold', sets={
+        b'FULL': zstr('Key Mold'),
+        b'DATA': struct.pack('<If', 25, 1.0),
+    })
     make_shovel = clone(cobj_pickaxe, RECIPE_SHOVEL, 'ThornswoodRecipeToolShovel', sets={
         b'CNAM': struct.pack('<I', SHOVEL),
     }, after={b'CNTO': [(b'CNTO', cnto(HANDLE, 1))]})
@@ -349,6 +378,10 @@ def main():
           % RECIPE_SHOVEL)
     print('  BOOK 0x%07X ThornswoodBookDeed            one record, named per instance in the pack'
           % DEED)
+    print('  MISC 0x%07X ThornswoodMiscKey             a key somebody can lose, so MISC and not KEYM'
+          % KEY)
+    print('  MISC 0x%07X ThornswoodMiscKeyMold         the mold a smith cuts keys from'
+          % MOLD)
     print('')
     print('What changes')
     print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
@@ -361,7 +394,7 @@ def main():
         print('  --check, so nothing was written.')
         return 0
 
-    built = [r for r in (handle, make_handle, make_shovel, deed)
+    built = [r for r in (handle, make_handle, make_shovel, deed, key, mold)
              if r.editor_id() not in already]
     # An edit that has already been made is not made twice. A recipe that already
     # asks for a handle would otherwise gain a second one on every run.
