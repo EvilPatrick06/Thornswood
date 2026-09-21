@@ -43,7 +43,40 @@ if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $G
 
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+  $cmd = "powershell -NoProfile -EncodedCommand $e"
+
+  # A long script does not fit on a command line, and nothing says so.
+  #
+  # sshd on Windows hands the command to cmd.exe, which stops at 8,191
+  # characters. Base64 of UTF-16 is about 2.7 times the script, so a block of
+  # any size arrives cut in half and PowerShell then complains about a brace or
+  # a token in a script nobody can see. On 20 Sep the settings block below went
+  # to 10,252 characters and the far end reported "Unexpected token '$?'" and
+  # "Missing closing '}'" about a line fifteen above the one that was actually
+  # cut, which is what makes this so expensive to find. Deploy-Docs.ps1 hit the
+  # same thing on 17 Sep and solved it; this is that fix, and it is now in all
+  # sixteen scripts that talk to the VPS rather than in one.
+  #
+  # Under the limit it goes on the command line as before, because that is one
+  # round trip. Over it, the script is sent as a file and run from there, which
+  # has no length to run into.
+  if ($cmd.Length -le 6000) {
+    return & ssh @ssh "$User@$Vps" $cmd 2>&1
+  }
+
+  $far = 'C:/Windows/Temp/thornswood-remote.ps1'
+  $tmp = [IO.Path]::GetTempFileName()
+  try {
+    Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
+    & scp @ssh $tmp "$User@${Vps}:$far" 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Vps" }
+    # The path goes across as it is. Windows PowerShell takes forward
+    # slashes, and converting them was how this shipped with the slashes
+    # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
+    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'" 2>&1
+    & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
+  }
+  finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
 }
 
 $rootWin = $Root.Replace('/', '\')
@@ -96,22 +129,32 @@ Write-Host 'Pointing the dev server at the dev voice service...'
 # build, which is the whole reason this script exists rather than
 # Deploy-Server.ps1. One key is set in place instead, and the old file is
 # kept beside it.
+# WHAT YOU ARE WEARING STAYS ON, and the three keys below are why. Measured on
+# 20 September from the live server.log: 24 refused equipment updates over two
+# days, every one of them 'inventory does not contain item 13790', which is
+# IronWarAxe. Skyrim Unbound hands out starting gear inside the client's own
+# game and the server never sees it happen, so the first equipment update a new
+# character sends names an item the server has no record of, and upstream throws
+# the WHOLE update away for it. The equipment record then stays empty all
+# session, and on the next spawn the client empties the pack and refills it from
+# that empty record, four times in a second and a half. equipmentSlotCheckEnabled
+# and equipmentSpellCheckEnabled are the other two refusals, neither of which the
+# log shows firing, both switchable in our fork already.
+# equipmentInventoryCheckEnabled is the one that matters and it needs the server
+# rebuilt from thornswood/engine-changes before it does anything; an unknown key
+# is ignored until then.
+#
+# This comment is HERE and not inside the here-string below on purpose. Anything
+# in that string is base64 encoded and sent as an ssh command line, where it
+# counts double and the far end truncates at about 8191 characters. Ten lines of
+# comment in there took the block from roughly 7,400 to 10,252 and the VPS
+# received a script that stopped in the middle of the line that writes the file.
 Remote @"
 `$p = '$rootWin\server-settings.json'
 if (-not (Test-Path `$p)) { 'NO server-settings.json AT ' + `$p; exit 0 }
 `$s = Get-Content `$p -Raw | ConvertFrom-Json
 `$have = 0
 if (`$s.PSObject.Properties.Name -contains 'thornswoodVoicePort') { `$have = [int]`$s.thornswoodVoicePort }
-# WHAT YOU ARE WEARING STAYS ON. Measured 20 September, after Patrick rejoined
-# an existing character and arrived with nothing on. The server refuses an
-# equipment update outright in two places and on a modded load order both fire
-# constantly: the gear strip, which refuses the whole update the moment two worn
-# items share one biped slot bit and then unequips every item involved, and the
-# spell strip, which refuses any spell the server did not itself grant and sends
-# a RemoveSpell back. Both were made switchable in our own fork and both still
-# default to true in WorldState.h, so the switches were built and never thrown.
-# What is worn is saved by the engine in the change form already; it only ever
-# saves an update that was accepted, and these two lines are what lets one be.
 `$wantEquip = `$false
 foreach (`$k in 'equipmentSlotCheckEnabled','equipmentSpellCheckEnabled','equipmentInventoryCheckEnabled') {
   if (`$s.PSObject.Properties.Name -notcontains `$k) { `$wantEquip = `$true }

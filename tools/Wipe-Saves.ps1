@@ -40,7 +40,40 @@ function Die($m) {
 }
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+  $cmd = "powershell -NoProfile -EncodedCommand $e"
+
+  # A long script does not fit on a command line, and nothing says so.
+  #
+  # sshd on Windows hands the command to cmd.exe, which stops at 8,191
+  # characters. Base64 of UTF-16 is about 2.7 times the script, so a block of
+  # any size arrives cut in half and PowerShell then complains about a brace or
+  # a token in a script nobody can see. Deploy-Docs.ps1 hit this on 17 Sep and
+  # solved it; every other script here carried the short version that cannot,
+  # and on 20 Sep this one truncated at 10,252 characters and reported
+  # "Unexpected token '$?'" about a line fifteen above the one that was cut.
+  # This is that fix, copied across so the sixteen scripts that talk to the VPS
+  # all behave the same way.
+  #
+  # Under the limit it goes on the command line as before, because that is one
+  # round trip. Over it, the script is sent as a file and run from there, which
+  # has no length to run into.
+  if ($cmd.Length -le 6000) {
+    return & ssh @ssh "$User@$Vps" $cmd 2>&1
+  }
+
+  $far = 'C:/Windows/Temp/thornswood-remote.ps1'
+  $tmp = [IO.Path]::GetTempFileName()
+  try {
+    Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
+    & scp @ssh $tmp "$User@${Vps}:$far" 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Vps" }
+    # The path goes across as it is. Windows PowerShell takes forward
+    # slashes, and converting them was how this shipped with the slashes
+    # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
+    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'" 2>&1
+    & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
+  }
+  finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
 }
 
 $stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
