@@ -703,7 +703,12 @@ namespace Thornswood
             string want = host + ":" + port + ":" + profile;
             if (!force && want == lastConfig)
             {
-                Say("Voice: already configured for " + host + ":" + port + " as profile " + profile);
+                // Worded as the working state it is. This used to read
+                // "already configured for ...", one word away from the
+                // success line below, and a tester on 21 September reported
+                // it as a fault. Nothing is wrong here: voice is up for this
+                // profile and there was nothing left to send it.
+                Say("Voice: on for " + host + ":" + port + " as profile " + profile);
                 return;
             }
             lastConfig = want;
