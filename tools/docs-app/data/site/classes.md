@@ -99,6 +99,82 @@ do for a living, and a Hunter cannot pull a flower out of the ground. If you
 want leather you know a hunter, and if you do not know one yet, that is the
 game telling you to go and meet people.
 
+## Farming
+
+Farm is the Farmer's verb, and this is what it means. A farm is made of plots.
+A plot is one crop growing in a field, and every crop in every farm in Skyrim
+is one of them.
+
+A farm nobody has worked yet is standing as it always was, and the first crop
+you bring in off each row is yours. That is where your first cabbage comes from,
+and your first wheat, and your first apple. Go and find the field. After that the
+row is empty, and only sowing fills it again, so a farm is full exactly once.
+
+A farmer claims a farm, one farm at a time. The claim is how the farm knows
+whose work it is. A farm nobody has claimed is open to anybody with the class,
+and that is where a new farmer starts. A claim lapses if the farm is left
+unworked, so nobody puts their name on good ground and then walks away from it.
+
+To plant, stand at an empty plot with the crop in your pack and plant it. The
+crop is its own seed: a cabbage plants a cabbage. Then it grows in real time,
+and how long it takes depends on what it is. A higher rank shortens the wait,
+because a farmer who knows the ground gets more out of it than somebody who is
+guessing at it.
+
+When it is ripe you bring it in, and the plot is empty again. It does not come
+back on its own. If you want another, you plant another. What you bring in is
+more than the one you put in the ground, so a farm that is worked grows and a
+farm that nobody works stops.
+
+### Where the crops come from
+
+The crop is its own seed, so the question of where the first one comes from is
+the whole question. Three answers, and none of them is a shop.
+
+The fields themselves. Every farm in Skyrim is standing full right now, and the
+first bring-in off each row is real. That is one crop per row in the life of the
+world, so it is finite, and it takes walking rather than waiting.
+
+What is already lying about. Cabbages, potatoes and leeks sit in barrels and on
+tables in every hold. Pick one up and you can grow it.
+
+Another farmer. Somebody who has worked an orchard has apples, and you have
+whatever they have not got round to. This is the same answer as everything else
+here: if you want leather you know a hunter.
+
+A farmer who has run out entirely is handed a few of the common crops when they
+stand at a plot with nothing to sow, so nobody is ever stuck with an empty pack
+in an empty field. It is not often and it is not much. It is a way back in, not
+a living.
+
+### What you are allowed to grow
+
+Rank gates the crop, the same way it gates a seam for a miner. Standing in
+front of an empty plot is not permission to grow whatever you like in it.
+
+| Rank | What opens |
+|---|---|
+| **Novice** | The common field crops: cabbage, leek, potato, gourd, carrot |
+| **Advanced** | The ones that take a season: wheat, tundra cotton, ash yam, tomato |
+| **Expert** | The orchard |
+| **Master** | Everything |
+
+A rank never stops you carrying a crop or eating it. It decides what you may put
+in the ground and what you may bring in, and nothing else. A novice can find an
+apple. A novice cannot run an orchard.
+
+The rank a crop asks for is about how hard it is to grow and not about what it
+sells for, which sounds obvious and was not: ranking the crops by their price
+put every single one of them out of a new farmer's reach, and a new farmer with
+nothing to sow can never do the work that earns the next rank.
+
+### The numbers behind it
+
+How long a crop takes to come up, how much a harvest gives back, and how long a
+claim survives unworked are all set on the server rather than settled here.
+They will move during the playtest, because the only way to find out what a
+day's farming should be worth is to watch people farm.
+
 ## Getting better at it
 
 Four ranks, and you climb them by doing the work rather than by being here a
