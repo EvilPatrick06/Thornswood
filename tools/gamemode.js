@@ -2846,9 +2846,60 @@ function chargenTick() {
       // case it was written for.
       const waited = now - (state.liveSince || state.askedAt || state.at || now);
 
-      if (!state.liveSince) { continue; }
+      /*
+        THE GUARD BELOW USED TO COVER BOTH RESCUES AND IT MADE NEITHER OF THEM
+        REACHABLE BY THE PEOPLE THEY WERE WRITTEN FOR.
 
-      if (!state.nudged && waited > NUDGE_MS) {
+        It read `if (!state.liveSince) { continue; }` and sat above both, so
+        everything from here down needed somebody to be MOVING. liveSince is
+        only set when the server watches a character turn or walk. Somebody
+        stuck at the character menu, on a load screen, or inside a race menu
+        that will not close is by definition not moving, so the continue fired
+        on every tick for ever and the two rescues below never ran once.
+
+        MEASURED IN THE LIVE SERVER LOG, 21 September, four sessions and the
+        same shape every time:
+
+          13:35:33  chargen ff000056 profile 933578397 is new, in the hall
+          13:35:33  chargen ff000056 -> appearance (already in the hall)
+          13:41:55  disconnect 2
+
+        Six minutes and twenty two seconds, nothing in between. The five minute
+        give up should have fired at 13:40:33 and could not. A playtester
+        described the same evening from the other side: "when I choose to make
+        a new character it instead chooses to stay inside of the menu rather
+        then taking me to the character creation".
+
+        The comment over the nudge says "Nobody is ever left standing in the
+        hall with nothing to do", and the guard was what made that untrue.
+
+        WHY IT WAS THERE, because it is not wrong about everything. The NUDGE
+        opens a race menu, and opening a second one while the first is still up
+        took the game down with an access violation in a head part call. That
+        is real, and liveSince is a decent proxy for 'no menu is open right
+        now', so the nudge keeps the guard.
+
+        THE GIVE UP OPENS NOTHING. It writes the state and moves on to the
+        choices. There is no second menu to collide with and no reason it ever
+        needed to know whether somebody was walking about. It is the only way
+        out for a character who cannot move, which is precisely the character
+        it exists for, so it runs on the clock like it says it does.
+
+        AND THE NUDGE IS UNREACHABLE TODAY, which is worth writing down rather
+        than leaving somebody to assume it is doing something. It needs
+        liveSince, and the branch a dozen lines above ends the stage the moment
+        onFeetFor passes MOVED_ENOUGH_MS, which is 500. So anybody with
+        liveSince set has been moved on half a second in, 119 and a half seconds
+        before the nudge could fire, and anybody without it is guarded out here.
+        There is no path to it at all.
+
+        It is kept rather than deleted because it is the safety net if
+        MOVED_ENOUGH_MS is ever raised past NUDGE_MS, and because a race menu
+        that never opened is still a real failure somebody may want to rescue
+        differently later. What it must not do is read as a rescue that is
+        running, because it is not.
+      */
+      if (!state.nudged && waited > NUDGE_MS && state.liveSince) {
         state.nudged = now;
         setChargen(actorId, state);
         try {
