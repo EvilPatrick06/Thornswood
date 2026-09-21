@@ -13397,6 +13397,42 @@ log('gamemode loaded:',
 // ==== end thornswood character ====
 
 // ==== thornswood chat commands ====
+/*
+  EVERY WORD THIS SERVER ANSWERS, WRITTEN DOWN ONCE.
+
+  There were three copies of this list on 21 September and all three were
+  wrong in different ways: /help named five words, the unknown-command reply
+  named the same five, and the startup line named ten. The server answered
+  fifteen. Somebody setting out to test the property system had no way to
+  discover /deed, /lock, /unlock, /mold or /key from any of the three.
+
+  A list in three places is a list that is wrong in two of them, so it is here
+  and the three readers all read it. WORDS is what the server answers; PLAYER is
+  the subset a person who is not a playtester is told about, because /restart,
+  /tp and the rest are theirs and saying so to everybody is an invitation.
+*/
+/*
+  Checked against the file rather than remembered: every word a router here
+  compares against, and nothing else. /roll is deliberately NOT in it. help
+  mentions /roll and this server has never answered it, because it is handled in
+  front of this in the chat itself, and putting it in a list called 'what the
+  server answers' would make that list wrong in the one place somebody would go
+  to check.
+*/
+const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
+               '/pick', '/spend',
+               '/plant', '/claim', '/plot',
+               '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
+               '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks'];
+
+/*
+  The ones a person who is not a playtester is told about. /tp, /goto, /face,
+  /restart, /shutdown and /tspicks are theirs, and naming them to everybody is
+  an invitation rather than a help.
+*/
+const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
+                      '/deed', '/lock', '/unlock', '/mold', '/key', '/help'];
+
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
 //
@@ -13801,8 +13837,7 @@ log('gamemode loaded:',
     // server at all, which means the voice service in front of it is not
     // holding slash lines back, which means the copy running up there is old.
     toProfile(profileId, 'No command called ' + word + '. ' +
-              'There is /ooc, /where, /plot, /plant, /claim, /deed, /lock, /unlock, ' +
-              '/mold, /key, /tp <place> and /help.');
+              'There is ' + PLAYER_WORDS.join(', ') + ', and /tp <place> for a playtester.');
   }
 
   /*
@@ -14187,7 +14222,6 @@ log('gamemode loaded:',
   // /claim and /plot were live and this line had never heard of them, and
   // the one place anybody looks to see what a build answers to is this line
   // in the log.
-  console.log('[thornswood] chat commands running: /ooc, /where, /tp, /help,',
-              '/restart, /pick, /spend, /plant, /claim, /plot');
+  console.log('[thornswood] chat commands running:', WORDS.join(', '));
 })();
 // ==== end thornswood chat commands ====
