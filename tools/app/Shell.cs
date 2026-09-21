@@ -3984,7 +3984,10 @@ namespace Thornswood
             List<int> ids = Chars.KnownIds();
             ThreadPool.QueueUserWorkItem(delegate
             {
-                foreach (int id in ids) CheckIn(id);
+                // Stop at the first id the site could not be reached for.
+                // It is reachable for all of them or for none, so carrying on
+                // only repeats one sentence once per character.
+                foreach (int id in ids) { if (!CheckIn(id)) break; }
             });
 
             chosenId = 0;
@@ -3995,8 +3998,12 @@ namespace Thornswood
         /// <summary>
         /// One check in with the site for one id, from a pool thread. What
         /// went wrong goes to the log; nothing here stops anything.
+        ///
+        /// False means the site could not be reached at all, which is true of
+        /// every id or none of them, so a caller working through a list stops
+        /// rather than saying the same thing once per character.
         /// </summary>
-        static void CheckIn(int id)
+        static bool CheckIn(int id)
         {
             try
             {
@@ -4018,7 +4025,27 @@ namespace Thornswood
                 // check in that had SUCCEEDED. st.Ok was true and the site had
                 // said yes. The launcher was telling somebody it had failed to
                 // do the thing it had just done.
-                if (st.Ok) { PresenceLog("checked character " + id + " in with thornswood.net"); return; }
+                if (st.Ok) { PresenceLog("checked character " + id + " in with thornswood.net"); return true; }
+
+                // The site not answering is not the site saying no, and it
+                // used to be reported as though it were.
+                //
+                // Discord.Join returns why "offline" when PostJson gets
+                // nothing back at all. Run through the prefix below that came
+                // out as "Could not check profile 1893288986 in with
+                // thornswood.net: Could not reach thornswood.net to check you
+                // in.", which names the site twice, reads like a refusal, and
+                // was read as one by a tester on 21 September. It is neither:
+                // checking in is done off the window's thread precisely so a
+                // site that is down changes nothing, and the game starts
+                // either way. Say that, once, and let the caller stop.
+                if (st.Why == "offline")
+                {
+                    PresenceLog("thornswood.net is not answering, so your characters were not " +
+                                "checked in. The game still starts.");
+                    return false;
+                }
+
                 string why = st.Message != null && st.Message.Length > 0 ? st.Message : st.Why;
                 PresenceLog("Could not check profile " + id + " in with thornswood.net: " + why);
             }
@@ -4026,6 +4053,7 @@ namespace Thornswood
             {
                 PresenceLog("Could not check profile " + id + " in with thornswood.net: " + ex.Message);
             }
+            return true;
         }
 
         /// <summary>
