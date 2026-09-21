@@ -1328,24 +1328,23 @@ const TOOLS = {
     accept: ['e3c16:Skyrim.esm', '1019d4:Skyrim.esm', '6a707:Skyrim.esm',
              '398e6:Dragonborn.esm', '206f2:Dragonborn.esm', '179c9:Dragonborn.esm'],
     name: 'pickaxe',
-    where: 'Any general goods trader sells one, and there are pickaxes lying at most mines.',
-    broken: 'A smith can forge you another. Failing that, a general goods trader sells one.'
+    where: 'A smith forges them. Nothing in the world hands one out any more: see the spoils block.',
+    broken: 'A smith can forge you another. There is nowhere else to get one now.'
   },
   woodworker: {
     give: '2f2f4:Skyrim.esm',
     accept: ['2f2f4:Skyrim.esm'],
     name: 'woodcutter\'s axe',
-    where: 'Any general goods trader sells one, and there is usually one at a mill.',
-    broken: 'A smith can forge you another. Failing that, a general goods trader sells one.'
+    where: 'A smith forges them. There are no longer any lying at the mills: see the spoils block.',
+    broken: 'A smith can forge you another. There is nowhere else to get one now.'
   },
   farmer: {
     give: 'f5d05:Skyrim.esm',
     accept: ['f5d05:Skyrim.esm', 'f5d06:Skyrim.esm'],
     name: 'shovel',
-    where: 'Skyrim has no hoe, so a shovel is the tool. There is one at most farms ' +
-           'and mills, and a general goods trader sells one.',
-    broken: 'A smith can forge you another. Failing that, there is a shovel at most ' +
-            'farms and mills.'
+    where: 'Skyrim has no hoe, so a shovel is the tool, and a smith forges them. ' +
+           'The ones that used to lean against every farm wall are gone: see the spoils block.',
+    broken: 'A smith can forge you another. There is nowhere else to get one now.'
   }
 };
 
@@ -4967,6 +4966,28 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
       // and nothing about the press changes.
     }
   }
+  /*
+    NOTHING IS SPAWNED IN THE WORLD. See the spoils block.
+
+    Before every branch below it, because a container is emptied on the press
+    that opens it and a weapon on the floor is refused before anything else gets
+    a chance to answer for it. It says nothing at all for the other million
+    presses in the world, which is why it is one lookup and a memo.
+  */
+  const spoils = globalThis.__thornswoodSpoils;
+  if (spoils && spoils.activate) {
+    try {
+      const no = spoils.activate(casterRefrId, refrId, baseDesc);
+      if (no) {
+        notify(casterRefrId, no);
+        say(casterRefrId, no);
+        return false;
+      }
+    } catch (e) {
+      log('the spoils rule threw, so the press goes on:', e);
+    }
+  }
+
   if (prop && prop.touchedBench) {
     // Which bench they just pressed, for /key. Costs one hash lookup and is
     // passed over inside touchedBench for anything that is not a bench.
@@ -10388,6 +10409,31 @@ log('gamemode loaded:',
   */
   function claimCovering(ground) {
     if (!ground) { return null; }
+    /*
+      A HOME AND ITS FARM ARE ONE CLAIM, and the home is asked first.
+
+      Patrick settled that on 21 September and then said plainly that he meant
+      it in the code and not only in the rules: "I was meaning the farm and
+      property being one property in the code and not just the claim".
+
+      So the property block is asked before this block looks at its own claims
+      at all. Ground outside somebody's front door belongs to the house, and
+      claiming the house is what claimed it: there is no second /claim to say
+      and no second record to keep. What is left here is ground with no building
+      on it, which is what a farm claim was always for.
+
+      The answer is shaped like one of this block's own claims, so every caller
+      below reads it without knowing which half of the system answered.
+    */
+    var W = g.__thornswoodProperty;
+    if (W && W.coversGround) {
+      try {
+        var house = W.coversGround(ground);
+        if (house) { return house; }
+      } catch (e) {
+        flog('the property block threw about ground, so only farm claims count:', e);
+      }
+    }
     var radius = tuning().claimRadius;
     var within = radius * radius;
     var keys = Object.keys(claims);
@@ -11212,8 +11258,23 @@ log('gamemode loaded:',
   function touched(actorId, doorDesc) {
     var building = buildingOf(doorDesc);
     if (!building) { return; }
+    /*
+      The ground the door stands on goes down with the door, because a home and
+      its farm are ONE claim and the farm is the ground outside the front door.
+      Patrick: "home and farm are the same property claim remember".
+
+      It is read at the moment the door is opened rather than at the moment
+      /claim is said, because by then the person may have walked inside and the
+      position would be the hallway. groundOf is the farming block's own, so the
+      two halves of one claim are measured the same way.
+    */
+    var ground = null;
+    var F = g.__thornswoodFarming;
+    if (F && F.groundOf) {
+      try { ground = F.groundOf(refrIdOfDoor(doorDesc)); } catch (e) { ground = null; }
+    }
     try {
-      mp.set(actorId, DOOR_PROPERTY, { door: doorDesc, at: Date.now() });
+      mp.set(actorId, DOOR_PROPERTY, { door: doorDesc, at: Date.now(), ground: ground });
     } catch (e) {
       plog('could not write the door for', actorId.toString(16) + ':', e);
     }
@@ -11241,6 +11302,20 @@ log('gamemode loaded:',
       held.touched = Date.now();
       save();
     }
+  }
+
+  /** The form id of a placed door, or 0. */
+  function refrIdOfDoor(doorDesc) {
+    return idOf(doorDesc);
+  }
+
+  /** The ground written down beside the door they last opened, or null. */
+  function groundHere(actorId) {
+    var v = null;
+    try { v = mp.get(actorId, DOOR_PROPERTY); } catch (e) { v = null; }
+    if (!v || typeof v !== 'object') { return null; }
+    if ((Date.now() - (Number(v.at) || 0)) > DOOR_MEMORY_MS) { return null; }
+    return v.ground || null;
   }
 
   /** The building of the door they last opened, or null with the reason. */
@@ -11306,8 +11381,20 @@ log('gamemode loaded:',
     } catch (e) { }
 
     var now = Date.now();
+    /*
+      ONE RECORD FOR THE HOUSE AND THE GROUND IT STANDS ON. Patrick asked for
+      the farm and the property to be one thing in the code and not only one
+      thing in the rules, and this is that: the claim carries where the door is,
+      and the farming block asks this block whether a plot is inside somebody's
+      property before it looks at its own claims at all.
+
+      A building whose door stands indoors, a cellar hatch or an inn's upstairs,
+      records no ground. That is right rather than a gap: there is no farm
+      outside an inn's landing.
+    */
+    var ground = groundHere(actorId);
     claims[building] = { by: profileId, name: who, at: now, touched: now,
-                         locked: false };
+                         locked: false, ground: ground };
     save();
     // A new claim is not locked, so nothing anybody sees changes yet. The push
     // is here anyway because the claim is the moment the building stops being
@@ -11744,6 +11831,39 @@ log('gamemode loaded:',
     return null;
   }
 
+  /*
+    The claim whose ground covers this plot, or null.
+
+    This is the half of 'a home and its farm are one claim' that the farming
+    block reads. It is asked BEFORE farming looks at its own claims, so ground
+    outside somebody's front door belongs to the house rather than to whoever
+    said /claim in the field next to it.
+
+    The radius is the farming block's own, because two different radii would be
+    two different sizes of farm depending on which half of the code you asked.
+  */
+  function coversGround(ground) {
+    if (!ground || !ground.cell || !ground.pos) { return null; }
+    var radius = 1200;
+    var P = g.__thornswoodProgression;
+    try {
+      var n = P.TABLE.tuning.farming.claimRadius;
+      if (typeof n === 'number' && n > 0) { radius = n; }
+    } catch (e) { }
+    var within = radius * radius;
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      var c = claims[b];
+      if (!c.ground || c.ground.cell !== ground.cell) { continue; }
+      var dx = c.ground.pos[0] - ground.pos[0];
+      var dy = c.ground.pos[1] - ground.pos[1];
+      if ((dx * dx + dy * dy) > within) { continue; }
+      if (!holderOf(b)) { continue; }
+      return { by: c.by, name: c.name, building: b, property: nameOf(b) };
+    }
+    return null;
+  }
+
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
@@ -11774,6 +11894,7 @@ log('gamemode loaded:',
     KEY: KEY, MOLD: MOLD, LOCK_PROPERTY: LOCK_PROPERTY,
     BENCH_PROPERTY: BENCH_PROPERTY, FORGE: FORGE,
     lapseDays: lapseDays, DEED: DEED, DOOR_MEMORY_MS: DOOR_MEMORY_MS,
+    coversGround: coversGround, groundHere: groundHere,
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; }
   };
@@ -11782,6 +11903,231 @@ log('gamemode loaded:',
        Object.keys(claims).length, 'claim(s)');
 })();
 // ==== end thornswood property ====
+
+// ==== thornswood spoils ====
+/*
+  NOTHING IS SPAWNED IN THE WORLD: NO WEAPONS, NO ARMOUR, NO TOOLS, NO GOLD.
+
+  Patrick, 21 September: "all weapons, armour, tools, and gold are not spawned in
+  the world at all. Not on the ground, not in containers, or display cases, not
+  anywhere in the world unless made by someone or from the starter ones for
+  Farmer, Miner, and Woodworker".
+
+  This is the economy having a bottom. It is the reason anybody would buy a thing
+  a person made, and it is the other end of what entry 26 asks for.
+
+  WHAT MAKES IT AFFORDABLE, measured on 21 September: the server can ask the
+  engine what any form is. mp.lookupEspmRecordById is bound in ScampServer.cpp
+  and returns the record's id, editor id, type and fields, so a container's
+  contents are classified at runtime and NOTHING has to be generated. That was
+  the thing that would have made this too expensive: a table of every weapon and
+  every piece of armour in 101 plugins, in a gamemode that is already 1.4MB. The
+  answers are memoed, so a form is looked up once for the life of the process.
+
+  A CONTAINER IS EMPTIED ONCE AND NEVER AGAIN, and that is the whole design.
+
+  A chest the server has never opened is still holding what Bethesda put there.
+  A chest it has opened is holding what people have put there since. So the first
+  press strips it and writes that down on the reference, and no press after that
+  touches it. Without that, a smith who stored their own swords in a chest would
+  come back to an empty chest, which is the opposite of the rule: the rule is
+  that nothing is spawned, not that nothing may be kept.
+
+  That is the same shape the farming block uses for a plot the server has never
+  written to, and for the same reason. The mark is a property on the reference,
+  so it survives a restart; a mark that did not would eat somebody's swords the
+  first time the server came back up.
+
+  AND THE GROUND IS TOLD APART FROM A DROPPED THING BY ITS FORM ID. MpForm's
+  IsEspmForm is id < 0xff000000, so a reference below that line was placed by a
+  plugin and one above it was made at runtime, which is what a person dropping
+  something makes. A sword Bethesda left on a table cannot be picked up; a sword
+  somebody put down can.
+
+  WHAT IS DELIBERATELY NOT HERE. A body cannot be opened by anybody at all,
+  which gamemode.js has written out at length above, so nothing has to be done
+  about death loot. And the starter tools are handed over by the server rather
+  than found, so the exception Patrick named needs no code: there is nothing in
+  the world for it to be an exception to.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  function slog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[spoils]');
+    console.log(a.join(' '));
+  }
+
+  /*
+    The record types the world may not hand over.
+
+    WEAP is every weapon. ARMO is every piece of armour and every shield, because
+    a shield is an ARMO with a keyword rather than a type of its own. AMMO is
+    arrows and bolts, which are the ammunition half of a weapon and would be a
+    strange thing to leave lying about when the bow is not.
+
+    Everything else stays. Food, ingredients, ore, potions, books, clutter and
+    keys are all things the world is meant to have in it, and stripping them
+    would empty Skyrim rather than close the economy.
+  */
+  var SPOIL_TYPES = { WEAP: true, ARMO: true, AMMO: true };
+
+  /* Gold001. The one form id in this file that is not a descriptor, because it
+     is the same number in every load order there has ever been. */
+  var GOLD = 0x0000000F;
+
+  /* Where 'this container has been emptied' is written. On the reference, so it
+     survives a restart; see the block comment for why that matters. */
+  var STRIPPED_PROPERTY = 'thornswoodStripped';
+
+  function ready() {
+    try {
+      mp.makeProperty(STRIPPED_PROPERTY, {
+        isVisibleByOwner: false, isVisibleByNeighbors: false,
+        updateOwner: '', updateNeighbor: ''
+      });
+    } catch (e) { /* already made by a previous load. harmless. */ }
+  }
+
+  /*
+    What kind of record a base is, asked once per form and then remembered.
+
+    An answer of '' is 'the engine could not say', and every caller treats that
+    as 'leave it alone'. Not knowing what a thing is has to mean not touching it:
+    the other way round, one unreadable record would quietly empty every chest
+    that held one.
+  */
+  var kinds = {};
+  function kindOf(baseId) {
+    if (!baseId) { return ''; }
+    if (Object.prototype.hasOwnProperty.call(kinds, baseId)) { return kinds[baseId]; }
+    var kind = '';
+    try {
+      var res = mp.lookupEspmRecordById(baseId);
+      if (res && res.record && res.record.type) { kind = String(res.record.type); }
+    } catch (e) {
+      kind = '';
+    }
+    kinds[baseId] = kind;
+    return kind;
+  }
+
+  /*
+    The three tools, by every form the world hands them out as.
+
+    TOOLS in the outer file already lists them, accept lists and all, because the
+    tool gate had to know that Skyrim has two shovels and six pickaxes. This is
+    the same six and the same two, read off that table rather than written down
+    again, so a tool added there is a tool taken out of the world here without
+    anybody remembering to do both.
+  */
+  var toolIds = null;
+  function isTool(baseId) {
+    if (!toolIds) {
+      toolIds = {};
+      for (var key in TOOLS) {
+        if (!Object.prototype.hasOwnProperty.call(TOOLS, key)) { continue; }
+        var accept = TOOLS[key].accept || [];
+        for (var i = 0; i < accept.length; i++) {
+          var id = idOf(accept[i]);
+          if (id) { toolIds[id] = true; }
+        }
+      }
+    }
+    return Object.prototype.hasOwnProperty.call(toolIds, baseId);
+  }
+
+  /** True when the world must not hand this over. */
+  function isSpoil(baseId) {
+    if (!baseId) { return false; }
+    if (baseId === GOLD) { return true; }
+    if (isTool(baseId)) { return true; }
+    return Object.prototype.hasOwnProperty.call(SPOIL_TYPES, kindOf(baseId));
+  }
+
+  /** Has this container been emptied already. */
+  function alreadyStripped(refrId) {
+    try {
+      return !!mp.get(refrId, STRIPPED_PROPERTY);
+    } catch (e) {
+      // A reference the server cannot answer about is one this must not touch.
+      // Saying yes here means leaving it exactly as it is.
+      return true;
+    }
+  }
+
+  /*
+    Take the spoils out of a container, once.
+
+    Returns the number of entries removed, or -1 when it did nothing at all. The
+    write happens before the mark, so a write that throws leaves the container
+    unmarked and it is tried again next time. The other order would mark a chest
+    as done and leave the swords in it.
+  */
+  function strip(refrId) {
+    if (alreadyStripped(refrId)) { return -1; }
+    var inv = null;
+    try { inv = mp.get(refrId, 'inventory'); } catch (e) { return -1; }
+    var entries = (inv && inv.entries) || [];
+    var keep = [], took = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && isSpoil(e.baseId)) { took++; continue; }
+      keep.push(e);
+    }
+    if (took) {
+      try {
+        mp.set(refrId, 'inventory', { entries: keep });
+      } catch (e2) {
+        slog('could not empty', refrId.toString(16) + ':', e2);
+        return -1;
+      }
+    }
+    try {
+      mp.set(refrId, STRIPPED_PROPERTY, 1);
+    } catch (e3) {
+      // The contents are gone and the mark is not written, so this runs again
+      // next time and finds nothing left to take. Harmless either way round.
+      slog('could not mark', refrId.toString(16), 'as emptied:', e3);
+    }
+    if (took) { slog('took', took, 'thing(s) out of', refrId.toString(16)); }
+    return took;
+  }
+
+  /*
+    The answer to a press, or null when this block has nothing to say.
+
+    Three cases and only the third refuses. A container is emptied and then
+    opens as it always did, because the point is what is inside it rather than
+    whether it opens. A dropped thing is somebody's and is left alone. A thing a
+    plugin placed, that is a weapon, a piece of armour, ammunition, a tool or a
+    coin, does not come up off the floor.
+  */
+  function activate(actorId, refrId, baseDesc) {
+    var baseId = idOf(baseDesc);
+    if (!baseId) { return null; }
+    if (kindOf(baseId) === 'CONT') {
+      strip(refrId);
+      return null;
+    }
+    // Made at runtime rather than placed by a plugin, so somebody put it there.
+    if (refrId >= 0xff000000) { return null; }
+    if (!isSpoil(baseId)) { return null; }
+    return 'That was left here by nobody. Weapons, armour and coin come from ' +
+           'people in this world, not off the ground.';
+  }
+
+  ready();
+  g.__thornswoodSpoils = {
+    activate: activate, strip: strip, isSpoil: isSpoil, kindOf: kindOf,
+    isTool: isTool, alreadyStripped: alreadyStripped,
+    SPOIL_TYPES: SPOIL_TYPES, GOLD: GOLD, STRIPPED_PROPERTY: STRIPPED_PROPERTY
+  };
+  slog('ready');
+})();
+// ==== end thornswood spoils ====
+
 
 
 // ==== thornswood character ====
