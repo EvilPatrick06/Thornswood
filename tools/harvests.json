@@ -5,28 +5,16 @@
   "rankedBy": "the gold value of the produce, the thresholds in RANK_MAX_VALUE at the top of the script",
   "cropsRankedBy": "how hard the crop is to grow, named one at a time in CROP_RANK_BY_EDITOR_ID at the top of the script, because the gold value is the gatherer's ladder and ranking a farm by it put every crop at advanced and left a new farmer nothing to sow",
   "rankMaxValue": {
-    "novice": 0,
+    "novice": 1,
     "advanced": 5,
     "expert": 12,
     "master": 2147483647
   },
-  "count": 181,
+  "count": 147,
   "harvests": {
     "1016a1:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
     "1016a2:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
     "1016a3:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
-    "1045e:HearthFires.esm": { "produce": "b2a:HearthFires.esm", "name": "Cabbage (2)", "rank": "novice" },
-    "1045f:HearthFires.esm": { "produce": "b2c:HearthFires.esm", "name": "Gourd (3)", "rank": "novice" },
-    "10460:HearthFires.esm": { "produce": "b2d:HearthFires.esm", "name": "Leek (2)", "rank": "novice" },
-    "10461:HearthFires.esm": { "produce": "b2f:HearthFires.esm", "name": "Canis Root (4)", "rank": "novice" },
-    "10462:HearthFires.esm": { "produce": "b32:HearthFires.esm", "name": "Deathbell (3)", "rank": "novice" },
-    "10463:HearthFires.esm": { "produce": "b33:HearthFires.esm", "name": "Dragon's Tongue (4)", "rank": "novice" },
-    "10464:HearthFires.esm": { "produce": "b35:HearthFires.esm", "name": "Giant Lichen (4)", "rank": "novice" },
-    "10465:HearthFires.esm": { "produce": "b36:HearthFires.esm", "name": "Glowing Mushroom (5)", "rank": "novice" },
-    "10466:HearthFires.esm": { "produce": "b37:HearthFires.esm", "name": "Jazbay Grapes (3)", "rank": "novice" },
-    "10467:HearthFires.esm": { "produce": "b38:HearthFires.esm", "name": "Juniper Berries (4)", "rank": "novice" },
-    "10468:HearthFires.esm": { "produce": "b39:HearthFires.esm", "name": "Lavender (3)", "rank": "novice" },
-    "10469:HearthFires.esm": { "produce": "b44:HearthFires.esm", "name": "Nightshade (3)", "rank": "novice" },
     "1062d1:Skyrim.esm": { "produce": "23d77:Skyrim.esm", "name": "Chicken's Egg", "rank": "advanced" },
     "108e35:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
     "108e36:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
@@ -34,62 +22,42 @@
     "108e38:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
     "108ee2:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
     "10f37:Dawnguard.esm": { "produce": "b097:Dawnguard.esm", "name": "Gleamblossom", "rank": "advanced" },
-    "110b9:HearthFires.esm": { "produce": "b2b:HearthFires.esm", "name": "Carrots (4)", "rank": "novice" },
-    "110ba:HearthFires.esm": { "produce": "b2e:HearthFires.esm", "name": "Potato (3)", "rank": "novice" },
-    "110bb:HearthFires.esm": { "produce": "b30:HearthFires.esm", "name": "Tundra Cotton (3)", "rank": "novice" },
-    "110bc:HearthFires.esm": { "produce": "b31:HearthFires.esm", "name": "Creep Cluster (5)", "rank": "novice" },
-    "110bd:HearthFires.esm": { "produce": "b34:HearthFires.esm", "name": "Swamp Fungal Pod (3)", "rank": "novice" },
-    "110be:HearthFires.esm": { "produce": "b3a:HearthFires.esm", "name": "Mora Tapinella (3)", "rank": "novice" },
-    "110bf:HearthFires.esm": { "produce": "b3b:HearthFires.esm", "name": "Blue Mountain Flower (3)", "rank": "novice" },
-    "110c0:HearthFires.esm": { "produce": "b3c:HearthFires.esm", "name": "Purple Mountain Flower (3)", "rank": "novice" },
-    "110c1:HearthFires.esm": { "produce": "b3d:HearthFires.esm", "name": "Red Mountain Flower (3)", "rank": "novice" },
-    "110c2:HearthFires.esm": { "produce": "b3e:HearthFires.esm", "name": "Fly Amanita (4)", "rank": "novice" },
-    "110c3:HearthFires.esm": { "produce": "b3f:HearthFires.esm", "name": "Bleeding Crown (3)", "rank": "novice" },
-    "110c4:HearthFires.esm": { "produce": "b40:HearthFires.esm", "name": "White Cap (2)", "rank": "novice" },
-    "110c5:HearthFires.esm": { "produce": "b41:HearthFires.esm", "name": "Imp Stool (4)", "rank": "novice" },
-    "110c6:HearthFires.esm": { "produce": "b42:HearthFires.esm", "name": "Namira's Rot (3)", "rank": "novice" },
-    "110c7:HearthFires.esm": { "produce": "b43:HearthFires.esm", "name": "Blisterwort (4)", "rank": "novice" },
     "110c8:HearthFires.esm": { "produce": "59b86:Skyrim.esm", "name": "Nirnroot", "rank": "expert" },
-    "110c9:HearthFires.esm": { "produce": "b45:HearthFires.esm", "name": "Scaly Pholiota (5)", "rank": "novice" },
-    "110ca:HearthFires.esm": { "produce": "b46:HearthFires.esm", "name": "Snowberries (4)", "rank": "novice" },
-    "110cb:HearthFires.esm": { "produce": "b47:HearthFires.esm", "name": "Grass Pod (3)", "rank": "novice" },
-    "110cc:HearthFires.esm": { "produce": "b48:HearthFires.esm", "name": "Thistle Branch (3)", "rank": "novice" },
-    "110cd:HearthFires.esm": { "produce": "b49:HearthFires.esm", "name": "Wheat (4)", "rank": "novice" },
-    "12db9:Dawnguard.esm": { "produce": "14dc4:Dawnguard.esm", "name": "Soul Husk", "rank": "advanced" },
-    "12dba:Dawnguard.esm": { "produce": "14dc4:Dawnguard.esm", "name": "Soul Husk", "rank": "advanced" },
-    "141081:JK's Whiterun's Outskirts.esp": { "produce": "64b2e:Skyrim.esm", "name": "Red Apple", "rank": "advanced" },
-    "141088:JK's Whiterun's Outskirts.esp": { "produce": "64b2f:Skyrim.esm", "name": "Green Apple", "rank": "advanced" },
-    "1503ff:JK's Whiterun's Outskirts.esp": { "produce": "64b40:Skyrim.esm", "name": "Carrot", "rank": "advanced" },
-    "16e24:Dragonborn.esm": { "produce": "16e26:Dragonborn.esm", "name": "Ashen Grass Pod", "rank": "advanced" },
-    "16e25:Dragonborn.esm": { "produce": "16e26:Dragonborn.esm", "name": "Ashen Grass Pod", "rank": "advanced" },
-    "17005:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "advanced" },
+    "12db9:Dawnguard.esm": { "produce": "14dc4:Dawnguard.esm", "name": "Soul Husk", "rank": "novice" },
+    "12dba:Dawnguard.esm": { "produce": "14dc4:Dawnguard.esm", "name": "Soul Husk", "rank": "novice" },
+    "141081:JK's Whiterun's Outskirts.esp": { "produce": "64b2e:Skyrim.esm", "name": "Red Apple", "rank": "novice" },
+    "141088:JK's Whiterun's Outskirts.esp": { "produce": "64b2f:Skyrim.esm", "name": "Green Apple", "rank": "novice" },
+    "1503ff:JK's Whiterun's Outskirts.esp": { "produce": "64b40:Skyrim.esm", "name": "Carrot", "rank": "novice" },
+    "16e24:Dragonborn.esm": { "produce": "16e26:Dragonborn.esm", "name": "Ashen Grass Pod", "rank": "novice" },
+    "16e25:Dragonborn.esm": { "produce": "16e26:Dragonborn.esm", "name": "Ashen Grass Pod", "rank": "novice" },
+    "17005:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "novice" },
     "176b2:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
     "176cd:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
-    "17e93:Dragonborn.esm": { "produce": "17e97:Dragonborn.esm", "name": "Scathecraw", "rank": "advanced" },
-    "17e94:Dragonborn.esm": { "produce": "17e97:Dragonborn.esm", "name": "Scathecraw", "rank": "advanced" },
-    "184ef:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "advanced" },
-    "18b19:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "advanced" },
-    "18d5d7:JK's Whiterun's Outskirts.esp": { "produce": "64b42:Skyrim.esm", "name": "Tomato", "rank": "advanced" },
+    "17e93:Dragonborn.esm": { "produce": "17e97:Dragonborn.esm", "name": "Scathecraw", "rank": "novice" },
+    "17e94:Dragonborn.esm": { "produce": "17e97:Dragonborn.esm", "name": "Scathecraw", "rank": "novice" },
+    "184ef:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "novice" },
+    "18b19:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "novice" },
+    "18d5d7:JK's Whiterun's Outskirts.esp": { "produce": "64b42:Skyrim.esm", "name": "Tomato", "rank": "novice" },
     "195dc:Dragonborn.esm": { "produce": "1cd74:Dragonborn.esm", "name": "Ash Creep Cluster", "rank": "master" },
     "195dd:Dragonborn.esm": { "produce": "1cd74:Dragonborn.esm", "name": "Ash Creep Cluster", "rank": "master" },
-    "1bb3d:Skyrim.esm": { "produce": "45c28:Skyrim.esm", "name": "Lavender", "rank": "advanced" },
-    "1ff64:Dragonborn.esm": { "produce": "1ff75:Dragonborn.esm", "name": "Emperor Parasol Moss", "rank": "advanced" },
-    "1ff65:Dragonborn.esm": { "produce": "1ff75:Dragonborn.esm", "name": "Emperor Parasol Moss", "rank": "advanced" },
-    "1ff66:Dragonborn.esm": { "produce": "1ff75:Dragonborn.esm", "name": "Emperor Parasol Moss", "rank": "advanced" },
-    "206e8:Dragonborn.esm": { "produce": "206e7:Dragonborn.esm", "name": "Ash Yam", "rank": "advanced" },
+    "1bb3d:Skyrim.esm": { "produce": "45c28:Skyrim.esm", "name": "Lavender", "rank": "novice" },
+    "1ff64:Dragonborn.esm": { "produce": "1ff75:Dragonborn.esm", "name": "Emperor Parasol Moss", "rank": "novice" },
+    "1ff65:Dragonborn.esm": { "produce": "1ff75:Dragonborn.esm", "name": "Emperor Parasol Moss", "rank": "novice" },
+    "1ff66:Dragonborn.esm": { "produce": "1ff75:Dragonborn.esm", "name": "Emperor Parasol Moss", "rank": "novice" },
+    "206e8:Dragonborn.esm": { "produce": "206e7:Dragonborn.esm", "name": "Ash Yam", "rank": "novice" },
     "23cff:Skyrim.esm": { "produce": "23d6f:Skyrim.esm", "name": "Pine Thrush Egg", "rank": "advanced" },
-    "2493d:JKs Skyrim.esp": { "produce": "64b40:Skyrim.esm", "name": "Carrot", "rank": "advanced" },
-    "2493e:JKs Skyrim.esp": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "advanced" },
+    "2493d:JKs Skyrim.esp": { "produce": "64b40:Skyrim.esm", "name": "Carrot", "rank": "novice" },
+    "2493e:JKs Skyrim.esp": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "novice" },
     "2a76:Dawnguard.esm": { "produce": "2a78:Dawnguard.esm", "name": "Yellow Mountain Flower", "rank": "advanced" },
     "2a77:Dawnguard.esm": { "produce": "2a78:Dawnguard.esm", "name": "Yellow Mountain Flower", "rank": "advanced" },
-    "2c91:JKs Skyrim.esp": { "produce": "64b2e:Skyrim.esm", "name": "Red Apple", "rank": "advanced" },
+    "2c91:JKs Skyrim.esp": { "produce": "64b2e:Skyrim.esm", "name": "Red Apple", "rank": "novice" },
     "306a:Update.esm": { "produce": "306e:Update.esm", "name": "Screaming Maw", "rank": "master" },
     "306b:Update.esm": { "produce": "306d:Update.esm", "name": "Rot Scale", "rank": "master" },
     "306c:Update.esm": { "produce": "306f:Update.esm", "name": "Thorn Hook", "rank": "master" },
-    "3274:JKs Skyrim.esp": { "produce": "64b2f:Skyrim.esm", "name": "Green Apple", "rank": "advanced" },
-    "34d2c:Skyrim.esm": { "produce": "34d32:Skyrim.esm", "name": "Frost Mirriam", "rank": "advanced" },
+    "3274:JKs Skyrim.esp": { "produce": "64b2f:Skyrim.esm", "name": "Green Apple", "rank": "novice" },
+    "34d2c:Skyrim.esm": { "produce": "34d32:Skyrim.esm", "name": "Frost Mirriam", "rank": "novice" },
     "34d2d:Skyrim.esm": { "produce": "34d31:Skyrim.esm", "name": "Elves Ear", "rank": "expert" },
-    "34d30:Skyrim.esm": { "produce": "34d22:Skyrim.esm", "name": "Garlic", "rank": "advanced" },
+    "34d30:Skyrim.esm": { "produce": "34d22:Skyrim.esm", "name": "Garlic", "rank": "novice" },
     "3828c:Dragonborn.esm": { "produce": "854fe:Skyrim.esm", "name": "Pearl", "rank": "advanced" },
     "3828d:Dragonborn.esm": { "produce": "85500:Skyrim.esm", "name": "Small Pearl", "rank": "advanced" },
     "38a7a:Dragonborn.esm": { "produce": "65c9b:Skyrim.esm", "name": "Horker Meat", "rank": "advanced" },
@@ -128,25 +96,25 @@
     "8b5c4:Skyrim.esm": { "produce": "77e1c:Skyrim.esm", "name": "Blue Mountain Flower", "rank": "advanced" },
     "9748b:Skyrim.esm": { "produce": "7ee01:Skyrim.esm", "name": "Glowing Mushroom", "rank": "advanced" },
     "a24d:Dawnguard.esm": { "produce": "b097:Dawnguard.esm", "name": "Gleamblossom", "rank": "advanced" },
-    "b03af:Skyrim.esm": { "produce": "b2183:Skyrim.esm", "name": "Creep Cluster", "rank": "advanced" },
-    "b202c:Skyrim.esm": { "produce": "b2183:Skyrim.esm", "name": "Creep Cluster", "rank": "advanced" },
+    "b03af:Skyrim.esm": { "produce": "b2183:Skyrim.esm", "name": "Creep Cluster", "rank": "novice" },
+    "b202c:Skyrim.esm": { "produce": "b2183:Skyrim.esm", "name": "Creep Cluster", "rank": "novice" },
     "b4ec:Dawnguard.esm": { "produce": "1932b:Dawnguard.esm", "name": "Canticle Bark", "rank": "novice" },
-    "b91f0:Skyrim.esm": { "produce": "134aa:Skyrim.esm", "name": "Thistle Branch", "rank": "advanced" },
+    "b91f0:Skyrim.esm": { "produce": "134aa:Skyrim.esm", "name": "Thistle Branch", "rank": "novice" },
     "b91f8:Skyrim.esm": { "produce": "77e1e:Skyrim.esm", "name": "Purple Mountain Flower", "rank": "advanced" },
-    "bb947:Skyrim.esm": { "produce": "3f7f8:Skyrim.esm", "name": "Tundra Cotton", "rank": "advanced" },
-    "bb948:Skyrim.esm": { "produce": "5076e:Skyrim.esm", "name": "Juniper Berries", "rank": "advanced" },
-    "bb949:Skyrim.esm": { "produce": "6ac4a:Skyrim.esm", "name": "Jazbay Grapes", "rank": "advanced" },
+    "bb947:Skyrim.esm": { "produce": "3f7f8:Skyrim.esm", "name": "Tundra Cotton", "rank": "novice" },
+    "bb948:Skyrim.esm": { "produce": "5076e:Skyrim.esm", "name": "Juniper Berries", "rank": "novice" },
+    "bb949:Skyrim.esm": { "produce": "6ac4a:Skyrim.esm", "name": "Jazbay Grapes", "rank": "novice" },
     "bb94a:Skyrim.esm": { "produce": "6abcb:Skyrim.esm", "name": "Canis Root", "rank": "advanced" },
     "bb94b:Skyrim.esm": { "produce": "516c8:Skyrim.esm", "name": "Deathbell", "rank": "advanced" },
     "bb94c:Skyrim.esm": { "produce": "516c8:Skyrim.esm", "name": "Deathbell", "rank": "advanced" },
     "bb94d:Skyrim.esm": { "produce": "889a2:Skyrim.esm", "name": "Dragon's Tongue", "rank": "advanced" },
     "bb94e:Skyrim.esm": { "produce": "889a2:Skyrim.esm", "name": "Dragon's Tongue", "rank": "advanced" },
-    "bb94f:Skyrim.esm": { "produce": "57f91:Skyrim.esm", "name": "Hanging Moss", "rank": "advanced" },
-    "bb950:Skyrim.esm": { "produce": "57f91:Skyrim.esm", "name": "Hanging Moss", "rank": "advanced" },
-    "bb951:Skyrim.esm": { "produce": "57f91:Skyrim.esm", "name": "Hanging Moss", "rank": "advanced" },
-    "bb952:Skyrim.esm": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "advanced" },
+    "bb94f:Skyrim.esm": { "produce": "57f91:Skyrim.esm", "name": "Hanging Moss", "rank": "novice" },
+    "bb950:Skyrim.esm": { "produce": "57f91:Skyrim.esm", "name": "Hanging Moss", "rank": "novice" },
+    "bb951:Skyrim.esm": { "produce": "57f91:Skyrim.esm", "name": "Hanging Moss", "rank": "novice" },
+    "bb952:Skyrim.esm": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "novice" },
     "bb953:Skyrim.esm": { "produce": "4b0ba:Skyrim.esm", "name": "Wheat", "rank": "advanced" },
-    "bc0:HearthFires.esm": { "produce": "353c:HearthFires.esm", "name": "Butter", "rank": "advanced" },
+    "bc0:HearthFires.esm": { "produce": "353c:HearthFires.esm", "name": "Butter", "rank": "novice" },
     "bcf33:Skyrim.esm": { "produce": "1b3bd:Skyrim.esm", "name": "Snowberries", "rank": "advanced" },
     "bcf34:Skyrim.esm": { "produce": "1b3bd:Skyrim.esm", "name": "Snowberries", "rank": "advanced" },
     "bcf3a:Skyrim.esm": { "produce": "77e1e:Skyrim.esm", "name": "Purple Mountain Flower", "rank": "advanced" },
@@ -154,17 +122,16 @@
     "bcf3d:Skyrim.esm": { "produce": "77e1c:Skyrim.esm", "name": "Blue Mountain Flower", "rank": "advanced" },
     "bcf3e:Skyrim.esm": { "produce": "77e1d:Skyrim.esm", "name": "Red Mountain Flower", "rank": "advanced" },
     "bcf3f:Skyrim.esm": { "produce": "77e1c:Skyrim.esm", "name": "Blue Mountain Flower", "rank": "advanced" },
-    "bcf47:Skyrim.esm": { "produce": "64b41:Skyrim.esm", "name": "Potato", "rank": "advanced" },
-    "bcf48:Skyrim.esm": { "produce": "64b3f:Skyrim.esm", "name": "Cabbage", "rank": "advanced" },
-    "be3e0:Skyrim.esm": { "produce": "83e64:Skyrim.esm", "name": "Grass Pod", "rank": "advanced" },
-    "be3e1:Skyrim.esm": { "produce": "83e64:Skyrim.esm", "name": "Grass Pod", "rank": "advanced" },
-    "be3e6:Skyrim.esm": { "produce": "10d666:Skyrim.esm", "name": "Gourd", "rank": "advanced" },
+    "bcf47:Skyrim.esm": { "produce": "64b41:Skyrim.esm", "name": "Potato", "rank": "novice" },
+    "bcf48:Skyrim.esm": { "produce": "64b3f:Skyrim.esm", "name": "Cabbage", "rank": "novice" },
+    "be3e0:Skyrim.esm": { "produce": "83e64:Skyrim.esm", "name": "Grass Pod", "rank": "novice" },
+    "be3e1:Skyrim.esm": { "produce": "83e64:Skyrim.esm", "name": "Grass Pod", "rank": "novice" },
+    "be3e6:Skyrim.esm": { "produce": "10d666:Skyrim.esm", "name": "Gourd", "rank": "novice" },
     "c43b0:Skyrim.esm": { "produce": "2f44c:Skyrim.esm", "name": "Nightshade", "rank": "expert" },
     "c43b6:Skyrim.esm": { "produce": "2f44c:Skyrim.esm", "name": "Nightshade", "rank": "expert" },
     "ce84c:Skyrim.esm": { "produce": "4da24:Skyrim.esm", "name": "Namira's Rot", "rank": "novice" },
     "db68b:Skyrim.esm": { "produce": "4da22:Skyrim.esm", "name": "White Cap", "rank": "novice" },
     "db6bc:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
-    "dbf8b3:Thornswood-Content.esp": { "produce": "b08c5:Skyrim.esm", "name": "Honeycomb", "rank": "advanced" },
     "dd676:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
     "dd679:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
     "dd683:Skyrim.esm": { "produce": "4da22:Skyrim.esm", "name": "White Cap", "rank": "novice" },
@@ -188,7 +155,6 @@
     "ece21:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
     "ece9a:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
     "f1ce:HearthFires.esm": { "produce": "f1cc:HearthFires.esm", "name": "Hawk's Egg", "rank": "advanced" },
-    "f39b:HearthFires.esm": { "produce": "f39c:HearthFires.esm", "name": "Nord Mead (5)", "rank": "novice" },
     "f3e57:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
     "f5eca:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
     "f5ecb:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
@@ -216,6 +182,262 @@
     "be3e6:Skyrim.esm": { "produce": "10d666:Skyrim.esm", "name": "Gourd", "rank": "novice", "growMinutes": 75 }
   },
   "unranked": {
+    "1045e:HearthFires.esm": {
+      "editorId": "BYOHHouseFloraCabbage01",
+      "name": "Cabbage",
+      "produce": "b2a:HearthFires.esm",
+      "produceName": "Cabbage (2)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Cabbage (2), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "1045f:HearthFires.esm": {
+      "editorId": "BYOHHouseFloraGourd01",
+      "name": "Gourds",
+      "produce": "b2c:HearthFires.esm",
+      "produceName": "Gourd (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Gourd (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "10460:HearthFires.esm": {
+      "editorId": "BYOHHouseFloraLeek01",
+      "name": "Leek",
+      "produce": "b2d:HearthFires.esm",
+      "produceName": "Leek (2)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Leek (2), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "10461:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdCanisRoot01",
+      "name": "Canis Root",
+      "produce": "b2f:HearthFires.esm",
+      "produceName": "Canis Root (4)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Canis Root (4), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "10462:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdDeathbell01",
+      "name": "Deathbell",
+      "produce": "b32:HearthFires.esm",
+      "produceName": "Deathbell (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Deathbell (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "10463:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdDragonTongue01",
+      "name": "Dragon's Tongue",
+      "produce": "b33:HearthFires.esm",
+      "produceName": "Dragon's Tongue (4)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Dragon's Tongue (4), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "10464:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdGiantLichen01",
+      "name": "Giant Lichen",
+      "produce": "b35:HearthFires.esm",
+      "produceName": "Giant Lichen (4)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Giant Lichen (4), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "10465:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdGlowMushrm01",
+      "name": "Glowing Mushroom",
+      "produce": "b36:HearthFires.esm",
+      "produceName": "Glowing Mushroom (5)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Glowing Mushroom (5), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "10466:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdJazbay01",
+      "name": "Jazbay",
+      "produce": "b37:HearthFires.esm",
+      "produceName": "Jazbay Grapes (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Jazbay Grapes (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "10467:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdJuniper01",
+      "name": "Juniper",
+      "produce": "b38:HearthFires.esm",
+      "produceName": "Juniper Berries (4)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Juniper Berries (4), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "10468:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdLavender01",
+      "name": "Lavender",
+      "produce": "b39:HearthFires.esm",
+      "produceName": "Lavender (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Lavender (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "10469:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdNightshade01",
+      "name": "Nightshade",
+      "produce": "b44:HearthFires.esm",
+      "produceName": "Nightshade (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Nightshade (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110b9:HearthFires.esm": {
+      "editorId": "BYOHHouseFloraCarrots01",
+      "name": "Carrot",
+      "produce": "b2b:HearthFires.esm",
+      "produceName": "Carrots (4)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Carrots (4), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110ba:HearthFires.esm": {
+      "editorId": "BYOHHouseFloraPotato01",
+      "name": "Potato",
+      "produce": "b2e:HearthFires.esm",
+      "produceName": "Potato (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Potato (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110bb:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdCotton01",
+      "name": "Tundra Cotton",
+      "produce": "b30:HearthFires.esm",
+      "produceName": "Tundra Cotton (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Tundra Cotton (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110bc:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdCreepCluster01",
+      "name": "Creep Cluster",
+      "produce": "b31:HearthFires.esm",
+      "produceName": "Creep Cluster (5)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Creep Cluster (5), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110bd:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdFungalPod01",
+      "name": "Swamp Fungal Pod",
+      "produce": "b34:HearthFires.esm",
+      "produceName": "Swamp Fungal Pod (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Swamp Fungal Pod (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110be:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdMoraTap01",
+      "name": "Mora Tapinella",
+      "produce": "b3a:HearthFires.esm",
+      "produceName": "Mora Tapinella (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Mora Tapinella (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110bf:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdMtFlBlue01",
+      "name": "Blue Mountain Flower",
+      "produce": "b3b:HearthFires.esm",
+      "produceName": "Blue Mountain Flower (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Blue Mountain Flower (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110c0:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdMtFlPurple01",
+      "name": "Purple Mountain Flower",
+      "produce": "b3c:HearthFires.esm",
+      "produceName": "Purple Mountain Flower (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Purple Mountain Flower (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110c1:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdMtFlRed01",
+      "name": "Red Mountain Flower",
+      "produce": "b3d:HearthFires.esm",
+      "produceName": "Red Mountain Flower (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Red Mountain Flower (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110c2:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdMushroom01",
+      "name": "Fly Amanita",
+      "produce": "b3e:HearthFires.esm",
+      "produceName": "Fly Amanita (4)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Fly Amanita (4), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110c3:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdMushroom02",
+      "name": "Bleeding Crown",
+      "produce": "b3f:HearthFires.esm",
+      "produceName": "Bleeding Crown (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Bleeding Crown (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110c4:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdMushroom03",
+      "name": "White Cap",
+      "produce": "b40:HearthFires.esm",
+      "produceName": "White Cap (2)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, White Cap (2), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110c5:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdMushroom04",
+      "name": "Imp Stool",
+      "produce": "b41:HearthFires.esm",
+      "produceName": "Imp Stool (4)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Imp Stool (4), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110c6:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdMushroom05",
+      "name": "Namira's Rot",
+      "produce": "b42:HearthFires.esm",
+      "produceName": "Namira's Rot (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Namira's Rot (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110c7:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdMushroom06",
+      "name": "Blisterwort",
+      "produce": "b43:HearthFires.esm",
+      "produceName": "Blisterwort (4)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Blisterwort (4), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110c9:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdScalyPBits01",
+      "name": "Scaly Pholiota",
+      "produce": "b45:HearthFires.esm",
+      "produceName": "Scaly Pholiota (5)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Scaly Pholiota (5), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110ca:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdSnowberry01",
+      "name": "Snowberry",
+      "produce": "b46:HearthFires.esm",
+      "produceName": "Snowberries (4)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Snowberries (4), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110cb:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdSpikyGrass01",
+      "name": "Spiky Grass",
+      "produce": "b47:HearthFires.esm",
+      "produceName": "Grass Pod (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Grass Pod (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110cc:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdThistle01",
+      "name": "Thistle",
+      "produce": "b48:HearthFires.esm",
+      "produceName": "Thistle Branch (3)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Thistle Branch (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "110cd:HearthFires.esm": {
+      "editorId": "BYOHHouseIngrdWheat01",
+      "name": "Wheat",
+      "produce": "b49:HearthFires.esm",
+      "produceName": "Wheat (4)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Wheat (4), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
     "17b9e1:WindhelmSSE.esp": {
       "editorId": "WHOarFish",
       "name": "Fish",
@@ -303,6 +525,22 @@
       "produceName": "TGCoinPurseGoldSmall",
       "produceType": "LVLI",
       "why": "its produce is a LVLI, which is a list of things rather than one thing, and carries no price"
+    },
+    "dbf8b3:Thornswood-Content.esp": {
+      "editorId": "KzlFloraBeehive",
+      "name": "Beehive",
+      "produce": "b08c5:Skyrim.esm",
+      "produceName": "Honeycomb",
+      "produceType": "INGR",
+      "why": "this server places this one itself and answers it with the station code written for it, so it is not a plant for this pass to rank"
+    },
+    "f39b:HearthFires.esm": {
+      "editorId": "BYOHMeadBarrel",
+      "name": "Mead Barrel",
+      "produce": "f39c:HearthFires.esm",
+      "produceName": "Nord Mead (5)",
+      "produceType": "MISC",
+      "why": "its produce is a sack, Nord Mead (5), that only a Papyrus script opens, and this server does not run Papyrus"
     }
   },
   "detail": {
@@ -351,198 +589,6 @@
       "plugin": "Skyrim.esm",
       "definedIn": "Skyrim.esm",
       "formId": "0x1016A3",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "1045e:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b2a:HearthFires.esm",
-      "produceName": "Cabbage (2)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Cabbage",
-      "editorId": "BYOHHouseFloraCabbage01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x01045E",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "1045f:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b2c:HearthFires.esm",
-      "produceName": "Gourd (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Gourds",
-      "editorId": "BYOHHouseFloraGourd01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x01045F",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "10460:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b2d:HearthFires.esm",
-      "produceName": "Leek (2)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Leek",
-      "editorId": "BYOHHouseFloraLeek01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x010460",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "10461:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b2f:HearthFires.esm",
-      "produceName": "Canis Root (4)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Canis Root",
-      "editorId": "BYOHHouseIngrdCanisRoot01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x010461",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "10462:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b32:HearthFires.esm",
-      "produceName": "Deathbell (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Deathbell",
-      "editorId": "BYOHHouseIngrdDeathbell01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x010462",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "10463:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b33:HearthFires.esm",
-      "produceName": "Dragon's Tongue (4)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Dragon's Tongue",
-      "editorId": "BYOHHouseIngrdDragonTongue01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x010463",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "10464:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b35:HearthFires.esm",
-      "produceName": "Giant Lichen (4)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Giant Lichen",
-      "editorId": "BYOHHouseIngrdGiantLichen01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x010464",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "10465:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b36:HearthFires.esm",
-      "produceName": "Glowing Mushroom (5)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Glowing Mushroom",
-      "editorId": "BYOHHouseIngrdGlowMushrm01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x010465",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "10466:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b37:HearthFires.esm",
-      "produceName": "Jazbay Grapes (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Jazbay",
-      "editorId": "BYOHHouseIngrdJazbay01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x010466",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "10467:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b38:HearthFires.esm",
-      "produceName": "Juniper Berries (4)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Juniper",
-      "editorId": "BYOHHouseIngrdJuniper01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x010467",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "10468:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b39:HearthFires.esm",
-      "produceName": "Lavender (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Lavender",
-      "editorId": "BYOHHouseIngrdLavender01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x010468",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "10469:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b44:HearthFires.esm",
-      "produceName": "Nightshade (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Nightshade",
-      "editorId": "BYOHHouseIngrdNightshade01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x010469",
       "seasons": "100,100,100,100",
       "nameFrom": "string table"
     },
@@ -658,246 +704,6 @@
       "seasons": "100,100,100,100",
       "nameFrom": "string table"
     },
-    "110b9:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b2b:HearthFires.esm",
-      "produceName": "Carrots (4)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Carrot",
-      "editorId": "BYOHHouseFloraCarrots01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110B9",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110ba:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b2e:HearthFires.esm",
-      "produceName": "Potato (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Potato",
-      "editorId": "BYOHHouseFloraPotato01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110BA",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110bb:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b30:HearthFires.esm",
-      "produceName": "Tundra Cotton (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Tundra Cotton",
-      "editorId": "BYOHHouseIngrdCotton01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110BB",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110bc:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b31:HearthFires.esm",
-      "produceName": "Creep Cluster (5)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Creep Cluster",
-      "editorId": "BYOHHouseIngrdCreepCluster01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110BC",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110bd:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b34:HearthFires.esm",
-      "produceName": "Swamp Fungal Pod (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Swamp Fungal Pod",
-      "editorId": "BYOHHouseIngrdFungalPod01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110BD",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110be:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b3a:HearthFires.esm",
-      "produceName": "Mora Tapinella (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Mora Tapinella",
-      "editorId": "BYOHHouseIngrdMoraTap01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110BE",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110bf:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b3b:HearthFires.esm",
-      "produceName": "Blue Mountain Flower (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Blue Mountain Flower",
-      "editorId": "BYOHHouseIngrdMtFlBlue01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110BF",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110c0:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b3c:HearthFires.esm",
-      "produceName": "Purple Mountain Flower (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Purple Mountain Flower",
-      "editorId": "BYOHHouseIngrdMtFlPurple01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110C0",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110c1:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b3d:HearthFires.esm",
-      "produceName": "Red Mountain Flower (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Red Mountain Flower",
-      "editorId": "BYOHHouseIngrdMtFlRed01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110C1",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110c2:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b3e:HearthFires.esm",
-      "produceName": "Fly Amanita (4)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Fly Amanita",
-      "editorId": "BYOHHouseIngrdMushroom01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110C2",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110c3:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b3f:HearthFires.esm",
-      "produceName": "Bleeding Crown (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Bleeding Crown",
-      "editorId": "BYOHHouseIngrdMushroom02",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110C3",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110c4:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b40:HearthFires.esm",
-      "produceName": "White Cap (2)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "White Cap",
-      "editorId": "BYOHHouseIngrdMushroom03",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110C4",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110c5:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b41:HearthFires.esm",
-      "produceName": "Imp Stool (4)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Imp Stool",
-      "editorId": "BYOHHouseIngrdMushroom04",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110C5",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110c6:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b42:HearthFires.esm",
-      "produceName": "Namira's Rot (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Namira's Rot",
-      "editorId": "BYOHHouseIngrdMushroom05",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110C6",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110c7:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b43:HearthFires.esm",
-      "produceName": "Blisterwort (4)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Blisterwort",
-      "editorId": "BYOHHouseIngrdMushroom06",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110C7",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
     "110c8:HearthFires.esm": {
       "rank": "expert",
       "produce": "59b86:Skyrim.esm",
@@ -914,88 +720,8 @@
       "seasons": "100,100,100,100",
       "nameFrom": "string table"
     },
-    "110c9:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b45:HearthFires.esm",
-      "produceName": "Scaly Pholiota (5)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Scaly Pholiota",
-      "editorId": "BYOHHouseIngrdScalyPBits01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110C9",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110ca:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b46:HearthFires.esm",
-      "produceName": "Snowberries (4)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Snowberry",
-      "editorId": "BYOHHouseIngrdSnowberry01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110CA",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110cb:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b47:HearthFires.esm",
-      "produceName": "Grass Pod (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Spiky Grass",
-      "editorId": "BYOHHouseIngrdSpikyGrass01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110CB",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110cc:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b48:HearthFires.esm",
-      "produceName": "Thistle Branch (3)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Thistle",
-      "editorId": "BYOHHouseIngrdThistle01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110CC",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "110cd:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "b49:HearthFires.esm",
-      "produceName": "Wheat (4)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Wheat",
-      "editorId": "BYOHHouseIngrdWheat01",
-      "recordType": "TREE",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x0110CD",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
     "12db9:Dawnguard.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "14dc4:Dawnguard.esm",
       "produceName": "Soul Husk",
       "produceType": "ALCH",
@@ -1011,7 +737,7 @@
       "nameFrom": "string table"
     },
     "12dba:Dawnguard.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "14dc4:Dawnguard.esm",
       "produceName": "Soul Husk",
       "produceType": "ALCH",
@@ -1027,7 +753,7 @@
       "nameFrom": "string table"
     },
     "141081:JK's Whiterun's Outskirts.esp": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "64b2e:Skyrim.esm",
       "produceName": "Red Apple",
       "produceType": "ALCH",
@@ -1043,7 +769,7 @@
       "nameFrom": "the record"
     },
     "141088:JK's Whiterun's Outskirts.esp": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "64b2f:Skyrim.esm",
       "produceName": "Green Apple",
       "produceType": "ALCH",
@@ -1059,7 +785,7 @@
       "nameFrom": "the record"
     },
     "1503ff:JK's Whiterun's Outskirts.esp": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "64b40:Skyrim.esm",
       "produceName": "Carrot",
       "produceType": "ALCH",
@@ -1075,7 +801,7 @@
       "nameFrom": "the record"
     },
     "16e24:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "16e26:Dragonborn.esm",
       "produceName": "Ashen Grass Pod",
       "produceType": "INGR",
@@ -1091,7 +817,7 @@
       "nameFrom": "string table"
     },
     "16e25:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "16e26:Dragonborn.esm",
       "produceName": "Ashen Grass Pod",
       "produceType": "INGR",
@@ -1107,7 +833,7 @@
       "nameFrom": "string table"
     },
     "17005:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "17008:Dragonborn.esm",
       "produceName": "Trama Root",
       "produceType": "INGR",
@@ -1155,7 +881,7 @@
       "nameFrom": "string table"
     },
     "17e93:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "17e97:Dragonborn.esm",
       "produceName": "Scathecraw",
       "produceType": "INGR",
@@ -1171,7 +897,7 @@
       "nameFrom": "string table"
     },
     "17e94:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "17e97:Dragonborn.esm",
       "produceName": "Scathecraw",
       "produceType": "INGR",
@@ -1187,7 +913,7 @@
       "nameFrom": "string table"
     },
     "184ef:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "17008:Dragonborn.esm",
       "produceName": "Trama Root",
       "produceType": "INGR",
@@ -1203,7 +929,7 @@
       "nameFrom": "string table"
     },
     "18b19:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "17008:Dragonborn.esm",
       "produceName": "Trama Root",
       "produceType": "INGR",
@@ -1219,7 +945,7 @@
       "nameFrom": "string table"
     },
     "18d5d7:JK's Whiterun's Outskirts.esp": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "64b42:Skyrim.esm",
       "produceName": "Tomato",
       "produceType": "ALCH",
@@ -1267,7 +993,7 @@
       "nameFrom": "string table"
     },
     "1bb3d:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "45c28:Skyrim.esm",
       "produceName": "Lavender",
       "produceType": "INGR",
@@ -1283,7 +1009,7 @@
       "nameFrom": "string table"
     },
     "1ff64:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "1ff75:Dragonborn.esm",
       "produceName": "Emperor Parasol Moss",
       "produceType": "INGR",
@@ -1299,7 +1025,7 @@
       "nameFrom": "string table"
     },
     "1ff65:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "1ff75:Dragonborn.esm",
       "produceName": "Emperor Parasol Moss",
       "produceType": "INGR",
@@ -1315,7 +1041,7 @@
       "nameFrom": "string table"
     },
     "1ff66:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "1ff75:Dragonborn.esm",
       "produceName": "Emperor Parasol Moss",
       "produceType": "INGR",
@@ -1331,7 +1057,7 @@
       "nameFrom": "string table"
     },
     "206e8:Dragonborn.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "206e7:Dragonborn.esm",
       "produceName": "Ash Yam",
       "produceType": "ALCH",
@@ -1363,7 +1089,7 @@
       "nameFrom": "string table"
     },
     "2493d:JKs Skyrim.esp": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "64b40:Skyrim.esm",
       "produceName": "Carrot",
       "produceType": "ALCH",
@@ -1379,7 +1105,7 @@
       "nameFrom": "the record"
     },
     "2493e:JKs Skyrim.esp": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "669a5:Skyrim.esm",
       "produceName": "Leek",
       "produceType": "ALCH",
@@ -1427,7 +1153,7 @@
       "nameFrom": "string table"
     },
     "2c91:JKs Skyrim.esp": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "64b2e:Skyrim.esm",
       "produceName": "Red Apple",
       "produceType": "ALCH",
@@ -1491,7 +1217,7 @@
       "nameFrom": "string table"
     },
     "3274:JKs Skyrim.esp": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "64b2f:Skyrim.esm",
       "produceName": "Green Apple",
       "produceType": "ALCH",
@@ -1507,7 +1233,7 @@
       "nameFrom": "the record"
     },
     "34d2c:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "34d32:Skyrim.esm",
       "produceName": "Frost Mirriam",
       "produceType": "INGR",
@@ -1539,7 +1265,7 @@
       "nameFrom": "string table"
     },
     "34d30:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "34d22:Skyrim.esm",
       "produceName": "Garlic",
       "produceType": "INGR",
@@ -2163,7 +1889,7 @@
       "nameFrom": "string table"
     },
     "b03af:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "b2183:Skyrim.esm",
       "produceName": "Creep Cluster",
       "produceType": "INGR",
@@ -2179,7 +1905,7 @@
       "nameFrom": "string table"
     },
     "b202c:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "b2183:Skyrim.esm",
       "produceName": "Creep Cluster",
       "produceType": "INGR",
@@ -2211,7 +1937,7 @@
       "nameFrom": "string table"
     },
     "b91f0:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "134aa:Skyrim.esm",
       "produceName": "Thistle Branch",
       "produceType": "INGR",
@@ -2243,7 +1969,7 @@
       "nameFrom": "string table"
     },
     "bb947:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "3f7f8:Skyrim.esm",
       "produceName": "Tundra Cotton",
       "produceType": "INGR",
@@ -2259,7 +1985,7 @@
       "nameFrom": "string table"
     },
     "bb948:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "5076e:Skyrim.esm",
       "produceName": "Juniper Berries",
       "produceType": "INGR",
@@ -2275,7 +2001,7 @@
       "nameFrom": "string table"
     },
     "bb949:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "6ac4a:Skyrim.esm",
       "produceName": "Jazbay Grapes",
       "produceType": "INGR",
@@ -2371,7 +2097,7 @@
       "nameFrom": "string table"
     },
     "bb94f:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "57f91:Skyrim.esm",
       "produceName": "Hanging Moss",
       "produceType": "INGR",
@@ -2387,7 +2113,7 @@
       "nameFrom": "string table"
     },
     "bb950:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "57f91:Skyrim.esm",
       "produceName": "Hanging Moss",
       "produceType": "INGR",
@@ -2403,7 +2129,7 @@
       "nameFrom": "string table"
     },
     "bb951:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "57f91:Skyrim.esm",
       "produceName": "Hanging Moss",
       "produceType": "INGR",
@@ -2419,7 +2145,7 @@
       "nameFrom": "string table"
     },
     "bb952:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "669a5:Skyrim.esm",
       "produceName": "Leek",
       "produceType": "ALCH",
@@ -2451,7 +2177,7 @@
       "nameFrom": "string table"
     },
     "bc0:HearthFires.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "353c:HearthFires.esm",
       "produceName": "Butter",
       "produceType": "ALCH",
@@ -2579,7 +2305,7 @@
       "nameFrom": "string table"
     },
     "bcf47:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "64b41:Skyrim.esm",
       "produceName": "Potato",
       "produceType": "ALCH",
@@ -2595,7 +2321,7 @@
       "nameFrom": "string table"
     },
     "bcf48:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "64b3f:Skyrim.esm",
       "produceName": "Cabbage",
       "produceType": "ALCH",
@@ -2611,7 +2337,7 @@
       "nameFrom": "string table"
     },
     "be3e0:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "83e64:Skyrim.esm",
       "produceName": "Grass Pod",
       "produceType": "INGR",
@@ -2627,7 +2353,7 @@
       "nameFrom": "string table"
     },
     "be3e1:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "83e64:Skyrim.esm",
       "produceName": "Grass Pod",
       "produceType": "INGR",
@@ -2643,7 +2369,7 @@
       "nameFrom": "string table"
     },
     "be3e6:Skyrim.esm": {
-      "rank": "advanced",
+      "rank": "novice",
       "produce": "10d666:Skyrim.esm",
       "produceName": "Gourd",
       "produceType": "ALCH",
@@ -2737,22 +2463,6 @@
       "formId": "0x0DB6BC",
       "seasons": "100,100,100,100",
       "nameFrom": "string table"
-    },
-    "dbf8b3:Thornswood-Content.esp": {
-      "rank": "advanced",
-      "produce": "b08c5:Skyrim.esm",
-      "produceName": "Honeycomb",
-      "produceType": "INGR",
-      "produceValue": 5,
-      "produceFrom": "Update.esm",
-      "name": "Beehive",
-      "editorId": "KzlFloraBeehive",
-      "recordType": "FLOR",
-      "plugin": "Thornswood-Content.esp",
-      "definedIn": "Thornswood-Content.esp",
-      "formId": "0xDBF8B3",
-      "seasons": "100,100,100,100",
-      "nameFrom": "the record"
     },
     "dd676:Skyrim.esm": {
       "rank": "expert",
@@ -3120,22 +2830,6 @@
       "definedIn": "HearthFires.esm",
       "formId": "0x00F1CE",
       "seasons": "0,0,0,0",
-      "nameFrom": "string table"
-    },
-    "f39b:HearthFires.esm": {
-      "rank": "novice",
-      "produce": "f39c:HearthFires.esm",
-      "produceName": "Nord Mead (5)",
-      "produceType": "MISC",
-      "produceValue": 0,
-      "produceFrom": "HearthFires.esm",
-      "name": "Mead Barrel",
-      "editorId": "BYOHMeadBarrel",
-      "recordType": "FLOR",
-      "plugin": "HearthFires.esm",
-      "definedIn": "HearthFires.esm",
-      "formId": "0x00F39B",
-      "seasons": "100,100,100,100",
       "nameFrom": "string table"
     },
     "f3e57:Skyrim.esm": {

@@ -125,9 +125,11 @@
     .\tools\Build-HarvestTable.ps1 -NoInstall
 
   Exit code 1 if a plugin in the load order is missing, if a localised plugin
-  has no string table, if a plant's produce names no record in the build, if
-  two plants land on the same key, if a crop has no produce or no price, if two
-  crops land on the same key, or if the game folder changed underneath it.
+  has no string table, if the stations file this server places its own bases
+  from is missing or does not parse, if a plant's produce names no record in
+  the build, if two plants land on the same key, if a crop has no produce or no
+  price, if two crops land on the same key, or if the game folder changed
+  underneath it.
 #>
 param(
     [string] $Data       = 'C:\Thornswood\Game\Data',
@@ -162,18 +164,37 @@ $LANGUAGE = 'english'
 # in between, so a threshold anywhere in a gap moves nothing: 12 through 19
 # all split the same way. The four below were chosen to sit on the gaps and to
 # land where classes.md already says each rank should land.
-#   novice   0g only. 'The basics of your half, and not much of it.' In the
-#            wild that is white cap, imp stool and namira's rot, plus the
-#            planter sacks, which the records price at nothing.
+#
+# THE NOVICE CEILING WAS 0g UNTIL 20 SEPTEMBER, AND THAT RUNG WAS EMPTY IN THE
+# OPEN WORLD. Measured that day against the table this script had just written:
+# 50 rows ranked novice, and 33 of them were the planter sacks below, 1 was the
+# clam at Oar's Rest and 1 the tree in the Ancestor Glade. The 15 that were
+# left were every one of them a FloraMushroom03, 04 or 05, which is white cap,
+# imp stool and namira's rot in a cave, because those three are the only
+# ingredients in this build the records price at nothing. Everything a person
+# walks past above ground was refused to a new Gatherer: lavender and thistle
+# at 1g, the mountain flowers at 2g, snowberries and deathbell at 4g, all of
+# them 'takes an Advanced Gatherer'. workPerRank.advanced in the gamemode is 20
+# pieces of work, so the only road onto the second rung was twenty cave
+# mushrooms. A ceiling of 1g puts the 1g ingredients on the rung with them and
+# leaves advanced the biggest rank, which is the shape classes.md asks for.
+#   novice   up to 1g. 'The basics of your half, and not much of it.' 57 rows
+#            of the 147 in the table: white cap, imp stool, namira's rot,
+#            lavender, thistle, creep cluster, juniper berries, jazbay grapes,
+#            hanging moss and the rest of the 1g ingredients, plus ten crops
+#            that a gatherer is refused anyway because a crop is the farming
+#            block's.
 #   advanced up to 5g. 'The everyday work. Most of what a hold actually
-#            needs.' Every flower, wheat, the food crops. The biggest rank,
-#            which is what that line asks for.
+#            needs.' 61 rows: every mountain flower, snowberries, deathbell,
+#            the eggs, wheat, the food crops. The biggest rank, which is what
+#            that line asks for.
 #   expert   up to 12g. 'The things people come looking for you specifically
-#            to get.' Nightshade, bleeding crown, nirnroot, blisterwort.
+#            to get.' 24 rows: nightshade, bleeding crown, nirnroot,
+#            blisterwort.
 #   master   everything above. 'The short list.' Five plants in this build:
 #            ash creep cluster and the three from Update.esm.
 $RANK_MAX_VALUE = @(
-    @{ Rank = 'novice';   Max = 0 },
+    @{ Rank = 'novice';   Max = 1 },
     @{ Rank = 'advanced'; Max = 5 },
     @{ Rank = 'expert';   Max = 12 },
     @{ Rank = 'master';   Max = 2147483647 }
@@ -208,6 +229,48 @@ $PRODUCE_WITHOUT_A_PRICE = @('LVLI', 'FLST', 'LVLN')
 # mean only a gatherer could ever pick up their own front door key. They are
 # reported by name every run and listed in the json under 'unranked'.
 $PRODUCE_NOT_GATHERED = @('KEYM')
+#
+# PRODUCE_A_SCRIPT_MUST_OPEN: produce that is a sack rather than a thing. The
+# HearthFires planters and the mead barrel in a built homestead give a MISC
+# named for what is inside it and how many, 'Nightshade (3)' or
+# 'Nord Mead (5)', which a Papyrus script opens into that many of the real
+# item. This server does not run Papyrus, for the two reasons written out over
+# the scripted activators in the gamemode, so the sack goes into a pack and
+# stays a sack.
+#
+# They were in the table until 20 September and they did two things wrong at
+# once. The records price a sack at nothing, so it ranked at the bottom while
+# the same ingredient picked in the wild ranked where its price puts it: the
+# planter of 'Nightshade (3)' was a novice plant and wild nightshade, which is
+# the same nightshade at 8g, was refused to the same person as an expert's.
+# Measured on 20 September, 29 ingredients sat at two ranks at once for that
+# reason. And harvest() in the gamemode hands over one of whatever the row
+# names, so the count in the name was thrown away before it could matter.
+#
+# Matched on the produce being a MISC whose name ends in a bracketed count,
+# which on this build is exactly the 33 sacks and nothing else: every MISC
+# produce that is a real item, the clam's fake coin and the Ancestor Glade's
+# canticle bark, carries no count. They are reported by name every run and
+# listed in the json under 'unranked'.
+$PRODUCE_A_SCRIPT_MUST_OPEN = ' \(\d+\)$'
+#
+# OUR_STATIONS: the bases this server places in the world itself, read out of
+# tools\thornswood-src\stations.json, which is the file the gamemode's own
+# STATIONS line is generated from. A record Thornswood put in the world is
+# answered by the station code written for it, never by a sweep of the load
+# order, and neither pass may claim one.
+#
+# Measured on 20 September: Thornswood-Content.esp's beehive is a FLOR with an
+# INGR produce like any other, so this pass read it and wrote it into the table
+# as a wild plant worth 5g and therefore an advanced one. The day the gamemode
+# started answering the table, pressing this server's own hive ran the gatherer
+# class gate and then 'Picking Honeycomb takes an Advanced Gatherer', and
+# because onActivate returns false for anything it answers, the engine's own
+# handover was blocked as well: a Woodworker got nothing at all from a hive
+# Thornswood placed for them. Nobody decided that. This is the check that stops
+# the next FLOR or TREE this server places from being reclassified the same
+# quiet way.
+$STATIONS_FILE = Join-Path $PSScriptRoot 'thornswood-src\stations.json'
 #
 # ------------------------------------------------------ the crop knobs ------
 #
@@ -603,6 +666,29 @@ foreach ($pl in $order) {
     else { Bad ("{0}: localised and no $LANGUAGE string table found; its names would fall back to editor ids" -f $pl) }
 }
 
+# ------------------------------------------------ the bases that are ours ---
+
+Write-Host ''
+Write-Host 'the stations this server places' -ForegroundColor Cyan
+# Read before the plants are, so that a missing or broken stations file stops
+# the run here rather than after a table has been built that cannot tell a
+# station from a flower. The case for the check is over OUR_STATIONS at the top.
+$ourStations = New-Object 'System.Collections.Generic.HashSet[string]'
+if (-not (Test-Path -LiteralPath $STATIONS_FILE)) {
+    Bad ("{0} is not there, so this run cannot tell a base this server placed from a wild plant" -f $STATIONS_FILE)
+} else {
+    $stationsJson = $null
+    try { $stationsJson = (Get-Content -LiteralPath $STATIONS_FILE -Raw) | ConvertFrom-Json }
+    catch { Bad ("{0} does not parse as json: {1}" -f $STATIONS_FILE, $_.Exception.Message) }
+    if ($stationsJson) {
+        foreach ($s in $stationsJson.PSObject.Properties) {
+            [void]$ourStations.Add([string]$s.Value)
+            Note ("{0,-14} {1}" -f $s.Name, $s.Value)
+        }
+        Ok ("{0} bases this server places itself, read from {1}" -f $ourStations.Count, $STATIONS_FILE)
+    }
+}
+
 # --------------------------------------------------- the FLOR/TREE records --
 
 Write-Host ''
@@ -892,10 +978,14 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
     if (-not $produce.ContainsKey($p.ProduceDesc)) { continue }
     $q = $produce[$p.ProduceDesc]
     $why = ''
-    if ($PRODUCE_WITHOUT_A_PRICE -contains $q.Type) {
+    if ($ourStations.Contains([string]$d)) {
+        $why = 'this server places this one itself and answers it with the station code written for it, so it is not a plant for this pass to rank'
+    } elseif ($PRODUCE_WITHOUT_A_PRICE -contains $q.Type) {
         $why = 'its produce is a ' + $q.Type + ', which is a list of things rather than one thing, and carries no price'
     } elseif ($PRODUCE_NOT_GATHERED -contains $q.Type) {
         $why = 'its produce is a ' + $q.Type + ', which is not material anybody gathers'
+    } elseif ([string]$q.Type -eq 'MISC' -and ([string]$q.Full) -match $PRODUCE_A_SCRIPT_MUST_OPEN) {
+        $why = 'its produce is a sack, ' + $q.Full + ', that only a Papyrus script opens, and this server does not run Papyrus'
     } elseif (-not $VALUE_RULES.ContainsKey($q.Type)) {
         $why = 'nothing here knows where the price sits in a ' + $q.Type + ' record'
     } elseif ($q.Value -lt 0) {
@@ -952,13 +1042,13 @@ foreach ($d in $table.Keys) { $perRank[[string]$table[$d].Rank] = $perRank[[stri
 foreach ($r in $RANK_MAX_VALUE) {
     Note ("{0,-9} value up to {1,-10} {2} plants" -f $r.Rank, $r.Max, $perRank[[string]$r.Rank])
 }
-# Everything the records price at nothing lands in the lowest rank together,
-# and that bundles two different things: ingredients that really are worth
-# nothing (white cap, imp stool, namira's rot) and the HearthFires planter
-# sacks, which are a MISC item a script turns into three of something. A sack
-# of three nightshade is priced at 0 where wild nightshade is 8, so the
-# planter ranks novice and the wild plant ranks expert. Nothing in the records
-# says what a sack is worth, so this reports it rather than inventing a price.
+# What the records price at nothing, now that the sacks are out of the table:
+# white cap, imp stool and namira's rot, which really are worth nothing, the
+# fake coin in the clam at Oar's Rest and the canticle bark in the Ancestor
+# Glade. They land on the first rung together and that is the right place for
+# them. This still reports them every run, because a produce record repriced to
+# 0 by a plugin later in the order is how a dear ingredient would quietly
+# become a novice pick, and the line below is the only place that would show it.
 $freeOnes = @{}
 foreach ($d in $table.Keys) {
     $q = $produce[$plants[$d].ProduceDesc]
@@ -1003,6 +1093,11 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
         if ([string]$p.Edid -like ($pre + '*')) { $isPlanter = $true }
     }
     if ($isPlanter) { $planters.Add([string]$p.Edid); continue }
+
+    # and a base this server places itself is never a plot either, for the
+    # reason written over OUR_STATIONS at the top: it is answered by the
+    # station code and not by a table built out of a sweep of the load order.
+    if ($ourStations.Contains([string]$d)) { continue }
 
     $named = ($CROP_BY_EDITOR_ID -contains [string]$p.Edid)
 

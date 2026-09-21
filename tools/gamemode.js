@@ -392,20 +392,742 @@ function setSkill(actorId, track, tier) {
 // gathering stations
 // ---------------------------------------------------------------------------
 
+/*
+  EVERY ORE SEAM IN THE LOAD ORDER, AND IT IS GENERATED.
+
+  Everything between the declaration below and the line that closes the block
+  is written by tools\Build-OreTable.ps1, out of the ACTI and FURN records
+  carrying MineOreScript that also built tools\ores.json: 581 veins across 101
+  plugins, counted on 20 September. DO NOT HAND EDIT IT. The next run of that
+  script replaces every line between them, and a correction made here goes with
+  it and leaves no trace that it was ever made. Same arrangement as
+  CROPS_BY_BASE and SPELL_IDS further down, for the same reason.
+
+  It is seeded empty and the script fills it. A row says what the record says
+  and nothing else:
+
+    ore     the MISC record the vein's MineOreScript points its Ore property
+            at, which is what comes away in somebody's hands.
+    name    what that ore is called, so a refusal and a yield can both say it.
+    rank    the Miner rank the seam asks for, which is the ore's value in gold
+            against the bands at the top of ores.json: up to 14 novice, up to
+            29 advanced, up to 59 expert, anything above that master.
+    yield   FOUR PAIRS, novice first, each the least and the most that rank
+            takes away. A pair of zeroes is a rank that cannot work that seam
+            at all, which is how mineOre refuses without a second table of
+            thresholds standing beside this one to disagree with it. Measured
+            across all 581 rows on 20 September: the first pair that is not
+            zero and zero sits at exactly the rank named beside it, every time.
+
+  THE TWO SPACES IN FRONT OF THE DECLARATION ARE NOT A STYLE CHOICE. The
+  install half of that script looks for its opening and closing lines as
+  literal text with that indent on them rather than as a pattern, so a block at
+  column zero is a block it cannot find: it reports that the gamemode has no
+  ORES_BY_BASE block yet and writes nothing, which reads exactly like a run
+  that worked. The harvests and crops passes match their declaration with a
+  regex instead and keep whatever indent they find, which is why those two
+  blocks sit at column zero and this one does not.
+
+  NOTHING ABOVE MAY SPELL THE CLOSING MARKER OUT. The script takes the first
+  match of it in the whole file and refuses when that lands above the
+  declaration, so one quotation of it in a comment turns the install back into
+  a no-op that still says nothing went wrong. That is what happened to the
+  crops block on 20 September and it cost a rewrite, so this paragraph talks
+  around the marker rather than quoting it.
+*/
+// ==== ORES_BY_BASE, generated ====
+  var ORES_BY_BASE = {
+    "10fc0e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10ee64:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10ee3f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10e101:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "10f0e7:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "10dcd2:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcd1:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcd0:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dccf:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcce:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dccd:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dccc:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dccb:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dcca:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dcc9:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dcc8:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dcc7:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dcc6:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dcc5:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dcc4:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dcc3:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dcc2:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dcc1:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcc0:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcbf:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcbe:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcbd:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcbc:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcbb:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcba:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcb9:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcb8:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcb7:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcb6:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcb5:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcb4:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcb3:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcb2:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcb1:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcb0:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcaf:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcae:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcad:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcac:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcab:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dcaa:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dca9:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dca8:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dca7:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dca6:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dca5:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dca4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dca3:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dca2:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dca1:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dca0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc9f:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc9e:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc9d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc9c:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc9b:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc9a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc99:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc98:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc97:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc96:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc95:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc94:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc93:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc92:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc91:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc90:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc8f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc8e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc8d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc8c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc8b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc8a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc89:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc88:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc87:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc86:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc85:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc84:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc83:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc82:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc81:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc80:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc7f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc7e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc7d:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc7c:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc7b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc7a:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc79:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc78:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc77:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc76:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc75:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc74:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc73:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc72:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc71:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc70:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc6f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc6e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc6d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc6c:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc6b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc6a:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc69:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc68:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc67:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc66:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc65:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc64:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc63:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc62:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc61:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc60:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc5f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc5e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc5d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc5c:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc5b:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc5a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc59:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc58:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc57:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc56:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc55:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc54:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc53:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc52:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc51:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc50:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc4f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc4e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc4d:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc4c:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc4b:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc4a:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc49:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc48:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc47:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc46:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc45:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc44:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc43:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc42:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc41:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc40:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc3f:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc3e:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc3d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc3c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc3b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc3a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc39:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc38:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc37:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc36:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc35:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dc34:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc33:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc32:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc31:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dc30:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc2f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc2e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc2d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc2c:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc2b:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dc2a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db89:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db88:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db87:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db86:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db85:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db84:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db83:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db82:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db81:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db80:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db7f:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db7e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db7d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db7c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db7b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10db7a:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10db79:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10db78:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db77:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db76:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db75:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db74:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db73:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db71:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db70:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db6f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db6e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db6d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db6c:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db6b:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db6a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db69:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db68:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db67:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db66:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db65:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db64:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db63:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db62:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db61:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10db60:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10db5f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10db5e:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db5d:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db5c:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db5b:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db5a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db59:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db58:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db57:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db55:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db54:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db53:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db52:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db51:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db50:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db4f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db4e:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db4d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db4c:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db4b:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db4a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db49:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db48:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db47:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db46:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db45:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db44:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db43:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db42:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db41:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db40:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db3f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db3e:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db3d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db3c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db3b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db3a:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db39:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db38:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db37:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db36:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db35:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db34:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db33:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db32:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db31:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db30:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db2f:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db2e:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db2d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db2c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db2b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db2a:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db29:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db28:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db27:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db26:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db25:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db24:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db23:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db22:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db21:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db20:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db1f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db1e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db1d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db1c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db1b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db1a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db19:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db18:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db17:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db16:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db15:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db14:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db13:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db12:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db11:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db10:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db0f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db0e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10db0d:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db0c:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db0b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db0a:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db09:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db08:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db07:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db06:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db05:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db04:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db03:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db02:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db01:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10db00:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10daff:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dafe:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dafd:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dafc:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dafb:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dafa:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10daf9:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10daf8:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10daf7:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10daf6:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10daf5:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daf4:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daf3:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daf2:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daf1:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daf0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daef:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daee:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daed:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daec:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daeb:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10daea:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dae9:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dae8:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dae7:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dae6:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dae5:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dae4:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dae3:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dae2:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dae1:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dae0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dadf:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dade:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10dadd:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dadc:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dadb:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dada:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dad9:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dad8:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dad7:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dad6:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dad5:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dad4:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dad3:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dad2:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dad1:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dad0:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dacf:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dace:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dacd:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dacc:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dacb:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10daca:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dac9:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dac8:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dac7:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dac6:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10dac5:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dac4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dac3:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dac2:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dac1:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dac0:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dabf:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dabe:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dabd:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dabc:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dabb:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10dab9:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10daa8:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10daa5:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10daa4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10daa3:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10daa1:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10daa0:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10da9f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10da9e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10da9d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10da9b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10da97:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10da95:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d7c8:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d7aa:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d7a9:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d798:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d76f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d749:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d710:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d6ff:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d4de:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d4db:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d4d5:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d4d0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d4c4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d130:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d098:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d096:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d095:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d094:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d093:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d092:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d091:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d090:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d08f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d08e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d08d:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d08c:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d08b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d08a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d089:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d088:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d087:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d086:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d085:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d084:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d083:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d082:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d081:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d080:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d07f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d07e:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d07d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d07c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d07b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d07a:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d079:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d078:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d077:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d076:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d075:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d074:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d073:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d072:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d071:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d070:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d06f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d06e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d06d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d06c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d06b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d06a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d069:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d068:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d067:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d066:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d065:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d064:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d063:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d062:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d061:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d060:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d05f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d05e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d05d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d05c:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d05b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d05a:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d059:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d058:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d057:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d056:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d055:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d054:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d053:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d052:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d051:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d050:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d04f:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d04e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d04d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d04c:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d04b:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d04a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d049:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d047:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d046:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d045:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d044:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d043:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d040:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d03f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d03e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d03b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d03a:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d039:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d038:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d037:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d036:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d035:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d034:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d032:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d031:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d030:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d02f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d02e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d02d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d02c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d027:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d026:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d025:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d024:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "10d023:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d022:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d021:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d020:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "10d01f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d01e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10d01d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "10acc8:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2cb1:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c85:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c82:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c81:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c80:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c7f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c7e:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c7d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c7c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c7b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c79:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c78:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2c77:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2c73:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2c6b:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2c68:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2c5b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2c52:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2c4f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2c4e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2c4d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "a2c4c:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "a2c4b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "a2c46:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "a2c42:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2c36:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2c33:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2bfe:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
+    "a2bfb:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2bf8:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2bf6:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2bed:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a2bec:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "a2be6:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "a2be5:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "e2bc2:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "195a5:Dawnguard.esm": { "ore": "195aa:Dawnguard.esm", "name": "Shellbug Chitin", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "a14:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "9f3:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "9f2:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "a511:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "310b:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "306b:HearthFires.esm": { "ore": "306c:HearthFires.esm", "name": "Quarried Stone", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
+    "3863e:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "3863d:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "377ee:Dragonborn.esm": { "ore": "2b06b:Dragonborn.esm", "name": "Stalhrim", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "32cd6:Dragonborn.esm": { "ore": "2b06b:Dragonborn.esm", "name": "Stalhrim", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "295cb:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28ea2:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28ea1:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28ea0:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28e9c:Dragonborn.esm": { "ore": "63b46:Skyrim.esm", "name": "Amethyst", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28e9b:Dragonborn.esm": { "ore": "63b46:Skyrim.esm", "name": "Amethyst", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28e9a:Dragonborn.esm": { "ore": "63b46:Skyrim.esm", "name": "Amethyst", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28e96:Dragonborn.esm": { "ore": "63b43:Skyrim.esm", "name": "Emerald", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28e95:Dragonborn.esm": { "ore": "63b43:Skyrim.esm", "name": "Emerald", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28e94:Dragonborn.esm": { "ore": "63b43:Skyrim.esm", "name": "Emerald", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28e92:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28e90:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "28e8e:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "1b659:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] }
+  };
+
+  // ==== end ORES_BY_BASE ====
+
+/*
+  The four ranks in order, for the code that runs above the progression block.
+
+  That block keeps its own copy in RANKS and this is not a second opinion: the
+  file loads top to bottom, the stations are read hundreds of lines before the
+  block registers itself on globalThis, and a station cannot borrow a name that
+  does not exist yet. The two spellings have to agree or a seam gates on a rank
+  nobody can hold, so the mining harness reads both out of this file and checks
+  them word for word rather than leaving it to whoever edits one of them.
+*/
+const RANK_LADDER = ['novice', 'advanced', 'expert', 'master'];
+
 const COOLDOWN_MS = 20000;
+
+/*
+  HOW LONG A SEAM IS DONE FOR, BY THE RANK THAT SEAM ASKS FOR.
+
+  THE RULEBOOK DOES NOT SET THESE. classes.md says rank decides which source
+  somebody may work and how much it gives, and says nothing about how often.
+  These are invented, they are first numbers for the dev server, and they are
+  here rather than inside mineOre so that changing the pace of every seam in
+  the province is one edit in one place.
+
+  WHY THE TWENTY SECONDS ABOVE COULD NOT STAY. COOLDOWN_MS was sized for the
+  one salt quarry this server placed and the kiln beside it, and mineOre took
+  it for all 581 seams because it was the number already there. Nothing else
+  limits a seam: MineOreScript never runs on this server or on the client, for
+  the two reasons written out over the scripted activators further down, so no
+  vein is ever depleted and none ever reloots, and onActivate returns false for
+  a seam, so the engine does nothing either. The cooldown is the entire supply.
+
+  Measured on 20 September against the built table. A Master Miner takes 1 to 5
+  off any master seam, three a strike on average. At twenty seconds that is 540
+  ebony an hour off the one seam at 10e101:Skyrim.esm, and at the emerald seam
+  28e95:Dragonborn.esm, where the ore is 600 gold, three a strike every twenty
+  seconds is about 324,000 gold an hour off a single reference. Vanilla gives
+  three strikes and then locks the vein for 30 in game days.
+
+  The plant half of this work gave itself ten minutes, near enough the hour the
+  engine reloots a FLOR in. An ore vein's own reloot is 30 in game days, which
+  at the default timescale is a day and a half of real time, and a tester who
+  saw a seam come back once a weekend would never see the ladder work at all.
+  So these sit between the two, by what the seam is worth:
+
+    novice    ten minutes, the same wait a picked plant gets. Iron is 2 gold
+              and a novice takes 1 to 2, so one seam is about 18 gold an hour,
+              which is the pace the plants already run at.
+    advanced  half an hour. Corundum, orichalcum, quicksilver, silver, 20 to
+              25 gold, and 310 of the 581 seams.
+    expert    an hour. Moonstone, malachite, gold ore, 30 to 50 gold.
+    master    four hours. The emerald seam above now gives about 1,800 gold
+              every four hours instead of 324,000 an hour, and all 24 master
+              seams worked in one circuit, including the six on Solstheim, come
+              to about 15,000 gold before the first of them is ready again.
+
+  The wait is kept per character and per reference in the same map the quarry
+  and the plants use, and that map is memory: a server restart or a hot reload
+  of this file clears every cooldown in it. That is true of the ten minutes on
+  a plant as well, and it is the first thing to know before these numbers are
+  argued about, because a four hour wait that a restart wipes is not four hours.
+*/
+const MINE_COOLDOWN_MS = {
+  novice: 600000,
+  advanced: 1800000,
+  expert: 3600000,
+  master: 14400000
+};
+
 const lastUse = new Map();   // "actorId:refrId" -> timestamp
 
 /** Seconds still to wait, 0 if ready. Read only: a refused action must not
- *  start a cooldown, or walking up to a kiln without firewood locks you out. */
-function cooldownLeft(actorId, refrId) {
+ *  start a cooldown, or walking up to a kiln without firewood locks you out.
+ *  spanMs is how long this source stays worked out and defaults to the twenty
+ *  seconds the stations use, because the quarry and the kiln were the only two
+ *  callers when this was written. A seam passes its own off MINE_COOLDOWN_MS. */
+function cooldownLeft(actorId, refrId, spanMs) {
+  const span = spanMs || COOLDOWN_MS;
   const prev = lastUse.get(actorId + ':' + refrId) || 0;
-  const left = COOLDOWN_MS - (Date.now() - prev);
+  const left = span - (Date.now() - prev);
   return left > 0 ? Math.ceil(left / 1000) : 0;
 }
 
 /** Start the cooldown. Call this only once the yield has actually been given. */
 function stampCooldown(actorId, refrId) {
   lastUse.set(actorId + ':' + refrId, Date.now());
+}
+
+/**
+ * A wait said the way a person says one.
+ *
+ * cooldownLeft answers in seconds and the quarry can say '14 more seconds'
+ * because its wait is twenty. A master seam is four hours and '14400 more
+ * seconds' is not a sentence anybody reads. Whole units, and the smaller one
+ * only when it is not zero, which is the shape the farming block already says
+ * a grow time in.
+ */
+function waitWord(seconds) {
+  const s = Math.max(0, Math.ceil(seconds));
+  if (s < 60) return s + (s === 1 ? ' second' : ' seconds');
+  const m = Math.ceil(s / 60);
+  if (m < 60) return m + (m === 1 ? ' minute' : ' minutes');
+  const h = Math.floor(m / 60);
+  const rest = m - h * 60;
+  const said = h + (h === 1 ? ' hour' : ' hours');
+  if (rest === 0) return said;
+  return said + ' and ' + rest + (rest === 1 ? ' minute' : ' minutes');
 }
 
 function addItem(actorId, itemDesc, count) {
@@ -513,8 +1235,7 @@ function rankStep(actorId, key) {
   const c = globalThis.__thornswoodCharacter;
   if (!c || !c.rankOf) return 0;
   try {
-    const ranks = ['novice', 'advanced', 'expert', 'master'];
-    const at = ranks.indexOf(c.rankOf(actorId, key));
+    const at = RANK_LADDER.indexOf(c.rankOf(actorId, key));
     return at < 0 ? 0 : at;
   } catch (e) {
     log('could not read the', key, 'rank for', actorId.toString(16) + ':', e);
@@ -554,6 +1275,100 @@ function mineSalt(actorId, refrId) {
   }
   const rank = creditWork(actorId, 'mine');
   return 'You work ' + yielded + ' salt from the seam.' + extra + (rank ? ' ' + rank : '');
+}
+
+/**
+ * A rank named in a sentence, with the article that belongs in front of it:
+ * 'a Novice', 'an Expert'. The farming block has the same three lines inside
+ * its closure and cannot be reached from here, so a refusal at a seam and a
+ * refusal at a plot read the same way because both were written to, not
+ * because one calls the other.
+ */
+function rankWord(rank) {
+  const n = String(rank || '').charAt(0).toUpperCase() + String(rank || '').slice(1);
+  return (/^[AEIOU]/.test(n) ? 'an ' : 'a ') + n;
+}
+
+/** True when this base is one of the 581 seams in the generated table above.
+ *  Never a bare lookup, for the reason own() in the progression block was
+ *  written: the descriptor names a record in the world, and '__proto__' finds
+ *  something on Object.prototype that a truth test cannot tell from a seam. */
+function isVein(baseDesc) {
+  return Object.prototype.hasOwnProperty.call(ORES_BY_BASE, baseDesc);
+}
+
+/**
+ * Every other seam in Skyrim: the miner's verb again, and the table sizes the
+ * yield instead of the rank arithmetic the quarry uses.
+ *
+ * The salt quarry above is one base this server put in the world. These are
+ * the 581 the game already had, and until now not one of them answered.
+ * Pressing an iron vein did nothing at all: mp.onActivate had no branch for
+ * it, and the engine's own mining is MineOreScript, a Papyrus script, which
+ * for the two reasons set out at the scripted activators further down never
+ * runs on this server or on the client. So a Miner could work the one quarry
+ * and walked past every seam in the province.
+ *
+ * The shape is mineSalt's, line for line, and the four differences are the
+ * table's doing. The yield is the pair for the miner's rank instead of
+ * randInt(1, 2 + step). A pair of zeroes is refused by name rather than handed
+ * a smaller pile, so a Novice at an ebony seam is told what it takes rather
+ * than left to work out why nothing came off it. There is no rare-drop roll:
+ * the quarry has one because salt is the only thing a salt seam can give, and
+ * a seam here already gives what it is made of. And the wait between two
+ * strikes is the seam's own, off MINE_COOLDOWN_MS, ten minutes at an iron vein
+ * and four hours at a gem geode, where the quarry's is a flat twenty seconds.
+ * That last one is not a refinement: it is the only limit on 581 seams the
+ * engine never depletes, and the case for the numbers is written over the
+ * table itself.
+ */
+function mineOre(actorId, refrId, baseDesc) {
+  if (!isVein(baseDesc)) return null;
+  const seam = ORES_BY_BASE[baseDesc];
+
+  // The class first, and before the cooldown, the same ordering mineSalt and
+  // harvest() settled on and for the same reason: somebody who is not a miner
+  // is never going to work this seam, and 'it needs 14 more seconds' tells
+  // them the wrong thing about why nothing happened.
+  const mine = classGate(actorId, 'mine');
+  if (mine) return mine;
+
+  const step = rankStep(actorId, 'miner');
+  const pair = (seam.yield && seam.yield[step]) || [0, 0];
+  if (pair[0] <= 0 && pair[1] <= 0) {
+    return 'This seam is ' + seam.name + '. Working it takes ' + rankWord(seam.rank) +
+           ' Miner. Work the seams you can until you are one.';
+  }
+
+  // The wait is the seam's own, off MINE_COOLDOWN_MS, and not the twenty
+  // seconds the quarry runs on. The case for that is written out over that
+  // table: this is the only thing standing between a Master Miner and every
+  // gem seam in the province, because nothing in the engine ever depletes one.
+  // A rank the table does not name falls back to the longest wait rather than
+  // the shortest, so a row that arrives with a rank nobody knows cannot be the
+  // cheapest tap in the game.
+  const span = Object.prototype.hasOwnProperty.call(MINE_COOLDOWN_MS, seam.rank)
+    ? MINE_COOLDOWN_MS[seam.rank] : MINE_COOLDOWN_MS.master;
+  const wait = cooldownLeft(actorId, refrId, span);
+  if (wait > 0) {
+    return 'This seam is worked out for now. ' + waitWord(wait) + ' to go.';
+  }
+
+  const yielded = randInt(pair[0], pair[1]);
+  // addItem answers false in one case only, which is idOf returning 0 because
+  // the plugin that owns this ore is not in the load order. The quarry says
+  // 'nothing you can carry' there, which would send somebody off to empty
+  // their pack over a fault in the build, so this says what is actually wrong
+  // and where to take it, in the shape the farming block already says it in
+  // for the same fault.
+  if (!addItem(actorId, seam.ore, yielded)) {
+    return 'The seam gives up ' + seam.name + ' and there is nothing in this load ' +
+           'order to put in your hands. Say so in the dev channel.';
+  }
+  stampCooldown(actorId, refrId);
+  const rank = creditWork(actorId, 'mine');
+  return 'You work ' + yielded + ' ' + seam.name + ' out of the seam.' +
+         (rank ? ' ' + rank : '');
 }
 
 /**
@@ -1678,13 +2493,290 @@ mp.onReadBook = guard('onReadBook', function (actorId, baseId) {
 // the server's data/scripts.
 // ---------------------------------------------------------------------------
 
-/* Activator -> what it should have given you, and how long before it gives
- * again. Read out of Skyrim.esm rather than from a wiki: nirnroot is ACTI
- * 0xE1FB2 yielding INGR 0x59B86, and the red one is 0xB6FB9 yielding 0xB701A. */
-const HARVESTS = {
-  'e1fb2:Skyrim.esm': { item: '59b86:Skyrim.esm', name: 'Nirnroot' },
-  'b6fb9:Skyrim.esm': { item: 'b701a:Skyrim.esm', name: 'Red Nirnroot' },
+/*
+  EVERY PLANT IN THE LOAD ORDER, AND IT IS GENERATED.
+
+  Everything between the declaration below and the line that closes the block
+  is written by the harvests pass in tools\Build-HarvestTable.ps1, out of the
+  FLOR and TREE records of the 101 plugins and 5 masters this build enables:
+  147 plants, counted on 20 September, the same table as the harvests key of
+  tools\harvests.json. DO NOT HAND EDIT IT. The next run of that script
+  replaces every line between them and takes any correction with it. Same
+  arrangement as CROPS_BY_BASE below and SPELL_IDS further down.
+
+  It is seeded empty and the script fills it. A row says:
+
+    produce  the item the record hands over when the plant is picked.
+    name     what a person is told they picked.
+    rank     THE GATHERER'S LADDER, and unlike the crops this is the one that
+             gates. harvests.json ranks by the gold value of the produce
+             against the thresholds at the top of it, which is a fair reading
+             of what a plant is worth to pick: measured on 20 September the 147
+             rows come out 57 novice, 61 advanced, 24 expert and 5 master. That
+             is the opposite of what the same arithmetic did to the crops, where
+             ten of eleven landed on one rung, which is why the crops carry a
+             hand written rule beside them and the plants do not need one.
+
+  THE TABLE WAS 181 ROWS AND THE FIRST RUNG OF IT WAS EMPTY IN THE OPEN WORLD.
+  Measured on 20 September, the same day the table went in: 50 rows ranked
+  novice, and 33 of them were the HearthFires planter sacks, which are a MISC
+  the records price at nothing and a Papyrus script opens into three of the real
+  ingredient, so they gated nothing and handed over a sack that this server
+  cannot open. One was the clam at Oar's Rest and one the tree in the Ancestor
+  Glade. The 15 that were left were every one of them a white cap, an imp stool
+  or a namira's rot in a cave. So a new Gatherer was refused every flower in
+  Skyrim, and with workPerRank.advanced at 20 the only road onto the second rung
+  was twenty cave mushrooms. The pass now leaves the sacks out and reads the
+  novice band as produce worth up to 1 gold, which is lavender, thistle, creep
+  cluster, juniper berries, jazbay grapes, hanging moss and the rest of them:
+  47 wild bases on the first rung instead of 15. The three numbers that did
+  that are RANK_MAX_VALUE, PRODUCE_A_SCRIPT_MUST_OPEN and OUR_STATIONS, all in
+  the knobs at the top of the script, each with what was measured beside it.
+
+  A BASE THIS SERVER PLACES ITSELF IS NEVER A ROW HERE. The pass reads the whole
+  load order and Thornswood-Content.esp is in it, so the beehive this server put
+  in the world was swept up as a wild plant worth 5 gold and gated behind an
+  Advanced Gatherer, which nobody decided and which blocked the engine's own
+  handover for everybody else as well. The pass reads the same stations file the
+  STATIONS line at the top of this file is generated from and leaves those bases
+  out, and plantAt below refuses one a second time in case a future station
+  reaches this table another way.
+
+  NOTHING ABOVE MAY SPELL THE CLOSING MARKER OUT, for the reason written out at
+  length over the crops block below: the install takes the first match of it in
+  the whole file and refuses when that lands above the declaration, so one
+  quotation in a comment turns the pass into a no-op that reports no fault.
+*/
+// ==== HARVESTS_BY_BASE, generated ====
+var HARVESTS_BY_BASE = {
+  "1016a1:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
+  "1016a2:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
+  "1016a3:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
+  "1062d1:Skyrim.esm": { "produce": "23d77:Skyrim.esm", "name": "Chicken's Egg", "rank": "advanced" },
+  "108e35:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
+  "108e36:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
+  "108e37:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
+  "108e38:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
+  "108ee2:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
+  "10f37:Dawnguard.esm": { "produce": "b097:Dawnguard.esm", "name": "Gleamblossom", "rank": "advanced" },
+  "110c8:HearthFires.esm": { "produce": "59b86:Skyrim.esm", "name": "Nirnroot", "rank": "expert" },
+  "12db9:Dawnguard.esm": { "produce": "14dc4:Dawnguard.esm", "name": "Soul Husk", "rank": "novice" },
+  "12dba:Dawnguard.esm": { "produce": "14dc4:Dawnguard.esm", "name": "Soul Husk", "rank": "novice" },
+  "141081:JK's Whiterun's Outskirts.esp": { "produce": "64b2e:Skyrim.esm", "name": "Red Apple", "rank": "novice" },
+  "141088:JK's Whiterun's Outskirts.esp": { "produce": "64b2f:Skyrim.esm", "name": "Green Apple", "rank": "novice" },
+  "1503ff:JK's Whiterun's Outskirts.esp": { "produce": "64b40:Skyrim.esm", "name": "Carrot", "rank": "novice" },
+  "16e24:Dragonborn.esm": { "produce": "16e26:Dragonborn.esm", "name": "Ashen Grass Pod", "rank": "novice" },
+  "16e25:Dragonborn.esm": { "produce": "16e26:Dragonborn.esm", "name": "Ashen Grass Pod", "rank": "novice" },
+  "17005:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "novice" },
+  "176b2:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
+  "176cd:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
+  "17e93:Dragonborn.esm": { "produce": "17e97:Dragonborn.esm", "name": "Scathecraw", "rank": "novice" },
+  "17e94:Dragonborn.esm": { "produce": "17e97:Dragonborn.esm", "name": "Scathecraw", "rank": "novice" },
+  "184ef:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "novice" },
+  "18b19:Dragonborn.esm": { "produce": "17008:Dragonborn.esm", "name": "Trama Root", "rank": "novice" },
+  "18d5d7:JK's Whiterun's Outskirts.esp": { "produce": "64b42:Skyrim.esm", "name": "Tomato", "rank": "novice" },
+  "195dc:Dragonborn.esm": { "produce": "1cd74:Dragonborn.esm", "name": "Ash Creep Cluster", "rank": "master" },
+  "195dd:Dragonborn.esm": { "produce": "1cd74:Dragonborn.esm", "name": "Ash Creep Cluster", "rank": "master" },
+  "1bb3d:Skyrim.esm": { "produce": "45c28:Skyrim.esm", "name": "Lavender", "rank": "novice" },
+  "1ff64:Dragonborn.esm": { "produce": "1ff75:Dragonborn.esm", "name": "Emperor Parasol Moss", "rank": "novice" },
+  "1ff65:Dragonborn.esm": { "produce": "1ff75:Dragonborn.esm", "name": "Emperor Parasol Moss", "rank": "novice" },
+  "1ff66:Dragonborn.esm": { "produce": "1ff75:Dragonborn.esm", "name": "Emperor Parasol Moss", "rank": "novice" },
+  "206e8:Dragonborn.esm": { "produce": "206e7:Dragonborn.esm", "name": "Ash Yam", "rank": "novice" },
+  "23cff:Skyrim.esm": { "produce": "23d6f:Skyrim.esm", "name": "Pine Thrush Egg", "rank": "advanced" },
+  "2493d:JKs Skyrim.esp": { "produce": "64b40:Skyrim.esm", "name": "Carrot", "rank": "novice" },
+  "2493e:JKs Skyrim.esp": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "novice" },
+  "2a76:Dawnguard.esm": { "produce": "2a78:Dawnguard.esm", "name": "Yellow Mountain Flower", "rank": "advanced" },
+  "2a77:Dawnguard.esm": { "produce": "2a78:Dawnguard.esm", "name": "Yellow Mountain Flower", "rank": "advanced" },
+  "2c91:JKs Skyrim.esp": { "produce": "64b2e:Skyrim.esm", "name": "Red Apple", "rank": "novice" },
+  "306a:Update.esm": { "produce": "306e:Update.esm", "name": "Screaming Maw", "rank": "master" },
+  "306b:Update.esm": { "produce": "306d:Update.esm", "name": "Rot Scale", "rank": "master" },
+  "306c:Update.esm": { "produce": "306f:Update.esm", "name": "Thorn Hook", "rank": "master" },
+  "3274:JKs Skyrim.esp": { "produce": "64b2f:Skyrim.esm", "name": "Green Apple", "rank": "novice" },
+  "34d2c:Skyrim.esm": { "produce": "34d32:Skyrim.esm", "name": "Frost Mirriam", "rank": "novice" },
+  "34d2d:Skyrim.esm": { "produce": "34d31:Skyrim.esm", "name": "Elves Ear", "rank": "expert" },
+  "34d30:Skyrim.esm": { "produce": "34d22:Skyrim.esm", "name": "Garlic", "rank": "novice" },
+  "3828c:Dragonborn.esm": { "produce": "854fe:Skyrim.esm", "name": "Pearl", "rank": "advanced" },
+  "3828d:Dragonborn.esm": { "produce": "85500:Skyrim.esm", "name": "Small Pearl", "rank": "advanced" },
+  "38a7a:Dragonborn.esm": { "produce": "65c9b:Skyrim.esm", "name": "Horker Meat", "rank": "advanced" },
+  "38b0c:Skyrim.esm": { "produce": "65c9d:Skyrim.esm", "name": "Pheasant Breast", "rank": "advanced" },
+  "38b0d:Skyrim.esm": { "produce": "65c9d:Skyrim.esm", "name": "Pheasant Breast", "rank": "advanced" },
+  "38b0e:Skyrim.esm": { "produce": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "rank": "advanced" },
+  "38b0f:Skyrim.esm": { "produce": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "rank": "advanced" },
+  "4d078:OarsRest.esp": { "produce": "4d079:OarsRest.esp", "name": "Fake Dwemer Coin", "rank": "novice" },
+  "4d9ff:Skyrim.esm": { "produce": "4da00:Skyrim.esm", "name": "Fly Amanita", "rank": "advanced" },
+  "4da03:Skyrim.esm": { "produce": "4da00:Skyrim.esm", "name": "Fly Amanita", "rank": "advanced" },
+  "4da04:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
+  "4da05:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
+  "4da06:Skyrim.esm": { "produce": "4da22:Skyrim.esm", "name": "White Cap", "rank": "novice" },
+  "4da07:Skyrim.esm": { "produce": "4da22:Skyrim.esm", "name": "White Cap", "rank": "novice" },
+  "4da08:Skyrim.esm": { "produce": "4da23:Skyrim.esm", "name": "Imp Stool", "rank": "novice" },
+  "4da09:Skyrim.esm": { "produce": "4da23:Skyrim.esm", "name": "Imp Stool", "rank": "novice" },
+  "4da0a:Skyrim.esm": { "produce": "4da24:Skyrim.esm", "name": "Namira's Rot", "rank": "novice" },
+  "4da0b:Skyrim.esm": { "produce": "4da24:Skyrim.esm", "name": "Namira's Rot", "rank": "novice" },
+  "4da0c:Skyrim.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" },
+  "4da1f:Skyrim.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" },
+  "52185:Skyrim.esm": { "produce": "e8448:Skyrim.esm", "name": "Cooked Skeever", "rank": "expert" },
+  "52189:Skyrim.esm": { "produce": "e8448:Skyrim.esm", "name": "Cooked Skeever", "rank": "expert" },
+  "6f94d:Skyrim.esm": { "produce": "6f950:Skyrim.esm", "name": "Scaly Pholiota", "rank": "advanced" },
+  "70e42:Skyrim.esm": { "produce": "6f950:Skyrim.esm", "name": "Scaly Pholiota", "rank": "advanced" },
+  "775fe:Skyrim.esm": { "produce": "e8448:Skyrim.esm", "name": "Cooked Skeever", "rank": "expert" },
+  "7e8b8:Skyrim.esm": { "produce": "7e8b7:Skyrim.esm", "name": "Swamp Fungal Pod", "rank": "advanced" },
+  "7e8c2:Skyrim.esm": { "produce": "7e8c1:Skyrim.esm", "name": "Giant Lichen", "rank": "advanced" },
+  "7e8c6:Skyrim.esm": { "produce": "7e8c5:Skyrim.esm", "name": "Slaughterfish Egg", "rank": "advanced" },
+  "7e8c9:Skyrim.esm": { "produce": "7e8c8:Skyrim.esm", "name": "Rock Warbler Egg", "rank": "advanced" },
+  "7edf0:Skyrim.esm": { "produce": "669a3:Skyrim.esm", "name": "Mammoth Cheese Bowl", "rank": "expert" },
+  "7edf6:Skyrim.esm": { "produce": "7edf5:Skyrim.esm", "name": "Nordic Barnacle", "rank": "advanced" },
+  "7ee00:Skyrim.esm": { "produce": "7ee01:Skyrim.esm", "name": "Glowing Mushroom", "rank": "advanced" },
+  "85f80:Skyrim.esm": { "produce": "eba03:Skyrim.esm", "name": "Clam Meat", "rank": "advanced" },
+  "85f82:Skyrim.esm": { "produce": "eba03:Skyrim.esm", "name": "Clam Meat", "rank": "advanced" },
+  "85f83:Skyrim.esm": { "produce": "eba03:Skyrim.esm", "name": "Clam Meat", "rank": "advanced" },
+  "8b5c4:Skyrim.esm": { "produce": "77e1c:Skyrim.esm", "name": "Blue Mountain Flower", "rank": "advanced" },
+  "9748b:Skyrim.esm": { "produce": "7ee01:Skyrim.esm", "name": "Glowing Mushroom", "rank": "advanced" },
+  "a24d:Dawnguard.esm": { "produce": "b097:Dawnguard.esm", "name": "Gleamblossom", "rank": "advanced" },
+  "b03af:Skyrim.esm": { "produce": "b2183:Skyrim.esm", "name": "Creep Cluster", "rank": "novice" },
+  "b202c:Skyrim.esm": { "produce": "b2183:Skyrim.esm", "name": "Creep Cluster", "rank": "novice" },
+  "b4ec:Dawnguard.esm": { "produce": "1932b:Dawnguard.esm", "name": "Canticle Bark", "rank": "novice" },
+  "b91f0:Skyrim.esm": { "produce": "134aa:Skyrim.esm", "name": "Thistle Branch", "rank": "novice" },
+  "b91f8:Skyrim.esm": { "produce": "77e1e:Skyrim.esm", "name": "Purple Mountain Flower", "rank": "advanced" },
+  "bb947:Skyrim.esm": { "produce": "3f7f8:Skyrim.esm", "name": "Tundra Cotton", "rank": "novice" },
+  "bb948:Skyrim.esm": { "produce": "5076e:Skyrim.esm", "name": "Juniper Berries", "rank": "novice" },
+  "bb949:Skyrim.esm": { "produce": "6ac4a:Skyrim.esm", "name": "Jazbay Grapes", "rank": "novice" },
+  "bb94a:Skyrim.esm": { "produce": "6abcb:Skyrim.esm", "name": "Canis Root", "rank": "advanced" },
+  "bb94b:Skyrim.esm": { "produce": "516c8:Skyrim.esm", "name": "Deathbell", "rank": "advanced" },
+  "bb94c:Skyrim.esm": { "produce": "516c8:Skyrim.esm", "name": "Deathbell", "rank": "advanced" },
+  "bb94d:Skyrim.esm": { "produce": "889a2:Skyrim.esm", "name": "Dragon's Tongue", "rank": "advanced" },
+  "bb94e:Skyrim.esm": { "produce": "889a2:Skyrim.esm", "name": "Dragon's Tongue", "rank": "advanced" },
+  "bb94f:Skyrim.esm": { "produce": "57f91:Skyrim.esm", "name": "Hanging Moss", "rank": "novice" },
+  "bb950:Skyrim.esm": { "produce": "57f91:Skyrim.esm", "name": "Hanging Moss", "rank": "novice" },
+  "bb951:Skyrim.esm": { "produce": "57f91:Skyrim.esm", "name": "Hanging Moss", "rank": "novice" },
+  "bb952:Skyrim.esm": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "novice" },
+  "bb953:Skyrim.esm": { "produce": "4b0ba:Skyrim.esm", "name": "Wheat", "rank": "advanced" },
+  "bc0:HearthFires.esm": { "produce": "353c:HearthFires.esm", "name": "Butter", "rank": "novice" },
+  "bcf33:Skyrim.esm": { "produce": "1b3bd:Skyrim.esm", "name": "Snowberries", "rank": "advanced" },
+  "bcf34:Skyrim.esm": { "produce": "1b3bd:Skyrim.esm", "name": "Snowberries", "rank": "advanced" },
+  "bcf3a:Skyrim.esm": { "produce": "77e1e:Skyrim.esm", "name": "Purple Mountain Flower", "rank": "advanced" },
+  "bcf3c:Skyrim.esm": { "produce": "77e1d:Skyrim.esm", "name": "Red Mountain Flower", "rank": "advanced" },
+  "bcf3d:Skyrim.esm": { "produce": "77e1c:Skyrim.esm", "name": "Blue Mountain Flower", "rank": "advanced" },
+  "bcf3e:Skyrim.esm": { "produce": "77e1d:Skyrim.esm", "name": "Red Mountain Flower", "rank": "advanced" },
+  "bcf3f:Skyrim.esm": { "produce": "77e1c:Skyrim.esm", "name": "Blue Mountain Flower", "rank": "advanced" },
+  "bcf47:Skyrim.esm": { "produce": "64b41:Skyrim.esm", "name": "Potato", "rank": "novice" },
+  "bcf48:Skyrim.esm": { "produce": "64b3f:Skyrim.esm", "name": "Cabbage", "rank": "novice" },
+  "be3e0:Skyrim.esm": { "produce": "83e64:Skyrim.esm", "name": "Grass Pod", "rank": "novice" },
+  "be3e1:Skyrim.esm": { "produce": "83e64:Skyrim.esm", "name": "Grass Pod", "rank": "novice" },
+  "be3e6:Skyrim.esm": { "produce": "10d666:Skyrim.esm", "name": "Gourd", "rank": "novice" },
+  "c43b0:Skyrim.esm": { "produce": "2f44c:Skyrim.esm", "name": "Nightshade", "rank": "expert" },
+  "c43b6:Skyrim.esm": { "produce": "2f44c:Skyrim.esm", "name": "Nightshade", "rank": "expert" },
+  "ce84c:Skyrim.esm": { "produce": "4da24:Skyrim.esm", "name": "Namira's Rot", "rank": "novice" },
+  "db68b:Skyrim.esm": { "produce": "4da22:Skyrim.esm", "name": "White Cap", "rank": "novice" },
+  "db6bc:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
+  "dd676:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
+  "dd679:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
+  "dd683:Skyrim.esm": { "produce": "4da22:Skyrim.esm", "name": "White Cap", "rank": "novice" },
+  "df015:Skyrim.esm": { "produce": "1b3bd:Skyrim.esm", "name": "Snowberries", "rank": "advanced" },
+  "e644b:Skyrim.esm": { "produce": "4da00:Skyrim.esm", "name": "Fly Amanita", "rank": "advanced" },
+  "ec7e7:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
+  "ec875:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
+  "ec876:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
+  "eca55:Skyrim.esm": { "produce": "4da00:Skyrim.esm", "name": "Fly Amanita", "rank": "advanced" },
+  "eca56:Skyrim.esm": { "produce": "4da00:Skyrim.esm", "name": "Fly Amanita", "rank": "advanced" },
+  "eca57:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
+  "eca58:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
+  "eca59:Skyrim.esm": { "produce": "4da22:Skyrim.esm", "name": "White Cap", "rank": "novice" },
+  "eca5a:Skyrim.esm": { "produce": "4da22:Skyrim.esm", "name": "White Cap", "rank": "novice" },
+  "eca5b:Skyrim.esm": { "produce": "4da23:Skyrim.esm", "name": "Imp Stool", "rank": "novice" },
+  "eca5c:Skyrim.esm": { "produce": "4da23:Skyrim.esm", "name": "Imp Stool", "rank": "novice" },
+  "eca5d:Skyrim.esm": { "produce": "4da24:Skyrim.esm", "name": "Namira's Rot", "rank": "novice" },
+  "eca5e:Skyrim.esm": { "produce": "4da24:Skyrim.esm", "name": "Namira's Rot", "rank": "novice" },
+  "eca5f:Skyrim.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" },
+  "eca60:Skyrim.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" },
+  "ece21:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
+  "ece9a:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
+  "f1ce:HearthFires.esm": { "produce": "f1cc:HearthFires.esm", "name": "Hawk's Egg", "rank": "advanced" },
+  "f3e57:Skyrim.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
+  "f5eca:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
+  "f5ecb:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "rank": "advanced" },
+  "f675f:Skyrim.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" }
 };
+
+// ==== end HARVESTS_BY_BASE ====
+
+/*
+  THE PLANTS THE PASS CANNOT SEE, WHICH IS WHY THIS MAP IS STILL HERE.
+
+  The pass reads FLOR and TREE. Nirnroot is neither: it is ACTI 0xE1FB2, an
+  activator whose whole behaviour is a Papyrus script, and the red one is ACTI
+  0xB6FB9. Checked on 20 September against the built table: neither base is one
+  of the 147 rows. So switching harvest() onto the generated table alone would
+  have quietly taken nirnroot back out of the game, and the block of comment
+  above the scripted activators is there to say why it had to be put in by hand
+  in the first place. The produce ids are read out of Skyrim.esm rather than
+  off a wiki: 0xE1FB2 yields INGR 0x59B86 and 0xB6FB9 yields 0xB701A.
+
+  They carry no rank, and that is deliberate rather than unfinished. The pass
+  ranks a plant by the gold value of its produce, and it cannot read a record
+  it does not look at, so a rank written here would be a number somebody made
+  up sitting in a column where every other row's is measured. The gatherer's
+  class verb is the only gate on these two, which is exactly the gate they had
+  before the big table arrived. harvest() reads a null rank as no rank and
+  skips the ladder for it.
+*/
+const HARVESTS = {
+  'e1fb2:Skyrim.esm': { produce: '59b86:Skyrim.esm', name: 'Nirnroot', rank: null },
+  'b6fb9:Skyrim.esm': { produce: 'b701a:Skyrim.esm', name: 'Red Nirnroot', rank: null },
+};
+
+/**
+ * True when this base is one of the ones this server puts in the world itself.
+ *
+ * STATIONS is generated from tools\thornswood-src\stations.json and carries
+ * three today: the salt quarry, the charcoal kiln and the beehive. Two of them
+ * have a branch in onActivate written for them and the beehive does not, which
+ * is what made this worth a function. The harvests pass reads every FLOR and
+ * TREE in the load order, Thornswood-Content.esp is in that load order, and the
+ * beehive is a FLOR with an INGR produce like any flower, so on 20 September it
+ * came out of the pass as a wild plant worth 5 gold, ranked advanced. The
+ * moment harvest() started answering the generated table, pressing this
+ * server's own hive ran the gatherer class gate and then 'Picking Honeycomb
+ * takes an Advanced Gatherer', and because onActivate returns false for
+ * anything it answers, the engine's own handover was blocked too: a Woodworker
+ * got nothing at all out of a hive Thornswood placed for them.
+ *
+ * The pass leaves the station bases out now, so this finds nothing in the table
+ * today. It is here because the pass is a sweep of the whole load order and
+ * this server's plugin keeps growing: the next FLOR or TREE Thornswood places
+ * would be swept up the same way if the two files ever fall out of step.
+ */
+function isStation(baseDesc) {
+  for (var k in STATIONS) {
+    if (!Object.prototype.hasOwnProperty.call(STATIONS, k)) continue;
+    if (STATIONS[k] === baseDesc) return true;
+  }
+  return false;
+}
+
+/** The row for a base, out of the generated table or the hand list beside it,
+ *  or null when this base is not a plant at all. Own-property checks on both,
+ *  for the reason own() in the progression block was written: '__proto__'
+ *  finds something on Object.prototype and a truth test cannot tell that from
+ *  a plant. */
+function plantAt(baseDesc) {
+  // A station is answered by the branch written for it in onActivate, or, while
+  // it has no branch, by the engine doing what it already does with a FLOR. It
+  // is never answered here. See isStation above for what happened when it was.
+  if (isStation(baseDesc)) return null;
+  if (Object.prototype.hasOwnProperty.call(HARVESTS_BY_BASE, baseDesc)) {
+    return HARVESTS_BY_BASE[baseDesc];
+  }
+  if (Object.prototype.hasOwnProperty.call(HARVESTS, baseDesc)) {
+    return HARVESTS[baseDesc];
+  }
+  return null;
+}
+
+/** True when somebody pressing this base should be answered by harvest(). */
+function isPlant(baseDesc) {
+  return plantAt(baseDesc) !== null;
+}
 
 /* Shrine -> the ability it grants. These are the Altar*Spell records, which
  * are what the vanilla shrine script adds; the blessing is one ability at a
@@ -1929,8 +3021,12 @@ var CROPS = mergeCrops();
 /** True when this base is one of the crops above. Never a bare lookup: the
  *  descriptor arrives from a reference in the world, and '__proto__' finding
  *  something on Object.prototype is the hole the progression block's own()
- *  was written for. */
+ *  was written for. A base this server places itself is refused first, for the
+ *  reason written over isStation: the crops pass sweeps the same load order the
+ *  harvests pass does, and a station that reached this table would be a plot
+ *  somebody could claim. */
 function isCrop(baseDesc) {
+  if (isStation(baseDesc)) return false;
   return Object.prototype.hasOwnProperty.call(CROPS, baseDesc);
 }
 
@@ -2002,19 +3098,56 @@ function bless(actorId, baseDesc) {
   return 'You take the blessing of ' + shrine.who + '.';
 }
 
+/**
+ * A press on a plant, answered off the generated table since 20 September.
+ *
+ * It read a hand written map with two nirnroots in it until then, so a
+ * gatherer could pick two things in the whole province and every other flower,
+ * mushroom and egg sack in the load order was a press that did nothing. The
+ * map is still there, holding those same two, because they are ACTI records
+ * the pass does not read. Everything else now comes out of HARVESTS_BY_BASE.
+ */
 function harvest(actorId, refrId, baseDesc) {
-  const plant = HARVESTS[baseDesc];
+  /*
+    A CROP IS NOT A PLANT TO BE PICKED HERE, whatever the pass says about it.
+
+    Measured on 20 September: every one of the fifteen bases in CROPS is also a
+    row in the generated harvests table, the four CROP_RULES adds by hand along
+    with the eleven the crops pass found, because both passes read the same FLOR
+    and TREE records and a cabbage plot is a FLOR like any other. onActivate
+    asks isCrop first for exactly that reason, and this asks again rather than
+    trusting the branch order to stay the way it is: a press that reached here
+    would hand over the produce with no plot, no wait, no claim and no farmer,
+    which is the free farming the farming block exists to stop.
+  */
+  if (isCrop(baseDesc)) return null;
+
+  const plant = plantAt(baseDesc);
   if (!plant) return null;
+
   // The gatherer's verb. Asked before the cooldown so that somebody who is
   // not a gatherer gets the same answer at every plant, every time, rather
   // than 'this one has already been picked' at one they never picked.
   const mine = classGate(actorId, 'harvest');
   if (mine) return mine;
+
+  /*
+    The plant's rank, gated the way mineOre gates a seam and for the same
+    reason: the ladder is worth climbing only if something is above you on it.
+    indexOf answers -1 for the two hand rows, which carry no rank, and 0 for a
+    novice plant, so the test skips both without a second branch saying so.
+  */
+  const want = RANK_LADDER.indexOf(plant.rank);
+  if (want > 0 && rankStep(actorId, 'gatherer') < want) {
+    return 'Picking ' + plant.name + ' takes ' + rankWord(plant.rank) +
+           ' Gatherer. Pick what you can until you are one.';
+  }
+
   const prev = lastUse.get(actorId + ':' + refrId) || 0;
   if (Date.now() - prev < HARVEST_COOLDOWN_MS) {
     return 'This one has already been picked.';
   }
-  if (!addItem(actorId, plant.item, 1)) return null;
+  if (!addItem(actorId, plant.produce, 1)) return null;
   lastUse.set(actorId + ':' + refrId, Date.now());
   const rank = creditWork(actorId, 'harvest');
   return 'You pick the ' + plant.name + '.' + (rank ? ' ' + rank : '');
@@ -2064,17 +3197,35 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     return;
   }
 
+  // STATIONS names three bases and two of them have a branch here. The beehive
+  // has none, so a press on it falls past every branch below and the engine
+  // hands the honeycomb over itself, which is what it did before any of these
+  // tables existed. That is on purpose: for one day on 20 September the
+  // generated plant table carried the hive, harvest() answered it, and a hive
+  // this server placed was locked to Advanced Gatherers and dead to everybody
+  // else. What the hive should ask for is a decision for Patrick and Djinn and
+  // not one to make inside a sweep of the load order, so until they take it the
+  // hive behaves the way it always has.
   let message = null;
   if (baseDesc === STATIONS.saltQuarry) message = mineSalt(casterRefrId, refrId);
   else if (baseDesc === STATIONS.charcoalKiln) message = burnCharcoal(casterRefrId, refrId);
   else if (SHRINES[baseDesc]) message = bless(casterRefrId, baseDesc);
-  else if (HARVESTS[baseDesc]) message = harvest(casterRefrId, refrId, baseDesc);
   // A crop always falls through to the return false at the bottom, whatever
   // farmActivate answered. ProcessActivateNormal in the engine reads the produce
   // straight out of the FLOR or TREE record and hands it over, and it is only
   // an explicit false from here that stops it. Anything that reached this line
   // and left without a false would be the free pick back.
+  //
+  // IT IS ASKED BEFORE THE PLANTS, AND THE ORDER IS LOAD BEARING. Measured on
+  // 20 September: all fifteen crop bases are rows in the generated harvests
+  // table as well, because both passes read the same FLOR and TREE records. A
+  // plants-first order would answer every cabbage plot in Skyrim as a plant to
+  // be picked, and the farming block would never be reached at all. harvest()
+  // refuses a crop on its own account too, so neither half of that depends on
+  // this line staying where it is.
   else if (isCrop(baseDesc)) message = farmActivate(casterRefrId, refrId, baseDesc);
+  else if (isPlant(baseDesc)) message = harvest(casterRefrId, refrId, baseDesc);
+  else if (isVein(baseDesc)) message = mineOre(casterRefrId, refrId, baseDesc);
   else return;
 
   if (message) {
@@ -2112,12 +3263,22 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     add(STATIONS.saltQuarry);
     add(STATIONS.charcoalKiln);
     for (var shrine in SHRINES) { add(shrine); }
-    for (var crop in HARVESTS) { add(crop); }
+    for (var handPlant in HARVESTS) { add(handPlant); }
     // Every farm crop as well. A crop base missing from this list is pressed
     // twice for every press: once by the person and once by the client
     // re-activating it, so the first press brings the crop in and the second
     // is told the plot is empty a tick later.
     for (var cropBase in CROPS) { add(cropBase); }
+    // And every base the two generated tables answer for, which is the 181
+    // plants and the 581 seams. This is the same defect as the crops one
+    // above and it is worth saying again in the shape it takes here: the
+    // second press lands inside the cooldown, so a gatherer who picks a
+    // deathbell is told a tick later that it has already been picked, and a
+    // miner who works an iron vein is told the seam needs 20 more seconds.
+    // The yield is right and the sentence on the screen is the wrong one,
+    // which is the hardest kind of fault to be shown a bug report for.
+    for (var plantBase in HARVESTS_BY_BASE) { add(plantBase); }
+    for (var veinBase in ORES_BY_BASE) { add(veinBase); }
 
     var fsb = require('fs');
     var pathb = require('path');
