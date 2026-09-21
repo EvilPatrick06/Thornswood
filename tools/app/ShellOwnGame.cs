@@ -57,6 +57,43 @@ namespace Thornswood
             Config c = cfg;
             bool active = OwnGame.Active;
             bool collection = Paths.Collection;
+
+            /*
+                SAID EVERY START, not once, and said before anything is offered.
+
+                The offer below is made once and can be declined, and after that
+                nothing ever mentioned it again. So somebody who said no in
+                September is still sharing one Skyrim with every other server on
+                their machine months later, with nothing anywhere saying so.
+
+                WHAT SHARING ACTUALLY COSTS, and it is not obvious from the
+                outside. Data\Platform\Plugins\skymp5-client-settings.txt is ONE
+                FILE in the Steam copy. Every launcher on the machine writes it
+                and the game reads whichever wrote last. Ours puts chooseAtMenu
+                and a profile id in it on every Play; another server's puts its
+                own settings there. Start the game after theirs and our plugin
+                sees no chooseAtMenu, does nothing, and the stock SkyMP login box
+                comes up reading ID: UNDEFINED. Reported 21 September by a tester
+                who plays two other servers, WITH OUR BACKDROP BEHIND IT, which
+                is what makes it so hard to read: Vortex deployed our collection
+                into that same shared copy, so the art, the menu and the mods are
+                all ours and correct while the one file that decides who you are
+                belongs to somebody else. My Games and LocalAppData are shared
+                the same way, because Swap.Apply stands down in this mode and
+                leaves Vortex to own them.
+
+                This line is what lets the next report be read in ten seconds
+                instead of an evening. It goes to the log on the window's thread,
+                before the pool work below, because Log writes a WPF object.
+            */
+            if (collection)
+            {
+                Log("Thornswood is sharing one Skyrim with every other server on this machine, " +
+                    "in " + Paths.Game + ". Saves, settings and the client's own settings file " +
+                    "are shared, so whichever launcher wrote last is the one the game believes. " +
+                    "Settings, Maintenance has the button to give Thornswood a folder of its own.");
+            }
+
             ThreadPool.QueueUserWorkItem(delegate
             {
                 bool refresh = false, offer = false;
