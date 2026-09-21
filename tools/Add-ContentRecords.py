@@ -88,6 +88,28 @@ HANDLE = 0x5015490
 RECIPE_HANDLE = 0x5015491
 RECIPE_SHOVEL = 0x5015492
 
+# ONE DEED RECORD FOR EVERY PROPERTY IN THE GAME.
+#
+# Patrick settled the property system on 21 September and this is the measurement
+# that made "every building in the game is claimable" affordable: Inventory::Entry
+# in the fork carries an optional per-instance name, serialised by name in
+# Inventory.h, so one BOOK becomes "Deed to Breezehome" or "Deed to Honeyside" in
+# the pack without a record per building. There are 852 claimable buildings and
+# this is one record rather than 852.
+#
+# It is cloned from a passage book, which is a BOOK this plugin already ships and
+# already reads as a plain document rather than a spell tome or a skill book.
+DEED = 0x5015493
+
+DEED_WORDS = (
+    '<p align="center"><font size="30">Deed</font></p>'
+    '<br><br>'
+    'This deed sets out the holding of the property written on its cover.'
+    '<br><br>'
+    '<font size="18">Whoever carries it holds the place. There is no copy and no '
+    'register but this. Keep it somewhere a thief will not look, or do not keep it '
+    'at all.</font>')
+
 # What the recipes are made of and what they make. Every one of these was read
 # out of a record already in this file or out of TOOLS in gamemode.js, never
 # remembered.
@@ -261,18 +283,33 @@ def main():
     taken = set(r.fid for r in records)
     before = {r.fid: r.data for r in records}
 
+    # ALREADY THERE IS NOT AN ERROR, BUT A DIFFERENT RECORD UNDER THE SAME NAME
+    # IS. This script is run again every time the plugin grows another record, so
+    # it says what is already in place and adds what is not. What it will not do
+    # is write a second record with an editor id the file already uses: two
+    # records under one name is the kind of thing that is found months later.
+    already = set()
     for name, fid in (('ThornswoodMiscToolHandle', HANDLE),
                       ('ThornswoodRecipeToolHandle', RECIPE_HANDLE),
-                      ('ThornswoodRecipeToolShovel', RECIPE_SHOVEL)):
-        if name in by_edid:
+                      ('ThornswoodRecipeToolShovel', RECIPE_SHOVEL),
+                      ('ThornswoodBookDeed', DEED)):
+        here_already = name in by_edid
+        if here_already and by_edid[name].fid != fid:
             print('')
-            print('STOP. %s is already in this plugin. Nothing was written.' % name)
+            print('STOP. %s is already in this plugin as 0x%07X and this would add it as '
+                  '0x%07X. Nothing was written.' % (name, by_edid[name].fid, fid))
             return 1
-        if fid in taken:
+        if here_already:
+            already.add(name)
+        elif fid in taken:
             print('')
             print('STOP. 0x%07X is already taken. Nothing was written.' % fid)
             return 1
-
+    if already:
+        print('')
+        print('Already in the plugin, so not added again')
+        for name in sorted(already):
+            print('  %s' % name)
     misc_src = by_edid['ThornswoodCharcoalTier1']
     cobj_charcoal = by_edid['ThornswoodRecipeCharcoalTier1']
     cobj_pickaxe = by_edid['ThornswoodRecipeWeaponPickaxe']
@@ -286,6 +323,13 @@ def main():
         b'CNTO': cnto(FIREWOOD, 1),
         b'CNAM': struct.pack('<I', HANDLE),
         b'BNAM': struct.pack('<I', KILN_KEYWORD),
+    })
+    # The body is the same on every deed, because there is only one record. What
+    # property it is, is the per-instance name in the pack, and the words below
+    # are why a stolen one is worth stealing: whoever carries it holds the place.
+    deed = clone(by_edid['ThornswoodPassageWhiterun'], DEED, 'ThornswoodBookDeed', sets={
+        b'FULL': zstr('Deed'),
+        b'DESC': zstr(DEED_WORDS),
     })
     make_shovel = clone(cobj_pickaxe, RECIPE_SHOVEL, 'ThornswoodRecipeToolShovel', sets={
         b'CNAM': struct.pack('<I', SHOVEL),
@@ -303,6 +347,8 @@ def main():
           % RECIPE_HANDLE)
     print('  COBJ 0x%07X ThornswoodRecipeToolShovel    1 iron ingot + 1 handle -> 1 shovel, at a forge'
           % RECIPE_SHOVEL)
+    print('  BOOK 0x%07X ThornswoodBookDeed            one record, named per instance in the pack'
+          % DEED)
     print('')
     print('What changes')
     print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
@@ -315,11 +361,24 @@ def main():
         print('  --check, so nothing was written.')
         return 0
 
-    built = [handle, make_handle, make_shovel]
-    wants_handle(cobj_pickaxe)
-    wants_handle(cobj_axe)
-    top_group(tree, b'MISC').kids.append(handle)
-    top_group(tree, b'COBJ').kids.extend([make_handle, make_shovel])
+    built = [r for r in (handle, make_handle, make_shovel, deed)
+             if r.editor_id() not in already]
+    # An edit that has already been made is not made twice. A recipe that already
+    # asks for a handle would otherwise gain a second one on every run.
+    edited = set()
+    for rec in (cobj_pickaxe, cobj_axe):
+        if any(t == b'CNTO' and len(b) >= 4 and
+               struct.unpack_from('<I', b, 0)[0] == HANDLE
+               for t, b in subrecords(rec.data)):
+            continue
+        wants_handle(rec)
+        edited.add(rec.fid)
+    if not built and not edited:
+        print('')
+        print('  Everything this adds is already in the plugin. Nothing was written.')
+        return 0
+    for r in built:
+        top_group(tree, r.tag).kids.append(r)
 
     # The header's record count, which sits in HEDR after the version float.
     #
@@ -353,7 +412,6 @@ def main():
         print('  STOP. %d records in, %d out, expected %d. Nothing was written.'
               % (len(records), len(after_records), len(records) + len(built)))
         return 1
-    edited = set([cobj_pickaxe.fid, cobj_axe.fid])
     added = set(r.fid for r in built)
     seen = []
     for r in after_records:
@@ -381,7 +439,8 @@ def main():
         return 1
     print('  ok    %d records in, %d out, same order, same ids, same flags'
           % (len(records), len(after_records)))
-    print('  ok    %d added, 2 edited, every other byte untouched' % len(built))
+    print('  ok    %d added, %d edited, every other byte untouched'
+          % (len(built), len(edited)))
     print('  ok    the header record count reads %d, which is what is in the file' % count)
 
     open(path, 'wb').write(out)
