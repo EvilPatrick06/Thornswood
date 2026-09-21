@@ -3318,11 +3318,13 @@
  "cells": {
   "103e1d:Arena - Markarth Side.esp": {
    "edid": "aaaMarkarthSideInnInterior",
-   "interior": true
+   "interior": true,
+   "name": "The Kings Rest"
   },
   "1041:Solitude Arena.esp": {
    "edid": "AAAAALSDentredelarne",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Arena Entry"
   },
   "10421b:Skyrim.esm": {
    "edid": "",
@@ -3338,351 +3340,438 @@
   },
   "10574:The Great City of Solitude.esp": {
    "edid": "SolitudeSouthsideWarehouseTGCoS",
-   "interior": true
+   "interior": true,
+   "name": "EEC Warehouse West"
   },
   "10665b:WindhelmSSE.esp": {
    "edid": "0GQExtGrayShackSmith",
-   "interior": true
+   "interior": true,
+   "name": "Delmon's Shack"
   },
   "1096b5:Arena - Markarth Side.esp": {
    "edid": "aaaMarkarthSideGeneralStore",
-   "interior": true
+   "interior": true,
+   "name": "The Silverspoon Trading Company"
   },
   "109d6d:Riften Expansion.esp": {
    "edid": "RiftenHouseofClanBearHeart",
-   "interior": true
+   "interior": true,
+   "name": "Bearheart Manor"
   },
   "10a65f:aaaGraniteHill.esp": {
    "edid": "aaaGraniteHillPlayerHome",
-   "interior": true
+   "interior": true,
+   "name": "Crossway Cottage"
   },
   "10a8b:Dawnguard.esm": {
    "edid": "DLC1zFalmerValley03",
-   "interior": true
+   "interior": true,
+   "name": "Forgotten Vale Cave"
   },
   "10ceea:Skyrim.esm": {
    "edid": "MorthalAlvasHouseCellar",
-   "interior": true
+   "interior": true,
+   "name": "Alva's Cellar"
   },
   "115c21:WindhelmSSE.esp": {
    "edid": "0WHIronCheapBard",
-   "interior": true
+   "interior": true,
+   "name": "Jorn's Home"
   },
   "115c8e:WindhelmSSE.esp": {
    "edid": "0WHIronCheapImperial",
-   "interior": true
+   "interior": true,
+   "name": "Broder's Home"
   },
   "115cfd:WindhelmSSE.esp": {
    "edid": "0WHSonsOfTalosHQ",
-   "interior": true
+   "interior": true,
+   "name": "Old Temple of Talos"
   },
   "11cb3:HearthFires.esm": {
    "edid": "BYOHHouse2Hjaalmarch",
-   "interior": true
+   "interior": true,
+   "name": "Windstad Manor"
   },
   "12f61e:WindhelmSSE.esp": {
    "edid": "0WHIronHall",
-   "interior": true
+   "interior": true,
+   "name": "The Iron Halls"
   },
   "12f7a9:WindhelmSSE.esp": {
    "edid": "0WHIronApartmentStonework",
-   "interior": true
+   "interior": true,
+   "name": "Ulf and Ringvilds Lodging"
   },
   "12fba4:WindhelmSSE.esp": {
    "edid": "0WHIronApartmentBroke",
-   "interior": true
+   "interior": true,
+   "name": "Morganna and Hellte's Lodging"
   },
   "12fcff:WindhelmSSE.esp": {
    "edid": "0WHIronMeadry",
-   "interior": true
+   "interior": true,
+   "name": "Battle-Brew Meadery"
   },
   "1321f:Skyrim.esm": {
    "edid": "XTestGrantInt",
-   "interior": true
+   "interior": true,
+   "name": "Magic Visuals Test Hall"
   },
   "1323c:SkyrimSewers.esp": {
    "edid": "SSewersSolitudeUnderworks01",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Sewers, Eastern Tunnel"
   },
   "133c6:Skyrim.esm": {
    "edid": "RiverwoodSleepingGiantInn",
-   "interior": true
+   "interior": true,
+   "name": "Sleeping Giant Inn"
   },
   "133c7:Skyrim.esm": {
    "edid": "RiverwoodGerdursHouse",
-   "interior": true
+   "interior": true,
+   "name": "Hod and Gerdur's House"
   },
   "133c8:Skyrim.esm": {
    "edid": "RiverwoodAlvorsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Alvor and Sigrid's House"
   },
   "133c9:Skyrim.esm": {
    "edid": "RiverwoodRiverwoodTrader",
-   "interior": true
+   "interior": true,
+   "name": "Riverwood Trader"
   },
   "133ca:Skyrim.esm": {
    "edid": "RiverwoodFaendalsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Faendal's House"
   },
   "13502e:WindhelmSSE.esp": {
    "edid": "0WHIronAxes",
-   "interior": true
+   "interior": true,
+   "name": "Audmund's Axes"
   },
   "1380e:Skyrim.esm": {
    "edid": "WinterholdCollegeHallofTheElements",
-   "interior": true
+   "interior": true,
+   "name": "Hall of the Elements"
   },
   "1380f:Skyrim.esm": {
    "edid": "WinterholdCollegeHallofCountenance",
-   "interior": true
+   "interior": true,
+   "name": "Hall of Countenance"
   },
   "13810:Skyrim.esm": {
    "edid": "WinterholdCollegeArcanaeum",
-   "interior": true
+   "interior": true,
+   "name": "The Arcanaeum"
   },
   "13812:Skyrim.esm": {
    "edid": "WinterholdKorirshouse",
-   "interior": true
+   "interior": true,
+   "name": "Kraldar's House"
   },
   "13813:Skyrim.esm": {
    "edid": "WinterholdRanmirshouse",
-   "interior": true
+   "interior": true,
+   "name": "Birna's Oddments"
   },
   "13814:Skyrim.esm": {
    "edid": "WinterholdTheFrozenHearth",
-   "interior": true
+   "interior": true,
+   "name": "The Frozen Hearth"
   },
   "13818:Skyrim.esm": {
    "edid": "WinterholdJarlsLonghouse",
-   "interior": true
+   "interior": true,
+   "name": "Jarl's Longhouse"
   },
   "1382d:Skyrim.esm": {
    "edid": "StonehillsSorlisHouse",
-   "interior": true
+   "interior": true,
+   "name": "Sorli's House"
   },
   "1382e:Skyrim.esm": {
    "edid": "ShorsStoneRedbellyMine",
-   "interior": true
+   "interior": true,
+   "name": "Redbelly Mine"
   },
   "1383a:Skyrim.esm": {
    "edid": "ShorsStoneSylgjasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Sylgja's House"
   },
   "13850:Skyrim.esm": {
    "edid": "ShorsStoneOdfelsandGrogmarsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Odfel's House"
   },
   "13856:Skyrim.esm": {
    "edid": "ShorsStoneFilnjarsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Filnjar's House"
   },
   "13867:Skyrim.esm": {
    "edid": "RoriksteadLemkilsFarm",
-   "interior": true
+   "interior": true,
+   "name": "Lemkil's Farmhouse"
   },
   "1386c:Skyrim.esm": {
    "edid": "RoriksteadCowflopFarm",
-   "interior": true
+   "interior": true,
+   "name": "Cowflop Farmhouse"
   },
   "13870:Skyrim.esm": {
    "edid": "RoriksteadFrostfruitInn",
-   "interior": true
+   "interior": true,
+   "name": "Frostfruit Inn"
   },
   "13871:Skyrim.esm": {
    "edid": "RoriksteadRoriksManor",
-   "interior": true
+   "interior": true,
+   "name": "Rorik's Manor"
   },
   "138be:Skyrim.esm": {
    "edid": "OldHroldanInn",
-   "interior": true
+   "interior": true,
+   "name": "Old Hroldan Inn"
   },
   "138ca:Skyrim.esm": {
    "edid": "MorthalThonnirsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Thonnir's House"
   },
   "138cb:Skyrim.esm": {
    "edid": "MorthalThaumaturgistsHut",
-   "interior": true
+   "interior": true,
+   "name": "Thaumaturgist's Hut"
   },
   "138cc:Skyrim.esm": {
    "edid": "MorthalHighmoonHall",
-   "interior": true
+   "interior": true,
+   "name": "Highmoon Hall"
   },
   "138cd:Skyrim.esm": {
    "edid": "MorthalGuardhouse",
-   "interior": true
+   "interior": true,
+   "name": "Guardhouse"
   },
   "138ce:Skyrim.esm": {
    "edid": "MorthalMoorsideInn",
-   "interior": true
+   "interior": true,
+   "name": "Moorside Inn"
   },
   "138cf:Skyrim.esm": {
    "edid": "MorthalJorgenandLamisHouse",
-   "interior": true
+   "interior": true,
+   "name": "Jorgen and Lami's House"
   },
   "138d0:Skyrim.esm": {
    "edid": "MorthalFalionsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Falion's House"
   },
   "138e1:Skyrim.esm": {
    "edid": "MorthalAlvasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Alva's House"
   },
   "13901:Skyrim.esm": {
    "edid": "KynesgroveSteamscorchGullyMine",
-   "interior": true
+   "interior": true,
+   "name": "Steamscorch Mine"
   },
   "13907:Skyrim.esm": {
    "edid": "KynesgroveBraidwoodInn",
-   "interior": true
+   "interior": true,
+   "name": "Braidwood Inn"
   },
   "13909:Skyrim.esm": {
    "edid": "KarthwastenSanuarachMine",
-   "interior": true
+   "interior": true,
+   "name": "Sanuarach Mine"
   },
   "13978:Skyrim.esm": {
    "edid": "KarthwastenFennsGulchMine",
-   "interior": true
+   "interior": true,
+   "name": "Fenn's Gulch Mine"
   },
   "13979:Skyrim.esm": {
    "edid": "KarthwastenMinersBarracks",
-   "interior": true
+   "interior": true,
+   "name": "Miner's Barracks"
   },
   "139d1:Skyrim.esm": {
    "edid": "KarthwastenHall",
-   "interior": true
+   "interior": true,
+   "name": "Karthwasten Hall"
   },
   "139d2:Skyrim.esm": {
    "edid": "KarthwastenEnmonsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Enmon's House"
   },
   "139e7:Skyrim.esm": {
    "edid": "IvarsteadKlimmeksHouse",
-   "interior": true
+   "interior": true,
+   "name": "Klimmek's House"
   },
   "13a48:Skyrim.esm": {
    "edid": "IvarsteadFellstarFarm",
-   "interior": true
+   "interior": true,
+   "name": "Fellstar Farm"
   },
   "13a5c:Skyrim.esm": {
    "edid": "IvarsteadVilemyrInn",
-   "interior": true
+   "interior": true,
+   "name": "Vilemyr Inn"
   },
   "13a5d:Skyrim.esm": {
    "edid": "NightgateInn",
-   "interior": true
+   "interior": true,
+   "name": "Nightgate Inn"
   },
   "13a66:Skyrim.esm": {
    "edid": "HelgenTorolfsMill",
-   "interior": true
+   "interior": true,
+   "name": "Torolf's Mill"
   },
   "13a67:Skyrim.esm": {
    "edid": "HelgenHomestead",
-   "interior": true
+   "interior": true,
+   "name": "Helgen Homestead"
   },
   "13a68:Skyrim.esm": {
    "edid": "HelgenTheLostMansReprieve",
-   "interior": true
+   "interior": true,
+   "name": "The Lost Man's Reprieve"
   },
   "13a71:Skyrim.esm": {
    "edid": "FalkreathHouseofArkay",
-   "interior": true
+   "interior": true,
+   "name": "Hall of the Dead"
   },
   "13a72:Skyrim.esm": {
    "edid": "FalkreathCorpselightFarm",
-   "interior": true
+   "interior": true,
+   "name": "Corpselight Farm"
   },
   "13a73:Skyrim.esm": {
    "edid": "FalkreathLodsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Lod's House"
   },
   "13a76:Skyrim.esm": {
    "edid": "FalkreathGrayPineGoods",
-   "interior": true
+   "interior": true,
+   "name": "Gray Pine Goods"
   },
   "13a78:Skyrim.esm": {
    "edid": "FalkreathDengeirsHall",
-   "interior": true
+   "interior": true,
+   "name": "Dengeir's House"
   },
   "13a79:Skyrim.esm": {
    "edid": "FalkreathJarlsLonghouse",
-   "interior": true
+   "interior": true,
+   "name": "Jarl's Longhouse"
   },
   "13a7a:Skyrim.esm": {
    "edid": "DragonBridgeHorgeirsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Horgeir's House"
   },
   "13a7b:Skyrim.esm": {
    "edid": "DragonBridgePenitusOculatusOutpost",
-   "interior": true
+   "interior": true,
+   "name": "Penitus Oculatus Outpost"
   },
   "13a7c:Skyrim.esm": {
    "edid": "DragonBridgeFourShieldsTavern",
-   "interior": true
+   "interior": true,
+   "name": "Four Shields Tavern"
   },
   "13a7d:Skyrim.esm": {
    "edid": "DragonBridgeLumberCamp",
-   "interior": true
+   "interior": true,
+   "name": "Dragon Bridge Lumber Camp"
   },
   "13a7e:Skyrim.esm": {
    "edid": "DragonBridgeFarm",
-   "interior": true
+   "interior": true,
+   "name": "Lylvieve Family's House"
   },
   "13a7f:Skyrim.esm": {
    "edid": "DawnstarWindpeakInn",
-   "interior": true
+   "interior": true,
+   "name": "Windpeak Inn"
   },
   "13a80:Skyrim.esm": {
    "edid": "DawnstarTheWhiteHall",
-   "interior": true
+   "interior": true,
+   "name": "The White Hall"
   },
   "13a81:Skyrim.esm": {
    "edid": "DawnstarFrukisHouse",
-   "interior": true
+   "interior": true,
+   "name": "Fruki's House"
   },
   "13a83:Skyrim.esm": {
    "edid": "DawnstarRustleifsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Rustleif's House"
   },
   "13a84:Skyrim.esm": {
    "edid": "DawnstarLeigelfsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Leigelf's House"
   },
   "13a85:Skyrim.esm": {
    "edid": "DawnstarIrgnirsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Irgnir's House"
   },
   "13a86:Skyrim.esm": {
    "edid": "DawnstarMortarandPestle",
-   "interior": true
+   "interior": true,
+   "name": "The Mortar and Pestle"
   },
   "13a87:Skyrim.esm": {
    "edid": "DawnstarBrinasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Brina's House"
   },
   "13a88:Skyrim.esm": {
    "edid": "DawnstarBeitildsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Beitild's House"
   },
   "13a89:Skyrim.esm": {
    "edid": "DawnstarBarracks",
-   "interior": true
+   "interior": true,
+   "name": "Dawnstar Barracks"
   },
   "13a8a:Skyrim.esm": {
    "edid": "DarkwaterCrossingGoldenrockMine",
-   "interior": true
+   "interior": true,
+   "name": "Goldenrock Mine"
   },
   "13a8c:Skyrim.esm": {
    "edid": "DarkwaterCrossingVernersHouse",
-   "interior": true
+   "interior": true,
+   "name": "Verner and Annekke's House"
   },
   "140a:Dawnguard.esm": {
    "edid": "DLC1Arkngthamz01",
-   "interior": true
+   "interior": true,
+   "name": "Arkngthamz"
   },
   "142e2:Dragonborn.esm": {
    "edid": "DLC2Benkongerike01",
-   "interior": true
+   "interior": true,
+   "name": "Benkongerike"
   },
   "142ec:Dragonborn.esm": {
    "edid": "",
@@ -3690,775 +3779,968 @@
   },
   "142ed:Dragonborn.esm": {
    "edid": "DLC2WhiteRidgeBarrow01",
-   "interior": true
+   "interior": true,
+   "name": "White Ridge Barrow"
   },
   "142ee:Dragonborn.esm": {
    "edid": "DLC2KolbjornBarrow01",
-   "interior": true
+   "interior": true,
+   "name": "Kolbjorn Barrow"
   },
   "142ef:Dragonborn.esm": {
    "edid": "DLC2VahloksTomb01",
-   "interior": true
+   "interior": true,
+   "name": "Vahlok's Tomb"
   },
   "142f0:Dragonborn.esm": {
    "edid": "DLC2TempleOfMiraak01",
-   "interior": true
+   "interior": true,
+   "name": "Temple of Miraak"
   },
   "142f1:Dragonborn.esm": {
    "edid": "DLC2Nchardak01",
-   "interior": true
+   "interior": true,
+   "name": "Nchardak Great Chamber"
   },
   "142f3:Dragonborn.esm": {
    "edid": "DLC2Book03Dungeon",
-   "interior": true
+   "interior": true,
+   "name": "Apocrypha"
   },
   "142f4:Dragonborn.esm": {
    "edid": "DLC2Book07Dungeon",
-   "interior": true
+   "interior": true,
+   "name": "Apocrypha"
   },
   "142f6:Dragonborn.esm": {
    "edid": "DLC2GyldenhulBarrow01",
-   "interior": true
+   "interior": true,
+   "name": "Gyldenhul Barrow"
   },
   "142f7:Dragonborn.esm": {
    "edid": "DLC2Frossel01",
-   "interior": true
+   "interior": true,
+   "name": "Frossel"
   },
   "142f8:Dragonborn.esm": {
    "edid": "DLC2FortFrostmoth01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Frostmoth"
   },
   "142f9:Dragonborn.esm": {
    "edid": "DLC2Kagrumez01",
-   "interior": true
+   "interior": true,
+   "name": "Kagrumez"
   },
   "142fa:Dragonborn.esm": {
    "edid": "DLC2Fahlbtharz01",
-   "interior": true
+   "interior": true,
+   "name": "Fahlbtharz"
   },
   "142fb:Dragonborn.esm": {
    "edid": "DLC2CastleKarstaagRuins01",
-   "interior": true
+   "interior": true,
+   "name": "Castle Karstaag Caverns"
   },
   "142fc:Dragonborn.esm": {
    "edid": "DLC2BloodskalBarrow01",
-   "interior": true
+   "interior": true,
+   "name": "Raven Rock Mine"
   },
   "14987c:WindhelmSSE.esp": {
    "edid": "0WHMuseumTopFloor",
-   "interior": true
+   "interior": true,
+   "name": "Upper Halls"
   },
   "14c095:Riften Expansion.esp": {
    "edid": "RiftenDockFort",
-   "interior": true
+   "interior": true,
+   "name": "The Dockfort"
   },
   "15154:HearthFires.esm": {
    "edid": "BYOHHouse2HjaalmarchBasement",
-   "interior": true
+   "interior": true,
+   "name": "Windstad Manor, Cellar"
   },
   "151f2:Skyrim.esm": {
    "edid": "SteepfallBurrow01",
-   "interior": true
+   "interior": true,
+   "name": "Steepfall Burrow"
   },
   "151f3:Skyrim.esm": {
    "edid": "SoljundsSinkhole01",
-   "interior": true
+   "interior": true,
+   "name": "Soljund's Sinkhole"
   },
   "151f4:Skyrim.esm": {
    "edid": "Yngvild01",
-   "interior": true
+   "interior": true,
+   "name": "Yngvild"
   },
   "151f5:Skyrim.esm": {
    "edid": "YngolBarrow01",
-   "interior": true
+   "interior": true,
+   "name": "Yngol Barrow"
   },
   "151f6:Skyrim.esm": {
    "edid": "WolfskullCave01",
-   "interior": true
+   "interior": true,
+   "name": "Wolfskull Cave"
   },
   "151f9:Skyrim.esm": {
    "edid": "WhiteRiverWatch01",
-   "interior": true
+   "interior": true,
+   "name": "White River Watch"
   },
   "151fa:Skyrim.esm": {
    "edid": "SerpentsBluffRedoubt01",
-   "interior": true
+   "interior": true,
+   "name": "Serpent's Bluff Ruins"
   },
   "151fb:Skyrim.esm": {
    "edid": "Volunruud01",
-   "interior": true
+   "interior": true,
+   "name": "Volunruud"
   },
   "151fc:Skyrim.esm": {
    "edid": "Volskygge01",
-   "interior": true
+   "interior": true,
+   "name": "Volskygge"
   },
   "15200:Skyrim.esm": {
    "edid": "TrevasWatch01",
-   "interior": true
+   "interior": true,
+   "name": "Treva's Watch"
   },
   "15201:Skyrim.esm": {
    "edid": "TolvaldsCave01",
-   "interior": true
+   "interior": true,
+   "name": "Tolvald's Cave"
   },
   "15206:Skyrim.esm": {
    "edid": "StillbornCave01",
-   "interior": true
+   "interior": true,
+   "name": "Stillborn Cave"
   },
   "15207:Skyrim.esm": {
    "edid": "HonningbrewMeadery01",
-   "interior": true
+   "interior": true,
+   "name": "Honningbrew Meadery"
   },
   "15208:Skyrim.esm": {
    "edid": "SnowVeilSanctum01",
-   "interior": true
+   "interior": true,
+   "name": "Snow Veil Catacombs"
   },
   "1520a:Skyrim.esm": {
    "edid": "SleepingTreeCamp01",
-   "interior": true
+   "interior": true,
+   "name": "Sleeping Tree Cave"
   },
   "15210:Skyrim.esm": {
    "edid": "SilverdriftLair01",
-   "interior": true
+   "interior": true,
+   "name": "Silverdrift Lair"
   },
   "15211:Skyrim.esm": {
    "edid": "SilentMoonsCamp01",
-   "interior": true
+   "interior": true,
+   "name": "Silent Moons Camp"
   },
   "15215:Skyrim.esm": {
    "edid": "ShroudedGrove01",
-   "interior": true
+   "interior": true,
+   "name": "Shrouded Grove Cave"
   },
   "1521b:Skyrim.esm": {
    "edid": "Icerunner01",
-   "interior": true
+   "interior": true,
+   "name": "The Icerunner"
   },
   "1521c:Skyrim.esm": {
    "edid": "ShimmermistCave01",
-   "interior": true
+   "interior": true,
+   "name": "Shimmermist Cave"
   },
   "15220:Skyrim.esm": {
    "edid": "Saarthal01",
-   "interior": true
+   "interior": true,
+   "name": "Saarthal Excavation"
   },
   "15223:Skyrim.esm": {
    "edid": "RimerockBurrow01",
-   "interior": true
+   "interior": true,
+   "name": "Rimerock Burrow"
   },
   "15224:Skyrim.esm": {
    "edid": "RedoransRetreat01",
-   "interior": true
+   "interior": true,
+   "name": "Redoran's Retreat"
   },
   "15226:Skyrim.esm": {
    "edid": "ReachwaterRock01",
-   "interior": true
+   "interior": true,
+   "name": "Reachwater Rock"
   },
   "15227:Skyrim.esm": {
    "edid": "ReachcliffCave01",
-   "interior": true
+   "interior": true,
+   "name": "Reachcliff Cave"
   },
   "15229:Skyrim.esm": {
    "edid": "RannveigsFast01",
-   "interior": true
+   "interior": true,
+   "name": "Rannveig's Fast"
   },
   "1522a:Skyrim.esm": {
    "edid": "Ragnvald01",
-   "interior": true
+   "interior": true,
+   "name": "Ragnvald Temple"
   },
   "1522c:Skyrim.esm": {
    "edid": "PurewaterRun01",
-   "interior": true
+   "interior": true,
+   "name": "Purewater Run"
   },
   "1522f:Skyrim.esm": {
    "edid": "Pinewatch01",
-   "interior": true
+   "interior": true,
+   "name": "Pinewatch"
   },
   "15230:Skyrim.esm": {
    "edid": "PinepeakCavern01",
-   "interior": true
+   "interior": true,
+   "name": "Pinepeak Cavern"
   },
   "15231:Skyrim.esm": {
    "edid": "PinemoonCave01",
-   "interior": true
+   "interior": true,
+   "name": "Pinemoon Cave"
   },
   "15233:Skyrim.esm": {
    "edid": "Orotheim01",
-   "interior": true
+   "interior": true,
+   "name": "Orotheim"
   },
   "15235:Skyrim.esm": {
    "edid": "NorthwatchKeep01",
-   "interior": true
+   "interior": true,
+   "name": "Northwatch Keep"
   },
   "15237:Skyrim.esm": {
    "edid": "NchuandZel01",
-   "interior": true
+   "interior": true,
+   "name": "Nchuand-Zel Excavation Site"
   },
   "15238:Skyrim.esm": {
    "edid": "NarzulburMauhulakhsLonghouse",
-   "interior": true
+   "interior": true,
+   "name": "Mauhulakh's Longhouse"
   },
   "15239:Skyrim.esm": {
    "edid": "Morvunskar01",
-   "interior": true
+   "interior": true,
+   "name": "Morvunskar"
   },
   "1523c:Skyrim.esm": {
    "edid": "MorKhazgurMine",
-   "interior": true
+   "interior": true,
+   "name": "Mor Khazgur Mine"
   },
   "1523d:Skyrim.esm": {
    "edid": "Mzinchaleft01",
-   "interior": true
+   "interior": true,
+   "name": "Mzinchaleft"
   },
   "1523f:Skyrim.esm": {
    "edid": "Mzulft01",
-   "interior": true
+   "interior": true,
+   "name": "Mzulft"
   },
   "15251:Skyrim.esm": {
    "edid": "LostKnifeHideout01",
-   "interior": true
+   "interior": true,
+   "name": "Lost Knife Cave"
   },
   "15253:Skyrim.esm": {
    "edid": "LostEchoCave01",
-   "interior": true
+   "interior": true,
+   "name": "Lost Echo Cave"
   },
   "15254:Skyrim.esm": {
    "edid": "YsgramorsTomb01",
-   "interior": true
+   "interior": true,
+   "name": "Ysgramor's Tomb"
   },
   "15255:Skyrim.esm": {
    "edid": "KilkreathRuins01",
-   "interior": true
+   "interior": true,
+   "name": "Kilkreath Temple"
   },
   "15257:Skyrim.esm": {
    "edid": "Raldbthar01",
-   "interior": true
+   "interior": true,
+   "name": "Raldbthar"
   },
   "15258:Skyrim.esm": {
    "edid": "IlinaltasDeep01",
-   "interior": true
+   "interior": true,
+   "name": "Ilinalta's Deep"
   },
   "1525c:Skyrim.esm": {
    "edid": "LargashburShagrolsLonghouse",
-   "interior": true
+   "interior": true,
+   "name": "Largashbur Longhouse"
   },
   "1525d:Skyrim.esm": {
    "edid": "HoneystrandGrove01",
-   "interior": true
+   "interior": true,
+   "name": "Honeystrand Cave"
   },
   "1525f:Skyrim.esm": {
    "edid": "HobsFallCave01",
-   "interior": true
+   "interior": true,
+   "name": "Hob's Fall Cave"
   },
   "15261:Skyrim.esm": {
    "edid": "HillgrundsTomb01",
-   "interior": true
+   "interior": true,
+   "name": "Hillgrund's Tomb"
   },
   "15262:Skyrim.esm": {
    "edid": "HighGateRuins01",
-   "interior": true
+   "interior": true,
+   "name": "High Gate Ruins"
   },
   "15265:Skyrim.esm": {
    "edid": "HalldirsCairn01",
-   "interior": true
+   "interior": true,
+   "name": "Halldir's Cairn"
   },
   "15267:Skyrim.esm": {
    "edid": "HagRockRedoubt01",
-   "interior": true
+   "interior": true,
+   "name": "Hag Rock Redoubt Ruin"
   },
   "15268:Skyrim.esm": {
    "edid": "HaemarsShame01",
-   "interior": true
+   "interior": true,
+   "name": "Haemar's Cavern"
   },
   "15269:Skyrim.esm": {
    "edid": "GuldunRock01",
-   "interior": true
+   "interior": true,
+   "name": "Guldun Rock Cave"
   },
   "1526a:Skyrim.esm": {
    "edid": "CrackedTuskKeep01",
-   "interior": true
+   "interior": true,
+   "name": "Cracked Tusk Keep"
   },
   "1526b:Skyrim.esm": {
    "edid": "GreywaterGrotto01",
-   "interior": true
+   "interior": true,
+   "name": "Greywater Grotto"
   },
   "1526c:Skyrim.esm": {
    "edid": "GraywinterWatch01",
-   "interior": true
+   "interior": true,
+   "name": "Graywinter Watch"
   },
   "1526d:Skyrim.esm": {
    "edid": "Gloomreach01",
-   "interior": true
+   "interior": true,
+   "name": "Gloomreach Cavern"
   },
   "1526e:Skyrim.esm": {
    "edid": "GlenmorilCoven01",
-   "interior": true
+   "interior": true,
+   "name": "Glenmoril Coven"
   },
   "1526f:Skyrim.esm": {
    "edid": "MovarthsLair01",
-   "interior": true
+   "interior": true,
+   "name": "Movarth's Lair"
   },
   "15273:Skyrim.esm": {
    "edid": "GallowsRock01",
-   "interior": true
+   "interior": true,
+   "name": "Gallows Rock"
   },
   "15274:Skyrim.esm": {
    "edid": "FrostflowLighthouse",
-   "interior": true
+   "interior": true,
+   "name": "Frostflow Lighthouse"
   },
   "15275:Skyrim.esm": {
    "edid": "FortSungard01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Sungard Annex"
   },
   "15276:Skyrim.esm": {
    "edid": "FortSnowhawk01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Snowhawk"
   },
   "15277:Skyrim.esm": {
    "edid": "FortNeugrad01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Neugrad"
   },
   "15279:Skyrim.esm": {
    "edid": "FortKastav01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Kastav Prison"
   },
   "1527b:Skyrim.esm": {
    "edid": "FortGreenwall01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Greenwall"
   },
   "1527c:Skyrim.esm": {
    "edid": "FortGreymoor01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Greymoor"
   },
   "1527d:Skyrim.esm": {
    "edid": "FortAmol01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Amol"
   },
   "1527e:Skyrim.esm": {
    "edid": "ForsakenCave01",
-   "interior": true
+   "interior": true,
+   "name": "Forsaken Cave"
   },
   "1527f:Skyrim.esm": {
    "edid": "Forelhost01",
-   "interior": true
+   "interior": true,
+   "name": "Forelhost Stronghold"
   },
   "15280:Skyrim.esm": {
    "edid": "Folgunthur01",
-   "interior": true
+   "interior": true,
+   "name": "Folgunthur"
   },
   "15281:Skyrim.esm": {
    "edid": "JaphetsFolly01",
-   "interior": true
+   "interior": true,
+   "name": "Sea Cave"
   },
   "15282:Skyrim.esm": {
    "edid": "FortDunstad01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Dunstad"
   },
   "15283:Skyrim.esm": {
    "edid": "FellglowKeep01",
-   "interior": true
+   "interior": true,
+   "name": "Fellglow Keep Dungeons"
   },
   "15284:Skyrim.esm": {
    "edid": "FortFellhammer01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Fellhammer Garrison"
   },
   "15286:Skyrim.esm": {
    "edid": "FaldarsTooth01",
-   "interior": true
+   "interior": true,
+   "name": "Faldar's Tooth"
   },
   "15288:Skyrim.esm": {
    "edid": "DriftshadeSanctuary01",
-   "interior": true
+   "interior": true,
+   "name": "Driftshade Refuge"
   },
   "1528a:Skyrim.esm": {
    "edid": "DushnikhYalMine",
-   "interior": true
+   "interior": true,
+   "name": "Dushnikh Mine"
   },
   "1528c:Skyrim.esm": {
    "edid": "DustmansCairn01",
-   "interior": true
+   "interior": true,
+   "name": "Dustman's Cairn"
   },
   "15290:Skyrim.esm": {
    "edid": "DuskglowCrevice01",
-   "interior": true
+   "interior": true,
+   "name": "Duskglow Crevice"
   },
   "15294:Skyrim.esm": {
    "edid": "NorthwindMine01",
-   "interior": true
+   "interior": true,
+   "name": "Northwind Mine"
   },
   "15295:Skyrim.esm": {
    "edid": "DeadCroneRock01",
-   "interior": true
+   "interior": true,
+   "name": "Dead Crone Rock"
   },
   "15296:Skyrim.esm": {
    "edid": "Darkshade01",
-   "interior": true
+   "interior": true,
+   "name": "Darkshade"
   },
   "1529c:Skyrim.esm": {
    "edid": "DeepwoodRedoubt01",
-   "interior": true
+   "interior": true,
+   "name": "Deepwood Redoubt"
   },
   "1529d:Skyrim.esm": {
    "edid": "DeadMensRespite01",
-   "interior": true
+   "interior": true,
+   "name": "Dead Men's Respite"
   },
   "1529f:Skyrim.esm": {
    "edid": "DarklightTower01",
-   "interior": true
+   "interior": true,
+   "name": "Darklight Tower"
   },
   "152a0:Skyrim.esm": {
    "edid": "CrystaldriftCave01",
-   "interior": true
+   "interior": true,
+   "name": "Crystaldrift Cave"
   },
   "152a1:Skyrim.esm": {
    "edid": "Korvanjund01",
-   "interior": true
+   "interior": true,
+   "name": "Korvanjund Temple"
   },
   "152a2:Skyrim.esm": {
    "edid": "ClearspringTarn01",
-   "interior": true
+   "interior": true,
+   "name": "Clearspring Cave"
   },
   "152a5:Skyrim.esm": {
    "edid": "CragslaneCavern01",
-   "interior": true
+   "interior": true,
+   "name": "Cragslane Cavern"
   },
   "152a7:Skyrim.esm": {
    "edid": "CronvangrHall01",
-   "interior": true
+   "interior": true,
+   "name": "Cronvangr Cave"
   },
   "152a8:Skyrim.esm": {
    "edid": "CragwallowSlope01",
-   "interior": true
+   "interior": true,
+   "name": "Cragwallow Slope"
   },
   "152aa:Skyrim.esm": {
    "edid": "Ustengrav02",
-   "interior": true
+   "interior": true,
+   "name": "Ustengrav Depths"
   },
   "152ad:Skyrim.esm": {
    "edid": "BrucasLeapRedoubt01",
-   "interior": true
+   "interior": true,
+   "name": "Bruca's Leap Redoubt"
   },
   "152ae:Skyrim.esm": {
    "edid": "BroodCavern01",
-   "interior": true
+   "interior": true,
+   "name": "Brood Cavern"
   },
   "152af:Skyrim.esm": {
    "edid": "BrokenTowerRedoubt01",
-   "interior": true
+   "interior": true,
+   "name": "Broken Tower Redoubt"
   },
   "152b0:Skyrim.esm": {
    "edid": "BrokenHelmHollow01",
-   "interior": true
+   "interior": true,
+   "name": "Broken Helm Hollow"
   },
   "152b1:Skyrim.esm": {
    "edid": "BrokenFangCave01",
-   "interior": true
+   "interior": true,
+   "name": "Broken Fang Cave"
   },
   "152b4:Skyrim.esm": {
    "edid": "OLDBluePalaceWing01",
-   "interior": true
+   "interior": true,
+   "name": "Pelagius Wing"
   },
   "152b7:Skyrim.esm": {
    "edid": "BlindCliffCave01",
-   "interior": true
+   "interior": true,
+   "name": "Blind Cliff Bastion"
   },
   "152ba:Skyrim.esm": {
    "edid": "BleakcoastCave01",
-   "interior": true
+   "interior": true,
+   "name": "Bleakcoast Cave"
   },
   "152bb:Skyrim.esm": {
    "edid": "BlackreachZcell03",
-   "interior": true
+   "interior": true,
+   "name": "War Quarters"
   },
   "152be:Skyrim.esm": {
    "edid": "Avanchnzel01",
-   "interior": true
+   "interior": true,
+   "name": "Avanchnzel"
   },
   "152c0:Skyrim.esm": {
    "edid": "Ansilvund01",
-   "interior": true
+   "interior": true,
+   "name": "Ansilvund Excavation"
   },
   "152c1:Skyrim.esm": {
    "edid": "Angarvunde01",
-   "interior": true
+   "interior": true,
+   "name": "Angarvunde"
   },
   "152c3:Skyrim.esm": {
    "edid": "Alftand01",
-   "interior": true
+   "interior": true,
+   "name": "Alftand Glacial Ruins"
   },
   "154d5:Dawnguard.esm": {
    "edid": "DLC1VampireCastleZCell2",
-   "interior": true
+   "interior": true,
+   "name": "Volkihar East Tower"
   },
   "15cc6f:WindhelmSSE.esp": {
    "edid": "0WHMarketBookshop",
-   "interior": true
+   "interior": true,
+   "name": "Tormund's Tales"
   },
   "1605e:Skyrim.esm": {
    "edid": "WhiterunBanneredMare",
-   "interior": true
+   "interior": true,
+   "name": "The Bannered Mare"
   },
   "161e7:Skyrim.esm": {
    "edid": "WhistlingMine01",
-   "interior": true
+   "interior": true,
+   "name": "Whistling Mine"
   },
   "161e9:Skyrim.esm": {
    "edid": "SolitudeSawmill",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Sawmill"
   },
   "161ea:Skyrim.esm": {
    "edid": "SnowShodFarm",
-   "interior": true
+   "interior": true,
+   "name": "Snow-Shod Farm"
   },
   "161eb:Skyrim.esm": {
    "edid": "SkyHavenTemple",
-   "interior": true
+   "interior": true,
+   "name": "Sky Haven Temple"
   },
   "161ec:Skyrim.esm": {
    "edid": "SarethiFarm",
-   "interior": true
+   "interior": true,
+   "name": "Sarethi Farm"
   },
   "161ed:Skyrim.esm": {
    "edid": "SalviusFarmhouse",
-   "interior": true
+   "interior": true,
+   "name": "Salvius Farmhouse"
   },
   "161ee:Skyrim.esm": {
    "edid": "PelagiaFarm",
-   "interior": true
+   "interior": true,
+   "name": "Pelagia Farm"
   },
   "161ef:Skyrim.esm": {
    "edid": "HalfMoonMill",
-   "interior": true
+   "interior": true,
+   "name": "Half-Moon Mill"
   },
   "161f0:Skyrim.esm": {
    "edid": "MixwaterMillWorkersHouse",
-   "interior": true
+   "interior": true,
+   "name": "Worker's House"
   },
   "161f1:Skyrim.esm": {
    "edid": "MixwaterMillGilfresHouse",
-   "interior": true
+   "interior": true,
+   "name": "Gilfre's House"
   },
   "161f3:Skyrim.esm": {
    "edid": "MerryfairFarm",
-   "interior": true
+   "interior": true,
+   "name": "Merryfair Farm"
   },
   "161f4:Skyrim.esm": {
    "edid": "LoreiusFarmhouse",
-   "interior": true
+   "interior": true,
+   "name": "Loreius Farm"
   },
   "161f5:Skyrim.esm": {
    "edid": "LeftHandMine",
-   "interior": true
+   "interior": true,
+   "name": "Left Hand Mine"
   },
   "161f6:Skyrim.esm": {
    "edid": "KolskeggrMine01",
-   "interior": true
+   "interior": true,
+   "name": "Kolskeggr Mine"
   },
   "161f7:Skyrim.esm": {
    "edid": "KatlasFarm",
-   "interior": true
+   "interior": true,
+   "name": "Katla's Farm"
   },
   "161fb:Skyrim.esm": {
    "edid": "HollyfrostFarm",
-   "interior": true
+   "interior": true,
+   "name": "Hollyfrost Farm"
   },
   "161fc:Skyrim.esm": {
    "edid": "HlaaluFarm",
-   "interior": true
+   "interior": true,
+   "name": "Hlaalu Farm"
   },
   "161fe:Skyrim.esm": {
    "edid": "HeartwoodMill",
-   "interior": true
+   "interior": true,
+   "name": "Heartwood Mill"
   },
   "161ff:Skyrim.esm": {
    "edid": "GoldenglowEstate01",
-   "interior": true
+   "interior": true,
+   "name": "Goldenglow Estate"
   },
   "16200:Skyrim.esm": {
    "edid": "GloomboundMine01",
-   "interior": true
+   "interior": true,
+   "name": "Gloombound Mine"
   },
   "16203:Skyrim.esm": {
    "edid": "CidhnaMine01",
-   "interior": true
+   "interior": true,
+   "name": "Cidhna Mine"
   },
   "16204:Skyrim.esm": {
    "edid": "ChillfurrowFarm",
-   "interior": true
+   "interior": true,
+   "name": "Chillfurrow Farm"
   },
   "16205:Skyrim.esm": {
    "edid": "BrandyMugFarm",
-   "interior": true
+   "interior": true,
+   "name": "Brandy-Mug Farm"
   },
   "16207:Skyrim.esm": {
    "edid": "BattleBornFarm",
-   "interior": true
+   "interior": true,
+   "name": "Battle-Born Farm"
   },
   "16209:Skyrim.esm": {
    "edid": "AngasMillCommonHouse",
-   "interior": true
+   "interior": true,
+   "name": "Anga's Mill Common House"
   },
   "1620b:Skyrim.esm": {
    "edid": "AngasMillAerisHouse",
-   "interior": true
+   "interior": true,
+   "name": "Aeri's House"
   },
   "1644d:SkyrimSewers.esp": {
    "edid": "SSewersDerelict01",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Sewers, Derelict Tunnels"
   },
   "165a0:Skyrim.esm": {
    "edid": "WhiterunStables",
-   "interior": true
+   "interior": true,
+   "name": "Whiterun Stables"
   },
   "165a3:Skyrim.esm": {
    "edid": "WhiterunDragonsreach",
-   "interior": true
+   "interior": true,
+   "name": "Dragonsreach"
   },
   "165a6:Skyrim.esm": {
    "edid": "WhiterunUnderforge",
-   "interior": true
+   "interior": true,
+   "name": "The Underforge"
   },
   "165a7:Skyrim.esm": {
    "edid": "WhiterunTempleofKynareth",
-   "interior": true
+   "interior": true,
+   "name": "Temple of Kynareth"
   },
   "165a8:Skyrim.esm": {
    "edid": "WhiterunBreezehome",
-   "interior": true
+   "interior": true,
+   "name": "Breezehome"
   },
   "165aa:Skyrim.esm": {
    "edid": "WhiterunHalloftheDead",
-   "interior": true
+   "interior": true,
+   "name": "Hall of the Dead"
   },
   "165ab:Skyrim.esm": {
    "edid": "WhiterunAmrensHouse",
-   "interior": true
+   "interior": true,
+   "name": "Amren's House"
   },
   "165ac:Skyrim.esm": {
    "edid": "WhiterunYsoldasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Ysolda's House"
   },
   "165ad:Skyrim.esm": {
    "edid": "WhiterunHeimskrsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Heimskr's House"
   },
   "165ae:Skyrim.esm": {
    "edid": "WhiterunOlavatheFeeblesHouse",
-   "interior": true
+   "interior": true,
+   "name": "Olava the Feeble's House"
   },
   "165af:Skyrim.esm": {
    "edid": "WhiterunHouseBattleBorn",
-   "interior": true
+   "interior": true,
+   "name": "House of Clan Battle-Born"
   },
   "165b1:Skyrim.esm": {
    "edid": "WhiterunCarlottaValentiasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Carlotta Valentia's House"
   },
   "165b2:Skyrim.esm": {
    "edid": "WhiterunHouseGrayMane",
-   "interior": true
+   "interior": true,
+   "name": "House Gray-Mane"
   },
   "165b3:Skyrim.esm": {
    "edid": "WhiterunBelethorsGeneralGoods",
-   "interior": true
+   "interior": true,
+   "name": "Belethor's General Goods"
   },
   "165b5:Skyrim.esm": {
    "edid": "WhiterunJorrvaskr",
-   "interior": true
+   "interior": true,
+   "name": "Jorrvaskr"
   },
   "165b6:Skyrim.esm": {
    "edid": "WhiterunArcadiasCauldron",
-   "interior": true
+   "interior": true,
+   "name": "Arcadia's Cauldron"
   },
   "165b7:Skyrim.esm": {
    "edid": "WhiterunDrunkenHuntsman",
-   "interior": true
+   "interior": true,
+   "name": "The Drunken Huntsman"
   },
   "16774:Skyrim.esm": {
    "edid": "WindhelmStables",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Stables"
   },
   "16775:Skyrim.esm": {
    "edid": "WindhelmNiranyesHouseBasement",
-   "interior": true
+   "interior": true,
+   "name": "Niranye's Basement"
   },
   "16776:Skyrim.esm": {
    "edid": "WindhelmArgonianAssemblage",
-   "interior": true
+   "interior": true,
+   "name": "Argonian Assemblage"
   },
   "16777:Skyrim.esm": {
    "edid": "WindhelmEastEmpireCompany",
-   "interior": true
+   "interior": true,
+   "name": "East Empire Company"
   },
   "16778:Skyrim.esm": {
    "edid": "WindhelmHjerim",
-   "interior": true
+   "interior": true,
+   "name": "Hjerim"
   },
   "16779:Skyrim.esm": {
    "edid": "WindhelmViolaGiordanosHouse",
-   "interior": true
+   "interior": true,
+   "name": "Viola Giordano's House"
   },
   "1677a:Skyrim.esm": {
    "edid": "WindhelmBloodworks",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Barracks"
   },
   "1677c:Skyrim.esm": {
    "edid": "WindhelmPalaceoftheKings",
-   "interior": true
+   "interior": true,
+   "name": "Palace of the Kings"
   },
   "1677d:Skyrim.esm": {
    "edid": "WindhelmHouseofClanCruelSea",
-   "interior": true
+   "interior": true,
+   "name": "House of Clan Cruel-Sea"
   },
   "1677e:Skyrim.esm": {
    "edid": "WindhelmHouseofClanShatterShield",
-   "interior": true
+   "interior": true,
+   "name": "House of Clan Shatter-Shield"
   },
   "1677f:Skyrim.esm": {
    "edid": "WindhelmNewGnisisCornerclub",
-   "interior": true
+   "interior": true,
+   "name": "New Gnisis Cornerclub"
   },
   "16780:Skyrim.esm": {
    "edid": "WindhelmBelynHlaalusHouse",
-   "interior": true
+   "interior": true,
+   "name": "Belyn Hlaalu's House"
   },
   "16781:Skyrim.esm": {
    "edid": "WindhelmAtheronResidence",
-   "interior": true
+   "interior": true,
+   "name": "Atheron Residence"
   },
   "16782:Skyrim.esm": {
    "edid": "WindhelmSadrisUsedWares",
-   "interior": true
+   "interior": true,
+   "name": "Sadri's Used Wares"
   },
   "16784:Skyrim.esm": {
    "edid": "WindhelmAretinoResidence",
-   "interior": true
+   "interior": true,
+   "name": "Aretino Residence"
   },
   "16785:Skyrim.esm": {
    "edid": "WindhelmTempleofTalos",
-   "interior": true
+   "interior": true,
+   "name": "Temple of Talos"
   },
   "16786:Skyrim.esm": {
    "edid": "WindhelmHalloftheDead",
-   "interior": true
+   "interior": true,
+   "name": "Hall of the Dead"
   },
   "16787:Skyrim.esm": {
    "edid": "WindhelmCalixtosHouseofCuriosities",
-   "interior": true
+   "interior": true,
+   "name": "Calixto's House of Curiosities"
   },
   "16788:Skyrim.esm": {
    "edid": "WindhelmNiranyesHouse",
-   "interior": true
+   "interior": true,
+   "name": "Niranye's House"
   },
   "16789:Skyrim.esm": {
    "edid": "WindhelmCandlehearthHall",
-   "interior": true
+   "interior": true,
+   "name": "Candlehearth Hall"
   },
   "1678b:Skyrim.esm": {
    "edid": "WindhelmBrunwulfFreeWintersHouse",
-   "interior": true
+   "interior": true,
+   "name": "Brunwulf Free-Winter's House"
   },
   "1678c:Skyrim.esm": {
    "edid": "WindhelmWhitePhial",
-   "interior": true
+   "interior": true,
+   "name": "The White Phial"
   },
   "1691f:Skyrim.esm": {
    "edid": "",
@@ -4466,151 +4748,188 @@
   },
   "169fe:Skyrim.esm": {
    "edid": "SolitudeFletcher",
-   "interior": true
+   "interior": true,
+   "name": "Fletcher"
   },
   "16a00:Skyrim.esm": {
    "edid": "SolitudeLighthouse",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Lighthouse"
   },
   "16a02:Skyrim.esm": {
    "edid": "SolitudeTempleoftheDivines",
-   "interior": true
+   "interior": true,
+   "name": "Temple of the Divines"
   },
   "16a03:Skyrim.esm": {
    "edid": "SolitudeHalloftheDead",
-   "interior": true
+   "interior": true,
+   "name": "Hall of the Dead"
   },
   "16a04:Skyrim.esm": {
    "edid": "SolitudeBluePalace",
-   "interior": true
+   "interior": true,
+   "name": "Blue Palace"
   },
   "16a05:Skyrim.esm": {
    "edid": "SolitudeJalasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Jala's House"
   },
   "16a06:Skyrim.esm": {
    "edid": "SolitudeProudspireManor",
-   "interior": true
+   "interior": true,
+   "name": "Proudspire Manor"
   },
   "16a07:Skyrim.esm": {
    "edid": "SolitudeVittoriaVicisHouse",
-   "interior": true
+   "interior": true,
+   "name": "Vittoria Vici's House"
   },
   "16a08:Skyrim.esm": {
    "edid": "SolitudeEvetteSansHouse",
-   "interior": true
+   "interior": true,
+   "name": "Evette San's House"
   },
   "16a09:Skyrim.esm": {
    "edid": "SolitudeErikursHouse",
-   "interior": true
+   "interior": true,
+   "name": "Erikur's House"
   },
   "16a0b:Skyrim.esm": {
    "edid": "SolitudeBrylingsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Bryling's House"
   },
   "16a0c:Skyrim.esm": {
    "edid": "SolitudeBardsCollege",
-   "interior": true
+   "interior": true,
+   "name": "Bards College"
   },
   "16a0d:Skyrim.esm": {
    "edid": "SolitudeAddvarsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Addvar's House"
   },
   "16a0e:Skyrim.esm": {
    "edid": "SolitudeWinkingSkeever",
-   "interior": true
+   "interior": true,
+   "name": "The Winking Skeever"
   },
   "16a0f:Skyrim.esm": {
    "edid": "SolitudeRadiantRaiment",
-   "interior": true
+   "interior": true,
+   "name": "Radiant Raiment"
   },
   "16a10:Skyrim.esm": {
    "edid": "SolitudeBitsandPieces",
-   "interior": true
+   "interior": true,
+   "name": "Bits and Pieces"
   },
   "16a11:Skyrim.esm": {
    "edid": "SolitudeAngelinesAromatics",
-   "interior": true
+   "interior": true,
+   "name": "The Lucky Cauldron"
   },
   "16a55:HearthFires.esm": {
    "edid": "BYOHHouse3PaleBasement",
-   "interior": true
+   "interior": true,
+   "name": "Heljarchen Hall, Cellar"
   },
   "16a56:HearthFires.esm": {
    "edid": "BYOHHouse3Pale",
-   "interior": true
+   "interior": true,
+   "name": "Heljarchen Hall"
   },
   "16bce:Skyrim.esm": {
    "edid": "RiftenElgrimsElixirs",
-   "interior": true
+   "interior": true,
+   "name": "Elgrim's Elixirs"
   },
   "16bcf:Skyrim.esm": {
    "edid": "RiftenRaggedFlagon",
-   "interior": true
+   "interior": true,
+   "name": "The Ragged Flagon"
   },
   "16bd0:Skyrim.esm": {
    "edid": "RiftenThievesGuildHeadquarters",
-   "interior": true
+   "interior": true,
+   "name": "The Ragged Flagon - Cistern"
   },
   "16bd1:Skyrim.esm": {
    "edid": "RiftenHouseofMjolltheLioness",
-   "interior": true
+   "interior": true,
+   "name": "Aerin's House"
   },
   "16bd2:Skyrim.esm": {
    "edid": "RiftenMistveilKeep",
-   "interior": true
+   "interior": true,
+   "name": "Mistveil Keep"
   },
   "16bd3:Skyrim.esm": {
    "edid": "RiftenHonorhallOrphanage",
-   "interior": true
+   "interior": true,
+   "name": "Honorhall Orphanage"
   },
   "16bd4:Skyrim.esm": {
    "edid": "RiftenHaelgasBunkhouse",
-   "interior": true
+   "interior": true,
+   "name": "Haelga's Bunkhouse"
   },
   "16bd5:Skyrim.esm": {
    "edid": "RiftenMausoleum",
-   "interior": true
+   "interior": true,
+   "name": "Hall of the Dead"
   },
   "16bd6:Skyrim.esm": {
    "edid": "RiftenBollisHouse",
-   "interior": true
+   "interior": true,
+   "name": "Bolli's House"
   },
   "16bd7:Skyrim.esm": {
    "edid": "RiftenTempleofMara",
-   "interior": true
+   "interior": true,
+   "name": "Temple of Mara"
   },
   "16bd8:Skyrim.esm": {
    "edid": "RiftenBlackBriarManor",
-   "interior": true
+   "interior": true,
+   "name": "Black-Briar Manor"
   },
   "16bd9:Skyrim.esm": {
    "edid": "RiftenPawnedPrawn",
-   "interior": true
+   "interior": true,
+   "name": "Pawned Prawn"
   },
   "16bda:Skyrim.esm": {
    "edid": "RiftenWarehouse",
-   "interior": true
+   "interior": true,
+   "name": "Riften Warehouse"
   },
   "16bdb:Skyrim.esm": {
    "edid": "RiftenFishery",
-   "interior": true
+   "interior": true,
+   "name": "Riften Fishery"
   },
   "16bdc:Skyrim.esm": {
    "edid": "RiftenBlackBriarMeadery",
-   "interior": true
+   "interior": true,
+   "name": "Black-Briar Meadery"
   },
   "16bdd:Skyrim.esm": {
    "edid": "RiftenHoneyside",
-   "interior": true
+   "interior": true,
+   "name": "Honeyside"
   },
   "16bde:Skyrim.esm": {
    "edid": "RiftenHouseofClanSnowShod",
-   "interior": true
+   "interior": true,
+   "name": "Snow-Shod Manor"
   },
   "16bdf:Skyrim.esm": {
    "edid": "RiftenBeeandBarb",
-   "interior": true
+   "interior": true,
+   "name": "The Bee and Barb"
   },
   "16be0:Skyrim.esm": {
    "edid": "",
@@ -4618,63 +4937,78 @@
   },
   "16d72:Skyrim.esm": {
    "edid": "MarkarthWarrens",
-   "interior": true
+   "interior": true,
+   "name": "The Warrens"
   },
   "16d761:WindhelmSSE.esp": {
    "edid": "0WHSonsOfTalosHQLiving",
-   "interior": true
+   "interior": true,
+   "name": "Living Quarters"
   },
   "16df2:Skyrim.esm": {
    "edid": "MarkarthUnderStoneKeep",
-   "interior": true
+   "interior": true,
+   "name": "Understone Keep"
   },
   "16df3:Skyrim.esm": {
    "edid": "MarkarthTempleofDibella",
-   "interior": true
+   "interior": true,
+   "name": "Temple of Dibella"
   },
   "16df4:Skyrim.esm": {
    "edid": "MarkarthGuardTower",
-   "interior": true
+   "interior": true,
+   "name": "Guard Tower"
   },
   "16df5:Skyrim.esm": {
    "edid": "MarkarthSmelterOverseersHouse",
-   "interior": true
+   "interior": true,
+   "name": "Smelter Overseer's House"
   },
   "16df6:Skyrim.esm": {
    "edid": "MarkarthHagsCure",
-   "interior": true
+   "interior": true,
+   "name": "The Hag's Cure"
   },
   "16df7:Skyrim.esm": {
    "edid": "MarkarthShrineofTalos",
-   "interior": true
+   "interior": true,
+   "name": "Shrine of Talos"
   },
   "16dfa:Skyrim.esm": {
    "edid": "MarkarthVlindrelHall",
-   "interior": true
+   "interior": true,
+   "name": "Vlindrel Hall"
   },
   "16dfb:Skyrim.esm": {
    "edid": "MarkarthNepossHouse",
-   "interior": true
+   "interior": true,
+   "name": "Nepos's House"
   },
   "16dfc:Skyrim.esm": {
    "edid": "MarkarthOgmundsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Ogmund's House"
   },
   "16dfd:Skyrim.esm": {
    "edid": "MarkarthEndonsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Endon's House"
   },
   "16dfe:Skyrim.esm": {
    "edid": "MarkarthSilverBloodInn",
-   "interior": true
+   "interior": true,
+   "name": "Silver-Blood Inn"
   },
   "16dff:Skyrim.esm": {
    "edid": "MarkarthArnleifandSonsTradingCompany",
-   "interior": true
+   "interior": true,
+   "name": "Arnleif and Sons Trading Company"
   },
   "16e00:Skyrim.esm": {
    "edid": "MarkarthTreasuryHouse",
-   "interior": true
+   "interior": true,
+   "name": "The Treasury House"
   },
   "16e02:Skyrim.esm": {
    "edid": "",
@@ -4682,7 +5016,8 @@
   },
   "16ea1:Skyrim.esm": {
    "edid": "BloodletThrone01",
-   "interior": true
+   "interior": true,
+   "name": "Bloodlet Throne"
   },
   "16fe:Solitude Arena.esp": {
    "edid": "aaalsdarene",
@@ -4690,7 +5025,8 @@
   },
   "16feb:Dragonborn.esm": {
    "edid": "DLC2ThirskMeadHallInterior01",
-   "interior": true
+   "interior": true,
+   "name": "Thirsk Mead Hall"
   },
   "1718:Solitude Arena.esp": {
    "edid": "",
@@ -4698,135 +5034,168 @@
   },
   "172b90:WindhelmSSE.esp": {
    "edid": "0GQExtGrayShackSad",
-   "interior": true
+   "interior": true,
+   "name": "Taluri's Shack"
   },
   "172bec:WindhelmSSE.esp": {
    "edid": "0GQExtGrayShackAngery",
-   "interior": true
+   "interior": true,
+   "name": "Tevyn's Shack"
   },
   "172c4c:WindhelmSSE.esp": {
    "edid": "0GQExtGrayShackSmug",
-   "interior": true
+   "interior": true,
+   "name": "Gilas' Shack"
   },
   "173b2:Dragonborn.esm": {
    "edid": "DLC2Nchardak03",
-   "interior": true
+   "interior": true,
+   "name": "Nchardak Aqueduct"
   },
   "173b3:Dragonborn.esm": {
    "edid": "DLC2Nchardak02",
-   "interior": true
+   "interior": true,
+   "name": "Nchardak Workshop"
   },
   "17728:Dragonborn.esm": {
    "edid": "DLC2TelMithrynKitchen",
-   "interior": true
+   "interior": true,
+   "name": "Tel Mithryn Kitchen"
   },
   "17729:Dragonborn.esm": {
    "edid": "DLC2TelMithrynStewardsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Tel Mithryn Steward's House"
   },
   "1772a:Dragonborn.esm": {
    "edid": "DLC2TelMithrynApothecary",
-   "interior": true
+   "interior": true,
+   "name": "Tel Mithryn Apothecary"
   },
   "17787:Dragonborn.esm": {
    "edid": "DLC2TelMithryn",
-   "interior": true
+   "interior": true,
+   "name": "Tel Mithryn"
   },
   "17a00:Dragonborn.esm": {
    "edid": "DLC2SVShamansHutInterior",
-   "interior": true
+   "interior": true,
+   "name": "Shaman's Hut"
   },
   "17b6a:Dragonborn.esm": {
    "edid": "DLC2HrothmundsBarrow01",
-   "interior": true
+   "interior": true,
+   "name": "Hrothmund's Barrow"
   },
   "17bbd4:WindhelmSSE.esp": {
    "edid": "0GrayQuarterTemple",
-   "interior": true
+   "interior": true,
+   "name": "Temple"
   },
   "17be56:WindhelmSSE.esp": {
    "edid": "0WHMuseum",
-   "interior": true
+   "interior": true,
+   "name": "The Hall of Relics"
   },
   "17c14f:WindhelmSSE.esp": {
    "edid": "0WHPalaceStealthQuest2",
-   "interior": true
+   "interior": true,
+   "name": "Palace of the Kings Upstairs"
   },
   "17ebe:Dragonborn.esm": {
    "edid": "DLC2RRSeverinHouse",
-   "interior": true
+   "interior": true,
+   "name": "Severin Manor"
   },
   "17ebf:Dragonborn.esm": {
    "edid": "DLC2RRAlorHouse",
-   "interior": true
+   "interior": true,
+   "name": "Alor House"
   },
   "17ec0:Dragonborn.esm": {
    "edid": "DLC2RRTheRetchingNetch",
-   "interior": true
+   "interior": true,
+   "name": "The Retching Netch"
   },
   "17ec1:Dragonborn.esm": {
    "edid": "DLC2RRMorvaynManor",
-   "interior": true
+   "interior": true,
+   "name": "Morvayn Manor"
   },
   "17ec2:Dragonborn.esm": {
    "edid": "DLC2RRCresciusHouse",
-   "interior": true
+   "interior": true,
+   "name": "Caerellius House"
   },
   "17ec3:Dragonborn.esm": {
    "edid": "DLC2RRTemple",
-   "interior": true
+   "interior": true,
+   "name": "Temple"
   },
   "17ec4:Dragonborn.esm": {
    "edid": "DLC2RRGloverMalloryHouse",
-   "interior": true
+   "interior": true,
+   "name": "Glover Mallory's House"
   },
   "18195d:WindhelmSSE.esp": {
    "edid": "0WHTsunThanM",
-   "interior": true
+   "interior": true,
+   "name": "House of Thane Alarik"
   },
   "181c8:Dawnguard.esm": {
    "edid": "DLC1HunterCave02",
-   "interior": true
+   "interior": true,
+   "name": "Dead Drop Mine"
   },
   "18276:Dragonborn.esm": {
    "edid": "DLC2RRBulwark",
-   "interior": true
+   "interior": true,
+   "name": "The Bulwark"
   },
   "18277:Dragonborn.esm": {
    "edid": "DLC2RRIenthFarm",
-   "interior": true
+   "interior": true,
+   "name": "Ienth Farm"
   },
   "1844f:Dragonborn.esm": {
    "edid": "DLC2RRMorvaynManorChambers",
-   "interior": true
+   "interior": true,
+   "name": "Morvayn Manor Chambers"
   },
   "18460:Skyrim.esm": {
    "edid": "HunterShack",
-   "interior": true
+   "interior": true,
+   "name": "Froki's Shack"
   },
   "184f0:Dragonborn.esm": {
    "edid": "DLC2HighpointTower01",
-   "interior": true
+   "interior": true,
+   "name": "Highpoint Tower"
   },
   "18682:Dragonborn.esm": {
    "edid": "DLC2RRAbandonedBuilding",
-   "interior": true
+   "interior": true,
+   "name": "Abandoned Building"
   },
   "186c2:SkyrimSewers.esp": {
    "edid": "SSewersOldHaafingar",
-   "interior": true
+   "interior": true,
+   "name": "Ruins of Old Haafingar"
   },
   "18b3ba:WindhelmSSE.esp": {
    "edid": "00QuestPitWaitingRoom",
-   "interior": true
+   "interior": true,
+   "name": "The Bloodworks Basin"
   },
   "18be0:Skyrim.esm": {
    "edid": "RiftenStables",
-   "interior": true
+   "interior": true,
+   "name": "Riften Stables"
   },
   "18be9:Skyrim.esm": {
    "edid": "MarkarthAbandonedHouse",
-   "interior": true
+   "interior": true,
+   "name": "Abandoned House"
   },
   "18bf:Skyrim.esm": {
    "edid": "",
@@ -4834,7 +5203,8 @@
   },
   "18bfda:WindhelmSSE.esp": {
    "edid": "0GrayQuarterStairway",
-   "interior": true
+   "interior": true,
+   "name": "Stairway"
   },
   "18de:Skyrim.esm": {
    "edid": "DLC1VampireCastleExterior06",
@@ -4846,31 +5216,38 @@
   },
   "18f45:Dragonborn.esm": {
    "edid": "DLC2SVDeorsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Deor Woodcutter's House"
   },
   "18f46:Dragonborn.esm": {
    "edid": "DLC2SVMorwensHouse",
-   "interior": true
+   "interior": true,
+   "name": "Morwen's House"
   },
   "18f47:Dragonborn.esm": {
    "edid": "DLC2SVOslafsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Oslaf's House"
   },
   "18f48:Dragonborn.esm": {
    "edid": "DLC2SVWulfWildbloodsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Wulf Wild-Blood's House"
   },
   "18f49:Dragonborn.esm": {
    "edid": "DLC2SVBaldorIronShapersHouse",
-   "interior": true
+   "interior": true,
+   "name": "Baldor Iron-Shaper's House"
   },
   "18f4a:Dragonborn.esm": {
    "edid": "DLC2SVEdlasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Edla's House"
   },
   "18f4b:Dragonborn.esm": {
    "edid": "DLC2SVGreathall",
-   "interior": true
+   "interior": true,
+   "name": "Greathall"
   },
   "191d:Skyrim.esm": {
    "edid": "DLC1VampireCastleExterior02",
@@ -4878,51 +5255,63 @@
   },
   "193ee:Skyrim.esm": {
    "edid": "DawnstarSanctuary",
-   "interior": true
+   "interior": true,
+   "name": "Dawnstar Sanctuary"
   },
   "19454:Skyrim.esm": {
    "edid": "SolitudeCastleDourEmperorsTower",
-   "interior": true
+   "interior": true,
+   "name": "Castle Dour, Emperor's Tower"
   },
   "198dd:Skyrim.esm": {
    "edid": "SoljundsSinkholeMinersHouse",
-   "interior": true
+   "interior": true,
+   "name": "Miner's House"
   },
   "198de:Skyrim.esm": {
    "edid": "LeftHandMineDaighresHouse",
-   "interior": true
+   "interior": true,
+   "name": "Daighre's House"
   },
   "198df:Skyrim.esm": {
    "edid": "LeftHandMineMinersBarracks",
-   "interior": true
+   "interior": true,
+   "name": "Miner's Barracks"
   },
   "198e0:Skyrim.esm": {
    "edid": "LeftHandMineSkaggisHouse",
-   "interior": true
+   "interior": true,
+   "name": "Skaggi's House"
   },
   "198e2:Skyrim.esm": {
    "edid": "DushnikhYalLonghouse",
-   "interior": true
+   "interior": true,
+   "name": "Burguk's Longhouse"
   },
   "19ad8:Dragonborn.esm": {
    "edid": "DLC2RRBulwark02",
-   "interior": true
+   "interior": true,
+   "name": "The Bulwark Jail"
   },
   "19bad4:Skyrim Unbound.esp": {
    "edid": "SkyrimUnboundRoom01",
-   "interior": true
+   "interior": true,
+   "name": "Skyrim Unbound"
   },
   "19cd7:Dragonborn.esm": {
    "edid": "DLC2TempleofMiraak02",
-   "interior": true
+   "interior": true,
+   "name": "Temple of Miraak Sanctum"
   },
   "19d5d9:Riften Expansion.esp": {
    "edid": "RiftenRethanHoldingsVault",
-   "interior": true
+   "interior": true,
+   "name": "Rethan Holdings Vaults"
   },
   "19dfe:Dawnguard.esm": {
    "edid": "DLC1VampireCastleBossRoom",
-   "interior": true
+   "interior": true,
+   "name": "Volkihar Cathedral"
   },
   "1a270:Skyrim.esm": {
    "edid": "",
@@ -4966,7 +5355,8 @@
   },
   "1a337:Skyrim.esm": {
    "edid": "LostKnifeHideout02",
-   "interior": true
+   "interior": true,
+   "name": "Lost Knife Hideout"
   },
   "1a618:OarsRest.esp": {
    "edid": "ORUtility",
@@ -4982,35 +5372,43 @@
   },
   "1a68a:Dawnguard.esm": {
    "edid": "TestJoelDLC01",
-   "interior": true
+   "interior": true,
+   "name": "Quick Test Cell"
   },
   "1a7a8:Dragonborn.esm": {
    "edid": "DLC2Benkongerike02",
-   "interior": true
+   "interior": true,
+   "name": "Benkongerike Great Hall"
   },
   "1ab5f:Skyrim.esm": {
    "edid": "FortSungard03",
-   "interior": true
+   "interior": true,
+   "name": "Fort Sungard Oubliette"
   },
   "1ab60:Skyrim.esm": {
    "edid": "FortSungard02",
-   "interior": true
+   "interior": true,
+   "name": "Fort Sungard Tower"
   },
   "1aec3:Skyrim.esm": {
    "edid": "Saarthal02",
-   "interior": true
+   "interior": true,
+   "name": "Saarthal"
   },
   "1b147:Skyrim.esm": {
    "edid": "BilegulchMine",
-   "interior": true
+   "interior": true,
+   "name": "Bilegulch Mine"
   },
   "1b262:The Great City of Solitude.esp": {
    "edid": "SolitudeJakobsFarmTGCoS",
-   "interior": true
+   "interior": true,
+   "name": "Jakob's House"
   },
   "1b3cc:The Great City of Solitude.esp": {
    "edid": "SolitudeFrederiksFarmTGCoSDUPLICATE001",
-   "interior": true
+   "interior": true,
+   "name": "Frederik's House"
   },
   "1b506:Skyrim.esm": {
    "edid": "TestCWWhiterunNoLOCATIONDATA",
@@ -5018,31 +5416,38 @@
   },
   "1b7c0:Skyrim.esm": {
    "edid": "Ragnvald02",
-   "interior": true
+   "interior": true,
+   "name": "Ragnvald Crypts"
   },
   "1ba33:SkyrimSewers.esp": {
    "edid": "SSewersGoblinsCauseway",
-   "interior": true
+   "interior": true,
+   "name": "Goblin's Causeway"
   },
   "1bbfb:Dragonborn.esm": {
    "edid": "DLC2BristlebackCave01",
-   "interior": true
+   "interior": true,
+   "name": "Bristleback Cave"
   },
   "1be37:Dragonborn.esm": {
    "edid": "DLC2AshfallowCitadel01",
-   "interior": true
+   "interior": true,
+   "name": "Ashfallow Citadel"
   },
   "1c080:Dragonborn.esm": {
    "edid": "DLC2DamphallMine01",
-   "interior": true
+   "interior": true,
+   "name": "Damphall Mine"
   },
   "1c09:Dawnguard.esm": {
    "edid": "DLC1GlacialCrevice01",
-   "interior": true
+   "interior": true,
+   "name": "Glacial Crevice"
   },
   "1c197:The Great City of Solitude.esp": {
    "edid": "SolitudeFreyjasHouseTGCoS",
-   "interior": true
+   "interior": true,
+   "name": "Freyja's House"
   },
   "1c263:Dragonborn.esm": {
    "edid": "",
@@ -5050,15 +5455,18 @@
   },
   "1cb84:Skyrim.esm": {
    "edid": "RiverwoodSvensHouse",
-   "interior": true
+   "interior": true,
+   "name": "Sven and Hilde's House"
   },
   "1cd86:The Great City of Solitude.esp": {
    "edid": "SolitudeTorilsHouseTGCoS",
-   "interior": true
+   "interior": true,
+   "name": "Toril's House"
   },
   "1ce8a:Skyrim.esm": {
    "edid": "FortNeugrad02",
-   "interior": true
+   "interior": true,
+   "name": "Fort Neugrad Prison"
   },
   "1ceb8:Skyrim.esm": {
    "edid": "",
@@ -5086,35 +5494,43 @@
   },
   "1d09a:Skyrim.esm": {
    "edid": "Ragnvald03",
-   "interior": true
+   "interior": true,
+   "name": "Ragnvald Canal"
   },
   "1d235:The Great City of Solitude.esp": {
    "edid": "SolitudeTildasHome",
-   "interior": true
+   "interior": true,
+   "name": "Tilda's Home"
   },
   "1d502:Dragonborn.esm": {
    "edid": "DLC2Fahlbtharz02",
-   "interior": true
+   "interior": true,
+   "name": "Fahlbtharz Corridor"
   },
   "1d98:SkyrimSewers.esp": {
    "edid": "SSewersSolitude01",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Sewers, Western Tunnel"
   },
   "1da5d:Dragonborn.esm": {
    "edid": "DLC2AbandonedLodge",
-   "interior": true
+   "interior": true,
+   "name": "Abandoned Lodge"
   },
   "1db4e:Skyrim.esm": {
    "edid": "WhiterunWarmaidens",
-   "interior": true
+   "interior": true,
+   "name": "Warmaiden's"
   },
   "1db9:Dawnguard.esm": {
    "edid": "TESTRyanJDLC",
-   "interior": true
+   "interior": true,
+   "name": "Swindler's Den"
   },
   "1dba:Dawnguard.esm": {
    "edid": "DLC1DawnguardHQ01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Dawnguard"
   },
   "1dbb:Dawnguard.esm": {
    "edid": "",
@@ -5122,11 +5538,13 @@
   },
   "1dd03:Dragonborn.esm": {
    "edid": "DLC2Fahlbtharz04",
-   "interior": true
+   "interior": true,
+   "name": "Fahlbtharz Grand Hall"
   },
   "1dd04:Dragonborn.esm": {
    "edid": "DLC2Fahlbtharz03",
-   "interior": true
+   "interior": true,
+   "name": "Fahlbtharz Boilery"
   },
   "1dd9:Dawnguard.esm": {
    "edid": "DLC1HunterWorldFort02",
@@ -5134,7 +5552,8 @@
   },
   "1e11e:Skyrim.esm": {
    "edid": "WindhelmClanShatterShieldOffice",
-   "interior": true
+   "interior": true,
+   "name": "Clan Shatter-Shield Office"
   },
   "1e3d7:Skyrim.esm": {
    "edid": "",
@@ -5146,39 +5565,48 @@
   },
   "1e8cc:Dragonborn.esm": {
    "edid": "DLC2BloodskalBarrow02",
-   "interior": true
+   "interior": true,
+   "name": "Bloodskal Barrow"
   },
   "1e9e2b:Riften Expansion.esp": {
    "edid": "RiftenMerchantsRow",
-   "interior": true
+   "interior": true,
+   "name": "Merchant's Row"
   },
   "1ede2:Dragonborn.esm": {
    "edid": "DLC2Book02DungeonNEW",
-   "interior": true
+   "interior": true,
+   "name": "Apocrypha"
   },
   "1f288:Dragonborn.esm": {
    "edid": "DLC2RRUlenTomb",
-   "interior": true
+   "interior": true,
+   "name": "Ulen Ancestral Tomb"
   },
   "1f358:Skyrim.esm": {
    "edid": "Ansilvund02",
-   "interior": true
+   "interior": true,
+   "name": "Ansilvund Burial Chambers"
   },
   "1f359:Skyrim.esm": {
    "edid": "Pinewatch02",
-   "interior": true
+   "interior": true,
+   "name": "Pinewatch Bandit's Sanctuary"
   },
   "1f7b3:Skyrim.esm": {
    "edid": "KolskeggrMinePavosHouse",
-   "interior": true
+   "interior": true,
+   "name": "Pavo's House"
   },
   "1fc66:Skyrim.esm": {
    "edid": "ShimmermistCave02",
-   "interior": true
+   "interior": true,
+   "name": "Shimmermist Grotto"
   },
   "2031a:Skyrim.esm": {
    "edid": "Volunruud02",
-   "interior": true
+   "interior": true,
+   "name": "Volunruud Elder's Cairn"
   },
   "20bff:Skyrim.esm": {
    "edid": "",
@@ -5206,27 +5634,33 @@
   },
   "21074:Dragonborn.esm": {
    "edid": "DLC2HrodulfsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Hrodulf's House"
   },
   "213a0:Skyrim.esm": {
    "edid": "SolitudeCastleDour",
-   "interior": true
+   "interior": true,
+   "name": "Castle Dour"
   },
   "21594:Skyrim.esm": {
    "edid": "AbandonedPrison01",
-   "interior": true
+   "interior": true,
+   "name": "Abandoned Prison"
   },
   "216bb:Skyrim.esm": {
    "edid": "HaemarsShame02",
-   "interior": true
+   "interior": true,
+   "name": "Haemar's Shame"
   },
   "21d5c:SkyrimSewers.esp": {
    "edid": "SSewersOutfall01",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Sewers, Eastern Outfall"
   },
   "21d8:JKs Skyrim.esp": {
    "edid": "XJKDawnstarShipInterior",
-   "interior": true
+   "interior": true,
+   "name": "Ship's Cargo Hold"
   },
   "21edc:Skyrim.esm": {
    "edid": "",
@@ -5262,27 +5696,33 @@
   },
   "2210d9:WindhelmSSE.esp": {
    "edid": "0WHTsunBakery",
-   "interior": true
+   "interior": true,
+   "name": "The Bakeshop Valand"
   },
   "227b9:Skyrim.esm": {
    "edid": "Yngvild02",
-   "interior": true
+   "interior": true,
+   "name": "Yngvild Throne Room"
   },
   "22d87:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvkbasiccellar",
-   "interior": true
+   "interior": true,
+   "name": "Qvkcellar"
   },
   "22d89:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvkdawnstarcellar",
-   "interior": true
+   "interior": true,
+   "name": "Windpeak Inn Cellar"
   },
   "22f52:Skyrim.esm": {
    "edid": "Forelhost03",
-   "interior": true
+   "interior": true,
+   "name": "Forelhost Refectory"
   },
   "22f53:Skyrim.esm": {
    "edid": "Forelhost02",
-   "interior": true
+   "interior": true,
+   "name": "Forelhost Crypt"
   },
   "23774:Skyrim.esm": {
    "edid": "RaldbtharBlackreach01",
@@ -5306,59 +5746,73 @@
   },
   "23a1b:JKs Skyrim.esp": {
    "edid": "XJKalchemyShed",
-   "interior": true
+   "interior": true,
+   "name": "Storage Shed"
   },
   "23ae5:JKs Skyrim.esp": {
    "edid": "XJKDawnstarFredicRoom",
-   "interior": true
+   "interior": true,
+   "name": "Fredic's Room"
   },
   "23cd0:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvkfalkreathcellar",
-   "interior": true
+   "interior": true,
+   "name": "Dead Man's Drink Cellar"
   },
   "23df9:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvkwhiteruncellar",
-   "interior": true
+   "interior": true,
+   "name": "Bannered Mare Cellar"
   },
   "23f22:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvksolitudecellar2",
-   "interior": true
+   "interior": true,
+   "name": "Winking Skeever Lower Cellar"
   },
   "23fd4:Skyrim.esm": {
    "edid": "MarkarthHalloftheDead",
-   "interior": true
+   "interior": true,
+   "name": "Hall of the Dead"
   },
   "2404b:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvkwindhelmcellar",
-   "interior": true
+   "interior": true,
+   "name": "Candlehearth Hall Cellar"
   },
   "240b7:Skyrim.esm": {
    "edid": "DawnstarSilussHouse",
-   "interior": true
+   "interior": true,
+   "name": "Silus Vesuius's House"
   },
   "24174:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvkriftencellar",
-   "interior": true
+   "interior": true,
+   "name": "Bee and Barb Cellar"
   },
   "241f2:JKs Skyrim.esp": {
    "edid": "XJKMorthalFalionsLaboratory",
-   "interior": true
+   "interior": true,
+   "name": "Falion's Basement"
   },
   "2429d:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvkmarkarthcellar",
-   "interior": true
+   "interior": true,
+   "name": "Silver-Blood Inn cellar"
   },
   "242f3:JKs Skyrim.esp": {
    "edid": "XJKMorthalBlacksmithHouse",
-   "interior": true
+   "interior": true,
+   "name": "Avros's House"
   },
   "243c6:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvksolitudecellar",
-   "interior": true
+   "interior": true,
+   "name": "Winking Skeever Cellar"
   },
   "243df:Skyrim.esm": {
    "edid": "WarehouseTraps",
-   "interior": true
+   "interior": true,
+   "name": "Warehouse Traps"
   },
   "243e0:Skyrim.esm": {
    "edid": "",
@@ -5370,67 +5824,83 @@
   },
   "244ef:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvkmorthalcellar",
-   "interior": true
+   "interior": true,
+   "name": "Moorside Inn Cellar"
   },
   "2471a:Skyrim.esm": {
    "edid": "Volskygge02",
-   "interior": true
+   "interior": true,
+   "name": "Volskygge Passages"
   },
   "24771:Skyrim.esm": {
    "edid": "FortKastav02",
-   "interior": true
+   "interior": true,
+   "name": "Fort Kastav Captain's Quarters"
   },
   "24887:JKs Skyrim.esp": {
    "edid": "XJKRoriksteadIngolHouse",
-   "interior": true
+   "interior": true,
+   "name": "Ingol's House"
   },
   "24cad:Dragonborn.esm": {
    "edid": "DLC2BloodskalBarrow01a",
-   "interior": true
+   "interior": true,
+   "name": "Bloodskal Barrow"
   },
   "24d9d:Dragonborn.esm": {
    "edid": "DLC2RRTempleTomb",
-   "interior": true
+   "interior": true,
+   "name": "Temple Ancestral Tomb"
   },
   "25195:Skyrim.esm": {
    "edid": "SightlessPit03",
-   "interior": true
+   "interior": true,
+   "name": "Abandoned Cave"
   },
   "2529e:Skyrim.esm": {
    "edid": "MehrunesDagonShrine",
-   "interior": true
+   "interior": true,
+   "name": "Shrine of Mehrunes Dagon"
   },
   "25e24:Skyrim.esm": {
    "edid": "SnowVeilSanctum02",
-   "interior": true
+   "interior": true,
+   "name": "Snow Veil Sanctum"
   },
   "261c6:Skyrim.esm": {
    "edid": "PotemasCatacombs02",
-   "interior": true
+   "interior": true,
+   "name": "Potema's Refuge"
   },
   "263ef:Skyrim.esm": {
    "edid": "PotemasCatacombs03",
-   "interior": true
+   "interior": true,
+   "name": "Potema's Sanctum"
   },
   "26e93:Dragonborn.esm": {
    "edid": "DLC2GlacialCave",
-   "interior": true
+   "interior": true,
+   "name": "Glacial Cave"
   },
   "270ab:Skyrim.esm": {
    "edid": "Ustengrav01",
-   "interior": true
+   "interior": true,
+   "name": "Ustengrav"
   },
   "27552:Skyrim.esm": {
    "edid": "NightgateInnCellar",
-   "interior": true
+   "interior": true,
+   "name": "Nightgate Inn Cellar"
   },
   "275d8:Skyrim.esm": {
    "edid": "TolvaldsCave03",
-   "interior": true
+   "interior": true,
+   "name": "Tolvald's Crossing"
   },
   "275d9:Skyrim.esm": {
    "edid": "TolvaldsCave02",
-   "interior": true
+   "interior": true,
+   "name": "Tolvald's Gap"
   },
   "27953:Skyrim.esm": {
    "edid": "",
@@ -5438,31 +5908,38 @@
   },
   "27d1c:Skyrim.esm": {
    "edid": "KilkreathRuins03",
-   "interior": true
+   "interior": true,
+   "name": "Kilkreath Catacombs"
   },
   "27ea3:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvkwinterstonecellar",
-   "interior": true
+   "interior": true,
+   "name": "Frozen Hearth Lower Cellar"
   },
   "27f1a:Skyrim.esm": {
    "edid": "ThalmorEmbassy05",
-   "interior": true
+   "interior": true,
+   "name": "Reeking Cave"
   },
   "2802a:Populated Cities Towns Villages Legendary.esp": {
    "edid": "qvkwhiteruncellar2",
-   "interior": true
+   "interior": true,
+   "name": "Drunken Huntsman Cellar"
   },
   "285a:Dawnguard.esm": {
    "edid": "DLC1VampireCastleDungeon02",
-   "interior": true
+   "interior": true,
+   "name": "Volkihar Ruins"
   },
   "285b:Dawnguard.esm": {
    "edid": "DLC1VampireCastleDungeon01",
-   "interior": true
+   "interior": true,
+   "name": "Volkihar Undercroft"
   },
   "285d:Dawnguard.esm": {
    "edid": "DLC1MolderingRuins01",
-   "interior": true
+   "interior": true,
+   "name": "Moldering Ruins"
   },
   "28b9:Dawnguard.esm": {
    "edid": "",
@@ -5470,31 +5947,38 @@
   },
   "28c444:WindhelmSSE.esp": {
    "edid": "0GrayQuarterLoft",
-   "interior": true
+   "interior": true,
+   "name": "Cramped Loft"
   },
   "28edf:Skyrim.esm": {
    "edid": "Skuldafn04",
-   "interior": true
+   "interior": true,
+   "name": "Skuldafn South Tower"
   },
   "2954c:Skyrim.esm": {
    "edid": "Korvanjund03",
-   "interior": true
+   "interior": true,
+   "name": "Korvanjund Crypt"
   },
   "2954d:Skyrim.esm": {
    "edid": "Korvanjund02",
-   "interior": true
+   "interior": true,
+   "name": "Korvanjund Halls"
   },
   "298bc:SkyrimSewers.esp": {
    "edid": "SSewersWHGreyQ01",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Sewers, Gray Quarter"
   },
   "2a03a:Skyrim.esm": {
    "edid": "DustmansCairn02",
-   "interior": true
+   "interior": true,
+   "name": "Dustman's Crypt"
   },
   "2a436:SkyrimSewers.esp": {
    "edid": "SSewersWHPlaza",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm, Plaza Sewers"
   },
   "2a4a4:Skyrim.esm": {
    "edid": "",
@@ -5510,19 +5994,23 @@
   },
   "2ba8d:SkyrimSewers.esp": {
    "edid": "SSewersWHMarket",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Sewers, Marketplace"
   },
   "2bcd7:Skyrim.esm": {
    "edid": "WinterholdCollegeMidden01",
-   "interior": true
+   "interior": true,
+   "name": "The Midden"
   },
   "2c778:Skyrim.esm": {
    "edid": "DawnstarIronBreakerMine",
-   "interior": true
+   "interior": true,
+   "name": "Iron-Breaker Mine"
   },
   "2c779:Skyrim.esm": {
    "edid": "DawnstarQuicksilverMine",
-   "interior": true
+   "interior": true,
+   "name": "Quicksilver Mine"
   },
   "2c993:Skyrim.esm": {
    "edid": "",
@@ -5530,7 +6018,8 @@
   },
   "2cc83:SkyrimSewers.esp": {
    "edid": "SSewersWHCatacombs",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm, Forlorn Catacombs"
   },
   "2cee9:Skyrim.esm": {
    "edid": "",
@@ -5538,15 +6027,18 @@
   },
   "2d38b:SkyrimSewers.esp": {
    "edid": "SSewersWHManor",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Sewers, Manor District"
   },
   "2d3e7:Skyrim.esm": {
    "edid": "GoldenglowEstate03",
-   "interior": true
+   "interior": true,
+   "name": "Goldenglow Estate Basement"
   },
   "2d3e8:Skyrim.esm": {
    "edid": "GoldenglowEstate02",
-   "interior": true
+   "interior": true,
+   "name": "Goldenglow Estate Second Floor"
   },
   "2d4e0:Skyrim.esm": {
    "edid": "",
@@ -5554,39 +6046,48 @@
   },
   "2d4e3:Skyrim.esm": {
    "edid": "TowerOfMzark",
-   "interior": true
+   "interior": true,
+   "name": "Tower of Mzark"
   },
   "2d4e4:Skyrim.esm": {
    "edid": "SeptimusSignusOutpost",
-   "interior": true
+   "interior": true,
+   "name": "Septimus Signus's Outpost"
   },
   "2d524:Skyrim.esm": {
    "edid": "Angarvunde03",
-   "interior": true
+   "interior": true,
+   "name": "Angarvunde Catacombs"
   },
   "2d525:Skyrim.esm": {
    "edid": "Angarvunde02",
-   "interior": true
+   "interior": true,
+   "name": "Angarvunde Ruins"
   },
   "2d5d1:Skyrim.esm": {
    "edid": "CronvangrHall02",
-   "interior": true
+   "interior": true,
+   "name": "Cronvangr Broodlair"
   },
   "2df5b:SkyrimSewers.esp": {
    "edid": "SSewersWHPalace",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm, Palace Underworks"
   },
   "2e521:Skyrim.esm": {
    "edid": "TwilightSepulcher02",
-   "interior": true
+   "interior": true,
+   "name": "Twilight Sepulcher Inner Sanctum"
   },
   "2e760:Skyrim.esm": {
    "edid": "StonehillsMine",
-   "interior": true
+   "interior": true,
+   "name": "Rockwallow Mine"
   },
   "2eac1:SkyrimSewers.esp": {
    "edid": "SSewersWHSubterrane",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Subterrane"
   },
   "2f82:Dawnguard.esm": {
    "edid": "",
@@ -5594,211 +6095,263 @@
   },
   "2f83d:Skyrim.esm": {
    "edid": "HighGateRuins03",
-   "interior": true
+   "interior": true,
+   "name": "Vokun's Throne Room"
   },
   "2f83e:Skyrim.esm": {
    "edid": "HighGateRuins02",
-   "interior": true
+   "interior": true,
+   "name": "High Gate Ruins Catacombs"
   },
   "2f98:Update.esm": {
    "edid": "ccEEJSSE003_Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Quick Test Cell"
   },
   "2f99:Update.esm": {
    "edid": "ccMDRSSE001_Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Quick Test Cell"
   },
   "2f9a:Update.esm": {
    "edid": "ccBGSSSE016Interior02",
-   "interior": true
+   "interior": true,
+   "name": "Quick Test Cell"
   },
   "2f9b:Update.esm": {
    "edid": "ccBGSSSE016Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Quick Test Cell"
   },
   "2f9c:Update.esm": {
    "edid": "ccBGSSSE043_Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Quick Test Cell"
   },
   "2fcf:Update.esm": {
    "edid": "ccPlaceholder01Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fd0:Update.esm": {
    "edid": "ccPlaceholder02Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fd1:Update.esm": {
    "edid": "ccPlaceholder03Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fd2:Update.esm": {
    "edid": "ccPlaceholder04Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fd3:Update.esm": {
    "edid": "ccPlaceholder05Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fd4:Update.esm": {
    "edid": "ccPlaceholder06Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fd5:Update.esm": {
    "edid": "ccPlaceholder07Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fd6:Update.esm": {
    "edid": "ccPlaceholder08Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fd7:Update.esm": {
    "edid": "ccPlaceholder09Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fd85:Skyrim.esm": {
    "edid": "ForsakenCave02",
-   "interior": true
+   "interior": true,
+   "name": "Forsaken Crypt"
   },
   "2fd8:Update.esm": {
    "edid": "ccPlaceholder10Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fd9:Update.esm": {
    "edid": "ccEEJSSE004_Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "2fec:HearthFires.esm": {
    "edid": "BYOHHouse1Falkreath",
-   "interior": true
+   "interior": true,
+   "name": "Lakeview Manor"
   },
   "3016a:Skyrim.esm": {
    "edid": "FortHraggstad02",
-   "interior": true
+   "interior": true,
+   "name": "Fort Hraggstad Prison"
   },
   "301c70:WindhelmSSE.esp": {
    "edid": "0WHSonsOfTalosHQThalmorB",
-   "interior": true
+   "interior": true,
+   "name": "Thalmor Embassy Interior"
   },
   "301d64:WindhelmSSE.esp": {
    "edid": "0WHSonsOfTalosHQThalmor",
-   "interior": true
+   "interior": true,
+   "name": "Thalmor Embassy"
   },
   "30313:Skyrim.esm": {
    "edid": "MarkarthWizardsQuarters01",
-   "interior": true
+   "interior": true,
+   "name": "Dwemer Museum"
   },
   "30442:Skyrim.esm": {
    "edid": "Bthardamz03",
-   "interior": true
+   "interior": true,
+   "name": "Bthardamz Arcanex"
   },
   "306f62:WindhelmSSE.esp": {
    "edid": "0WHExtExplorerHouse",
-   "interior": true
+   "interior": true,
+   "name": "Freuchen's Office"
   },
   "30934:aaaGraniteHill.esp": {
    "edid": "aaaGraniteHillMayorHouse",
-   "interior": true
+   "interior": true,
+   "name": "Jen and John's House"
   },
   "30df:Update.esm": {
    "edid": "ccPlaceholder25Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30e0:Update.esm": {
    "edid": "ccPlaceholder24Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30e1:Update.esm": {
    "edid": "ccPlaceholder23Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30e2:Update.esm": {
    "edid": "ccPlaceholder21Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30e3:Update.esm": {
    "edid": "ccPlaceholder22Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30e4:Update.esm": {
    "edid": "ccPlaceholder20Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30e5:Update.esm": {
    "edid": "ccPlaceholder19Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30e6:Update.esm": {
    "edid": "ccPlaceholder18Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30e7:Update.esm": {
    "edid": "ccPlaceholder17Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30e8:Update.esm": {
    "edid": "ccPlaceholder16Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30e9:Update.esm": {
    "edid": "ccPlaceholder15Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30ea:Update.esm": {
    "edid": "ccPlaceholder14Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30eb:Update.esm": {
    "edid": "ccPlaceholder13Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30ec:Update.esm": {
    "edid": "ccPlaceholder12Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "30ed:Update.esm": {
    "edid": "ccPlaceholder11Interior01",
-   "interior": true
+   "interior": true,
+   "name": "Creation Club Cell"
   },
   "3109d:Dragonborn.esm": {
    "edid": "DLC2Book01Dungeon",
-   "interior": true
+   "interior": true,
+   "name": "Apocrypha"
   },
   "317e7:Skyrim.esm": {
    "edid": "Skuldafn05",
-   "interior": true
+   "interior": true,
+   "name": "Skuldafn North Tower"
   },
   "31edd:SkyrimSewers.esp": {
    "edid": "SSewersWHpalaceCellar",
-   "interior": true
+   "interior": true,
+   "name": "Palace of the Kings, Cellar"
   },
   "32ae7:Skyrim.esm": {
    "edid": "QASmoke",
-   "interior": true
+   "interior": true,
+   "name": "Editor Smoke Test Cell"
   },
   "32b8:JKs Skyrim.esp": {
    "edid": "XJKDawnstarVendorStore",
-   "interior": true
+   "interior": true,
+   "name": "Northern Star Goods"
   },
   "32fb04:WindhelmSSE.esp": {
    "edid": "0WHIronGuardHouse",
-   "interior": true
+   "interior": true,
+   "name": "East Gate Guardhouse"
   },
   "336fb:Skyrim.esm": {
    "edid": "Valthume02",
-   "interior": true
+   "interior": true,
+   "name": "Valthume Catacombs"
   },
   "33779:Skyrim.esm": {
    "edid": "Gloomreach02",
-   "interior": true
+   "interior": true,
+   "name": "Gloomreach Hive"
   },
   "3377b:Dragonborn.esm": {
    "edid": "DLC2BrokenTuskMine01",
-   "interior": true
+   "interior": true,
+   "name": "Broken Tusk Mine"
   },
   "33d68:Skyrim.esm": {
    "edid": "Valthume01",
-   "interior": true
+   "interior": true,
+   "name": "Valthume"
   },
   "34245:Skyrim.esm": {
    "edid": "",
@@ -5806,43 +6359,53 @@
   },
   "34864:Skyrim.esm": {
    "edid": "FortSungard05",
-   "interior": true
+   "interior": true,
+   "name": "Fort Sungard Muster"
   },
   "3486e:Skyrim.esm": {
    "edid": "FortSungard04",
-   "interior": true
+   "interior": true,
+   "name": "Fort Sungard Shrine"
   },
   "34955:Skyrim.esm": {
    "edid": "FortAmol02",
-   "interior": true
+   "interior": true,
+   "name": "Fort Amol Prison"
   },
   "34b75:Skyrim.esm": {
    "edid": "vampireDreamworld03",
-   "interior": true
+   "interior": true,
+   "name": "Dreamworld"
   },
   "34b94:Skyrim.esm": {
    "edid": "vampireDreamworld02",
-   "interior": true
+   "interior": true,
+   "name": "Dreamworld"
   },
   "34ba4:Skyrim.esm": {
    "edid": "vampireDreamworld01",
-   "interior": true
+   "interior": true,
+   "name": "Dreamworld"
   },
   "34e548:WindhelmSSE.esp": {
    "edid": "0WHMarketArmory",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Guard Armory"
   },
   "34ef4:ElysiumEstateSSE.esp": {
    "edid": "00ElysiumEstateB",
-   "interior": true
+   "interior": true,
+   "name": "Elysium Estate Basement"
   },
   "34fd2:Dragonborn.esm": {
    "edid": "DLC2Nchardak00",
-   "interior": true
+   "interior": true,
+   "name": "Nchardak Reading Room"
   },
   "3519:JKs Skyrim.esp": {
    "edid": "XJKIvarsteadJauffresCorner",
-   "interior": true
+   "interior": true,
+   "name": "Jauffre's Corner"
   },
   "351c:Solitude Arena.esp": {
    "edid": "",
@@ -5850,19 +6413,23 @@
   },
   "35299:Skyrim.esm": {
    "edid": "SightlessPit01",
-   "interior": true
+   "interior": true,
+   "name": "Sightless Pit"
   },
   "352c7:Skyrim.esm": {
    "edid": "FortGreymoor02",
-   "interior": true
+   "interior": true,
+   "name": "Fort Greymoor Prison"
   },
   "3538d:Skyrim.esm": {
    "edid": "BonechillPassage01",
-   "interior": true
+   "interior": true,
+   "name": "Bonechill Passage"
   },
   "35604:Skyrim.esm": {
    "edid": "IronbindBarrow01",
-   "interior": true
+   "interior": true,
+   "name": "Ironbind Barrow"
   },
   "356ab:Skyrim.esm": {
    "edid": "",
@@ -5870,11 +6437,13 @@
   },
   "35a22:Dragonborn.esm": {
    "edid": "DLC2MoesringPass01",
-   "interior": true
+   "interior": true,
+   "name": "Strange Vessel"
   },
   "35dec:ElysiumEstateSSE.esp": {
    "edid": "00ElysiumEstateint",
-   "interior": true
+   "interior": true,
+   "name": "Elysium Estate"
   },
   "35e5:Solitude Arena.esp": {
    "edid": "",
@@ -5882,103 +6451,128 @@
   },
   "35f67:Dragonborn.esm": {
    "edid": "DLC2RRMorvaynTomb",
-   "interior": true
+   "interior": true,
+   "name": "Morvayn Ancestral Tomb"
   },
   "361f9:Skyrim.esm": {
    "edid": "Bthardamz02",
-   "interior": true
+   "interior": true,
+   "name": "Bthardamz Lower District"
   },
   "361fa:Skyrim.esm": {
    "edid": "Bthardamz01",
-   "interior": true
+   "interior": true,
+   "name": "Bthardamz Upper District"
   },
   "362d8:Skyrim.esm": {
    "edid": "ThalmorEmbassy03",
-   "interior": true
+   "interior": true,
+   "name": "Thalmor Embassy, Dungeon"
   },
   "3678a:SkyrimSewers.esp": {
    "edid": "SSewersWRAvenue",
-   "interior": true
+   "interior": true,
+   "name": "Whiterun Sewers, Plains District"
   },
   "36798:Dragonborn.esm": {
    "edid": "DLC2AltarOfThrond01",
-   "interior": true
+   "interior": true,
+   "name": "Altar of Thrond Cave"
   },
   "36a72:Skyrim.esm": {
    "edid": "MarkarthWizardsQuarters02",
-   "interior": true
+   "interior": true,
+   "name": "Calcelmo's Laboratory"
   },
   "36d10e:WindhelmSSE.esp": {
    "edid": "0QGrayQuarterHouseAssassin",
-   "interior": true
+   "interior": true,
+   "name": "Kushishi's Home"
   },
   "36ed5:Skyrim.esm": {
    "edid": "WhiterunSeverioPelagiasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Severio Pelagia's House"
   },
   "36ed6:Skyrim.esm": {
    "edid": "WhiterunGuardHouse",
-   "interior": true
+   "interior": true,
+   "name": "Guard Barracks"
   },
   "371dd:Skyrim.esm": {
    "edid": "BleakFallsBarrow02",
-   "interior": true
+   "interior": true,
+   "name": "Bleak Falls Sanctum"
   },
   "371de:Skyrim.esm": {
    "edid": "BleakFallsBarrow01",
-   "interior": true
+   "interior": true,
+   "name": "Bleak Falls Temple"
   },
   "373aa:ElysiumEstateSSE.esp": {
    "edid": "00ElysiumEstateLoft",
-   "interior": true
+   "interior": true,
+   "name": "Elysium Estate Loft"
   },
   "373b:Dawnguard.esm": {
    "edid": "TestRSearsDLC01",
-   "interior": true
+   "interior": true,
+   "name": "TestRSears"
   },
   "37a22:AnotherOakwood.esp": {
    "edid": "OakwoodNinniasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Ninnia's House"
   },
   "37a25:AnotherOakwood.esp": {
    "edid": "OakwoodEreniResidence",
-   "interior": true
+   "interior": true,
+   "name": "Ereni Residence"
   },
   "37a26:AnotherOakwood.esp": {
    "edid": "OakwoodMonasteryTower",
-   "interior": true
+   "interior": true,
+   "name": "Storm's Tale Tower"
   },
   "37a27:AnotherOakwood.esp": {
    "edid": "OakwoodMonasteryMainHall",
-   "interior": true
+   "interior": true,
+   "name": "Storm's Tale Temple"
   },
   "37a28:AnotherOakwood.esp": {
    "edid": "OakwoodMonasteryNoviceRoom01",
-   "interior": true
+   "interior": true,
+   "name": "Storm's Tale Dormitory"
   },
   "37a29:AnotherOakwood.esp": {
    "edid": "OakwoodMonasteryNoviceRoom02",
-   "interior": true
+   "interior": true,
+   "name": "Storm's Tale Dormitory"
   },
   "37a2a:AnotherOakwood.esp": {
    "edid": "OakwoodMonasteryStorageRoom",
-   "interior": true
+   "interior": true,
+   "name": "Storm's Tale Storage"
   },
   "37b76:Skyrim.esm": {
    "edid": "Avanchnzel02",
-   "interior": true
+   "interior": true,
+   "name": "Avanchnzel Animoncultory"
   },
   "37cc6:Skyrim.esm": {
    "edid": "RiftenMercerFreyHouse",
-   "interior": true
+   "interior": true,
+   "name": "Riftweald Manor"
   },
   "37d7:Dawnguard.esm": {
    "edid": "TestBrieDLC",
-   "interior": true
+   "interior": true,
+   "name": "Swindler's Den"
   },
   "37ee0:Skyrim.esm": {
    "edid": "SolitudeBlackSmith",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Blacksmith"
   },
   "37ee2:Skyrim.esm": {
    "edid": "SolitudeBluePalaceCourtyard",
@@ -6022,7 +6616,8 @@
   },
   "384f:Dawnguard.esm": {
    "edid": "DLC1FalmerTemple01",
-   "interior": true
+   "interior": true,
+   "name": "Inner Sanctum"
   },
   "38e00:WindhelmSSE.esp": {
    "edid": "0WHPitOrigin",
@@ -6030,7 +6625,8 @@
   },
   "38e652:Riften Expansion.esp": {
    "edid": "RiftenRoggvarsCistern",
-   "interior": true
+   "interior": true,
+   "name": "Derelict Cistern"
   },
   "38e8c:WindhelmSSE.esp": {
    "edid": "",
@@ -6038,67 +6634,83 @@
   },
   "38f3a:SkyrimSewers.esp": {
    "edid": "SSewersWRBurrow",
-   "interior": true
+   "interior": true,
+   "name": "Whiterun Burrows"
   },
   "3929e:Dragonborn.esm": {
    "edid": "DLC2RRBulwarkCave",
-   "interior": true
+   "interior": true,
+   "name": "Coldcinder Cave"
   },
   "39850:Skyrim.esm": {
    "edid": "NightingaleHall01",
-   "interior": true
+   "interior": true,
+   "name": "Nightingale Hall"
   },
   "399d1:Skyrim.esm": {
    "edid": "ReachwindEyrie01",
-   "interior": true
+   "interior": true,
+   "name": "Reachwind Eyrie"
   },
   "39eac:Dragonborn.esm": {
    "edid": "DLC2HarstradCave01",
-   "interior": true
+   "interior": true,
+   "name": "Harstrad Cave"
   },
   "3a183:Skyrim.esm": {
    "edid": "FalkreathGraveConcoctions",
-   "interior": true
+   "interior": true,
+   "name": "Grave Concoctions"
   },
   "3a184:Skyrim.esm": {
    "edid": "FalkreathDeadMansDrink",
-   "interior": true
+   "interior": true,
+   "name": "Dead Man's Drink"
   },
   "3a985:North Keep.esp": {
    "edid": "NorthkeepBlacksmith",
-   "interior": true
+   "interior": true,
+   "name": "Pripata Residence"
   },
   "3a986:North Keep.esp": {
    "edid": "NorthkeepFarmer",
-   "interior": true
+   "interior": true,
+   "name": "Northkeep Workers Barracks"
   },
   "3a987:North Keep.esp": {
    "edid": "NorthkeepGeneralGoods",
-   "interior": true
+   "interior": true,
+   "name": "North Colovian Trading Company"
   },
   "3a988:North Keep.esp": {
    "edid": "NorthkeepInn",
-   "interior": true
+   "interior": true,
+   "name": "The Estates' Edge"
   },
   "3a989:North Keep.esp": {
    "edid": "NorthkeepPenitusOculatus",
-   "interior": true
+   "interior": true,
+   "name": "Penitus Oculatus Outpost"
   },
   "3a98a:North Keep.esp": {
    "edid": "NorthkeepPlayerHouse",
-   "interior": true
+   "interior": true,
+   "name": "Falcrost Residence"
   },
   "3a98b:North Keep.esp": {
    "edid": "NorthkeepTower",
-   "interior": true
+   "interior": true,
+   "name": "Tower of Appointment"
   },
   "3a98c:North Keep.esp": {
    "edid": "NorthkeepViscountHouse",
-   "interior": true
+   "interior": true,
+   "name": "Valgador Residence"
   },
   "3ac5:JKs Skyrim.esp": {
    "edid": "XJKDawnstarShipCaptainsCabin",
-   "interior": true
+   "interior": true,
+   "name": "Captain's Cabin"
   },
   "3ae63:Skyrim.esm": {
    "edid": "",
@@ -6106,63 +6718,78 @@
   },
   "3b065:Dragonborn.esm": {
    "edid": "DLC2Book01DungeonA",
-   "interior": true
+   "interior": true,
+   "name": "Apocrypha"
   },
   "3b21f:SkyrimSewers.esp": {
    "edid": "SSewersWRCloud",
-   "interior": true
+   "interior": true,
+   "name": "Whiterun Sewers, Wind District"
   },
   "3b696:Skyrim.esm": {
    "edid": "RiftenEsbernsVault",
-   "interior": true
+   "interior": true,
+   "name": "The Ratway Warrens"
   },
   "3b698:Skyrim.esm": {
    "edid": "RiftenRatway01",
-   "interior": true
+   "interior": true,
+   "name": "The Ratway"
   },
   "3b87d:Skyrim.esm": {
    "edid": "RiftenMistveilKeepJarlsChambers",
-   "interior": true
+   "interior": true,
+   "name": "Mistveil Keep Jarl's Chambers"
   },
   "3bf0:Dawnguard.esm": {
    "edid": "DLC1Ruunvald01",
-   "interior": true
+   "interior": true,
+   "name": "Ruunvald Excavation"
   },
   "3bf9f:SkyrimSewers.esp": {
    "edid": "SSewersWRJorrvaskr",
-   "interior": true
+   "interior": true,
+   "name": "Jorrvaskr Underworks"
   },
   "3c7f5:Dragonborn.esm": {
    "edid": "DLC2WhiteRidgeBarrow02",
-   "interior": true
+   "interior": true,
+   "name": "White Ridge Sanctum"
   },
   "3c90e:SkyrimSewers.esp": {
    "edid": "SSewersWRHallofHeroes",
-   "interior": true
+   "interior": true,
+   "name": "Urvaskr"
   },
   "3cbcb:Skyrim.esm": {
    "edid": "DarklightTower02",
-   "interior": true
+   "interior": true,
+   "name": "Darklight Chambers"
   },
   "3cfa:OarsRest.esp": {
    "edid": "ORHappyHorker01",
-   "interior": true
+   "interior": true,
+   "name": "Happy Horker"
   },
   "3d35a:Skyrim.esm": {
    "edid": "HonningbrewMeadery02",
-   "interior": true
+   "interior": true,
+   "name": "Honningbrew Basement"
   },
   "3d61b:SkyrimSewers.esp": {
    "edid": "SSewersWRCrypt",
-   "interior": true
+   "interior": true,
+   "name": "Hall of the Dead, Forsaken Crypt"
   },
   "3d62b:Skyrim.esm": {
    "edid": "DA14Interior",
-   "interior": true
+   "interior": true,
+   "name": "Misty Grove"
   },
   "3dd34:Skyrim.esm": {
    "edid": "DriftshadeSanctuary02",
-   "interior": true
+   "interior": true,
+   "name": "Driftshade Cellar"
   },
   "3e13:TavernGames.esp": {
    "edid": "_SAG_BoardGameInterface_Cell",
@@ -6170,39 +6797,48 @@
   },
   "3e908:Skyrim.esm": {
    "edid": "ChillwindDepths01",
-   "interior": true
+   "interior": true,
+   "name": "Chillwind Depths"
   },
   "3ea9d:Skyrim.esm": {
    "edid": "MarkarthTempleInnerSanctum",
-   "interior": true
+   "interior": true,
+   "name": "Inner Sanctum"
   },
   "3f516:Skyrim.esm": {
    "edid": "Mistwatch01",
-   "interior": true
+   "interior": true,
+   "name": "Mistwatch North Tower"
   },
   "3f78:JKs Skyrim.esp": {
    "edid": "XJKRoriksteadVendorStore",
-   "interior": true
+   "interior": true,
+   "name": "Cedric's Trading Stop"
   },
   "3fc8f:Skyrim.esm": {
    "edid": "IlinaltasDeep02",
-   "interior": true
+   "interior": true,
+   "name": "Ilinalta's Deluge"
   },
   "3ff10:Skyrim.esm": {
    "edid": "FellglowKeep02",
-   "interior": true
+   "interior": true,
+   "name": "Fellglow Keep"
   },
   "414dd:Skyrim.esm": {
    "edid": "JaphetsFolly02",
-   "interior": true
+   "interior": true,
+   "name": "Japhet's Folly Towers"
   },
   "41777:Skyrim.esm": {
    "edid": "SwindlersDen01",
-   "interior": true
+   "interior": true,
+   "name": "Swindler's Den"
   },
   "41cd2:AnotherOakwood.esp": {
    "edid": "OakwoodClebusAndJettasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Clebus and Jetta's House"
   },
   "42242:Skyrim.esm": {
    "edid": "RiftenCityEast",
@@ -6226,39 +6862,48 @@
   },
   "42ab0:Arena - Markarth Side.esp": {
    "edid": "aaaMarkarthSideBarracks",
-   "interior": true
+   "interior": true,
+   "name": "Markarth Side Barracks"
   },
   "42bec:Skyrim.esm": {
    "edid": "Mistwatch03",
-   "interior": true
+   "interior": true,
+   "name": "Mistwatch East Tower"
   },
   "42bed:Skyrim.esm": {
    "edid": "Mistwatch02",
-   "interior": true
+   "interior": true,
+   "name": "Mistwatch West Tower"
   },
   "4346:Dawnguard.esm": {
    "edid": "DLC1DarkfallCave01",
-   "interior": true
+   "interior": true,
+   "name": "Darkfall Cave"
   },
   "439e7:SkyrimSewers.esp": {
    "edid": "SSewersWHDwemerTunnel",
-   "interior": true
+   "interior": true,
+   "name": "Tunnels of Trnazcht"
   },
   "43fab:Skyrim.esm": {
    "edid": "HaltedStreamCamp01",
-   "interior": true
+   "interior": true,
+   "name": "Halted Stream Camp"
   },
   "4401b:Skyrim.esm": {
    "edid": "DruadachRedoubt01",
-   "interior": true
+   "interior": true,
+   "name": "Druadach Redoubt Cave"
   },
   "446bf:Skyrim.esm": {
    "edid": "FortFellhammer02",
-   "interior": true
+   "interior": true,
+   "name": "Fort Fellhammer Mines"
   },
   "45a1d:Skyrim.esm": {
    "edid": "RiftenMistveilBarracks",
-   "interior": true
+   "interior": true,
+   "name": "Mistveil Keep Barracks"
   },
   "46034:Skyrim.esm": {
    "edid": "",
@@ -6266,51 +6911,63 @@
   },
   "4624f:Skyrim.esm": {
    "edid": "KilkreathRuins02",
-   "interior": true
+   "interior": true,
+   "name": "Kilkreath Ruins"
   },
   "4637:JKs Skyrim.esp": {
    "edid": "XJKDragonBridgeVendorStore",
-   "interior": true
+   "interior": true,
+   "name": "Old Bridge Goods"
   },
   "466cb:Skyrim.esm": {
    "edid": "Irkngthand04",
-   "interior": true
+   "interior": true,
+   "name": "Irkngthand Sanctuary"
   },
   "470e7:AnotherOakwood.esp": {
    "edid": "OakwoodCrypt",
-   "interior": true
+   "interior": true,
+   "name": "Askorunde"
   },
   "471dc:Skyrim.esm": {
    "edid": "FrostflowAbyss",
-   "interior": true
+   "interior": true,
+   "name": "Frostflow Abyss"
   },
   "4761b:Skyrim.esm": {
    "edid": "TrevasWatch02",
-   "interior": true
+   "interior": true,
+   "name": "Treva's Watch Escape Tunnel"
   },
   "47817:Skyrim.esm": {
    "edid": "SkyboundPass01",
-   "interior": true
+   "interior": true,
+   "name": "Skybound Watch Pass"
   },
   "479d5:JK's Whiterun's Outskirts.esp": {
    "edid": "XJKWhiterunOutskirtsInn",
-   "interior": true
+   "interior": true,
+   "name": "The Dancing Horse"
   },
   "47aac:JK's Whiterun's Outskirts.esp": {
    "edid": "XJKWhiterunOutskirtsWorkshop",
-   "interior": true
+   "interior": true,
+   "name": "Augustus's Workshop"
   },
   "480ff:SkyrimSewers.esp": {
    "edid": "SSewersWRDRSubstructure",
-   "interior": true
+   "interior": true,
+   "name": "Dragonsreach Substructure"
   },
   "4823a:WindhelmSSE.esp": {
    "edid": "0WHExtWheelhouse",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Wheelhouse"
   },
   "4849:HearthFires.esm": {
    "edid": "BYOHHouse1FalkreathBasement",
-   "interior": true
+   "interior": true,
+   "name": "Lakeview Manor, Cellar"
   },
   "48d5:Dawnguard.esm": {
    "edid": "",
@@ -6318,15 +6975,18 @@
   },
   "4a376:Skyrim.esm": {
    "edid": "WhiterunDragonsreachBasement",
-   "interior": true
+   "interior": true,
+   "name": "Dragonsreach Dungeon"
   },
   "4b8fb:Skyrim.esm": {
    "edid": "StonyCreekCave01",
-   "interior": true
+   "interior": true,
+   "name": "Stony Creek Cave"
   },
   "4bbac:SkyrimSewers.esp": {
    "edid": "SSewersMRKeast",
-   "interior": true
+   "interior": true,
+   "name": "Markarth Sewers"
   },
   "4beb:Dawnguard.esm": {
    "edid": "",
@@ -6334,39 +6994,48 @@
   },
   "4c35:AnotherOakwood.esp": {
    "edid": "OakwoodAlberAndBibisHouse",
-   "interior": true
+   "interior": true,
+   "name": "Alber and Bibi's House"
   },
   "4c36:AnotherOakwood.esp": {
    "edid": "OakwoodBurgundesHouse",
-   "interior": true
+   "interior": true,
+   "name": "Burgunde's House"
   },
   "4c37:AnotherOakwood.esp": {
    "edid": "OakwoodDragolfsFinestSundries",
-   "interior": true
+   "interior": true,
+   "name": "Dragolf's Finest Sundries"
   },
   "4c38:AnotherOakwood.esp": {
    "edid": "OakwoodFishery",
-   "interior": true
+   "interior": true,
+   "name": "Oakwood Fishery"
   },
   "4c39:AnotherOakwood.esp": {
    "edid": "OakwoodHouseOfClanGreenBlade",
-   "interior": true
+   "interior": true,
+   "name": "House of Clan Green-Blade"
   },
   "4c3a:AnotherOakwood.esp": {
    "edid": "OakwoodWatchtower",
-   "interior": true
+   "interior": true,
+   "name": "Oakwood Watchtower"
   },
   "4c3b:AnotherOakwood.esp": {
    "edid": "OakwoodWoodlandRemedies",
-   "interior": true
+   "interior": true,
+   "name": "Woodland Remedies"
   },
   "4c3d:AnotherOakwood.esp": {
    "edid": "OakwoodSprightfulSprigganInn",
-   "interior": true
+   "interior": true,
+   "name": "Sprightful Spriggan Inn"
   },
   "4c6dd:Skyrim.esm": {
    "edid": "Avanchnzel03",
-   "interior": true
+   "interior": true,
+   "name": "Avanchnzel Boilery"
   },
   "4d0ef:Skyrim.esm": {
    "edid": "",
@@ -6374,39 +7043,48 @@
   },
   "4d322:SkyrimSewers.esp": {
    "edid": "SSewersMRKruins",
-   "interior": true
+   "interior": true,
+   "name": "Nether Markath"
   },
   "4d3bb:WindhelmSSE.esp": {
    "edid": "0WHMarketWinterWares",
-   "interior": true
+   "interior": true,
+   "name": "Wilhelm's Winter Warehouse"
   },
   "4d45c:WindhelmSSE.esp": {
    "edid": "0WHMarketBakery",
-   "interior": true
+   "interior": true,
+   "name": "Bread and Salt"
   },
   "4d674:WindhelmSSE.esp": {
    "edid": "0WHExtTavern",
-   "interior": true
+   "interior": true,
+   "name": "Wallside Inn"
   },
   "4d7bf:WindhelmSSE.esp": {
    "edid": "0WHThePitPlace",
-   "interior": true
+   "interior": true,
+   "name": "The Pit Bloodworks"
   },
   "4d912:WindhelmSSE.esp": {
    "edid": "0GrayQuarterMerchant",
-   "interior": true
+   "interior": true,
+   "name": "Mathendi's Magic and Imports"
   },
   "4da84:WindhelmSSE.esp": {
    "edid": "0GrayQuarterHousePriest",
-   "interior": true
+   "interior": true,
+   "name": "Sulen's Loft"
   },
   "4dbf4:WindhelmSSE.esp": {
    "edid": "0GrayQuarterHouseWoman",
-   "interior": true
+   "interior": true,
+   "name": "Varasa's Loft"
   },
   "4dd75:WindhelmSSE.esp": {
    "edid": "0GrayQuarterThievesGuild",
-   "interior": true
+   "interior": true,
+   "name": "The Rooftop"
   },
   "4de20:Skyrim.esm": {
    "edid": "",
@@ -6414,7 +7092,8 @@
   },
   "4dfba:WindhelmSSE.esp": {
    "edid": "0WHTsunCultHQ",
-   "interior": true
+   "interior": true,
+   "name": "Cult of Tsun"
   },
   "4f839:Skyrim.esm": {
    "edid": "",
@@ -6430,7 +7109,8 @@
   },
   "4fcdf:SkyrimSewers.esp": {
    "edid": "SSewersMRKpit",
-   "interior": true
+   "interior": true,
+   "name": "The Pit of Bzarhk"
   },
   "50016:Skyrim.esm": {
    "edid": "",
@@ -6446,19 +7126,23 @@
   },
   "5015c:Skyrim.esm": {
    "edid": "LargashburBasement",
-   "interior": true
+   "interior": true,
+   "name": "Largashbur Cellar"
   },
   "5015d:Skyrim.esm": {
    "edid": "NarzulburBasement",
-   "interior": true
+   "interior": true,
+   "name": "Mauhulakh's Cellar"
   },
   "50f1e:Skyrim.esm": {
    "edid": "AbandonedShackInterior",
-   "interior": true
+   "interior": true,
+   "name": "Abandoned Shack"
   },
   "52390:Skyrim.esm": {
    "edid": "FortDunstad02",
-   "interior": true
+   "interior": true,
+   "name": "Fort Dunstad Prison"
   },
   "52580:Skyrim.esm": {
    "edid": "WindhelmMarketplaceExterior",
@@ -6466,11 +7150,13 @@
   },
   "5258c:Skyrim.esm": {
    "edid": "FortDunstad03",
-   "interior": true
+   "interior": true,
+   "name": "Fort Dunstad Commander's Quarters"
   },
   "527f2:Skyrim.esm": {
    "edid": "Irkngthand03",
-   "interior": true
+   "interior": true,
+   "name": "Irkngthand Slave Pens"
   },
   "528e:Dawnguard.esm": {
    "edid": "",
@@ -6478,123 +7164,153 @@
   },
   "529dd:Skyrim.esm": {
    "edid": "FortGreenwall03",
-   "interior": true
+   "interior": true,
+   "name": "Fort Greenwall Captain's Quarters"
   },
   "52cb5:Skyrim.esm": {
    "edid": "Irkngthand01",
-   "interior": true
+   "interior": true,
+   "name": "Irkngthand Arcanex"
   },
   "52feb:Skyrim.esm": {
    "edid": "Kagrenzel01",
-   "interior": true
+   "interior": true,
+   "name": "Kagrenzel"
   },
   "53081:Skyrim.esm": {
    "edid": "RiftenBlacksmith",
-   "interior": true
+   "interior": true,
+   "name": "The Scorched Hammer"
   },
   "54226:Skyrim.esm": {
    "edid": "BronzeWaterCave",
-   "interior": true
+   "interior": true,
+   "name": "Bronze Water Cave"
   },
   "542c:OarsRest.esp": {
    "edid": "ORHappyHorker02",
-   "interior": true
+   "interior": true,
+   "name": "Happy Horker Basement"
   },
   "544ab:SkyrimSewers.esp": {
    "edid": "SSewersWHOldCanals",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Sewers, Old Canals"
   },
   "547f0:Skyrim.esm": {
    "edid": "MarkarthWizardsQuarters03",
-   "interior": true
+   "interior": true,
+   "name": "Calcelmo's Tower"
   },
   "54b6f:Skyrim.esm": {
    "edid": "Mzulft03",
-   "interior": true
+   "interior": true,
+   "name": "Mzulft Aedrome"
   },
   "54b70:Skyrim.esm": {
    "edid": "Mzulft02",
-   "interior": true
+   "interior": true,
+   "name": "Mzulft Boilery"
   },
   "54d0e:Skyrim.esm": {
    "edid": "ColdRockPass01",
-   "interior": true
+   "interior": true,
+   "name": "Cold Rock Pass"
   },
   "55215:Skyrim.esm": {
    "edid": "NchuandZel02",
-   "interior": true
+   "interior": true,
+   "name": "Nchuand-Zel"
   },
   "5554a:Skyrim.esm": {
    "edid": "LostProspectMine01",
-   "interior": true
+   "interior": true,
+   "name": "Lost Prospect Mine"
   },
   "563e2:Skyrim.esm": {
    "edid": "FortSnowhawk02",
-   "interior": true
+   "interior": true,
+   "name": "Fort Snowhawk Prison"
   },
   "56c1b:Skyrim.esm": {
    "edid": "Alftand02",
-   "interior": true
+   "interior": true,
+   "name": "Alftand Animonculory"
   },
   "56e88:Skyrim.esm": {
    "edid": "SolitudeJail01",
-   "interior": true
+   "interior": true,
+   "name": "Castle Dour Dungeon"
   },
   "571b4:Skyrim.esm": {
    "edid": "NchuandZel03",
-   "interior": true
+   "interior": true,
+   "name": "Nchuand-Zel Armory"
   },
   "5734:Dawnguard.esm": {
    "edid": "DLC1Bthalft01",
-   "interior": true
+   "interior": true,
+   "name": "Aetherium Forge"
   },
   "580a2:Skyrim.esm": {
    "edid": "WhiterunJail02",
-   "interior": true
+   "interior": true,
+   "name": "Guard Barracks"
   },
   "58663:Skyrim.esm": {
    "edid": "Mzinchaleft03",
-   "interior": true
+   "interior": true,
+   "name": "Mzinchaleft Gatehouse"
   },
   "58b4c:Skyrim.esm": {
    "edid": "NchuandZel06",
-   "interior": true
+   "interior": true,
+   "name": "Nchuand-Zel Control"
   },
   "58b4d:Skyrim.esm": {
    "edid": "NchuandZel05",
-   "interior": true
+   "interior": true,
+   "name": "Nchuand-Zel Quarters"
   },
   "5900:Arena - Markarth Side.esp": {
    "edid": "aaaMorvunskarCrypts",
-   "interior": true
+   "interior": true,
+   "name": "Morvunskar Crypts"
   },
   "5912d:Skyrim.esm": {
    "edid": "Bthardamz02a",
-   "interior": true
+   "interior": true,
+   "name": "Bthardamz Study"
   },
   "59398:Skyrim.esm": {
    "edid": "HagsEnd01",
-   "interior": true
+   "interior": true,
+   "name": "Hag's End"
   },
   "597d4:Skyrim.esm": {
    "edid": "CidhnaMine02",
-   "interior": true
+   "interior": true,
+   "name": "Markarth Ruins"
   },
   "59eb:OarsRest.esp": {
    "edid": "ORFishermansShack",
-   "interior": true
+   "interior": true,
+   "name": "Fisherman's Shack"
   },
   "5a01a:Skyrim.esm": {
    "edid": "CidhnaMine03",
-   "interior": true
+   "interior": true,
+   "name": "Obscured Passage"
   },
   "5a856:Skyrim.esm": {
    "edid": "Bthardamz01b",
-   "interior": true
+   "interior": true,
+   "name": "Bthardamz Workshop"
   },
   "5a857:Skyrim.esm": {
    "edid": "Bthardamz01a",
-   "interior": true
+   "interior": true,
+   "name": "Bthardamz Dwelling"
   },
   "5aaa:Dawnguard.esm": {
    "edid": "",
@@ -6614,103 +7330,128 @@
   },
   "5b5dd:Skyrim.esm": {
    "edid": "MorKhazgurLaraksLonghouse",
-   "interior": true
+   "interior": true,
+   "name": "Larak's Longhouse"
   },
   "5b88b:Skyrim.esm": {
    "edid": "FortGreenwall02",
-   "interior": true
+   "interior": true,
+   "name": "Fort Greenwall Prison"
   },
   "5b91b:Skyrim.esm": {
    "edid": "TwilightSepulcher01",
-   "interior": true
+   "interior": true,
+   "name": "Twilight Sepulcher"
   },
   "5c483:Skyrim.esm": {
    "edid": "FortGreenwall04",
-   "interior": true
+   "interior": true,
+   "name": "Greenwall Cave"
   },
   "5c591:Arena - Markarth Side.esp": {
    "edid": "aaaMarkarthSideClothingShopInterior",
-   "interior": true
+   "interior": true,
+   "name": "The Splended Spool"
   },
   "5c98:aaaGraniteHill.esp": {
    "edid": "aaaOdditiesandCuriosities",
-   "interior": true
+   "interior": true,
+   "name": "Oddities & Curiosities"
   },
   "5d010:Skyrim.esm": {
    "edid": "MorthalGuardhouseJail",
-   "interior": true
+   "interior": true,
+   "name": "Morthal Jail"
   },
   "5d01d:Skyrim.esm": {
    "edid": "WinterholdTheFrozenHearthCellar",
-   "interior": true
+   "interior": true,
+   "name": "The Frozen Hearth Cellar"
   },
   "5de24:Skyrim.esm": {
    "edid": "HelgenKeep01",
-   "interior": true
+   "interior": true,
+   "name": "Helgen Keep"
   },
   "5e1f9:SkyrimSewers.esp": {
    "edid": "SSewersSungard",
-   "interior": true
+   "interior": true,
+   "name": "Fort Sungard, Underworks"
   },
   "5eaa:Dawnguard.esm": {
    "edid": "DLC1RedwaterDen02",
-   "interior": true
+   "interior": true,
+   "name": "Redwater Spring"
   },
   "5eab:Dawnguard.esm": {
    "edid": "DLC1RedwaterDen01",
-   "interior": true
+   "interior": true,
+   "name": "Redwater Den"
   },
   "5f496:SkyrimSewers.esp": {
    "edid": "SSewersGreenwall",
-   "interior": true
+   "interior": true,
+   "name": "Fort Greenwall, Underworks"
   },
   "5f536:Skyrim.esm": {
    "edid": "Harmugstahl01",
-   "interior": true
+   "interior": true,
+   "name": "Harmugstahl"
   },
   "626a:aaaGraniteHill.esp": {
    "edid": "aaaGraniteHillSheepsHeadInn",
-   "interior": true
+   "interior": true,
+   "name": "Sheepshead Inn"
   },
   "633a:JKs Skyrim.esp": {
    "edid": "XJKRoriksteadRegnerHouse",
-   "interior": true
+   "interior": true,
+   "name": "Regner's House"
   },
   "6429:Dawnguard.esm": {
    "edid": "DLC1SoulCairnReaperCell",
-   "interior": true
+   "interior": true,
+   "name": "Reaper's Lair"
   },
   "6439:Dawnguard.esm": {
    "edid": "SoulCairnZcell01",
-   "interior": true
+   "interior": true,
+   "name": "Dark Chasm"
   },
   "64b5:Dawnguard.esm": {
    "edid": "TestCoryDLC01",
-   "interior": true
+   "interior": true,
+   "name": "Quick Test Cell"
   },
   "64fc2:SkyrimSewers.esp": {
    "edid": "SSewersSolitudeRuinStairs",
-   "interior": true
+   "interior": true,
+   "name": "Ruins of Old Haafingar"
   },
   "6554:OarsRest.esp": {
    "edid": "ORTheOldTrunk",
-   "interior": true
+   "interior": true,
+   "name": "The Old Trunk"
   },
   "656ca:SkyrimSewers.esp": {
    "edid": "SSewersMRKpassage",
-   "interior": true
+   "interior": true,
+   "name": "Passage to Nchuand-Zel"
   },
   "65ab5:Skyrim.esm": {
    "edid": "DushnikhYalCellar",
-   "interior": true
+   "interior": true,
+   "name": "Cellar"
   },
   "65ab6:Skyrim.esm": {
    "edid": "CrackedTuskKeep02",
-   "interior": true
+   "interior": true,
+   "name": "Cracked Tusk Vaults"
   },
   "660d:Solitude Arena.esp": {
    "edid": "aamaisonchamp",
-   "interior": true
+   "interior": true,
+   "name": "Lost Hut"
   },
   "6710:Solitude Arena.esp": {
    "edid": "aalearen",
@@ -6722,19 +7463,23 @@
   },
   "67f2a:Skyrim.esm": {
    "edid": "SnaplegCave01",
-   "interior": true
+   "interior": true,
+   "name": "Snapleg Cave"
   },
   "681dd:Skyrim.esm": {
    "edid": "BoulderfallCave01",
-   "interior": true
+   "interior": true,
+   "name": "Boulderfall Cave"
   },
   "68b99:Skyrim.esm": {
    "edid": "PotemasCatacombs01",
-   "interior": true
+   "interior": true,
+   "name": "Potema's Catacombs"
   },
   "69858:Skyrim.esm": {
    "edid": "AlftandZCell",
-   "interior": true
+   "interior": true,
+   "name": "Alftand Ruined Tower"
   },
   "69869:Skyrim.esm": {
    "edid": "",
@@ -6754,31 +7499,38 @@
   },
   "6c3b6:Skyrim.esm": {
    "edid": "AAALSDquartierdescombattants",
-   "interior": true
+   "interior": true,
+   "name": "Fighters Quarter"
   },
   "6c532:WindhelmSSE.esp": {
    "edid": "0QGrayQuarterPlayerhome",
-   "interior": true
+   "interior": true,
+   "name": "Graystone Lodge"
   },
   "6c62b:SkyrimSewers.esp": {
    "edid": "SSewersWHKastavPassage",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Sewers, Kastav's Burrow"
   },
   "6c658:WindhelmSSE.esp": {
    "edid": "0QGrayQuarterHouseHanged",
-   "interior": true
+   "interior": true,
+   "name": "Tedril's Home"
   },
   "6ccbb:Skyrim.esm": {
    "edid": "ShroudHearthBarrow01",
-   "interior": true
+   "interior": true,
+   "name": "Shroud Hearth Barrow"
   },
   "6daa0:Skyrim.esm": {
    "edid": "ThalmorEmbassy04",
-   "interior": true
+   "interior": true,
+   "name": "Thalmor Embassy, Barracks"
   },
   "6dcd5:SkyrimSewers.esp": {
    "edid": "SSewersWRWhiteWatchPassage",
-   "interior": true
+   "interior": true,
+   "name": "Dragonsreach, Underground Stream"
   },
   "6e0f:Skyrim.esm": {
    "edid": "NorthwatchKeepExterior02",
@@ -6786,7 +7538,8 @@
   },
   "6e2ac:Skyrim.esm": {
    "edid": "MorKhazgurCellar",
-   "interior": true
+   "interior": true,
+   "name": "Mor Khazgur Cellar"
   },
   "6f28:Skyrim.esm": {
    "edid": "MorKhazgurExterior",
@@ -6802,7 +7555,8 @@
   },
   "70469:Skyrim.esm": {
    "edid": "SolitudeStables",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Stables"
   },
   "7063:Skyrim.esm": {
    "edid": "BthardamzExterior03",
@@ -6810,11 +7564,13 @@
   },
   "7066:Dawnguard.esm": {
    "edid": "DLC1Ruunvald02",
-   "interior": true
+   "interior": true,
+   "name": "Ruunvald Temple"
   },
   "7144c:Skyrim.esm": {
    "edid": "FortDunstad04",
-   "interior": true
+   "interior": true,
+   "name": "The Stumbling Sabrecat"
   },
   "7178:Skyrim.esm": {
    "edid": "SalviusFarmExterior01",
@@ -6830,11 +7586,13 @@
   },
   "71ffe:Skyrim.esm": {
    "edid": "SolitudeJusticiarsHeadquarters",
-   "interior": true
+   "interior": true,
+   "name": "Thalmor Headquarters"
   },
   "7203:Dawnguard.esm": {
    "edid": "DLC1VampireCastleZCell1",
-   "interior": true
+   "interior": true,
+   "name": "Volkihar North Tower"
   },
   "7204:Dawnguard.esm": {
    "edid": "",
@@ -6842,15 +7600,18 @@
   },
   "7284e:Skyrim.esm": {
    "edid": "BrokenTowerRedoubt02",
-   "interior": true
+   "interior": true,
+   "name": "Broken Tower Redoubt"
   },
   "75270:Skyrim.esm": {
    "edid": "XTestGrantInt3",
-   "interior": true
+   "interior": true,
+   "name": "Magic Visuals Test Hall"
   },
   "75669:Skyrim.esm": {
    "edid": "E3demoBleakFallsBarrow",
-   "interior": true
+   "interior": true,
+   "name": "Bleak Falls Barrow"
   },
   "75ab:Skyrim.esm": {
    "edid": "LeftHandMineExterior02",
@@ -6862,11 +7623,13 @@
   },
   "760a:AnotherOakwood.esp": {
    "edid": "OakwoodSewer",
-   "interior": true
+   "interior": true,
+   "name": "Sewer"
   },
   "7614c:Skyrim.esm": {
    "edid": "Irkngthand02",
-   "interior": true
+   "interior": true,
+   "name": "Irkngthand Grand Cavern"
   },
   "7660:Skyrim.esm": {
    "edid": "DushnikhYalExterior02",
@@ -6874,63 +7637,78 @@
   },
   "77289:Skyrim.esm": {
    "edid": "SolitudeCastleDourTower",
-   "interior": true
+   "interior": true,
+   "name": "Castle Dour, Tower"
   },
   "777de:ElysiumEstateSSE.esp": {
    "edid": "00ElysiumEstateGuestHouse",
-   "interior": true
+   "interior": true,
+   "name": "Elysium Estate Guest House"
   },
   "778f1:Skyrim.esm": {
    "edid": "RobbersGorge01",
-   "interior": true
+   "interior": true,
+   "name": "Robber's Cove"
   },
   "78124:Skyrim.esm": {
    "edid": "Raldbthar02",
-   "interior": true
+   "interior": true,
+   "name": "Raldbthar Deep Market"
   },
   "7843:The Great City of Solitude.esp": {
    "edid": "SolitudeTheEmpireTrader",
-   "interior": true
+   "interior": true,
+   "name": "The Empire Trader"
   },
   "7947a:Skyrim.esm": {
    "edid": "WhiterunJorrvaskrBasement",
-   "interior": true
+   "interior": true,
+   "name": "Jorrvaskr Living Quarters"
   },
   "79f9f:Skyrim.esm": {
    "edid": "KnifepointRidge01",
-   "interior": true
+   "interior": true,
+   "name": "Knifepoint Mine"
   },
   "7b7ab:Skyrim.esm": {
    "edid": "DaintySload01",
-   "interior": true
+   "interior": true,
+   "name": "Dainty Sload"
   },
   "7bc27:Skyrim.esm": {
    "edid": "UtteringHillsCave01",
-   "interior": true
+   "interior": true,
+   "name": "Uttering Hills Cave"
   },
   "7bef7:Skyrim.esm": {
    "edid": "BlackreachZcell02",
-   "interior": true
+   "interior": true,
+   "name": "Silent Ruin"
   },
   "7bef8:Skyrim.esm": {
    "edid": "BlackreachZcell01",
-   "interior": true
+   "interior": true,
+   "name": "Reeking Tower"
   },
   "7c98b:Skyrim.esm": {
    "edid": "ThalmorEmbassy01",
-   "interior": true
+   "interior": true,
+   "name": "Thalmor Embassy"
   },
   "7d033:Skyrim.esm": {
    "edid": "WindhelmBlacksmith",
-   "interior": true
+   "interior": true,
+   "name": "Blacksmith Quarters"
   },
   "7dcfc:Skyrim.esm": {
    "edid": "ThalmorEmbassy02",
-   "interior": true
+   "interior": true,
+   "name": "Thalmor Embassy, Elenwen's Solar"
   },
   "7f93:SkyrimSewers.esp": {
    "edid": "SSewersSolitude03",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Sewers, Cloaca Maxima"
   },
   "7fc4:Solitude Arena.esp": {
    "edid": "",
@@ -6938,79 +7716,98 @@
   },
   "7fcdd:Skyrim.esm": {
    "edid": "BlackreachSewer01",
-   "interior": true
+   "interior": true,
+   "name": "Silent City Catacombs"
   },
   "801:Arena - Markarth Side.esp": {
    "edid": "aaaMarkarthSidePlayerhomeInterior",
-   "interior": true
+   "interior": true,
+   "name": "Cliffside Manor"
   },
   "801b3:Arena - Markarth Side.esp": {
    "edid": "aaaMarkarthSideMagicShop",
-   "interior": true
+   "interior": true,
+   "name": "The Boiling Cauldron"
   },
   "803:Dawnguard.esm": {
    "edid": "DLC1VampireCastleGuildhall",
-   "interior": true
+   "interior": true,
+   "name": "Volkihar Keep"
   },
   "80c6a:Skyrim.esm": {
    "edid": "WhiterunDragonsreachJarlsQuarters",
-   "interior": true
+   "interior": true,
+   "name": "Dragonsreach Jarl's Quarters"
   },
   "811:Dawnguard.esm": {
    "edid": "DLC1VampireCastleTest",
-   "interior": true
+   "interior": true,
+   "name": "Quick Test Cell"
   },
   "81972:Skyrim.esm": {
    "edid": "SightlessPit02",
-   "interior": true
+   "interior": true,
+   "name": "Temple of Xrib"
   },
   "81d5b:Skyrim.esm": {
    "edid": "LabyrinthianPriestSanctuary",
-   "interior": true
+   "interior": true,
+   "name": "Bromjunaar Sanctuary"
   },
   "81dec:Skyrim.esm": {
    "edid": "BrittleShinPass01",
-   "interior": true
+   "interior": true,
+   "name": "Brittleshin Pass"
   },
   "83559:Skyrim.esm": {
    "edid": "Labyrinthian01",
-   "interior": true
+   "interior": true,
+   "name": "Labyrinthian"
   },
   "83c1:aaaGraniteHill.esp": {
    "edid": "aaaGraniteHillPotentPotables",
-   "interior": true
+   "interior": true,
+   "name": "Potent Potables"
   },
   "8482:Dawnguard.esm": {
    "edid": "DLC1zFalmerValley01",
-   "interior": true
+   "interior": true,
+   "name": "Darkfall Grotto"
   },
   "87764:Skyrim.esm": {
    "edid": "HighHrothgar",
-   "interior": true
+   "interior": true,
+   "name": "High Hrothgar"
   },
   "8995:Dawnguard.esm": {
    "edid": "DLC1zFalmerValley02",
-   "interior": true
+   "interior": true,
+   "name": "Sharpslope Cave"
   },
   "89d51:Skyrim.esm": {
    "edid": "RiftenBeggarsRow",
-   "interior": true
+   "interior": true,
+   "name": "Beggar's Row"
   },
   "8a04c:Riften Expansion.esp": {
    "edid": "RiftenHouseofClanWaveBreaker",
-   "interior": true
+   "interior": true,
+   "name": "House of Clan Wave-Breaker"
   },
   "8a43:aaaGraniteHill.esp": {
    "edid": "aaaGraniteHillTolvierHouse",
-   "interior": true
+   "interior": true,
+   "name": "Tolvier's House"
   },
   "8afc:The Great City of Solitude.esp": {
    "edid": "SolitudeAkselsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Aksel's House"
   },
   "8b84d:Skyrim.esm": {
    "edid": "SunderstoneGorge01",
-   "interior": true
+   "interior": true,
+   "name": "Sunderstone Gorge"
   },
   "8ba8:Solitude Arena.esp": {
    "edid": "avalbois",
@@ -7022,11 +7819,13 @@
   },
   "8c81:The Great City of Solitude.esp": {
    "edid": "SolitudeNorthsideBarracks",
-   "interior": true
+   "interior": true,
+   "name": "Northside Barracks"
   },
   "8cdee:Skyrim.esm": {
    "edid": "Valthume00",
-   "interior": true
+   "interior": true,
+   "name": "Valthume Vestibule"
   },
   "8dea:Skyrim.esm": {
    "edid": "POINorthernCoast18",
@@ -7038,11 +7837,13 @@
   },
   "8e52:Dawnguard.esm": {
    "edid": "DLC1HunterValleyCave01",
-   "interior": true
+   "interior": true,
+   "name": "Mossy Glen Cave"
   },
   "8e906:Skyrim.esm": {
    "edid": "MarkarthStableHouse",
-   "interior": true
+   "interior": true,
+   "name": "Markarth Stables"
   },
   "8ea1:Skyrim.esm": {
    "edid": "WinterholdExterior06",
@@ -7078,7 +7879,8 @@
   },
   "8ed5:The Great City of Solitude.esp": {
    "edid": "SolitudePenitusOculatusOutpostSolitude",
-   "interior": true
+   "interior": true,
+   "name": "Penitus Oculatus Outpost Solitude"
   },
   "8f29:Skyrim.esm": {
    "edid": "FrostflowLighthouseExterior01",
@@ -7114,11 +7916,13 @@
   },
   "90232:WindhelmSSE.esp": {
    "edid": "0WHExtWarehouse",
-   "interior": true
+   "interior": true,
+   "name": "Warehouse"
   },
   "90335:WindhelmSSE.esp": {
    "edid": "0WHExtDockmaster",
-   "interior": true
+   "interior": true,
+   "name": "Dockmaster's Home"
   },
   "9068:Skyrim.esm": {
    "edid": "TowerofMzarkSurfaceExterior",
@@ -7158,7 +7962,8 @@
   },
   "9174e:Skyrim.esm": {
    "edid": "WarehousePrefabs",
-   "interior": true
+   "interior": true,
+   "name": "Warehouse Prefabs"
   },
   "917e:Skyrim.esm": {
    "edid": "",
@@ -7166,11 +7971,13 @@
   },
   "91872:Skyrim.esm": {
    "edid": "Labyrinthian03",
-   "interior": true
+   "interior": true,
+   "name": "Labyrinthian Thoroughfare"
   },
   "918d3:Skyrim.esm": {
    "edid": "WhiterunUthgerdTheUnbrokensHouse",
-   "interior": true
+   "interior": true,
+   "name": "Uthgerd's House"
   },
   "919c:Skyrim.esm": {
    "edid": "",
@@ -7278,7 +8085,8 @@
   },
   "94322:Skyrim.esm": {
    "edid": "Brinehammer01",
-   "interior": true
+   "interior": true,
+   "name": "The Brinehammer Below Deck"
   },
   "944c:Skyrim.esm": {
    "edid": "RobbersGorgeExterior03",
@@ -7306,7 +8114,8 @@
   },
   "94bab:Skyrim.esm": {
    "edid": "WhiterunHalloftheDeadCatacombs",
-   "interior": true
+   "interior": true,
+   "name": "Whiterun Catacombs"
   },
   "94fb:Skyrim.esm": {
    "edid": "RedEagleRedoubtExterior07",
@@ -7334,7 +8143,8 @@
   },
   "95c44:Skyrim.esm": {
    "edid": "Sovngarde01",
-   "interior": true
+   "interior": true,
+   "name": "Hall of Valor"
   },
   "95cf:Skyrim.esm": {
    "edid": "ValtheimKeepExterior03",
@@ -7374,7 +8184,8 @@
   },
   "961ff:Skyrim.esm": {
    "edid": "WinterholdJail",
-   "interior": true
+   "interior": true,
+   "name": "The Chill"
   },
   "963a:Skyrim.esm": {
    "edid": "WhiterunExterior16",
@@ -7406,7 +8217,8 @@
   },
   "965b3:Skyrim.esm": {
    "edid": "WindhelmWarehouse",
-   "interior": true
+   "interior": true,
+   "name": "Warehouse"
   },
   "965b:Skyrim.esm": {
    "edid": "00ElysiumEstateExt1",
@@ -7430,11 +8242,13 @@
   },
   "97298:Skyrim.esm": {
    "edid": "WindhelmPalaceUpstairs02",
-   "interior": true
+   "interior": true,
+   "name": "Palace of the Kings, Upstairs"
   },
   "97299:Skyrim.esm": {
    "edid": "WindhelmPalaceUpstairs01",
-   "interior": true
+   "interior": true,
+   "name": "Palace of the Kings Upstairs"
   },
   "9731:Skyrim.esm": {
    "edid": "Riverwood04",
@@ -7478,7 +8292,8 @@
   },
   "9aa4a:Skyrim.esm": {
    "edid": "NightcallerTemple01",
-   "interior": true
+   "interior": true,
+   "name": "Nightcaller Temple"
   },
   "9ad8:Skyrim.esm": {
    "edid": "aaaGraniteHill",
@@ -7494,7 +8309,8 @@
   },
   "9b238:Skyrim.esm": {
    "edid": "BluePalaceWing01",
-   "interior": true
+   "interior": true,
+   "name": "Pelagius Wing"
   },
   "9b241:Skyrim.esm": {
    "edid": "",
@@ -7506,7 +8322,8 @@
   },
   "9bde:Dawnguard.esm": {
    "edid": "DLC1HunterCave01",
-   "interior": true
+   "interior": true,
+   "name": "Dead Drop Falls"
   },
   "9be5:Skyrim.esm": {
    "edid": "KnifepointRidgeExterior04",
@@ -7542,131 +8359,163 @@
   },
   "9ccdd:Skyrim.esm": {
    "edid": "RiftenValindorsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Valindor's House"
   },
   "9ccde:Skyrim.esm": {
    "edid": "RiftenMariseAravelsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Marise Aravel's House"
   },
   "9ccdf:Skyrim.esm": {
    "edid": "RiftenRomlynDrethsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Romlyn Dreth's House"
   },
   "a013b:Skyrim.esm": {
    "edid": "GoldenglowEstate04",
-   "interior": true
+   "interior": true,
+   "name": "Goldenglow Estate Sewer"
   },
   "a0877:Skyrim.esm": {
    "edid": "Skuldafn01",
-   "interior": true
+   "interior": true,
+   "name": "Skuldafn Temple"
   },
   "a1793:Skyrim.esm": {
    "edid": "SolitudeRedWave",
-   "interior": true
+   "interior": true,
+   "name": "Red Wave"
   },
   "a1a61:Skyrim.esm": {
    "edid": "ShriekwindBastion01",
-   "interior": true
+   "interior": true,
+   "name": "Shriekwind Bastion"
   },
   "a1bfd:Skyrim.esm": {
    "edid": "RiftenRatway02",
-   "interior": true
+   "interior": true,
+   "name": "The Ratway Vaults"
   },
   "a37a0:Riften Expansion.esp": {
    "edid": "RiftenTempleOfTalos",
-   "interior": true
+   "interior": true,
+   "name": "Temple of Talos"
   },
   "a5a71:Skyrim.esm": {
    "edid": "GeirmundsHall01",
-   "interior": true
+   "interior": true,
+   "name": "Geirmund's Hall"
   },
   "a6d8e:Skyrim.esm": {
    "edid": "BlackBriarLodge01",
-   "interior": true
+   "interior": true,
+   "name": "Black-Briar Lodge"
   },
   "a73f4:Skyrim.esm": {
    "edid": "Skuldafn02",
-   "interior": true
+   "interior": true,
+   "name": "Skuldafn Temple"
   },
   "a87c5:Skyrim.esm": {
    "edid": "RavenscarHollow01",
-   "interior": true
+   "interior": true,
+   "name": "Ravenscar Hollow"
   },
   "a8b23:Skyrim.esm": {
    "edid": "RiftenJail01",
-   "interior": true
+   "interior": true,
+   "name": "Riften Jail"
   },
   "a8b24:Skyrim.esm": {
    "edid": "RiftenJail02",
-   "interior": true
+   "interior": true,
+   "name": "Sewer"
   },
   "a903:Dawnguard.esm": {
    "edid": "DLC1zSoulCairn01",
-   "interior": true
+   "interior": true,
+   "name": "Cave"
   },
   "a9194:Skyrim.esm": {
    "edid": "RebelsCairn01",
-   "interior": true
+   "interior": true,
+   "name": "Rebel's Cairn"
   },
   "aa20c:Skyrim.esm": {
    "edid": "LiarsRetreat01",
-   "interior": true
+   "interior": true,
+   "name": "Liar's Retreat"
   },
   "aac5:Riften Expansion.esp": {
    "edid": "RiftenMaraSquareTower",
-   "interior": true
+   "interior": true,
+   "name": "Guard Tower"
   },
   "ab531:Skyrim.esm": {
    "edid": "Folgunthur02",
-   "interior": true
+   "interior": true,
+   "name": "Folgunthur Crypt"
   },
   "abd31:Skyrim.esm": {
    "edid": "FrostmereCrypt01",
-   "interior": true
+   "interior": true,
+   "name": "Frostmere Crypt"
   },
   "ac5d2:Skyrim.esm": {
    "edid": "WolfSkullCave02",
-   "interior": true
+   "interior": true,
+   "name": "Wolfskull Ruins"
   },
   "ad5a1:Skyrim.esm": {
    "edid": "DarkBrotherhoodSanctuary",
-   "interior": true
+   "interior": true,
+   "name": "Dark Brotherhood Sanctuary"
   },
   "addb:The Great City of Solitude.esp": {
    "edid": "SolitudeSouthsideBarracks",
-   "interior": true
+   "interior": true,
+   "name": "Southside Barracks"
   },
   "ae783:Skyrim.esm": {
    "edid": "WinterholdCollegeMidden02",
-   "interior": true
+   "interior": true,
+   "name": "The Midden Dark"
   },
   "af227:Skyrim.esm": {
    "edid": "Mzulft04z",
-   "interior": true
+   "interior": true,
+   "name": "Dwarven Storeroom"
   },
   "afdb:The Great City of Solitude.esp": {
    "edid": "SolitudeSwampsideApothecary",
-   "interior": true
+   "interior": true,
+   "name": "Riverside Apothecary"
   },
   "b1783:Skyrim.esm": {
    "edid": "CTest",
-   "interior": true
+   "interior": true,
+   "name": "Quick Test Cell"
   },
   "b213:The Great City of Solitude.esp": {
    "edid": "SolitudeDigitusQuintusHouse",
-   "interior": true
+   "interior": true,
+   "name": "Digitus Quintus' House"
   },
   "b29d4:Skyrim.esm": {
    "edid": "BlackreachZcell06",
-   "interior": true
+   "interior": true,
+   "name": "Hall of Rumination"
   },
   "b29d5:Skyrim.esm": {
    "edid": "BlackreachZcell05",
-   "interior": true
+   "interior": true,
+   "name": "Debate Hall"
   },
   "b29d6:Skyrim.esm": {
    "edid": "BlackreachZcell04",
-   "interior": true
+   "interior": true,
+   "name": "Pumping Station"
   },
   "b3a9:Skyrim.esm": {
    "edid": "WinterWarExterior03",
@@ -7698,15 +8547,18 @@
   },
   "b64b4:Skyrim.esm": {
    "edid": "FortHraggstad01",
-   "interior": true
+   "interior": true,
+   "name": "Fort Hraggstad"
   },
   "b6be6:Skyrim.esm": {
    "edid": "EmbershardMine01",
-   "interior": true
+   "interior": true,
+   "name": "Embershard Mine"
   },
   "ba599:Skyrim.esm": {
    "edid": "BrokenOarGrotto01",
-   "interior": true
+   "interior": true,
+   "name": "Broken Oar Grotto"
   },
   "bae3:Skyrim.esm": {
    "edid": "CragslaneCavernExterior",
@@ -7714,7 +8566,8 @@
   },
   "bbb2f:Skyrim.esm": {
    "edid": "Katariah01",
-   "interior": true
+   "interior": true,
+   "name": "The Katariah"
   },
   "bc0f:Skyrim.esm": {
    "edid": "POIFallForest04",
@@ -7762,11 +8615,13 @@
   },
   "be46a:Skyrim.esm": {
    "edid": "Mzinchaleft02",
-   "interior": true
+   "interior": true,
+   "name": "Mzinchaleft Depths"
   },
   "c0bba:Skyrim.esm": {
    "edid": "ThievesGuildHoldingCell",
-   "interior": true
+   "interior": true,
+   "name": "Do Not Delete - Not A Test Cell"
   },
   "c19:Dawnguard.esm": {
    "edid": "",
@@ -7790,7 +8645,8 @@
   },
   "c5aa0:Skyrim.esm": {
    "edid": "HonningbrewMeadery03",
-   "interior": true
+   "interior": true,
+   "name": "Honningbrew Boilery"
   },
   "c5ed:TavernGames.esp": {
    "edid": "_SAG_DiceGameInterface_Cell",
@@ -7798,15 +8654,18 @@
   },
   "c7348:Skyrim.esm": {
    "edid": "HallOfTheVigilant01",
-   "interior": true
+   "interior": true,
+   "name": "Hall of the Vigilant"
   },
   "c849d:WindhelmSSE.esp": {
    "edid": "0WHTsunThanF",
-   "interior": true
+   "interior": true,
+   "name": " House of Thane Skjorta"
   },
   "c8b44:WindhelmSSE.esp": {
    "edid": "0WHPalaceStealthQuest",
-   "interior": true
+   "interior": true,
+   "name": "Hall of Victory"
   },
   "c97ec:Skyrim.esm": {
    "edid": "",
@@ -7814,31 +8673,38 @@
   },
   "c9dab:Skyrim.esm": {
    "edid": "FellglowKeep03",
-   "interior": true
+   "interior": true,
+   "name": "Fellglow Keep Ritual Chamber"
   },
   "cab91:Skyrim.esm": {
    "edid": "WinterholdCollegeHallofAttainment",
-   "interior": true
+   "interior": true,
+   "name": "Hall of Attainment"
   },
   "cab92:Skyrim.esm": {
    "edid": "WinterholdCollegeArchMageQuarters",
-   "interior": true
+   "interior": true,
+   "name": "Arch-Mage's Quarters"
   },
   "cc3f6:Riften Expansion.esp": {
    "edid": "RiftenWeaveAndThread",
-   "interior": true
+   "interior": true,
+   "name": "The Weave and Thread"
   },
   "cc616:Riften Expansion.esp": {
    "edid": "RiftenHoneyedWordsBakery",
-   "interior": true
+   "interior": true,
+   "name": "Honeyed Words Bakery"
   },
   "ccdaa:Skyrim.esm": {
    "edid": "WarehouseFurniture",
-   "interior": true
+   "interior": true,
+   "name": "Warehouse Furniture"
   },
   "cd4a:SkyrimSewers.esp": {
    "edid": "SSewersSolitude02",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Sewers, Canalworks"
   },
   "ce5:Dawnguard.esm": {
    "edid": "FalmerPlayground",
@@ -7870,43 +8736,53 @@
   },
   "d81e3:WindhelmSSE.esp": {
    "edid": "0WHUndercityMain",
-   "interior": true
+   "interior": true,
+   "name": "Windhelm Passageway"
   },
   "d9ac:aaaGraniteHill.esp": {
    "edid": "aaaGraniteHillGeneralGoods",
-   "interior": true
+   "interior": true,
+   "name": "Crossroads Goods"
   },
   "d9dc7:Skyrim.esm": {
    "edid": "ShroudHearthBarrow02",
-   "interior": true
+   "interior": true,
+   "name": "Shroud Hearth Depths"
   },
   "da07:aaaGraniteHill.esp": {
    "edid": "aaaGraniteHillOACCrawlSpace",
-   "interior": true
+   "interior": true,
+   "name": "The Crawl Space"
   },
   "db070:Skyrim.esm": {
    "edid": "LundsHut01",
-   "interior": true
+   "interior": true,
+   "name": "Lund's Hut"
   },
   "dbf12:Skyrim.esm": {
    "edid": "MarasEyePond01",
-   "interior": true
+   "interior": true,
+   "name": "Mara's Eye Den"
   },
   "dd216:Skyrim.esm": {
    "edid": "SolitudeHalloftheDeadCatacombs",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Catacombs"
   },
   "dd95b:WindhelmSSE.esp": {
    "edid": "0WHTsunNordBros",
-   "interior": true
+   "interior": true,
+   "name": "Clan Hammer-Shield"
   },
   "ddf7c:Skyrim.esm": {
    "edid": "AnisesCabin01",
-   "interior": true
+   "interior": true,
+   "name": "Cellar"
   },
   "debcd:Skyrim.esm": {
    "edid": "DrelasCottage01",
-   "interior": true
+   "interior": true,
+   "name": "Drelas' Cottage"
   },
   "e00:Solitude Arena.esp": {
    "edid": "",
@@ -7914,23 +8790,28 @@
   },
   "e09c:The Great City of Solitude.esp": {
    "edid": "SolitudeHjoldansHouse",
-   "interior": true
+   "interior": true,
+   "name": "Hjoldan's House"
   },
   "e1e6:The Great City of Solitude.esp": {
    "edid": "SolitudeTorbecsHouse",
-   "interior": true
+   "interior": true,
+   "name": "Torbec's House"
   },
   "e348:The Great City of Solitude.esp": {
    "edid": "SolitudeThalenRasHouse",
-   "interior": true
+   "interior": true,
+   "name": "Tahlen-Ra's House"
   },
   "e48e:The Great City of Solitude.esp": {
    "edid": "SolitudeAbandonedWarehouse",
-   "interior": true
+   "interior": true,
+   "name": "Abandoned Warehouse"
   },
   "e6114:Riften Expansion.esp": {
    "edid": "RiftenRethanHoldingsBank",
-   "interior": true
+   "interior": true,
+   "name": "Rethan Holdings"
   },
   "ea6:Dawnguard.esm": {
    "edid": "",
@@ -7942,19 +8823,23 @@
   },
   "eb440:Skyrim.esm": {
    "edid": "DawnstarBarracksJail",
-   "interior": true
+   "interior": true,
+   "name": "Dawnstar Jail"
   },
   "eb7:Dawnguard.esm": {
    "edid": "DLC1DimHollowCrypt02",
-   "interior": true
+   "interior": true,
+   "name": "Dimhollow Cavern"
   },
   "eb8:Dawnguard.esm": {
    "edid": "DLC1DimHollowCrypt01",
-   "interior": true
+   "interior": true,
+   "name": "Dimhollow Crypt"
   },
   "ed8e0:Skyrim.esm": {
    "edid": "BlackreachZcell07",
-   "interior": true
+   "interior": true,
+   "name": "Derelict Pumphouse"
   },
   "edc3:Dragonborn.esm": {
    "edid": "",
@@ -7966,19 +8851,23 @@
   },
   "eec53:Skyrim.esm": {
    "edid": "BlackreachZCell08",
-   "interior": true
+   "interior": true,
+   "name": "Farm Overseer's House"
   },
   "eec55:Skyrim.esm": {
    "edid": "BlackreachZCell10",
-   "interior": true
+   "interior": true,
+   "name": "Sinderion's Field Laboratory"
   },
   "ef324:Skyrim.esm": {
    "edid": "FalkreathBarracksJail",
-   "interior": true
+   "interior": true,
+   "name": "Falkreath Jail"
   },
   "ef325:Skyrim.esm": {
    "edid": "FalkreathBarracks",
-   "interior": true
+   "interior": true,
+   "name": "Falkreath Barracks"
   },
   "ef79:Dragonborn.esm": {
    "edid": "DLC2StridentSquallExterior03",
@@ -7986,31 +8875,38 @@
   },
   "f10d:The Great City of Solitude.esp": {
    "edid": "SolitudeBreweryTGCoS",
-   "interior": true
+   "interior": true,
+   "name": "Solitude Brewery"
   },
   "f2cab:Skyrim.esm": {
    "edid": "LabyrinthianMaze",
-   "interior": true
+   "interior": true,
+   "name": "Shalidor's Maze"
   },
   "f453:The Great City of Solitude.esp": {
    "edid": "SolitudeLongSerpentTGCoS",
-   "interior": true
+   "interior": true,
+   "name": "The Long Serpent"
   },
   "f9a47:Arena - Markarth Side.esp": {
    "edid": "aaaMarkarthSideBlacksmithInterior",
-   "interior": true
+   "interior": true,
+   "name": "Iron Maidens"
   },
   "f9b2a:Arena - Markarth Side.esp": {
    "edid": "aaaMarkarthSideAlchemyShopInterior",
-   "interior": true
+   "interior": true,
+   "name": "Healers and Dealers"
   },
   "fd2b:The Great City of Solitude.esp": {
    "edid": "SolitudeNorthsideWarehouseTGCoS",
-   "interior": true
+   "interior": true,
+   "name": "EEC Warehouse East"
   },
   "fee74:JK's Whiterun's Outskirts.esp": {
    "edid": "XJKWhiterunOutskirtsPavelHouse",
-   "interior": true
+   "interior": true,
+   "name": "Pavel's House"
   }
  },
  "counts": {

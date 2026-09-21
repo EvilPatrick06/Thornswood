@@ -58,12 +58,20 @@ import struct
 import sys
 import zlib
 
+import bsa
+
 COMPRESSED = 0x00040000
 MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
 
 # A cell is an interior when bit 0 of its DATA flags is set. Everything else is
 # a piece of a worldspace.
 CELL_INTERIOR = 0x01
+
+# A localised plugin stores FULL as a four byte string id rather than as text,
+# and the text lives in a .STRINGS file inside a BSA. The bit is in the TES4
+# header's flags. Five of the 101 plugins in this load order are localised and
+# they are the five masters, which is where nearly every cell in the game is.
+LOCALISED = 0x80
 
 
 def subrecords(data):
@@ -94,6 +102,16 @@ class Plugin(object):
         self.masters = masters_of(self.buf)
         self.header = struct.unpack_from('<I', self.buf, 4)[0]
         self.failed = 0
+        self.localised = bool(struct.unpack_from('<I', self.buf, 8)[0] & LOCALISED)
+        self.strings = {}
+
+    def text(self, body):
+        """A FULL subrecord as words, whichever way this plugin stores it."""
+        if self.localised:
+            if len(body) < 4:
+                return ''
+            return self.strings.get(struct.unpack_from('<I', body, 0)[0], '')
+        return body.rstrip(bytes([0])).decode('utf-8', 'replace')
 
     def desc(self, fid):
         """A form id as <hex>:<plugin>, or None when it cannot be placed.
@@ -155,13 +173,18 @@ def walk(pl, doors, out, want_bases):
                 d = pl.desc(fid)
                 if d:
                     pairs = subrecords(pl.data(p, size, flags))
-                    name, interior = '', False
+                    name, full, interior = '', '', False
                     for st, body in pairs:
                         if st == b'EDID':
                             name = body.rstrip(bytes([0])).decode('ascii', 'replace')
+                        elif st == b'FULL':
+                            full = pl.text(body)
                         elif st == b'DATA' and len(body) >= 1:
                             interior = bool(body[0] & CELL_INTERIOR)
-                    out['cells'][d] = {'edid': name, 'interior': interior}
+                    row = {'edid': name, 'interior': interior}
+                    if full:
+                        row['name'] = full
+                    out['cells'][d] = row
             elif tag == b'REFR' and cell:
                 pairs = subrecords(pl.data(p, size, flags))
                 base = None
@@ -243,10 +266,18 @@ def main():
     print('Door bases')
     print('  %d door record(s) across the load order' % len(doors))
 
+    localised = 0
     for name in order:
         pl = Plugin(os.path.join(args.data, name), name)
         if not pl.ok:
             continue
+        # A localised plugin's cell names are string ids, and the text is in a
+        # BSA. Only the plugins that say they are localised are looked up, so a
+        # plugin that stores its names as words costs nothing here.
+        if pl.localised:
+            pl.strings = bsa.load_strings(args.data, name)
+            if pl.strings:
+                localised += 1
         walk(pl, doors, out, set(doors))
         failed += pl.failed
 
@@ -293,6 +324,16 @@ def main():
     print('  %s door(s) name a partner this pass never saw' % format(unpaired, ','))
     print('  %s cell(s) in all, %s of them interiors'
           % (format(len(cells), ','), format(sum(1 for c in cells.values() if c['interior']), ',')))
+    named = sum(1 for b in buildings if cells.get(b, {}).get('name'))
+    print('  %s of the %s buildings have a name a person would recognise, out of %d string '
+          'table(s)' % (format(named, ','), format(len(buildings), ','), localised))
+    if named < len(buildings):
+        print('  %s have only an editor id, so a deed to one cannot be worded yet'
+              % format(len(buildings) - named, ','))
+        for b in sorted(buildings):
+            if not cells.get(b, {}).get('name'):
+                print('    %s' % cells.get(b, {}).get('edid', b))
+                break
 
     if args.check:
         print('')
