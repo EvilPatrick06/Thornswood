@@ -2374,6 +2374,23 @@ function chargenTick() {
     }
   }
 
+  /*
+    The starting purse, here because this is the one loop that already walks
+    everybody who is online. It costs one property read per person per tick and
+    answers no on all but the first, and the reasoning for the forty is written
+    out over purse() in the spoils block.
+
+    It is outside the chargen state machine below on purpose: a character that
+    finished creation months ago still needs it, because the world they are
+    standing in no longer has a coin in it.
+  */
+  const spoilsBlock = globalThis.__thornswoodSpoils;
+  if (spoilsBlock && spoilsBlock.purse) {
+    for (const who of online) {
+      try { spoilsBlock.purse(who); } catch (e) { /* said in the spoils log */ }
+    }
+  }
+
   for (const actorId of online) {
     if (!firstSeen.has(actorId)) {
       firstSeen.set(actorId, now);
@@ -11988,6 +12005,12 @@ log('gamemode loaded:',
         updateOwner: '', updateNeighbor: ''
       });
     } catch (e) { /* already made by a previous load. harmless. */ }
+    try {
+      mp.makeProperty(PURSE_PROPERTY, {
+        isVisibleByOwner: false, isVisibleByNeighbors: false,
+        updateOwner: '', updateNeighbor: ''
+      });
+    } catch (e) { }
   }
 
   /*
@@ -12118,8 +12141,81 @@ log('gamemode loaded:',
            'people in this world, not off the ground.';
   }
 
+  // ------------------------------------------------- where gold comes from --
+  /*
+    FORTY GOLD, ONCE, TO EVERY CHARACTER.
+
+    Patrick, 21 September: "everyone starts with 40 gold, and we can add a job
+    for gold later but that's just to start."
+
+    This is the other half of the rule above and it belongs beside it. Taking
+    every coin out of the world closes the economy at the bottom, and a closed
+    economy with no way in is not an economy: nobody could buy the first thing
+    anybody made. So the world stops handing coin out and the server starts, and
+    both of those facts live in one block so that neither can be changed without
+    the other being read.
+
+    IT IS A FLOOR AND NOT AN INCOME. Forty gold buys a meal and a bed and not
+    much else, which is the point: it is enough to trade with on the first
+    evening and not enough to live on, so the job Patrick means to add later is
+    still the thing that pays.
+
+    ONCE PER CHARACTER, EVER, and the mark is on the character rather than in a
+    file. Somebody who logs in twice is not somebody who starts twice, and the
+    purse would otherwise be an income of forty gold a session, which is exactly
+    the tap this whole block exists to close.
+
+    IT REACHES CHARACTERS THAT ALREADY EXIST, deliberately. Every character on
+    this server picked their class before any of this was written, and the
+    world they are standing in no longer has a coin in it. A starting purse that
+    only new characters got would leave everybody already here with no money and
+    no way to get any. Same reasoning as the tool handout's way back, written
+    out over offerTool.
+  */
+  var PURSE = 40;
+  var PURSE_PROPERTY = 'thornswoodPurse';
+
+  function purse(actorId) {
+    try {
+      if (mp.get(actorId, PURSE_PROPERTY)) { return false; }
+    } catch (e) {
+      // Cannot tell whether they have had it, so do not hand it over. Saying no
+      // costs somebody forty gold once; saying yes hands it out every tick.
+      return false;
+    }
+    var goldId = GOLD;
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    var found = false;
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i] && entries[i].baseId === goldId) {
+        entries[i].count += PURSE;
+        found = true;
+        break;
+      }
+    }
+    if (!found) { entries.push({ baseId: goldId, count: PURSE }); }
+    try {
+      mp.set(actorId, 'inventory', { entries: entries });
+    } catch (e) {
+      return false;
+    }
+    try {
+      mp.set(actorId, PURSE_PROPERTY, Date.now());
+    } catch (e) {
+      // The coin is in the pack and the mark is not written, so this runs again
+      // next tick and hands over another forty. That is the one direction that
+      // is not harmless, so it is said out loud rather than swallowed.
+      slog('handed', actorId.toString(16), 'their purse and could not mark it:', e);
+    }
+    slog(actorId.toString(16), 'was handed a starting purse of', PURSE);
+    return true;
+  }
+
   ready();
   g.__thornswoodSpoils = {
+    purse: purse, PURSE: PURSE, PURSE_PROPERTY: PURSE_PROPERTY,
     activate: activate, strip: strip, isSpoil: isSpoil, kindOf: kindOf,
     isTool: isTool, alreadyStripped: alreadyStripped,
     SPOIL_TYPES: SPOIL_TYPES, GOLD: GOLD, STRIPPED_PROPERTY: STRIPPED_PROPERTY
