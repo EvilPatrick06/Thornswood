@@ -164,7 +164,15 @@ if (`$p) { 'FOUND ' + (& `$p.Source --version 2>&1) } else { 'MISSING' }
 # --------------------------------------------------------------- files ---
 Head 'Copying it up'
 $null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\assets' | Out-Null; 'ready'"
-foreach ($f in 'bot.py', 'card.py') {
+# dev-channel.txt goes up with the code, and it is not an afterthought.
+#
+# The site watcher reads the staff channel's id out of it, beside bot.py. It
+# was not in this list on 21 September, so the first run of the watcher on the
+# VPS said "in channel 0" and would have found the site down and had nowhere to
+# say so. The id is not a secret and the file is tracked in git, unlike the two
+# webhook files sitting next to it, which are not sent by anything and must not
+# be added here.
+foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt') {
   $src = Join-Path $Here "discord\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   & scp @ssh $src "${User}@${Vps}:$Root/$f" | Out-Null
