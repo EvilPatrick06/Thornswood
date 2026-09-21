@@ -433,7 +433,21 @@ if ($DryRun) {
             Say '  the next release may think it has already gone out. Check it.' 'Red'
         }
     }
-    Say '  dry run cleaned up: the feed and the baseline are as they were' 'DarkGray'
+    # AND THE VERSION, which is the third file and was missed.
+    #
+    # The two above were put back because a dry run had twice consumed the next
+    # real release. Updater.cs is the same fault with a different face: the bump
+    # happens before the build, because the exe has to carry the number, and
+    # nothing put it back. Measured 21 September: a dry run went 1.1.67 to
+    # 1.1.68, left it there, and the real Ship that followed minutes later went
+    # 1.1.68 to 1.1.69. 1.1.68 does not exist and never will.
+    #
+    # Unbump is the function written for exactly this and its own comment says
+    # why: "a failed run burns a number and the launcher people are running
+    # claims a version that was never published." A dry run is a run that does
+    # not publish, so it is one of those.
+    Unbump 'the dry run published nothing'
+    Say '  dry run cleaned up: the feed, the baseline and the version are as they were' 'DarkGray'
 }
 
 # Ground truth, as well as the exit code.
