@@ -2596,6 +2596,11 @@
       // it asks the server to say again what this character already is, and
       // asks again every time it opens. The answer comes back through the
       // property's own updateOwner script.
+      //
+      // That script hands the view to the page and never to this file, so the
+      // page is asked to pass it back before the answer to that refresh
+      // arrives. See the tree block below.
+      treeForwardInstall();
       tellServer('/pick refresh');
       return;
     }
@@ -2613,6 +2618,16 @@
       tellServer('/pick ' + rest);
       return;
     }
+
+    /*
+      The panel view, passed back out of the page. Two spellings, because two
+      halves can send it: the forwarder this file puts on the panel's setData
+      sends the whole view, and a panel that decides to send the totals on its
+      own can send the map by itself. The same numbers arriving twice cost
+      nothing; an unchanged map is never applied twice.
+    */
+    if (what.indexOf('skills:view ') === 0) { treeFromView(what.slice(12)); return; }
+    if (what.indexOf('skills:effects ') === 0) { treeFromMap(what.slice(15)); return; }
 
     if (what === 'typing') { beat = Date.now(); return; }
     if (what === 'typing-idle') {
@@ -2686,6 +2701,210 @@
 
     log(what);
   }));
+
+  // ----------------------------------------------- what the skill tree adds --
+  /*
+    The tree has to change the character, and the server cannot do it.
+
+    Base health, magicka and stamina are worked out from the race record when
+    the character is made (skymp5-server, GetBaseActorValues.cpp), and our own
+    Thornswood-Content.esp holds no spell, magic effect or perk record to hand
+    out, which is what a parse of it says. So the server owns the arithmetic
+    and this file owns the hand that puts it on the character. It decides
+    nothing else: a value the server did not send is a value nothing here
+    touches.
+
+    WHAT ARRIVES. A map of what the tree adds up to, only the entries that are
+    not zero:
+
+        { health: 25, magicka: 10, stamina: 0, carryWeight: 40, speedMult: 3 }
+
+    and anything else of the same shape. The key is a Skyrim actor value name
+    in lower camel case and goes through to the game as it arrives, because
+    the game's own names are case insensitive: skymp5-client.js sets "health"
+    and "Aggression" in the same breath (line 5453 and its neighbours).
+
+    HOW IT ARRIVES. The property's updateOwner script runs inside
+    skymp5-client and hands the view to window.thornswoodSkills.setData in the
+    page. It never reaches this file. So the page is asked to pass it back:
+    treeForwardInstall puts a wrapper on setData that sends the view out as a
+    browserMessage, the same route every other line from the panel travels,
+    and it goes in when the panel says it is ready, before the /pick refresh
+    that answer comes from.
+
+    SET, NOT MOD. setActorValue writes the base value to a number this block
+    worked out. modActorValue adds to whatever is in front of it, and a
+    repeated add is the whole failure being avoided here: the view is pushed
+    again every time anything about the character changes, and a session of
+    adds is somebody growing without limit. Every pass here works out one
+    total, the natural value plus what the tree adds, and sets that, so the
+    same map applied a second time lands on the same number. getBaseActorValue
+    reads the base back, which is what the total is worked out from.
+
+    WHAT NATURAL IS. The base with this plugin's own change taken back out of
+    it. The record below keeps both halves of the last pass, what was added
+    and what the base was left reading, because our change is not always still
+    there: skymp5-client rewrites health, magicka, stamina and their rates
+    from the server's spawn props every time it spawns somebody
+    (skymp5-client.js line 5453). So the base only counts as ours when it
+    still reads exactly what we set it to. Anything else and the base in front
+    of us is the natural one already and there is nothing of ours to take
+    back.
+
+    The block between the markers is lifted out by
+    <scratchpad>\treeapplytest.js, which drives it against a fake
+    skyrimPlatform. Moving the markers moves the test.
+  */
+  // >>> tree apply: begin >>>
+
+  /* The map the server last sent, waiting for a frame that can call the game. */
+  let treeWant = null;
+  /* That map as sorted text, so a view saying the same thing costs nothing. */
+  let treeSig = '';
+  /* Set while treeWant has not been put on the character yet. */
+  let treeDirty = false;
+  /* lower case name -> { name, add, total }: what was added and what the base
+     was left reading. See WHAT NATURAL IS above. */
+  let treeMine = {};
+
+  /*
+    The wrapper the page runs. Idempotent: the flag it leaves means a second
+    install does nothing, and a page that reloads takes the flag with it, so
+    the next 'skills:ready' puts a fresh one on the fresh panel.
+  */
+  const TREE_FORWARD = [
+    '(function(){try{',
+    '  var s = window.thornswoodSkills;',
+    '  if (!s || s.__thornswoodTreeForward) { return; }',
+    '  var was = s.setData;',
+    '  s.setData = function(table, got){',
+    '    try { window.skyrimPlatform.sendMessage("thornswood-front",',
+    '          "skills:view " + JSON.stringify(got || null)); } catch(e) {}',
+    '    return was.apply(this, arguments);',
+    '  };',
+    '  s.__thornswoodTreeForward = true;',
+    '}catch(e){}})();'
+  ].join('\n');
+
+  function treeForwardInstall() {
+    try { T.js(TREE_FORWARD); } catch (e) { log('tree: could not ask the page to pass the view back:', e); }
+  }
+
+  /* Only names the game could have, only numbers, and nothing that adds up to
+     zero, which is the same as not being sent. */
+  function treeNumbers(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') { return out; }
+    for (const k in raw) {
+      if (!Object.prototype.hasOwnProperty.call(raw, k)) { continue; }
+      if (!/^[A-Za-z][A-Za-z0-9]*$/.test(k)) { continue; }
+      const n = Number(raw[k]);
+      if (!isFinite(n) || n === 0) { continue; }
+      out[k] = n;
+    }
+    return out;
+  }
+
+  function treeSigOf(map) {
+    const keys = Object.keys(map).sort();
+    const parts = [];
+    for (let i = 0; i < keys.length; i++) { parts.push(keys[i] + '=' + map[keys[i]]); }
+    return parts.join(',');
+  }
+
+  /* A map has arrived. Nothing is called on the game here: this can be any
+     frame at all, and the calls only work in update. */
+  function treeSeen(map) {
+    const sig = treeSigOf(map);
+    if (sig === treeSig && !treeDirty) { return; }
+    treeWant = map;
+    treeDirty = true;
+  }
+
+  /* The whole panel view. The totals are its own field and nothing else in it
+     is read, because a view is full of numbers that are not actor values. */
+  function treeFromView(json) {
+    let v = null;
+    try { v = JSON.parse(String(json)); } catch (e) { log('tree: the view did not parse:', e); return; }
+    if (!v || typeof v !== 'object') { return; }
+    let raw = {};
+    if (v.effects && typeof v.effects === 'object') { raw = v.effects; }
+    else if (v.panel && v.panel.effects && typeof v.panel.effects === 'object') { raw = v.panel.effects; }
+    treeSeen(treeNumbers(raw));
+  }
+
+  /* The map on its own. */
+  function treeFromMap(json) {
+    let m = null;
+    try { m = JSON.parse(String(json)); } catch (e) { log('tree: the totals did not parse:', e); return; }
+    if (!m || typeof m !== 'object') { return; }
+    if (m.effects && typeof m.effects === 'object') { m = m.effects; }
+    treeSeen(treeNumbers(m));
+  }
+
+  function treeApplyNow(pc) {
+    const next = treeWant || {};
+    const mine = {};
+    const said = [];
+    /* Every value this block last touched, so it can be taken back, and every
+       value the server is sending now. Nothing else is looked at. */
+    const todo = {};
+    for (const key in treeMine) { todo[key] = treeMine[key].name; }
+    for (const k in next) { todo[k.toLowerCase()] = k; }
+
+    for (const key in todo) {
+      const name = todo[key];
+      const add = Number(next[name] || 0) || 0;
+      const rec = treeMine[key];
+      try {
+        const base = Number(pc.getBaseActorValue(name));
+        if (!isFinite(base)) {
+          if (rec) { mine[key] = rec; }
+          log('tree: the game had no number for', name + ', leaving it alone');
+          continue;
+        }
+        const natural = (rec && base === rec.total) ? base - rec.add : base;
+        const want = natural + add;
+        if (want !== base) { pc.setActorValue(name, want); }
+        if (add) {
+          mine[key] = { name: name, add: add, total: want };
+          said.push(name + ' ' + (add > 0 ? '+' : '') + add + ' (' + want + ')');
+        }
+      } catch (e) {
+        /* The set threw, so the base is whatever it was and the old record is
+           still the truth about it. Said once and not retried: the next view
+           that says something different comes through here again. */
+        if (rec) { mine[key] = rec; }
+        log('tree: could not set', name + ':', e);
+      }
+    }
+
+    treeMine = mine;
+    treeSig = treeSigOf(next);
+    log('tree:', said.length
+      ? ('the server\'s totals are on the character: ' + said.join(', '))
+      : 'the server sends no totals, so anything this plugin added is off again');
+  }
+
+  /*
+    After the world and not before. __thornswoodInWorld is the flag the tick
+    above sets the moment there is a character and no menu, which is the same
+    signal this file already uses for the browser, and update is the event
+    where calls into the game work at all.
+  */
+  sp.on('update', guard('tree', () => {
+    if (!treeDirty) { return; }
+    let here = false;
+    try { here = !!globalThis.__thornswoodInWorld; } catch (e) { here = false; }
+    if (!here) { return; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return; }
+    treeDirty = false;
+    treeApplyNow(pc);
+  }));
+
+  // <<< tree apply: end <<<
 
   /*
     Write the game's real load order to disk, once, on the first update.

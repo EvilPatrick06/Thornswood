@@ -37,9 +37,16 @@
   any of it would be a client anybody could edit. What the server refuses
   comes back as a note under the panel, and as a line in the chat. "Choose
   later", a soft choice and a marked spell are marks on this page until
-  Confirm in Review sends the choices; "later" and the spells are never
-  sent, "later" is a mark on this
-  page and nothing else, because leaving a choice unmade changes nothing.
+  something sends them: Confirm in Review while creating, Learn in the spell
+  book in the world. "later" is never sent and is a mark on this page and
+  nothing else, because leaving a choice unmade changes nothing.
+
+  THE SPELLS ARE REAL NOW, 20 September. A marked spell used to be a mark and
+  no more. It is a pick like any other: Learn sends one 'skills:pick spell
+  <name>' per mark and waits, and in creation the marks go out with Confirm
+  in Review, after the profession, because a spell needs the profession that
+  owns it. What is yours, how many points you hold and your rank in each
+  school are read from what the server sent and are never worked out here.
 
   NOTHING REDRAWS FOR NOTHING, 20 September. The server writes the property
   on every answer, on every refresh and on every reminder while somebody is
@@ -48,7 +55,8 @@
   and every click did the same, with 90 millisecond colour transitions on the
   rebuilt cards: the boxes flashed. Now draw() compares what it would draw
   with what it drew last, as JSON, and does nothing when they match; the
-  status line is its own smaller redraw; and there are no transitions and no
+  status line and the work counters on the progress lines are each their own
+  smaller redraw, written in place; and there are no transitions and no
   hover rules, for the same reason the character choice page has none (see
   thornswood-select.js: its first three cuts died the moment the mouse moved
   over them). The cursor still turns into a hand over anything clickable; a
@@ -59,6 +67,30 @@
     page -> plugin  'skills:ready' | 'skills:opened' | 'skills:closed' |
                     'skills:refresh' | 'skills:pick <words>'
     the plugin turns 'skills:pick X' into the chat line '/pick X'
+
+  THE CONTRACT with the server, agreed 20 September, written down here
+  because the two halves were written at the same time and did not match, so
+  nothing drew. What setData is handed is the whole stored state with this
+  panel's view nested under .panel, and these are the fields this page reads:
+
+    progress: { '<key>': { next: '<the rank being climbed to>',
+                           done: <number>, need: <number> } }
+      One entry per half, school or class verb that can still climb, under
+      the same keys as ranks. A key at master, or one that cannot climb, is
+      left out entirely rather than sent with a null, and the whole field is
+      left out when there is nothing to say.
+
+    note: { text: '<the refusal, in plain words>', at: <ms>,
+            about: '<class|profession|spell|town|spend>' }
+      about says which pick the refusal answers, so the panel clears that
+      pick and only that one. A note with no about is still shown.
+
+    spells: { '<spell name>': true }     what the character actually holds
+    spellPoints: <number>                what is left to spend
+    tree: { '<sub-skill key>': <0..5> }  points in the tree, placed and spent
+    points: <number>                     free tree points
+    placed: { '<sub-skill key>': <0..5> } the part of tree that was placed at
+                                          creation and cannot be moved
 */
 
 (function () {
@@ -151,10 +183,11 @@
     /*
       The spell book. The names are Skyrim's own spells, sorted into the
       mage's four ranks (the game's Apprentice and Adept tiers both sit
-      under Advanced). Not wired to the server yet, on Patrick's word of
-      20 September: this is the shape of the page. The server does not know
-      spells or spell points, so what is drawn comes from here, every spell
-      reads as one you could take, and nothing is sent.
+      under Advanced). The list of names is this page's; everything about a
+      person is the server's. Which spells are yours comes from mine.spells,
+      how many points you hold from mine.spellPoints, and the rank in each
+      school from mine.ranks. A spell the server lists is drawn as yours and
+      cannot be unmarked; the rest are marks until they are sent.
     */
     spells: {
       title: 'Spell book',
@@ -226,6 +259,8 @@
   var tableGen = 0;        // bumped when a table arrives from the server, so a redraw is forced
   var drawnKey = '';       // JSON of what head, nav and body were last drawn from
   var footKey = '';        // the same for the foot
+  var progRows = [];       // the value half of each progress line on the page, in order
+  var progKey = '';        // the same for those lines: their words, so a tick writes once
 
   // ------------------------------------------------------------------ css --
   /*
@@ -274,9 +309,16 @@
     '#ts-skills .cards{display:grid;grid-template-columns:1fr;gap:9px}',
     '#ts-skills .cards.three{grid-template-columns:repeat(3,1fr)}',
     '#ts-skills .card{border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);padding:13px 18px 12px;position:relative;cursor:pointer}',
-    '#ts-skills .card.at{border-color:rgba(233,209,155,.95);background:rgba(120,94,44,.34)}',
-    '#ts-skills .card.mine{border-color:rgba(160,205,150,.8)}',
+    '#ts-skills .card.at{border-color:rgba(198,170,109,.55);box-shadow:inset 3px 0 0 0 #c6aa6d}',
+    '#ts-skills .card.mine{border-color:rgba(160,205,150,.85);background:rgba(120,170,115,.13)}',
     '#ts-skills .card.off{opacity:.42}',
+    '#ts-skills .card.chosen{border-color:#e9d19b;background:rgba(201,162,75,.16)}',
+    '#ts-skills .spell.on{background:rgba(201,162,75,.16)}',
+    '#ts-skills .spell.mine{background:rgba(120,170,115,.11)}',
+    '#ts-skills .skill.full{background:rgba(120,170,115,.11)}',
+    '#ts-skills .skill.full .sn{color:#9fcf92}',
+    '#ts-skills .skill.full .pip.lit{background:#7fb877;border-color:#9fcf92}',
+    '#ts-skills .skill.some .pip.lit{background:#c6aa6d;border-color:#e9d19b}',
     '#ts-skills .card.later{border-style:dashed}',
     '#ts-skills .card .name{font-size:16.5px;color:#f6e9c8;display:flex;align-items:baseline;gap:12px}',
     '#ts-skills .card .desc{font-size:13px;line-height:1.5;color:rgba(217,207,180,.78);margin-top:4px}',
@@ -288,8 +330,8 @@
     '#ts-skills .halves{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}',
     '#ts-skills .halves.five{grid-template-columns:repeat(5,1fr)}',
     '#ts-skills .half{border:1px solid rgba(198,170,109,.32);padding:9px 12px;background:rgba(0,0,0,.22);cursor:pointer}',
-    '#ts-skills .half.on{border-color:rgba(233,209,155,.95);background:rgba(120,94,44,.42)}',
-    '#ts-skills .half.mine{border-color:rgba(160,205,150,.8)}',
+    '#ts-skills .half.on{border-color:#e9d19b;background:rgba(201,162,75,.20)}',
+    '#ts-skills .half.mine{border-color:rgba(160,205,150,.85);background:rgba(120,170,115,.13)}',
     '#ts-skills .half .hn{font-size:14.5px;color:#f6e9c8}',
     '#ts-skills .half .hd{font-size:12px;color:rgba(217,207,180,.66);margin-top:2px}',
     '#ts-skills .half .hr{font-size:11px;color:#9fcf92;letter-spacing:.12em;text-transform:uppercase;margin-top:4px}',
@@ -300,13 +342,25 @@
     'padding-bottom:8px;border-bottom:1px solid rgba(198,170,109,.22);margin-bottom:6px}',
     '#ts-skills .skill{display:grid;grid-template-columns:1fr auto auto;grid-template-rows:auto auto;column-gap:10px;align-items:center;',
     'padding:9px 6px 8px;border:1px solid transparent}',
-    '#ts-skills .skill.at{border-color:rgba(233,209,155,.6);background:rgba(120,94,44,.18)}',
+    '#ts-skills .skill.at{border-color:transparent;box-shadow:inset 3px 0 0 0 rgba(198,170,109,.75)}',
     '#ts-skills .skill .sn{font-size:15px;color:#f6e9c8}',
     '#ts-skills .skill .sd{grid-column:1/4;font-size:12px;color:rgba(217,207,180,.6);line-height:1.45;margin-top:3px}',
-    '#ts-skills .skill .sd.lit{color:#e9d19b}',
+    '#ts-skills .skill .sd.lit{color:#9fcf92}',
     '#ts-skills .pips{display:flex;gap:4px}',
     '#ts-skills .pip{width:10px;height:10px;border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.2)}',
     '#ts-skills .pip.lit{background:#c6aa6d;border-color:#e9d19b}',
+    // A point that came with your class or profession rather than one you
+    // spent: green, which in this panel is what is already yours. Written at
+    // the same weight as the .some and .full pip rules above and after them,
+    // so it wins the tie whatever the rest of the row is.
+    '#ts-skills .skill.some .pip.given,#ts-skills .skill.full .pip.given,#ts-skills .skill .pip.given{',
+    'background:#7fb877;border-color:#9fcf92}',
+    // how far off the next rank is, one line per half, above the tree. Words
+    // and a number, never a bar: a bar with no number on it says nothing.
+    '#ts-skills .progress{max-width:680px;margin:0 0 16px;padding-bottom:12px;border-bottom:1px solid rgba(198,170,109,.18)}',
+    '#ts-skills .prow{display:flex;align-items:baseline;gap:18px;padding:4px 0}',
+    '#ts-skills .prow .pk{flex:0 0 150px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;color:rgba(198,170,109,.85)}',
+    '#ts-skills .prow .pv{flex:1 1 auto;min-width:0;font-size:14px;color:#d9cfb4}',
     '#ts-skills .plus{width:26px;height:26px;border:1px solid rgba(198,170,109,.55);color:#e9d19b;display:grid;place-items:center;',
     'font-size:18px;line-height:1;background:rgba(0,0,0,.25);cursor:pointer}',
     '#ts-skills .plus.off{opacity:.25;pointer-events:none}',
@@ -344,10 +398,12 @@
     '#ts-skills .spellpts{font-size:14px;color:#e9d19b}',
     '#ts-skills .spellnote{font-size:12px;font-style:italic;color:rgba(217,207,180,.55)}',
     '#ts-skills .spellcols{grid-template-columns:repeat(2,minmax(0,1fr))}',
+    // the school's name on the left, the server's rank in it on the right
+    '#ts-skills .spellcols .colhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}',
     '#ts-skills .rankhead{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:rgba(217,207,180,.5);margin:10px 0 4px}',
     '#ts-skills .spell{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 10px;',
     'border:1px solid transparent;cursor:pointer}',
-    '#ts-skills .spell.at{border-color:rgba(233,209,155,.7);background:rgba(120,94,44,.16)}',
+    '#ts-skills .spell.at{border-color:transparent;box-shadow:inset 3px 0 0 0 rgba(198,170,109,.75)}',
     '#ts-skills .spell.on .spellname{color:#f6e9c8}',
     '#ts-skills .spell.mine .spellname{color:#9fcf92}',
     '#ts-skills .spellname{font-size:14px}',
@@ -462,13 +518,6 @@
     return (creating() && p && p.row === 'mage') ? (p.subs || []).slice() : [];
   }
   /*
-    Spell points. The server's number when it sends one; until it does, a
-    mage starts with two (Patrick, 20 September: "it should be 2"). A mark
-    costs one, so no more can be marked than there are points, and the bar
-    counts down. The real rule, points by rank and spells granted, is the
-    server's and is still to come.
-  */
-  /*
     Which spells are open to you, and why one is not.
 
     Two rules, Patrick's, 20 September: a spell of a rank above Novice needs
@@ -488,13 +537,36 @@
     var i = RANK_ORDER.indexOf(String(key || 'novice'));
     return i < 0 ? 0 : i;
   }
-  /* The rank this character has reached in that school. Nothing is Novice. */
+  /* The rank this character has reached in that school. The server's, or Novice. */
   function schoolRank(school) { return rankOf(school) || 'novice'; }
+  /*
+    The spells the server says are yours, by name.
+
+    It sends them as { Flames: true }. A list of names, or the stored
+    { points: 2, known: [...] } shape, reads the same way here: what arrives
+    is the server's to name, and this page only reads it. A shape it does not
+    know reads as no spells, which draws an empty book rather than a wrong one.
+  */
+  function knownOf(view) {
+    var out = {};
+    var got = view && view.spells;
+    if (!got || typeof got !== 'object') return out;
+    var list = null;
+    if (Array.isArray(got)) list = got;
+    else if (Array.isArray(got.known)) list = got.known;
+    if (list) {
+      for (var i = 0; i < list.length; i++) if (list[i]) out[String(list[i])] = true;
+      return out;
+    }
+    for (var k in got) if (got[k] === true) out[k] = true;
+    return out;
+  }
+  function knownSpells() { return knownOf(mine); }
   /* Does the book hold a spell of that rank in that school, granted or marked. */
   function holdsRank(school, rankKey) {
     var book = DATA.spells;
     if (!book || !book.schools[school]) return false;
-    var have = (mine && mine.spells) || {};
+    var have = knownSpells();
     var names = book.schools[school][rankKey] || [];
     for (var i = 0; i < names.length; i++) {
       if (have[names[i]] || marked[names[i]]) return true;
@@ -518,13 +590,56 @@
     return '';
   }
 
-  var STARTING_SPELL_POINTS = 2;
+  /*
+    Spell points: the server's number, or the rulebook's two while there is
+    no character yet, or nothing at all.
+
+    The server sends it as mine.spellPoints, or as the points on mine.spells
+    when what arrives is the stored shape. While creating it has said
+    nothing, because there is nobody to say it about, so the two the
+    rulebook gives a new mage stand in: "A mage picks two schools, then two
+    starting spells" (tools\docs-app\data\site\classes.md).
+
+    In the world there is no standing in. A mage the server has sent no
+    number for reads as no number: null, and every line that would print one
+    checks for it and prints nothing instead. This used to fall back to two
+    whatever the character was, so a Master with three spells read "2 of 2
+    spell points left", which is the page inventing the one thing it must
+    never invent. Nothing is spent here either; a mark holds a point on this
+    page until a pick is answered.
+  */
+  var STARTING_SPELL_POINTS = 2;   // the rulebook's, classes.md: two starting spells
   function spellPoints() {
     if (mine && mine.spellPoints !== undefined && mine.spellPoints !== null) return Number(mine.spellPoints) || 0;
-    return STARTING_SPELL_POINTS;
+    var got = mine && mine.spells;
+    if (got && typeof got === 'object' && !Array.isArray(got) && got.points !== undefined && got.points !== null) {
+      return Number(got.points) || 0;
+    }
+    return creating() ? STARTING_SPELL_POINTS : null;
   }
-  function markedCount() { var n = 0; for (var k in marked) if (marked[k]) n++; return n; }
-  function pointsLeft() { return Math.max(0, spellPoints() - markedCount()); }
+  function markedCount() { return markedNames().length; }
+  /*
+    What is left after the marks, or null when there is no number to count
+    down from. Every caller has to tell null from 0: null is the server
+    saying nothing and a mark is still allowed, 0 is the server saying none
+    and a mark is not.
+  */
+  function pointsLeft() {
+    var p = spellPoints();
+    if (p === null) return null;
+    return Math.max(0, p - markedCount());
+  }
+  /*
+    The marked spells, in the order the book draws them, which is the order
+    they are sent in. Read off the book rather than off the marks, so a mark
+    left behind by a school that is no longer yours counts for nothing and is
+    never sent.
+  */
+  function markedNames() {
+    var out = [];
+    bookRows().forEach(function (r) { if (marked[r.name] && out.indexOf(r.name) < 0) out.push(r.name); });
+    return out;
+  }
   /*
     Mark or unmark a spell; a mark needs a point and an open rank. True when
     something changed.
@@ -534,10 +649,15 @@
     Flames must not leave Firebolt marked under nothing.
   */
   function toggleMark(school, rankKey, name) {
+    // A spell the server has granted is not a mark and never comes off.
+    if (knownSpells()[name]) { status = name + ' is yours already.'; statusKind = 'no'; return false; }
     if (marked[name]) { marked[name] = false; tidyMarks(); return true; }
     var why = lockedBecause(school, rankKey);
     if (why) { status = cap(name) + ' ' + why + '.'; statusKind = 'no'; return false; }
-    if (pointsLeft() <= 0) { status = 'No spell points left. Unmark one to mark another.'; statusKind = 'no'; return false; }
+    // null is the server saying nothing about points, and a mark it has not
+    // ruled on goes on the page: the server is the one that refuses it.
+    var left = pointsLeft();
+    if (left !== null && left <= 0) { status = 'No spell points left. Unmark one to mark another.'; statusKind = 'no'; return false; }
     marked[name] = true;
     return true;
   }
@@ -586,6 +706,32 @@
     }
     return bits.join(' · ');
   }
+  /*
+    The points that were placed at creation, per the contract's mine.placed.
+    They came with the class and profession that were chosen, they are part
+    of mine.tree like any other point, and they are not yours to move.
+
+    Read against the tree, so a number for a skill that holds fewer points
+    than the server says were placed counts only as far as the pips go, and
+    a number for a skill that is not in the tree counts for nothing.
+  */
+  function placedAt(key) {
+    var got = mine && mine.placed;
+    if (!got || typeof got !== 'object') return 0;
+    var n = Number(got[key]);
+    if (!isFinite(n) || n <= 0) return 0;
+    var have = Number((mine.tree || {})[key]) || 0;
+    return Math.min(Math.floor(n), have, CAP);
+  }
+  function placedTotal() {
+    var total = 0;
+    var attrs = (DATA.tree && DATA.tree.rows) || [];
+    for (var i = 0; i < attrs.length; i++) {
+      var subs = attrs[i].subs || [];
+      for (var j = 0; j < subs.length; j++) total += placedAt(subs[j].key);
+    }
+    return total;
+  }
   function topRank() {
     var best = '';
     var own = ownHalves();
@@ -594,6 +740,60 @@
       if (!best || ['novice', 'advanced', 'expert', 'master'].indexOf(r) > ['novice', 'advanced', 'expert', 'master'].indexOf(best)) best = r;
     }
     return best;
+  }
+
+  /*
+    How far off the next rank is, when the server sends it, and silence when
+    it does not.
+
+    The contract, at the head of this file:
+
+      progress: { '<key>': { next: '<the rank being climbed to>',
+                             done: <number>, need: <number> } }
+
+    One entry per half, school or class verb that can still climb, under the
+    same keys as ranks, so 'platewright' and 'hunter' and 'destruction' all
+    read the same way. The remainder drawn is need less done. How much work a
+    rank takes is the server's number and is nowhere on this page, and an
+    entry without a next rank or without the numbers draws no line at all,
+    because a line reading "Advanced in 0 more" would be this page inventing
+    one. A field that is not an object draws nothing and throws nothing.
+
+    left and unit are the shape this page asked for before the contract was
+    agreed. They are still read, so a server that has not caught up draws a
+    line rather than nothing; the contract does not send them.
+  */
+  function labelOf(key) {
+    var n = nameOf('profession', key);
+    return n !== cap(key) ? n : nameOf('class', key);
+  }
+  function progressLines() {
+    var out = [];
+    var got = mine && mine.progress;
+    if (!got || typeof got !== 'object') return out;
+    for (var k in got) {
+      var p = got[k];
+      if (!p || typeof p !== 'object') continue;
+      var next = p.next ? (RANK_NAMES[p.next] || cap(p.next)) : '';
+      if (!next) continue;
+      var left = null;
+      if (p.need !== undefined && p.need !== null) left = Number(p.need) - (Number(p.done) || 0);
+      else if (p.left !== undefined && p.left !== null) left = Number(p.left);
+      if (left === null || !isFinite(left)) continue;
+      out.push({ k: labelOf(k),
+                 t: left > 0 ? next + ' in ' + left + ' more' + (p.unit ? ' ' + p.unit : '') : next + ' earned' });
+    }
+    return out;
+  }
+  /*
+    Which lines there are and in what order, and not a single one of their
+    numbers. This is what decides a rebuild; the numbers are written into the
+    lines in place (see drawProgress), because a work counter ticking every
+    time somebody swings a hammer must not tear the panel down under
+    somebody who is reading it.
+  */
+  function progressShape() {
+    return progressLines().map(function (p) { return p.k; });
   }
 
   /*
@@ -649,15 +849,30 @@
 
   // ------------------------------------------------------------------ draw --
   /*
-    Everything head, nav and body are drawn from, as one string. The note is
-    left out: it only ever reaches the status line, and a refusal must not
-    tear the cards down. When the string is the one drawn last, nothing is
-    touched, which is what makes the server's repeated writes invisible.
+    Everything head, nav and body are drawn from, as one string. When the
+    string is the one drawn last, nothing is touched, which is what makes the
+    server's repeated writes invisible.
+
+    Three fields are left out of it on purpose:
+
+      note      only ever reaches the status line, and a refusal must not
+                tear the cards down.
+      progress  its counters tick every time somebody picks a flower, and a
+                panel that rebuilt its head, its nav and its body on each
+                one would be rebuilding itself under a person who is reading
+                it. What is in the key instead is progressShape(), the lines
+                and their order and none of their numbers; the numbers are
+                written in place by drawProgress, the way the foot is
+                written in place by drawFoot.
+      work      the same counters said the other way round, and this page
+                draws nothing at all from it. Leaving it in would undo all
+                of the above the first time a caught-up count arrived.
   */
+  var NOT_DRAWN = { note: true, progress: true, work: true };
   function viewKey() {
     var v = null;
-    if (mine) { v = {}; for (var k in mine) if (k !== 'note') v[k] = mine[k]; }
-    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, v]);
+    if (mine) { v = {}; for (var k in mine) if (!NOT_DRAWN[k]) v[k] = mine[k]; }
+    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, v, progressShape()]);
   }
 
   function draw() {
@@ -677,7 +892,25 @@
       drawNav();
       drawBody();
     }
+    drawProgress();
     drawFoot();
+  }
+
+  /*
+    The counters, written into the lines that are already on the page. The
+    shape is viewKey's and a change to it has already rebuilt the body by the
+    time this runs; this is the numbers and nothing else, so a tick of work
+    changes one string and leaves every card, every section name and the
+    place the reader had got to exactly where they were.
+  */
+  function drawProgress() {
+    if (!progRows.length) return;
+    var prog = progressLines();
+    if (prog.length !== progRows.length) return;   // the shape moved; the rebuild has it
+    var key = JSON.stringify(prog.map(function (p) { return p.t; }));
+    if (key === progKey) return;
+    progKey = key;
+    for (var i = 0; i < prog.length; i++) progRows[i].textContent = prog[i].t;
   }
 
   function drawHead() {
@@ -752,10 +985,19 @@
 
   function drawBody() {
     elBody.textContent = '';
+    progRows = [];   // whatever was on the page is gone with it
+    progKey = '';
     var lead = DATA[section] ? DATA[section].lead : '';
     if (section === 'tree') {
       var pts = mine ? Number(mine.points) || 0 : 0;
       lead += ' ' + (pts ? 'You have ' + pts + (pts === 1 ? ' point' : ' points') + ' to spend.' : 'No points to spend right now.');
+      // The one line about the placed points, so the green pips below are
+      // not a colour nobody explained.
+      var gv = placedTotal();
+      if (gv) {
+        lead += ' ' + (gv === 1 ? 'One point came' : gv + ' points came') + ' with what you chose, ' +
+                'in green, and ' + (gv === 1 ? 'it does' : 'they do') + ' not move.';
+      }
     }
     if (lead) elBody.appendChild(el('p', 'lead', lead));
     if (section === 'class') drawClass();
@@ -783,10 +1025,12 @@
   }
 
   /*
-    The spell book: one column per school, the spells under their rank,
-    each with a mark that says have, marked, or could take. Have comes from
-    the server once it sends spells (mine.spells); until then everything
-    reads as one you could take, and a click marks it on this page only.
+    The spell book: one column per school, the spells under their rank, each
+    with a mark that says yours, marked, or could take. Yours comes from the
+    server (mine.spells) and cannot be unmarked; the rank over each column is
+    the server's too (mine.ranks), and no rank at all is drawn rather than a
+    guessed Novice. A click marks; Learn, or Confirm in Review while
+    creating, is what sends.
   */
   function drawSpells() {
     var schools = bookSchools();
@@ -796,18 +1040,33 @@
       return;
     }
     var pts = spellPoints();
-    var have = (mine && mine.spells) || {};
+    var have = knownSpells();
     var n = markedCount();
     var leftPts = pointsLeft();
     var top = el('div', 'spellbar');
-    top.appendChild(el('div', 'spellpts', leftPts + ' of ' + pts + (pts === 1 ? ' spell point' : ' spell points') + ' left' + (n ? ', ' + n + ' marked' : '')));
-    top.appendChild(el('div', 'spellnote', 'Not sent to the server yet. What you mark here stays on this page.'));
+    // The count, when the server has sent one. When it has not, the marks
+    // alone, and no number at all rather than one this page made up.
+    var bar = '';
+    if (leftPts !== null) {
+      bar = leftPts + ' of ' + pts + (pts === 1 ? ' spell point' : ' spell points') + ' left' + (n ? ', ' + n + ' marked' : '');
+    } else if (n) {
+      bar = n + ' marked';
+    }
+    top.appendChild(el('div', 'spellpts', bar));
+    top.appendChild(el('div', 'spellnote', creating()
+      ? 'Not sent to the server yet. Confirm in Review sends what you marked.'
+      : 'Marked spells go to the server when you press Learn.'));
     elBody.appendChild(top);
     var cols = el('div', 'cols spellcols');
     var idx = 0;
     schools.forEach(function (sc) {
       var col = el('div', 'col');
-      col.appendChild(el('div', 'colhead', cap(sc)));
+      var head = el('div', 'colhead', cap(sc));
+      // The rank the server holds you at in this school, beside its name.
+      // Nothing when the server has not said, which is the whole of creation.
+      var schRank = rankOf(sc);
+      if (schRank) head.appendChild(el('span', 'tag dim', RANK_NAMES[schRank] || cap(schRank)));
+      col.appendChild(head);
       var byRank = book.schools[sc] || {};
       book.ranks.forEach(function (r) {
         var names = byRank[r.key] || [];
@@ -823,9 +1082,11 @@
           row.appendChild(el('span', 'spellname', name));
           row.appendChild(el('span', 'tag' + (got ? '' : (marked[name] ? ' gold' : ' dim')),
                              got ? 'yours' : (marked[name] ? 'marked' : (shut ? why : 'could take'))));
+          // One handler, one rule: toggleMark says no to a spell that is
+          // already yours, so the row does not have to know.
           row.onclick = function () {
             rowAt = i;
-            if (!got) toggleMark(sc, r.key, name);
+            toggleMark(sc, r.key, name);
             draw();
           };
           col.appendChild(row);
@@ -966,7 +1227,7 @@
     else if ((soft = softProf())) out.push({ k: 'Profession', v: soft.t, c: soft.c });
     else out.push({ k: 'Profession', v: later.profession ? 'later' : 'not chosen yet', c: 'dim' });
     if (isMage()) {
-      var m = 0; for (var mk in marked) if (marked[mk]) m++;
+      var m = markedCount();
       out.push({ k: 'Spell book', v: m ? m + ' marked, not sent yet' : 'nothing marked yet', c: m ? 'chosen' : 'dim' });
     }
     if (haveClass()) out.push({ k: 'Class', v: nameOf('class', mine['class']), c: 'set' });
@@ -990,6 +1251,24 @@
   }
 
   function drawTree() {
+    // The work towards the next rank, when the server has sent it, above the
+    // fifteen skills: they are the two things a person came here to read.
+    var prog = progressLines();
+    if (prog.length) {
+      var pw = el('div', 'progress');
+      prog.forEach(function (p) {
+        var prow = el('div', 'prow');
+        prow.appendChild(el('div', 'pk', p.k));
+        // Kept, so drawProgress can write the number into it without the
+        // body being torn down around it.
+        var pv = el('div', 'pv', p.t);
+        prow.appendChild(pv);
+        progRows.push(pv);
+        pw.appendChild(prow);
+      });
+      elBody.appendChild(pw);
+      progKey = JSON.stringify(prog.map(function (p) { return p.t; }));
+    }
     var cols = el('div', 'cols');
     var pts = mine ? Number(mine.points) || 0 : 0;
     var tree = (mine && mine.tree) || {};
@@ -1000,14 +1279,31 @@
       (attr.subs || []).forEach(function (s) {
         var idx = flat.length; flat.push(s.key);
         var have = Number(tree[s.key]) || 0;
+        var given = placedAt(s.key);
         var full = have >= CAP;
-        var row = el('div', 'skill' + (idx === rowAt ? ' at' : ''));
+        var row = el('div', 'skill' + (idx === rowAt ? ' at' : '') + (full ? ' full' : (have ? ' some' : '')));
         row.appendChild(el('div', 'sn', s.name));
+        // The placed pips first and in green, which in this panel is what is
+        // already yours; the ones over them are what was spent and keep the
+        // colour the row has always given them.
         var pips = el('div', 'pips');
-        for (var i = 0; i < CAP; i++) pips.appendChild(el('span', 'pip' + (i < have ? ' lit' : '')));
+        for (var i = 0; i < CAP; i++) {
+          pips.appendChild(el('span', 'pip' + (i < have ? ' lit' : '') + (i < given ? ' given' : '')));
+        }
         row.appendChild(pips);
+        /*
+          The plus offers the room that is left. Placed points fill a skill
+          like any other, so a skill filled by what your choices placed is
+          full and offers no plus: there is nothing on it to add to and
+          nothing on it to take back. A skill that is part placed and part
+          empty keeps its plus, because the server takes that spend and
+          refuses only at the cap, and this page decides none of it.
+        */
+        var allPlaced = given > 0 && given >= have;
         var plus = el('div', 'plus' + ((pts > 0 && !full) ? '' : ' off'), '+');
-        plus.title = 'Put a point in ' + s.name;
+        plus.title = (full && allPlaced) ? s.name + ' came with what you chose.'
+                   : 'Put a point in ' + s.name +
+                     (given ? '. ' + given + ' of these came with what you chose and do not move.' : '');
         plus.onclick = function (ev) { ev.stopPropagation(); spend(s.key); };
         row.appendChild(plus);
         row.appendChild(el('div', 'sd' + (full ? ' lit' : ''), full ? s.perk : s.desc + '. ' + s.perk));
@@ -1030,8 +1326,10 @@
     var cr = creating();
     var can = canConfirm();
     var line = status || hint();
-    var label = 'Confirm';
-    var showConfirm = cr ? section === 'review' : (section !== 'tree' && section !== 'spells');
+    // The spell book's own button says Learn, because what it sends is not a
+    // choice about who you are: it is the spells you marked, one pick each.
+    var label = (!cr && section === 'spells') ? 'Learn' : 'Confirm';
+    var showConfirm = cr ? section === 'review' : (section !== 'tree');
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr]);
     if (key === footKey) return;
     footKey = key;
@@ -1047,7 +1345,14 @@
     if (section === 'tree') return 'Press + on a skill to put a point in it.';
     if (section === 'spells') {
       if (!bookSchools().length) return 'The book needs your two schools.';
-      return 'Click a spell to mark it. Spells are not sent to the server yet.';
+      if (creating()) return 'Click a spell to mark it. Nothing is sent until Confirm in Review.';
+      if (learnWaiting()) return 'Sent. The server is checking.';
+      if (markedCount()) return 'Learn sends the spells you marked, one point each.';
+      // 0 is the server saying none; no number at all is the server saying
+      // nothing, and the page does not put words in its mouth.
+      var sp = spellPoints();
+      if (sp !== null && sp <= 0) return 'No spell points to spend. More come with every rank.';
+      return 'Mark the spells you want, then press Learn. One point each.';
     }
     if (section === 'review') {
       if (!(haveHome() || softHome())) return 'Pick a home first. Confirm sends everything you chose to the server.';
@@ -1076,8 +1381,47 @@
     chosen. In the world Confirm sends the section's own pick: a class, or a
     profession with its half or both schools.
   */
+  /*
+    Learn lights when there is something to send and the points cover it: at
+    least one spell marked, and no more marks than the points the server says
+    you hold. Marking already asks the same question, and it is asked again
+    here because the points are the server's and can change between the mark
+    and the press. No number from the server is not a no: the marks go and
+    the server answers them.
+
+    It goes dark the moment it has sent and stays dark until the answer comes
+    back, the way Confirm elsewhere goes dark the moment the thing it asked
+    for is the server's. Every line Learn sends is a chat command the server
+    clones and checks, so three presses on two marked spells used to be six
+    of them.
+  */
+  /*
+    How long Learn stays dark when no answer comes at all. NOT IN THE
+    RULEBOOK: classes.md says nothing about how long a button waits, so this
+    is a first number, long enough that a second press is a second thought
+    and short enough that a lost answer does not strand the button. It is
+    kept beside PENDING_MS, the other number of this kind on the page; this
+    file has no TUNING block of its own and the server's is in gamemode.js.
+  */
+  var LEARN_WAIT_MS = 4000;
+  var learnAt = 0;   // when Learn last sent, 0 when it is not waiting on anything
+  function learnWaiting() {
+    if (!learnAt) return false;
+    if (Date.now() - learnAt >= LEARN_WAIT_MS) { learnAt = 0; return false; }
+    for (var i = 0; i < pending.length; i++) if (pending[i].section === 'spells') return true;
+    learnAt = 0;   // every spell it sent has been answered
+    return false;
+  }
+  function canLearn() {
+    if (learnWaiting()) return false;
+    var n = markedCount();
+    var p = spellPoints();
+    return n > 0 && (p === null || n <= p);
+  }
+
   function canConfirm() {
     if (creating()) return section === 'review' && !!softHome();
+    if (section === 'spells') return canLearn();
     var p = picked[section];
     if (!p || !p.row) return false;
     if (section === 'class') return !haveClass();
@@ -1090,15 +1434,45 @@
     return false;
   }
 
-  /* One pick to the server, remembered until its answer or a refusal comes back. */
-  function send(sec, words) {
-    pending.push({ section: sec, words: words, at: Date.now() });
+  /*
+    One pick to the server, remembered until its answer or a refusal comes
+    back. A spell carries its name as well, because Learn puts several in
+    flight at once and each one is cleared by its own answer.
+  */
+  function send(sec, words, spell) {
+    pending.push({ section: sec, words: words, spell: spell || '', at: Date.now() });
     tell('pick', words);
+  }
+
+  /*
+    Learn, in the world: every marked spell goes out as its own pick, in the
+    order the book draws them, and the page waits exactly as the other
+    sections wait. The mark stays until the server lists the spell as yours,
+    so a refused one can be sent again.
+  */
+  function learn() {
+    // The guard, and not only the dark button: Enter, a click on a button a
+    // stylesheet failed to deaden, and a second call from anywhere else all
+    // arrive here.
+    if (learnWaiting()) return;
+    var names = markedNames();
+    if (!names.length) return;
+    // The name goes as the book writes it, spaces and all: 'spell Ice Spike'
+    // reaches the server as the chat line '/pick spell Ice Spike', so what it
+    // reads is the rest of the line and not one word of it.
+    names.forEach(function (n) { send('spells', 'spell ' + n, n); });
+    learnAt = Date.now();
+    status = 'Sent. The server is checking.'; statusKind = '';
+    // Nothing else is coming if the answer is lost, so the button lights
+    // itself again when the wait is over.
+    setTimeout(function () { if (!learnWaiting()) draw(); }, LEARN_WAIT_MS + 50);
+    draw();
   }
 
   function confirm() {
     if (!canConfirm()) return;
     if (creating()) { begin(); return; }
+    if (section === 'spells') { learn(); return; }
     var p = picked[section];
     send(section, section === 'class' ? 'class ' + p.row : 'profession ' + p.row + ' ' + p.subs.join(','));
     status = 'Sent. The server is checking.'; statusKind = '';
@@ -1107,16 +1481,18 @@
 
   /*
     Begin, from Review while creating: every soft choice goes to the server
-    now, one pick each, in the order profession, class, town. The town is
-    last because the town is the pick that ends creation on the server, and
-    anything sent after it would land in the world. Later marks and marked
-    spells send nothing; the server never hears of them. What the server
-    already has is not sent again, which is what a second Begin after a
-    refused home relies on.
+    now, one pick each, in the order profession, spells, class, town. The
+    spells come after the profession because a spell needs the profession
+    that owns it, and the town is last because the town is the pick that ends
+    creation on the server, and anything sent after it would land in the
+    world. A "later" mark sends nothing; the server never hears of it. What
+    the server already has is not sent again, which is what a second Begin
+    after a refused home relies on.
   */
   function begin() {
     var pf = softProf();
     if (pf && pf.whole && !haveProf()) send('profession', 'profession ' + picked.profession.row + ' ' + picked.profession.subs.join(','));
+    markedNames().forEach(function (n) { send('spells', 'spell ' + n, n); });
     if (softClass() && !haveClass()) send('class', 'class ' + picked['class'].row);
     send('home', 'town ' + picked.home.row);
     status = 'Sent. The server is checking.'; statusKind = '';
@@ -1136,17 +1512,20 @@
   /*
     The server answered by rewriting the property. Each pick in flight is
     cleared by its own answer, the thing it asked for now set, and says so;
-    a refusal clears one by note (see refused). Confirm sends up to three at
-    once and the server answers each with its own write, so the picks are
-    read one at a time: a refused class must not swallow the home's answer,
-    and only the home's own answer ends creation. A pick nothing answers in
-    thirty seconds is dropped, so the list cannot grow for ever.
+    a refusal clears the one its note is about (see refused). Confirm sends
+    up to three at once and the server answers each with its own write, so
+    the picks are read one at a time: a refused class must not swallow the
+    home's answer, and only the home's own answer ends creation. A pick
+    nothing answers in thirty seconds is dropped, so the list cannot grow
+    for ever.
   */
   var PENDING_MS = 30000;
   function answered(before, after) {
     if (!pending.length) return;
     var keep = [];
     var now = Date.now();
+    var known = knownOf(after);
+    var cleared = false;
     pending.forEach(function (p) {
       var done = true;
       if (p.section === 'class' && after['class'] && !(before && before['class'])) { status = nameOf('class', after['class']) + ' it is.'; statusKind = 'ok'; later['class'] = false; }
@@ -1159,22 +1538,54 @@
         // loading screen, with the panel still up over it.
         if (creating() && !closing) { later = {}; closing = true; setTimeout(leave, 700); }
       }
+      else if (p.section === 'spells' && p.spell && known[p.spell] && !knownOf(before)[p.spell]) {
+        // The server granted it. The mark has done its work and goes, and the
+        // spell now reads as yours because the server says so.
+        status = p.spell + ' is yours.'; statusKind = 'ok';
+        marked[p.spell] = false;
+        cleared = true;
+      }
       else if (p.section === 'tree') { status = 'Spent.'; statusKind = 'ok'; }
       else done = false;
       if (done) picked[p.section] = null;
       else if (now - p.at < PENDING_MS) keep.push(p);
     });
     pending = keep;
+    // A granted spell can hold up a marked one above it; tidyMarks sees that
+    // it does not, because a granted spell counts for the rank below.
+    if (cleared) tidyMarks();
   }
 
   /*
-    A refusal. The server writes one note per refused pick, in the order the
-    picks arrived, so the oldest pick still in flight is the one it answers.
-    The card stays as it was picked, so it can be sent again or replaced.
+    A refusal, and which pick it answers.
+
+    The server writes one note per refused pick and says in note.about which
+    pick that was: class, profession, spell, town or spend, per the contract
+    at the head of this file. The panel clears that pick and only that one.
+    It used to shift the oldest pick in flight whatever the note was about,
+    so a refused spell ate the profession's answer and the profession sat in
+    the list until it timed out.
+
+    A note with no about at all is still shown, and then the oldest pick is
+    the one it is taken for, which is the best a panel can do without being
+    told. A note about something this page has no word for clears nothing:
+    the words are still shown, and whatever was really refused leaves the
+    list on PENDING_MS. The card stays as it was picked either way, so it can
+    be sent again or replaced.
   */
-  function refused(text) {
+  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'town': 'home', 'spend': 'tree' };
+  function refused(text, about) {
     status = 'No: ' + text + '.'; statusKind = 'no';
-    if (pending.length) pending.shift();
+    if (!pending.length) return;
+    if (about) {
+      var sec = ABOUT_SECTION[String(about)];
+      if (!sec) return;
+      for (var i = 0; i < pending.length; i++) {
+        if (pending[i].section === sec) { pending.splice(i, 1); return; }
+      }
+      return;
+    }
+    pending.shift();
   }
 
   // ---------------------------------------------------------------- keys --
@@ -1193,15 +1604,18 @@
         var flat = [];
         rows().forEach(function (a) { (a.subs || []).forEach(function (s) { flat.push(s.key); }); });
         if (flat[rowAt]) spend(flat[rowAt]);
+      } else if (section === 'spells') {
+        // Enter marks the lit spell, the way Enter puts a point in the lit
+        // skill, and it keeps doing that however many are marked. Learn is a
+        // press of its own: a book is marked several times before it is sent,
+        // so an Enter that sent the moment one spell was marked would take
+        // the keyboard away from the second.
+        var sr = bookRows()[rowAt];
+        if (sr) { toggleMark(sr.school, sr.rank, sr.name); draw(); }
       } else if (canConfirm()) { confirm(); }
       else {
         // Enter on a row picks it. While creating that is the choice, and
         // Enter in Review is Begin; in the world the second Enter confirms.
-        if (section === 'spells') {
-          var sr = bookRows()[rowAt];
-          if (sr && !((mine && mine.spells) || {})[sr.name]) { toggleMark(sr.school, sr.rank, sr.name); draw(); }
-          e.preventDefault(); return;
-        }
         var r = section === 'home' ? ((mine && mine.towns) || [])[rowAt] : rows()[rowAt];
         var pp = picked.profession;
         if (!r && rowAt === rows().length && laterOffered(section)) { chooseLater(section); draw(); }
@@ -1254,9 +1668,11 @@
         var before = mine;
         mine = (got.panel && typeof got.panel === 'object') ? got.panel : got;
         answered(before, mine);
-        // A note is new when its time or its words changed: two refusals
-        // from one Confirm can carry the same millisecond.
-        if (mine.note && mine.note.text && (!before || !before.note || before.note.at !== mine.note.at || before.note.text !== mine.note.text)) refused(mine.note.text);
+        // A note is new when its time, its words or what it is about
+        // changed: two refusals from one Confirm can carry the same
+        // millisecond, and two picks can be refused in the same words.
+        var nn = mine.note, bn = before && before.note;
+        if (nn && nn.text && (!bn || bn.at !== nn.at || bn.text !== nn.text || bn.about !== nn.about)) refused(nn.text, nn.about);
         // Creation just ended: the home was confirmed and the server moved
         // you. The panel keeps what it shows, says so, and shuts itself; the
         // marks for later are cleared, since in the world there is no later.
