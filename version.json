@@ -993,17 +993,18 @@
   ],
   "news": [
     {
-      "date": "15 Sep 2026",
-      "title": "Server updated",
+      "date": "20 Sep 2026",
+      "title": "Your gear and your spells stay on across a relog",
       "body": "The server at 192.135.112.23 was reinstalled and is answering.",
       "details": [
+        "The gamemode was rebuilt: starting kits, creation and arrival points live in it",
         "Load order: 60 plugins server side",
         "Nothing to download for this one. It is on the server, so it is already live."
       ],
       "files": [],
       "kind": "server",
-      "stamp": "2026-09-15T15:42:44.8998242-06:00",
-      "named": false
+      "stamp": "2026-09-20T23:19:01.4740622-06:00",
+      "named": true
     },
     {
       "date": "14 Sep 2026",
