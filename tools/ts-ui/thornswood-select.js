@@ -92,6 +92,19 @@
     '#ts-select .title{font-size:42px;color:#f6e9c8;line-height:1.05}',
     '#ts-select .count{font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:rgba(198,170,109,.7);padding-bottom:8px}',
     '#ts-select .list{padding:22px 44px 8px;overflow:auto;display:grid;gap:14px}',
+    /*
+      Scrollbars, for this page and for the window it sits in. The browser's
+      own is a white strip against a dark page, which reads as a fault rather
+      than as a control. Written without a page in front of them on purpose:
+      this page is up at the main menu before any other is loaded, and the K
+      panel carries the same rules for the world.
+    */
+    '::-webkit-scrollbar{width:10px;height:10px}',
+    '::-webkit-scrollbar-track{background:rgba(0,0,0,.25)}',
+    '::-webkit-scrollbar-thumb{background:rgba(198,170,109,.35);border:2px solid transparent;',
+    'background-clip:padding-box;border-radius:6px}',
+    '::-webkit-scrollbar-thumb:active{background:rgba(233,209,155,.55);background-clip:padding-box}',
+    '::-webkit-scrollbar-corner{background:transparent}',
     // a slot
     '#ts-select .slot{position:relative;border:1px solid rgba(198,170,109,.34);background:rgba(255,255,255,.025);padding:20px 26px 20px 30px;',
     'min-height:132px}',

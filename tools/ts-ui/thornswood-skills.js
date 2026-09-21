@@ -351,6 +351,26 @@
     '#ts-skills .spell.on .spellname{color:#f6e9c8}',
     '#ts-skills .spell.mine .spellname{color:#9fcf92}',
     '#ts-skills .spellname{font-size:14px}',
+    '#ts-skills .spell.shut .spellname{color:rgba(217,207,180,.38)}',
+    '#ts-skills .spell.shut{cursor:default}',
+    /*
+      Scrollbars, here and everywhere else in this window.
+
+      The browser's own is a white strip down the side of a dark panel, which
+      in a dark room reads as a fault rather than as a control: Patrick called
+      it a flash bang on 20 September, and said it is in all the menus rather
+      than only this one. Every page in the game is drawn in one document, so
+      these rules are written without a page in front of them and the whole
+      window matches, the front's own pages included. They are the same rules
+      the character choice at the main menu carries, because that page is up
+      before this one is loaded.
+    */
+    '::-webkit-scrollbar{width:10px;height:10px}',
+    '::-webkit-scrollbar-track{background:rgba(0,0,0,.25)}',
+    '::-webkit-scrollbar-thumb{background:rgba(198,170,109,.35);border:2px solid transparent;',
+    'background-clip:padding-box;border-radius:6px}',
+    '::-webkit-scrollbar-thumb:active{background:rgba(233,209,155,.55);background-clip:padding-box}',
+    '::-webkit-scrollbar-corner{background:transparent}',
     // the K, drawn as a key cap beside Close
     '#ts-skills .key{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;',
     'border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;border-radius:3px;background:rgba(0,0,0,.35);',
@@ -448,6 +468,56 @@
     counts down. The real rule, points by rank and spells granted, is the
     server's and is still to come.
   */
+  /*
+    Which spells are open to you, and why one is not.
+
+    Two rules, Patrick's, 20 September: a spell of a rank above Novice needs
+    your rank in that school to have reached it, and it needs at least one
+    spell of the rank below already in your book. So during creation, when
+    nobody has a rank in anything, only Novice spells can be marked. The
+    first cut let a Conjuration Advanced spell be marked with no Novice one
+    under it, which is what he caught.
+
+    A spell already marked on this page counts as one you have for the rank
+    below, so marking Flames opens Advanced Destruction the moment the rank
+    allows it. The server grants nothing from here yet; this is the shape of
+    the rule, and the rules themselves stay the server's.
+  */
+  var RANK_ORDER = ['novice', 'advanced', 'expert', 'master'];
+  function rankIndex(key) {
+    var i = RANK_ORDER.indexOf(String(key || 'novice'));
+    return i < 0 ? 0 : i;
+  }
+  /* The rank this character has reached in that school. Nothing is Novice. */
+  function schoolRank(school) { return rankOf(school) || 'novice'; }
+  /* Does the book hold a spell of that rank in that school, granted or marked. */
+  function holdsRank(school, rankKey) {
+    var book = DATA.spells;
+    if (!book || !book.schools[school]) return false;
+    var have = (mine && mine.spells) || {};
+    var names = book.schools[school][rankKey] || [];
+    for (var i = 0; i < names.length; i++) {
+      if (have[names[i]] || marked[names[i]]) return true;
+    }
+    return false;
+  }
+  /*
+    Empty when the spell is open, otherwise the short reason it is not, in
+    the words a person would use.
+  */
+  function lockedBecause(school, rankKey) {
+    var want = rankIndex(rankKey);
+    if (want === 0) return '';
+    if (want > rankIndex(schoolRank(school))) {
+      return 'needs ' + (RANK_NAMES[rankKey] || cap(rankKey)) + ' ' + cap(school);
+    }
+    var below = RANK_ORDER[want - 1];
+    if (!holdsRank(school, below)) {
+      return 'needs a ' + (RANK_NAMES[below] || below).toLowerCase() + ' spell first';
+    }
+    return '';
+  }
+
   var STARTING_SPELL_POINTS = 2;
   function spellPoints() {
     if (mine && mine.spellPoints !== undefined && mine.spellPoints !== null) return Number(mine.spellPoints) || 0;
@@ -455,12 +525,39 @@
   }
   function markedCount() { var n = 0; for (var k in marked) if (marked[k]) n++; return n; }
   function pointsLeft() { return Math.max(0, spellPoints() - markedCount()); }
-  /* Mark or unmark a spell; a mark needs a point. True when something changed. */
-  function toggleMark(name) {
-    if (marked[name]) { marked[name] = false; return true; }
+  /*
+    Mark or unmark a spell; a mark needs a point and an open rank. True when
+    something changed.
+
+    Unmarking can shut a rank above it, so anything that is no longer open
+    loses its mark with it: marking Flames, then Firebolt, then unmarking
+    Flames must not leave Firebolt marked under nothing.
+  */
+  function toggleMark(school, rankKey, name) {
+    if (marked[name]) { marked[name] = false; tidyMarks(); return true; }
+    var why = lockedBecause(school, rankKey);
+    if (why) { status = cap(name) + ' ' + why + '.'; statusKind = 'no'; return false; }
     if (pointsLeft() <= 0) { status = 'No spell points left. Unmark one to mark another.'; statusKind = 'no'; return false; }
     marked[name] = true;
     return true;
+  }
+
+  /* Drop any mark that is no longer open, until nothing more falls. */
+  function tidyMarks() {
+    var book = DATA.spells;
+    if (!book) return;
+    var again = true;
+    while (again) {
+      again = false;
+      bookSchools().forEach(function (sc) {
+        var byRank = book.schools[sc] || {};
+        book.ranks.forEach(function (r) {
+          (byRank[r.key] || []).forEach(function (nm) {
+            if (marked[nm] && lockedBecause(sc, r.key)) { marked[nm] = false; again = true; }
+          });
+        });
+      });
+    }
   }
   function rows() { return DATA[section] ? DATA[section].rows : []; }
   function titleOf(sec) { return DATA[sec] ? DATA[sec].title : cap(sec); }
@@ -716,15 +813,19 @@
         var names = byRank[r.key] || [];
         if (!names.length) return;
         col.appendChild(el('div', 'rankhead', r.name));
+        var why = lockedBecause(sc, r.key);
         names.forEach(function (name) {
           var i = idx++;
           var got = !!have[name];
-          var row = el('div', 'spell' + (i === rowAt ? ' at' : '') + (got ? ' mine' : '') + (marked[name] ? ' on' : ''));
+          var shut = !got && !marked[name] && !!why;
+          var row = el('div', 'spell' + (i === rowAt ? ' at' : '') + (got ? ' mine' : '') +
+                       (marked[name] ? ' on' : '') + (shut ? ' shut' : ''));
           row.appendChild(el('span', 'spellname', name));
-          row.appendChild(el('span', 'tag' + (got ? '' : (marked[name] ? ' gold' : ' dim')), got ? 'yours' : (marked[name] ? 'marked' : 'could take')));
+          row.appendChild(el('span', 'tag' + (got ? '' : (marked[name] ? ' gold' : ' dim')),
+                             got ? 'yours' : (marked[name] ? 'marked' : (shut ? why : 'could take'))));
           row.onclick = function () {
             rowAt = i;
-            if (!got) toggleMark(name);
+            if (!got) toggleMark(sc, r.key, name);
             draw();
           };
           col.appendChild(row);
@@ -1098,7 +1199,7 @@
         // Enter in Review is Begin; in the world the second Enter confirms.
         if (section === 'spells') {
           var sr = bookRows()[rowAt];
-          if (sr && !((mine && mine.spells) || {})[sr.name]) { toggleMark(sr.name); draw(); }
+          if (sr && !((mine && mine.spells) || {})[sr.name]) { toggleMark(sr.school, sr.rank, sr.name); draw(); }
           e.preventDefault(); return;
         }
         var r = section === 'home' ? ((mine && mine.towns) || [])[rowAt] : rows()[rowAt];
