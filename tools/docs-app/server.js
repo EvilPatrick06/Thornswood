@@ -159,7 +159,7 @@ const BOARDS = {
 const LEVEL = {
   tests: 'admin', help: 'admin', known: 'admin', roadmap: 'admin',
   suggestions: 'admin', files: 'admin', uploads: 'admin', report: 'admin',
-  news: 'admin', link: 'admin', linked: 'admin',
+  news: 'admin', link: 'admin', linked: 'admin', sessions: 'admin',
   active: 'admin', archive: 'admin', todo: 'admin', inbox: 'admin'
 };
 
@@ -216,6 +216,7 @@ const PAGES = {
   '/uploads':     'uploads',
   '/link':        'link',
   '/linked':      'linked',
+  '/sessions':    'sessions',
   '/active':      'active',
   '/patrick':     'todo',
   '/archive':     'archive',
@@ -638,6 +639,63 @@ function noteSignIn(req, me, st, back) {
     });
     putJson(ATTEMPTS, rows.slice(0, ATTEMPTS_KEEP));
   } catch (e) { }
+}
+
+/* Who played, when they started, when they stopped, and on which build.
+ *
+ * linked.json holds a last played stamp, which answers "has this person ever
+ * pressed Play" and nothing else: not how long they were in, not whether they
+ * are still in now, not which build it was. Djinn asked on 20 September for a
+ * sheet testers are logged in and out of, and this is the record behind it.
+ *
+ * One row a session. Newest LAST, the way a log is written, and capped so the
+ * file cannot grow without bound on the VPS. Two thousand sessions is years of
+ * a closed playtest. */
+const SESSIONS = path.join(DATA, 'sessions.json');
+const SESSIONS_KEEP = 2000;
+
+function sessionRows() {
+  const list = jsonFile(SESSIONS, []);
+  return Array.isArray(list) ? list : [];
+}
+function putSessions(rows) {
+  return putJson(SESSIONS, rows.slice(-SESSIONS_KEEP));
+}
+
+/* The id the launcher made for one session: its characters only, so nothing
+   sent from outside can carry a path or punctuation into the file, and long
+   enough to be a real id rather than a stub somebody typed. */
+function sessionKey(v) {
+  const s = String(v == null ? '' : v).replace(/[^A-Za-z0-9-]/g, '').slice(0, 64);
+  return s.length >= 8 ? s : '';
+}
+
+/* The row this session id made FOR THIS ACCOUNT. Both halves matter: a ticket
+   is only ever allowed to write its own rows, so an id that somebody else
+   started is not this account's to start, end or annotate. Newest first,
+   because a re-used id should find the row still open. */
+function findSession(rows, key, who) {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i] && rows[i].session === key && String(rows[i].who) === String(who)) return i;
+  }
+  return -1;
+}
+
+/* One row, from whatever the launcher sent and the ticket it sent it with.
+   The Discord id and the name come from the ticket and the linked file, never
+   from the body: the body is the launcher's, and the ticket is the only part
+   of it the site signed. */
+function sessionRow(t, o, key) {
+  const known = jsonFile(LINKED, {})[t.d] || {};
+  return {
+    session: key,
+    who: String(t.d),
+    name: String(known.name || t.n || ''),
+    profile: Number(o.profileId) || 0,
+    channel: String(o.channel || '') === 'dev' ? 'dev' : 'main',
+    version: String(o.version || '').slice(0, 32),
+    start: 0, end: 0, minutes: 0, why: '', note: ''
+  };
 }
 
 /* What this person is allowed to do, decided by their roles in the Discord and
@@ -1430,6 +1488,98 @@ async function handle(req, res) {
   }
 
   /*
+    Both ends of a play session, from the launcher.
+
+    Start when the game is started, end when it has closed, the same id on
+    both. The ticket is read the same way the door reads it, and the row is
+    written against the Discord id INSIDE that ticket, so a ticket can only
+    ever write its own rows: one person's launcher cannot start, end or fill
+    in a session belonging to somebody else, whatever id it sends.
+
+    A row with no end is a session still open, not a fault. A row with no
+    start is a session whose start was never seen, which is what a launcher
+    that was replaced or restarted mid session produces, and it is recorded
+    rather than dropped.
+  */
+  if ((p === '/api/play/start' || p === '/api/play/end') && req.method === 'POST') {
+    const ending = (p === '/api/play/end');
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const t = readTicket(o.ticket);
+    if (!t) return sendJson(res, 401, { ok: false, why: 'link' });
+    const key = sessionKey(o.session);
+    if (!key) return sendJson(res, 400, { ok: false, why: 'no session id' });
+
+    /* A ticket outlives a ban by up to a month, so a ban Discord confirms
+       refuses here too. A lookup that failed records the session, because
+       losing an evening's testing to a bad minute at Discord is the worse of
+       the two. This is not what keeps the log from being scrubbed: any
+       linked account could post starts until the rolling cap took every real
+       session off the front with them, and the count below is what stops
+       that. */
+    const st = await standingCached(t.d);
+    if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned' });
+
+    const rows = sessionRows();
+    const at = findSession(rows, key, t.d);
+    const now = Date.now();
+
+    /* Nobody plays thirty times an hour. Past that from one account it is a
+       fault or somebody pushing, and either way the row is not written. An
+       end is never refused: an end only fills in a row that is already
+       there. */
+    if (!ending) {
+      const hourAgo = now - 3600000;
+      let mine = 0;
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const r = rows[i];
+        if (!r || !(Number(r.start) >= hourAgo)) continue;
+        if (String(r.who) === String(t.d)) mine++;
+      }
+      if (mine >= 30 && at < 0) return sendJson(res, 429, { ok: false, why: 'too many' });
+    }
+
+    if (!ending) {
+      // A second start on the same id is the same session said twice, not
+      // another one, so it fills the row in rather than adding to it.
+      if (at >= 0) {
+        const was = rows[at];
+        was.start = was.start || now;
+        if (Number(o.profileId) > 0) was.profile = Number(o.profileId);
+        if (o.version) was.version = String(o.version).slice(0, 32);
+        was.channel = String(o.channel || '') === 'dev' ? 'dev' : 'main';
+      } else {
+        const row = sessionRow(t, o, key);
+        row.start = now;
+        rows.push(row);
+      }
+    } else {
+      let m = Number(o.minutes);
+      if (!isFinite(m) || m < 0) m = 0;
+      m = Math.round(m * 10) / 10;
+      const why = String(o.why || '') === 'update' ? 'update' : 'quit';
+      if (at >= 0) {
+        const was = rows[at];
+        was.end = now;
+        was.minutes = m;
+        was.why = why;
+        // The character is picked at the game's menu, so the start went out
+        // not knowing it and the end is the first that does.
+        if (Number(o.profileId) > 0) was.profile = Number(o.profileId);
+        if (o.version) was.version = String(o.version).slice(0, 32);
+      } else {
+        const row = sessionRow(t, o, key);
+        row.end = now;
+        row.minutes = m;
+        row.why = why;
+        rows.push(row);   // start stays 0: it was never seen
+      }
+    }
+    if (!putSessions(rows)) return sendJson(res, 500, { ok: false, why: 'could not save' });
+    return sendJson(res, 200, { ok: true });
+  }
+
+  /*
     The character roster, in from the game server and out to each person.
 
     In: the gamemode posts its whole book with the door key whenever it
@@ -1642,6 +1792,7 @@ async function handle(req, res) {
         news: jsonFile(NEWS, { launcher:'', news: [] }),
         invite: cfg.discord.invite || '',
         linked: w.admin ? Object.values(jsonFile(LINKED, {})) : [],
+        sessions: w.admin ? sessionRows() : [],
         inbox: w.admin ? jsonFile(INBOX, []) : []
       });
     }
@@ -1669,6 +1820,27 @@ async function handle(req, res) {
       try { obj = JSON.parse(await body(req)); }
       catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
       if (!writeBoardOne(mb[1], obj)) return sendJson(res, 400, { error: 'no such board' });
+      return sendJson(res, 200, { ok: true });
+    }
+
+    /* The sheet part: what a staff member writes against one session.
+       Admins only, like everything below the line above, and one row at a
+       time rather than the whole file, so two people with the page open do
+       not write over each other's notes. The row is found by the session id
+       AND the Discord id it belongs to, so a stray id cannot land a note on
+       somebody else's session. */
+    if (p === '/api/session-note' && req.method === 'PUT') {
+      let obj;
+      try { obj = JSON.parse(await body(req)); }
+      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      const key = sessionKey(obj && obj.session);
+      const rows = sessionRows();
+      const at = key ? findSession(rows, key, obj.who) : -1;
+      if (at < 0) return sendJson(res, 404, { error: 'no such session' });
+      rows[at].note = String(obj.note == null ? '' : obj.note).slice(0, 2000);
+      rows[at].noteBy = String(w.name || '');
+      rows[at].noteAt = Date.now();
+      if (!putSessions(rows)) return sendJson(res, 500, { error: 'could not save' });
       return sendJson(res, 200, { ok: true });
     }
 

@@ -1444,6 +1444,18 @@ namespace Thornswood
                     if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build now that " + cfg.BuildName + " has closed.");
                 }
                 Stats.StoppedPlaying(playStartedAt);
+                // The other end of the session for the site's log: how long it
+                // ran, who was played, and why it stopped. closedForUpdate is
+                // read here because it is cleared further down this same tick.
+                // Off this thread and wrapped: the game has already closed and
+                // nothing here is worth a wait on a network.
+                double ranFor = (DateTime.Now - playStartedAt).TotalMinutes;
+                int playedAs = chosenId;
+                bool endedForUpdate = closedForUpdate;
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try { Discord.SessionEnd(playedAs, ranFor, endedForUpdate ? "update" : "quit"); } catch { }
+                });
                 // Against the character, not just the install. Skyrim keeps its
                 // own play time inside the save, and under SkyMP the character
                 // is a change form on the server with often no save here at all,
@@ -3772,6 +3784,20 @@ namespace Thornswood
                 string mode = "";
                 try { mode = ", " + Display.Mode.ToLowerInvariant(); } catch { }
                 Log("Starting the game on launcher " + Updater.Version + ", " + onPack + mode + ".");
+
+                // The site keeps a log of who played, when, and on which
+                // build, so the staff console has a sheet to fill in rather
+                // than a last played stamp. One id for this session, the start
+                // now and the end when the game closes. Off this thread, and
+                // wrapped, so a site that is down changes nothing about
+                // playing. No character is picked yet: the menu does that, and
+                // the end carries whoever was chosen.
+                try { Discord.NewSession(); } catch { }
+                int startedAs = chosenId;
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try { Discord.SessionStart(startedAs); } catch { }
+                });
 
                 // "Playing Thornswood" in Discord, with the headcount and the
                 // Download and Discord buttons, for as long as the game runs.

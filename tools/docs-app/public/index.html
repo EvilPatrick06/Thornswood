@@ -461,13 +461,14 @@ tr.adder .plus{color:var(--faint);font-size:16px;line-height:38px}
 var S = {
   me:{member:false,admin:false,name:''}, titles:{}, level:{},
   docs:{}, boards:{}, results:{}, files:[], uploads:[], inbox:[], linked:[],
+  sessions:[],
   news:{news:[]}, invite:'', at:'home', editing:false, discord:false
 };
 
 var ROUTES = {
   '/hub':'home', '/hub/help':'help', '/news':'news', '/hub/known':'known', '/roadmap':'roadmap',
   '/suggestions':'suggestions', '/testthese':'tests',
-  '/uploads':'uploads', '/link':'link', '/linked':'linked',
+  '/uploads':'uploads', '/link':'link', '/linked':'linked', '/sessions':'sessions',
   '/active':'active', '/patrick':'todo', '/archive':'archive', '/inbox':'inbox'
 };
 var PATHS = {};
@@ -489,7 +490,9 @@ var ABOUT = {
   todo:        'Your own list, in the order it wants doing.',
   inbox:       'Bugs and ideas sent in from the public report page.',
   link:        'How getting in works, and what to do when the launcher says you are not linked.',
-  linked:      'Everybody who has linked a Discord account to a copy of the game.'
+  linked:      'Everybody who has linked a Discord account to a copy of the game.',
+  sessions:    'Every play session the launcher has reported, newest first. ' +
+               'Write down what was tested in the note beside it.'
 };
 
 /*
@@ -505,7 +508,7 @@ var GROUPS = [
   { label:'Work',        keys:['patrick','inbox','active','testthese'] },
   { label:'Files',       keys:['uploads'] },
   { label:'On the site', keys:['roadmap','known','suggestions','help'] },
-  { label:'Records',     keys:['archive','linked'] }
+  { label:'Records',     keys:['archive','linked','sessions'] }
 ];
 
 var el = function (id) { return document.getElementById(id); };
@@ -522,6 +525,7 @@ function label(k) {
   if (k === 'news') return 'News';
   if (k === 'link') return 'Getting in';
   if (k === 'linked') return 'Linked accounts';
+  if (k === 'sessions') return 'Play sessions';
   return S.titles[k] || k;
 }
 function maySee(k) {
@@ -614,6 +618,7 @@ function start() {
     S.results = d.results || {}; S.files = d.files || [];
     S.uploads = d.uploads || []; S.inbox = d.inbox || [];
     S.linked = d.linked || []; S.invite = d.invite || '';
+    S.sessions = d.sessions || [];
     S.news = d.news || { news: [] };
     el('gate').style.display = 'none';
     el('shell').style.display = 'grid';
@@ -627,7 +632,7 @@ function refresh() {
     S.docs = d.docs || {}; S.boards = d.boards || {};
     S.results = d.results || {}; S.files = d.files || [];
     S.uploads = d.uploads || []; S.inbox = d.inbox || [];
-    S.linked = d.linked || [];
+    S.linked = d.linked || []; S.sessions = d.sessions || [];
   }).catch(function () { });
 }
 
@@ -727,6 +732,127 @@ function drawLinked() {
   el('page').innerHTML = out;
 }
 
+/* ------------------------------------------------------- play sessions -- */
+/*
+  One row a session, as the launcher reported it: a start when the game was
+  started and an end when it closed. A row with no end is somebody still
+  playing, or a machine that never got the end out. That is open, not broken,
+  and the page says so in those words.
+
+  The note is the sheet part. A staff member types what was tested against the
+  session it happened in, and it saves on its own.
+*/
+function forMins(m) {
+  var n = Number(m) || 0;
+  if (n < 1) return 'under a minute';
+  if (n < 60) return Math.round(n) + ' min';
+  var h = n / 60;
+  return (h < 10 ? h.toFixed(1) : String(Math.round(h))) + ' hours';
+}
+function sessionAt(s) { return s.start || s.end || 0; }
+/* No end means the game has not closed, or the closing word never reached the
+   site. Either way the session is open and the page says open. */
+function sessionOpen(s) { return !s.end; }
+
+/*
+  The week's totals, counting only the sessions that reported an end.
+
+  A row with no end carries no minutes, so counting it raised the session and
+  the people counts while the hours stayed where they were, and the three
+  numbers on one screen disagreed with each other. Open rows are counted on
+  their own and said separately, which is the honest shape: this is what was
+  played, and this many rows never reported an end.
+*/
+function sessionTotals(list) {
+  var week = Date.now() - 7 * 86400000;
+  var n = 0, mins = 0, open = 0, who = {};
+  list.forEach(function (s) {
+    if (sessionAt(s) < week) return;
+    if (sessionOpen(s)) { open++; return; }
+    n++;
+    mins += Number(s.minutes) || 0;
+    if (s.who) who[s.who] = true;
+  });
+  return { n:n, mins:mins, open:open, people:Object.keys(who).length };
+}
+
+function saveNote(box) {
+  saidNow('saving');
+  api('/api/session-note', {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ session: box.dataset.s, who: box.dataset.w, note: box.value })
+  }).then(function (r) {
+    saidNow(r.ok ? 'saved' : 'did not save');
+    if (!r.ok) return;
+    S.sessions.forEach(function (s) {
+      if (s.session === box.dataset.s && String(s.who) === String(box.dataset.w)) s.note = box.value;
+    });
+  }).catch(function () { saidNow('did not save'); });
+}
+
+function drawSessions() {
+  var list = S.sessions.slice().sort(function (a, b) { return sessionAt(b) - sessionAt(a); });
+  var t = sessionTotals(list);
+  var out = head() +
+    '<div class="tally">' +
+      '<span class="pill pass">' + t.n + (t.n === 1 ? ' session' : ' sessions') +
+        ' in the last seven days</span>' +
+      '<span class="pill skip">' + (t.mins < 1 ? 'no time yet' : esc(forMins(t.mins)) + ' of it') + '</span>' +
+      (t.open ? '<span class="pill left">' + t.open + ' with no end reported</span>' : '') +
+      '<span class="pill left">' + t.people + (t.people === 1 ? ' person' : ' people') + '</span>' +
+    '</div>';
+
+  if (!list.length) {
+    out += '<div class="empty">Nobody has played yet. A row lands here the ' +
+      'moment somebody presses Play, and fills in when they stop.</div>';
+  } else {
+    out += '<div class="tablewrap"><table class="board"><thead><tr>' +
+      '<th>Who</th><th>Character</th><th>Build</th><th>Started</th>' +
+      '<th>Stopped</th><th>For</th><th>Note</th></tr></thead><tbody>';
+    list.forEach(function (s) {
+      var open = sessionOpen(s);
+      out += '<tr>' +
+        '<td data-label="Who"><div class="cell">' + esc(s.name || s.who || '') +
+          (s.channel === 'dev' ? ' <span class="pill left">dev</span>' : '') + '</div></td>' +
+        '<td data-label="Character"><div class="cell">' +
+          (s.profile ? '<code>' + esc(s.profile) + '</code>' : 'none picked') + '</div></td>' +
+        '<td data-label="Build"><div class="cell">' + esc(s.version || 'not said') + '</div></td>' +
+        '<td data-label="Started"><div class="cell">' +
+          (s.start
+            ? esc(new Date(s.start).toLocaleString())
+            : '<span class="pill left">start never seen</span>' +
+              '<div class="said">the launcher was replaced or restarted while ' +
+              'they were playing, so only the end reached us</div>') + '</div></td>' +
+        '<td data-label="Stopped"><div class="cell">' +
+          (open
+            ? '<span class="pill left">no end reported</span>'
+            : esc(new Date(s.end).toLocaleString()) +
+              (s.why === 'update' ? '<div class="said">closed for an update</div>' : '')) +
+          '</div></td>' +
+        '<td data-label="For"><div class="cell">' +
+          (open ? 'open' : esc(forMins(s.minutes))) + '</div></td>' +
+        '<td data-label="Note"><textarea data-s="' + esc(s.session) + '" data-w="' + esc(s.who) +
+          '" placeholder="what they tested, what broke">' + esc(s.note || '') + '</textarea>' +
+          (s.noteBy ? '<div class="said" style="padding:0 2px 7px">written by ' +
+            esc(s.noteBy) + '</div>' : '') +
+        '</td>' +
+      '</tr>';
+    });
+    out += '</tbody></table></div>';
+  }
+
+  out += '<p class="lede" style="margin-top:20px">The launcher sends both ends ' +
+    'of every session, so a row appears as somebody starts and fills in when ' +
+    'they stop. One still open is somebody playing right now, or a machine ' +
+    'that never got the closing word out. Nothing here is typed by the person ' +
+    'playing.</p>';
+  el('page').innerHTML = out;
+
+  each(el('page'), 'textarea[data-s]', function (box) {
+    box.onchange = function () { saveNote(box); };
+  });
+}
+
 /* ---------------------------------------------------------------- draw -- */
 function draw() {
   Array.prototype.forEach.call(el('tabs').querySelectorAll('a.tab'), function (a) {
@@ -740,6 +866,7 @@ function draw() {
   if (S.at === 'inbox')   return drawInbox();
   if (S.at === 'link')    return drawLink();
   if (S.at === 'linked')  return drawLinked();
+  if (S.at === 'sessions') return drawSessions();
   if (isBoard(S.at))      return drawBoard();
   if (S.editing)          return drawEdit();
   drawDoc();
@@ -796,6 +923,10 @@ function countFor(k) {
   }
   if (k === 'link')   return 'Discord decides';
   if (k === 'linked') return S.linked.length + ' linked';
+  if (k === 'sessions') {
+    var w = sessionTotals(S.sessions);
+    return w.n ? w.n + ' in the last seven days' : 'nobody yet';
+  }
   var n = rowCount(k);
   return n === 1 ? '1 entry' : n + ' entries';
 }
@@ -842,7 +973,7 @@ function drawHome() {
     out += '<div class="section-label">What visitors see</div>';
     out += '<div class="cards">' + card('roadmap') + card('known') + card('suggestions') + '</div>';
     out += '<div class="section-label">Records</div>';
-    out += '<div class="cards">' + card('archive') + card('linked') + '</div>';
+    out += '<div class="cards">' + card('archive') + card('linked') + card('sessions') + '</div>';
   } else {
     out += '<div class="cards">' + card('tests', true) + card('uploads') + '</div>';
     out += '<div class="section-label">Run the server?</div>' +

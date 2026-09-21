@@ -19,8 +19,11 @@
 //   Discord.Connect(...)     -> opens the browser, waits, saves the ticket
 //   Discord.Join()           -> ask the site: allowed in, and the password
 //   Discord.Forget()         -> unlink
+//   Discord.NewSession()     -> one id for this Play
+//   Discord.SessionStart/End -> both ends of a session, for the site's log
 
 using System;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Security.Cryptography;
@@ -350,6 +353,108 @@ namespace Thornswood
             if (st.Ok && st.Name.Length > 0 && st.Name != Name) Save(Ticket, st.Name);
             if (!st.Ok && st.Message.Length == 0) st.Message = "Not allowed in.";
             return st;
+        }
+
+        // -------------------------------------------------------- sessions --
+        //
+        // Both ends of a play session, so there is a record of who tested what
+        // and for how long. /api/play/join is a last played stamp: it says
+        // somebody pressed Play and nothing about when they stopped. Djinn
+        // asked for a checking sheet on 20 September, and this is the half of
+        // it the launcher can see.
+        //
+        // One id per Play, made here, sent with the start and again with the
+        // end. The site matches the two up and the staff console reads them.
+        //
+        // Nothing in here is allowed to matter. A site that is down, a ticket
+        // that has run out, an answer that never comes: each is a line in the
+        // log and the game plays exactly the same.
+
+        static string session = "";
+
+        /// <summary>The id this session is logged under. "" before the first Play.</summary>
+        public static string SessionId { get { return session; } }
+
+        /// <summary>A fresh id for one session. Made once, as the game starts.</summary>
+        public static string NewSession()
+        {
+            session = Guid.NewGuid().ToString("N");
+            return session;
+        }
+
+        /// <summary>The game has just been started. Call it from a pool thread.</summary>
+        public static void SessionStart(int profileId)
+        {
+            if (session.Length == 0) NewSession();
+            Send("start", Site + "/api/play/start", Head(profileId) + "}");
+        }
+
+        /// <summary>
+        /// The game has closed. minutes is how long it ran; why is "quit" when
+        /// the person closed it and "update" when the launcher closed it for a
+        /// release. Call it from a pool thread.
+        /// </summary>
+        public static void SessionEnd(int profileId, double minutes, string why)
+        {
+            // A launcher that took a running session over, or one that was
+            // itself replaced mid session, has no id of its own. It makes one
+            // and sends the end alone; the site records that as a session whose
+            // start was never seen, which is the truth of it.
+            if (session.Length == 0) NewSession();
+            double m = minutes;
+            if (m < 0 || m > 60 * 24 * 7 || double.IsNaN(m)) m = 0;
+            string reason = why == "update" ? "update" : "quit";
+            Send("end", Site + "/api/play/end",
+                 Head(profileId) +
+                 ",\"minutes\":" + m.ToString("F1", CultureInfo.InvariantCulture) +
+                 ",\"why\":\"" + reason + "\"}");
+        }
+
+        /// <summary>Everything both ends send, without the closing brace.</summary>
+        static string Head(int profileId)
+        {
+            return "{\"ticket\":\"" + Escape(Ticket) + "\"" +
+                   ",\"session\":\"" + Escape(session) + "\"" +
+                   (profileId > 0 ? ",\"profileId\":" + profileId : "") +
+                   ",\"channel\":\"" + Escape(string.IsNullOrEmpty(Channel) ? "main" : Channel) + "\"" +
+                   ",\"version\":\"" + Escape(Updater.Version) + "\"";
+        }
+
+        static void Send(string what, string url, string json)
+        {
+            try
+            {
+                if (!Linked)
+                {
+                    Note("Did not tell thornswood.net the session " + what +
+                         ": this copy is not linked to a Discord account.");
+                    return;
+                }
+                string reply;
+                int code = PostJson(url, json, out reply);
+                if (code == 200) return;
+                Note("thornswood.net did not record the session " + what + ": " +
+                     (code == 0 ? "the site could not be reached" : "it answered " + code) + ".");
+            }
+            catch (Exception ex)
+            {
+                Note("Could not tell thornswood.net the session " + what + ": " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Straight into launcher.log. Shell.Log writes the status line as well
+        /// and has to be on the window's thread; these run on the pool.
+        /// </summary>
+        static void Note(string line)
+        {
+            try
+            {
+                Directory.CreateDirectory(Folder);
+                File.AppendAllText(Path.Combine(Folder, "launcher.log"),
+                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + line + Environment.NewLine);
+            }
+            catch { }
         }
 
         public static int PostJson(string url, string json, out string reply)
