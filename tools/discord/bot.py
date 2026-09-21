@@ -21,7 +21,8 @@ Everything it needs is in env:
   TICKET_LOG       staff only channel closed tickets are recorded in
   STAFF_ROLES      comma separated, who gets pulled into every ticket thread
   CREATOR_ROLES    comma separated, added to Apply: Content Creator only
-  WATCH_CHANNEL    comma separated, where the site watcher speaks, default dev
+  WATCH_CHANNEL_ID id of the staff channel the site watcher speaks in,
+                   default whatever dev-channel.txt beside this file holds
   WATCH_EVERY      seconds between checks, default 300
   WATCH_MISSES     how many in a row before it says so, default 2
 
@@ -102,22 +103,31 @@ CREATOR = [r.strip().lower() for r in
 EXTRA_STAFF = {'creator': CREATOR}
 
 # Where the site watcher speaks. Staff, not public: an outage is something to
-# fix, not an announcement, and #general reading "the site is down" every time
-# a certificate renews badly helps nobody.
+# fix, not an announcement.
 #
-# THE NAME IS dev-notes, which is what Build-Discord.py:219 makes. A first
-# draft of this defaulted to 'dev,general' and there is no channel called dev,
-# so every outage message would have gone to the public channel by way of the
-# fallback. There is no public fallback now on purpose: a watcher with nowhere
-# staff only to speak says nothing and writes a line in the bot log saying so,
-# which is better than telling everybody.
-WATCH = [n.strip().lower() for n in
-         os.environ.get('WATCH_CHANNEL', 'dev-notes,dev').split(',')
-         if n.strip()]
+# BY ID AND NOT BY NAME, and the reason is the whole point. The staff channel
+# is called news and sits in the Staff category. There is also a public news,
+# made by Build-Discord.py:154, which is the one releases are announced in. Two
+# channels, one name, and by_name hands back whichever the server lists first,
+# so a watcher matching on 'news' would eventually tell everybody the site was
+# down. A first draft guessed at 'dev-notes' and then 'dev', neither of which
+# exists at all, and would have fallen through to whatever did.
+#
+# dev-channel.txt holds that id, sits beside this file and is tracked in git,
+# unlike the webhook files next to it, so the id is not a secret and does not
+# need putting anywhere new.
+def _dev_channel_id():
+    """The staff channel's id, from the file that already records it."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        with open(os.path.join(here, 'dev-channel.txt')) as f:
+            return int(f.read().strip())
+    except Exception:
+        return 0
 
 
-def _seconds(name, fallback):
-    """A count from env, and the default when it is missing or nonsense."""
+def _int_env(name, fallback):
+    """A number from env, and the default when it is missing or nonsense."""
     try:
         n = int(os.environ.get(name, '') or fallback)
         return n if n > 0 else fallback
@@ -125,12 +135,15 @@ def _seconds(name, fallback):
         return fallback
 
 
-WATCH_EVERY = _seconds('WATCH_EVERY', 300)
+WATCH_ID = _int_env('WATCH_CHANNEL_ID', _dev_channel_id())
+
+
+WATCH_EVERY = _int_env('WATCH_EVERY', 300)
 # Two in a row rather than one. A single timeout is a moment of packet loss and
 # nobody wants to read about it. Two, five minutes apart, is the site being
 # down. Caddy's own repeating trigger is five minutes as well, so anything that
 # clears by itself has had a go at clearing before this says a word.
-WATCH_MISSES = _seconds('WATCH_MISSES', 2)
+WATCH_MISSES = _int_env('WATCH_MISSES', 2)
 
 if not TOKEN:
     raise SystemExit('No DISCORD_TOKEN. Install-Bot.ps1 sets it.')
@@ -866,18 +879,29 @@ def site_answers():
 
 
 async def watch_say(text):
-    """Say it once in each server, in the first watch channel that exists."""
-    for g in client.guilds:
-        ch = by_name(g, WATCH)
-        if not ch:
-            log('watch: no #%s in "%s", so nothing was said there'
-                % (WATCH[0], g.name))
-            continue
-        try:
-            await ch.send(text)
-        except Exception:
-            log('watch: could not post in #%s:\n' % ch.name
-                + traceback.format_exc())
+    """
+    Say it once, in the staff channel, found by id.
+
+    Nothing is guessed and nothing falls back to another channel. If that id is
+    not a channel this bot can see, it says so in the bot log and stays quiet in
+    Discord, because the only channel it could fall back to by name is the
+    public one.
+    """
+    if not WATCH_ID:
+        log('watch: no channel id, so nothing was said. dev-channel.txt is '
+            'missing or unreadable, or set WATCH_CHANNEL_ID in bot.env.json '
+            'on the VPS.')
+        return
+    ch = client.get_channel(WATCH_ID)
+    if ch is None:
+        log('watch: channel %d is not one this bot can see, so nothing was '
+            'said.' % WATCH_ID)
+        return
+    try:
+        await ch.send(text)
+    except Exception:
+        log('watch: could not post in #%s:\n' % getattr(ch, 'name', WATCH_ID)
+            + traceback.format_exc())
 
 
 async def watch_site():
@@ -895,8 +919,8 @@ async def watch_site():
     await client.wait_until_ready()
     misses = 0
     said_down = False
-    log('watch: asking %s every %ds, speaking up after %d miss(es) in #%s'
-        % (SITE, WATCH_EVERY, WATCH_MISSES, WATCH[0]))
+    log('watch: asking %s every %ds, speaking up after %d miss(es), in channel '
+        '%d' % (SITE, WATCH_EVERY, WATCH_MISSES, WATCH_ID))
 
     while not client.is_closed():
         try:

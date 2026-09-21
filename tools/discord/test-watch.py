@@ -268,15 +268,55 @@ yes('S10 a raise is down and not a crash', ok is False)
 yes('S10 and an empty error still names something', why == 'OSError')
 urllib.request.urlopen = real
 
-# S11: the default channel has to be one that exists and has to be staff only.
-#      The first draft defaulted to 'dev,general'. There is no channel called
-#      dev, so the fallback would have put every outage message in the public
-#      channel. A watcher that tells everybody is worse than one that tells
-#      nobody, so there is no public fallback at all now.
-yes('S11 the default names the staff channel that actually exists',
-    bot.WATCH[0] == 'dev-notes')
-yes('S11 and nothing public is in the fallback list',
-    'general' not in bot.WATCH)
+# S11: THE CHANNEL IS FOUND BY ID, AND THIS IS THE CHECK THAT MATTERS MOST.
+#
+#      The staff channel is called news and sits in the Staff category. So does
+#      a public news, which is where releases are announced. Two channels, one
+#      name. Matching by name hands back whichever the server lists first, so a
+#      watcher doing that tells everybody the site is down sooner or later.
+#      Two drafts of this guessed at names, 'dev,general' and then 'dev-notes',
+#      and neither name exists at all, so both would have fallen through to
+#      whatever did.
+yes('S11 the default is an id, taken from dev-channel.txt',
+    isinstance(bot.WATCH_ID, int) and bot.WATCH_ID > 0)
+yes('S11 and it is the id that file holds',
+    bot.WATCH_ID == bot._dev_channel_id())
+yes('S11 nothing is looked up by name any more',
+    not hasattr(bot, 'WATCH'))
+
+# S12: with no channel, or a channel the bot cannot see, it says NOTHING in
+#      Discord rather than finding somewhere else to say it.
+said_none = []
+
+
+async def catch(t):
+    said_none.append(t)
+
+
+class NoChannel(object):
+    guilds = []
+
+    def get_channel(self, _id):
+        return None
+
+    async def wait_until_ready(self):
+        return None
+
+    def is_closed(self):
+        return False
+
+
+keep_c, keep_id = bot.client, bot.WATCH_ID
+bot.client = NoChannel()
+try:
+    asyncio.run(bot.watch_say('this must not appear anywhere'))
+    yes('S12 a channel the bot cannot see is silence, not a fallback',
+        said_none == [])
+    bot.WATCH_ID = 0
+    asyncio.run(bot.watch_say('nor this'))
+    yes('S12 and no id at all is silence too', said_none == [])
+finally:
+    bot.client, bot.WATCH_ID = keep_c, keep_id
 
 print('')
 print('%d passed, %d failed' % (len(PASS), len(FAIL)))
