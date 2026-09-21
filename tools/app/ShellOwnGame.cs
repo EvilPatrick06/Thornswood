@@ -126,6 +126,69 @@ namespace Thornswood
             });
         }
 
+        /// <summary>
+        /// Refuse to start out of a shared Skyrim. True when Play may go on.
+        ///
+        /// "nothing here supports another server's install any more", decided by
+        /// Patrick on 20 September and written into CLAUDE.md. The own game
+        /// folder was built, the launcher restarts into it, and the shared
+        /// layout was left in place underneath as a thing somebody could decline
+        /// their way into and stay in for ever. That is not what was decided,
+        /// and on 21 September it was still costing people:
+        ///
+        ///   "we keep having this issue with everyone where some of our stuff
+        ///    appears in other servers when launching and vice versae"
+        ///
+        /// Because in that mode Data\Platform\Plugins\skymp5-client-settings.txt
+        /// is ONE FILE that every launcher on the machine writes, and the game
+        /// believes whichever wrote last. Ours writes chooseAtMenu and a profile
+        /// id on every Play; another server's writes its own; the person gets
+        /// the stock SkyMP login box reading ID: UNDEFINED behind our own
+        /// backdrop, because Vortex deployed our collection into that same
+        /// shared copy so the art is all correct. My Games and LocalAppData go
+        /// the same way, since Swap.Apply stands down there.
+        ///
+        /// NOBODY IS LEFT WITHOUT A WAY FORWARD. WhyNot names the one thing
+        /// stopping the folder being made, and every one of its answers says
+        /// what to do: downgrade first, turn the Thornswood profile on in
+        /// Vortex, or install on the same drive as Skyrim. When it names
+        /// nothing, the offer is put up here and now rather than pointing at a
+        /// button in another screen.
+        /// </summary>
+        static bool OwnGameRequired()
+        {
+            if (!Paths.Collection) return true;
+
+            string src = OwnGame.Source(cfg);
+            string why = OwnGame.WhyNot(cfg, src);
+
+            if (why == null)
+            {
+                // It can be made. Offer it instead of refusing at them, and let
+                // the person say yes or no to the thing that actually fixes it.
+                Log("Thornswood will not start out of a Skyrim shared with other servers.");
+                AskOwnGame(false);
+                return false;
+            }
+
+            string msg =
+                "Thornswood needs a Skyrim folder of its own before it can start.\n\n" +
+                "Right now it would run out of " + Paths.Game + ", which is shared with every " +
+                "other server on this machine. They all write the same client settings file and " +
+                "the game believes whichever wrote last, which is how their menus and logins get " +
+                "into Thornswood and Thornswood's get into theirs.\n\n" +
+                "The folder cannot be made yet:\n\n    " + why;
+            Log("Not starting: Thornswood would run out of the shared Skyrim, and the own folder " +
+                "cannot be made yet. " + why);
+            try
+            {
+                MessageBox.Show(win, msg, "Thornswood", MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+            }
+            catch { }
+            return false;
+        }
+
         static void AskOwnGame(bool atStart)
         {
             if (OwnGame.Active) { Log("Thornswood already runs from its own Skyrim folder, " + OwnGame.Folder + "."); return; }

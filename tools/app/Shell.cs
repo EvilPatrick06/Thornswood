@@ -3916,6 +3916,11 @@ namespace Thornswood
         /// </summary>
         static void StartPlay()
         {
+            // Before anything else, including Discord: a shared Skyrim is not
+            // an install this supports any more. OwnGameRequired says why and
+            // offers the folder when it can be made. See ShellOwnGame.cs.
+            if (!OwnGameRequired()) return;
+
             // Discord decides who gets in, and it is asked here rather than
             // inside Play() because Play() is also the path a game already
             // running comes back through. Asked off the UI thread: the site can
