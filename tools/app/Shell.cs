@@ -3815,7 +3815,13 @@ namespace Thornswood
             }
             catch (Exception ex)
             {
-                Log("Failed to start: " + ex.Message);
+                string reason = ex.Message == null ? "" : ex.Message;
+
+                // The whole thing still goes to the log file, because Log
+                // writes there before the bar trims anything, and the log is
+                // how a report from a tester becomes something to act on.
+                Log("Failed to start: " + reason);
+
                 Swap.Restore();
                 try { Hold.Release(); } catch { }
                 try { Keep.Unpark(); } catch { }
@@ -3824,6 +3830,33 @@ namespace Thornswood
                 playing = false;
                 btnPlay.Content = "PLAY";
                 DrawStatus();
+
+                // A start that failed has one job left, which is to say why in
+                // a way the person can act on, and the status bar cannot do it.
+                //
+                // WHAT A TESTER SAW, 21 September: Swap.MoveAside could not
+                // move a folder, so it threw the message it was written to
+                // throw, which names the folder and then the two causes worth
+                // acting on: a Skyrim or multiplayer client left over from a
+                // crash, which a restart clears, and the folder sitting in
+                // OneDrive, which needs moving out for good. Three lines.
+                // TxtStatus is one line with TextTrimming CharacterEllipsis,
+                // so they read "Failed to start: Windows would not let go of"
+                // and nothing after it, and reported that it cuts off. It did.
+                // Every line past the first was written for exactly the person
+                // who was not shown it.
+                //
+                // Last, and not before the cleanup above, because this blocks
+                // until it is dismissed and the folders should be back by then.
+                if (reason.IndexOf('\n') >= 0)
+                {
+                    try
+                    {
+                        MessageBox.Show(win, reason, "Thornswood could not start",
+                                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    catch { }
+                }
             }
         }
 
