@@ -24,13 +24,34 @@
   it meant a new character could do nothing at all and had no way to earn the
   rank that would have let them.
 
-  It CANNOT yet follow a single recipe to the class that produces its inputs.
-  tools\recipes.json records how MANY inputs a recipe has and not WHICH: the
-  CNTO subrecords are read by the build script to count them and then dropped.
-  Carrying the form ids through is a small change to a script that already has
-  them in its hands, and until that is done this reports the shape rather than
-  the chain. That limit is printed every run rather than left for somebody to
-  discover.
+  COUNTING ROWS ON A RUNG IS NOT ENOUGH, WHICH WAS FOUND ON 21 SEPTEMBER. This
+  script read the counts, found four rungs of the Enchanter/Bladebinder with 41,
+  56, 40 and 24 recipes on them, and said every ladder was sound and exited 0.
+  All 41 rows on that novice rung want a Heart Stone, and ores.json ranks all
+  four Heart Stone deposits master, so a novice Bladebinder opens 41 recipes and
+  can gather the makings for none of them. That is the same dead end as an empty
+  rung wearing a label, and the label came from the second rule in
+  Build-RecipeTable.ps1, which re-ranks a half by how long its shopping lists
+  are when neither price nor input cost can tell its rows apart. So every rung
+  is now checked for whether anybody standing on it could gather for even one
+  row of it, and a half where that fails and is not written down in the table
+  with a measured reason fails this script.
+
+  It also follows a recipe to the class that produces its inputs, which it
+  could not do until 21 September. tools\recipes.json records WHICH items each
+  recipe wants now and not just how many: Build-RecipeTable.ps1 read the CNTO
+  subrecords to count them and dropped the form ids, and it keeps them. Every
+  owned row carries inputItems, each with the class that produces that item and
+  the rank it is produced at, and inputRank, the dearest of them. So the chain
+  report below is a number rather than a shape: how far each half's recipes sit
+  from what their inputs cost, and every case more than one rung out.
+
+  What is still out of reach is one more hop. Leather Strips, Steel Ingot and
+  Leather are the three commonest inputs in the whole table and none of them
+  comes out of the ground: each is made at a smelter or a tanning rack, which
+  is itself a recipe, one of the 1679 nobody owns. Those rows are ranked by
+  what they sell for and say so, and the limit is printed every run rather than
+  left for somebody to discover.
 
   Read only. It opens five json files in this repository and writes nothing
   anywhere, and it does not touch the game folder or the VPS at all.
@@ -39,8 +60,9 @@
     .\tools\Check-Balance.ps1
     .\tools\Check-Balance.ps1 -Quiet     the verdict lines only
 
-  Exit code 1 if any ladder has an empty rung below its top, because that is the
-  one shape that is always wrong.
+  Exit code 1 if any ladder has an empty rung below its top, or a rung nobody
+  standing on it could gather for that the table has not already written down
+  with a reason. Those are the two shapes that are always wrong.
 #>
 [CmdletBinding()]
 param(
@@ -128,6 +150,9 @@ Head 'What consumes'
 $recipes = Load 'recipes.json'
 if ($recipes) {
     $byHalf = @{}
+    # The same rows again, kept rather than counted, because the standability
+    # check below has to look at what each one asks for and a count cannot.
+    $rowsOf = @{}
     foreach ($k in $recipes.recipes.PSObject.Properties.Name) {
         $row = $recipes.recipes.$k
         # A recipe the server is never asked about cannot be gated, so it is not
@@ -137,10 +162,12 @@ if ($recipes) {
         if ($row.PSObject.Properties.Name -contains 'fires' -and -not $row.fires) { continue }
         $half = [string]$row.owner + '/' + [string]$row.half
         if (-not $byHalf.ContainsKey($half)) { $byHalf[$half] = @{} }
+        if (-not $rowsOf.ContainsKey($half)) { $rowsOf[$half] = New-Object 'System.Collections.Generic.List[object]' }
         $rank = [string]$row.rank
         if (-not $rank) { continue }
         if (-not $byHalf[$half].ContainsKey($rank)) { $byHalf[$half][$rank] = 0 }
         $byHalf[$half][$rank]++
+        $rowsOf[$half].Add($row)
     }
 
     $empties = @()
@@ -167,6 +194,56 @@ if ($recipes) {
                 } else {
                     Bad ("{0}: nothing at {1} with {2} recipe(s) above it, so reaching that rank opens nothing" -f $half, $r, ($tot - $c))
                 }
+            }
+        }
+
+        # AND WHETHER ANYBODY CAN STAND ON THE RUNGS THAT DO HAVE ROWS ON THEM.
+        # A row is standable at its rung when inputRank is null, meaning no
+        # class rank stands between somebody and the makings, or when inputRank
+        # is at or below that rung. A rung whose every row fails that is the
+        # Bladebinder case in the header: a rank you reach, a list of recipes it
+        # opens, and not one of them you can gather for.
+        #
+        # The table itself names the halves somebody has decided to live with,
+        # in rungsNobodyCanGatherFor with the reason beside it, and
+        # Build-RecipeTable.ps1 refuses to write a table with any half that is
+        # not named. That is the same arrangement cannotCraftYet has: a decision
+        # written down beats a check quietly passing, and a half that turns up
+        # here without one is a fault in whoever changed the ranking.
+        $known = ''
+        if ($recipes.PSObject.Properties.Name -contains 'halves' -and
+            $recipes.halves.PSObject.Properties.Name -contains $half) {
+            $hv = $recipes.halves.$half
+            if ($hv.PSObject.Properties.Name -contains 'rungsNobodyCanGatherFor') {
+                $known = [string]$hv.rungsNobodyCanGatherFor
+            }
+        }
+        $unstandable = @()
+        foreach ($r in $RANKS) {
+            $on = 0
+            $can = 0
+            $need = ''
+            foreach ($row in $rowsOf[$half]) {
+                if ([string]$row.rank -ne $r) { continue }
+                $on++
+                $ir = [string]$row.inputRank
+                if (-not $ir) { $can++; continue }
+                if ([array]::IndexOf($RANKS, $ir) -le [array]::IndexOf($RANKS, $r)) { $can++; continue }
+                if (-not $need) { $need = $ir + ' work from a ' + [string]$row.inputRankWho }
+            }
+            if ($on -eq 0 -or $can -gt 0) { continue }
+            $unstandable += ('{0} ({1} recipe(s), every one wanting {2})' -f $r, $on, $need)
+        }
+        # One line per half and not one per rung. The Bladebinder fails on three
+        # rungs for the same reason and printing that reason three times buries
+        # the halves underneath it.
+        if ($unstandable.Count -gt 0) {
+            if ($known) {
+                Note ("{0}: nobody standing on these rungs can gather for anything they open: {1}. The table names this half itself and says why, so it is a decision rather than a fault." -f `
+                      $half, ($unstandable -join '; '))
+            } else {
+                Bad ("{0}: nobody standing on these rungs can gather for anything they open: {1}. Reaching that rank opens nothing anybody there can make, and nothing in the table says this was decided." -f `
+                     $half, ($unstandable -join '; '))
             }
         }
     }
@@ -206,12 +283,167 @@ if ($shape.Count) {
     }
 }
 
-Head 'What this cannot answer yet'
-Say '  Which class produces the inputs of any given recipe.'
-Say '  tools\recipes.json records how many inputs a recipe has and not which, because'
-Say '  the build script reads the CNTO subrecords to count them and then drops the ids.'
-Say '  Carrying them through is a small change to a script that already holds them, and'
-Say '  until then this reports the shape of each ladder rather than the chain between two.'
+Head 'The chain: what a recipe asks for against what it is ranked at'
+
+# THIS IS THE ANSWER TO PATRICK'S QUESTION, AS A NUMBER.
+#
+# Every owned row of recipes.json now carries inputItems, each with the class
+# that produces it and the rank that class gets it at, and inputRank, which is
+# the dearest of those. Comparing inputRank against the row's own rank says
+# exactly how far a profession's ladder sits from the ladders that feed it.
+#
+# A row whose rank matches its inputRank is in step: you can gather the makings
+# on the same rung you are allowed to use them. A row ranked BELOW what its
+# inputs cost is the dead end that started all of this, a novice Hearthcook
+# handed a recipe wanting a crop only an expert Farmer may grow. A row ranked
+# ABOVE what its inputs cost is the other kind of waste: the makings are in
+# your pack and the bench still refuses you.
+#
+# Only the rows the server is asked about are counted, for the same reason the
+# ladder counts above skip tempering: a row the gate is never asked about
+# cannot be in step or out of it with anything.
+if ($recipes) {
+    $inStep = 0; $outStep = 0; $noChain = 0; $far = @()
+    $perHalf = @{}
+    foreach ($k in $recipes.recipes.PSObject.Properties.Name) {
+        $row = $recipes.recipes.$k
+        if ($row.PSObject.Properties.Name -contains 'fires' -and -not $row.fires) { continue }
+        $half = [string]$row.owner + '/' + [string]$row.half
+        if (-not $perHalf.ContainsKey($half)) {
+            $perHalf[$half] = [pscustomobject]@{ Chained = 0; Loose = 0; Sum = 0; Worst = 0; InStep = 0 }
+        }
+        $ir = [string]$row.inputRank
+        if (-not $ir) { $noChain++; $perHalf[$half].Loose++; continue }
+        $a = [array]::IndexOf($RANKS, [string]$row.rank)
+        $b = [array]::IndexOf($RANKS, $ir)
+        if ($a -lt 0 -or $b -lt 0) { $noChain++; $perHalf[$half].Loose++; continue }
+        $gap = $a - $b
+        $perHalf[$half].Chained++
+        $perHalf[$half].Sum += [Math]::Abs($gap)
+        if ([Math]::Abs($gap) -gt $perHalf[$half].Worst) { $perHalf[$half].Worst = [Math]::Abs($gap) }
+        if ($gap -eq 0) { $inStep++; $perHalf[$half].InStep++ } else { $outStep++ }
+        if ([Math]::Abs($gap) -gt 1) {
+            # Which input it was. The row carries inputRank as the dearest of
+            # them; this finds the one that set it, so the line names a thing
+            # rather than a rank.
+            $dearest = ''
+            foreach ($it in $row.inputItems) {
+                if ([string]$it.producedAt -eq $ir) { $dearest = [string]$it.name; break }
+            }
+            if (-not $dearest) { $dearest = 'what it asks for' }
+            $which = 'above'
+            if ($gap -lt 0) { $which = 'below' }
+            $far += ('{0}: {1} is ranked {2} and its dearest input, {3}, is {4} work for a {5}. {6} rung(s) {7} what it costs.' -f `
+                     $half, [string]$row.name, [string]$row.rank, $dearest, $ir, [string]$row.inputRankWho, [Math]::Abs($gap), $which)
+        }
+    }
+
+    if ($perHalf.Count -eq 0) {
+        Note 'no recipe row carries inputItems yet, so rebuild the table with tools\Build-RecipeTable.ps1 and run this again'
+    } else {
+        foreach ($half in ($perHalf.Keys | Sort-Object)) {
+            $h = $perHalf[$half]
+            $tot = $h.Chained + $h.Loose
+            if ($h.Chained -eq 0) {
+                Say ('  {0}  {1} row(s), and NOT ONE of them asks for anything a class in this world produces, so there is no chain to read here at all' -f $half.PadRight(24), $tot)
+                continue
+            }
+            $avg = [Math]::Round(($h.Sum / [double]$h.Chained), 2)
+            Say ('  {0}  {1} of {2} row(s) have a producer behind them: {3} sit exactly on what their inputs cost, average gap {4} rung(s), worst {5}' -f `
+                 $half.PadRight(24), $h.Chained, $tot, $h.InStep, $avg, $h.Worst)
+        }
+        Say ''
+        Say ('  {0} row(s) are in step with what their inputs cost, {1} are not, and {2} ask for nothing any class produces.' -f $inStep, $outStep, $noChain)
+    }
+
+    # More than one rung apart is the imbalance worth a name. One rung is the
+    # ranking rules rounding against each other; two or more means somebody
+    # reaches a rank and the work it opens is either already in their pack or
+    # still out of their reach.
+    #
+    # It does NOT set the exit code. An empty rung is always wrong and this
+    # script exits 1 for it; a recipe out of step with its inputs is a thing
+    # somebody has to decide about, and a script that refused to finish over it
+    # would be refusing to report the rest.
+    if ($far.Count -gt 0) {
+        Note ("{0} recipe(s) are more than one rung away from what their inputs cost" -f $far.Count)
+        foreach ($f in ($far | Select-Object -First 10)) { Note ('  ' + $f) }
+        if ($far.Count -gt 10) { Note ("  ... and {0} more, every one of them in tools\recipes.json with its inputItems" -f ($far.Count - 10)) }
+    } else {
+        Ok 'no recipe is more than one rung away from what its inputs cost'
+    }
+}
+
+Head 'Where a profession sits below the class that grows what it asks for'
+
+# THE OTHER HALF OF PATRICK'S QUESTION, AND THE HALF THAT WAS MISSING.
+#
+# The chain above reads inputRank, which is what an input costs at the CHEAPEST
+# class that produces it, because that is what a recipe costs to gather for. It
+# cannot see the class that has to climb furthest for the same item, and for the
+# Farmer that is every item: all 11 crops in harvests.json are also plants a
+# gatherer picks at the same rank or lower, so the farmer sets no inputRank
+# anywhere in the table and was invisible in this report until 21 September.
+#
+# alsoProducedBy on an input names every class that has to be higher up its own
+# ladder for the same thing. A Cook row ranked below one of those is the
+# imbalance in Patrick's own words, farmer against cook, stated as a row and a
+# rank rather than as a feeling.
+#
+# It does NOT set the exit code, for the reason the chain gaps do not: which of
+# the two ladders should move is a decision, and a Confectioner baking with an
+# apple a gatherer picked at novice is defensible whatever rank the farmer who
+# grows one has to hold.
+if ($recipes) {
+    $cross = @{}
+    $crossSaid = New-Object 'System.Collections.Generic.List[string]'
+    $crossRows = 0
+    foreach ($k in $recipes.recipes.PSObject.Properties.Name) {
+        $row = $recipes.recipes.$k
+        if ($row.PSObject.Properties.Name -contains 'fires' -and -not $row.fires) { continue }
+        $at = [array]::IndexOf($RANKS, [string]$row.rank)
+        if ($at -lt 0) { continue }
+        $worst = -1
+        $worstWho = ''
+        $worstWhat = ''
+        foreach ($it in $row.inputItems) {
+            if (-not ($it.PSObject.Properties.Name -contains 'alsoProducedBy')) { continue }
+            foreach ($other in $it.alsoProducedBy) {
+                $oAt = [array]::IndexOf($RANKS, [string]$other.at)
+                if ($oAt -le $at) { continue }
+                if ($oAt -gt $worst) { $worst = $oAt; $worstWho = [string]$other.who; $worstWhat = [string]$it.name }
+            }
+        }
+        if ($worst -lt 0) { continue }
+        $crossRows++
+        $pair = ([string]$row.owner + '/' + [string]$row.half + ' against the ' + $worstWho)
+        if (-not $cross.ContainsKey($pair)) { $cross[$pair] = 0 }
+        $cross[$pair]++
+        if ($crossSaid.Count -lt 8) {
+            $crossSaid.Add(('{0} is ranked {1} and wants {2}, which a {3} has to be {4} to produce' -f `
+                            [string]$row.name, [string]$row.rank, $worstWhat, $worstWho, $RANKS[$worst]))
+        }
+    }
+    if ($crossRows -eq 0) {
+        Ok 'no recipe the server is asked about is ranked below a class that has to climb higher for something on its list'
+    } else {
+        Note ("{0} recipe(s) the server is asked about are ranked below a class that has to climb higher for something they ask for" -f $crossRows)
+        foreach ($pair in ($cross.Keys | Sort-Object { -$cross[$_] })) { Note ('  {0,5}  {1}' -f $cross[$pair], $pair) }
+        foreach ($s in $crossSaid) { Note ('  ' + $s) }
+        if ($crossRows -gt $crossSaid.Count) {
+            Note ("  ... and {0} more, every one of them in tools\recipes.json under alsoProducedBy" -f ($crossRows - $crossSaid.Count))
+        }
+    }
+}
+
+Head 'What this still cannot answer'
+Say '  What a smelter and a tanning rack cost. Leather Strips are wanted by 924 recipes,'
+Say '  Steel Ingot by 888 and Leather by 665, and not one of the three comes out of the'
+Say '  ground: they come out of a recipe in the same table, one of the 1679 unowned rows'
+Say '  anybody may make. Following that one extra hop is what would put the Smith''s'
+Say '  ladder against the Miner''s. Until it is done those rows are ranked by what they'
+Say '  sell for, they say so in their rankFrom field, and they are the rows counted'
+Say '  above as asking for nothing any class produces.'
 
 Write-Host ''
 if ($script:fail -gt 0) {
@@ -219,5 +451,12 @@ if ($script:fail -gt 0) {
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 1
 }
-Write-Host 'every ladder has a bottom rung and nothing above an empty one.' -ForegroundColor Green
+# WHAT THIS LINE MAY CLAIM IS WHAT WAS CHECKED. It used to say every ladder had
+# a bottom rung and nothing above an empty one, which was true of the counts and
+# false of the Bladebinder, whose bottom rung held 41 recipes nobody at that rank
+# could gather for. A green line that says more than the checks above did is
+# worse than no line, because it is the sentence somebody reads instead of the
+# output.
+Write-Host 'every ladder has a bottom rung, nothing above an empty one, and every rung that holds work holds something' -ForegroundColor Green
+Write-Host 'somebody at that rank could gather for, except where the table names the half and says why.' -ForegroundColor Green
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

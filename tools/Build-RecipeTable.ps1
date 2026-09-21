@@ -235,11 +235,81 @@
 
   classes.md has four ranks and says each one opens more of what you can make.
   No row in this table carried one until 20 September, so a gate built on it
-  could only be all or nothing per half. Every row now carries a rank, worked
-  out inside its own half by what the recipe makes, and the RANK_SHARE knob is
-  where that judgement lives. It is also the only way to express the sister
-  half rule the published page promises, that an Edgewright can beat out plain
-  iron plate and no more.
+  could only be all or nothing per half. Every row carries a rank now, and a
+  rank on the row is also the only way to express the sister half rule the
+  published page promises, that an Edgewright can beat out plain iron plate and
+  no more.
+
+  WHAT SETS THAT RANK IS THE NEXT SECTION AND NOT THIS ONE. From 20 to
+  21 September it was the price of what the recipe makes, cut into shares by
+  the RANK_SHARE knob. That rule left three halves with an empty rung and is
+  now the FALLBACK: it ranks only the rows whose inputs no class in this world
+  produces. Saying otherwise here is what a reader would carry away, so this
+  paragraph says it once and hands over.
+
+  INPUT COST, AND WHY THE PRICE OF THE OUTPUT CANNOT RANK ANYTHING
+
+  The rule above shipped on 20 September and tools\Check-Balance.ps1 found
+  three halves with an empty rung the next morning. It is not a threshold and
+  no threshold fixes it. Measured on 21 September, on the table this script
+  itself wrote:
+
+      Cook/Confectioner      28 recipes, TWO distinct output prices in the
+                             whole half: 18 at 6 gold and 10 at 14 gold.
+      Enchanter/Bladebinder 161 recipes, TWO distinct prices: 160 at 5 gold,
+                             because a staff's worth is in its enchantment and
+                             not in its record, and one at 1250.
+      Woodworker/Charburner   4 recipes, ONE price: all four at 2 gold.
+
+  Four rungs cannot be cut out of two numbers. The data has no spread in it,
+  and the measure was wrong rather than the cut.
+
+  What the output SELLS for is a fact about a shopkeeper. What a recipe COSTS
+  is a fact about work: somebody had to go and get the makings, and they had to
+  be far enough up their own ladder to be allowed to. A dessert of flour and a
+  cabbage is novice work whoever priced it; a staff that wants ebony is not.
+
+  So a recipe's rank is the rank of the DEAREST thing it asks for, read off the
+  producing tables in this same folder. That answers Patrick's question of
+  21 September at the same time and by construction rather than by luck:
+  "we also need to make sure the different tiers match across so like farmer
+  matches with tiers of cook for their recipes, miner and smith, woodworker and
+  miner and so on, so there isn't an imbalance". A Cook's rungs are the
+  Farmer's rungs because they are the same numbers off the same table.
+
+  THE REVERSE INDEX. ores.json, harvests.json with its three maps and
+  hunts.json are all keyed by the base that gets worked and carry the item it
+  hands over, and the salt quarry this server put in the world is in
+  tools\gamemode.js rather than in any of them, so it is named in a knob of its
+  own. This script needs the other direction, item -> rank, and it takes the
+  LOWEST rank any class gets that item at: if a novice miner can find iron
+  anywhere in Skyrim then iron costs novice, whatever some expert seam also
+  drops.
+
+  THE LOWEST RANK IS NOT ALWAYS THE FARMER'S, AND THE FARMER IS THE CLASS THIS
+  MATTERS TO. All 11 crops of harvests.json are the same base records as rows
+  in its harvests map, Cabbage is bcf48:Skyrim.esm in both, and for every one
+  of the 11 the gatherer picks it at a rank at or below the one a farmer has to
+  hold to grow it. So the crops map places nothing in the index and the farmer
+  owns no entry in it, which was measured on 21 September after it had been
+  asserted in a comment that said the opposite. That is the lowest-wins rule
+  working rather than a fault: a Cook wanting a Red Apple can be handed one by
+  a novice gatherer, so a Red Apple costs novice, whoever else grows it. What
+  it is NOT is Patrick's tiers lining up by construction. The run now prints
+  what each table placed and what it lost to an earlier one, and prints every
+  owned row that is ranked below a class that produces one of its inputs, so
+  the gap between the Cook and the Farmer is a number in the output instead of
+  a claim in a comment.
+
+  WHAT IT CANNOT PLACE, AND THIS IS THE NEXT PIECE OF WORK RATHER THAN A BUG.
+  The owned recipes ask for 176 distinct items and 71 of them have a producer.
+  The 105 that do not are led by Leather Strips, wanted by 924 recipes, Steel
+  Ingot by 888 and Leather by 665. None of those comes out of the ground: they
+  come out of a smelter or a tanning rack, which is a recipe in this same
+  table, in the 1679 unowned rows that anybody may make. Following that one
+  extra hop is what would place the Smith's ladder against the Miner's, and it
+  is not done here. Those rows fall back to the price rule and say so in their
+  rankFrom field, so the gap is readable in the table rather than hidden.
 
   THE OWNERSHIP RULE
 
@@ -281,8 +351,11 @@
   a half named as empty turns out to have some, if a half with recipes has
   nothing at all a new character can make and is not named in
   HALVES_NOBODY_CAN_START, if a half named there turns out to have something,
-  or if the game folder changed while this ran. Nothing is written unless every
-  check passed.
+  if one of the producing tables named in PRODUCER_TABLES is missing or has no
+  map of that name, if any half is left with an empty rung below a full one
+  after both ranking rules have run, counting every owned row and counting only
+  the rows the server is asked about, or if the game folder changed while this
+  ran. Nothing is written unless every check passed.
 #>
 param(
     # The build's Data folder. Read only.
@@ -526,12 +599,239 @@ $RANKS = @('novice', 'advanced', 'expert', 'master')
 # The Bladebinder has 160 staves priced at 5 gold each, because a staff's worth
 # is in its enchantment rather than its record, so 160 rows sit at novice and
 # the Aetherial Staff at 1250 sits alone at master.
+#
+# THIS RULE IS NOW THE FALLBACK AND NOT THE RULE, and the paragraph above is
+# why. Read the two sentences again: three halves come out with an empty rung
+# and no threshold anywhere can fix it, because the data those halves have is
+# two numbers. Measured on 21 September, on the table this script wrote:
+#   Cook/Confectioner       28 rows, TWO distinct prices: 18 at 6 gold, 10 at 14
+#   Enchanter/Bladebinder  161 rows, TWO distinct prices: 160 at 5, one at 1250
+#   Woodworker/Charburner    4 rows, ONE price: all four at 2 gold
+# No ranking by output price makes four rungs out of two numbers. The tie rule
+# is not the problem and moving the shares is not the answer; the measure is.
+# What ranks a recipe now is INPUT COST, below, and the shares here rank only
+# the rows whose inputs no class in this world produces.
 $RANK_SHARE = @(
     @{ Rank = 'novice';   Upto = 0.25 },
     @{ Rank = 'advanced'; Upto = 0.60 },
     @{ Rank = 'expert';   Upto = 0.85 },
     @{ Rank = 'master';   Upto = 1.00 }
 )
+
+# WHAT A RECIPE COSTS THE PERSON WHO HAS TO GATHER FOR IT. INVENTED, in the
+# sense that classes.md sets no numbers for it, and measured in the sense that
+# every number it reads comes out of a table built from the game's own records.
+#
+# PATRICK, 21 September: "we also need to make sure the different tiers match
+# across so like farmer matches with tiers of cook for their recipes, miner and
+# smith, woodworker and miner and so on, so there isn't an imbalance".
+#
+# That request and the three empty rungs above are the same defect from two
+# ends. A recipe's rank came from what its output SELLS for, which is a fact
+# about a shopkeeper and not about work. A dessert of flour and a cabbage is
+# novice work whoever priced it. A staff that wants ebony is not. Rank a recipe
+# by what its inputs cost somebody to get and the empty rungs close, and the
+# Cook is reading the same numbers off the same tables the producing classes
+# are ranked from.
+#
+# IT DOES NOT MAKE THE COOK'S RUNGS THE FARMER'S, and this comment claimed it
+# did until 21 September. The index takes the LOWEST rank any class gets an
+# item at, and every crop a farmer grows is also a plant a gatherer picks at
+# the same rank or lower, so the farmer never sets a number here at all.
+# Measured on the build of 21 September: 12 Cook rows are ranked below the
+# farmer rank of a crop they ask for, Apple Dumpling at novice against an
+# expert farmer's Red Apple among them. That is defensible, because the apple
+# in the pot does not care who pulled it, but it is not the same sentence, and
+# the difference is now printed under 'where a ladder sits below the class that
+# grows what it asks for' every run instead of being asserted here.
+#
+# THE FIVE PRODUCING LADDERS, all already built and all in this folder. Each
+# one is keyed by the base that gets worked, a vein or a plant or an animal,
+# and carries the descriptor of the ITEM it hands over. This script needs the
+# reverse of that: item -> the rank somebody has to hold to get it.
+$PRODUCER_TABLES = @(
+    @{ File = 'ores.json';     Map = 'ores';     Who = 'miner';    Item = 'ore';     List = ''      },
+    @{ File = 'harvests.json'; Map = 'harvests'; Who = 'gatherer'; Item = 'produce'; List = ''      },
+    @{ File = 'harvests.json'; Map = 'crops';    Who = 'farmer';   Item = 'produce'; List = ''      },
+    @{ File = 'harvests.json'; Map = 'fish';     Who = 'fisher';   Item = 'produce'; List = ''      },
+    @{ File = 'hunts.json';    Map = 'hunts';    Who = 'hunter';   Item = 'item';    List = 'gives' }
+)
+
+# THE SIXTH LADDER, AND IT IS NOT IN A JSON FILE BECAUSE THIS SERVER WROTE IT.
+# INVENTED in the sense that classes.md sets no numbers for it. Every rank in
+# it was read off tools\gamemode.js on 21 September rather than remembered, and
+# the line it was read from is written beside it.
+#
+# The five tables above are built from the game's own records. The salt quarry
+# is not in the game's records at all: STATIONS.saltQuarry is a base this
+# repository's own plugin put in the world, gamemode.js answers it in
+# mineSalt(), and no script writes a json table for it. So the reverse index
+# could not see it, and the whole of it was missing from the one place that
+# decides what a recipe costs.
+#
+# WHAT THAT COST, MEASURED ON THE BUILD OF 21 SEPTEMBER before this knob
+# existed: 98 owned rows ask for a Salt Pile and 38 ask for a rare salt, 138
+# input entries in all, and every one of them came back producedBy null. Four
+# of those rows, two Bread Loaf and two Cooked Boar Meat, ask for salt and for
+# nothing else the index could place, so they carried 'nothing it asks for is
+# produced by any class in this world' while a novice miner was in fact handing
+# salt over at the quarry. The two Cooked Boar Meat rows sat at advanced on the
+# price rule and are novice work by the input rule.
+#
+# WHAT IS IN IT AND WHAT IS DELIBERATELY NOT.
+#   mineSalt() gates on classGate(actorId, 'mine') and the pickaxe and then
+#   gives randInt(1, 2 + step) Salt Pile, where step is 0 for a novice, so a
+#   novice miner works salt. Salt Pile is novice, miner.
+#   The same function rolls a rare salt only when rankStep is 2 or more, which
+#   is expert on RANK_LADDER, so Fire, Frost and Void Salts are expert, miner.
+#   The charcoal kiln is NOT here. It is a profession's verb rather than a
+#   class's, it consumes firewood somebody already has rather than producing
+#   from the world, and no recipe in this table asks for charcoal of any grade:
+#   measured over all 5116 rows, zero want 33760:Skyrim.esm or any of the four
+#   Thornswood-Content grades.
+#   The beehive is NOT here either. It hands its produce over as a FLOR like
+#   any flower and nothing in gamemode.js gives an item for it, and no row of
+#   harvests.json produces Honey, which two recipes want. That is a gap in the
+#   harvest table rather than a class ladder this script can name.
+$SERVER_PRODUCERS = @(
+    @{ Desc = '34cdf:Skyrim.esm'; Name = 'Salt Pile';   Who = 'miner'; Rank = 'novice';
+       Where = 'tools\gamemode.js mineSalt(), addItem(actorId, ITEMS.saltPile, randInt(1, 2 + step))' },
+    @{ Desc = '3ad5e:Skyrim.esm'; Name = 'Fire Salts';  Who = 'miner'; Rank = 'expert';
+       Where = 'tools\gamemode.js mineSalt(), the rare roll behind step >= 2' },
+    @{ Desc = '3ad5f:Skyrim.esm'; Name = 'Frost Salts'; Who = 'miner'; Rank = 'expert';
+       Where = 'tools\gamemode.js mineSalt(), the rare roll behind step >= 2' },
+    @{ Desc = '3ad60:Skyrim.esm'; Name = 'Void Salts';  Who = 'miner'; Rank = 'expert';
+       Where = 'tools\gamemode.js mineSalt(), the rare roll behind step >= 2' }
+)
+
+# LOWEST WINS IN THE REVERSE INDEX, and this is a judgement rather than an
+# obvious truth, so it is a knob with the argument written next to it.
+#
+# The same item is produced in more than one place at more than one rank. Iron
+# Ore comes off novice seams all over Skyrim and off a handful of seams that
+# this table ranks higher. If a novice miner can get iron ANYWHERE, then iron
+# costs novice, and a recipe wanting iron is novice-cost work. Taking the
+# highest instead would rank a recipe by the unluckiest place to find its
+# inputs, which is not what it costs anybody.
+#
+# Set this to $false and the index records the dearest rank instead, which is
+# worth doing once to see how far it pushes every half up.
+$PRODUCER_RANK_IS_LOWEST = $true
+
+# WHETHER THE INPUT RULE RANKS AT ALL. Set to $false and every row falls back
+# to RANK_SHARE, which is what this script did before 21 September, including
+# the three empty rungs.
+$RANK_FROM_INPUT_COST = $true
+
+# THE FLOOR IS THE DEAREST INPUT, not the cheapest and not an average. A recipe
+# is unmakeable until you can get ALL of it, so the rung somebody has to have
+# reached is the rung of the hardest thing on the list. An average would say a
+# staff of ebony and firewood is advanced work, and nobody can make half a
+# staff.
+$INPUT_RANK_IS_THE_DEAREST = $true
+
+# WHAT TO DO WITH A ROW WHOSE SHOPPING LIST IS ONLY HALF PLACED. INVENTED:
+# classes.md sets nothing here, and until 21 September the code did not ask the
+# question at all, which is how the worst defect in this build got in.
+#
+# 'the dearest input' above can only be the dearest of the inputs the index can
+# SEE. An input nothing produces is an unknown cost, not a cost of nothing, and
+# the rule above skipped it silently and then overrode the price rank anyway.
+#
+# WHAT THAT DID, MEASURED ON THE BUILD OF 21 SEPTEMBER. Dragon Knight Light
+# Armor is worth 3100 gold and asks for Dragon Scales, Dragon Bone, Ebony Ingot
+# and Refined Malachite, none of which any class produces, and one Snow Fox
+# Pelt, which a hunter skins at novice. The four unknowns were skipped, the fox
+# pelt was the dearest of what was left, and the row went out at NOVICE: a
+# first-day Platewright allowed dragonbone armour. It was not one row. 301 of
+# the 320 firing rows the input rule fired on carry at least one input nothing
+# produces; 150 landed below the rank the price rule gave them and 49 of those
+# fell two rungs or more, Wild Hunt Heavy Helm master to novice, 14 Hearthcook
+# stews expert to novice off a Salt Pile.
+#
+# 'floor'    IN USE. When every input is placed, the dearest one decides, which
+#            is the rule above unchanged. When any input is not placed, the
+#            dearest placed one can only RAISE the row above what its price
+#            said and never lower it, because the things nobody produces could
+#            cost anything and a fox pelt is not evidence that dragon bone is
+#            cheap. The row says which of the two answered, in rankFrom.
+# 'decides'  what shipped on 21 September: the dearest placed input decides
+#            whatever else is on the list. The numbers above are what it does.
+# 'price'    a row with any unplaced input is not ranked by its inputs at all
+#            and keeps the price rank. Honest, and it throws away the one thing
+#            the index does know about 301 rows.
+$UNPLACED_INPUT_RULE = 'floor'
+
+# THE SECOND RULE, for a half the first two rules leave with an empty rung.
+# INVENTED. classes.md does not set it, and it is here rather than in the code
+# so that it is one edit to change and impossible to apply by accident.
+#
+# Some halves cannot be ranked by either honest measure, and that is a fact
+# about the records rather than a failure of a threshold. The Bladebinder is the
+# case this was written for, and it is worth writing out in full because it is
+# the one place in this table where a rank does NOT mean what every other rank
+# means. Measured on 21 September, on this build:
+#   every one of its 161 rows sells for 5 gold but one, so price says nothing;
+#   160 of the 161 want a Heart Stone, which ores.json ranks as master work for
+#   a miner, so input cost puts the WHOLE half on master and leaves novice,
+#   advanced and expert with nothing on them.
+# Two honest rules, one rung between them, and a half nobody could ever climb.
+#
+# What DOES vary there is the shopping list: 5 distinct total input counts
+# across the 161 rows against 2 distinct prices and 1 distinct input rank. The
+# run prints those three numbers for any half it is about to re-rank, so the
+# choice below can be argued with against numbers rather than taste.
+#
+# WHAT THIS COSTS, SAID OUT LOUD. A Bladebinder row ranked novice by this rule
+# still wants a Heart Stone. The rank stops meaning "what it costs you" for
+# that half and starts meaning "how long its shopping list is".
+# tools\Check-Balance.ps1 counts every row more than one rung from its input
+# cost and prints them by name: on this build it is 97 rows, all of them
+# Bladebinder. It is the least bad of three answers, the other two being a half
+# with one usable rung or an invented recipe, and it is a knob so that somebody
+# who decides otherwise changes one line.
+#
+# AND IT IS NOT ENOUGH ON ITS OWN, WHICH WAS FOUND ON 21 SEPTEMBER. Counting
+# rows on a rung cannot see whether anybody can stand on it. All 41 rows this
+# rule put on the Bladebinder's novice rung want a Heart Stone, which
+# ores.json ranks master on all four of its deposits, so a novice Bladebinder
+# opens 41 recipes and can gather the makings for none of them. That is the
+# exact circle the empty rung rule exists to catch, and both this script and
+# Check-Balance were passing it, because the only thing the second rule changed
+# was the label. So the standability check below now asks the other question,
+# and a half that fails it has to be named in the knob under it with the
+# measured reason or this build does not write a table.
+#
+# 'total inputs'    how many things the recipe wants in all, counting three
+#                   firewood as three. This is the one in use: it is the
+#                   closest thing the records have to how much work went into
+#                   standing at the bench with everything ready.
+# 'distinct inputs' how many different things it wants. Fewer distinct values
+#                   in every half measured, so it collapses sooner.
+$SECOND_RULE_KEY = 'total inputs'
+
+# A RUNG YOU CAN REACH AND CANNOT GATHER FOR IS STILL AN EMPTY RUNG. INVENTED,
+# and it is the other half of the rule HoleIn already enforces.
+#
+# HoleIn asks whether a rung has rows on it. This asks whether anybody standing
+# on that rung could get the makings for even one of them. A row is standable
+# at its rung when the dearest input any class produces for it is at or below
+# that rung, or when nothing it asks for is produced by a class at all, which
+# means a shop or another recipe hands it over and no class rank is in the way.
+#
+# Set this to $false and the build goes back to counting rows and calling that
+# a ladder, which is what it did until the Bladebinder's 41 Heart Stone rows
+# were measured on 21 September.
+$RUNGS_MUST_BE_STANDABLE = $true
+
+# THE HALVES WHOSE LADDER IS KNOWN TO HAVE AN UNSTANDABLE RUNG, each with the
+# measured reason, in the shape of HALVES_NOBODY_CAN_START above and for the
+# same purpose: a fact somebody decided to live with, written down, rather than
+# a check quietly passing. Any half not named here that fails the check fails
+# the build, because a rung nobody can gather for is a rank that opens nothing.
+$HALVES_WITH_AN_UNSTANDABLE_RUNG = [ordered]@{
+    'Enchanter/Bladebinder' = 'its novice, advanced and expert rungs are the second rule''s, not the input rule''s. 160 of its 161 rows want a Heart Stone and ores.json ranks all four Heart Stone deposits master, so every rung below master holds rows nobody at that rank can gather for. The second rule is argued for at SECOND_RULE_KEY and this is the price of it, stated rather than passed over: the half is ranked by how long a recipe''s shopping list is and the shopping list starts with a master miner''s stone either way. It closes when somebody decides where an Enchanter''s Heart Stones come from, which is the same decision HALVES_NOBODY_CAN_START is waiting on for this half.'
+}
 
 # WHERE THE GOLD VALUE SITS IN EACH KIND OF RECORD. The first five were proved
 # in Build-HarvestTable.ps1 and are copied from its VALUE_RULES knob. AMMO and
@@ -967,6 +1267,215 @@ function DescOf([uint32]$formId, $masters, [string]$plugin) {
     return ('{0:x}' -f ($formId -band 0xFFFFFF)) + ':' + $owner
 }
 
+# Where a rank sits on classes.md's ladder, 0 for novice up to 3 for master,
+# and -1 for anything that is not one of the four. Comparing ranks as strings
+# is how a ladder gets checked in alphabetical order, where advanced comes
+# before novice and the whole answer is wrong without anything printing.
+function RankAt([string]$rank) {
+    for ($i = 0; $i -lt $RANKS.Count; $i++) { if ($RANKS[$i] -eq $rank) { return $i } }
+    return -1
+}
+
+# One producer of one item, into both maps. True when this is the first entry
+# for the item, which is the number each table is credited with in the run.
+#
+# BOTH MAPS, ALWAYS. $producer keeps one answer per item by the rule in
+# PRODUCER_RANK_IS_LOWEST, because a recipe costs what the cheapest way of
+# getting its makings costs. $producerAll keeps every class that produces it,
+# because the answer $producer throws away is exactly the cross-class question
+# Patrick asked: a Cook wanting a Red Apple is novice work off a gatherer and
+# the farmer who grows one has to be expert, and only this map can say so.
+function RememberProducer([string]$desc, [string]$rank, [int]$at, [string]$who, [string]$name, [string]$via) {
+    if (-not $producerAll.ContainsKey($desc)) { $producerAll[$desc] = @() }
+    $producerAll[$desc] += ,([pscustomobject]@{ Rank = $rank; At = $at; Who = $who; Name = $name; Via = $via })
+
+    $have = $null
+    if ($producer.ContainsKey($desc)) { $have = $producer[$desc] }
+    $take = $false
+    if (-not $have) {
+        $take = $true
+    } elseif ($PRODUCER_RANK_IS_LOWEST) {
+        if ($at -lt $have.At) { $take = $true }
+    } else {
+        if ($at -gt $have.At) { $take = $true }
+    }
+    if ($take) {
+        $producer[$desc] = [pscustomobject]@{ Rank = $rank; At = $at; Who = $who; Name = $name; Via = $via }
+    }
+    if (-not $have) { return $true }
+    return $false
+}
+
+# How many rows of one half sit on each of the four rungs, in classes.md's
+# order, counted off the Rank that is on the rows right now.
+function CountRungs($descs) {
+    $counts = [ordered]@{}
+    foreach ($rk in $RANKS) { $counts[$rk] = 0 }
+    foreach ($d in $descs) {
+        $rk = [string]$owned[$d].Rank
+        if ($counts.Contains($rk)) { $counts[$rk] = $counts[$rk] + 1 }
+    }
+    return $counts
+}
+
+# The lowest empty rung that has work above it, or -1 when the ladder is sound.
+# An empty rung with nothing above it is fine: that is a half whose work simply
+# does not reach that far up. An empty rung with work above it is a rank that
+# opens nothing, and a rank that opens nothing at the bottom is a character who
+# can never start.
+function HoleIn($counts) {
+    for ($i = 0; $i -lt $RANKS.Count; $i++) {
+        if ([int]$counts[$RANKS[$i]] -gt 0) { continue }
+        for ($j = $i + 1; $j -lt $RANKS.Count; $j++) {
+            if ([int]$counts[$RANKS[$j]] -gt 0) { return $i }
+        }
+    }
+    return -1
+}
+
+# The other half of HoleIn: the rungs that have rows on them and not one row
+# anybody standing on that rung could gather the makings for.
+#
+# A row is standable at its rung when the dearest input any class produces for
+# it sits at or below that rung, or when nothing it asks for is produced by a
+# class at all, which means a shop or one of the 1679 unowned recipes hands it
+# over and no class rank stands in the way.
+#
+# Counting rows is what both this script and Check-Balance did until the
+# Bladebinder was measured: 41 rows on its novice rung, every one of them
+# wanting a master miner's Heart Stone, and every count in both scripts said
+# the ladder was sound. Returns one entry per bad rung, worst rung first.
+function UnstandableRungs($descs) {
+    $out = New-Object 'System.Collections.Generic.List[object]'
+    for ($i = 0; $i -lt $RANKS.Count; $i++) {
+        $on = 0
+        $standable = 0
+        $cheapest = -1
+        $blocker = ''
+        $blockerWho = ''
+        foreach ($d in $descs) {
+            if ([string]$owned[$d].Rank -ne $RANKS[$i]) { continue }
+            $on++
+            $ir = [string]$owned[$d].InputRank
+            if (-not $ir) { $standable++; continue }
+            $irAt = RankAt $ir
+            if ($irAt -le $i) { $standable++; continue }
+            if ($cheapest -lt 0 -or $irAt -lt $cheapest) {
+                $cheapest = $irAt
+                $blocker = [string]$owned[$d].OutName
+                $blockerWho = [string]$owned[$d].InputRankWho
+            }
+        }
+        if ($on -gt 0 -and $standable -eq 0) {
+            $out.Add([pscustomobject]@{
+                Rank = $RANKS[$i]; Rows = $on; NeedAt = $RANKS[$cheapest]
+                Nearest = $blocker; Who = $blockerWho
+            })
+        }
+    }
+    return $out.ToArray()
+}
+
+# THE SECOND RULE, for one half at a time and only where the first two left a
+# rung with nothing on it. Named in SECOND_RULE_KEY, argued for there.
+#
+# The ordering is deliberately a TOTAL order with no ties in it: the key, then
+# the other input measure, then the output price, then the row's own id. That
+# is the difference between this and the price rule, which collapses rungs
+# exactly because it refuses to split rows that tie. A total order fills every
+# rung the shares ask for whenever the half has four rows or more, which is why
+# this rule always closes the hole and the price rule cannot.
+function SecondRule([string]$key, $descs) {
+    $order = @($descs | Sort-Object `
+        @{ Expression = { [int](SecondRuleKey $owned[$_]) } }, `
+        @{ Expression = { [int](OtherInputMeasure $owned[$_]) } }, `
+        @{ Expression = { [int64]$owned[$_].Value } }, `
+        @{ Expression = { [string]$_ } })
+    $n = $order.Count
+    $at = 0
+    foreach ($s in $RANK_SHARE) {
+        $last = [int][math]::Ceiling($n * [double]$s.Upto)
+        if ($last -gt $n) { $last = $n }
+        while ($at -lt $last) {
+            $owned[$order[$at]].Rank = [string]$s.Rank
+            $owned[$order[$at]].RankFrom = ('the second rule, ' + $SECOND_RULE_KEY)
+            $owned[$order[$at]].RankWhy = ('what this half makes cannot be told apart by price or by what its inputs cost, so it is ranked by ' +
+                                           $SECOND_RULE_KEY + ': this one wants ' + (SecondRuleKey $owned[$order[$at]]) +
+                                           ', which puts it in the ' + $s.Rank + ' share of its own half')
+            $at++
+        }
+    }
+    while ($at -lt $n) {
+        $owned[$order[$at]].Rank = [string]$RANK_SHARE[$RANK_SHARE.Count - 1].Rank
+        $owned[$order[$at]].RankFrom = ('the second rule, ' + $SECOND_RULE_KEY)
+        $owned[$order[$at]].RankWhy = ('the longest shopping list in a half that cannot be told apart by price or by what its inputs cost')
+        $at++
+    }
+    return (CountRungs $descs)
+}
+
+# The number the second rule sorts on, and the other one, so that changing
+# SECOND_RULE_KEY changes both in one place.
+function SecondRuleKey($row) {
+    if ($SECOND_RULE_KEY -eq 'distinct inputs') { return @($row.InputList).Count }
+    $t = 0
+    foreach ($i in @($row.InputList)) { $t += [int]$i.Count }
+    return $t
+}
+function OtherInputMeasure($row) {
+    if ($SECOND_RULE_KEY -eq 'distinct inputs') {
+        $t = 0
+        foreach ($i in @($row.InputList)) { $t += [int]$i.Count }
+        return $t
+    }
+    return @($row.InputList).Count
+}
+
+# The inputs of one recipe, as json. Every CNTO the record carried: the item,
+# what it is called, what kind of record it is, how many the recipe wants, and
+# which class produces it at which rank. producedBy null means no producing
+# table in this repository hands that item over, which is the case for anything
+# bought from a shop or made by an earlier recipe, and it is written down
+# rather than left out so that a reader can tell "nobody produces this" from
+# "this script did not look".
+function InputsJson($r) {
+    if (-not $r.InputList -or @($r.InputList).Count -eq 0) { return '[]' }
+    $bits = @()
+    foreach ($i in $r.InputList) {
+        $nm = $i.Desc
+        $ty = ''
+        if ($items.ContainsKey($i.Desc)) { $nm = $items[$i.Desc].Name; $ty = $items[$i.Desc].Type }
+        $line = '{ "item": ' + (JsonStr $i.Desc) + ', "name": ' + (JsonStr $nm) +
+                ', "type": ' + (JsonStr $ty) + ', "count": ' + $i.Count
+        if ($producer.ContainsKey($i.Desc)) {
+            $line += ', "producedBy": ' + (JsonStr $producer[$i.Desc].Who) +
+                     ', "producedAt": ' + (JsonStr $producer[$i.Desc].Rank)
+            # THE CLASSES THAT HAVE TO CLIMB FURTHER FOR THE SAME THING, and
+            # only those: a class producing it at the same rank or lower is
+            # already answered by producedAt. This is the field Patrick's
+            # cross-tier question is read off, and without it the farmer is
+            # invisible in this whole file, because every crop is also a plant a
+            # gatherer picks at the same rank or lower.
+            $dearer = @()
+            $seen = @{}
+            if ($producerAll.ContainsKey($i.Desc)) {
+                foreach ($pz in $producerAll[$i.Desc]) {
+                    if ($pz.At -le $producer[$i.Desc].At) { continue }
+                    $k = $pz.Who + '/' + $pz.Rank
+                    if ($seen.ContainsKey($k)) { continue }
+                    $seen[$k] = $true
+                    $dearer += ('{ "who": ' + (JsonStr $pz.Who) + ', "at": ' + (JsonStr $pz.Rank) + ' }')
+                }
+            }
+            if ($dearer.Count -gt 0) { $line += ', "alsoProducedBy": [' + ($dearer -join ', ') + ']' }
+        } else {
+            $line += ', "producedBy": null, "producedAt": null'
+        }
+        $bits += ($line + ' }')
+    }
+    return '[' + ($bits -join ', ') + ']'
+}
+
 # A listing of the game folder: name, size and last write, for the files this
 # reads and the folder they sit in. Taken before and after so the promise that
 # nothing was touched is measured rather than asserted.
@@ -1100,6 +1609,17 @@ $SCAN_TYPES = @('KYWD', 'COBJ') + $OUTPUT_TYPES + $CONDITION_TYPES
 # record the game is using
 $items   = @{}
 $kwName  = @{}
+# item desc -> which class produces it, at the lowest rank any of them does.
+# Filled under 'what an input costs a producer', below, out of the five
+# producing tables and the server's own verbs. Declared here because InputsJson
+# reads it.
+$producer = @{}
+# item desc -> every class that produces it and at what rank, the winner above
+# among them. A separate map because $producer holds one answer per item by
+# design and the cross-class report needs the ones it beat: the farmer's whole
+# ladder lives in here and nowhere else, since every crop is also a plant a
+# gatherer picks at the same rank or lower.
+$producerAll = @{}
 # desc -> the recipe, same rule. Ordered so the json and the block come out in
 # load order, which makes a rebuild a small diff rather than a shuffle.
 $recipes = New-Object System.Collections.Specialized.OrderedDictionary
@@ -1163,6 +1683,12 @@ foreach ($pl in $order) {
                     if ($VALUE_RULES.Contains($label)) { $valueRule = $VALUE_RULES[$label] }
                     $kwds = New-Object 'System.Collections.Generic.List[string]'
                     $conds = New-Object 'System.Collections.Generic.List[object]'
+                    # The form ids inside the CNTO subrecords, which this
+                    # script read and threw away until 21 September. They are
+                    # what a recipe costs somebody, and the rank of a recipe is
+                    # built out of them now rather than out of what its output
+                    # sells for. See INPUT COST above.
+                    $cnto = New-Object 'System.Collections.Generic.List[object]'
                     while ($k + 6 -le $rec.Length) {
                         $sub = [System.Text.Encoding]::ASCII.GetString($rec, $k, 4)
                         $sz  = [int][BitConverter]::ToUInt16($rec, $k + 4)
@@ -1205,7 +1731,23 @@ foreach ($pl in $order) {
                             if ($sub -eq 'CNAM' -and $sz -eq 4) { $cnam = [BitConverter]::ToUInt32($rec, $k); $hasCnam = $true }
                             elseif ($sub -eq 'BNAM' -and $sz -eq 4) { $bnam = [BitConverter]::ToUInt32($rec, $k); $hasBnam = $true }
                             elseif ($sub -eq 'NAM1' -and $sz -eq 2) { $nam1 = [int][BitConverter]::ToUInt16($rec, $k) }
-                            elseif ($sub -eq 'CNTO') { $inputs++ }
+                            elseif ($sub -eq 'CNTO') {
+                                $inputs++
+                                # Eight bytes: the input item's form id, then
+                                # how many of it the recipe wants. Proved in
+                                # the header against RecipeLeatherFoxHide,
+                                # which has COCT 1, one CNTO, and wants one fox
+                                # pelt. The count was never in doubt; what was
+                                # dropped was the id, and the id is the only
+                                # thing that can say which class has to go and
+                                # get it.
+                                if ($sz -ge 8) {
+                                    $cnto.Add([pscustomobject]@{
+                                        Id    = [BitConverter]::ToUInt32($rec, $k)
+                                        Count = [int][BitConverter]::ToUInt32($rec, $k + 4)
+                                    })
+                                }
+                            }
                             elseif ($sub -eq 'COCT' -and $sz -eq 4) { $coct = [int][BitConverter]::ToUInt32($rec, $k) }
                             elseif ($sub -eq 'CTDA' -and $sz -ge 20) {
                                 # The layout is in the header, out of
@@ -1252,12 +1794,25 @@ foreach ($pl in $order) {
                         if ($hasCnam -and $cnam -ne 0) { $outDesc = DescOf ([uint32]$cnam) $masters $pl }
                         $benchDesc = ''
                         if ($hasBnam -and $bnam -ne 0) { $benchDesc = DescOf ([uint32]$bnam) $masters $pl }
+                        # The inputs, as descs, resolved here where the master
+                        # list of the plugin that carried the record is still
+                        # in hand. The same two lines the output and the bench
+                        # already had.
+                        $inList = New-Object 'System.Collections.Generic.List[object]'
+                        foreach ($c in $cnto) {
+                            if ($c.Id -eq 0) { continue }
+                            $inList.Add([pscustomobject]@{
+                                Desc  = (DescOf ([uint32]$c.Id) $masters $pl)
+                                Count = $c.Count
+                            })
+                        }
                         $recipes[$desc] = [pscustomobject]@{
                             Desc = $desc; Edid = $edid; SeenIn = $pl
                             Plugin = $desc.Split(':')[1]
                             Local = ($formId -band 0xFFFFFF)
                             OutDesc = $outDesc; BenchDesc = $benchDesc
                             Count = $nam1; Inputs = $inputs; Coct = $coct
+                            InputList = $inList.ToArray()
                             Conditions = $conds.ToArray(); Masters = $masters
                         }
                         $here++
@@ -1684,7 +2239,7 @@ foreach ($desc in $recipes.Keys) {
         Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type
         BenchDesc = $r.BenchDesc; BenchName = $benchName
         Owner = $ownerName; Half = $half; Reason = $reason
-        Count = $r.Count; Inputs = $r.Inputs; Fires = $fires
+        Count = $r.Count; Inputs = $r.Inputs; InputList = $r.InputList; Fires = $fires
         Plugin = $r.Plugin; SeenIn = $r.SeenIn; Local = $r.Local
         NameFrom = $o.NameFrom
         Value = $o.Value
@@ -1694,6 +2249,15 @@ foreach ($desc in $recipes.Keys) {
         ServerChecks = $serverChecks
         Rank = ''
         RankWhy = ''
+        RankByValue = ''
+        RankFrom = ''
+        InputRank = ''
+        InputRankWho = ''
+        # How many of this row's inputs no class in this world produces. The
+        # UNPLACED_INPUT_RULE knob reads it, and it goes in the json, because
+        # 'the dearest input is novice' means something different on a row where
+        # that is the whole list and on a row with four unknowns beside it.
+        InputsUnplaced = 0
     }
 }
 
@@ -1871,6 +2435,166 @@ if ($wantedItems.Count -eq 0) {
     }
 }
 
+# -------------------------------------------------- what an input costs ----
+#
+# The reverse index: item -> the rank somebody has to hold before any class in
+# this world can hand that item over, and which class that is. Built out of the
+# five producing tables named in PRODUCER_TABLES, every one of which is in this
+# folder and was built from the game's own records by its own script, and out
+# of SERVER_PRODUCERS, which is the salt quarry this repository's own plugin
+# and gamemode.js put in the world and no table is written for.
+#
+# This is the only place the two halves of the economy meet. Until it existed,
+# the producing ladders and the crafting ladder were built by different scripts
+# from different records with different rules and nothing compared them, so a
+# novice Hearthcook could be handed a first recipe wanting a crop only an
+# expert Farmer may grow and neither table could see it.
+#
+# EVERY PRODUCER OF AN ITEM IS KEPT AND NOT JUST THE WINNER. The index answers
+# with the lowest, which is what a recipe costs, but a table that placed
+# nothing used to be indistinguishable in the output from a table that was not
+# read at all: the crops map contributed 0 of 137 entries for a year of builds
+# and the run said '0 item(s) it is the first to name' and nothing else. The
+# full list is what the cross-class report below reads to say that a Cook is
+# novice on an apple a farmer has to be expert to grow.
+
+Write-Host ''
+Write-Host 'what an input costs a producer' -ForegroundColor Cyan
+
+$producerSources = @{}
+foreach ($t in $PRODUCER_TABLES) {
+    $path = Join-Path $PSScriptRoot $t.File
+    if (-not (Test-Path -LiteralPath $path)) {
+        Bad ("{0} is not in this folder, so nothing can say what a {1} produces or at what rank. Build it and run this again." -f $t.File, $t.Who)
+        continue
+    }
+    if (-not $producerSources.ContainsKey($t.File)) {
+        $producerSources[$t.File] = (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json)
+    }
+    $tab = $producerSources[$t.File]
+    if (-not ($tab.PSObject.Properties.Name -contains $t.Map)) {
+        Bad ("{0} has no '{1}' map in it, so the {2}'s ladder cannot be read" -f $t.File, $t.Map, $t.Who)
+        continue
+    }
+    $map = $tab.($t.Map)
+    $rows = 0
+    $addedHere = 0
+    $lostHere = 0
+    foreach ($k in $map.PSObject.Properties.Name) {
+        $row = $map.$k
+        $rank = [string]$row.rank
+        $at = RankAt $rank
+        if ($at -lt 0) { continue }
+        $rows++
+        # An ore vein or a plant hands over one item and names it in a field of
+        # its own. An animal hands over a list, because a mudcrab gives legs
+        # and chitin off the same carcass, so both shapes are read.
+        $gives = @()
+        if ($t.List) {
+            if ($row.PSObject.Properties.Name -contains $t.List) {
+                foreach ($g in $row.($t.List)) {
+                    $d = [string]$g.($t.Item)
+                    if ($d) { $gives += @{ Desc = $d; Name = [string]$g.name } }
+                }
+            }
+        } else {
+            $d = [string]$row.($t.Item)
+            if ($d) { $gives += @{ Desc = $d; Name = [string]$row.name } }
+        }
+        foreach ($g in $gives) {
+            if (RememberProducer $g.Desc $rank $at $t.Who $g.Name ($t.File + ' ' + $t.Map)) {
+                $addedHere++
+            } else {
+                $lostHere++
+            }
+        }
+    }
+    if ($addedHere -eq 0 -and $rows -gt 0) {
+        # A whole ladder that places nothing is the failure that hid for as long
+        # as this only printed what a table won. Named out loud, with the reason
+        # it lost, because a silent zero here is a class whose ranks decide
+        # nothing about any recipe in the table.
+        Loud ("{0} {1}: {2} ranked row(s) read and NOT ONE item entered the index. Every item it hands over is already in there off an earlier table at the same rank or lower, so the {3}'s ranks set nothing in this table." -f `
+              $t.File, $t.Map, $rows, $t.Who)
+    } else {
+        Note ("{0} {1}: {2} ranked row(s) read, {3} item(s) it is the first to name, {4} an earlier table already had at the same rank or lower" -f `
+              $t.File, $t.Map, $rows, $addedHere, $lostHere)
+    }
+}
+
+# The salt quarry, which is this server's own and is in no table. Read off
+# gamemode.js by hand into SERVER_PRODUCERS, with the line each rank came from
+# written beside it there.
+$serverAdded = 0
+foreach ($s in $SERVER_PRODUCERS) {
+    $at = RankAt $s.Rank
+    if ($at -lt 0) {
+        Bad ("SERVER_PRODUCERS names {0} at rank '{1}', which is not one of classes.md's four" -f $s.Name, $s.Rank)
+        continue
+    }
+    if (RememberProducer $s.Desc $s.Rank $at $s.Who $s.Name $s.Where) { $serverAdded++ }
+}
+if ($SERVER_PRODUCERS.Count -gt 0) {
+    Note ("the server's own verbs: {0} item(s) named in SERVER_PRODUCERS, {1} of them the first to name the item" -f `
+          $SERVER_PRODUCERS.Count, $serverAdded)
+}
+
+$byWho = @{}
+foreach ($d in $producer.Keys) {
+    $w = $producer[$d].Who
+    if (-not $byWho.ContainsKey($w)) { $byWho[$w] = 0 }
+    $byWho[$w] = $byWho[$w] + 1
+}
+$whoLine = @()
+foreach ($w in ($byWho.Keys | Sort-Object)) { $whoLine += ('{0} {1}' -f $w, $byWho[$w]) }
+Ok ("the reverse index holds {0} distinct item(s): {1}" -f $producer.Count, ($whoLine -join ', '))
+
+# How many of the recipes' inputs this index can place, counted two ways,
+# because the two numbers answer different questions. Distinct items says how
+# much of the world's stock has a producer behind it. Rows says how many
+# recipes can be ranked by the new rule at all.
+$inputItemsSeen = @{}
+$rowsWithInputs = 0
+$rowsPlaced = 0
+foreach ($desc in $owned.Keys) {
+    $r = $owned[$desc]
+    $list = @($r.InputList)
+    if ($list.Count -eq 0) { continue }
+    $rowsWithInputs++
+    $anyPlaced = $false
+    foreach ($i in $list) {
+        if (-not $inputItemsSeen.ContainsKey($i.Desc)) { $inputItemsSeen[$i.Desc] = 0 }
+        $inputItemsSeen[$i.Desc] = $inputItemsSeen[$i.Desc] + 1
+        if ($producer.ContainsKey($i.Desc)) { $anyPlaced = $true }
+    }
+    if ($anyPlaced) { $rowsPlaced++ }
+}
+$placedItems = 0
+foreach ($d in $inputItemsSeen.Keys) { if ($producer.ContainsKey($d)) { $placedItems++ } }
+Ok ("the owned recipes ask for {0} distinct input item(s); {1} of them have a producer and {2} do not" -f `
+    $inputItemsSeen.Count, $placedItems, ($inputItemsSeen.Count - $placedItems))
+Ok ("{0} of the {1} owned rows that list any input have at least one input with a producer behind it; {2} have none and fall back to what the output sells for" -f `
+    $rowsPlaced, $rowsWithInputs, ($rowsWithInputs - $rowsPlaced))
+$noInputRows = $owned.Count - $rowsWithInputs
+if ($noInputRows -gt 0) {
+    Note ("{0} owned row(s) carry no CNTO at all, so they list no inputs and there is nothing to read a cost off" -f $noInputRows)
+}
+
+# The commonest inputs nothing produces, because that list is the shopping list
+# for whoever wants more halves ranked by cost rather than by price.
+$unplaced = @()
+foreach ($d in $inputItemsSeen.Keys) { if (-not $producer.ContainsKey($d)) { $unplaced += $d } }
+if ($unplaced.Count -gt 0) {
+    $unplaced = @($unplaced | Sort-Object { -$inputItemsSeen[$_] })
+    Note 'the inputs no producing table hands out, commonest first:'
+    foreach ($d in ($unplaced | Select-Object -First 12)) {
+        $nm = $d
+        if ($items.ContainsKey($d)) { $nm = $items[$d].Name + ' (' + $items[$d].Type + ')' }
+        Note ("  {0,5} recipe(s) want {1} [{2}]" -f $inputItemsSeen[$d], $nm, $d)
+    }
+    if ($unplaced.Count -gt 12) { Note ("  ... and {0} more" -f ($unplaced.Count - 12)) }
+}
+
 # ------------------------------------------------------------- the ranking --
 
 Write-Host ''
@@ -1897,6 +2621,17 @@ if ($noValue.Count -gt 0) {
 # that make things worth the same never land on different rungs.
 $promoted = New-Object 'System.Collections.Generic.List[string]'
 $rankRows = @{}
+$rankedByInputs = @{}
+$rankedByValue = @{}
+# Per half: how many rows the placed inputs would have pulled DOWN and the
+# price rule held up, under UNPLACED_INPUT_RULE 'floor'. Printed per half and
+# totalled, because this number is the whole of the dragonbone defect.
+$heldByPrice = @{}
+$secondRuleUsed = [ordered]@{}
+# Per half: the rungs that hold rows nobody at that rank can gather the makings
+# for. Written into the json so Check-Balance.ps1 reads the same finding off the
+# table rather than working it out a second way and disagreeing.
+$unstandable = [ordered]@{}
 foreach ($p in $PROFESSIONS.Keys) {
     foreach ($h in $PROFESSIONS[$p]) {
         $key = $p + '/' + $h
@@ -1925,6 +2660,88 @@ foreach ($p in $PROFESSIONS.Keys) {
             $at++
         }
 
+        # THE INPUT COST RULE. What the shares said is kept on every row as
+        # rankByValue, so the two answers can be compared afterwards rather than
+        # one of them quietly replacing the other with nothing to read.
+        #
+        # A row is ranked by the DEAREST thing it asks for, because a recipe is
+        # unmakeable until you can get all of it. A row that asks for nothing
+        # any class produces keeps what it sells for, and says so on the row.
+        #
+        # IT DOES NOT OVERRIDE ANYTHING UNCONDITIONALLY, and it did until
+        # 21 September. It can only read the inputs the index PLACES, and an
+        # input nothing produces is an unknown cost and not a cost of nothing.
+        # UNPLACED_INPUT_RULE is where that is decided and the measurement that
+        # forced it is written out there: a 3100 gold dragonbone plate went out
+        # at novice because the one thing on its list anybody produces was a
+        # novice hunter's fox pelt.
+        $fromInputs = 0
+        $heldUpByPrice = 0
+        foreach ($d in $sorted) {
+            $owned[$d].RankByValue = [string]$owned[$d].Rank
+            $best = -1
+            $whoBest = ''
+            $nameBest = ''
+            $unplaced = 0
+            foreach ($i in @($owned[$d].InputList)) {
+                if (-not $producer.ContainsKey($i.Desc)) { $unplaced++; continue }
+                if (-not $RANK_FROM_INPUT_COST) { continue }
+                $pz = $producer[$i.Desc]
+                $better = $false
+                if ($best -lt 0) {
+                    $better = $true
+                } elseif ($INPUT_RANK_IS_THE_DEAREST) {
+                    if ($pz.At -gt $best) { $better = $true }
+                } else {
+                    if ($pz.At -lt $best) { $better = $true }
+                }
+                if ($better) { $best = $pz.At; $whoBest = $pz.Who; $nameBest = $pz.Name }
+            }
+            $owned[$d].InputsUnplaced = $unplaced
+            if ($best -lt 0) {
+                $owned[$d].InputRank = ''
+                $owned[$d].InputRankWho = ''
+                $owned[$d].RankFrom = 'what it sells for, because nothing it asks for is produced by any class in this world'
+                continue
+            }
+            $owned[$d].InputRank = [string]$RANKS[$best]
+            $owned[$d].InputRankWho = $whoBest
+
+            # The whole list is placed, so the dearest of it is what the recipe
+            # costs and there is nothing unknown left to be wrong about.
+            $inputDecides = $true
+            if ($unplaced -gt 0 -and $UNPLACED_INPUT_RULE -ne 'decides') {
+                $valAt = RankAt ([string]$owned[$d].RankByValue)
+                if ($UNPLACED_INPUT_RULE -eq 'price') {
+                    $inputDecides = $false
+                } elseif ($valAt -gt $best) {
+                    # 'floor': the placed inputs are a floor and the price is
+                    # above it, so the price stands and the row says why.
+                    $inputDecides = $false
+                }
+            }
+            if (-not $inputDecides) {
+                $heldUpByPrice++
+                $owned[$d].RankFrom = ('what it sells for, held above what its placed inputs cost because ' + $unplaced +
+                                       ' of the things it asks for are produced by no class in this world and could cost anything')
+                $owned[$d].RankWhy = ($owned[$d].RankWhy + '. The dearest input any class does produce is ' + $nameBest +
+                                      ', ' + $RANKS[$best] + ' work for a ' + $whoBest + ', which is a floor and not the answer here')
+                continue
+            }
+            $owned[$d].Rank = [string]$RANKS[$best]
+            $owned[$d].RankFrom = 'what its inputs cost a producer'
+            $owned[$d].RankWhy = ('the dearest thing it asks for is ' + $nameBest + ', which a ' + $whoBest +
+                                  ' gets at ' + $RANKS[$best] + ', so that is the rung somebody has to have reached before they could gather the makings at all')
+            if ($unplaced -gt 0) {
+                $owned[$d].RankWhy = ($owned[$d].RankWhy + '. ' + $unplaced +
+                                      ' more thing(s) on its list are produced by no class and what it sells for does not put it any higher')
+            }
+            $fromInputs++
+        }
+        $rankedByInputs[$key] = $fromInputs
+        $heldByPrice[$key] = $heldUpByPrice
+        $rankedByValue[$key] = $n - $fromInputs
+
         # The circle check, and the one rule that breaks it. The cheapest row
         # of this half that a new character can actually reach is novice,
         # whatever the share said, because a rung nobody can stand on is a rung
@@ -1942,14 +2759,84 @@ foreach ($p in $PROFESSIONS.Keys) {
             }
         }
 
-        $counts = [ordered]@{}
-        foreach ($rk in $RANKS) { $counts[$rk] = 0 }
-        foreach ($d in $sorted) { $counts[[string]$owned[$d].Rank] = $counts[[string]$owned[$d].Rank] + 1 }
+        $counts = CountRungs $sorted
+        $hole = HoleIn $counts
+
+        # THE RUNGS MUST NOT BE EMPTY, and this is where that is enforced rather
+        # than reported. A rung with nothing on it and something above it is a
+        # rank that opens nothing: you reach it, and the list of what you may
+        # make is the same list as yesterday.
+        #
+        # Nothing is invented and nothing is smeared. The half is named out
+        # loud, the empty rung is named, the reason is printed from what was
+        # measured, and then the SECOND RULE below ranks that half alone.
+        if ($hole -ge 0) {
+            $spread = @{}
+            foreach ($d in $sorted) {
+                $rk = [string]$owned[$d].Rank
+                if (-not $spread.ContainsKey($rk)) { $spread[$rk] = 0 }
+                $spread[$rk] = $spread[$rk] + 1
+            }
+            $vals = @{}
+            foreach ($d in $sorted) { $vals[[string]$owned[$d].Value] = $true }
+            $distinct = @{}
+            $totals = @{}
+            foreach ($d in $sorted) {
+                $distinct[[string](@($owned[$d].InputList).Count)] = $true
+                $tc = 0
+                foreach ($i in @($owned[$d].InputList)) { $tc += [int]$i.Count }
+                $totals[[string]$tc] = $true
+            }
+            $spreadTxt = @()
+            foreach ($rk in $RANKS) {
+                $c = 0
+                if ($spread.ContainsKey($rk)) { $c = $spread[$rk] }
+                $spreadTxt += ('{0} {1}' -f $rk, $c)
+            }
+            $why = ('{0} row(s) ranked by what their inputs cost and {1} by what they sell for, and they land {2}. What is left to rank by is {3} distinct output price(s), {4} distinct input list length(s) and {5} distinct total input count(s)' -f `
+                    $rankedByInputs[$key], $rankedByValue[$key], ($spreadTxt -join ', '), $vals.Keys.Count, $distinct.Keys.Count, $totals.Keys.Count)
+            Loud ("{0}: the {1} rung is empty with rows above it. {2}" -f $key, $RANKS[$hole], $why)
+            $secondRuleUsed[$key] = ('the {0} rung came out empty with rows above it. {1}. Ranked by {2} for this half alone.' -f `
+                                     $RANKS[$hole], $why, $SECOND_RULE_KEY)
+            $counts = SecondRule $key $sorted
+            $hole = HoleIn $counts
+            if ($hole -ge 0) {
+                Bad ("{0}: the {1} rung is still empty after the {2} rule, so this half has no ladder and the table was not written" -f `
+                     $key, $RANKS[$hole], $SECOND_RULE_KEY)
+            } else {
+                Loud ("  {0}: ranked by {1} instead, and every rung now has work on it" -f $key, $SECOND_RULE_KEY)
+            }
+        }
+
+        # AND THE RUNGS HAVE TO BE STANDABLE, which is the question a count of
+        # rows cannot ask. Argued for at RUNGS_MUST_BE_STANDABLE. A half that
+        # fails it and is not named in HALVES_WITH_AN_UNSTANDABLE_RUNG with a
+        # measured reason fails this build.
+        if ($RUNGS_MUST_BE_STANDABLE) {
+            $bad = @(UnstandableRungs $sorted)
+            if ($bad.Count -gt 0) {
+                $said = @()
+                foreach ($b in $bad) {
+                    $said += ('the {0} rung holds {1} row(s) and not one of them can be gathered for below {2}; the nearest is {3}, wanting {4} work from a {5}' -f `
+                              $b.Rank, $b.Rows, $b.NeedAt, $b.Nearest, $b.NeedAt, $b.Who)
+                }
+                $unstandable[$key] = ($said -join '. ')
+                if ($HALVES_WITH_AN_UNSTANDABLE_RUNG.Contains($key)) {
+                    Loud ("{0}: {1}. Named in HALVES_WITH_AN_UNSTANDABLE_RUNG, so this build is allowed to write it: {2}" -f `
+                          $key, ($said -join '. '), $HALVES_WITH_AN_UNSTANDABLE_RUNG[$key])
+                } else {
+                    Bad ("{0}: {1}. Reaching that rank opens work nobody at that rank can gather for, which is an empty rung wearing a label. Decide it and name it in HALVES_WITH_AN_UNSTANDABLE_RUNG, or change what the half asks for." -f `
+                         $key, ($said -join '. '))
+                }
+            }
+        }
+
         $rankRows[$key] = $counts
         $lo = [int64]$owned[$sorted[0]].Value
         $hi = [int64]$owned[$sorted[$n - 1]].Value
-        Write-Host ("  {0,-24} {1,5} rows, {2} to {3} gold, novice {4}, advanced {5}, expert {6}, master {7}" -f `
-                    $key, $n, $lo, $hi, $counts['novice'], $counts['advanced'], $counts['expert'], $counts['master'])
+        Write-Host ("  {0,-24} {1,5} rows, {2} to {3} gold, novice {4}, advanced {5}, expert {6}, master {7}   ({8} by input cost, {9} by price, {10} held up by price over an unplaced input)" -f `
+                    $key, $n, $lo, $hi, $counts['novice'], $counts['advanced'], $counts['expert'], $counts['master'], `
+                    $rankedByInputs[$key], $rankedByValue[$key], $heldByPrice[$key])
     }
 }
 if ($promoted.Count -gt 0) {
@@ -1959,10 +2846,116 @@ if ($promoted.Count -gt 0) {
     Ok 'every half already had a reachable novice row, so nothing was moved'
 }
 
+# --------------- where a ladder sits below the class that grows what it asks --
+#
+# PATRICK'S QUESTION, ANSWERED AS A NUMBER INSTEAD OF AS A CLAIM. 21 September:
+# "farmer matches with tiers of cook for their recipes, miner and smith,
+# woodworker and miner and so on, so there isn't an imbalance".
+#
+# The reverse index answers with the LOWEST rank any class gets an item at, and
+# that is the right answer for what a recipe costs: an apple in the pot does not
+# care who pulled it off the tree. What it hides is the class that has to climb
+# furthest for the same item, and for crops that is every one of them, because
+# all 11 crops are also plants a gatherer picks at the same rank or lower.
+#
+# So this walks the OTHER producers, the ones $producer dropped, and names every
+# owned row whose rank sits below a class that produces something on its list.
+# That is not automatically wrong and nothing here fails on it. It is the
+# imbalance stated: reading 'Apple Pie, Cook/Confectioner advanced, wants Red
+# Apple, which a farmer grows at expert' is what lets somebody decide whether
+# the Farmer's ladder or the recipe's rank is the thing to move.
+
+Write-Host ''
+Write-Host 'where a ladder sits below the class that grows what it asks for' -ForegroundColor Cyan
+
+$crossPairs = @{}
+$crossRows = 0
+$crossSaid = New-Object 'System.Collections.Generic.List[string]'
+foreach ($desc in $owned.Keys) {
+    $r = $owned[$desc]
+    $rowAt = RankAt ([string]$r.Rank)
+    if ($rowAt -lt 0) { continue }
+    $worst = -1
+    $worstWho = ''
+    $worstName = ''
+    foreach ($i in @($r.InputList)) {
+        if (-not $producerAll.ContainsKey($i.Desc)) { continue }
+        foreach ($pz in $producerAll[$i.Desc]) {
+            if ($pz.At -le $rowAt) { continue }
+            if ($pz.At -gt $worst) { $worst = $pz.At; $worstWho = $pz.Who; $worstName = $pz.Name }
+        }
+    }
+    if ($worst -lt 0) { continue }
+    $crossRows++
+    $pair = ($r.Owner + '/' + $r.Half + ' <- ' + $worstWho)
+    if (-not $crossPairs.ContainsKey($pair)) { $crossPairs[$pair] = 0 }
+    $crossPairs[$pair] = $crossPairs[$pair] + 1
+    if ($crossSaid.Count -lt 12) {
+        $crossSaid.Add(('{0}/{1} {2} is {3} and wants {4}, which a {5} has to be {6} to produce' -f `
+                        $r.Owner, $r.Half, $r.OutName, $r.Rank, $worstName, $worstWho, $RANKS[$worst]))
+    }
+}
+if ($crossRows -eq 0) {
+    Ok 'no owned row is ranked below a class that produces something on its list'
+} else {
+    Note ("{0} owned row(s) are ranked below a class that produces something they ask for" -f $crossRows)
+    foreach ($pair in ($crossPairs.Keys | Sort-Object { -$crossPairs[$_] })) {
+        Note ("  {0,5}  {1}" -f $crossPairs[$pair], $pair)
+    }
+    foreach ($s in $crossSaid) { Note ("  " + $s) }
+    if ($crossRows -gt $crossSaid.Count) {
+        Note ("  ... and {0} more, every one of them in tools\recipes.json with the other producers on the input" -f ($crossRows - $crossSaid.Count))
+    }
+}
+
 # ------------------------------------------------------------- the checks ---
 
 Write-Host ''
 Write-Host 'checks' -ForegroundColor Cyan
+
+# THE RUNGS OF THE GATE, not of the table. The ranking above checks every owned
+# row of a half, and a third of the Smith's rows are tempering the server is
+# never asked about. tools\Check-Balance.ps1 counts the rows that FIRE, because
+# those are the only ones a gate can refuse, so a half can pass the ranking and
+# still fail there. Both subsets are checked here so that this script cannot
+# write a table that the balance check then rejects.
+foreach ($p in $PROFESSIONS.Keys) {
+    foreach ($h in $PROFESSIONS[$p]) {
+        $key = $p + '/' + $h
+        $firing = New-Object 'System.Collections.Generic.List[string]'
+        foreach ($desc in $owned.Keys) {
+            if (-not $owned[$desc].Fires) { continue }
+            if (($owned[$desc].Owner + '/' + $owned[$desc].Half) -ne $key) { continue }
+            $firing.Add($desc)
+        }
+        if ($firing.Count -eq 0) { continue }
+        $c = CountRungs $firing
+        $hole = HoleIn $c
+        if ($hole -ge 0) {
+            Bad ("{0}: of the {1} row(s) the server is asked about, the {2} rung is empty and there is work above it, so reaching that rank opens nothing" -f `
+                 $key, $firing.Count, $RANKS[$hole])
+        }
+        # And standable, on the same subset and for the same reason. The gate
+        # only ever refuses a firing row, so this is the set a person actually
+        # meets at a bench.
+        if ($RUNGS_MUST_BE_STANDABLE) {
+            foreach ($b in @(UnstandableRungs $firing)) {
+                if ($HALVES_WITH_AN_UNSTANDABLE_RUNG.Contains($key)) { continue }
+                Bad ("{0}: of the {1} row(s) the server is asked about, the {2} rung holds {3} and not one can be gathered for below {4}" -f `
+                     $key, $firing.Count, $b.Rank, $b.Rows, $b.NeedAt)
+            }
+        }
+    }
+}
+Ok 'no half has an empty rung with work above it, counting every owned row and counting only the rows the server is asked about'
+if ($RUNGS_MUST_BE_STANDABLE) {
+    if ($unstandable.Count -eq 0) {
+        Ok 'every rung that holds work holds at least one row somebody at that rank could gather the makings for'
+    } else {
+        Note ("{0} half/halves hold a rung nobody at that rank can gather for, every one of them named in HALVES_WITH_AN_UNSTANDABLE_RUNG with the reason: {1}" -f `
+              $unstandable.Count, (($unstandable.Keys) -join ', '))
+    }
+}
 
 if ($unresolvedOut.Count -gt 0) {
     Bad ("{0} recipe(s) name an output that is not a record in this load order" -f $unresolvedOut.Count)
@@ -2242,7 +3235,15 @@ $doc.Add('  "language": ' + (JsonStr $LANGUAGE) + ',')
 $doc.Add('  "readFrom": ' + (JsonStr 'BNAM is the workbench keyword, CNAM is the output item, NAM1 is how many it makes, COCT and CNTO are the inputs, CTDA is the conditions, which are in every row''s needs list') + ',')
 $doc.Add('  "event": ' + (JsonStr 'mp.onCraft(actorFormId, craftedItemBaseId, count, recipeId). All four arguments are numbers. The keys of this table are desc strings, so look a row up with RECIPES_BY_ID[mp.getDescFromId(recipeId)] and never with recipeId itself, which matches nothing. Returning false refuses the craft outright: CraftEvent::OnFireSuccess is what removes the inputs and adds the output, and GameModeEvent::Fire only calls it when nobody blocked.') + ',')
 $doc.Add('  "key": ' + (JsonStr 'the recipe''s form id in lower case hex, a colon, and the file it belongs to. mp.getDescFromId turns onCraft''s fourth argument into one.') + ',')
-$doc.Add('  "rank": ' + (JsonStr 'which of classes.md''s four ranks the row asks for: novice, advanced, expert or master. Ranked inside its own half by what the recipe makes, cheapest quarter first. classes.md sets no numbers for this and nothing in the game records ranks a recipe, so the shares are this script''s judgement and they are in the RANK_SHARE knob.') + ',')
+$doc.Add('  "rank": ' + (JsonStr 'which of classes.md''s four ranks the row asks for: novice, advanced, expert or master. Ranked by WHAT ITS INPUTS COST A PRODUCER, taking the dearest thing it asks for, because that is the rung somebody has to have reached before they could gather the makings at all. Where part of the list is produced by nobody, that dearest placed input is a FLOOR and not the answer: it can raise the row above what the output sells for and never lower it, because an item nothing produces is an unknown cost rather than a free one. A row whose inputs no class produces at all falls back to what the output sells for, ranked inside its own half. rankFrom says which of the three answered. classes.md sets no numbers for any of this and nothing in the game records ranks a recipe, so every judgement is a knob at the top of the script: RANK_FROM_INPUT_COST, PRODUCER_TABLES, SERVER_PRODUCERS, PRODUCER_RANK_IS_LOWEST, INPUT_RANK_IS_THE_DEAREST, UNPLACED_INPUT_RULE, RANK_SHARE and SECOND_RULE_KEY.') + ',')
+$doc.Add('  "inputItems": ' + (JsonStr 'every CNTO the record carried: what the recipe wants, how many, and which class produces that item at which rank. producedBy is the class that gets it at the LOWEST rank, because that is what the thing costs to get hold of; alsoProducedBy, where it is present, is every class that has to climb higher for the same item, which is where the farmer appears, since all 11 crops are also plants a gatherer picks at the same rank or lower. producedBy null means nothing in this repository hands that item over: no table in this folder and no verb in tools\gamemode.js. Read out of the recipe''s own CNTO subrecords, eight bytes each, a form id then a count.') + ',')
+$doc.Add('  "inputsWithNoProducer": ' + (JsonStr 'how many of the row''s inputs nothing in this repository produces. Read it with inputRank: "the dearest input is novice" means one thing on a row where that is the whole list and another on a row with four unknowns beside it, and not reading it is how a 3100 gold dragonbone plate went out at novice on 21 September off one novice hunter''s fox pelt.') + ',')
+$doc.Add('  "rankFrom": ' + (JsonStr 'which rule gave this row its rank: what its inputs cost a producer, what it sells for, or the second rule named in SECOND_RULE_KEY. The second rule is used for one half at a time and only where the first two leave a rung with nothing on it, and every use of it is printed by name when the table is built.') + ',')
+$doc.Add('  "rankByValue": ' + (JsonStr 'what the old rule would have said: the rank this row got from the price of what it makes, inside its own half. Kept on every row so the two answers can be compared rather than one of them quietly replacing the other.') + ',')
+$doc.Add('  "inputRank": ' + (JsonStr 'the rank of the dearest input this row asks for, and inputRankWho is the class that produces it. Null when nothing it asks for is produced by any class.') + ',')
+$doc.Add('  "crossTier": ' + (JsonStr 'tools\Check-Balance.ps1 reads inputRank against rank and reports every half by how far its recipes sit from what their inputs cost, and reads alsoProducedBy to report every row ranked below a class that has to climb higher for something on its list. That is the imbalance Patrick asked about on 21 September, stated as a number. Both scripts print it; neither fails on it, because which of the two ladders should move is a decision.') + ',')
+$doc.Add('  "rungsNobodyCanGatherFor": ' + (JsonStr 'on a half: a rung that holds recipes and not one of them can be gathered for at that rank, which is an empty rung wearing a label and is what the second rule can leave behind. Build-RecipeTable.ps1 fails the build for any half that has one and is not named in its HALVES_WITH_AN_UNSTANDABLE_RUNG knob with the measured reason, so a half carrying this field is one somebody decided to live with and wrote down.') + ',')
+$doc.Add('  "rankedByInputCost": ' + (JsonStr 'on each half: how many of its rows the input cost rule could answer for and how many fell back to price, counted BEFORE any second rule ran. Where the half also carries a secondRule field, that rule then re-ranked every row of it, so read rankFrom on the row for what actually decided it.') + ',')
 $doc.Add('  "sisterHalf": ' + (JsonStr 'classes.md gives you the novice work of the other half of your own profession for nothing, and no further than novice. The gate can answer that because every row carries a rank.') + ',')
 $doc.Add('  "needs": ' + (JsonStr 'the recipe''s own conditions, read out of its CTDA subrecords. An empty list means anybody standing at the bench can make it. serverSees false means the fork has no function for that condition and the server answers True, so the only thing enforcing it is the crafting menu on the machine in front of the person, which hides the recipe rather than refusing it.') + ',')
 $doc.Add('  "default": ' + (JsonStr 'a recipe id this table does not carry is one nobody owns, and anybody may make it') + ',')
@@ -2331,8 +3332,17 @@ foreach ($k in $keys) {
             ', "canBeMadeOnDayOne": ' + $perHalfDayOne[$k] +
             ', "behindAVanillaPerk": ' + $perHalfPerk[$k] +
             ', "byRank": ' + $byRank +
+            ', "rankedByInputCost": ' + $(if ($rankedByInputs.ContainsKey($k)) { $rankedByInputs[$k] } else { 0 }) +
+            ', "rankedByPrice": ' + $(if ($rankedByValue.ContainsKey($k)) { $rankedByValue[$k] } else { 0 }) +
             ', "craftsAtAll": ' + $craftsTxt +
             ', "offerInCharacterCreation": true'
+    if ($secondRuleUsed.Contains($k)) { $line += ', "secondRule": ' + (JsonStr $secondRuleUsed[$k]) }
+    if ($unstandable.Contains($k)) {
+        $line += ', "rungsNobodyCanGatherFor": ' + (JsonStr $unstandable[$k])
+        if ($HALVES_WITH_AN_UNSTANDABLE_RUNG.Contains($k)) {
+            $line += ', "andThatIsAllowedBecause": ' + (JsonStr $HALVES_WITH_AN_UNSTANDABLE_RUNG[$k])
+        }
+    }
     if ($why) { $line += ', "why": ' + (JsonStr $why) }
     if ($HALVES_NOBODY_CAN_START.Contains($k)) {
         $line += ', "nothingToMakeOnDayOne": ' + (JsonStr $HALVES_NOBODY_CAN_START[$k])
@@ -2367,7 +3377,7 @@ foreach ($desc in $owned.Keys) {
     $doc.Add('    ' + (JsonStr $desc) + ': { "editorId": ' + (JsonStr $r.Edid) +
              ', "out": ' + (JsonStr $r.OutDesc) + ', "name": ' + (JsonStr $r.OutName) +
              ', "type": ' + (JsonStr $r.OutType) + ', "makes": ' + $r.Count +
-             ', "inputs": ' + $r.Inputs + ', "worth": ' + $r.Value +
+             ', "inputs": ' + $r.Inputs + ', "inputItems": ' + (InputsJson $r) + ', "worth": ' + $r.Value +
              ', "bench": ' + (JsonStr $r.BenchDesc) + ', "benchName": ' + (JsonStr $r.BenchName) +
              ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
              ', "rank": ' + (JsonStr $r.Rank) +
@@ -2376,6 +3386,11 @@ foreach ($desc in $owned.Keys) {
              ', "plugin": ' + (JsonStr $r.Plugin) +
              ', "nameFrom": ' + (JsonStr $r.NameFrom) +
              ', "why": ' + (JsonStr $r.Reason) +
+             ', "rankFrom": ' + (JsonStr $r.RankFrom) +
+             ', "rankByValue": ' + (JsonStr $r.RankByValue) +
+             ', "inputRank": ' + $(if ($r.InputRank) { JsonStr $r.InputRank } else { 'null' }) +
+             ', "inputRankWho": ' + $(if ($r.InputRankWho) { JsonStr $r.InputRankWho } else { 'null' }) +
+             ', "inputsWithNoProducer": ' + $r.InputsUnplaced +
              ', "whyThatRank": ' + (JsonStr $r.RankWhy) + ' }' + $comma)
 }
 $doc.Add('  },')
@@ -2428,6 +3443,22 @@ if ($blockRows.Count -gt 0) {
     $blockRows[$blockRows.Count - 1] = $last.Substring(0, $last.Length - 1)
 }
 
+# Which rule decided the rank of the rows that actually ship in the block. The
+# generated comment states it as a count rather than as a claim, because the
+# hand written paragraph it replaces went on describing the price rule for a
+# day after the price rule had stopped being the rule.
+$ruleInput = 0
+$rulePrice = 0
+$ruleSecond = 0
+foreach ($desc in $owned.Keys) {
+    if (-not $owned[$desc].Fires) { continue }
+    $rf = [string]$owned[$desc].RankFrom
+    if ($rf.StartsWith('the second rule')) { $ruleSecond++ }
+    elseif ($rf.StartsWith('what its inputs cost')) { $ruleInput++ }
+    else { $rulePrice++ }
+}
+$secondRuleHalves = @($secondRuleUsed.Keys)
+
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('  /* Built by tools\Build-RecipeTable.ps1 out of the game''s own records. Do not hand edit.')
 $lines.Add('     ' + $blockRows.Count + ' crafting recipes, out of ' + ($owned.Count + $unowned.Count) + ' in tools\recipes.json.')
@@ -2450,6 +3481,27 @@ $lines.Add('     rank is what to compare the character''s rank in that half agai
 $lines.Add('     classes.md also gives somebody the novice work of the other half of')
 $lines.Add('     their own profession and no further, so a row whose half is the sister')
 $lines.Add('     half passes at rank novice and nowhere above it.')
+$lines.Add('')
+$lines.Add('     WHAT SETS THAT RANK IS WHAT THE RECIPE COSTS THE PERSON WHO GATHERS FOR')
+$lines.Add('     IT, and not what it sells for. The rank is the rank of the dearest thing')
+$lines.Add('     on its list, at the rung the class that produces that thing has to have')
+$lines.Add('     reached. Where part of the list is produced by nobody, that is a floor')
+$lines.Add('     and what the output sells for can hold the row higher; where none of it')
+$lines.Add('     is, the price ranks it inside its own half. On this build that is')
+$lines.Add('     ' + $ruleInput + ' row(s) by what their inputs cost, ' + $rulePrice + ' by price and ' + $ruleSecond + ' by how long')
+$lines.Add('     the shopping list is. That last rule is used for a whole half at a time')
+if ($secondRuleHalves.Count -gt 0) {
+    $lines.Add('     and only where the first two leave a rung with nothing on it, which here')
+    $lines.Add('     is ' + ($secondRuleHalves -join ', ') + '. A rank there means how long the list is and')
+    $lines.Add('     nothing else, and the half says so in tools\recipes.json.')
+} else {
+    $lines.Add('     and only where the first two leave a rung with nothing on it, which no')
+    $lines.Add('     half in this build did.')
+}
+$lines.Add('     Every row carries rankFrom in tools\recipes.json saying which of the')
+$lines.Add('     three answered for it. Nothing in here is the script''s opinion of what a')
+$lines.Add('     thing is worth: classes.md sets no numbers for any of it, and every')
+$lines.Add('     judgement is a named knob at the top of the script that wrote this.')
 $lines.Add('')
 $lines.Add('     open is true when the recipe carries no condition of its own. A row')
 $lines.Add('     with open false needs something first, an item, a spell or a vanilla')
@@ -2474,9 +3526,20 @@ $literal = $lines -join [Environment]::NewLine
 # leaves the file alone, and so does a gamemode.js that has no markers yet: this
 # never invents a place to put it.
 #
+# THE COMMENT OVER THE TABLE IS PART OF THE TABLE, and it was not until
+# 21 September. The opening marker used to be the var line itself, so the
+# paragraph above it describing what every field means was hand written and was
+# never regenerated. It went on saying that rank came from the price of what a
+# recipe makes for a full day after input cost had replaced that rule and had
+# changed 344 of the 1728 installed rows. The only statement in the repository
+# of what the field the gate reads MEANS was contradicting the data beside it,
+# in the file that ships to the server. So the marker moved up above the
+# generated comment, and the script now owns the sentence as well as the rows.
+# Whatever prose is still hand written sits above the opening marker, where it
+# is about the block rather than about the fields.
 if (-not $NoInstall -and $fail -eq 0) {
     $gm = Join-Path $PSScriptRoot 'gamemode.js'
-    $open  = '  var RECIPES_BY_ID = {'
+    $open  = '  // ==== RECIPES_BY_ID ===='
     $close = '  // ==== end RECIPES_BY_ID ===='
     if (-not (Test-Path -LiteralPath $gm)) {
         Note "no gamemode.js beside this script, so the table was not installed"
@@ -2492,12 +3555,11 @@ if (-not $NoInstall -and $fail -eq 0) {
         } else {
             $body = New-Object 'System.Collections.Generic.List[string]'
             $body.Add($open)
-            foreach ($row in $blockRows) { $body.Add($row) }
-            $body.Add('  };')
+            foreach ($l in $lines) { $body.Add($l) }
             $body.Add('')
             $new = $text.Substring(0, $a) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
-            Ok ("wrote {0} recipes into the RECIPES_BY_ID block of {1}" -f $blockRows.Count, $gm)
+            Ok ("wrote {0} recipes and the comment over them into the RECIPES_BY_ID block of {1}" -f $blockRows.Count, $gm)
         }
     }
 }
