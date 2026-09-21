@@ -247,8 +247,12 @@ if (`$chk) {
   'task settings: restart count ' + `$chk.Settings.RestartCount +
   ', execution time limit ' + (`$(if (`$chk.Settings.ExecutionTimeLimit -eq 'PT0S') { 'none' } else { `$chk.Settings.ExecutionTimeLimit })) +
   ', multiple instances ' + `$chk.Settings.MultipleInstances
+  # The startup trigger has no repetition, so its slot comes back empty and
+  # joining the lot printed a leading space. Only the triggers that actually
+  # repeat are worth naming here.
+  `$rep = @(`$chk.Triggers.Repetition.Interval | Where-Object { `$_ })
   'triggers: ' + (`$chk.Triggers.Count) + ', repeating every ' +
-    (`$(if (`$chk.Triggers.Repetition.Interval) { `$chk.Triggers.Repetition.Interval -join ' ' } else { 'never' }))
+    (`$(if (`$rep.Count) { `$rep -join ' ' } else { 'never' }))
 }
 
 Start-ScheduledTask -TaskName 'Thornswood Web'
