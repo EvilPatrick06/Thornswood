@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
 namespace Thornswood
@@ -37,6 +38,78 @@ namespace Thornswood
         }
 
         static string P(string name) { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\" + name); }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr sec,
+                                         uint disposition, uint flags, IntPtr template);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool GetFileInformationByHandle(IntPtr file, out BY_HANDLE_FILE_INFORMATION info);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool CloseHandle(IntPtr h);
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct BY_HANDLE_FILE_INFORMATION
+        {
+            public uint Attributes, CreatedLow, CreatedHigh, AccessedLow, AccessedHigh;
+            public uint WrittenLow, WrittenHigh, SerialNumber, SizeHigh, SizeLow, Links;
+            public uint IndexHigh, IndexLow;
+        }
+
+        /// <summary>How many names this file has. One is a file of our own; more is a hard link.</summary>
+        static int Names(string file)
+        {
+            IntPtr h = CreateFileW(file, 0x80000000, 7, IntPtr.Zero, 3, 0x80, IntPtr.Zero);
+            if (h == IntPtr.Zero || h.ToInt64() == -1) return 1;
+            try
+            {
+                BY_HANDLE_FILE_INFORMATION info;
+                if (!GetFileInformationByHandle(h, out info)) return 1;
+                return (int)info.Links;
+            }
+            finally { CloseHandle(h); }
+        }
+
+        /// <summary>
+        /// Anything worth saying from the last Apply, for the caller to log.
+        /// Enforce runs before the window is up on one of its two paths, so it
+        /// collects rather than logs.
+        /// </summary>
+        public static readonly List<string> Said = new List<string>();
+
+        /// <summary>
+        /// Make this file ours alone before a line of it is rewritten.
+        ///
+        /// The game folder is built of hard links so the collection is not on
+        /// the disk twice, and a hard link is the same file under a second
+        /// name: writing a line into one writes it into Vortex's copy, and
+        /// through that into every other server's deployment. That happened.
+        /// Thornswood pinned Skyrim Souls' favourites menu to paused in
+        /// September while it still ran from the Steam copy, the write landed
+        /// in Vortex's own file, and the Q menu went on pausing the world in
+        /// Keizaal long after Thornswood stopped asking for it (Djinn, 20
+        /// September). The folder copies these files now rather than linking
+        /// them, so this is the belt rather than the braces, and it is cheap:
+        /// one handle, and nothing to do in the normal case.
+        ///
+        /// Breaking the link is a copy aside, a delete and a rename, so what
+        /// is left is a file with one name and the same contents, and nobody
+        /// else's file moves.
+        /// </summary>
+        static void MakeItOurs(string file)
+        {
+            try
+            {
+                if (!File.Exists(file) || Names(file) <= 1) return;
+                string tmp = file + ".mine";
+                File.Copy(file, tmp, true);
+                File.Delete(file);
+                File.Move(tmp, file);
+                Said.Add("A setting this build writes was the same file as another launcher's copy of " +
+                         Path.GetFileName(file) + ". It has its own copy now, so nothing outside " +
+                         Paths.Game + " is written.");
+            }
+            catch { }
+        }
 
         static List<Rule> Rules()
         {
@@ -86,6 +159,7 @@ namespace Thornswood
         public static int Apply(Config cfg)
         {
             int changed = 0;
+            Said.Clear();
             foreach (Rule r in Rules())
             {
                 if (r.Section == null) { if (Set(r.File, r.Key, r.Value)) changed++; }
@@ -123,7 +197,7 @@ namespace Thornswood
                 }
 
                 var lines = new List<string>();
-                if (File.Exists(file)) lines.AddRange(File.ReadAllLines(file));
+                if (File.Exists(file)) { MakeItOurs(file); lines.AddRange(File.ReadAllLines(file)); }
 
                 // Find the section header; insert right after it, or append a
                 // new section when the file has none.
@@ -159,6 +233,7 @@ namespace Thornswood
             try
             {
                 if (!File.Exists(file)) return false;
+                MakeItOurs(file);
                 var lines = new List<string>(File.ReadAllLines(file));
                 var rx = new Regex("^(\\s*)" + Regex.Escape(key) + "\\s*=\\s*(.*?)\\s*$", RegexOptions.IgnoreCase);
 

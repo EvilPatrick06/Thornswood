@@ -3685,6 +3685,7 @@ namespace Thornswood
 
                 int held = Enforce.Apply(cfg);
                 if (held > 0) Log("Put back " + held + " setting" + (held == 1 ? "" : "s") + " the last session overwrote.");
+                foreach (string note in Enforce.Said) Log(note);
 
                 // Written fresh every launch so the address and port the client
                 // reads are whatever the launcher is showing. SkyMP has no join
