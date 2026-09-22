@@ -131,17 +131,59 @@ foreach ($l in $logs) {
     Say ("  {0,-12} {1,7:n0} lines  {2,9:n0} bytes   {3}" -f $l.Name, $count, $size, $l.What) 'Gray'
 }
 
-# What the service says about itself. Small, and it is the fastest way to tell
-# a stale process from a fresh one, which has cost days here before.
+<#
+  What the service says about itself. Small, and it is the fastest way to tell
+  a stale process from a fresh one, which has cost days here before.
+
+  THROUGH THE SITE FIRST, BECAUSE THAT IS HOW EVERYTHING ELSE REACHES IT.
+
+  This asked http://<vps>:7778/health and nothing else, and on 21 and 22
+  September it printed "no answer from 192.135.112.23:7778" on every pull.
+  That read as the voice service being down. It was not: measured on
+  22 September, https://thornswood.net/voice/health answers 200 and says
+
+      {"ok":true,"build":"owners-5","auth":"on","bind":"127.0.0.1", ...}
+
+  bind is 127.0.0.1. The service is deliberately on loopback with Caddy
+  carrying /voice/, which is exactly what Install-Voice's own -Bind parameter
+  describes, and the raw port is therefore shut from outside ON PURPOSE. Both
+  services were healthy the entire time this said they were not.
+
+  A check that cries wolf is worse than no check, because the next real outage
+  reads as the same yellow line everybody has learned to scroll past. So the
+  site is asked first, the raw port is the fallback for a box with no Caddy in
+  front of it, and the answer's own bind is printed so the shape of the
+  install is visible rather than inferred.
+#>
 $dest = Join-Path $Out 'health.json'
-try {
-    $h = Invoke-RestMethod -Uri "http://${Vps}:$Port/health" -TimeoutSec 8
+$voicePath = if ($Dev) { 'voice-dev' } else { 'voice' }
+$tries = @(
+    @{ Url = "https://thornswood.net/$voicePath/health"; How = 'through the site' }
+    @{ Url = "http://${Vps}:$Port/health";               How = "straight at $Vps`:$Port" }
+)
+
+$h = $null; $how = ''
+foreach ($t in $tries) {
+    try {
+        $h = Invoke-RestMethod -Uri $t.Url -TimeoutSec 8
+        $how = $t.How
+        break
+    } catch { }
+}
+
+if ($h) {
     ($h | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $dest -Encoding UTF8
     $build = if ($h.PSObject.Properties['build']) { $h.build } else { '(no build in the answer)' }
-    Say ("  {0,-12} build {1}" -f 'health.json', $build) 'Gray'
-} catch {
-    "the voice service did not answer: $($_.Exception.Message)" | Set-Content -LiteralPath $dest -Encoding UTF8
-    Say ("  {0,-12} no answer from {1}:{2}" -f 'health.json', $Vps, $Port) 'Yellow'
+    $bind  = if ($h.PSObject.Properties['bind'])  { $h.bind }  else { '?' }
+    $auth  = if ($h.PSObject.Properties['auth'])  { $h.auth }  else { '?' }
+    Say ("  {0,-12} build {1}, {2}, bound to {3}, auth {4}" -f 'health.json', $build, $how, $bind, $auth) 'Gray'
+    if ($bind -eq '127.0.0.1') {
+        Say '               loopback only, so the raw port is shut from outside on purpose' 'DarkGray'
+    }
+} else {
+    ("the voice service did not answer through the site or on the raw port. " +
+     "Both were tried.") | Set-Content -LiteralPath $dest -Encoding UTF8
+    Say ("  {0,-12} NO ANSWER through the site or on {1}:{2}. This one is real." -f 'health.json', $Vps, $Port) 'Red'
 }
 
 Head 'Where they are'

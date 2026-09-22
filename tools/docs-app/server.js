@@ -802,7 +802,7 @@ function notAllowedPage(me, st) {
     why = '<p>Thornswood could not ask Discord about that account, so it cannot ' +
           'let anybody in right now. This is the site, not you.</p>' +
           '<p style="color:#8D9682;font-size:13px">' + esc(st.lookupFailed) + '</p>' +
-          '<p>Tell Gavin and try again in a minute.</p>';
+          '<p>Tell Patrick and try again in a minute.</p>';
   } else if (st.banned) {
     why = '<p>That account is banned from Thornswood.</p>';
   } else if (!st.inGuild) {
