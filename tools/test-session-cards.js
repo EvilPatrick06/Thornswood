@@ -88,6 +88,46 @@ yes('under a minute says so', forMins(0.5) === 'under a minute');
 yes('the page has no note column', src.indexOf('<th>Note</th>') < 0);
 yes('the page never calls the note endpoint', src.indexOf('/api/session-note') < 0);
 
+/* ---- what a session row says about where it got to ---------------------- */
+/*
+  A character is picked at the game's main menu, so a session with no
+  character never reached either world. Saying "main" for one of those puts a
+  session on the live server that was never on it, which is exactly what
+  somebody would later be asked to account for.
+*/
+eval(grab('sessionTable'));
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const onMain  = sessionTable([{ who:'1', profile:7, version:'1.1.78', channel:'main', start:1, end:2, minutes:5, session:'aaaaaaaa' }]);
+const onDev   = sessionTable([{ who:'1', profile:7, version:'1.1.78', channel:'dev',  start:1, end:2, minutes:5, session:'bbbbbbbb' }]);
+const stuckM  = sessionTable([{ who:'1', profile:0, version:'1.1.78', channel:'main', start:1, end:2, minutes:1, session:'cccccccc' }]);
+const stuckD  = sessionTable([{ who:'1', profile:0, version:'1.1.78', channel:'dev',  start:1, end:2, minutes:1, session:'dddddddd' }]);
+const stuckU  = sessionTable([{ who:'1', profile:0, version:'', channel:'', start:1, end:2, minutes:1, session:'eeeeeeee' }]);
+
+yes('a session with a character on main reads main', onMain.indexOf('>main<') >= 0);
+yes('a session with a character on dev reads dev', onDev.indexOf('>dev<') >= 0);
+
+/* The three that never reached a world, told apart as far as the row allows. */
+yes('stuck on the main build reads Main Launcher', stuckM.indexOf('>Main Launcher<') >= 0);
+yes('stuck on the dev build reads Dev Launcher', stuckD.indexOf('>Dev Launcher<') >= 0);
+yes('stuck with no build reported reads plain Launcher', stuckU.indexOf('>Launcher<') >= 0);
+
+yes('a stuck main session does NOT also claim the main world', stuckM.indexOf('>main<') < 0);
+yes('a stuck dev session does NOT also claim the dev world', stuckD.indexOf('>dev<') < 0);
+yes('a stuck session says which world it would have joined',
+    stuckM.indexOf('never reached the main world') >= 0);
+yes('and the unknown one says the build was not reported, rather than guessing',
+    stuckU.indexOf('the build was not reported') >= 0);
+
+/* ---- the logs button ---------------------------------------------------- */
+yes('every session offers More details', onMain.indexOf('More details') >= 0);
+yes('the button carries the session and the Discord id',
+    onMain.indexOf('data-s="aaaaaaaa"') >= 0 && onMain.indexOf('data-w="1"') >= 0);
+yes('the log row spans the whole table', onMain.indexOf('colspan="6"') >= 0);
+yes('the page has a download control for a log', src.indexOf('class="dl"') >= 0);
+yes('logs are fetched per session, not with the page', src.indexOf('/api/session-logs?session=') >= 0);
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

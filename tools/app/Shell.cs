@@ -259,6 +259,15 @@ namespace Thornswood
             // install that already exists gets one on its next launch.
             try { Register.Ensure(cfg); } catch { }
 
+            // Logs from a session that ended without sending them, sent now.
+            // On a pool thread so nothing waits on the site, and BEFORE Play
+            // can be pressed, because the game truncates its own logs under
+            // Data\Platform at every game start and after that there is
+            // nothing left to send. A crash that took the launcher down with
+            // it is exactly the session somebody wants to read afterwards,
+            // and it was the one that was always lost.
+            try { ThreadPool.QueueUserWorkItem(delegate { try { Discord.SendPendingLogs(); } catch { } }); } catch { }
+
             // The client settings file, made here if this install has none.
             // Nothing ships it, the client does not create it, and without it
             // a character cannot be chosen. From startup, so the log says so
@@ -1458,6 +1467,13 @@ namespace Thornswood
                 ThreadPool.QueueUserWorkItem(delegate
                 {
                     try { Discord.SessionEnd(playedAs, ranFor, endedForUpdate ? "update" : "quit"); } catch { }
+                    // Then the logs, on the same thread so they go after the
+                    // row they attach to exists. This is the only moment they
+                    // can be collected: the game truncates its own logs under
+                    // Data\Platform at every game start, so anything not taken
+                    // now is gone. Until 22 September every report began by
+                    // asking the person to go and find four files themselves.
+                    try { Discord.SessionLogs(); } catch { }
                 });
                 // Against the character, not just the install. Skyrim keeps its
                 // own play time inside the save, and under SkyMP the character

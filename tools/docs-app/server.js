@@ -681,6 +681,194 @@ function findSession(rows, key, who) {
   return -1;
 }
 
+/* ------------------------------------------------------- session logs -- */
+/*
+  The logs from one session, so a report can be read without asking the person
+  to find four files and paste them.
+
+  The client half is sent by the launcher when the game closes, which is the
+  only moment it can be: the game wipes its own logs at every start, so by the
+  time anybody asks for them they are gone. One file per session id.
+
+  The server half is not stored at all. It is sliced out of the game server's
+  own log on demand, by the session's start and end, because that log is
+  already on this box and copying lines out of it into another file would be
+  two copies of the same thing going stale against each other.
+
+  THIS IS EVIDENCE, and it is written to be usable as evidence when somebody
+  is suspended or banned. Three things follow from that and none of them is
+  optional.
+
+  WRITE ONCE. A session's logs can be sent once. A second upload for the same
+  id is refused and the refusal is recorded. Without that, anybody who knew the
+  endpoint could play, do something worth banning for, and then post a clean
+  set over the top from the same launcher; the evidence would be whatever the
+  accused chose to send last, which is no evidence at all.
+
+  PROVENANCE IN THE FILE. Each set records the Discord id off the TICKET, not
+  off the body, when it arrived, and a sha256 of every log. The hash is not
+  security theatre: it is so that a copy pasted into a Discord argument months
+  later can be held against the one on the box and shown to be the same text.
+
+  KEPT BY AGE, NOT BY THE ROLLING LIST. sessions.json keeps the last two
+  thousand rows. Tying the logs to that would quietly delete the evidence for
+  an old incident the moment two thousand newer sessions had happened, which
+  on a public server is weeks. They are kept for SLOG_DAYS instead, and a
+  session whose row is marked kept is never pruned at all.
+
+  WHAT THIS DOES NOT COVER, and it matters for the ban case: nothing here is a
+  record of what anybody SAID. Chat and voice are not logged anywhere, so an
+  argument about behaviour between two people is still one person's word
+  against another's. That is its own piece of work and this is not it.
+
+  Caps, because this accepts a body from every launcher: one log is trimmed to
+  its last 256 KB (the end is the part with the fault in it) and a whole set to
+  1 MB.
+*/
+const SLOGS = path.join(DATA, 'session-logs');
+const SLOG_ONE = 256 * 1024;
+const SLOG_ALL = 1024 * 1024;
+const SLOG_DAYS = 365;
+
+/* The names the launcher may send. Anything else is dropped rather than
+   written: this is a path coming from outside, and a file name is the shortest
+   way into a folder nobody meant to write. */
+const SLOG_NAMES = [
+  'launcher.log', 'thornswood-front.log', 'thornswood-voice.log',
+  'thornswood-emotes.log', 'thornswood-input.log', 'thornswood-dress.log',
+  'thornswood-loadorder.txt', 'thornswood-plugins-light.txt'
+];
+
+function slogFile(key) { return path.join(SLOGS, key + '.json'); }
+
+/* The tail of a log, never the head. A crash is at the end. */
+function slogTrim(s, cap) {
+  const t = String(s == null ? '' : s);
+  if (t.length <= cap) return t;
+  return '... the first ' + (t.length - cap) + ' characters are not kept ...\n' +
+         t.slice(t.length - cap);
+}
+
+/* Written once. Returns 'saved', 'already' or 'nothing'. */
+function putSessionLogs(key, who, logs) {
+  try {
+    if (!fs.existsSync(SLOGS)) fs.mkdirSync(SLOGS, { recursive: true });
+    const file = slogFile(key);
+
+    /* Write once. A second set for the same session is not written over the
+       first; the attempt is recorded on the original so a replay shows up as
+       what it is rather than as nothing. */
+    if (fs.existsSync(file)) {
+      try {
+        const had = JSON.parse(fs.readFileSync(file, 'utf8')) || {};
+        had.resent = (Number(had.resent) || 0) + 1;
+        had.resentAt = Date.now();
+        fs.writeFileSync(file, JSON.stringify(had));
+      } catch (e) { }
+      return 'already';
+    }
+
+    const keep = {};
+    const hash = {};
+    let total = 0;
+    for (const name of SLOG_NAMES) {
+      if (!Object.prototype.hasOwnProperty.call(logs, name)) continue;
+      const text = slogTrim(logs[name], SLOG_ONE);
+      if (!text.trim()) continue;
+      if (total + text.length > SLOG_ALL) continue;
+      total += text.length;
+      keep[name] = text;
+      hash[name] = crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+    }
+    if (!Object.keys(keep).length) return 'nothing';
+
+    fs.writeFileSync(file, JSON.stringify({
+      session: key,
+      who: String(who),      /* off the ticket, never off the body */
+      at: Date.now(),
+      bytes: total,
+      sha256: hash,
+      logs: keep
+    }));
+    return 'saved';
+  } catch (e) { return 'nothing'; }
+}
+
+/*
+  Old log sets go, by age.
+
+  NOT by whether the session is still in sessions.json. That file keeps the
+  last two thousand rows, so tying the logs to it would delete the evidence
+  for an old incident the moment two thousand newer sessions had happened, and
+  on a public server that is weeks. A row marked kept is never pruned, so
+  anything an argument rests on can be held indefinitely by marking it.
+*/
+function pruneSessionLogs() {
+  try {
+    if (!fs.existsSync(SLOGS)) return;
+    const cutoff = Date.now() - SLOG_DAYS * 86400000;
+    const held = new Set(sessionRows().filter(r => r && r.keep).map(r => String(r.session)));
+    for (const f of fs.readdirSync(SLOGS)) {
+      if (!f.endsWith('.json')) continue;
+      const key = f.slice(0, -5);
+      if (held.has(key)) continue;
+      const full = path.join(SLOGS, f);
+      let at = 0;
+      try { at = Number((JSON.parse(fs.readFileSync(full, 'utf8')) || {}).at) || 0; } catch (e) { at = 0; }
+      if (!at) { try { at = fs.statSync(full).mtimeMs; } catch (e) { at = Date.now(); } }
+      if (at < cutoff) { try { fs.unlinkSync(full); } catch (e) { } }
+    }
+  } catch (e) { }
+}
+
+/*
+  The game server's log between two moments.
+
+  Its lines start "[2026-09-22 10:02:10.155]", which is local time on this box
+  and the same clock the session's start and end were stamped with, so they
+  compare directly. A line with no stamp belongs to the line above it, which is
+  what a stack trace is, so it is kept whenever the last stamped line was.
+
+  dev and main are different servers with different logs; the session says
+  which it was on.
+*/
+const SERVER_LOGS = {
+  main: 'C:\\Thornswood-Server\\server.log',
+  dev:  'C:\\Thornswood-Server-Dev\\server.log'
+};
+
+function serverLogSlice(channel, from, to) {
+  const file = SERVER_LOGS[channel === 'dev' ? 'dev' : 'main'];
+  let text = '';
+  try {
+    if (!fs.existsSync(file)) return { ok: false, why: 'no server log on this box', lines: [] };
+    /* Only the tail is read. These grow, and a session is minutes long. */
+    const size = fs.statSync(file).size;
+    const want = 4 * 1024 * 1024;
+    const fd = fs.openSync(file, 'r');
+    try {
+      const start = Math.max(0, size - want);
+      const buf = Buffer.alloc(Math.min(size, want));
+      fs.readSync(fd, buf, 0, buf.length, start);
+      text = buf.toString('utf8');
+      if (start > 0) text = text.slice(text.indexOf('\n') + 1);
+    } finally { fs.closeSync(fd); }
+  } catch (e) { return { ok: false, why: String(e.message || e), lines: [] }; }
+
+  const out = [];
+  let keeping = false;
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\[(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+    if (m) {
+      const at = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime();
+      keeping = at >= from && at <= to;
+    }
+    if (keeping && line.length) out.push(line);
+    if (out.length > 4000) break;
+  }
+  return { ok: true, lines: out };
+}
+
 /* One row, from whatever the launcher sent and the ticket it sent it with.
    The Discord id and the name come from the ticket and the linked file, never
    from the body: the body is the launcher's, and the ticket is the only part
@@ -692,7 +880,20 @@ function sessionRow(t, o, key) {
     who: String(t.d),
     name: String(known.name || t.n || ''),
     profile: Number(o.profileId) || 0,
-    channel: String(o.channel || '') === 'dev' ? 'dev' : 'main',
+    /*
+      dev, main, or "" when the launcher did not say.
+
+      This used to read `=== 'dev' ? 'dev' : 'main'`, which turned "nothing was
+      sent" into "main" and threw away the difference. That matters on the
+      sessions page: a session that never reached a world is shown as Main
+      Launcher or Dev Launcher when we know which build it was, and as plain
+      Launcher when we genuinely do not, so the two cases can be told apart
+      rather than the second quietly claiming the live server.
+    */
+    channel: (function (c) {
+      const s = String(c == null ? '' : c).trim().toLowerCase();
+      return (s === 'dev' || s === 'main') ? s : '';
+    })(o.channel),
     version: String(o.version || '').slice(0, 32),
     start: 0, end: 0, minutes: 0, why: '', note: ''
   };
@@ -1576,7 +1777,43 @@ async function handle(req, res) {
       }
     }
     if (!putSessions(rows)) return sendJson(res, 500, { ok: false, why: 'could not save' });
+    if (ending) { try { pruneSessionLogs(); } catch (e) { } }
     return sendJson(res, 200, { ok: true });
+  }
+
+  /*
+    The logs from one session, sent by the launcher as the game closes.
+
+    That moment and no other: the game wipes its own logs at every start, so a
+    log nobody collected then is gone, which is why every report has had to
+    begin by asking the person to go and find four files.
+
+    Written once. A second set for the same session is refused and the attempt
+    recorded on the first, because these are meant to stand up when somebody is
+    suspended and evidence that the accused can overwrite is not evidence. The
+    Discord id is taken off the ticket, never off the body.
+
+    A bigger body than the rest of the API accepts, because it is carrying
+    logs, and still capped: putSessionLogs trims each log and the set.
+  */
+  if (p === '/api/play/logs' && req.method === 'POST') {
+    let o = {};
+    try { o = JSON.parse(await body(req, SLOG_ALL + 64 * 1024)) || {}; } catch (e) { }
+    const t = readTicket(o.ticket);
+    if (!t) return sendJson(res, 401, { ok: false, why: 'link' });
+    const key = sessionKey(o.session);
+    if (!key) return sendJson(res, 400, { ok: false, why: 'no session id' });
+
+    /* Only for a session this account actually has a row for. Without this
+       anybody linked could write a log set against any id they invented, and
+       the folder would fill with sets belonging to no session. */
+    const rows = sessionRows();
+    if (findSession(rows, key, t.d) < 0) return sendJson(res, 404, { ok: false, why: 'no such session' });
+
+    const what = putSessionLogs(key, t.d, (o.logs && typeof o.logs === 'object') ? o.logs : {});
+    if (what === 'already') return sendJson(res, 409, { ok: false, why: 'already sent' });
+    if (what === 'nothing') return sendJson(res, 200, { ok: true, stored: false });
+    return sendJson(res, 200, { ok: true, stored: true });
   }
 
   /*
@@ -1833,6 +2070,84 @@ async function handle(req, res) {
       catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
       if (!writeBoardOne(mb[1], obj)) return sendJson(res, 400, { error: 'no such board' });
       return sendJson(res, 200, { ok: true });
+    }
+
+    /* Everything from one session, for the View more button on /sessions.
+       Admins only, like everything below the line above.
+
+       The client half is what the launcher sent when the game closed. The
+       server half is sliced out of the game server's own log now, by this
+       session's start and end, rather than having been copied anywhere. A
+       session still open has no end yet, so the slice runs to now.
+
+       The row is found by the session id AND the Discord id it belongs to, so
+       a stray id cannot read somebody else's session. */
+    if (p === '/api/session-logs' && req.method === 'GET') {
+      const key = sessionKey(url.searchParams.get('session'));
+      const rows = sessionRows();
+      const at = key ? findSession(rows, key, url.searchParams.get('who')) : -1;
+      if (at < 0) return sendJson(res, 404, { error: 'no such session' });
+      const row = rows[at];
+
+      let client = {};
+      let sent = null;
+      try {
+        const f = slogFile(key);
+        if (fs.existsSync(f)) {
+          const set = JSON.parse(fs.readFileSync(f, 'utf8')) || {};
+          client = set.logs || {};
+          /* The provenance, so the page can show where this came from and
+             whether anybody tried to send a second set over it. */
+          sent = {
+            who: String(set.who || ''),
+            at: Number(set.at) || 0,
+            bytes: Number(set.bytes) || 0,
+            sha256: set.sha256 || {},
+            resent: Number(set.resent) || 0
+          };
+        }
+      } catch (e) { client = {}; sent = null; }
+
+      /* A minute either side, because the launcher stamps the session and the
+         server stamps its own lines, and the two clocks are the same clock but
+         the moments are not: the start is sent as the game launches and the
+         server sees the connection a little after. */
+      const from = (Number(row.start) || Number(row.end) || 0) - 60000;
+      const to = (Number(row.end) || Date.now()) + 60000;
+      const server = serverLogSlice(row.channel, from, to);
+
+      return sendJson(res, 200, {
+        session: key,
+        channel: row.channel,
+        client,
+        sent,
+        server: server.lines,
+        serverWhy: server.ok ? '' : server.why,
+        clientSent: Object.keys(client).length > 0
+      });
+    }
+
+    /* Hold one session's logs indefinitely, or let them age out again.
+
+       Everything else is pruned after SLOG_DAYS. This is the switch for the
+       set that an argument rests on, so a suspension is not quietly undone a
+       year later by the retention rule. Admins only, and it records who held
+       it and when, because "who decided to keep this" is part of the evidence
+       rather than separate from it. */
+    if (p === '/api/session-keep' && req.method === 'PUT') {
+      let obj;
+      try { obj = JSON.parse(await body(req)); }
+      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      const key = sessionKey(obj && obj.session);
+      const rows = sessionRows();
+      const at = key ? findSession(rows, key, obj.who) : -1;
+      if (at < 0) return sendJson(res, 404, { error: 'no such session' });
+      const on = !!(obj && obj.keep);
+      rows[at].keep = on;
+      if (on) { rows[at].keptBy = String(w.name || ''); rows[at].keptAt = Date.now(); }
+      else { delete rows[at].keptBy; delete rows[at].keptAt; }
+      if (!putSessions(rows)) return sendJson(res, 500, { error: 'could not save' });
+      return sendJson(res, 200, { ok: true, keep: on });
     }
 
     /* The sheet part: what a staff member writes against one session.

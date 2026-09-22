@@ -204,6 +204,37 @@ main{overflow-y:auto;padding:34px 40px 90px;min-width:0}
 .pbody{border-top:1px solid var(--line)}
 .pbody .tablewrap{border:0;border-radius:0;background:none}
 .pbody table.board{min-width:0}
+
+/* ------------------------------------------------ one session's logs -- */
+.moreWrap{padding:2px 12px 12px}
+.moreBtn,.keepBtn{font:inherit;font-size:12.5px;cursor:pointer;border-radius:6px;
+  border:1px solid var(--line2);background:var(--panel);color:var(--dim);padding:4px 10px}
+.moreBtn:hover,.keepBtn:hover{border-color:var(--gold-dim);color:var(--text)}
+.keepBtn{margin-left:7px}
+.keepBtn.on{border-color:var(--gold);color:var(--gold);background:rgba(201,162,75,.08)}
+.keptBy{margin-left:9px;font:11.5px var(--mono);color:var(--faint)}
+.logs{margin-top:9px;display:grid;gap:6px}
+.logs .none{font-size:13px;color:var(--faint);padding:2px 2px 4px}
+.prov{font:12px var(--mono);color:var(--faint);padding:2px 2px 6px;line-height:1.7;word-break:break-word}
+.prov b{color:var(--dim);font-weight:500}
+.prov .warn{color:var(--fail)}
+.logf{border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
+.logf>summary{cursor:pointer;list-style:none;padding:8px 11px;display:flex;align-items:center;gap:10px}
+.logf>summary::-webkit-details-marker{display:none}
+.logf>summary::marker{content:''}
+.logf>summary:hover{background:rgba(201,162,75,.05)}
+.logf>summary:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.logf[open]{border-color:var(--gold-dim)}
+.logf .nm{font:600 13px var(--mono);color:var(--text);flex:1;min-width:0;word-break:break-all}
+.logf .sz{font:11.5px var(--mono);color:var(--faint);white-space:nowrap}
+.logf .chev{color:var(--faint);font-size:11px;transition:transform .12s}
+.logf[open] .chev{transform:rotate(90deg);color:var(--gold)}
+.dl{flex:none;font:inherit;font-size:11.5px;cursor:pointer;border-radius:5px;padding:2px 8px;
+  border:1px solid var(--line2);background:var(--raised);color:var(--dim)}
+.dl:hover{border-color:var(--gold);color:var(--gold)}
+.logf pre{margin:0;padding:10px 12px;border-top:1px solid var(--line);background:var(--bg);
+  font:12px/1.55 var(--mono);color:var(--dim);white-space:pre-wrap;word-break:break-word;
+  max-height:420px;overflow:auto}
 @media(max-width:760px){
   .person>summary{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 14px}
   .pf .val.hrs,.pf .val.when{white-space:normal}
@@ -844,6 +875,107 @@ function sessionPeople(list) {
               .sort(function (a, b) { return b.last - a.last; });
 }
 
+/*
+  One session's logs, behind a button.
+
+  Not fetched with the page. Most sessions are never opened and a log set is
+  up to a megabyte, so the page would carry tens of megabytes nobody reads.
+  One request per session, when somebody asks for it.
+*/
+function bytesFor(n) {
+  var b = Number(n) || 0;
+  if (b < 1024) return b + ' B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+  return (b / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+/* Straight to a file on the person's machine, made in the browser out of text
+   it already has. No round trip, and it works for the server slice too, which
+   was never a file anywhere. */
+function downloadText(name, text) {
+  try {
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      try { URL.revokeObjectURL(a.href); document.body.removeChild(a); } catch (e) { }
+    }, 0);
+  } catch (e) { saidNow('could not download'); }
+}
+
+/* Every log kept for this session, so the download names cannot collide and
+   the click handlers have something to read. Keyed by session id. */
+var LOGS = {};
+
+function logFileHtml(sid, name, text) {
+  return '<details class="logf">' +
+    '<summary>' +
+      '<span class="chev">&#9654;</span>' +
+      '<span class="nm">' + esc(name) + '</span>' +
+      '<span class="sz">' + esc(bytesFor(text.length)) + '</span>' +
+      '<button class="dl" data-s="' + esc(sid) + '" data-n="' + esc(name) + '">Download</button>' +
+    '</summary>' +
+    '<pre>' + esc(text) + '</pre>' +
+  '</details>';
+}
+
+function drawLogs(box, sid, d) {
+  var out = '';
+
+  /* Where this came from, because the point of keeping it is to be able to
+     say so later. A second set having been tried is worth shouting about. */
+  if (d.sent) {
+    out += '<div class="prov">' +
+      '<b>sent by</b> ' + esc(d.sent.who || 'unknown') +
+      '  <b>at</b> ' + esc(d.sent.at ? new Date(d.sent.at).toLocaleString() : 'unknown') +
+      '  <b>total</b> ' + esc(bytesFor(d.sent.bytes)) +
+      (d.sent.resent
+        ? '<br><span class="warn">A further set was sent for this session ' +
+          esc(d.sent.resent) + ' time(s) and refused. The first set is what is kept.</span>'
+        : '') +
+      '</div>';
+  }
+
+  var names = Object.keys(d.client || {});
+  LOGS[sid] = {};
+  names.forEach(function (n) { LOGS[sid][n] = d.client[n]; });
+
+  if (names.length) {
+    names.forEach(function (n) { out += logFileHtml(sid, n, d.client[n]); });
+  } else {
+    out += '<div class="none">No logs came from that machine. The launcher sends them ' +
+      'as the game closes, so a session from before that was added, or one whose ' +
+      'launcher never came back, has none.</div>';
+  }
+
+  var srv = (d.server || []).join('\n');
+  if (srv) {
+    var sn = 'server-' + (d.channel === 'dev' ? 'dev' : 'main') + '.log';
+    LOGS[sid][sn] = srv;
+    out += logFileHtml(sid, sn, srv);
+  } else {
+    out += '<div class="none">Nothing in the game server\'s log for that window' +
+      (d.serverWhy ? ': ' + esc(d.serverWhy) : '.') + '</div>';
+  }
+
+  box.innerHTML = out;
+
+  each(box, 'button.dl', function (b) {
+    b.onclick = function (ev) {
+      /* Inside a summary, so a plain click would also toggle the details. */
+      ev.preventDefault();
+      ev.stopPropagation();
+      var s = b.dataset.s, n = b.dataset.n;
+      var text = (LOGS[s] || {})[n];
+      if (text == null) { saidNow('nothing to download'); return; }
+      downloadText(s.slice(0, 8) + '-' + n, text);
+    };
+  });
+}
+
 /* The sessions of one person, as the table this page used to be. */
 function sessionTable(rows) {
   var out = '<div class="tablewrap"><table class="board"><thead><tr>' +
@@ -855,10 +987,35 @@ function sessionTable(rows) {
       '<td data-label="Character"><div class="cell">' +
         (s.profile ? '<code>' + esc(s.profile) + '</code>' : 'none picked') + '</div></td>' +
       '<td data-label="Build"><div class="cell">' + esc(s.version || 'not said') + '</div></td>' +
+      /*
+        Where they actually GOT TO, not which feed the launcher follows, and
+        as precisely as the row allows.
+
+        A character is picked at the game's main menu, so a session with no
+        character never reached either world: it got no further than the
+        launcher and the menu in front of it. Calling that "main" put a session
+        on the live server that was never on it, which is exactly the kind of
+        thing somebody would later be asked to account for.
+
+        Three answers, most precise first. Reached a world: main or dev.
+        Did not, but the build is known: Main Launcher or Dev Launcher. Did
+        not and the build is not known either, which is a row from a launcher
+        that sent no channel at all: Launcher.
+      */
       '<td data-label="Where"><div class="cell">' +
-        (s.channel === 'dev'
-          ? '<span class="pill left">dev</span>'
-          : '<span class="pill pass">main</span>') + '</div></td>' +
+        (s.profile
+          ? (s.channel === 'dev'
+              ? '<span class="pill left">dev</span>'
+              : '<span class="pill pass">main</span>')
+          : (s.channel === 'dev'
+              ? '<span class="pill skip">Dev Launcher</span>' +
+                '<div class="said">never picked a character, so never reached the dev world</div>'
+              : s.channel === 'main'
+                ? '<span class="pill skip">Main Launcher</span>' +
+                  '<div class="said">never picked a character, so never reached the main world</div>'
+                : '<span class="pill skip">Launcher</span>' +
+                  '<div class="said">never picked a character, and the build was not reported</div>')
+          ) + '</div></td>' +
       '<td data-label="Started"><div class="cell">' +
         (s.start
           ? esc(new Date(s.start).toLocaleString())
@@ -873,9 +1030,85 @@ function sessionTable(rows) {
         '</div></td>' +
       '<td data-label="For"><div class="cell">' +
         (open ? 'open' : esc(forMins(s.minutes))) + '</div></td>' +
-    '</tr>';
+    '</tr>' +
+    /* The logs sit in a row of their own under the session, spanning the
+       table, so the columns above stay readable and a long log does not
+       stretch a cell. */
+    '<tr class="morerow"><td colspan="6">' +
+      '<div class="moreWrap">' +
+        '<button class="moreBtn" data-s="' + esc(s.session) + '" data-w="' + esc(s.who) + '">More details</button>' +
+        /* Everything else ages out after a year. This holds one session's
+           logs indefinitely, for the set an argument or a suspension rests
+           on, so the retention rule cannot quietly undo it later. */
+        '<button class="keepBtn' + (s.keep ? ' on' : '') + '" data-s="' + esc(s.session) +
+          '" data-w="' + esc(s.who) + '">' +
+          (s.keep ? 'Kept as evidence' : 'Keep as evidence') + '</button>' +
+        (s.keptBy ? '<span class="keptBy">held by ' + esc(s.keptBy) + '</span>' : '') +
+        '<div class="logs" hidden></div>' +
+      '</div>' +
+    '</td></tr>';
   });
   return out + '</tbody></table></div>';
+}
+
+/* The More details buttons on whatever is currently drawn. Called after every
+   draw, and again each time a card is opened, because a card's table is in
+   the page from the start and only hidden by details. */
+function wireMore(root) {
+  each(root, 'button.keepBtn', function (b) {
+    if (b.dataset.wired) return;
+    b.dataset.wired = '1';
+    b.onclick = function () {
+      var on = !b.classList.contains('on');
+      b.disabled = true;
+      saidNow('saving');
+      api('/api/session-keep', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: b.dataset.s, who: b.dataset.w, keep: on })
+      }).then(function (r) {
+        b.disabled = false;
+        saidNow(r.ok ? 'saved' : 'did not save');
+        if (!r.ok) return;
+        b.classList.toggle('on', on);
+        b.textContent = on ? 'Kept as evidence' : 'Keep as evidence';
+        S.sessions.forEach(function (s) {
+          if (s.session === b.dataset.s && String(s.who) === String(b.dataset.w)) s.keep = on;
+        });
+      }).catch(function () { b.disabled = false; saidNow('did not save'); });
+    };
+  });
+
+  each(root, 'button.moreBtn', function (b) {
+    if (b.dataset.wired) return;
+    b.dataset.wired = '1';
+    b.onclick = function () {
+      var box = b.parentNode.querySelector('.logs');
+      if (!box) return;
+      /* Second press folds it away rather than asking again. */
+      if (!box.hidden) { box.hidden = true; b.textContent = 'More details'; return; }
+      if (box.dataset.got) { box.hidden = false; b.textContent = 'Hide details'; return; }
+
+      b.disabled = true;
+      b.textContent = 'Fetching...';
+      api('/api/session-logs?session=' + encodeURIComponent(b.dataset.s) +
+          '&who=' + encodeURIComponent(b.dataset.w))
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (d) {
+          drawLogs(box, b.dataset.s, d);
+          box.dataset.got = '1';
+          box.hidden = false;
+          b.disabled = false;
+          b.textContent = 'Hide details';
+        })
+        .catch(function (e) {
+          box.innerHTML = '<div class="none">Could not fetch the logs' +
+            (e === 404 ? ': the site has no record of that session.' : '.') + '</div>';
+          box.hidden = false;
+          b.disabled = false;
+          b.textContent = 'More details';
+        });
+    };
+  });
 }
 
 function drawSessions() {
@@ -925,13 +1158,17 @@ function drawSessions() {
 
   out += '<p class="lede" style="margin-top:20px">One card a person, newest ' +
     'first by when they last played. Open one for every session they have had: ' +
-    'which character, which build, and whether it was the main server or dev. ' +
+    'which character, which build, and where they got to. Where reads Launcher ' +
+    'when no character was ever picked, which means the session never reached ' +
+    'either world. More details under a session fetches the logs from that ' +
+    'machine and the game server\'s own lines for that window. ' +
     'The launcher sends both ends of every session, so a session appears as ' +
     'somebody starts and fills in when they stop. One still open is somebody ' +
     'playing right now, or a machine that never got the closing word out. ' +
     'Total playtime counts only the sessions that reported an end. Nothing ' +
     'here is typed by the person playing.</p>';
   el('page').innerHTML = out;
+  wireMore(el('page'));
 }
 
 /* ---------------------------------------------------------------- draw -- */

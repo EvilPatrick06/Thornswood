@@ -386,7 +386,68 @@ namespace Thornswood
         public static void SessionStart(int profileId)
         {
             if (session.Length == 0) NewSession();
+            MarkPending(session);
             Send("start", Site + "/api/play/start", Head(profileId) + "}");
+        }
+
+        /// <summary>
+        /// The session whose logs have not been sent yet, or "".
+        ///
+        /// Written when a session starts and cleared when its logs are safely
+        /// up. If the launcher is killed, or the machine goes down, or the
+        /// game takes the launcher with it, SessionEnd never runs and the logs
+        /// are still sitting on disk. This is what remembers them, so the next
+        /// start can send them before anything wipes them.
+        /// </summary>
+        static string PendingFile { get { return Path.Combine(Folder, "logs-pending.txt"); } }
+
+        static void MarkPending(string id)
+        {
+            try
+            {
+                Directory.CreateDirectory(Folder);
+                File.WriteAllText(PendingFile, id);
+            }
+            catch { }
+        }
+
+        static void ClearPending()
+        {
+            try { if (File.Exists(PendingFile)) File.Delete(PendingFile); }
+            catch { }
+        }
+
+        /// <summary>
+        /// Logs from a session that ended without sending them, sent now.
+        ///
+        /// Called once as the launcher starts, BEFORE Play can run, because
+        /// the game truncates its own logs at every game start and after that
+        /// there is nothing left to send. The crash that took the launcher
+        /// down is exactly the session somebody wants to read afterwards, and
+        /// until now it was the one that was always lost.
+        ///
+        /// Call it from a pool thread.
+        /// </summary>
+        public static void SendPendingLogs()
+        {
+            try
+            {
+                if (!Linked) return;
+                string id = "";
+                try { if (File.Exists(PendingFile)) id = (File.ReadAllText(PendingFile) ?? "").Trim(); }
+                catch { return; }
+                if (id.Length < 8) { ClearPending(); return; }
+
+                string was = session;
+                session = id;
+                try
+                {
+                    Note("The last session ended without sending its logs. Sending them now.");
+                    SessionLogs();
+                }
+                finally { session = was; }
+            }
+            catch { }
         }
 
         /// <summary>
@@ -408,6 +469,118 @@ namespace Thornswood
                  Head(profileId) +
                  ",\"minutes\":" + m.ToString("F1", CultureInfo.InvariantCulture) +
                  ",\"why\":\"" + reason + "\"}");
+        }
+
+        /// <summary>
+        /// The session's logs, up to the site, as the game closes.
+        ///
+        /// THIS MOMENT AND NO OTHER. The game truncates its own logs under
+        /// Data\Platform every time it starts, so a log nobody collected here
+        /// is gone for good. That is why every report so far has begun by
+        /// asking the person to go and find four files and paste them, which
+        /// they mostly cannot and reasonably do not want to.
+        ///
+        /// Sent once per session. The site writes a set once and refuses a
+        /// second for the same id, because these are meant to stand up when
+        /// somebody is suspended, and evidence the accused can overwrite is
+        /// not evidence.
+        ///
+        /// Nothing here is read from the person: these are the launcher's own
+        /// log and the game's own logs. Called from a pool thread, after
+        /// SessionEnd so the row it attaches to exists.
+        /// </summary>
+        public static void SessionLogs()
+        {
+            try
+            {
+                if (!Linked || session.Length == 0) return;
+
+                // Name, then where it is. The names are the ones the site
+                // accepts; anything else it drops on the floor.
+                string plat = Path.Combine(Paths.Game, "Data\\Platform");
+                string[][] want = new string[][] {
+                    new string[] { "launcher.log",               Path.Combine(Folder, "launcher.log") },
+                    new string[] { "thornswood-front.log",       Path.Combine(plat, "thornswood-front.log") },
+                    new string[] { "thornswood-voice.log",       Path.Combine(plat, "thornswood-voice.log") },
+                    new string[] { "thornswood-emotes.log",      Path.Combine(plat, "thornswood-emotes.log") },
+                    new string[] { "thornswood-input.log",       Path.Combine(plat, "thornswood-input.log") },
+                    new string[] { "thornswood-dress.log",       Path.Combine(plat, "thornswood-dress.log") },
+                    new string[] { "thornswood-loadorder.txt",   Path.Combine(plat, "thornswood-loadorder.txt") },
+                    new string[] { "thornswood-plugins-light.txt", Path.Combine(plat, "thornswood-plugins-light.txt") }
+                };
+
+                var sb = new StringBuilder();
+                sb.Append("{\"ticket\":\"").Append(Escape(Ticket)).Append("\"");
+                sb.Append(",\"session\":\"").Append(Escape(session)).Append("\"");
+                sb.Append(",\"logs\":{");
+                int n = 0;
+                for (int i = 0; i < want.Length; i++)
+                {
+                    string text = ReadLogTail(want[i][1]);
+                    if (text.Length == 0) continue;
+                    if (n > 0) sb.Append(",");
+                    sb.Append("\"").Append(Escape(want[i][0])).Append("\":\"").Append(Escape(text)).Append("\"");
+                    n++;
+                }
+                sb.Append("}}");
+                if (n == 0) return;
+
+                string reply;
+                int code = PostJson(Site + "/api/play/logs", sb.ToString(), out reply);
+
+                // 200 is stored, 409 is a set already there. Both mean there
+                // is nothing still owed for this session, so the marker goes.
+                // 404 means the site has no row for it and never will, so the
+                // marker goes too rather than being retried at every start for
+                // ever. Anything else is worth trying again next time.
+                if (code == 200) { ClearPending(); Note("Sent " + n + " log(s) from this session to thornswood.net."); return; }
+                if (code == 409) { ClearPending(); Note("This session's logs were already sent; the site kept the first set."); return; }
+                if (code == 404) { ClearPending(); Note("The site has no record of that session, so its logs were not kept."); return; }
+                Note("Could not send this session's logs: " +
+                     (code == 0 ? "the site could not be reached" : "it answered " + code) +
+                     ". They will be sent at the next start.");
+            }
+            catch (Exception ex)
+            {
+                Note("Could not send this session's logs: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// The last of a log, or "" when there is nothing worth sending.
+        ///
+        /// The tail, because a crash is at the end and the front of a long log
+        /// is the same twenty lines of start-up every time. FileShare is
+        /// everything: the game may still be letting go of these, and a log
+        /// that cannot be opened is worth skipping rather than worth throwing.
+        /// </summary>
+        const int LogTailBytes = 192 * 1024;
+        static string ReadLogTail(string path)
+        {
+            try
+            {
+                if (!File.Exists(path)) return "";
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read,
+                                               FileShare.ReadWrite | FileShare.Delete))
+                {
+                    long len = fs.Length;
+                    if (len == 0) return "";
+                    int take = (int)Math.Min(len, LogTailBytes);
+                    fs.Seek(len - take, SeekOrigin.Begin);
+                    var buf = new byte[take];
+                    int got = fs.Read(buf, 0, take);
+                    string s = Encoding.UTF8.GetString(buf, 0, got);
+                    // A tail almost always starts mid line. Drop the fragment
+                    // so the first line in the file is a whole one.
+                    if (len > take)
+                    {
+                        int nl = s.IndexOf('\n');
+                        if (nl >= 0 && nl + 1 < s.Length) s = s.Substring(nl + 1);
+                    }
+                    return s;
+                }
+            }
+            catch { return ""; }
         }
 
         /// <summary>Everything both ends send, without the closing brace.</summary>
