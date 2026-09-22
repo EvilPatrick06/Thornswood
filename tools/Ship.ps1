@@ -1,4 +1,4 @@
-<#
+﻿<#
   Ship.ps1
 
   One command. Bumps the launcher version, builds it, and publishes everything
@@ -187,16 +187,66 @@ elseif ($Dev) {
     # again at .1 whenever main has moved on. The launcher compares numbers
     # part by part, so 1.1.36 beats every 1.1.35.x and a promoted main release
     # always wins.
+    #
+    # THE BASE IS THE HIGHER OF THIS BRANCH AND WHAT MAIN HAS PUBLISHED, and
+    # it used to be this branch alone.
+    #
+    # 21 September. 1.1.76 was rolled back, which put main on 1.1.77, and the
+    # three fixes that came off it went onto a branch cut BEFORE that bump, so
+    # its Updater.cs still said 1.1.76. Shipping that branch to dev produced
+    # 1.1.76.1, and the run said so plainly: "main is on 1.1.77, this one is on
+    # 1.1.76.1". Updater.IsNewer compares part by part, so 1.1.76.1 is LOWER
+    # than 1.1.77, and every dev launcher that had taken the 1.1.77 reset was
+    # never offered the build at all. Published, uploaded, announced in Discord,
+    # and unreachable.
+    #
+    # The comment above already stated the rule this broke: a promoted main
+    # release always wins. That holds while dev ships from main. It stops
+    # holding the moment dev ships from a branch behind main, which is exactly
+    # what a rollback forces, because a rollback is the case where main moves
+    # forward and the work does not.
+    #
+    # Reading the MAIN feed rather than main's Updater.cs is deliberate: what
+    # matters is the number people's launchers actually have, and that is the
+    # number that was published.
+    function Compare-Ver([string]$a, [string]$b) {
+        $x = @(); $y = @()
+        foreach ($p in ($a -split '\.')) { $k = 0; if ([int]::TryParse($p, [ref]$k)) { $x += $k } }
+        foreach ($p in ($b -split '\.')) { $k = 0; if ([int]::TryParse($p, [ref]$k)) { $y += $k } }
+        for ($i = 0; $i -lt [Math]::Max($x.Count, $y.Count); $i++) {
+            $u = if ($i -lt $x.Count) { $x[$i] } else { 0 }
+            $v = if ($i -lt $y.Count) { $y[$i] } else { 0 }
+            if ($u -ne $v) { return $(if ($u -gt $v) { 1 } else { -1 }) }
+        }
+        return 0
+    }
+
+    $base = $current
+    try {
+        $mainWas = [string]((Get-Content (Join-Path $MainReleaseDir 'version.json') -Raw | ConvertFrom-Json).launcherVersion)
+        # Only the first three parts of main's number. Main never carries a
+        # fourth, but reading defensively costs nothing and a 1.1.77.2 base
+        # would produce a five part version nobody can read.
+        if ($mainWas) {
+            $mb = ($mainWas -split '\.')
+            if ($mb.Count -ge 3) { $mainWas = ($mb[0..2] -join '.') }
+            if ((Compare-Ver $mainWas $base) -gt 0) {
+                Say "  this branch says $base and main has published $mainWas, so dev climbs from $mainWas" 'Yellow'
+                $base = $mainWas
+            }
+        }
+    } catch { }
+
     $n = 1
     try {
         $was = [string]((Get-Content (Join-Path $ReleaseDir 'version.json') -Raw | ConvertFrom-Json).launcherVersion)
-        if ($was.StartsWith("$current.")) {
-            $tail = $was.Substring($current.Length + 1)
+        if ($was.StartsWith("$base.")) {
+            $tail = $was.Substring($base.Length + 1)
             $k = 0
             if ([int]::TryParse($tail, [ref]$k)) { $n = $k + 1 }
         }
     } catch { }
-    $target = "$current.$n"
+    $target = "$base.$n"
 }
 elseif ($NoBump) {
     $target = $current
