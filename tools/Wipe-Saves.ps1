@@ -44,13 +44,31 @@
   problem with no half broken characters in it.
 
   Stop before you run this if people are on. It puts them out.
+
+  It asks you to type WIPE before it does anything. -Yes answers that, for a
+  release being run start to finish without somebody sitting at it:
+
+    .\Wipe-Saves.ps1          asks
+    .\Wipe-Saves.ps1 -Yes     does not ask
+
+  Read-Host reads the console rather than standard input, so a wipe run from a
+  script or from an agent cannot answer the question however it is fed: it comes
+  back empty and the script stops with "Left alone.". That is the whole reason
+  this switch exists, and it is a switch rather than the question going away,
+  because the question is what stops a wipe nobody meant to run.
 #>
 [CmdletBinding()]
 param(
   [string]$Vps  = '192.135.112.23',
   [string]$User = 'Administrator',
-  [string]$Task = 'Thornswood Server',
-  [switch]$NoPause
+  # There was a -Task here naming one scheduled task. It is gone because the
+  # tasks are now read off the box, one per server folder found, and a
+  # parameter that no longer decides anything is worse than no parameter: it
+  # reads like it works.
+  [switch]$NoPause,
+  # Skip the typed confirmation. The list of what would go is still printed
+  # first, so an unattended run still leaves a record of exactly what it took.
+  [switch]$Yes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -117,8 +135,30 @@ foreach (`$d in (Get-ChildItem 'C:\' -Directory -EA SilentlyContinue)) {
   if (Test-Path (Join-Path `$d.FullName 'server-settings.json')) { `$roots += `$d.FullName }
 }
 if (`$roots.Count -eq 0) { 'NOROOT'; exit }
+# Which scheduled task runs out of which folder, read off the task's own action
+# rather than guessed from the folder name. The live one is 'Thornswood Server'
+# and the dev one is 'Thornswood Dev Server', which no transform of
+# 'Thornswood-Server-Dev' produces, so guessing it would stop the wrong server.
+#
+# Each task takes the LONGEST root its action mentions, not the first one that
+# matches. C:\Thornswood-Server is a prefix of C:\Thornswood-Server-Dev, so a
+# plain contains test gives the dev task the live folder, and on 22 September
+# that stopped the dev server twice and moved the live world out from under a
+# server that was still running.
+`$taskOf = @{}
+foreach (`$t in (Get-ScheduledTask -EA SilentlyContinue)) {
+  foreach (`$a in @(`$t.Actions)) {
+    `$line = "`$(`$a.Execute) `$(`$a.Arguments) `$(`$a.WorkingDirectory)"
+    `$best = ''
+    foreach (`$r in `$roots) {
+      if (`$line -like ('*' + `$r + '*') -and `$r.Length -gt `$best.Length) { `$best = `$r }
+    }
+    if (`$best -ne '' -and -not `$taskOf.ContainsKey(`$best)) { `$taskOf[`$best] = `$t.TaskName }
+  }
+}
 foreach (`$r in `$roots) {
   'ROOT|' + `$r
+  if (`$taskOf.ContainsKey(`$r)) { 'TASK|' + `$r + '|' + `$taskOf[`$r] } else { 'NOTASK|' + `$r }
   foreach (`$n in @('world', 'private\characters.json', 'data\property.json', 'data\farm-claims.json')) {
     `$p = Join-Path `$r `$n
     if (-not (Test-Path `$p)) { 'NONE|' + `$n; continue }
@@ -137,14 +177,22 @@ foreach (`$r in `$roots) {
 }
 "@
 
-$root = $null
-$items = @()
+# Every root, not the last one. This held a single $root until 22 September,
+# and the survey emits a ROOT line per server, so it kept whichever came last.
+# On the VPS that is C:\Thornswood-Server-Dev, so every wipe ever run took the
+# dev world, left the live world alone, and printed a list of both as though it
+# had taken both. Nothing said otherwise and the live characters stayed.
+$roots  = @()
+$taskOf = @{}
+$items  = @()
 foreach ($l in $lines) {
   $s = "$l"
   if ($s -eq 'NOROOT') { Die 'No server-settings.json anywhere under C:\ on that machine, so there is no server to wipe.' }
   $bits = $s -split '\|'
   switch ($bits[0]) {
-    'ROOT'  { $root = $bits[1]; Say "  server at $root" 'DarkGray' }
+    'ROOT'   { $roots += $bits[1]; Say "  server at $($bits[1])" 'DarkGray' }
+    'TASK'   { $taskOf[$bits[1]] = $bits[2]; Say ("    run by the '{0}' task" -f $bits[2]) 'DarkGray' }
+    'NOTASK' { Say '    no scheduled task runs out of this folder, so it is moved but not restarted' 'Yellow' }
     'ITEM'  { $items += $bits[1]; Say ("  {0,8:n1} MB  {1}   ({2} file(s))" -f ([int64]$bits[2] / 1MB), $bits[1], $bits[3]) 'Yellow' }
     'CHARS' { Say ("  {0} character record(s) in characters.json" -f $bits[1]) 'Yellow' }
     'NONE'  { Say ("  not there: {0}" -f $bits[1]) 'DarkGray' }
@@ -158,14 +206,28 @@ Say '  Every character anybody has made on this server goes back to nothing.' 'R
 Say '  They are renamed rather than deleted, so this is undoable today, but' 'DarkGray'
 Say '  anybody who logs in after it starts over and that part is not.' 'DarkGray'
 Write-Host ''
-$typed = Read-Host '  Type WIPE to go ahead'
-if ($typed -cne 'WIPE') { Die 'Left alone.' }
+if ($Yes) {
+  Say '  -Yes was passed, so it is not asking. Going ahead.' 'Yellow'
+}
+else {
+  $typed = Read-Host '  Type WIPE to go ahead'
+  if ($typed -cne 'WIPE') { Die 'Left alone.' }
+}
 
 # ------------------------------------------------------------------- do it ---
-Head 'Stopping the server'
+# Both lists go across as literals. A single quote inside either would end the
+# string early on the far side, so it is doubled first.
+function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ',') }
+$rootsLit = Lit $roots
+$tasksLit = Lit @($roots | Where-Object { $taskOf.ContainsKey($_) } | ForEach-Object { $taskOf[$_] })
+
+Head 'Stopping the servers'
 $out = Remote @"
 `$ErrorActionPreference = 'Continue'
-`$null = & schtasks /end /tn '$Task' 2>&1
+foreach (`$t in @($tasksLit)) {
+  `$null = & schtasks /end /tn `$t 2>&1
+  'ended ' + `$t
+}
 Start-Sleep -Seconds 3
 foreach (`$p in (Get-Process -Name 'skymp*','node' -EA SilentlyContinue)) {
   if ("`$(`$p.Path)" -like '*Thornswood-Server*') { 'still running: ' + `$p.ProcessName + ' ' + `$p.Id }
@@ -177,7 +239,7 @@ foreach ($l in $out) { Say "  $l" }
 Head 'Moving the old storage aside'
 $moved = Remote @"
 `$ErrorActionPreference = 'Continue'
-`$r = '$root'
+foreach (`$r in @($rootsLit)) {
 foreach (`$n in @('world', 'private\characters.json', 'data\property.json', 'data\farm-claims.json')) {
   `$p = Join-Path `$r `$n
   if (-not (Test-Path `$p)) { continue }
@@ -192,6 +254,7 @@ foreach (`$n in @('world', 'private\characters.json', 'data\property.json', 'dat
   try { Move-Item -LiteralPath `$p -Destination `$to -Force -EA Stop; 'moved  ' + `$p + '  ->  ' + `$to }
   catch { 'FAILED ' + `$p + '  ' + `$_.Exception.Message }
 }
+}
 "@
 $bad = $false
 foreach ($l in $moved) {
@@ -202,18 +265,23 @@ if ($bad) {
   Say '  whatever is holding those files has let go.' 'Yellow'
 }
 
-Head 'Starting it again'
+Head 'Starting them again'
 $out = Remote @"
 `$ErrorActionPreference = 'Continue'
-`$null = & schtasks /run /tn '$Task' 2>&1
+foreach (`$t in @($tasksLit)) { `$null = & schtasks /run /tn `$t 2>&1 }
 Start-Sleep -Seconds 12
-`$r = '$root'
-`$lg = Join-Path `$r 'server.log'
-if (Test-Path `$lg) { Get-Content `$lg -Tail 6 | ForEach-Object { 'log  ' + `$_ } }
-`$cf = Join-Path `$r 'private\characters.json'
-if (Test-Path `$cf) {
-  try { `$j = Get-Content `$cf -Raw | ConvertFrom-Json; 'now  ' + @(`$j).Count + ' character record(s)' } catch { 'now  characters.json is there but unreadable yet' }
-} else { 'now  no characters.json yet, which is what empty looks like' }
+foreach (`$r in @($rootsLit)) {
+  `$r
+  `$cf = Join-Path `$r 'private\characters.json'
+  if (Test-Path `$cf) {
+    try { `$j = Get-Content `$cf -Raw | ConvertFrom-Json; '  now  ' + @(`$j).Count + ' character record(s)' } catch { '  now  characters.json is there but unreadable yet' }
+  } else { '  now  no characters.json yet, which is what empty looks like' }
+  # The tail is read per server and only two lines each, because six lines of
+  # one server's log was what made a wipe that touched one of them read as
+  # though it had done the lot.
+  `$lg = Join-Path `$r 'server.log'
+  if (Test-Path `$lg) { Get-Content `$lg -Tail 2 | ForEach-Object { '  log  ' + `$_ } }
+}
 "@
 foreach ($l in $out) { Say "  $l" 'DarkGray' }
 
