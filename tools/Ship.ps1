@@ -788,9 +788,18 @@ if (-not $DryRun -and -not $NoAnnounce) {
     Head 'Telling the server'
     $announce = Join-Path $Here 'Request-Restart.ps1'
     if (Test-Path -LiteralPath $announce) {
+        # THE TITLE ONLY, never the whole note.
+        #
+        # This is a line on screen in front of somebody mid-sentence with five
+        # minutes before they are put back to the launcher. The full note has a
+        # body and bullets now, and the 1.1.80 release sent all of it: four
+        # bullet points and a paragraph, as an in-game warning. The News tab is
+        # where the rest belongs and it is one click away.
+        $why = ($Notes -split "`r?`n")[0].Trim()
+        if (-not $why) { $why = $Notes }
         try {
-            if ($Dev) { & $announce -Minutes $AnnounceMinutes -Mode update -Why $Notes -Data 'C:/Thornswood-Server-Dev/data' }
-            else      { & $announce -Minutes $AnnounceMinutes -Mode update -Why $Notes }
+            if ($Dev) { & $announce -Minutes $AnnounceMinutes -Mode update -Why $why -Data 'C:/Thornswood-Server-Dev/data' }
+            else      { & $announce -Minutes $AnnounceMinutes -Mode update -Why $why }
         } catch {
             Say "  could not announce it: $_" 'Yellow'
             Say '  Ship still worked. Tell people yourself, or run' 'DarkGray'

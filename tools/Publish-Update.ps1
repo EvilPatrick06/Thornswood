@@ -1400,7 +1400,16 @@ if (-not $NoPush) {
         }
         else {
             & git add version.json
-            & git commit -m "Update $Id$(if ($Notes) { ": $Notes" })" 2>&1 | Relay
+            # The title as the subject and the rest as the body, which is what
+            # a commit message is. A note has a body and bullets now, and
+            # flattening the lot onto the subject line gave the 1.1.80 release
+            # a subject four hundred characters long that no git tool will
+            # ever show whole. Two -m arguments is how git takes a body.
+            $noteTitle = if ($Notes) { ($Notes -split "`r?`n")[0].Trim() } else { '' }
+            $noteBody  = if ($Notes) { (($Notes -split "`r?`n") | Select-Object -Skip 1) -join "`n" } else { '' }
+            $subject = "Update $Id$(if ($noteTitle) { ": $noteTitle" })"
+            if ($noteBody.Trim()) { & git commit -m $subject -m $noteBody.Trim() 2>&1 | Relay }
+            else                  { & git commit -m $subject 2>&1 | Relay }
             $rcCommit = $LASTEXITCODE
             & git push -u origin HEAD 2>&1 | Relay
             $rcPush = $LASTEXITCODE
