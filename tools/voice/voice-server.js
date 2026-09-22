@@ -54,7 +54,11 @@ const HERE = __dirname;
  *
  * Bump it whenever anything in this file changes behaviour.
  */
-const BUILD = 'owners-5';
+// Bumped whenever what this serves changes, because /health reports it and
+// that string is the only way to tell from outside which copy is running. It
+// stayed at owners-5 across the chat log going in on 22 September, so the
+// health check answered identically before and after and proved nothing.
+const BUILD = 'chat-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
