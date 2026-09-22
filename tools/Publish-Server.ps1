@@ -1,4 +1,4 @@
-<#
+﻿<#
   Publish-Server.ps1
 
   Run this ON YOUR LAPTOP. It packs the server, sends it to the VPS, installs it
@@ -300,13 +300,31 @@ if ($LASTEXITCODE -ne 0) { Die "the installer on the VPS exited with $LASTEXITCO
 
 # ---------------------------------------------------------------- verify -----
 # Game traffic is UDP and there is nothing to connect to, so the resources
-# folder on 3000 is what a probe from here can actually reach.
+# folder is what a probe from here can actually reach.
+#
+# THE PORTS ARE THE CHANNEL'S, AND THEY USED TO BE THE LIVE ONES EITHER WAY.
+#
+# 21 September, on the first dev publish of the engine changes, this printed
+# "Thornswood is up at 192.135.112.23:7777" at the end of a run that had
+# correctly said "dev channel: port 7787" at the top. Both numbers here were
+# written in, so a dev publish probed the LIVE resources port, got an answer
+# from the LIVE server, and reported a healthy dev server without ever having
+# asked it anything. It would have said exactly the same thing if the dev
+# server had failed to start, which is the one case this block exists for.
+#
+# The resources port is not a setting. skymp5-server/ts/ui.ts:102 derives it:
+# 3000 when the game port is 7777, and game port plus one otherwise. So dev is
+# 7788 and there is no clash with live, and this is where that rule is written
+# down on our side of the fence.
+$GamePort = if ($IsDev) { 7787 } else { 7777 }
+$ResPort  = if ($GamePort -eq 7777) { 3000 } else { $GamePort + 1 }
+
 Head 'Checking it answers'
 $up = $false
 for ($i = 0; $i -lt 30; $i++) {
     try {
         $c = New-Object Net.Sockets.TcpClient
-        $null = $c.BeginConnect($VpsHost, 3000, $null, $null).AsyncWaitHandle.WaitOne(1000)
+        $null = $c.BeginConnect($VpsHost, $ResPort, $null, $null).AsyncWaitHandle.WaitOne(1000)
         $up = $c.Connected
         $c.Close()
     } catch { }
@@ -316,10 +334,10 @@ for ($i = 0; $i -lt 30; $i++) {
 
 Write-Host ''
 if ($up) {
-    Say "Thornswood is up at ${VpsHost}:7777" 'Green'
+    Say ("{0} is up at {1}:{2}, resources on {3}" -f $(if ($IsDev) { 'The DEV server' } else { 'Thornswood' }), $VpsHost, $GamePort, $ResPort) 'Green'
     Write-Host ''
 } else {
-    Say "The install finished but nothing is answering on ${VpsHost}:3000." 'Red'
+    Say "The install finished but nothing is answering on ${VpsHost}:${ResPort}." 'Red'
 
     # Rather than list what it might be, fetch what it actually said. The task
     # redirects everything the server prints into this file for exactly this.
