@@ -96,6 +96,18 @@ before code; a Claude does not settle it for them.
   approving review that he cannot give himself, so every one of his own pull
   requests sat blocked until he overrode it with `--admin`. This makes the
   real practice the written one.
+- What branch protection on main actually enforces, read off GitHub on
+  22 Sep and not off this file: one approving review, the `Launcher builds`
+  check, and a code owner review on the files in `.github/CODEOWNERS`. All
+  three bind Djinn's branches. Whether they bind Patrick is `enforce_admins`,
+  and until 22 Sep it had to stay off because `Ship.ps1` pushed its own
+  version commit straight to main and the setting refuses that push: the
+  release would have reached every launcher with the source never landing.
+  Ship writes nothing to the repository now (`Bump-Version.ps1` moves the
+  number first, as an ordinary commit), so the setting can be on. When it is,
+  the sentence above stops being true for Patrick as well and everything goes
+  through a pull request. Check which it is rather than assuming:
+  `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
 - Djinn's work still goes on a branch: `git checkout -b djinn/what-it-is`.
   Small commits, plain messages. Push the branch and open a pull request,
   standing on the branch, not on main:

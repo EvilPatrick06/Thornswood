@@ -1,13 +1,35 @@
 ﻿<#
   Ship.ps1
 
-  One command. Bumps the launcher version, builds it, and publishes everything
-  that changed - launcher and mods both, in a single release.
+  One command. Builds the launcher and publishes everything that changed,
+  launcher and mods both, in a single release.
 
-      .\tools\Ship.ps1 "Fixed the map marker"
+  THE VERSION IS BUMPED BEFOREHAND, not here, by Bump-Version.ps1. Ship only
+  reads this repository now and writes nothing back to it, which is what lets
+  branch protection apply to everybody including the owner. A main release is
+  refused if anything is uncommitted or unpushed, so what ships and what is
+  written down are the same thing.
+
+      .\tools\Bump-Version.ps1
+      git push
+      .\tools\Ship.ps1 "..."
+
+  THE NOTE IS WHAT CUSTOMERS READ, in the launcher's News tab, on the site and
+  in #news. It takes several lines and splits them: the first line is the
+  title, a line starting with a dash becomes a bullet, and the rest becomes the
+  body. A one-line note leaves the body empty and the details as nothing but
+  the version and the download size, which is how "Everything from dev" reached
+  people on 22 September and told them nothing.
+
+      .\tools\Ship.ps1 "The map marker points at the right door now
+      It pointed one building east in four towns, which is why directions from
+      other people never matched what you saw.
+      - Map markers in Riverwood, Whiterun, Falkreath and Rorikstead
+      - Nothing to reinstall, it arrives with the update"
 
   Options:
-      -NoBump          keep the current version number
+      -NoBump          kept for anything that passes it; every main release
+                       now keeps the version number, so it changes nothing
       -Version 1.2.0   set it explicitly
       -ModsOnly        skip the launcher, publish only changed mod files
       -DryRun          build and diff, but upload nothing
@@ -142,6 +164,34 @@ if ($Dev) {
 
 Write-Host ''
 Write-Host '  SHIP' -ForegroundColor White
+
+# What goes in -Notes is what customers read, in three places: the launcher's
+# News tab, the site's News page and the #news post in Discord. It has always
+# taken several lines and split them, first line the title, a line starting
+# with a dash into the details, the rest into the body, and that was in none of
+# the help text, so every release went out as one line with an empty body.
+#
+# On 22 September one read "Everything from dev, the final theme for everybody,
+# and one card a person on the sessions page". Patrick, fairly: that does not
+# tell people what was actually added. It names where the work came from.
+#
+# This does not refuse a one-line note. Refusing to publish over the wording of
+# a release note would be worse than the note. It says so once, with the shape
+# to copy, at the top where there is still time to stop.
+if ($Notes -notmatch "`n") {
+    Write-Host ''
+    Say '  This note is one line, so the release goes out with no body and no' 'Yellow'
+    Say '  details beyond the version and the download size. That is what people' 'Yellow'
+    Say '  see in the launcher, on the site and in Discord.' 'Yellow'
+    Write-Host ''
+    Say '  The shape that fills them in:' 'DarkGray'
+    Say '      .\tools\Ship.ps1 "A title, written from their side' 'DarkGray'
+    Say '      A sentence or two of what changed and why anybody would care.' 'DarkGray'
+    Say '      - one thing they will notice' 'DarkGray'
+    Say '      - another thing they will notice"' 'DarkGray'
+    Write-Host ''
+    Say '  Carrying on with the one line.' 'DarkGray'
+}
 Write-Host "  $Notes" -ForegroundColor DarkGray
 
 # ------------------------------------------------------------ git

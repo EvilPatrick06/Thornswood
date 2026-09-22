@@ -35,6 +35,26 @@ A report filed from a session showing that message costs an evening to chase
 and cannot be trusted. On 17 September a mining fault was reported from one,
 and the mining was never the problem.
 
+## Before you start: send us your load order once
+
+This is a one-off and it takes a minute. After you have started the game at
+least once, find this file and paste it into the Discord with your name:
+
+```
+C:\Thornswood\Game\Data\Platform\thornswood-loadorder.txt
+```
+
+It is the list of mods the game actually loaded, in the order it loaded them,
+and it is the only way to know whether your machine is carrying anything the
+server is not. On one machine in September it held 62 plugins where the server
+had 60, because Skyrim loads Creation Club content it finds in Data whether or
+not any list asks for it. That machine got LOAD ORDER ERROR and the launcher
+still said everything checked out.
+
+The launcher catches that case now. What nobody has checked is whether anybody
+else is carrying the same two extra files, and Steam has been putting them in
+every Special Edition install since the 1.6 updates. Your file settles it.
+
 ## TEST 1. Launcher opens and closes
 
 1. Open the launcher.
