@@ -158,13 +158,37 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
     $dirty = @(& git -C $RepoDir status --porcelain --untracked-files=no 2>$null | Where-Object { $_ })
     & git -C $RepoDir fetch --quiet origin 2>$null | Out-Null
     $behind = 0
+    $ahead = 0
     try { $behind = [int]((& git -C $RepoDir rev-list --count "HEAD..origin/$branch" 2>$null | Out-String).Trim()) } catch { $behind = 0 }
+    try { $ahead  = [int]((& git -C $RepoDir rev-list --count "origin/$branch..HEAD" 2>$null | Out-String).Trim()) } catch { $ahead = 0 }
     $ErrorActionPreference = $oldEap
-    Say ("  branch {0}, {1} uncommitted change(s), {2} commit(s) behind origin/{0}" -f $branch, $dirty.Count, $behind) 'DarkGray'
+    Say ("  branch {0}, {1} uncommitted change(s), {2} behind and {3} ahead of origin/{0}" -f $branch, $dirty.Count, $behind, $ahead) 'DarkGray'
     if (-not $Dev) {
         if ($branch -ne 'main') { Die "A main release ships from main. This is $branch. Merge it into main first, or use -Channel dev to try it on the dev server." }
         if ($behind -gt 0) { Die "main is $behind commit(s) behind origin/main. Run git pull first, so the other machine's work is in this release." }
-        if ($dirty.Count) { Say '  the uncommitted changes are what this release is built from; they are committed and pushed when it is out' 'DarkGray' }
+
+        # A MAIN RELEASE NOW SHIPS ONLY WHAT IS ALREADY ON GITHUB, and these
+        # two refusals are the whole of that rule.
+        #
+        # Ship used to build from the working tree and then commit and push it
+        # afterwards, so a release could go out carrying code that existed on
+        # one disk. That worked because Ship could write to main. It cannot any
+        # more, by design, so anything not already pushed would simply be lost:
+        # the release reaches every launcher and the source never lands.
+        #
+        # So: nothing uncommitted, nothing unpushed, and then what shipped and
+        # what is written down are the same thing by construction rather than
+        # by a step at the end that might fail.
+        if ($dirty.Count) {
+            foreach ($d in $dirty | Select-Object -First 10) { Say "    $d" 'Yellow' }
+            Die ("There are $($dirty.Count) uncommitted change(s). A release ships what is on GitHub, and " +
+                 "Ship no longer commits anything itself, so these would not travel. Commit them, push them, " +
+                 "then Ship.")
+        }
+        if ($ahead -gt 0) {
+            Die ("main is $ahead commit(s) ahead of origin/main. Run git push first: a release has to be " +
+                 "buildable from what everybody else can see, and Ship no longer pushes anything itself.")
+        }
     } elseif ($behind -gt 0) {
         Say "  this branch is $behind commit(s) behind origin; the dev build will not carry them" 'Yellow'
     }
@@ -252,14 +276,25 @@ elseif ($Dev) {
     } catch { }
     $target = "$base.$n"
 }
-elseif ($NoBump) {
-    $target = $current
-}
 else {
-    $parts = $current.Split('.')
-    if ($parts.Count -lt 3) { Die "Version '$current' is not in x.y.z form" }
-    $parts[2] = [string]([int]$parts[2] + 1)
-    $target = $parts -join '.'
+    # A MAIN RELEASE NO LONGER BUMPS THE VERSION, and this is the change that
+    # lets branch protection apply to everybody.
+    #
+    # It used to bump Updater.cs here and then, after publishing, `git add -A`
+    # and push the result straight to main. That push is why enforce_admins had
+    # to stay off: turning it on refuses it, and the release would reach every
+    # launcher while the source commit never landed, so the repo would say
+    # something different from what shipped. The worst half-state there is, on
+    # every release.
+    #
+    # The bump is its own commit now, made by Bump-Version.ps1 before any of
+    # this runs, and it goes through whatever the branch rules are like any
+    # other change. Ship only READS the repository, so nothing it does needs
+    # write access to main.
+    #
+    # -NoBump is kept and means the same as it always did, so anything that
+    # passed it keeps working; it is simply what every main release does now.
+    $target = $current
 }
 
 if ($target -ne $current) {
@@ -754,21 +789,25 @@ if (-not $DryRun -and -not $Dev) {
     }
 }
 
+# SHIP NO LONGER COMMITS OR PUSHES ANYTHING.
+#
+# It used to `git add -A` here, commit the whole working tree under the release
+# message, and push it straight to main. Two things were wrong with that and
+# both have their own entry on the list. It swept up whatever happened to be
+# sitting in the repo, so a release commit could carry eight unrelated things
+# and could not be reverted. And it needed write access to main, which is the
+# single reason enforce_admins had to stay off in branch protection: with the
+# rules applying to the owner too, that push is refused, the release still
+# reaches every launcher, and the source never lands.
+#
+# Now the version is bumped and committed by Bump-Version.ps1 beforehand, the
+# Git gate above refuses a release with anything uncommitted or unpushed, and
+# by the time anything is published the repository already says exactly what
+# shipped. There is nothing left to do here, which is the point.
 if (-not $DryRun -and -not $Dev -and (Test-Path (Join-Path $RepoDir '.git'))) {
     Head 'Source'
-    $oldEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try {
-        & git -C $RepoDir add -A 2>$null | Out-Null
-        $staged = @(& git -C $RepoDir diff --cached --name-only 2>$null | Where-Object { $_ })
-        if ($staged.Count) {
-            & git -C $RepoDir commit -q -m "$target`: $Notes" 2>$null | Out-Null
-            Say ("  committed {0} file(s) as {1}" -f $staged.Count, $target) 'Green'
-        } else { Say '  nothing new to commit' 'DarkGray' }
-        $pushed = & git -C $RepoDir push -q origin HEAD 2>&1
-        if ($LASTEXITCODE -eq 0) { Say '  pushed to GitHub' 'Green' }
-        else { Say "  push did not go through: $pushed" 'Yellow'; Say '  Run git pull, then git push, so the other machine gets this release''s source.' 'Yellow' }
-    } catch { Say "  could not commit the source: $_" 'Yellow' }
-    $ErrorActionPreference = $oldEap
+    Say "  already on GitHub. The gate above refused anything uncommitted or unpushed," 'DarkGray'
+    Say "  so what shipped and what is written down are the same thing." 'DarkGray'
 }
 
 Head 'Done'
