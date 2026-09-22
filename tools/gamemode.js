@@ -346,6 +346,66 @@ function ensureProperties() {
       updateOwner: '',
       updateNeighbor: '',
     });
+    /*
+      HOW MUCH IS LEFT IN A SEAM, AND WHY THIS LINE IS THE WHOLE OF THE DEFECT.
+
+      Patrick, 21 September: "the quearry was infinite or close to it just got
+      100 ore in one vein vs the 20 it's supposed to be".
+
+      DEPOSIT_PROPERTY was the only property in this file never registered.
+      Every read of an unregistered property throws, depositLeft catches it and
+      answers DEPOSIT_SIZE, and mp.set throws too, so nothing was ever written:
+      every swing read a full seam, took one out of it, failed to record that,
+      and read a full seam again. A seam with no bottom.
+
+      The fail-open in depositLeft is still right and stays: a seam the server
+      cannot read should be workable rather than dead, because failing shut
+      there takes every seam in the province out of the game at once. What was
+      wrong is that the unreadable case was ALL of them, every time, and
+      nothing said so. takeFromDeposit now logs a failed write once per seam,
+      so this cannot be silent again.
+
+      Invisible to both: how worked out a seam is is not something the client
+      needs and not something a neighbour has any business being told.
+    */
+    mp.makeProperty(DEPOSIT_PROPERTY, {
+      isVisibleByOwner: false,
+      isVisibleByNeighbors: false,
+      updateOwner: '',
+      updateNeighbor: '',
+    });
+    /*
+      THE SWING, AND WHY THE SERVER HAS TO ASK FOR IT.
+
+      Patrick, 21 September: "Mining is still skipping the animation".
+
+      Nothing is skipping it. It never played. A vanilla ore vein is an ACTI
+      whose animation comes from MineOreScript, and no Papyrus object script
+      runs under SkyMP at all, which is the same reason the Whiterun gate stays
+      locked and the same reason the client has to re-activate levers. Letting
+      the press through, which is what ALLOW does, hands it to an engine whose
+      script will not start. There was never anything there to skip.
+
+      So the server asks the person's own client to play it, through the one
+      channel that already exists for this: updateOwner, the same mechanism the
+      door locks use. ctx.sp is Skyrim Platform on their machine.
+
+      THE EVENT NAMES ARE READ OUT OF Skyrim.esm, not guessed. IdlePickaxeEnter
+      is the event on IDLE a82c6 under PickaxeRoot, and IdleWoodChopStart is
+      the event on IDLE 6c1df under WoodChopRoot. Both exit through
+      IdleChairExitStart, which is what every one of those records names as its
+      exit, however odd it reads.
+
+      Visible to the owner and to nobody else. A neighbour sees the animation
+      because Skyrim is playing it on a body they can see, not because they
+      were sent anything.
+    */
+    mp.makeProperty(SWING_PROPERTY, {
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: swingScript(),
+      updateNeighbor: '',
+    });
   } catch (e) {
     // already made, or made by a previous load. harmless.
   }
@@ -1686,6 +1746,8 @@ function mineSalt(actorId, refrId) {
     addItem(actorId, rare, 1);
     extra = ' Something rarer came away with it.';
   }
+  // The swing, because no Papyrus runs here to play it. See SWING_PROPERTY.
+  swing(actorId, SWING_MINE);
   const rank = creditWork(actorId, 'mine');
   const worn = wearTool(actorId, 'miner');
   return 'You work ' + yielded + ' salt from the seam.' + extra +
@@ -1779,7 +1841,71 @@ function isVein(baseDesc) {
 const ALLOW = { thornswoodAllow: true };
 
 const DEPOSIT_SIZE = 20;
+const SWING_PROPERTY = 'thornswoodSwing';
+
+/*
+  How long a swing is held before the person is let go of.
+
+  Long enough to read as a swing, short enough that nobody feels held. The exit
+  is sent regardless, because an idle with no exit leaves somebody rooted until
+  they work out that moving breaks it.
+*/
+const SWING_MS = 2500;
+
+/** The animation to play, by what is being worked. See SWING_PROPERTY. */
+const SWING_MINE = 'IdlePickaxeEnter';
+const SWING_CHOP = 'IdleWoodChopStart';
+const SWING_STOP = 'IdleChairExitStart';
+
+/*
+  Run on the person's own machine when SWING_PROPERTY changes. See the note on
+  the property. Written as one string for the same reason lockScript is: the
+  script cannot be changed once the property is made, so a change here needs a
+  server restart, which a deploy is.
+*/
+function swingScript() {
+  return [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || !v.anim) { return; }',
+    '    var sp = ctx.sp;',
+    '    var pc = sp.Game.getPlayer();',
+    '    if (!pc) { return; }',
+    '    sp.Debug.sendAnimationEvent(pc, v.anim);',
+    // And let them go again. Utility.wait is a promise here, not a block.
+    '    sp.Utility.wait((v.ms || 2500) / 1000).then(function () {',
+    '      try { sp.Debug.sendAnimationEvent(sp.Game.getPlayer(), v.stop); } catch (e) { }',
+    '    });',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+}
+
+/*
+  Ask for a swing. The stamp is what makes it a change: the same animation
+  twice running is the same value, and a property that has not changed does not
+  run its script, so a second swing on the same seam would play nothing.
+*/
+function swing(actorId, anim) {
+  try {
+    mp.set(actorId, SWING_PROPERTY,
+           { anim: anim, stop: SWING_STOP, ms: SWING_MS, at: Date.now() });
+  } catch (e) {
+    // A person whose property will not take is a person without an animation,
+    // and nothing else about their work changes. Once, so a broken client does
+    // not fill the log.
+    if (!SWING_QUIET[actorId]) {
+      SWING_QUIET[actorId] = true;
+      log('could not ask', actorId.toString(16), 'for a swing animation:', e);
+    }
+  }
+}
+const SWING_QUIET = {};
+
 const DEPOSIT_PROPERTY = 'thornswoodDeposit';
+/* Seams whose last write threw. See takeFromDeposit. */
+const DEPOSIT_UNWRITABLE = {};
 
 /*
   How long a worked out seam takes to come back, by what it gives.
@@ -1842,8 +1968,26 @@ function takeFromDeposit(refrId, backMs) {
   const now = left - 1;
   try {
     mp.set(refrId, DEPOSIT_PROPERTY, { left: now, at: now === 0 ? Date.now() : 0 });
+    delete DEPOSIT_UNWRITABLE[refrId];
   } catch (e) {
-    log('could not write the deposit on', refrId.toString(16) + ':', e);
+    /*
+      ONCE PER SEAM, NOT ONCE PER SWING, AND NEVER SILENTLY.
+
+      This already logged, and the log is what nobody was reading, because a
+      seam that cannot be written is also a seam that reads full: the person
+      sees ore coming out and nothing looks wrong from any side. Patrick got a
+      hundred out of one vein before anybody noticed.
+
+      A line per swing would be a hundred lines and would bury the first one,
+      so it is the first swing on each seam that says it, and the message says
+      what it MEANS rather than only what failed. The count is kept so a seam
+      that starts working again is not held against it.
+    */
+    if (!DEPOSIT_UNWRITABLE[refrId]) {
+      DEPOSIT_UNWRITABLE[refrId] = true;
+      log('THE SEAM AT', refrId.toString(16), 'CANNOT BE WRITTEN, so it will ' +
+          'never run out and everybody can take from it forever:', e);
+    }
   }
   return now + 1;
 }
@@ -1916,6 +2060,8 @@ function mineOre(actorId, refrId, baseDesc) {
     return 'The seam gives up ' + seam.name + ' and there is nothing in this load ' +
            'order to put in your hands. Say so in the dev channel.';
   }
+  // The swing, because no Papyrus runs here to play it. See SWING_PROPERTY.
+  swing(actorId, SWING_MINE);
   const rank = creditWork(actorId, 'mine');
   const worn = wearTool(actorId, 'miner');
   /*
@@ -2057,6 +2203,8 @@ function chopWood(actorId, refrId) {
     return 'The block gives up firewood and there is nothing in this load order to ' +
            'put in your hands. Say so in #bugs.';
   }
+  // Same as the seam: the block's own script never starts here either.
+  swing(actorId, SWING_CHOP);
   const rank = creditWork(actorId, 'woodwright');
   const worn = wearTool(actorId, 'woodworker');
   // Only when there is something worth interrupting them for, and the press

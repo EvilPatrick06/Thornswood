@@ -145,6 +145,24 @@ if (block !== null) {
   yes('quicksilver is on the thirty minute clock rather than silver\'s ten',
       /DEPOSIT_SLOW/.test(code) &&
       code.indexOf('DEPOSIT_SLOW') < code.indexOf('DEPOSIT_QUICK[j]'));
+
+  /*
+    THE CHECK THIS HARNESS DID NOT HAVE, AND THE REASON IT PASSED ALL EVENING
+    WHILE PATRICK TOOK A HUNDRED ORE OUT OF ONE VEIN.
+
+    Everything above drives the real functions over a pretend mp whose get and
+    set work. On the live server they did not. DEPOSIT_PROPERTY was the only
+    property in gamemode.js never registered with mp.makeProperty, so every
+    read threw, depositLeft's fail-open answered a full seam, and every write
+    threw as well. The arithmetic was perfect and there was nowhere to keep it.
+
+    A harness that supplies its own storage can never find that. So it asks the
+    file instead, which is the one question a stub cannot answer.
+  */
+  yes('the deposit property is registered, or nothing it counts is ever stored',
+      /mp\.makeProperty\(DEPOSIT_PROPERTY/.test(code));
+  yes('and a seam that cannot be written says so rather than never running out',
+      src.indexOf('CANNOT BE WRITTEN') !== -1);
 }
 
 console.log('');
