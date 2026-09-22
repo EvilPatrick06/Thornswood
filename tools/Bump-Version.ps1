@@ -108,8 +108,29 @@ Write-Host ('  ' + ('=' * 68)) -ForegroundColor DarkGray
 Say '  Next, in this order:' 'White'
 Write-Host ''
 if ($branch -eq 'main') {
-  Say '      git push' 'White'
-  Say '  LEAVES THIS MACHINE. Sends the version commit.' 'DarkGray'
+  # Whether a push to main is possible at all depends on enforce_admins in
+  # branch protection, which was turned on on 22 September. With it on, NOBODY
+  # pushes to main, owner included, and this commit has to go through a pull
+  # request like any other. Asked rather than assumed, because the setting can
+  # be changed at any time and a wrong instruction here sends somebody into a
+  # refused push with a release half prepared.
+  $enforced = ''
+  try { $enforced = (& gh api repos/EvilPatrick06/Thornswood/branches/main/protection --jq '.enforce_admins.enabled' 2>$null | Out-String).Trim() } catch { }
+  if ($enforced -eq 'true') {
+    Say '  main is protected against everybody, including you, so this cannot be' 'Yellow'
+    Say '  pushed straight there. Put it on a branch:' 'Yellow'
+    Write-Host ''
+    Say ("      git branch -f patrick/launcher-$target; git reset --hard HEAD~1; git checkout patrick/launcher-$target") 'White'
+    Say '  Moves the commit you just made onto a branch and takes main back.' 'DarkGray'
+    Write-Host ''
+    Say ("      git push -u origin patrick/launcher-$target") 'White'
+    Say '      gh pr create --fill' 'White'
+    Say '  LEAVE THIS MACHINE. Merge it, then git checkout main and git pull.' 'DarkGray'
+  } else {
+    Say '      git push' 'White'
+    Say '  LEAVES THIS MACHINE. Sends the version commit.' 'DarkGray'
+    Say '  (enforce_admins is off, so a direct push to main is still allowed.)' 'DarkGray'
+  }
 } else {
   Say ("      git push -u origin $branch") 'White'
   Say ("      gh pr create --fill") 'White'
