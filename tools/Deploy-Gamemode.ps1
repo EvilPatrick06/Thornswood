@@ -63,7 +63,35 @@ param(
       Off is not a downgrade to the Skyrim Together behaviour: that was
       everybody getting their own private copy. Off is nobody getting one.
     #>
-    [ValidateSet('all', 'interior', 'off')][string]$Npcs = 'all'
+    [ValidateSet('all', 'interior', 'off')][string]$Npcs = 'all',
+
+    <#
+      What a blow is worth, in each direction.
+
+      Patrick, 21 September, after playing it: "enimes hit way to hard and have
+      to much health or dont die at all". Both halves are one class in the
+      engine, DamageMultFormula, which is always in the chain.
+
+      -HitsOnPeople    an NPC hitting a person. The engine's own default is 2,
+                       applied when this file says nothing, which is what it
+                       has always said. Nobody chose that doubling. 1 is the
+                       blow the weapon is actually worth.
+      -HitsOnNpcs      a person hitting an NPC. This direction was never
+                       multiplied at all, and the formula under it reads the
+                       weapon's base damage, the target's armour and the power,
+                       block and sneak flags, and NOTHING about the person
+                       swinging: no skill, no perks, no attackDamageMult. So a
+                       giant keeps its full vanilla health and takes the number
+                       printed on the sword, over and over. 2 is a starting
+                       point and it is one number to turn.
+
+      Both are read separately by the fork, so setting one does not discard the
+      other. They are in server-settings.json, so they reach the dev server
+      through Publish-Server -Channel dev and the live one through
+      Deploy-Server, and neither needs a rebuild once the fork is built.
+    #>
+    [double]$HitsOnPeople = 1.0,
+    [double]$HitsOnNpcs   = 2.0
 )
 
 # ---------------------------------------------------------------- -Vortex ---
@@ -359,6 +387,21 @@ $s | Add-Member -NotePropertyName npcSettings -NotePropertyValue ([pscustomobjec
     default = $npcDefault
 }) -Force
 Write-Host "  NPCs: $Npcs (interior $($npcDefault.spawnInInterior), exterior $($npcDefault.spawnInExterior))" -ForegroundColor DarkGray
+
+<#
+  What a blow is worth. See -HitsOnPeople and -HitsOnNpcs above.
+
+  This key was absent from every settings file this repo has ever written, so
+  the server logged "Unable to get multiplier from config" at startup and
+  doubled every blow landed on a person, and nobody knew. Writing it is the
+  whole of the fix for the first half of Patrick's sentence; the second half
+  needs the fork built, because playerMultiplier is ours.
+#>
+$s | Add-Member -NotePropertyName damageMultFormulaSettings -NotePropertyValue ([pscustomobject]@{
+    multiplier       = $HitsOnPeople
+    playerMultiplier = $HitsOnNpcs
+}) -Force
+Write-Host ("  damage: an NPC hitting a person x{0}, a person hitting an NPC x{1}" -f $HitsOnPeople, $HitsOnNpcs) -ForegroundColor DarkGray
 # Where a brand new character first appears, which is also where the gamemode
 # runs character creation. Skyrim Unbound's own creation room is the right
 # answer on this setup: a new game already puts everybody there, so the client
