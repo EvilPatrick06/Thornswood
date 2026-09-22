@@ -1,4 +1,4 @@
-<#
+﻿<#
   Install-ThornswoodServer.ps1
 
   Run this ON THE VPS, after Bootstrap-VPS.ps1, as Administrator.
@@ -81,6 +81,36 @@ if (Test-Path -LiteralPath $dataDir) {
     Write-Host "existing data set aside at $dataBak" -ForegroundColor Yellow
 }
 
+<#
+  AND THE PRIVATE FOLDER, WHICH IS WHERE THE ROSTER LIVES.
+
+  This set aside the world and the data folder and not this one, so every
+  install since there has been a private folder has deleted it: door.json,
+  allowed.json and characters.json, gone, on a script that reports nothing but
+  success.
+
+  gamemode.js already wrote down what that costs, on 20 September, when the
+  whole folder went: "the character register silently stops being saved, the
+  door silently never fetches a roster, and /tp silently refuses everybody
+  because the list it reads was never written. That is three separate reports
+  with one cause and no log line between them." It was read as a one off. It
+  is this script, every time.
+
+  Patrick, 21 September, from the dev server: "Dev has no playtetser list so I
+  can't tp like I can on main."
+
+  Restored whole rather than file by file, unlike data. Nothing in a build
+  ships into private, so there is no shipped file here for a new build to be
+  entitled to replace, and merging would only risk half a roster.
+#>
+$privDir = Join-Path $Root 'private'
+$privBak = $null
+if (Test-Path -LiteralPath $privDir) {
+    $privBak = Join-Path $env:TEMP ("serverprivate-" + $stamp)
+    Copy-Item -LiteralPath $privDir -Destination $privBak -Recurse -Force
+    Write-Host "existing roster set aside at $privBak" -ForegroundColor Yellow
+}
+
 if (Test-Path -LiteralPath $Root) { Remove-Item -LiteralPath $Root -Recurse -Force }
 New-Item -ItemType Directory -Path $Root -Force | Out-Null
 Expand-Archive -LiteralPath $Zip -DestinationPath $Root -Force
@@ -89,6 +119,24 @@ Write-Host "unpacked to $Root" -ForegroundColor Cyan
 if ($worldBak) {
     Copy-Item -LiteralPath $worldBak -Destination $world -Recurse -Force
     Write-Host 'world restored' -ForegroundColor Cyan
+}
+
+# See the note above. Whole, because nothing in a build ships into private.
+if ($privBak) {
+    Copy-Item -LiteralPath $privBak -Destination $privDir -Recurse -Force
+    $n = @(Get-ChildItem -LiteralPath $privDir -Recurse -File -Force -EA SilentlyContinue).Count
+    Write-Host "roster restored, $n file(s) including door.json and allowed.json" -ForegroundColor Cyan
+} elseif (-not (Test-Path -LiteralPath $privDir)) {
+    <#
+      A root that has never had one. The door writes allowed.json itself once
+      it has fetched, and the register writes characters.json, but neither can
+      write into a folder that is not there: gamemode.js does one mkdir at load
+      for exactly that reason. Saying so here is the difference between "this
+      server has no roster yet" and the silence that cost three reports.
+    #>
+    New-Item -ItemType Directory -Path $privDir -Force | Out-Null
+    Write-Host 'no roster to restore: this root has never had a private folder.' -ForegroundColor Yellow
+    Write-Host '  /tp will refuse everybody until door.json is put there.' -ForegroundColor Yellow
 }
 
 if ($dataBak) {
