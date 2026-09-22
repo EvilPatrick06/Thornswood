@@ -136,6 +136,26 @@ Ready 'a launcher is installed' (Test-Path (Join-Path $Root 'Launcher\Thornswood
 
 $GameDir = Join-Path $Root 'Game'
 $hasGame = Test-Path $GameDir
+
+# The collection this machine would build a release from.
+#
+# Asked here because this is the question that went unasked for a week: the
+# server's load order and the reference plugin list are both derived from
+# what Vortex has deployed here, and nothing checked whether that deployment
+# was current. Vortex knew all along and wrote it in its own state.
+try {
+    . (Join-Path $Here 'LoadOrder.ps1')
+    $colUrl = ''
+    try { $colUrl = [string](Get-Content -LiteralPath (Join-Path $Root 'config.json') -Raw | ConvertFrom-Json).CollectionUrl } catch { }
+    $cs = Get-CollectionState $colUrl
+    if ($cs.Known) {
+        Ready 'the collection here is the newest Vortex knows of' (-not $cs.Behind) `
+            ("revision {0}, newest {1}" -f $cs.Have, $cs.Newest) `
+            'Update the collection in Vortex, let it deploy, then Deploy-Gamemode and ship. A release built from a stale collection turns away everybody who installed the current one.' 'patrick'
+    } else {
+        Say '  note  could not read the collection revision from Vortex, so it was not checked' 'DarkGray'
+    }
+} catch { Say '  note  the collection revision check did not run' 'DarkGray' }
 Ready 'it has its own game folder' $hasGame $GameDir `
   'Open the launcher and press Play once; it builds the folder from what Vortex has deployed'
 
