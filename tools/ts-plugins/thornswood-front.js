@@ -262,6 +262,64 @@
     try { return !!readText(CHOICE_FILE).trim(); } catch (e) { return false; }
   }
 
+
+  /*
+    ------------------------------------------------- putting the shift on
+
+    Patrick, twice, from playing it: "We keep spawning in with our clothes off
+    still".
+
+    THE SERVER CANNOT DRESS ANYBODY, and that is the whole of it. giveShift
+    pushes the two shift records into the pack with worn: true, and in the
+    engine the worn flag on an inventory entry and the equipment the client
+    actually wears are two different things. There is no 'equipment' property
+    binding for a gamemode at all: the client owns what is equipped and only
+    ever reports it upward. So the shift arrived in the pack and stayed there,
+    folded, and the person stood in the creation hall with nothing on.
+
+    So the only place this can be done is here.
+
+    THE TWO IDS ARE VANILLA AND THEY MUST MATCH CHARGEN.shift IN gamemode.js,
+    which is 1be1a and 1be1b out of Skyrim.esm. They are written here rather
+    than fetched because they are Bethesda's own records and cannot move, and
+    because a fetch that fails would leave somebody naked, which is the thing
+    being fixed. If the shift ever changes, both places change.
+
+    ONCE, AND ONLY WHAT IS NOT ALREADY WORN. Equipping something already worn
+    is how a person ends up dressed twice, and equipping every armour in the
+    pack would take somebody's own clothes off to put rags on. Each id is tried
+    once per session and never again.
+  */
+  const SHIFT_IDS = [0x1be1a, 0x1be1b];
+  let shiftDone = false;
+
+  function wearTheShift() {
+    if (shiftDone) { return; }
+    shiftDone = true;
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { return; }
+    if (!pc) { return; }
+    const ac = sp.Actor.from(pc);
+    if (!ac) { return; }
+
+    let put = 0;
+    for (let i = 0; i < SHIFT_IDS.length; i++) {
+      const id = SHIFT_IDS[i];
+      try {
+        const form = sp.Game.getFormEx(id);
+        if (!form) { continue; }
+        // Only what they are actually carrying, and only if it is not on.
+        if (pc.getItemCount(form) <= 0) { continue; }
+        if (ac.isEquipped(form)) { continue; }
+        ac.equipItem(form, false, true);   // not preventRemoval, silent
+        put++;
+      } catch (e) {
+        log('could not put on shift item ' + id.toString(16) + ': ' + e);
+      }
+    }
+    if (put) { log('put on ' + put + ' piece(s) of the shift'); }
+  }
+
   /*
     KEEP SAYING THE CHOICE UNTIL THE WORLD ACTUALLY LOADS.
 
@@ -712,9 +770,25 @@
     strayFocusSince = 0;
   }
 
+  /*
+    WHEN EACH CLAIM WENT UP, so the cap below can cover all of them.
+
+    Focus withholds DirectInput, so a claim that goes up and never comes down
+    is indistinguishable from the game freezing: the keyboard stops reaching
+    the game AND stops reaching every plugin that would otherwise notice.
+    There were three watchdogs and every one of them tested claims.chat, so the
+    K panel and the emote wheel could each leave somebody with a dead keyboard
+    and nothing would ever take it back. Djinn has twice reported the game
+    going down with no crash log, once on pressing K.
+
+    Found by the audit of 21 September.
+  */
+  const claimedAt = {};
+
   T.claimFocus = function (who, on) {
     if (!!claims[who] === !!on) return;
     claims[who] = !!on;
+    claimedAt[who] = on ? Date.now() : 0;
     // Logged every time, because a claim that goes up and does not come down is
     // indistinguishable from the game freezing: focus withholds DirectInput,
     // so the keyboard stops reaching the game AND stops reaching every plugin
@@ -1001,6 +1075,46 @@
     // before its line: every door press threw "Cannot access 'now'
     // before initialization" and the door rescue below never ran.
     const now = Date.now();
+
+    /*
+      SOMEBODY ELSE'S PRESS IS NOT OURS.
+
+      Patrick, 21 September, from playing it: "Theres a weird thing when yoiu
+      walk my quarries an npc will spawn and force you to start mining when one
+      you didnt click on it and two you have no pickaxe and arent a miner".
+      His clip shows him walking past the quarry with nothing under the
+      crosshair while the server says "Only a miner can work a seam. Ask one."
+      four times over, and "Only a farmer can bring a crop in" three times.
+
+      This event fires for EVERY activation in the loaded area, by anybody. The
+      comment on the log line below already said so: "every door an NPC opens
+      and every crate anybody walks past". Whiterun's own miners and farmhands
+      work their seams and their crops all day, and every one of those strikes
+      arrived here.
+
+      And then the ACTI branch at the bottom re-activated the thing AS THE
+      PERSON: `e.target.activate(pc, false)`, with pc fetched from
+      Game.getPlayer(). So an NPC swinging at a vein made us activate that vein
+      on the person's behalf, which ran the vanilla mine script on them, which
+      is the animation and the marker Patrick read as an NPC spawning and
+      forcing him to mine. The same call is forwarded to the server, which is
+      where the four refusals came from: the server was answering presses he
+      never made.
+
+      caster is the actionRef out of TESActivateEvent, set in EventHandler.cpp
+      next to target. 0x14 is the person's own reference and is fixed for every
+      Skyrim there has ever been. An activation with no actionRef at all
+      (caster 0) is the game activating something while a cell loads, which is
+      likewise not a press, so it is dropped with the rest.
+
+      lastActivateAt is set AFTER this, not before. It feeds the focus
+      watchdog's "activated something Xms ago", and a farmhand's day of work
+      is not a reason to believe the person is busy.
+    */
+    let casterId = 0;
+    try { casterId = e.caster ? e.caster.getFormID() : 0; } catch (err) { }
+    if (casterId !== 0x14) { return; }
+
     lastActivateAt = now;
     if (reActivating) { return; }
 
@@ -1225,6 +1339,86 @@
       if (!sent) { return; }
       toServer.shift();
     }
+  }
+
+  /*
+    ------------------------------------------------- every fall of the axe
+
+    Patrick, 21 September: "the chopping block is still not always doing the
+    animation and not always giving the wood apon hit still".
+
+    THE SERVER SEES A PRESS AND SKYRIM DOES THE SWINGING. A chopping block is a
+    FURN record, so pressing it puts the person into Skyrim's own chopping
+    furniture and the axe falls over and over with the server hearing nothing.
+    Vanilla's own block script would have handed wood over per swing and it
+    does not run here, for the same reason MineOreScript does not and the
+    Whiterun gate stays locked. So one press was one handover and every swing
+    after it was free exercise.
+
+    The events do pass through here, so this is the only place that can count
+    them. Each one is reported as /chopped on the chat overlay socket, the same
+    channel a broken lockpick already rides, and the server decides whether it
+    is worth anything: choppedSwing credits nobody it has not just watched
+    press a block, and no faster than an axe can fall. Typing the word is
+    worth nothing.
+
+    WHICH EVENT IS THE FALL. The four IdleWoodChop records in Skyrim.esm are
+    Start, EnterInstant, Stop and Exit, and those are the session, not the
+    swing: the fall itself is an annotation inside the animation and it does
+    not have to be one of those names. So this matches a family rather than a
+    name, and WRITES DOWN, ONCE EACH, EVERY EVENT IT SAW DURING A SESSION THAT
+    IT DID NOT COUNT. After one session at a block the log names the real
+    event, and this can be narrowed to exactly it instead of guessed at again.
+  */
+  const CHOP_START = /woodchop.*(start|enter)/i;
+  const CHOP_END = /woodchop.*(stop|exit)|idlechairexitstart|idleforcedefaultstate/i;
+  // The fall. Broad on purpose until the log says what it actually is.
+  const CHOP_HIT = /chop|hit|impact|swing/i;
+  /* A session is only this long without another event, so somebody who walks
+     away mid animation is not left counted as chopping. */
+  const CHOP_IDLE_MS = 15000;
+  let chopping = 0;          // when the session started, 0 for none
+  let chopSeen = 0;          // when an event last arrived
+  const chopUnknown = {};    // event names seen and not counted, once each
+
+  try {
+    sp.hooks.sendAnimationEvent.add({
+      enter: (ctx) => {
+        try {
+          const name = String(ctx.animEventName || '');
+          if (!name) { return; }
+          const now = Date.now();
+
+          if (CHOP_START.test(name)) {
+            chopping = now; chopSeen = now;
+            say('chopping: session started on ' + name);
+            return;
+          }
+          if (!chopping) { return; }
+          if (now - chopSeen > CHOP_IDLE_MS) { chopping = 0; return; }
+          chopSeen = now;
+
+          if (CHOP_END.test(name)) {
+            chopping = 0;
+            say('chopping: session ended on ' + name);
+            return;
+          }
+          if (CHOP_HIT.test(name)) {
+            tellServer('/chopped');
+            return;
+          }
+          // Not counted, and worth knowing about exactly once.
+          if (!chopUnknown[name]) {
+            chopUnknown[name] = true;
+            say('chopping: saw ' + name + ' and did not count it as a swing');
+          }
+        } catch (err) { }
+      },
+      leave() { }
+    }, 0x14, 0x14);
+    say('watching for the axe');
+  } catch (e) {
+    say('could not watch for the axe, so wood comes per press only: ' + e);
   }
 
   sp.on('containerChanged', guard('picks', (e) => {
@@ -2114,6 +2308,78 @@
     calmTheGuards();
   }));
 
+  /*
+    ------------------------------------------------- the town gates
+
+    Patrick, 21 September, from playing it: "The gate into the whiterun inner
+    city needs to be unlocked", and then "it is the front gate into the city".
+
+    MEASURED IN Skyrim.esm, through the same reader Build-DoorTable.py uses.
+    The Whiterun main gate is base WRDoorMainGate01, 50973, and it is placed
+    twice: 1b1f1 stands outside in the Tamriel persistent cell and carries a
+    lock of level 255 wanting key d8f0c, and 1b1f3 stands inside and carries
+    none. So the gate is shipped locked by Bethesda, and the outside leaf is
+    the one everybody presses.
+
+    IN A SINGLE GAME a quest script opens it. Under SkyMP no Papyrus quest
+    runs at all, so nothing ever does, and the town has no way in. The Riften
+    main gate, RTMainGate01, is the same shape twice over: 42284 wants key
+    e6705 and 42286 wants a key that does not exist, both at level 255. Riften
+    is not on Patrick's list because nobody has walked up to it yet; it is in
+    here because it is the identical defect at the identical kind of door and
+    finding it and leaving it shut would be choosing to keep a town closed.
+
+    WHY THE CLIENT AND NOT THE SERVER. The server has no lock state; it has
+    never had one. activationService.ts in the fork refuses to announce a press
+    on a locked reference at all, which is the Thornswood patch that keeps the
+    lockpicking game honest, so a locked gate never reaches the server for the
+    server to have an opinion about. The lock only exists here, so it can only
+    be lifted here.
+
+    ON A CLOCK RATHER THAN ONCE. A persistent reference keeps its lock across a
+    cell load and the world is rebuilt every session, so a single call at world
+    up would be enough today and would be silently wrong the first time
+    anything relocks it. Thirty seconds and three isLocked reads is nothing.
+
+    NOTHING ELSE IS TOUCHED. Every other locked door in the province stays
+    locked, including the two JK's Skyrim doors inside the Whiterun gate, so
+    lockpicking is the same game it was.
+  */
+  const TOWN_GATES = [0x1b1f1, 0x42284, 0x42286];
+  const GATE_EVERY_MS = 30000;
+  let gatesAt = 0;
+  const gateSaid = {};
+
+  function openTheGates() {
+    for (let i = 0; i < TOWN_GATES.length; i++) {
+      const id = TOWN_GATES[i];
+      try {
+        const refr = sp.ObjectReference.from(sp.Game.getFormEx(id));
+        // Not loaded is not a problem. The next pass will find it.
+        if (!refr) { continue; }
+        if (!refr.isLocked()) { continue; }
+        refr.lock(false, false);
+        if (!gateSaid[id]) {
+          gateSaid[id] = true;
+          say('opened the town gate ' + id.toString(16) +
+              ', which vanilla ships locked and no script here opens');
+        }
+      } catch (e) {
+        if (!gateSaid[id]) {
+          gateSaid[id] = true;
+          say('could not open the town gate ' + id.toString(16) + ': ' + e);
+        }
+      }
+    }
+  }
+
+  sp.on('update', guard('gates', () => {
+    const now = Date.now();
+    if (gatesAt && now - gatesAt < GATE_EVERY_MS) { return; }
+    gatesAt = now;
+    openTheGates();
+  }));
+
   sp.on('update', guard('pulse', () => {
     const now = Date.now();
     if (!lastPulse) { lastPulse = now; return; }
@@ -2333,6 +2599,13 @@
         so there is a game to be in.
       */
       try { globalThis.__thornswoodInWorld = true; } catch (e) { }
+
+      /*
+        AND PUT THE SHIFT ON. Here rather than on a tick, because this is the
+        moment the world is known to be up and calls into the game work, which
+        is the same reason the flag above is set here.
+      */
+      wearTheShift();
       // Cleared again on the way out, below. Nothing in the shipped client
       // bundle reads this today, so it costs nothing either way, but a flag
       // that is only ever set true is a flag that lies the moment anything
@@ -2483,6 +2756,30 @@
       T.js('try{window.thornswoodChat&&window.thornswoodChat.blurInput();}catch(e){}');
       T.claimFocus('chat', false);
       log('the chat box has held the keyboard for two minutes, taking it back');
+    }
+
+    /*
+      THE SAME CAP FOR EVERY OTHER CLAIM, which had none at all.
+
+      The three watchdogs above all test claims.chat. The chat box is not the
+      only thing that takes the keyboard: the K panel claims 'skills' and the
+      emote wheel claims 'wheel', and neither had a way back. A panel that
+      never says it closed, a page that reloads with the wheel up, or any
+      throw between raising the claim and lowering it left the person unable to
+      move, with no key able to reach the plugin that would have fixed it.
+
+      Two minutes, the same number and the same reasoning: far longer than
+      anybody spends in a menu, far shorter than giving up on the game. The
+      claim is released by name so the log says which one it was, which is the
+      only evidence anybody will have next time.
+    */
+    for (const who in claimedAt) {
+      if (who === 'chat') { continue; }
+      if (!claims[who] || !claimedAt[who]) { continue; }
+      if (now - claimedAt[who] > 120000) {
+        log('the ' + who + ' claim has held the keyboard for two minutes, taking it back');
+        T.claimFocus(who, false);
+      }
     }
 
     checkServer(now);

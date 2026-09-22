@@ -374,6 +374,25 @@ foreach ($old in @(Get-ChildItem $outDir -Filter 'icon-*.ico' -ErrorAction Silen
 }
 Say ("  icon-$iconHash.ico") 'DarkGray'
 
+# A build names its shortcut after the build it is.
+#
+# MEASURED 22 SEPTEMBER on Patrick's machine. This block wrote Thornswood.lnk
+# to the Desktop pointing at whatever -Root was, and -Root defaults to
+# C:\Thornswood-DevBuild. So every compile, including the compile check a
+# Claude runs and the one inside Ship, silently repointed the Desktop icon
+# called "Thornswood" at the DEV launcher, which joins the dev server on
+# 7787. The icon read 9/21 23:47:03, the minute the dev build was last
+# compiled, and it had been pointing at the dev build ever since. Nothing
+# said so, because the shortcut still had the right name and the right
+# artwork. The Start menu entries were correct the whole time, which is why
+# it went unnoticed: Thornswood.lnk there points at C:\Thornswood and
+# Thornswood Dev.lnk at the dev build.
+#
+# The dev build gets its own name, so the two can never overwrite each other,
+# and a dev build never touches the Desktop icon the play install owns.
+$isDevRoot = $Root.TrimEnd('\') -match '-DevBuild$'
+$lnkName   = if ($isDevRoot) { 'Thornswood Dev.lnk' } else { 'Thornswood.lnk' }
+
 $ws = New-Object -ComObject WScript.Shell
 foreach ($dest in @([Environment]::GetFolderPath('Desktop'), $Root)) {
     # The old name, tidied away so nobody ends up with two shortcuts to the
@@ -381,15 +400,33 @@ foreach ($dest in @([Environment]::GetFolderPath('Desktop'), $Root)) {
     $was = Join-Path $dest 'Skyrim Together.lnk'
     if (Test-Path $was) { Remove-Item $was -Force -ErrorAction SilentlyContinue }
 
-    $sc = $ws.CreateShortcut((Join-Path $dest 'Thornswood.lnk'))
+    # A dev build that previously wrote the play install's name here left a
+    # shortcut behind pointing at the dev exe. Take it away rather than leave
+    # it lying, but only when it really does point into this dev root: a
+    # correct Thornswood.lnk aimed at the play install is not ours to remove.
+    if ($isDevRoot) {
+        $stale = Join-Path $dest 'Thornswood.lnk'
+        if (Test-Path -LiteralPath $stale) {
+            try {
+                $old = $ws.CreateShortcut($stale)
+                if ($old.TargetPath -and $old.TargetPath.StartsWith($Root.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) {
+                    Remove-Item -LiteralPath $stale -Force -ErrorAction SilentlyContinue
+                    Say "  removed a Thornswood.lnk in $dest that pointed at the dev build" 'Yellow'
+                }
+            } catch { }
+        }
+    }
+
+    $sc = $ws.CreateShortcut((Join-Path $dest $lnkName))
     $sc.TargetPath       = $exe
     $sc.Arguments        = ''
     $sc.WorkingDirectory = $outDir
     $sc.IconLocation     = "$iconFile,0"
-    $sc.Description      = 'Thornswood'
+    $sc.Description      = if ($isDevRoot) { 'Thornswood Dev' } else { 'Thornswood' }
     $sc.Save()
 }
-Say '  Points at the exe now, no PowerShell in the chain' 'Green'
+Say ("  $lnkName points at the exe now, no PowerShell in the chain") 'Green'
+if ($isDevRoot) { Say '  the play install''s own Thornswood.lnk is left alone' 'DarkGray' }
 
 # Telling the shell an association changed is what actually makes Explorer
 # redraw, and unlike clearing the cache it costs nothing and interrupts

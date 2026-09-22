@@ -1,0 +1,38 @@
+# The files both machines touch.
+#
+# CLAUDE.md and SECOND-DEVELOPER.md both say these six need a word before they
+# are edited, because a change in any of them lands on the other machine's work
+# without warning. Until now that rule was prose in two documents with nothing
+# behind it: nothing asked, nothing checked, and it was forgotten as often as
+# it was kept.
+#
+# A leading slash pins the pattern to the repository root, the same way a
+# gitignore pattern works. Without it, tools/app/Shell.cs would also match any
+# Shell.cs in any folder added later.
+#
+# WHAT THIS DOES AND DOES NOT DO. GitHub requests a review from the owner named
+# here when a pull request touches the file. It does not require one until
+# Require review from Code Owners is switched on in branch protection for main,
+# and GitHub never asks a pull request's own author for a code owner review. So
+# a pull request Patrick opens on Shell.cs asks Djinn, and one Djinn opens asks
+# Patrick, which is exactly the intent. Patrick's own work goes straight to
+# main and never becomes a pull request at all, so this binds Djinn's branches
+# and the occasional pull request Patrick does open.
+#
+# A mistyped path or a handle without push access is ignored in silence, which
+# is why the check is worth running after any edit here:
+#
+#     gh api repos/EvilPatrick06/Thornswood/codeowners/errors
+
+/tools/app/Shell.cs        @EvilPatrick06 @WiccanDjinn
+/tools/app/Checks.cs       @EvilPatrick06 @WiccanDjinn
+/tools/app/Keep.cs         @EvilPatrick06 @WiccanDjinn
+/tools/app/Hold.cs         @EvilPatrick06 @WiccanDjinn
+/tools/app/Updater.cs      @EvilPatrick06 @WiccanDjinn
+/tools/Publish-Update.ps1  @EvilPatrick06 @WiccanDjinn
+
+# Not on CLAUDE.md's list, and here because getting them wrong is the same
+# shape of accident: they decide what leaves a machine and what a release is.
+/tools/Ship.ps1            @EvilPatrick06 @WiccanDjinn
+/tools/Ship-Rules.ps1      @EvilPatrick06 @WiccanDjinn
+/.github/                  @EvilPatrick06

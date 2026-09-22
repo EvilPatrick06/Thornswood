@@ -1,4 +1,4 @@
-<#
+﻿<#
   Install-ThornswoodServer.ps1
 
   Run this ON THE VPS, after Bootstrap-VPS.ps1, as Administrator.
@@ -81,7 +81,103 @@ if (Test-Path -LiteralPath $dataDir) {
     Write-Host "existing data set aside at $dataBak" -ForegroundColor Yellow
 }
 
-if (Test-Path -LiteralPath $Root) { Remove-Item -LiteralPath $Root -Recurse -Force }
+<#
+  AND THE PRIVATE FOLDER, WHICH IS WHERE THE ROSTER LIVES.
+
+  This set aside the world and the data folder and not this one, so every
+  install since there has been a private folder has deleted it: door.json,
+  allowed.json and characters.json, gone, on a script that reports nothing but
+  success.
+
+  gamemode.js already wrote down what that costs, on 20 September, when the
+  whole folder went: "the character register silently stops being saved, the
+  door silently never fetches a roster, and /tp silently refuses everybody
+  because the list it reads was never written. That is three separate reports
+  with one cause and no log line between them." It was read as a one off. It
+  is this script, every time.
+
+  Patrick, 21 September, from the dev server: "Dev has no playtetser list so I
+  can't tp like I can on main."
+
+  Restored whole rather than file by file, unlike data. Nothing in a build
+  ships into private, so there is no shipped file here for a new build to be
+  entitled to replace, and merging would only risk half a roster.
+#>
+$privDir = Join-Path $Root 'private'
+$privBak = $null
+if (Test-Path -LiteralPath $privDir) {
+    $privBak = Join-Path $env:TEMP ("serverprivate-" + $stamp)
+    Copy-Item -LiteralPath $privDir -Destination $privBak -Recurse -Force
+    Write-Host "existing roster set aside at $privBak" -ForegroundColor Yellow
+}
+
+<#
+  THE OLD SERVER LETTING GO, WHICH IT DOES NOT ALWAYS DO ON ITS OWN.
+
+  21 September, on a dev publish that had just said "stopped":
+
+    Remove-Item : Cannot remove item
+    C:\Thornswood-Server-Dev\data\api\servers\thornswood\plugins\10.bin:
+    Access to the path '10.bin' is denied.
+    STOP. the installer on the VPS exited with 1.
+
+  Stopping a scheduled task asks the process to end. It does not wait for it,
+  and node does not drop its file handles the instant it is asked: the
+  resources server under data\api holds the plugin files it is serving. So the
+  delete raced the process, hit one locked file, and took the whole install
+  down after the payload had already been copied up.
+
+  Three things, in the order that costs least.
+
+  ONE, ask anything still running under this root to stop, by command line
+  rather than by name, because the live server and the dev server are both node
+  and killing by name would take the other one down. That is the same rule
+  Publish-Server settled on 21 September after a dev publish stopped live.
+
+  TWO, wait for the handles. A few short goes rather than one long sleep, so
+  the ordinary case where it is already gone costs nothing.
+
+  THREE, say which file it was if it still will not go, because "access to the
+  path is denied" without a process name is the start of a long evening.
+#>
+if (Test-Path -LiteralPath $Root) {
+    $rootMatch = $Root.TrimEnd('\') + '\*'
+    try {
+        foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
+            if ($p.CommandLine -and $p.CommandLine -like $rootMatch) {
+                Write-Host ("asking node {0} under this root to stop" -f $p.ProcessId) -ForegroundColor Yellow
+                Stop-Process -Id $p.ProcessId -Force -EA SilentlyContinue
+            }
+        }
+    } catch { }
+
+    $gone = $false
+    for ($i = 1; $i -le 10; $i++) {
+        try {
+            Remove-Item -LiteralPath $Root -Recurse -Force -EA Stop
+            $gone = $true
+            break
+        } catch {
+            if ($i -eq 1) {
+                Write-Host 'the old server is still holding a file, waiting for it' -ForegroundColor Yellow
+            }
+            Start-Sleep -Milliseconds 700
+        }
+    }
+
+    if (-not $gone) {
+        # Name what is still open, then stop rather than half installing.
+        $stuck = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -EA SilentlyContinue |
+                   Where-Object {
+                       try { $h = [IO.File]::Open($_.FullName, 'Open', 'ReadWrite', 'None'); $h.Close(); $false }
+                       catch { $true }
+                   } | Select-Object -First 5)
+        foreach ($f in $stuck) { Write-Host ("still open: {0}" -f $f.FullName) -ForegroundColor Red }
+        throw ("could not clear $Root after ten tries. Something outside this " +
+               "script is holding those files; the world, the data folder and " +
+               "the roster are all still set aside in $env:TEMP.")
+    }
+}
 New-Item -ItemType Directory -Path $Root -Force | Out-Null
 Expand-Archive -LiteralPath $Zip -DestinationPath $Root -Force
 Write-Host "unpacked to $Root" -ForegroundColor Cyan
@@ -89,6 +185,24 @@ Write-Host "unpacked to $Root" -ForegroundColor Cyan
 if ($worldBak) {
     Copy-Item -LiteralPath $worldBak -Destination $world -Recurse -Force
     Write-Host 'world restored' -ForegroundColor Cyan
+}
+
+# See the note above. Whole, because nothing in a build ships into private.
+if ($privBak) {
+    Copy-Item -LiteralPath $privBak -Destination $privDir -Recurse -Force
+    $n = @(Get-ChildItem -LiteralPath $privDir -Recurse -File -Force -EA SilentlyContinue).Count
+    Write-Host "roster restored, $n file(s) including door.json and allowed.json" -ForegroundColor Cyan
+} elseif (-not (Test-Path -LiteralPath $privDir)) {
+    <#
+      A root that has never had one. The door writes allowed.json itself once
+      it has fetched, and the register writes characters.json, but neither can
+      write into a folder that is not there: gamemode.js does one mkdir at load
+      for exactly that reason. Saying so here is the difference between "this
+      server has no roster yet" and the silence that cost three reports.
+    #>
+    New-Item -ItemType Directory -Path $privDir -Force | Out-Null
+    Write-Host 'no roster to restore: this root has never had a private folder.' -ForegroundColor Yellow
+    Write-Host '  /tp will refuse everybody until door.json is put there.' -ForegroundColor Yellow
 }
 
 if ($dataBak) {
@@ -173,13 +287,38 @@ if ($StartNow -and -not $NoTask) {
 
     Start-ScheduledTask -TaskName $TaskName
 
+    <#
+      THE PORT OF THE SERVER THIS SCRIPT JUST INSTALLED, NOT 3000.
+
+      This probed 127.0.0.1:3000 whatever it had installed. 3000 is the LIVE
+      server's resources port, and the live server is up, so a DEV install
+      asked the live server whether dev had started and was told yes. It would
+      have printed "the server is answering" with the dev server face down in
+      its own log, which is the one case this loop exists for.
+
+      Publish-Server had the identical fault in its own verify block and it was
+      fixed there on 21 September. This is the second copy of it. The rule is
+      written down in one more place now: skymp5-server/ts/ui.ts derives the
+      resources port as 3000 when the game port is 7777 and game port plus one
+      otherwise, so dev on 7787 serves on 7788.
+
+      Read out of the settings that were just unpacked, so it is right for any
+      root without anybody passing a number.
+    #>
+    $gamePort = 7777
+    try {
+        $cfg = Get-Content -LiteralPath (Join-Path $Root 'server-settings.json') -Raw | ConvertFrom-Json
+        if ($cfg.port) { $gamePort = [int]$cfg.port }
+    } catch { }
+    $resPort = if ($gamePort -eq 7777) { 3000 } else { $gamePort + 1 }
+
     # Wait for the resources port rather than a fixed few seconds, and when it
     # never opens, print the log instead of leaving the caller to guess.
     $up = $false
     for ($i = 0; $i -lt 30; $i++) {
         try {
             $c = New-Object Net.Sockets.TcpClient
-            $null = $c.BeginConnect('127.0.0.1', 3000, $null, $null).AsyncWaitHandle.WaitOne(500)
+            $null = $c.BeginConnect('127.0.0.1', $resPort, $null, $null).AsyncWaitHandle.WaitOne(500)
             $up = $c.Connected
             $c.Close()
         } catch { }
@@ -191,7 +330,7 @@ if ($StartNow -and -not $NoTask) {
     Write-Host ("task state: {0}" -f $t.State) -ForegroundColor DarkGray
 
     if ($up) {
-        Write-Host 'the server is answering on 3000' -ForegroundColor Green
+        Write-Host ("the server is answering on {0}, game port {1}" -f $resPort, $gamePort) -ForegroundColor Green
     }
     else {
         Write-Host ''

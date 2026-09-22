@@ -346,6 +346,66 @@ function ensureProperties() {
       updateOwner: '',
       updateNeighbor: '',
     });
+    /*
+      HOW MUCH IS LEFT IN A SEAM, AND WHY THIS LINE IS THE WHOLE OF THE DEFECT.
+
+      Patrick, 21 September: "the quearry was infinite or close to it just got
+      100 ore in one vein vs the 20 it's supposed to be".
+
+      DEPOSIT_PROPERTY was the only property in this file never registered.
+      Every read of an unregistered property throws, depositLeft catches it and
+      answers DEPOSIT_SIZE, and mp.set throws too, so nothing was ever written:
+      every swing read a full seam, took one out of it, failed to record that,
+      and read a full seam again. A seam with no bottom.
+
+      The fail-open in depositLeft is still right and stays: a seam the server
+      cannot read should be workable rather than dead, because failing shut
+      there takes every seam in the province out of the game at once. What was
+      wrong is that the unreadable case was ALL of them, every time, and
+      nothing said so. takeFromDeposit now logs a failed write once per seam,
+      so this cannot be silent again.
+
+      Invisible to both: how worked out a seam is is not something the client
+      needs and not something a neighbour has any business being told.
+    */
+    mp.makeProperty(DEPOSIT_PROPERTY, {
+      isVisibleByOwner: false,
+      isVisibleByNeighbors: false,
+      updateOwner: '',
+      updateNeighbor: '',
+    });
+    /*
+      THE SWING, AND WHY THE SERVER HAS TO ASK FOR IT.
+
+      Patrick, 21 September: "Mining is still skipping the animation".
+
+      Nothing is skipping it. It never played. A vanilla ore vein is an ACTI
+      whose animation comes from MineOreScript, and no Papyrus object script
+      runs under SkyMP at all, which is the same reason the Whiterun gate stays
+      locked and the same reason the client has to re-activate levers. Letting
+      the press through, which is what ALLOW does, hands it to an engine whose
+      script will not start. There was never anything there to skip.
+
+      So the server asks the person's own client to play it, through the one
+      channel that already exists for this: updateOwner, the same mechanism the
+      door locks use. ctx.sp is Skyrim Platform on their machine.
+
+      THE EVENT NAMES ARE READ OUT OF Skyrim.esm, not guessed. IdlePickaxeEnter
+      is the event on IDLE a82c6 under PickaxeRoot, and IdleWoodChopStart is
+      the event on IDLE 6c1df under WoodChopRoot. Both exit through
+      IdleChairExitStart, which is what every one of those records names as its
+      exit, however odd it reads.
+
+      Visible to the owner and to nobody else. A neighbour sees the animation
+      because Skyrim is playing it on a body they can see, not because they
+      were sent anything.
+    */
+    mp.makeProperty(SWING_PROPERTY, {
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: swingScript(),
+      updateNeighbor: '',
+    });
   } catch (e) {
     // already made, or made by a previous load. harmless.
   }
@@ -1373,11 +1433,16 @@ const TOOL_AGAIN_HOURS = 12;
   thing somebody owns once and becomes stock, which somebody has to make.
 
   A hundred uses, measured against the ladder rather than picked out of the air.
-  TUNING.workPerRank adds up to 20 + 50 + 120 = 190 yields from novice to
-  Master, so one tool carries somebody a little over half the way: two tools to
-  the top, and a Master who keeps working keeps ordering. That is a standing
-  order book for the smiths without being a chore, and it is the number to move
-  if it turns out to be either.
+  TUNING.workPerRank added up to 20 + 50 + 120 = 190 yields from novice to
+  Master when this was written, so one tool carried somebody a little over half
+  the way: two tools to the top, and a Master who keeps working keeps ordering.
+  That was a standing order book for the smiths without being a chore.
+
+  IT IS 100 + 250 + 600 = 950 NOW, changed on 21 September when a rank stopped
+  meaning twenty seams and started meaning one. So the climb costs about ten
+  tools rather than two, which is five times the order book and may well be too
+  much of one. If the tool starts feeling like a toll rather than stock, this
+  is the number to move and not the ladder.
 
   The warning comes at fifteen left. Far enough out to finish what you are doing
   and walk to a town, short enough to mean something.
@@ -1686,6 +1751,8 @@ function mineSalt(actorId, refrId) {
     addItem(actorId, rare, 1);
     extra = ' Something rarer came away with it.';
   }
+  // The swing, because no Papyrus runs here to play it. See SWING_PROPERTY.
+  swing(actorId, SWING_MINE);
   const rank = creditWork(actorId, 'mine');
   const worn = wearTool(actorId, 'miner');
   return 'You work ' + yielded + ' salt from the seam.' + extra +
@@ -1779,7 +1846,71 @@ function isVein(baseDesc) {
 const ALLOW = { thornswoodAllow: true };
 
 const DEPOSIT_SIZE = 20;
+const SWING_PROPERTY = 'thornswoodSwing';
+
+/*
+  How long a swing is held before the person is let go of.
+
+  Long enough to read as a swing, short enough that nobody feels held. The exit
+  is sent regardless, because an idle with no exit leaves somebody rooted until
+  they work out that moving breaks it.
+*/
+const SWING_MS = 2500;
+
+/** The animation to play, by what is being worked. See SWING_PROPERTY. */
+const SWING_MINE = 'IdlePickaxeEnter';
+const SWING_CHOP = 'IdleWoodChopStart';
+const SWING_STOP = 'IdleChairExitStart';
+
+/*
+  Run on the person's own machine when SWING_PROPERTY changes. See the note on
+  the property. Written as one string for the same reason lockScript is: the
+  script cannot be changed once the property is made, so a change here needs a
+  server restart, which a deploy is.
+*/
+function swingScript() {
+  return [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || !v.anim) { return; }',
+    '    var sp = ctx.sp;',
+    '    var pc = sp.Game.getPlayer();',
+    '    if (!pc) { return; }',
+    '    sp.Debug.sendAnimationEvent(pc, v.anim);',
+    // And let them go again. Utility.wait is a promise here, not a block.
+    '    sp.Utility.wait((v.ms || 2500) / 1000).then(function () {',
+    '      try { sp.Debug.sendAnimationEvent(sp.Game.getPlayer(), v.stop); } catch (e) { }',
+    '    });',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+}
+
+/*
+  Ask for a swing. The stamp is what makes it a change: the same animation
+  twice running is the same value, and a property that has not changed does not
+  run its script, so a second swing on the same seam would play nothing.
+*/
+function swing(actorId, anim) {
+  try {
+    mp.set(actorId, SWING_PROPERTY,
+           { anim: anim, stop: SWING_STOP, ms: SWING_MS, at: Date.now() });
+  } catch (e) {
+    // A person whose property will not take is a person without an animation,
+    // and nothing else about their work changes. Once, so a broken client does
+    // not fill the log.
+    if (!SWING_QUIET[actorId]) {
+      SWING_QUIET[actorId] = true;
+      log('could not ask', actorId.toString(16), 'for a swing animation:', e);
+    }
+  }
+}
+const SWING_QUIET = {};
+
 const DEPOSIT_PROPERTY = 'thornswoodDeposit';
+/* Seams whose last write threw. See takeFromDeposit. */
+const DEPOSIT_UNWRITABLE = {};
 
 /*
   How long a worked out seam takes to come back, by what it gives.
@@ -1842,8 +1973,26 @@ function takeFromDeposit(refrId, backMs) {
   const now = left - 1;
   try {
     mp.set(refrId, DEPOSIT_PROPERTY, { left: now, at: now === 0 ? Date.now() : 0 });
+    delete DEPOSIT_UNWRITABLE[refrId];
   } catch (e) {
-    log('could not write the deposit on', refrId.toString(16) + ':', e);
+    /*
+      ONCE PER SEAM, NOT ONCE PER SWING, AND NEVER SILENTLY.
+
+      This already logged, and the log is what nobody was reading, because a
+      seam that cannot be written is also a seam that reads full: the person
+      sees ore coming out and nothing looks wrong from any side. Patrick got a
+      hundred out of one vein before anybody noticed.
+
+      A line per swing would be a hundred lines and would bury the first one,
+      so it is the first swing on each seam that says it, and the message says
+      what it MEANS rather than only what failed. The count is kept so a seam
+      that starts working again is not held against it.
+    */
+    if (!DEPOSIT_UNWRITABLE[refrId]) {
+      DEPOSIT_UNWRITABLE[refrId] = true;
+      log('THE SEAM AT', refrId.toString(16), 'CANNOT BE WRITTEN, so it will ' +
+          'never run out and everybody can take from it forever:', e);
+    }
   }
   return now + 1;
 }
@@ -1916,6 +2065,8 @@ function mineOre(actorId, refrId, baseDesc) {
     return 'The seam gives up ' + seam.name + ' and there is nothing in this load ' +
            'order to put in your hands. Say so in the dev channel.';
   }
+  // The swing, because no Papyrus runs here to play it. See SWING_PROPERTY.
+  swing(actorId, SWING_MINE);
   const rank = creditWork(actorId, 'mine');
   const worn = wearTool(actorId, 'miner');
   /*
@@ -2010,7 +2161,52 @@ function isChoppingBlock(baseDesc) {
  * axe wears here, which is the point of a tool that breaks: the trade that uses
  * it hardest is the one that buys the most of them.
  */
-function chopWood(actorId, refrId) {
+/*
+  WHO IS STANDING AT WHICH BLOCK, AND WHEN THEY LAST PRESSED IT.
+
+  Patrick, 21 September: "the chopping block is still not always doing the
+  animation and not always giving the wood apon hit still".
+
+  The server sees a PRESS. The block is a FURN record, so pressing it puts the
+  person into Skyrim's own chopping furniture and the axe falls over and over
+  while the server hears nothing at all, and vanilla's own block script, which
+  would have handed wood over per swing, does not run here any more than
+  MineOreScript does. So one press was one handover and everything after it was
+  a person swinging an axe at a server that had stopped listening.
+
+  The client can see each swing, because the animation events pass through it.
+  It reports them on the one channel that exists, the chat overlay's socket,
+  as /chopped. That channel is a chat line, so anybody could type the word, and
+  this is what stops that being worth anything: a /chopped is only credited to
+  somebody the server has just watched press a chopping block, and no faster
+  than an axe can actually fall.
+*/
+const CHOP_AT = {};
+/* A press is good for this long. Longer than anybody chops in one go, short
+   enough that it is not a licence to type the word an hour later. */
+const CHOP_WINDOW_MS = 120000;
+/* The fastest an axe falls. Two a second is not an axe, it is a chat macro. */
+const CHOP_MIN_MS = 1200;
+
+/*
+  One swing's worth, reported by the client rather than pressed.
+
+  Every gate chopWood applies is applied again here, by calling chopWood
+  itself: the half, the tool, the rank and the wear all have to be asked again
+  because a session can outlast any of them. A tool that broke on the last
+  swing stops the next one, which is the whole point of counting swings.
+*/
+function choppedSwing(actorId) {
+  const at = CHOP_AT[actorId];
+  if (!at) { return null; }
+  const now = Date.now();
+  if (now - at.at > CHOP_WINDOW_MS) { delete CHOP_AT[actorId]; return null; }
+  if (now - (at.last || 0) < CHOP_MIN_MS) { return null; }
+  at.last = now;
+  return chopWood(actorId, at.refrId, true);
+}
+
+function chopWood(actorId, refrId, fromSwing) {
   const half = halfGate(actorId, 'woodwright', 'novice',
     'A chopping block is a woodworker\'s. Only a woodworker who took Woodwright can ' +
     'work one, and a charburner gets the novice yield. Ask one.');
@@ -2057,6 +2253,17 @@ function chopWood(actorId, refrId) {
     return 'The block gives up firewood and there is nothing in this load order to ' +
            'put in your hands. Say so in #bugs.';
   }
+  /*
+    The press is what starts a session, and the block is a FURN so Skyrim's own
+    furniture plays the swing. The server only asks for an animation when the
+    report came from a swing rather than a press, because asking twice for the
+    same swing is what makes it stutter.
+  */
+  if (!fromSwing) {
+    CHOP_AT[actorId] = { refrId: refrId, at: Date.now(), last: Date.now() };
+  } else {
+    swing(actorId, SWING_CHOP);
+  }
   const rank = creditWork(actorId, 'woodwright');
   const worn = wearTool(actorId, 'woodworker');
   // Only when there is something worth interrupting them for, and the press
@@ -2068,6 +2275,12 @@ function chopWood(actorId, refrId) {
   }
   return ALLOW;
 }
+
+/*
+  Who has been told what a kiln will cost them, and when. See burnCharcoal.
+*/
+const KILN_ARMED = {};
+const KILN_ARM_MS = 15000;
 
 function burnCharcoal(actorId, refrId) {
   const half = halfGate(actorId, 'charburner', 'novice',
@@ -2085,6 +2298,43 @@ function burnCharcoal(actorId, refrId) {
   if (wait > 0) return 'The kiln is still burning. ' + wait + ' seconds.';
 
   const cost = 3;
+
+  /*
+    A PRESS IS NOT A DECISION, AND THIS ONE WAS SPENDING FIREWOOD LIKE ONE.
+
+    Patrick, 21 September: "it's making charcoal automatically instantly upon
+    opening the kiln and not when you click to make it".
+
+    Every other verb in this file answers a press that can only mean one thing.
+    A seam is struck, a block is chopped, a plot is sown, and if you did not
+    want it you would not have walked up to it. A kiln is different because it
+    SPENDS something: three firewood, out of a pack you are carrying for
+    something else, for a grade of charcoal you may not have wanted yet. Walking
+    past one and pressing it took them.
+
+    WHY IT IS NOT A MENU, and this is the honest part. The kiln is a bench, it
+    has a keyword, and BENCH_ACCESS gates it, so the crafting menu does open.
+    There is nothing in it: charcoalT1 to T4 appear exactly twice in this whole
+    file, in ITEMS and in this function, and no COBJ anywhere makes them. A
+    proper menu needs four recipe records in Thornswood-Content.esp, which is
+    Creation Kit work and its own entry.
+
+    SO IT ASKS. The first press says what it will cost and what it will make.
+    The second press within the window does it. That is still a press rather
+    than a chat word, it cannot happen by accident, and it needs no new records.
+    The window is deliberately short: this is a confirmation, not a state, and
+    somebody who walked off and came back should be asked again.
+  */
+  var armed = KILN_ARMED[actorId];
+  if (!armed || armed.refrId !== refrId || (Date.now() - armed.at) > KILN_ARM_MS) {
+    KILN_ARMED[actorId] = { refrId: refrId, at: Date.now() };
+    const willBe = ['charcoalT1', 'charcoalT2', 'charcoalT3', 'charcoalT4']
+      [rankStep(actorId, 'charburner')] || 'charcoalT1';
+    return 'The kiln will take ' + cost + ' firewood and give you ' +
+           willBe.replace('charcoalT', 'grade ') + ' charcoal. Press it again to burn.';
+  }
+  delete KILN_ARMED[actorId];
+
   if (!takeItem(actorId, ITEMS.firewood, cost)) {
     return 'The kiln needs ' + cost + ' firewood.';
   }
@@ -3397,8 +3647,8 @@ mp.onRespawn = guard('onRespawn', function (actorId) {
   cannot open. One was the clam at Oar's Rest and one the tree in the Ancestor
   Glade. The 15 that were left were every one of them a white cap, an imp stool
   or a namira's rot in a cave. So a new Gatherer was refused every flower in
-  Skyrim, and with workPerRank.advanced at 20 the only road onto the second rung
-  was twenty cave mushrooms. The pass now leaves the sacks out and reads the
+  Skyrim, and with workPerRank.advanced at 20 as it was then, the only road onto
+  the second rung was twenty cave mushrooms. The pass now leaves the sacks out and reads the
   novice band as produce worth up to 1 gold, which is lavender, thistle, creep
   cluster, juniper berries, jazbay grapes, hanging moss and the rest of them:
   47 wild bases on the first rung instead of 15. The three numbers that did
@@ -8820,13 +9070,59 @@ log('gamemode loaded:',
   // No file means no refreshing, and the door uses whatever allowed.json
   // already says. "enforce" is never touched by this: turning the door on is a
   // decision, not something a web request gets to make.
+  /*
+    SAID ONCE, AND SAYING WHAT TO DO ABOUT IT.
+
+    Patrick, 21 September, after an evening on this: "still can't tp says no
+    list", and before that "well it should pull the roles from discord
+    automaticlly bruh". It should, and it could not, and nothing anywhere said
+    why.
+
+    MEASURED with Check-Roster on both servers: private held characters.json
+    and nothing else. No door.json on live, none on dev, so the door has never
+    had a config to fetch WITH, allowed.json has never been written, and every
+    tier of every role check has been answering no to everybody on both
+    servers. Set-Door.ps1 -Connect is what writes that file, and every install
+    deleted the folder it lives in until that was fixed the same night, so it
+    was almost certainly written once and quietly wiped.
+
+    EVERY FAILURE ON THIS PATH WAS SILENT, which is the whole reason it cost an
+    evening. This function returned on a missing file, refresh is on a timer so
+    it returned again five minutes later, and /tp said "you are not on the
+    list" to the owner of the server. Three symptoms, one missing file, no line
+    anywhere.
+
+    So it says so, once, and names the script that fixes it. Once because this
+    runs every five minutes forever and a line each time is a log nobody reads.
+    The KEY IS NEVER TOUCHED HERE: the file is named, never its contents.
+  */
+  var doorSaid = false;
+
   function refresh() {
     var conf;
     try {
       conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8')
                           .replace(/^\uFEFF/, ''));
-    } catch (e) { return; }
-    if (!conf || !conf.site || !conf.key) return;
+    } catch (e) {
+      if (!doorSaid) {
+        doorSaid = true;
+        console.log('[thornswood] there is no ' + path.join(privDir, 'door.json') +
+                    ', so the door never fetches, allowed.json is never written, ' +
+                    'and every role check refuses everybody including the owner. ' +
+                    'Set-Door.ps1 -Connect writes it.');
+      }
+      return;
+    }
+    if (!conf || !conf.site || !conf.key) {
+      if (!doorSaid) {
+        doorSaid = true;
+        console.log('[thornswood] ' + path.join(privDir, 'door.json') +
+                    ' is there but has no site or no key, so the door cannot ' +
+                    'fetch. Set-Door.ps1 -Connect rewrites it.');
+      }
+      return;
+    }
+    doorSaid = false;
 
     var https;
     try { https = require('https'); } catch (e) { return; }
@@ -8853,10 +9149,39 @@ log('gamemode loaded:',
           // while Discord was unreachable would turn away everybody missing
           // from it.
           if (doc.lookupFailed) {
-            note('the site could not reach Discord, keeping the list as it was');
+            /*
+              AND WHY. This said only that the site could not reach Discord,
+              and on 22 September that one line was the whole of what anybody
+              knew after an evening of looking. The site works the reason out
+              in plain words and used to throw it away one line after it knew
+              it; it sends it now. A wrong token, a bot that may not read
+              members, a rate limit and no token at all are four different
+              fixes and they read identically without this.
+            */
+            note('the site could not reach Discord, keeping the list as it was' +
+                 (doc.lookupFailedWhy ? ': ' + doc.lookupFailedWhy
+                                      : '. The site did not say why, so it is ' +
+                                        'running a build older than 22 September.'));
             return;
           }
-          if (!Array.isArray(doc.profiles)) return;
+          /*
+            THE LAST SILENT BRANCH IN THIS CHAIN, AND IT IS THE ONE THAT WOULD
+            HAVE HURT MOST.
+
+            Every other way this can fail already says so: a body that is not
+            JSON, a status that is not 200, Discord being unreachable, the
+            write failing, the request erroring, the timeout. This one returned
+            on a two hundred with a perfectly good JSON document that simply
+            had no profiles array in it, and said nothing at all. The door
+            would keep refreshing every five minutes, forever, and allowed.json
+            would never appear, which reads from the outside exactly like the
+            missing door.json that cost 21 September.
+          */
+          if (!Array.isArray(doc.profiles)) {
+            note('the site answered 200 but sent no profiles list. Keys it sent: ' +
+                 Object.keys(doc || {}).join(', '));
+            return;
+          }
 
           var enforce = false;
           try {
@@ -9342,10 +9667,47 @@ log('gamemode loaded:',
   var TUNING = {
     /*
       Yields handed out to climb into each rank, counted from the rank below
-      and reset on arrival. So novice -> advanced is 20 pieces of work done,
-      and the count starts again at 0 against the 50 for expert.
+      and reset on arrival. So novice -> advanced is 100 pieces of work done,
+      and the count starts again at 0 against the 250 for expert.
+
+      FIVE VEINS TO ADVANCED, ASKED FOR BY PATRICK ON 21 SEPTEMBER: "it should
+      be like 5 veins per rank one is wayy to fast een 5 might be too quick",
+      and then "make sure the others don't level up that quickly".
+
+      A vein holds twenty, so the arithmetic is the whole of this line:
+
+        advanced  100 = 5 veins
+        expert    250 = 12 and a half
+        master    600 = 30
+        all the way up          47 and a half veins
+
+      These were 20, 50 and 120, which is one vein to Advanced. That number was
+      never wrong on purpose: it was picked when a vein handed over its whole
+      yield in one press, so twenty yields meant twenty SEAMS. Once a swing
+      became the unit, the same number meant one seam, and nobody moved it. The
+      ratio between the three is kept exactly, because the shape of the ladder
+      was not what was wrong with it.
+
+      ONE LADDER, EVERY CLASS, which is what makes the second half of Patrick's
+      instruction free: workPerRank is not per class, so this slows the
+      gatherer, the farmer, the hunter and the fisher by the same five.
+
+      WHAT IT DOES NOT DO, and this is worth being exact about rather than
+      claiming more than it earns. It equalises the COUNT, not the PACE. Mining
+      is bounded by a vein that holds twenty and comes back in ten or thirty
+      minutes, so five veins is real time whatever anybody does. Picking
+      flowers is bounded by how many flowers are in front of you. So if the
+      gatherer still climbs faster than the miner after this, that is not this
+      number, it is the absence of anything like a vein on the gathering side,
+      and it wants watching before it wants another guess.
+
+      AND IT IS TOOLS. TOOL_USES is 100, so the whole climb now costs about ten
+      tools rather than two. That is a far bigger standing order for the smiths
+      than the comment on TOOL_USES describes, and it is the next number to
+      look at if the tool stops feeling like stock and starts feeling like a
+      toll.
     */
-    workPerRank: { advanced: 20, expert: 50, master: 120 },
+    workPerRank: { advanced: 100, expert: 250, master: 600 },
     /*
       Skill tree points a rank gives. Nothing anywhere else awards one, so
       without this the fifteen sub-skills on the K panel can never be spent
@@ -15040,7 +15402,17 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
                '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob',
-               '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks'];
+               '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
+               /*
+                 NOT A COMMAND ANYBODY TYPES. The client reports each fall of
+                 the axe with it, because the server sees a press and Skyrim's
+                 furniture does the swinging. It is registered here so the
+                 dispatcher answers it rather than saying "unknown command",
+                 and it is deliberately NOT in PLAYER_WORDS: naming it in /help
+                 would be inviting people to type it, and choppedSwing is what
+                 makes typing it worth nothing.
+               */
+               '/chopped'];
 
 /*
   The ones a person who is not a playtester is told about. /tp, /goto, /face,
@@ -15247,6 +15619,24 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var charCmd = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCharacter;
       if (charCmd && charCmd.command(word, parts, actorId, profileId, toProfile)) { return; }
     } catch (eChar) { log('character command failed:', eChar); }
+
+    /*
+      One fall of the axe, reported by the client. See choppedSwing.
+
+      Nothing is ever said back for an ordinary swing, whether it was credited
+      or refused: this arrives once or twice a second while somebody chops, and
+      a line per swing is the spam Patrick asked to be rid of in the first
+      place. The rank line and the tool warning still come through, because
+      choppedSwing answers them the same way a press does.
+    */
+    if (word === '/chopped') {
+      var swung = choppedSwing(actorId);
+      if (swung && swung !== ALLOW) {
+        notify(actorId, swung);
+        say(actorId, swung);
+      }
+      return true;
+    }
 
     if (word === '/tspicks') {
       if (!needCharacter()) { return; }

@@ -473,6 +473,9 @@ namespace Thornswood
                 var newInGame = new List<string>();
                 var gameWritten = new List<string>();
                 var removed = new List<string>();
+                // Whether this pack carried a reference plugin list, so it can
+                // be settled into the live location once the pack is out.
+                bool carriedProfile = false;
                 using (var ar = ZipFile.OpenRead(zip))
                 {
                     var del = ar.GetEntry("delete.txt");
@@ -515,7 +518,13 @@ namespace Thornswood
                             inGame = true;
                         }
                         else if (rel.StartsWith("profile\\", StringComparison.OrdinalIgnoreCase))
+                        {
                             dest = Path.Combine(Paths.Golden, Path.GetFileName(rel));
+                            string leaf = Path.GetFileName(rel);
+                            if (leaf.Equals("plugins.txt", StringComparison.OrdinalIgnoreCase) ||
+                                leaf.Equals("loadorder.txt", StringComparison.OrdinalIgnoreCase))
+                                carriedProfile = true;
+                        }
                         else if (rel.Equals("delete.txt", StringComparison.OrdinalIgnoreCase))
                             continue;
                         else
@@ -544,6 +553,34 @@ namespace Thornswood
                         if (inGame && !existed) newInGame.Add(under);
                         if (inGame) gameWritten.Add(under);
                         files++;
+                    }
+                }
+
+                // A reference plugin list that arrived in this pack goes into
+                // the file the game actually reads, now, rather than waiting
+                // for somebody to press Fix.
+                //
+                // Until 22 September it waited. A release that moved the load
+                // order installed cleanly, left the new list in
+                // Profile\Default, and the game then turned the person away
+                // with LOAD ORDER ERROR until they went back to the launcher
+                // and pressed a button nothing had told them about. A first
+                // time person reads that as the game being broken.
+                //
+                // Only this one step of Fix. The rest of Fix moves other
+                // people's files aside and asks the server, and none of that
+                // is wanted unprompted after every pack.
+                if (carriedProfile)
+                {
+                    try
+                    {
+                        int settled = Verify.SettleLoadOrder();
+                        if (settled > 0)
+                            log("The plugin list this update carried is in place, so the load order is right without pressing Fix.");
+                    }
+                    catch (Exception ex)
+                    {
+                        log("Could not put this update's plugin list in place: " + ex.Message + ". Press Fix in the launcher.");
                     }
                 }
 

@@ -15,6 +15,26 @@ C:\Thornswood\Game\Data\Platform\thornswood-loadorder.txt
 C:\Thornswood\Profile\launcher.log
 ```
 
+## STOP. If the game says LOAD ORDER ERROR
+
+Do not carry on and do not file anything from that session. Your mods are out
+of step with the server, so the objects on your machine are not the objects on
+everybody else's, and every fault you see after that is a guess.
+
+1. Quit the game.
+2. In the launcher press **Scan**. It names the plugin and the position.
+3. Press **Fix**. It puts the server's order into this build's plugin list.
+   Nothing is downloaded and nothing in Vortex changes.
+4. Press Play again. If the error is gone, carry on from TEST 1.
+
+If Scan says everything checks out and the game still shows the error, that is
+worth reporting on its own. Send `thornswood-loadorder.txt` from the list at
+the top of this page with the report, and say which build you are on.
+
+A report filed from a session showing that message costs an evening to chase
+and cannot be trusted. On 17 September a mining fault was reported from one,
+and the mining was never the problem.
+
 ## TEST 1. Launcher opens and closes
 
 1. Open the launcher.

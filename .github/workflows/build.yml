@@ -1,8 +1,17 @@
-# Every pull request and every push to main gets the same two checks a
-# release starts with: do all the PowerShell scripts parse, and does the
-# launcher compile with the .NET Framework 4 csc (C# 5). A red mark here
-# means the branch would stop Ship.ps1 at the build step; a green one means
-# it is worth a person's time to read. It builds only; nothing is published.
+# Every pull request and every push to main gets the checks a release starts
+# with: do all the PowerShell scripts parse, does every game script parse,
+# does the bot parse, do the test harnesses still pass, and does the launcher
+# compile with the .NET Framework 4 csc (C# 5). A red mark here means the
+# branch would stop Ship.ps1; a green one means it is worth a person's time
+# to read. It builds only; nothing is published.
+#
+# Everything is one job on purpose. Branch protection names ONE required
+# check, "Launcher builds", and a second job would not be covered by it, so a
+# new job would be a check that blocks nothing. Steps are named instead, and
+# a failed step names itself in the summary just as a failed job would.
+#
+# The harnesses were all written to be run by hand and none of them had ever
+# run here: 236 checks across twelve files, sitting in the repo going stale.
 name: Build check
 on:
   pull_request:
@@ -29,6 +38,57 @@ jobs:
           }
           if ($bad) { exit 1 }
           Write-Host "every script parses"
+
+      - name: Parse every game script
+        shell: pwsh
+        run: |
+          $bad = 0
+          $files = @(Get-ChildItem -Path tools -Filter *.js -File) +
+                   @(Get-ChildItem -Path tools\ts-plugins, tools\ts-ui -Filter *.js -File -ErrorAction SilentlyContinue)
+          foreach ($f in $files) {
+            & node --check $f.FullName 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              $bad++
+              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host ("{0} game script(s) parse" -f $files.Count)
+
+      - name: Parse every bot file
+        shell: pwsh
+        run: |
+          if (-not (Test-Path tools\discord)) { Write-Host 'no bot to parse'; exit 0 }
+          $bad = 0
+          foreach ($f in (Get-ChildItem tools\discord -Filter *.py -Recurse -File)) {
+            & python -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read(), sys.argv[1])" $f.FullName 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              $bad++
+              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host 'every bot file parses'
+
+      - name: Run the test harnesses
+        shell: pwsh
+        run: |
+          # Written to be run by hand, and until now never run anywhere else.
+          # A harness that reads this machine's game folder says SKIP for the
+          # parts it cannot measure on a runner and still checks the rest.
+          $bad = 0
+          foreach ($t in (Get-ChildItem tools -Filter 'test-*.js' -File | Sort-Object Name)) {
+            Write-Host ("--- {0}" -f $t.Name)
+            & node $t.FullName
+            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          }
+          foreach ($t in (Get-ChildItem tools -Filter 'test-*.ps1' -File | Sort-Object Name)) {
+            Write-Host ("--- {0}" -f $t.Name)
+            & pwsh -NoProfile -File $t.FullName
+            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          }
+          if ($bad) { exit 1 }
+          Write-Host 'every harness passed'
 
       - name: Build the launcher
         shell: pwsh

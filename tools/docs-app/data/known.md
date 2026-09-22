@@ -55,4 +55,8 @@ The server and every machine must carry the same plugins in the same order with 
 
 If the launcher says a plugin differs, press **Fix**. It downloads the server's copy of that plugin and puts it in place, and **Scan** runs the comparison again. Nothing in your Vortex profile has to change for that.
 
+If the game turns you away with LOAD ORDER ERROR, quit it and press **Scan**, then **Fix**. The launcher compares your order with the server's position by position, names the first place they differ, and Fix puts the server's order into this build's plugin list. That one downloads nothing. Do not play on and do not report anything else from that session: your machine is resolving objects to different things from everybody else's, so whatever you see next is not evidence.
+
+Scan also sees the plugins the game loads on its own. Skyrim.ccc names the Creation Club content, and the game loads any of it that is sitting in Data whether or not a list asks for it, which puts everything after it out of step. Those are named too, and Fix moves them aside rather than deleting them.
+
 This is why mods are added in batches rather than one at a time: every addition moves the load order for everybody at once.

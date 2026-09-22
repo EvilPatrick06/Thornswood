@@ -298,6 +298,56 @@ if ($FreshWorld) {
 & ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs"
 if ($LASTEXITCODE -ne 0) { Die "the installer on the VPS exited with $LASTEXITCODE. Nothing local was changed." }
 
+<#
+  DEV CARRIES MAIN'S ROSTER.
+
+  Patrick, 21 September, on the dev server: "Dev has no playtetser list so I
+  can't tp like I can on main", and then "keep the same list on dev as main as
+  so I as Owner still have commands".
+
+  The roles come out of private\door.json and private\allowed.json, which the
+  door fetches and writes beside itself in the LIVE root. A dev root has never
+  had them: nothing creates that folder on a fresh install, and the door on
+  dev has no reason to have fetched yet. So every tier answered no to
+  everybody on dev, including the owner, and /tp refused him on his own server.
+
+  The live root's copy is taken as the truth and put into the dev root every
+  dev publish, so the two lists cannot drift and a playtester added in Discord
+  reaches dev the moment live has it. One direction only: dev never writes back
+  over live.
+
+  NOTHING IS READ OUT OF THOSE FILES HERE. They are copied on the VPS, from one
+  folder to another, and only the count is printed. door.json is a config file
+  and its contents are not this script's business.
+
+  Install-ThornswoodServer.ps1 now sets the folder aside and restores it, so
+  after the first seeding this is keeping the two in step rather than repairing
+  a wipe.
+#>
+if ($IsDev) {
+    Head 'The roster'
+    $seed = @'
+# PowerShell wraps the answer in a block of CLIXML progress records without
+# this, which is the trap already written down on the server build entry. It
+# leaked into the roster line on the first run.
+$ProgressPreference = 'SilentlyContinue'
+$live = 'C:\Thornswood-Server\private'
+$dev  = '@@DEVROOT@@\private'
+if (-not (Test-Path -LiteralPath $live)) {
+    'the live server has no private folder, so there is no roster to copy'
+} else {
+    New-Item -ItemType Directory -Path $dev -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $live '*') -Destination $dev -Recurse -Force
+    $n = @(Get-ChildItem -LiteralPath $dev -File -Force -EA SilentlyContinue).Count
+    "dev now has the same roster as main, $n file(s)"
+}
+'@
+    $seed = $seed.Replace('@@DEVROOT@@', $VpsRoot.TrimEnd('\'))
+    $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($seed))
+    $out = & ssh $target "powershell -NoProfile -EncodedCommand $enc"
+    foreach ($line in @($out)) { Say "  $line" 'Green' }
+}
+
 # ---------------------------------------------------------------- verify -----
 # Game traffic is UDP and there is nothing to connect to, so the resources
 # folder is what a probe from here can actually reach.
