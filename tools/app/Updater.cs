@@ -10,7 +10,7 @@ namespace Thornswood
 {
     static class Updater
     {
-        public const string Version = "1.1.78";
+        public const string Version = "1.1.79";
 
         // WebClient has no timeout worth the name, and the default is long
         // enough that a GitHub which accepts the connection and then says
