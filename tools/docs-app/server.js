@@ -2287,6 +2287,10 @@ async function handle(req, res) {
         channel: row.channel,
         client,
         sent,
+        /* Whether this one is held past the retention rule, so the button
+           beside the provenance shows the right state. */
+        keep: !!row.keep,
+        keptBy: String(row.keptBy || ''),
         server: server.lines,
         serverWhy: server.ok ? '' : server.why,
         clientSent: Object.keys(client).length > 0

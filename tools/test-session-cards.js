@@ -125,7 +125,15 @@ yes('every session offers More details', onMain.indexOf('More details') >= 0);
 yes('the button carries the session and the Discord id',
     onMain.indexOf('data-s="aaaaaaaa"') >= 0 && onMain.indexOf('data-w="1"') >= 0);
 yes('the log row spans the whole table', onMain.indexOf('colspan="6"') >= 0);
-yes('the page has a download control for a log', src.indexOf('class="dl"') >= 0);
+/* Matched on the dl class and the handler rather than the whole class
+   attribute, which changed when these were rebuilt on the site's own .btn
+   instead of a bespoke one. */
+yes('the page has a download control for a log',
+    src.indexOf('small dl') >= 0 && src.indexOf('button.dl') >= 0);
+yes('the controls use the site\'s own button and bar classes, not invented ones',
+    src.indexOf('class="tools"') < 0 && src.indexOf('btn small moreBtn') >= 0);
+yes('search boxes and pickers have a site-wide style at last',
+    src.indexOf('input[type=search],input[type=text]') >= 0);
 yes('logs are fetched per session, not with the page', src.indexOf('/api/session-logs?session=') >= 0);
 
 /* ---- one session coloured, never the whole card ------------------------- */

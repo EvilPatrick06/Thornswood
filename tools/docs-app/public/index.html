@@ -182,62 +182,69 @@ main{overflow-y:auto;padding:34px 40px 90px;min-width:0}
   keyboard and screen reader behaviour for free, and the open state survives a
   redraw without anything here having to remember it.
 */
-.people{display:grid;gap:10px}
-.person{background:var(--panel);border:1px solid var(--line);border-radius:11px;overflow:hidden}
-.person[open]{border-color:var(--gold-dim)}
-.person>summary{cursor:pointer;padding:13px 16px;display:grid;gap:4px 20px;align-items:start;
-  grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto 14px;list-style:none}
+/*
+  Built out of what the rest of the site already uses, which the first version
+  of this was not: .entry for a panel, .btn for a button, .pill for a tag,
+  --carve for a name and the uppercase letterspaced label that .entry .when
+  established. The search boxes were left on the browser's own styling, white
+  on a dark page, which was most of what looked wrong.
+*/
+.people{display:grid;gap:11px}
+.person{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  transition:border-color .12s}
+.person[open],.person:hover{border-color:var(--gold-dim)}
+.person>summary{cursor:pointer;padding:15px 19px;display:grid;gap:6px 22px;align-items:start;
+  grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) auto auto 12px;list-style:none}
 .person>summary::-webkit-details-marker{display:none}
 .person>summary::marker{content:''}
-.person>summary:hover{background:rgba(201,162,75,.05)}
-.person>summary:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.person>summary:focus-visible{outline:2px solid var(--gold-dim);outline-offset:-2px}
 .pf{min-width:0}
-.pf .lab{display:block;font:600 10px var(--sans);letter-spacing:.09em;text-transform:uppercase;
-  color:var(--faint);margin-bottom:3px}
+/* The same label as .entry .when, because it is the same kind of label. */
+.pf .lab{display:block;font:600 11px var(--sans);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:4px}
 .pf .val{display:block;font-size:14px;color:var(--text);word-break:break-word}
-.pf .val.nm{font:600 16px var(--carve);letter-spacing:.02em}
+.pf .val.nm{font:600 18px/1.3 var(--carve);letter-spacing:.02em}
 .pf .val.id{font:12.5px var(--mono);color:var(--dim)}
 .pf .val.hrs{font:600 15px var(--sans);color:var(--gold);white-space:nowrap}
 .pf .val.when{white-space:nowrap;color:var(--dim);font-size:13.5px}
-.person .chev{align-self:center;color:var(--faint);transition:transform .12s;font-size:12px}
+.person .chev{align-self:center;color:var(--faint);transition:transform .12s,color .12s;font-size:11px}
 .person[open] .chev{transform:rotate(90deg);color:var(--gold)}
-.pbody{border-top:1px solid var(--line)}
+.pbody{border-top:1px solid var(--line);background:var(--ink)}
 .pbody .tablewrap{border:0;border-radius:0;background:none}
 .pbody table.board{min-width:0}
+.pbody .bar{padding:13px 19px 0;margin-bottom:0}
+.pbody .tally{padding:13px 19px 0;margin-bottom:0}
 
 /* ------------------------------------------------ one session's logs -- */
-.moreWrap{padding:2px 12px 12px}
-.moreBtn,.keepBtn{font:inherit;font-size:12.5px;cursor:pointer;border-radius:6px;
-  border:1px solid var(--line2);background:var(--panel);color:var(--dim);padding:4px 10px}
-.moreBtn:hover,.keepBtn:hover{border-color:var(--gold-dim);color:var(--text)}
-.keepBtn{margin-left:7px}
-.keepBtn.on{border-color:var(--gold);color:var(--gold);background:rgba(201,162,75,.08)}
-.keptBy{margin-left:9px;font:11.5px var(--mono);color:var(--faint)}
-.logs{margin-top:9px;display:grid;gap:6px}
-.logs .none{font-size:13px;color:var(--faint);padding:2px 2px 4px}
-.prov{font:12px var(--mono);color:var(--faint);padding:2px 2px 6px;line-height:1.7;word-break:break-word}
-.prov b{color:var(--dim);font-weight:500}
+.moreWrap{padding:11px 19px 15px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.keptBy{font:11.5px var(--mono);color:var(--faint)}
+.logs{flex:1 1 100%;display:grid;gap:7px;margin-top:4px}
+.logs .none{font-size:13.5px;color:var(--dim);padding:10px 13px;
+  border:1px dashed var(--line);border-radius:8px}
+.prov{font-size:13px;color:var(--dim);padding:10px 13px;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;line-height:1.7;word-break:break-word}
+.prov b{color:var(--faint);font-weight:600;font-size:11px;letter-spacing:.07em;
+  text-transform:uppercase;margin-right:3px}
 .prov .warn{color:var(--fail)}
-.logf{border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
-.logf>summary{cursor:pointer;list-style:none;padding:8px 11px;display:flex;align-items:center;gap:10px}
+.logf{border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;
+  transition:border-color .12s}
+.logf:hover{border-color:var(--line2)}
+.logf[open]{border-color:var(--gold-dim)}
+.logf>summary{cursor:pointer;list-style:none;padding:9px 13px;display:flex;align-items:center;gap:11px}
 .logf>summary::-webkit-details-marker{display:none}
 .logf>summary::marker{content:''}
-.logf>summary:hover{background:rgba(201,162,75,.05)}
-.logf>summary:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
-.logf[open]{border-color:var(--gold-dim)}
+.logf>summary:focus-visible{outline:2px solid var(--gold-dim);outline-offset:-2px}
 .logf .nm{font:600 13px var(--mono);color:var(--text);flex:1;min-width:0;word-break:break-all}
 .logf .sz{font:11.5px var(--mono);color:var(--faint);white-space:nowrap}
-.logf .chev{color:var(--faint);font-size:11px;transition:transform .12s}
+.logf .chev{color:var(--faint);font-size:10px;transition:transform .12s,color .12s}
 .logf[open] .chev{transform:rotate(90deg);color:var(--gold)}
-.dl{flex:none;font:inherit;font-size:11.5px;cursor:pointer;border-radius:5px;padding:2px 8px;
-  border:1px solid var(--line2);background:var(--raised);color:var(--dim)}
-.dl:hover{border-color:var(--gold);color:var(--gold)}
-.logf pre{margin:0;padding:10px 12px;border-top:1px solid var(--line);background:var(--bg);
-  font:12px/1.55 var(--mono);color:var(--dim);white-space:pre-wrap;word-break:break-word;
-  max-height:420px;overflow:auto}
+.logf pre{margin:0;padding:12px 13px;border-top:1px solid var(--line);background:var(--ink);
+  font:12px/1.6 var(--mono);color:var(--dim);white-space:pre-wrap;word-break:break-word;
+  max-height:440px;overflow:auto}
 @media(max-width:760px){
-  .person>summary{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 14px}
+  .person>summary{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 12px;padding:14px 16px}
   .pf .val.hrs,.pf .val.when{white-space:normal}
+  .moreWrap,.pbody .bar,.pbody .tally{padding-inline:16px}
 }
 
 /* ------------------------------------------------------------- toolbar -- */
@@ -254,6 +261,24 @@ main{overflow-y:auto;padding:34px 40px 90px;min-width:0}
 .btn.key{background:var(--gold);color:#17190F;border-color:var(--gold);font-weight:600}
 .btn.small{min-height:0;padding:4px 9px;font-size:12.5px}
 .btn:disabled{opacity:.5;cursor:default}
+.btn.on{border-color:var(--gold);color:var(--gold);background:rgba(201,162,75,.09)}
+
+/* Search boxes and pickers, matching .btn.
+ *
+ * There was no site-wide rule for these at all: every input outside .form and
+ * .res took the browser's own styling, which on a dark page is a white box
+ * with a system font, and that was most of what made the sessions controls
+ * look bolted on rather than built in. */
+input[type=search],input[type=text],input[type=date],select{
+  padding:7px 11px;background:var(--raised);color:var(--text);
+  border:1px solid var(--line);border-radius:6px;font:14px var(--sans);min-height:36px}
+input[type=search]:hover,input[type=text]:hover,input[type=date]:hover,select:hover{
+  border-color:var(--line2)}
+input[type=search]:focus,input[type=text]:focus,input[type=date]:focus,select:focus{
+  outline:none;border-color:var(--gold-dim)}
+input[type=search]::placeholder,input[type=text]::placeholder{color:var(--faint)}
+select{cursor:pointer;padding-right:26px}
+.bar input[type=search]{flex:1 1 220px;min-width:0}
 .said{font-size:13px;color:var(--dim)}
 .lede{color:var(--dim);font-size:14px;margin:6px 0 26px;max-width:66ch}
 .tagline{display:inline-block;font:600 10px var(--sans);letter-spacing:.1em;text-transform:uppercase;
@@ -947,7 +972,7 @@ function logFileHtml(sid, name, text) {
       '<span class="chev">&#9654;</span>' +
       '<span class="nm">' + esc(name) + '</span>' +
       '<span class="sz">' + esc(bytesFor(text.length)) + '</span>' +
-      '<button class="dl" data-s="' + esc(sid) + '" data-n="' + esc(name) + '">Download</button>' +
+      '<button class="btn small dl" data-s="' + esc(sid) + '" data-n="' + esc(name) + '">Download</button>' +
     '</summary>' +
     '<pre>' + esc(text) + '</pre>' +
   '</details>';
@@ -1030,14 +1055,36 @@ function drawLogs(box, sid, d) {
   /* Where this came from, because the point of keeping it is to be able to
      say so later. A second set having been tried is worth shouting about. */
   if (d.sent) {
+    /*
+      WHAT KEEPING IS FOR, WHEN YOU CAN ALREADY DOWNLOAD, which is a fair
+      question and the button did not answer it.
+
+      Download gives you a copy on your own machine. That copy is a plain file:
+      anybody could have edited it, and it carries nothing that says otherwise.
+      Keeping holds the copy ON THE SERVER past the one year everything else
+      ages out at, and that is the copy with the checksum, the Discord id taken
+      off the signed ticket, and the refusal to be written over. It is the one
+      worth pointing at when somebody disputes what happened.
+
+      So: download to read it or send it to somebody. Keep so that in fourteen
+      months the authoritative copy is still there to check it against.
+    */
     out += '<div class="prov">' +
       '<b>sent by</b> ' + esc(d.sent.who || 'unknown') +
       '  <b>at</b> ' + esc(d.sent.at ? new Date(d.sent.at).toLocaleString() : 'unknown') +
-      '  <b>total</b> ' + esc(bytesFor(d.sent.bytes)) +
+      '  <b>size</b> ' + esc(bytesFor(d.sent.bytes)) +
       (d.sent.resent
         ? '<br><span class="warn">A further set was sent for this session ' +
           esc(d.sent.resent) + ' time(s) and refused. The first set is what is kept.</span>'
         : '') +
+      '<br><span class="said">Downloading gives you a copy that anybody could ' +
+      'have edited. This one carries a checksum and the id off the signed ticket, ' +
+      'and cannot be written over. Everything ages out after a year unless it is held.</span>' +
+      '<div style="margin-top:9px">' +
+        '<button class="btn small keepBtn' + (d.keep ? ' on' : '') + '" ' +
+          'data-s="' + esc(d.session) + '" data-w="' + esc(d.sent.who || '') + '">' +
+          (d.keep ? 'Held, stop holding it' : 'Hold this past the year') + '</button>' +
+      '</div>' +
       '</div>';
   }
 
@@ -1074,6 +1121,30 @@ function drawLogs(box, sid, d) {
       var text = (LOGS[s] || {})[n];
       if (text == null) { saidNow('nothing to download'); return; }
       downloadText(s.slice(0, 8) + '-' + n, text);
+    };
+  });
+
+  /* Holding this one past the retention rule. Beside the provenance, because
+     that is what it is about: the copy on the server outliving the year, not
+     anything to do with the session itself. */
+  each(box, 'button.keepBtn', function (b) {
+    b.onclick = function () {
+      var on = !b.classList.contains('on');
+      b.disabled = true;
+      saidNow('saving');
+      api('/api/session-keep', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: b.dataset.s, who: b.dataset.w, keep: on })
+      }).then(function (r) {
+        b.disabled = false;
+        saidNow(r.ok ? 'saved' : 'did not save');
+        if (!r.ok) return;
+        b.classList.toggle('on', on);
+        b.textContent = on ? 'Held, stop holding it' : 'Hold this past the year';
+        S.sessions.forEach(function (s) {
+          if (s.session === b.dataset.s) s.keep = on;
+        });
+      }).catch(function () { b.disabled = false; saidNow('did not save'); });
     };
   });
 }
@@ -1151,14 +1222,16 @@ function sessionTable(rows) {
        stretch a cell. */
     '<tr class="morerow"><td colspan="6">' +
       '<div class="moreWrap">' +
-        '<button class="moreBtn" data-s="' + esc(s.session) + '" data-w="' + esc(s.who) + '">More details</button>' +
-        /* Everything else ages out after a year. This holds one session's
-           logs indefinitely, for the set an argument or a suspension rests
-           on, so the retention rule cannot quietly undo it later. */
-        '<button class="keepBtn' + (s.keep ? ' on' : '') + '" data-s="' + esc(s.session) +
-          '" data-w="' + esc(s.who) + '">' +
-          (s.keep ? 'Kept as evidence' : 'Keep as evidence') + '</button>' +
-        (s.keptBy ? '<span class="keptBy">held by ' + esc(s.keptBy) + '</span>' : '') +
+        '<button class="btn small moreBtn" data-s="' + esc(s.session) + '" data-w="' + esc(s.who) + '">More details</button>' +
+        /* Kept as evidence moved INSIDE More details, beside the provenance
+           it belongs to. It was a second button on every row and it earned
+           nothing there: it is not about this session, it is about the copy
+           on the server outliving the retention rule, and that only means
+           anything once somebody is reading the logs. */
+        (s.keep
+          ? '<span class="pill warn">held</span>' +
+            (s.keptBy ? '<span class="keptBy">by ' + esc(s.keptBy) + '</span>' : '')
+          : '') +
         '<div class="logs" hidden></div>' +
       '</div>' +
     '</td></tr>';
@@ -1170,29 +1243,6 @@ function sessionTable(rows) {
    draw, and again each time a card is opened, because a card's table is in
    the page from the start and only hidden by details. */
 function wireMore(root) {
-  each(root, 'button.keepBtn', function (b) {
-    if (b.dataset.wired) return;
-    b.dataset.wired = '1';
-    b.onclick = function () {
-      var on = !b.classList.contains('on');
-      b.disabled = true;
-      saidNow('saving');
-      api('/api/session-keep', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session: b.dataset.s, who: b.dataset.w, keep: on })
-      }).then(function (r) {
-        b.disabled = false;
-        saidNow(r.ok ? 'saved' : 'did not save');
-        if (!r.ok) return;
-        b.classList.toggle('on', on);
-        b.textContent = on ? 'Kept as evidence' : 'Keep as evidence';
-        S.sessions.forEach(function (s) {
-          if (s.session === b.dataset.s && String(s.who) === String(b.dataset.w)) s.keep = on;
-        });
-      }).catch(function () { b.disabled = false; saidNow('did not save'); });
-    };
-  });
-
   each(root, 'button.moreBtn', function (b) {
     if (b.dataset.wired) return;
     b.dataset.wired = '1';
@@ -1279,7 +1329,7 @@ function drawSessions() {
     filter left on is never mistaken for an empty server.
   */
   var out = head() +
-    '<div class="tools" style="margin-bottom:14px">' +
+    '<div class="bar" style="margin-bottom:16px">' +
       '<input type="search" id="sfind" value="' + esc(SFIND.q) + '" ' +
         'placeholder="A name, an id, a character, a build, anything in a fault">' +
       '<select id="sshow" aria-label="Show">' +
@@ -1302,7 +1352,7 @@ function drawSessions() {
         }).join('') +
       '</select>' +
       ((SFIND.q || SFIND.show !== 'all' || SFIND.chan !== 'all' || SFIND.sort !== 'recent')
-        ? '<button id="sreset">Reset</button>' : '') +
+        ? '<button class="btn" id="sreset">Reset</button>' : '') +
     '</div>' +
     '<div class="tally">' +
       '<span class="pill pass">' + t.n + (t.n === 1 ? ' session' : ' sessions') +
@@ -1376,10 +1426,10 @@ function drawSessions() {
           '</div>' +
           /* Only worth a search box once there is enough to search. */
           (n > 3
-            ? '<div class="tools" style="padding:9px 16px 0">' +
+            ? '<div class="bar">' +
                 '<input type="search" class="findmine" data-w="' + esc(p.who) + '" ' +
                   'value="' + esc(mq) + '" placeholder="Search this person\'s ' + n + ' sessions">' +
-                (mq ? '<button class="clearmine" data-w="' + esc(p.who) + '">Clear</button>' : '') +
+                (mq ? '<button class="btn small clearmine" data-w="' + esc(p.who) + '">Clear</button>' : '') +
               '</div>'
             : '') +
           (rows.length
@@ -1492,7 +1542,7 @@ function chatFetch() {
 function drawChat() {
   var out = head();
 
-  out += '<div class="tools" style="margin-bottom:14px">' +
+  out += '<div class="bar" style="margin-bottom:16px">' +
     '<select id="chatday" aria-label="Day">' +
       (CHAT.days.length
         ? CHAT.days.map(function (d) {
@@ -1502,8 +1552,8 @@ function drawChat() {
     '</select>' +
     '<input type="search" id="chatwho" placeholder="A name or a profile id" value="' + esc(CHAT.who) + '">' +
     '<input type="search" id="chatq" placeholder="Words in the message" value="' + esc(CHAT.q) + '">' +
-    '<button id="chatgo" class="primary">Search</button>' +
-    '<button id="chatclear">Clear</button>' +
+    '<button class="btn key" id="chatgo">Search</button>' +
+    '<button class="btn" id="chatclear">Clear</button>' +
   '</div>';
 
   if (CHAT.why) {
