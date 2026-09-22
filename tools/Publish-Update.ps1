@@ -1343,7 +1343,21 @@ if ($KeepPacks -gt 0) {
         $packs = @(Get-ChildItem -LiteralPath $DistDir -Filter 'pack-*.zip' -File -EA SilentlyContinue |
                    Sort-Object Name -Descending)
         if ($packs.Count -gt $KeepPacks) {
-            $go = $packs | Select-Object -Skip $KeepPacks
+            # @() around it, and the reason is Set-StrictMode -Version Latest
+            # at the top of this file.
+            #
+            # Select-Object hands back ONE FileInfo rather than an array when
+            # exactly one pack is over the limit, and under StrictMode reading
+            # .Count on a scalar throws rather than answering 1. That is what
+            # happened on the 1.1.79 release: "The property 'Count' cannot be
+            # found on this object". The catch meant the tidy was skipped and
+            # the release carried on, which is the right way round, but nothing
+            # was pruned and the message read like a mystery.
+            #
+            # Worth remembering for any count in this file: without StrictMode
+            # a scalar answers .Count = 1 quite happily, so this shape tests
+            # clean in a bare prompt and fails only where it matters.
+            $go = @($packs | Select-Object -Skip $KeepPacks)
             $mb = (($go | Measure-Object Length -Sum).Sum / 1MB)
             foreach ($f in $go) { Remove-Item -LiteralPath $f.FullName -Force -EA SilentlyContinue }
             Say ("  {0} older pack(s) removed from $DistDir, {1:N1} MB. They are all on the releases repository." -f $go.Count, $mb) 'DarkGray'
