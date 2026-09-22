@@ -171,6 +171,44 @@ main{overflow-y:auto;padding:34px 40px 90px;min-width:0}
 .latest .what{font:600 16px var(--sans);margin-top:3px}
 .latest a{font-size:13px}
 
+/* ------------------------------------------------- people and sessions -- */
+/*
+  One card a person, not one row a session. Closed it answers the four things
+  asked of this page at a glance: who they are, their id, how long they have
+  played in total, and when they last did. Open it is the table that used to
+  be the whole page.
+
+  details and summary rather than a button and a handler: the browser gives
+  keyboard and screen reader behaviour for free, and the open state survives a
+  redraw without anything here having to remember it.
+*/
+.people{display:grid;gap:10px}
+.person{background:var(--panel);border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.person[open]{border-color:var(--gold-dim)}
+.person>summary{cursor:pointer;padding:13px 16px;display:grid;gap:4px 20px;align-items:start;
+  grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto 14px;list-style:none}
+.person>summary::-webkit-details-marker{display:none}
+.person>summary::marker{content:''}
+.person>summary:hover{background:rgba(201,162,75,.05)}
+.person>summary:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.pf{min-width:0}
+.pf .lab{display:block;font:600 10px var(--sans);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:3px}
+.pf .val{display:block;font-size:14px;color:var(--text);word-break:break-word}
+.pf .val.nm{font:600 16px var(--carve);letter-spacing:.02em}
+.pf .val.id{font:12.5px var(--mono);color:var(--dim)}
+.pf .val.hrs{font:600 15px var(--sans);color:var(--gold);white-space:nowrap}
+.pf .val.when{white-space:nowrap;color:var(--dim);font-size:13.5px}
+.person .chev{align-self:center;color:var(--faint);transition:transform .12s;font-size:12px}
+.person[open] .chev{transform:rotate(90deg);color:var(--gold)}
+.pbody{border-top:1px solid var(--line)}
+.pbody .tablewrap{border:0;border-radius:0;background:none}
+.pbody table.board{min-width:0}
+@media(max-width:760px){
+  .person>summary{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 14px}
+  .pf .val.hrs,.pf .val.when{white-space:normal}
+}
+
 /* ------------------------------------------------------------- toolbar -- */
 .crumb{font-size:13px;color:var(--faint);margin-bottom:10px}
 .crumb a{color:var(--dim);text-decoration:none}
@@ -491,8 +529,8 @@ var ABOUT = {
   inbox:       'Bugs and ideas sent in from the public report page.',
   link:        'How getting in works, and what to do when the launcher says you are not linked.',
   linked:      'Everybody who has linked a Discord account to a copy of the game.',
-  sessions:    'Every play session the launcher has reported, newest first. ' +
-               'Write down what was tested in the note beside it.'
+  sessions:    'One card a person, newest first by when they last played. ' +
+               'Open one for every session they have had.'
 };
 
 /*
@@ -776,18 +814,68 @@ function sessionTotals(list) {
   return { n:n, mins:mins, open:open, people:Object.keys(who).length };
 }
 
-function saveNote(box) {
-  saidNow('saving');
-  api('/api/session-note', {
-    method:'PUT', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ session: box.dataset.s, who: box.dataset.w, note: box.value })
-  }).then(function (r) {
-    saidNow(r.ok ? 'saved' : 'did not save');
-    if (!r.ok) return;
-    S.sessions.forEach(function (s) {
-      if (s.session === box.dataset.s && String(s.who) === String(box.dataset.w)) s.note = box.value;
-    });
-  }).catch(function () { saidNow('did not save'); });
+/*
+  One entry a person, newest first by when they last played.
+
+  Total playtime counts only the sessions that reported an end, for the same
+  reason the week's totals do: a row with no end carries no minutes, and
+  counting it would make the hours disagree with the session count on the same
+  card. Open rows are counted separately and said separately.
+
+  The name is taken from the newest row that carries one. The list is sorted
+  newest first before this runs, so the first one wins, and somebody who
+  changed their Discord name shows the name they have now rather than the one
+  they had on their first session.
+*/
+function sessionPeople(list) {
+  var by = {}, order = [];
+  list.forEach(function (s) {
+    var k = String(s.who || '');
+    if (!k) return;
+    if (!by[k]) { by[k] = { who:k, name:'', mins:0, last:0, open:0, rows:[] }; order.push(k); }
+    var p = by[k];
+    if (!p.name && s.name) p.name = s.name;
+    if (sessionOpen(s)) p.open++; else p.mins += Number(s.minutes) || 0;
+    var at = sessionAt(s);
+    if (at > p.last) p.last = at;
+    p.rows.push(s);
+  });
+  return order.map(function (k) { return by[k]; })
+              .sort(function (a, b) { return b.last - a.last; });
+}
+
+/* The sessions of one person, as the table this page used to be. */
+function sessionTable(rows) {
+  var out = '<div class="tablewrap"><table class="board"><thead><tr>' +
+    '<th>Character</th><th>Build</th><th>Where</th><th>Started</th>' +
+    '<th>Stopped</th><th>For</th></tr></thead><tbody>';
+  rows.forEach(function (s) {
+    var open = sessionOpen(s);
+    out += '<tr>' +
+      '<td data-label="Character"><div class="cell">' +
+        (s.profile ? '<code>' + esc(s.profile) + '</code>' : 'none picked') + '</div></td>' +
+      '<td data-label="Build"><div class="cell">' + esc(s.version || 'not said') + '</div></td>' +
+      '<td data-label="Where"><div class="cell">' +
+        (s.channel === 'dev'
+          ? '<span class="pill left">dev</span>'
+          : '<span class="pill pass">main</span>') + '</div></td>' +
+      '<td data-label="Started"><div class="cell">' +
+        (s.start
+          ? esc(new Date(s.start).toLocaleString())
+          : '<span class="pill left">start never seen</span>' +
+            '<div class="said">the launcher was replaced or restarted while ' +
+            'they were playing, so only the end reached us</div>') + '</div></td>' +
+      '<td data-label="Stopped"><div class="cell">' +
+        (open
+          ? '<span class="pill left">no end reported</span>'
+          : esc(new Date(s.end).toLocaleString()) +
+            (s.why === 'update' ? '<div class="said">closed for an update</div>' : '')) +
+        '</div></td>' +
+      '<td data-label="For"><div class="cell">' +
+        (open ? 'open' : esc(forMins(s.minutes))) + '</div></td>' +
+    '</tr>';
+  });
+  return out + '</tbody></table></div>';
 }
 
 function drawSessions() {
@@ -803,54 +891,47 @@ function drawSessions() {
     '</div>';
 
   if (!list.length) {
-    out += '<div class="empty">Nobody has played yet. A row lands here the ' +
+    out += '<div class="empty">Nobody has played yet. A card lands here the ' +
       'moment somebody presses Play, and fills in when they stop.</div>';
   } else {
-    out += '<div class="tablewrap"><table class="board"><thead><tr>' +
-      '<th>Who</th><th>Character</th><th>Build</th><th>Started</th>' +
-      '<th>Stopped</th><th>For</th><th>Note</th></tr></thead><tbody>';
-    list.forEach(function (s) {
-      var open = sessionOpen(s);
-      out += '<tr>' +
-        '<td data-label="Who"><div class="cell">' + esc(s.name || s.who || '') +
-          (s.channel === 'dev' ? ' <span class="pill left">dev</span>' : '') + '</div></td>' +
-        '<td data-label="Character"><div class="cell">' +
-          (s.profile ? '<code>' + esc(s.profile) + '</code>' : 'none picked') + '</div></td>' +
-        '<td data-label="Build"><div class="cell">' + esc(s.version || 'not said') + '</div></td>' +
-        '<td data-label="Started"><div class="cell">' +
-          (s.start
-            ? esc(new Date(s.start).toLocaleString())
-            : '<span class="pill left">start never seen</span>' +
-              '<div class="said">the launcher was replaced or restarted while ' +
-              'they were playing, so only the end reached us</div>') + '</div></td>' +
-        '<td data-label="Stopped"><div class="cell">' +
-          (open
-            ? '<span class="pill left">no end reported</span>'
-            : esc(new Date(s.end).toLocaleString()) +
-              (s.why === 'update' ? '<div class="said">closed for an update</div>' : '')) +
-          '</div></td>' +
-        '<td data-label="For"><div class="cell">' +
-          (open ? 'open' : esc(forMins(s.minutes))) + '</div></td>' +
-        '<td data-label="Note"><textarea data-s="' + esc(s.session) + '" data-w="' + esc(s.who) +
-          '" placeholder="what they tested, what broke">' + esc(s.note || '') + '</textarea>' +
-          (s.noteBy ? '<div class="said" style="padding:0 2px 7px">written by ' +
-            esc(s.noteBy) + '</div>' : '') +
-        '</td>' +
-      '</tr>';
+    var people = sessionPeople(list);
+    out += '<div class="people">';
+    people.forEach(function (p) {
+      var n = p.rows.length;
+      out += '<details class="person">' +
+        '<summary>' +
+          '<span class="pf"><span class="lab">Discord name</span>' +
+            '<span class="val nm">' + esc(p.name || 'not linked') + '</span></span>' +
+          '<span class="pf"><span class="lab">ID</span>' +
+            '<span class="val id">' + esc(p.who) + '</span></span>' +
+          '<span class="pf"><span class="lab">Total playtime</span>' +
+            '<span class="val hrs">' + (p.mins < 1 ? 'none yet' : esc(forMins(p.mins))) + '</span></span>' +
+          '<span class="pf"><span class="lab">Last played</span>' +
+            '<span class="val when">' +
+              (p.last ? esc(new Date(p.last).toLocaleString()) : 'never') + '</span></span>' +
+          '<span class="chev">&#9654;</span>' +
+        '</summary>' +
+        '<div class="pbody">' +
+          '<div class="tally" style="padding:11px 16px 0">' +
+            '<span class="pill pass">' + n + (n === 1 ? ' session' : ' sessions') + '</span>' +
+            (p.open ? '<span class="pill left">' + p.open + ' with no end reported</span>' : '') +
+          '</div>' +
+          sessionTable(p.rows) +
+        '</div>' +
+      '</details>';
     });
-    out += '</tbody></table></div>';
+    out += '</div>';
   }
 
-  out += '<p class="lede" style="margin-top:20px">The launcher sends both ends ' +
-    'of every session, so a row appears as somebody starts and fills in when ' +
-    'they stop. One still open is somebody playing right now, or a machine ' +
-    'that never got the closing word out. Nothing here is typed by the person ' +
-    'playing.</p>';
+  out += '<p class="lede" style="margin-top:20px">One card a person, newest ' +
+    'first by when they last played. Open one for every session they have had: ' +
+    'which character, which build, and whether it was the main server or dev. ' +
+    'The launcher sends both ends of every session, so a session appears as ' +
+    'somebody starts and fills in when they stop. One still open is somebody ' +
+    'playing right now, or a machine that never got the closing word out. ' +
+    'Total playtime counts only the sessions that reported an end. Nothing ' +
+    'here is typed by the person playing.</p>';
   el('page').innerHTML = out;
-
-  each(el('page'), 'textarea[data-s]', function (box) {
-    box.onchange = function () { saveNote(box); };
-  });
 }
 
 /* ---------------------------------------------------------------- draw -- */
