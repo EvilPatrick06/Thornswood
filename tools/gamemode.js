@@ -1433,11 +1433,16 @@ const TOOL_AGAIN_HOURS = 12;
   thing somebody owns once and becomes stock, which somebody has to make.
 
   A hundred uses, measured against the ladder rather than picked out of the air.
-  TUNING.workPerRank adds up to 20 + 50 + 120 = 190 yields from novice to
-  Master, so one tool carries somebody a little over half the way: two tools to
-  the top, and a Master who keeps working keeps ordering. That is a standing
-  order book for the smiths without being a chore, and it is the number to move
-  if it turns out to be either.
+  TUNING.workPerRank added up to 20 + 50 + 120 = 190 yields from novice to
+  Master when this was written, so one tool carried somebody a little over half
+  the way: two tools to the top, and a Master who keeps working keeps ordering.
+  That was a standing order book for the smiths without being a chore.
+
+  IT IS 100 + 250 + 600 = 950 NOW, changed on 21 September when a rank stopped
+  meaning twenty seams and started meaning one. So the climb costs about ten
+  tools rather than two, which is five times the order book and may well be too
+  much of one. If the tool starts feeling like a toll rather than stock, this
+  is the number to move and not the ladder.
 
   The warning comes at fifteen left. Far enough out to finish what you are doing
   and walk to a town, short enough to mean something.
@@ -2156,7 +2161,52 @@ function isChoppingBlock(baseDesc) {
  * axe wears here, which is the point of a tool that breaks: the trade that uses
  * it hardest is the one that buys the most of them.
  */
-function chopWood(actorId, refrId) {
+/*
+  WHO IS STANDING AT WHICH BLOCK, AND WHEN THEY LAST PRESSED IT.
+
+  Patrick, 21 September: "the chopping block is still not always doing the
+  animation and not always giving the wood apon hit still".
+
+  The server sees a PRESS. The block is a FURN record, so pressing it puts the
+  person into Skyrim's own chopping furniture and the axe falls over and over
+  while the server hears nothing at all, and vanilla's own block script, which
+  would have handed wood over per swing, does not run here any more than
+  MineOreScript does. So one press was one handover and everything after it was
+  a person swinging an axe at a server that had stopped listening.
+
+  The client can see each swing, because the animation events pass through it.
+  It reports them on the one channel that exists, the chat overlay's socket,
+  as /chopped. That channel is a chat line, so anybody could type the word, and
+  this is what stops that being worth anything: a /chopped is only credited to
+  somebody the server has just watched press a chopping block, and no faster
+  than an axe can actually fall.
+*/
+const CHOP_AT = {};
+/* A press is good for this long. Longer than anybody chops in one go, short
+   enough that it is not a licence to type the word an hour later. */
+const CHOP_WINDOW_MS = 120000;
+/* The fastest an axe falls. Two a second is not an axe, it is a chat macro. */
+const CHOP_MIN_MS = 1200;
+
+/*
+  One swing's worth, reported by the client rather than pressed.
+
+  Every gate chopWood applies is applied again here, by calling chopWood
+  itself: the half, the tool, the rank and the wear all have to be asked again
+  because a session can outlast any of them. A tool that broke on the last
+  swing stops the next one, which is the whole point of counting swings.
+*/
+function choppedSwing(actorId) {
+  const at = CHOP_AT[actorId];
+  if (!at) { return null; }
+  const now = Date.now();
+  if (now - at.at > CHOP_WINDOW_MS) { delete CHOP_AT[actorId]; return null; }
+  if (now - (at.last || 0) < CHOP_MIN_MS) { return null; }
+  at.last = now;
+  return chopWood(actorId, at.refrId, true);
+}
+
+function chopWood(actorId, refrId, fromSwing) {
   const half = halfGate(actorId, 'woodwright', 'novice',
     'A chopping block is a woodworker\'s. Only a woodworker who took Woodwright can ' +
     'work one, and a charburner gets the novice yield. Ask one.');
@@ -2203,8 +2253,17 @@ function chopWood(actorId, refrId) {
     return 'The block gives up firewood and there is nothing in this load order to ' +
            'put in your hands. Say so in #bugs.';
   }
-  // Same as the seam: the block's own script never starts here either.
-  swing(actorId, SWING_CHOP);
+  /*
+    The press is what starts a session, and the block is a FURN so Skyrim's own
+    furniture plays the swing. The server only asks for an animation when the
+    report came from a swing rather than a press, because asking twice for the
+    same swing is what makes it stutter.
+  */
+  if (!fromSwing) {
+    CHOP_AT[actorId] = { refrId: refrId, at: Date.now(), last: Date.now() };
+  } else {
+    swing(actorId, SWING_CHOP);
+  }
   const rank = creditWork(actorId, 'woodwright');
   const worn = wearTool(actorId, 'woodworker');
   // Only when there is something worth interrupting them for, and the press
@@ -3515,8 +3574,8 @@ mp.onRespawn = guard('onRespawn', function (actorId) {
   cannot open. One was the clam at Oar's Rest and one the tree in the Ancestor
   Glade. The 15 that were left were every one of them a white cap, an imp stool
   or a namira's rot in a cave. So a new Gatherer was refused every flower in
-  Skyrim, and with workPerRank.advanced at 20 the only road onto the second rung
-  was twenty cave mushrooms. The pass now leaves the sacks out and reads the
+  Skyrim, and with workPerRank.advanced at 20 as it was then, the only road onto
+  the second rung was twenty cave mushrooms. The pass now leaves the sacks out and reads the
   novice band as produce worth up to 1 gold, which is lavender, thistle, creep
   cluster, juniper berries, jazbay grapes, hanging moss and the rest of them:
   47 wild bases on the first rung instead of 15. The three numbers that did
@@ -9460,10 +9519,47 @@ log('gamemode loaded:',
   var TUNING = {
     /*
       Yields handed out to climb into each rank, counted from the rank below
-      and reset on arrival. So novice -> advanced is 20 pieces of work done,
-      and the count starts again at 0 against the 50 for expert.
+      and reset on arrival. So novice -> advanced is 100 pieces of work done,
+      and the count starts again at 0 against the 250 for expert.
+
+      FIVE VEINS TO ADVANCED, ASKED FOR BY PATRICK ON 21 SEPTEMBER: "it should
+      be like 5 veins per rank one is wayy to fast een 5 might be too quick",
+      and then "make sure the others don't level up that quickly".
+
+      A vein holds twenty, so the arithmetic is the whole of this line:
+
+        advanced  100 = 5 veins
+        expert    250 = 12 and a half
+        master    600 = 30
+        all the way up          47 and a half veins
+
+      These were 20, 50 and 120, which is one vein to Advanced. That number was
+      never wrong on purpose: it was picked when a vein handed over its whole
+      yield in one press, so twenty yields meant twenty SEAMS. Once a swing
+      became the unit, the same number meant one seam, and nobody moved it. The
+      ratio between the three is kept exactly, because the shape of the ladder
+      was not what was wrong with it.
+
+      ONE LADDER, EVERY CLASS, which is what makes the second half of Patrick's
+      instruction free: workPerRank is not per class, so this slows the
+      gatherer, the farmer, the hunter and the fisher by the same five.
+
+      WHAT IT DOES NOT DO, and this is worth being exact about rather than
+      claiming more than it earns. It equalises the COUNT, not the PACE. Mining
+      is bounded by a vein that holds twenty and comes back in ten or thirty
+      minutes, so five veins is real time whatever anybody does. Picking
+      flowers is bounded by how many flowers are in front of you. So if the
+      gatherer still climbs faster than the miner after this, that is not this
+      number, it is the absence of anything like a vein on the gathering side,
+      and it wants watching before it wants another guess.
+
+      AND IT IS TOOLS. TOOL_USES is 100, so the whole climb now costs about ten
+      tools rather than two. That is a far bigger standing order for the smiths
+      than the comment on TOOL_USES describes, and it is the next number to
+      look at if the tool stops feeling like stock and starts feeling like a
+      toll.
     */
-    workPerRank: { advanced: 20, expert: 50, master: 120 },
+    workPerRank: { advanced: 100, expert: 250, master: 600 },
     /*
       Skill tree points a rank gives. Nothing anywhere else awards one, so
       without this the fifteen sub-skills on the K panel can never be spent
@@ -15158,7 +15254,17 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
                '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob',
-               '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks'];
+               '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
+               /*
+                 NOT A COMMAND ANYBODY TYPES. The client reports each fall of
+                 the axe with it, because the server sees a press and Skyrim's
+                 furniture does the swinging. It is registered here so the
+                 dispatcher answers it rather than saying "unknown command",
+                 and it is deliberately NOT in PLAYER_WORDS: naming it in /help
+                 would be inviting people to type it, and choppedSwing is what
+                 makes typing it worth nothing.
+               */
+               '/chopped'];
 
 /*
   The ones a person who is not a playtester is told about. /tp, /goto, /face,
@@ -15365,6 +15471,24 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var charCmd = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCharacter;
       if (charCmd && charCmd.command(word, parts, actorId, profileId, toProfile)) { return; }
     } catch (eChar) { log('character command failed:', eChar); }
+
+    /*
+      One fall of the axe, reported by the client. See choppedSwing.
+
+      Nothing is ever said back for an ordinary swing, whether it was credited
+      or refused: this arrives once or twice a second while somebody chops, and
+      a line per swing is the spam Patrick asked to be rid of in the first
+      place. The rank line and the tool warning still come through, because
+      choppedSwing answers them the same way a press does.
+    */
+    if (word === '/chopped') {
+      var swung = choppedSwing(actorId);
+      if (swung && swung !== ALLOW) {
+        notify(actorId, swung);
+        say(actorId, swung);
+      }
+      return true;
+    }
 
     if (word === '/tspicks') {
       if (!needCharacter()) { return; }

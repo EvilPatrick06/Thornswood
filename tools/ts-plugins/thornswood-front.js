@@ -1341,6 +1341,86 @@
     }
   }
 
+  /*
+    ------------------------------------------------- every fall of the axe
+
+    Patrick, 21 September: "the chopping block is still not always doing the
+    animation and not always giving the wood apon hit still".
+
+    THE SERVER SEES A PRESS AND SKYRIM DOES THE SWINGING. A chopping block is a
+    FURN record, so pressing it puts the person into Skyrim's own chopping
+    furniture and the axe falls over and over with the server hearing nothing.
+    Vanilla's own block script would have handed wood over per swing and it
+    does not run here, for the same reason MineOreScript does not and the
+    Whiterun gate stays locked. So one press was one handover and every swing
+    after it was free exercise.
+
+    The events do pass through here, so this is the only place that can count
+    them. Each one is reported as /chopped on the chat overlay socket, the same
+    channel a broken lockpick already rides, and the server decides whether it
+    is worth anything: choppedSwing credits nobody it has not just watched
+    press a block, and no faster than an axe can fall. Typing the word is
+    worth nothing.
+
+    WHICH EVENT IS THE FALL. The four IdleWoodChop records in Skyrim.esm are
+    Start, EnterInstant, Stop and Exit, and those are the session, not the
+    swing: the fall itself is an annotation inside the animation and it does
+    not have to be one of those names. So this matches a family rather than a
+    name, and WRITES DOWN, ONCE EACH, EVERY EVENT IT SAW DURING A SESSION THAT
+    IT DID NOT COUNT. After one session at a block the log names the real
+    event, and this can be narrowed to exactly it instead of guessed at again.
+  */
+  const CHOP_START = /woodchop.*(start|enter)/i;
+  const CHOP_END = /woodchop.*(stop|exit)|idlechairexitstart|idleforcedefaultstate/i;
+  // The fall. Broad on purpose until the log says what it actually is.
+  const CHOP_HIT = /chop|hit|impact|swing/i;
+  /* A session is only this long without another event, so somebody who walks
+     away mid animation is not left counted as chopping. */
+  const CHOP_IDLE_MS = 15000;
+  let chopping = 0;          // when the session started, 0 for none
+  let chopSeen = 0;          // when an event last arrived
+  const chopUnknown = {};    // event names seen and not counted, once each
+
+  try {
+    sp.hooks.sendAnimationEvent.add({
+      enter: (ctx) => {
+        try {
+          const name = String(ctx.animEventName || '');
+          if (!name) { return; }
+          const now = Date.now();
+
+          if (CHOP_START.test(name)) {
+            chopping = now; chopSeen = now;
+            say('chopping: session started on ' + name);
+            return;
+          }
+          if (!chopping) { return; }
+          if (now - chopSeen > CHOP_IDLE_MS) { chopping = 0; return; }
+          chopSeen = now;
+
+          if (CHOP_END.test(name)) {
+            chopping = 0;
+            say('chopping: session ended on ' + name);
+            return;
+          }
+          if (CHOP_HIT.test(name)) {
+            tellServer('/chopped');
+            return;
+          }
+          // Not counted, and worth knowing about exactly once.
+          if (!chopUnknown[name]) {
+            chopUnknown[name] = true;
+            say('chopping: saw ' + name + ' and did not count it as a swing');
+          }
+        } catch (err) { }
+      },
+      leave() { }
+    }, 0x14, 0x14);
+    say('watching for the axe');
+  } catch (e) {
+    say('could not watch for the axe, so wood comes per press only: ' + e);
+  }
+
   sp.on('containerChanged', guard('picks', (e) => {
     if (!e) { return; }
 
