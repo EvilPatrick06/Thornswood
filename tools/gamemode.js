@@ -11164,6 +11164,60 @@ log('gamemode loaded:',
            'is empty now, and only sowing will fill it again.' + (rank ? ' ' + rank : '');
   }
 
+  /*
+    Sow one named plot, and answer with the sentence to say.
+
+    This is the body of /plant from the moment the plot is known, so the command
+    and the press cannot drift into saying different things or enforcing
+    different rules. /plant finds a plot and calls this; a press already has one.
+  */
+  function sowAt(actorId, refrId, baseDesc) {
+    var crop = CROPS[baseDesc];
+    if (!crop) { return null; }
+
+    var mine = profileOf(actorId);
+    if (!mine) {
+      return 'The server cannot tell who you are right now. Give it a moment and ' +
+             'press it again.';
+    }
+
+    var step = rankStep(actorId, 'farmer');
+    if (!rankOk(step, baseDesc)) {
+      return 'Sowing ' + crop.name + ' needs ' + rankPhrase(demanded(baseDesc)) +
+             ' Farmer. Work the crops you can until you are one.';
+    }
+
+    var ground = groundOf(refrId);
+    if (!ground) {
+      return 'The server cannot tell which ground that plot stands on. Move a step ' +
+             'and press it again.';
+    }
+    var held = claimCovering(ground);
+    if (held && held.by !== mine) {
+      return 'This farm is held by ' + held.name + '. Ask before you sow here, or ' +
+             'claim ground of your own with /claim.';
+    }
+
+    if (!takeItem(actorId, crop.produce, 1)) {
+      var handout = offerSeed(actorId, mine);
+      if (handout) { return handout; }
+      return 'You have no ' + crop.name + ' to sow. Bring one and press it again.';
+    }
+
+    var ms = growMs(baseDesc, step);
+    if (!writePlot(refrId, mine, baseDesc, ms, step)) {
+      addItem(actorId, crop.produce, 1);
+      return 'The ground would not take it. Nothing was sown and the ' + crop.name +
+             ' is back in your pack.';
+    }
+
+    touchClaim(ground, mine);
+    var mins = Math.ceil(ms / 60000);
+    flog(actorId.toString(16), 'sowed', crop.name, 'at', refrId.toString(16),
+         'for', mins, 'minutes');
+    return 'You sow the ' + crop.name + '. It will be ready in ' + minutes(mins) + '.';
+  }
+
   function activate(actorId, refrId, baseDesc) {
     if (!P.has(CROPS, baseDesc)) { return null; }
     var here = CROPS[baseDesc];
@@ -11191,8 +11245,25 @@ log('gamemode loaded:',
         above for why, and for why it cannot run away.
       */
       if (!neverWorked(refrId)) {
-        return 'Nothing is sown here. Stand close and say /plant to put ' +
-               'a ' + here.name + ' in the ground.';
+        /*
+          PRESSING EMPTY GROUND SOWS IT.
+
+          Patrick, 21 September, after playing it: "With Farming I don't want to
+          type /plant I want to click e on the ground in that spot."
+
+          It used to answer "Nothing is sown here. Stand close and say /plant",
+          which is a server telling somebody to go and use a chat box while they
+          are standing on the thing with a shovel in their hand. Every other
+          verb in this file is a press: the seam, the block, the kiln, the
+          plant. This one asked for typing because it was written as a command
+          first and never grew a press.
+
+          THIS PLOT, NOT THE NEAREST ONE. /plant has to go looking, because a
+          word carries no reference with it and nearestPlot is how it guesses.
+          A press already knows exactly which patch of ground was pressed, so
+          there is nothing to guess.
+        */
+        return sowAt(actorId, refrId, baseDesc);
       }
       return standing(actorId, refrId, baseDesc, here);
     }
@@ -13580,6 +13651,29 @@ log('gamemode loaded:',
     var inv = null;
     try { inv = mp.get(refrId, 'inventory'); } catch (e) { return -1; }
     var entries = (inv && inv.entries) || [];
+
+    /*
+      AN EMPTY CHEST IS NOT AN EMPTIED CHEST, and mistaking one for the other
+      is why gold and armour were still in every container in the world.
+
+      A container's contents come out of the plugin LAZILY:
+      MpObjectReference::EnsureBaseContainerAdded copies them in the first time
+      something needs them, and sets baseContainerAdded so it never runs twice.
+      This runs on the press, which is often BEFORE that has happened, so the
+      inventory read back was empty. Nothing was taken, the chest was marked
+      emptied, and a moment later the engine filled it with everything the
+      plugin said was in it. The mark meant it was never looked at again.
+
+      Patrick, 21 September, after playing it: "Gold, Weapoms, and Armor can
+      still be found in storages and looted the on the ground system works
+      though." The ground works because a placed item is its own reference and
+      was never empty.
+
+      So an empty read is not recorded. The next press reads it again, by which
+      time the engine has filled it, and that is the one that empties it.
+    */
+    if (!entries.length) { return 0; }
+
     var keep = [], took = 0;
     for (var i = 0; i < entries.length; i++) {
       var e = entries[i];
