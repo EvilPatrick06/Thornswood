@@ -1801,6 +1801,27 @@ namespace Thornswood
                     ? "This Skyrim is not build 1.6.1170. The card above puts it right; the mods come after that."
                     : "This Skyrim is not build 1.6.1170. The card above puts it right.";
             }
+            // A shared Skyrim is not an install this supports, so the button
+            // says the thing that fixes it rather than saying PLAY and then
+            // refusing. Pressing it goes to OwnGameRequired in ShellOwnGame.cs,
+            // which offers the folder when it can be made and names the one
+            // thing in the way when it cannot.
+            //
+            // Ranked BELOW the four above on purpose. Every one of them is also
+            // a reason OwnGame.WhyNot gives for the folder not being makeable
+            // yet: the mods have to be deployed, the build has to be right.
+            // Putting this first would tell somebody to make a folder that
+            // cannot be made, and hide the step that actually unblocks them.
+            else if (Paths.Collection && !playing)
+            {
+                btnPlay.Content = "MAKE THORNSWOOD'S OWN FOLDER";
+                btnPlay.ToolTip =
+                    "Thornswood is sharing one Skyrim with every other server on this machine, in " +
+                    Paths.Game + ". They all write the same client settings file and the game " +
+                    "believes whichever wrote last, which is how their menus and logins get into " +
+                    "Thornswood and Thornswood's get into theirs. This gives Thornswood a folder " +
+                    "of its own. It takes a few minutes and the launcher restarts when it is done.";
+            }
             else if (!playing)
             {
                 btnPlay.ToolTip = null;

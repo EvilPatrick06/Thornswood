@@ -91,7 +91,7 @@ namespace Thornswood
                 Log("Thornswood is sharing one Skyrim with every other server on this machine, " +
                     "in " + Paths.Game + ". Saves, settings and the client's own settings file " +
                     "are shared, so whichever launcher wrote last is the one the game believes. " +
-                    "Settings, Maintenance has the button to give Thornswood a folder of its own.");
+                    "The Play button says MAKE THORNSWOOD'S OWN FOLDER until that is put right.");
             }
 
             ThreadPool.QueueUserWorkItem(delegate
