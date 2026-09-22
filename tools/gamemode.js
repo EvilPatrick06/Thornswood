@@ -2276,6 +2276,12 @@ function chopWood(actorId, refrId, fromSwing) {
   return ALLOW;
 }
 
+/*
+  Who has been told what a kiln will cost them, and when. See burnCharcoal.
+*/
+const KILN_ARMED = {};
+const KILN_ARM_MS = 15000;
+
 function burnCharcoal(actorId, refrId) {
   const half = halfGate(actorId, 'charburner', 'novice',
     'A kiln is a charburner\'s. Only a woodworker who took Charburner can run one, ' +
@@ -2292,6 +2298,43 @@ function burnCharcoal(actorId, refrId) {
   if (wait > 0) return 'The kiln is still burning. ' + wait + ' seconds.';
 
   const cost = 3;
+
+  /*
+    A PRESS IS NOT A DECISION, AND THIS ONE WAS SPENDING FIREWOOD LIKE ONE.
+
+    Patrick, 21 September: "it's making charcoal automatically instantly upon
+    opening the kiln and not when you click to make it".
+
+    Every other verb in this file answers a press that can only mean one thing.
+    A seam is struck, a block is chopped, a plot is sown, and if you did not
+    want it you would not have walked up to it. A kiln is different because it
+    SPENDS something: three firewood, out of a pack you are carrying for
+    something else, for a grade of charcoal you may not have wanted yet. Walking
+    past one and pressing it took them.
+
+    WHY IT IS NOT A MENU, and this is the honest part. The kiln is a bench, it
+    has a keyword, and BENCH_ACCESS gates it, so the crafting menu does open.
+    There is nothing in it: charcoalT1 to T4 appear exactly twice in this whole
+    file, in ITEMS and in this function, and no COBJ anywhere makes them. A
+    proper menu needs four recipe records in Thornswood-Content.esp, which is
+    Creation Kit work and its own entry.
+
+    SO IT ASKS. The first press says what it will cost and what it will make.
+    The second press within the window does it. That is still a press rather
+    than a chat word, it cannot happen by accident, and it needs no new records.
+    The window is deliberately short: this is a confirmation, not a state, and
+    somebody who walked off and came back should be asked again.
+  */
+  var armed = KILN_ARMED[actorId];
+  if (!armed || armed.refrId !== refrId || (Date.now() - armed.at) > KILN_ARM_MS) {
+    KILN_ARMED[actorId] = { refrId: refrId, at: Date.now() };
+    const willBe = ['charcoalT1', 'charcoalT2', 'charcoalT3', 'charcoalT4']
+      [rankStep(actorId, 'charburner')] || 'charcoalT1';
+    return 'The kiln will take ' + cost + ' firewood and give you ' +
+           willBe.replace('charcoalT', 'grade ') + ' charcoal. Press it again to burn.';
+  }
+  delete KILN_ARMED[actorId];
+
   if (!takeItem(actorId, ITEMS.firewood, cost)) {
     return 'The kiln needs ' + cost + ' firewood.';
   }

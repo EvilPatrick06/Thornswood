@@ -327,6 +327,10 @@ if ($LASTEXITCODE -ne 0) { Die "the installer on the VPS exited with $LASTEXITCO
 if ($IsDev) {
     Head 'The roster'
     $seed = @'
+# PowerShell wraps the answer in a block of CLIXML progress records without
+# this, which is the trap already written down on the server build entry. It
+# leaked into the roster line on the first run.
+$ProgressPreference = 'SilentlyContinue'
 $live = 'C:\Thornswood-Server\private'
 $dev  = '@@DEVROOT@@\private'
 if (-not (Test-Path -LiteralPath $live)) {

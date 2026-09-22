@@ -111,7 +111,73 @@ if (Test-Path -LiteralPath $privDir) {
     Write-Host "existing roster set aside at $privBak" -ForegroundColor Yellow
 }
 
-if (Test-Path -LiteralPath $Root) { Remove-Item -LiteralPath $Root -Recurse -Force }
+<#
+  THE OLD SERVER LETTING GO, WHICH IT DOES NOT ALWAYS DO ON ITS OWN.
+
+  21 September, on a dev publish that had just said "stopped":
+
+    Remove-Item : Cannot remove item
+    C:\Thornswood-Server-Dev\data\api\servers\thornswood\plugins\10.bin:
+    Access to the path '10.bin' is denied.
+    STOP. the installer on the VPS exited with 1.
+
+  Stopping a scheduled task asks the process to end. It does not wait for it,
+  and node does not drop its file handles the instant it is asked: the
+  resources server under data\api holds the plugin files it is serving. So the
+  delete raced the process, hit one locked file, and took the whole install
+  down after the payload had already been copied up.
+
+  Three things, in the order that costs least.
+
+  ONE, ask anything still running under this root to stop, by command line
+  rather than by name, because the live server and the dev server are both node
+  and killing by name would take the other one down. That is the same rule
+  Publish-Server settled on 21 September after a dev publish stopped live.
+
+  TWO, wait for the handles. A few short goes rather than one long sleep, so
+  the ordinary case where it is already gone costs nothing.
+
+  THREE, say which file it was if it still will not go, because "access to the
+  path is denied" without a process name is the start of a long evening.
+#>
+if (Test-Path -LiteralPath $Root) {
+    $rootMatch = $Root.TrimEnd('\') + '\*'
+    try {
+        foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
+            if ($p.CommandLine -and $p.CommandLine -like $rootMatch) {
+                Write-Host ("asking node {0} under this root to stop" -f $p.ProcessId) -ForegroundColor Yellow
+                Stop-Process -Id $p.ProcessId -Force -EA SilentlyContinue
+            }
+        }
+    } catch { }
+
+    $gone = $false
+    for ($i = 1; $i -le 10; $i++) {
+        try {
+            Remove-Item -LiteralPath $Root -Recurse -Force -EA Stop
+            $gone = $true
+            break
+        } catch {
+            if ($i -eq 1) {
+                Write-Host 'the old server is still holding a file, waiting for it' -ForegroundColor Yellow
+            }
+            Start-Sleep -Milliseconds 700
+        }
+    }
+
+    if (-not $gone) {
+        # Name what is still open, then stop rather than half installing.
+        $stuck = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -EA SilentlyContinue |
+                   Where-Object {
+                       try { $h = [IO.File]::Open($_.FullName, 'Open', 'ReadWrite', 'None'); $h.Close(); $false }
+                       catch { $true }
+                   } | Select-Object -First 5)
+        foreach ($f in $stuck) { Write-Host ("still open: {0}" -f $f.FullName) -ForegroundColor Red }
+        throw ("could not clear $Root after ten tries. Something outside this " +
+               "script is holding those files; the world, the data folder and " +
+               "the roster are all still set aside in $env:TEMP.")
+    }
+}
 New-Item -ItemType Directory -Path $Root -Force | Out-Null
 Expand-Archive -LiteralPath $Zip -DestinationPath $Root -Force
 Write-Host "unpacked to $Root" -ForegroundColor Cyan
