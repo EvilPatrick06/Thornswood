@@ -42,7 +42,28 @@ param(
     [switch]$MinimalLoadOrder,   # masters plus Thornswood-Content.esp only
     [switch]$FullLoadOrder,      # list everything, indices be damned. for bisecting
     [switch]$Vortex,             # read the Steam game and the active Vortex profile
-    [switch]$NewOrder            # take the plugin list's order as it is, for a world being wiped
+    [switch]$NewOrder,           # take the plugin list's order as it is, for a world being wiped
+    <#
+      The NPCs, and how many of them the server simulates.
+
+      Patrick, 21 September, after playing it: "To many fucking NPCs spawning
+      man all at once group together, on top of players, enimes hit way to hard
+      and have to much health or dont die at all".
+
+      npcEnabled true with an empty npcSettings means the server simulates
+      EVERY npc in the world, interior and exterior, because both spawn flags
+      default to true in ScampServer. That is one shared world, which is the
+      thing SkyMP is for, and it is also every bandit and every chicken in
+      Skyrim being kept alive by one process.
+
+        -Npcs off        none at all. The cleanest way to test a trade.
+        -Npcs interior   only inside, so towns are alive and the roads are not.
+        -Npcs all        the default, everything.
+
+      Off is not a downgrade to the Skyrim Together behaviour: that was
+      everybody getting their own private copy. Off is nobody getting one.
+    #>
+    [ValidateSet('all', 'interior', 'off')][string]$Npcs = 'all'
 )
 
 # ---------------------------------------------------------------- -Vortex ---
@@ -234,7 +255,7 @@ $s | Add-Member -NotePropertyName dataDir     -NotePropertyValue 'data'      -Fo
 # behaviour we are leaving behind: everyone gets their own private copy of every
 # bandit. On means one shared world. npcSettings stays empty, which is "no
 # per-NPC overrides", not "no NPCs".
-$s | Add-Member -NotePropertyName npcEnabled  -NotePropertyValue $true       -Force
+$s | Add-Member -NotePropertyName npcEnabled  -NotePropertyValue ($Npcs -ne 'off') -Force
 
 # WHAT YOU ARE WEARING STAYS ON. Measured 20 September, after Patrick rejoined
 # an existing character and arrived with nothing on.
@@ -323,9 +344,21 @@ $s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue 
 # next spawn the client empties the pack and refills it from that empty record.
 # Off, the unknown item is dropped and the rest of the update is kept.
 $s | Add-Member -NotePropertyName equipmentInventoryCheckEnabled -NotePropertyValue $false -Force
-if (-not $s.PSObject.Properties.Name.Contains('npcSettings')) {
-    $s | Add-Member -NotePropertyName npcSettings -NotePropertyValue ([pscustomobject]@{}) -Force
+<#
+  npcSettings.default is where the two spawn flags actually live.
+
+  ScampServer reads them from INSIDE npcSettings (it used to read them from the
+  root, which is a Thornswood fix already in the fork). An empty object leaves
+  both true, which is every NPC everywhere.
+#>
+$npcDefault = [pscustomobject]@{
+    spawnInInterior = ($Npcs -ne 'off')
+    spawnInExterior = ($Npcs -eq 'all')
 }
+$s | Add-Member -NotePropertyName npcSettings -NotePropertyValue ([pscustomobject]@{
+    default = $npcDefault
+}) -Force
+Write-Host "  NPCs: $Npcs (interior $($npcDefault.spawnInInterior), exterior $($npcDefault.spawnInExterior))" -ForegroundColor DarkGray
 # Where a brand new character first appears, which is also where the gamemode
 # runs character creation. Skyrim Unbound's own creation room is the right
 # answer on this setup: a new game already puts everybody there, so the client

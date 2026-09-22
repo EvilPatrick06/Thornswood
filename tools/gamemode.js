@@ -1535,8 +1535,24 @@ function toolGate(actorId, key) {
   const tool = toolFor(key);
   if (!tool) { return null; }
   if (holdsTool(actorId, tool)) { return null; }
-  const handout = offerTool(actorId, key);
-  if (handout) { return handout; }
+  /*
+    NO TOOL, NO WORK, AND NOTHING IS HANDED OVER.
+
+    Patrick, 21 September, after playing it: "Don't let p[eople chop wood, mine,
+    or farm without a pickaxe, shovel, or woodcutters axe."
+
+    This used to call offerTool here, which gave anybody with an empty pack a
+    free tool once every twelve hours and told them to try again. So nobody was
+    ever actually refused for want of one: the gate read as a gate and behaved
+    as a vending machine, and the tool-breaking system it was written beside had
+    nothing to bite on, because a snapped pickaxe was replaced for free by the
+    thing that was supposed to make you go and buy another.
+
+    A tool comes from a smith now, which is the whole point of the handle and
+    the recipes that need one. offerTool and handTool are left where they are:
+    they are how the FIRST tool of a starting profession is placed, and taking
+    them out of this gate is what stops them being an endless supply.
+  */
   return 'You need a ' + tool.name + ' in your pack for that. ' + tool.where;
 }
 
@@ -1863,17 +1879,43 @@ function chopWood(actorId, refrId) {
   const wait = cooldownLeft(actorId, refrId);
   if (wait > 0) return 'You have only just worked this block. ' + wait + ' seconds.';
 
-  const step = rankStep(actorId, 'woodwright');
-  const yielded = randInt(1, 2 + step);
+  /*
+    TWO A SPLIT, EVERY SPLIT, AND NOTHING SAID ABOUT IT.
+
+    Patrick, 21 September, after playing it: "it outs alot spam like you did
+    this amnouint of tiem Idont want that spam everytime", and "it should give 2
+    each time the wood is split udring the looping animation".
+
+    THE YIELD. It was randInt(1, 2 + step), so a novice got one or two and it
+    changed every time. Two, flat, per split. A rank still matters because a
+    higher rank splits are not what this measures; the rank shows up in what the
+    charcoal kiln gives and in the recipes the half unlocks.
+
+    THE SPAM. Every press said "You split N firewood", plus the rank line and
+    the tool-wear line, and the chopping animation loops, so a minute of
+    chopping was a wall of text. Nothing is said for an ordinary split now. The
+    two lines that actually matter are kept: a rank going up is news, and a tool
+    about to break is a warning somebody needs before it happens.
+
+    WHAT IS STILL NOT RIGHT, said here rather than pretended: the server sees
+    one press, not one swing. Vanilla's own block script hands over its firewood
+    at the end of the animation, which is the "one at the end" Patrick saw. Per
+    swing needs the client to tell the server each time the axe falls, and that
+    is a plugin change and its own entry.
+  */
+  const yielded = 2;
   if (!addItem(actorId, ITEMS.firewood, yielded)) {
     return 'The block gives up firewood and there is nothing in this load order to ' +
-           'put in your hands. Say so in the dev channel.';
+           'put in your hands. Say so in #bugs.';
   }
   stampCooldown(actorId, refrId);
   const rank = creditWork(actorId, 'woodwright');
   const worn = wearTool(actorId, 'woodworker');
-  return 'You split ' + yielded + ' firewood.' + (rank ? ' ' + rank : '') +
-         (worn ? ' ' + worn : '');
+  // Only when there is something worth interrupting them for.
+  if (rank || worn) {
+    return ((rank || '') + (rank && worn ? ' ' : '') + (worn || '')).trim();
+  }
+  return null;
 }
 
 function burnCharcoal(actorId, refrId) {
