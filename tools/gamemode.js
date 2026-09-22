@@ -11447,13 +11447,78 @@ log('gamemode loaded:',
       var dir = require('path').dirname(registerPath());
       try { require('fs').mkdirSync(dir, { recursive: true }); } catch (e) { }
       require('fs').writeFileSync(registerPath(),
-        JSON.stringify({ claims: claims }, null, 1));
+        JSON.stringify({ claims: claims, stewards: stewards }, null, 1));
     } catch (e) {
       plog('could not write the register:', e);
     }
   }
 
   var claims = load();
+
+  /*
+    ------------------------------------------------------------ the offices
+
+    A JARL is an office held by a character. An admin gives an account the Jarl
+    role, out of character, as world setup, and that is the ONLY out of
+    character grant in the whole chain: nothing in the world can create the
+    first office, so somebody has to place it. After that admins never grant
+    anything again, which is Patrick's rule on 21 September that "admins only
+    overlook the RP and not get involved on their admin characters".
+
+    A JARL NAMES STEWARDS and that list lives here, beside the claims, rather
+    than in Discord. A jarl saying a name in the world is the act; making them
+    wait for somebody to click in a Discord role menu is not an act in the
+    world at all. The Jarl role itself stays in Discord because it has to: it
+    is the one thing that cannot come from inside.
+
+    A STEWARD IS NOT AN ADMIN and carries no admin power. The only thing a
+    steward can do that nobody else can is end a claim, which is the city
+    taking a house back. They cannot make one, cannot lock one, and cannot see
+    anybody's pack.
+
+    STILL OPEN, and it is on the list rather than decided here: a Discord role
+    sits on the ACCOUNT, so being a jarl follows somebody onto every character
+    they play, which is the exact thing Patrick objected to for admins. The
+    recommendation was that the role grants eligibility and one named character
+    holds the office. That needs a field beside class and profession and is not
+    built.
+  */
+  var stewards = loadStewards();
+
+  function loadStewards() {
+    try {
+      var raw = require('fs').readFileSync(registerPath(), 'utf8');
+      var o = JSON.parse(raw);
+      var list = (o && o.stewards) || [];
+      var out = [];
+      for (var i = 0; i < list.length; i++) {
+        var n = Number(list[i]) || 0;
+        if (n > 0 && out.indexOf(n) === -1) { out.push(n); }
+      }
+      return out;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /** The Jarl role, which only ever comes from outside. */
+  function isJarl(profileId) {
+    var fn = g['__thornswoodIsJarl'];
+    try { if (typeof fn === 'function' && fn(profileId)) { return true; } } catch (e) { }
+    // An admin counts, because somebody has to be able to place the first one
+    // and test the chain. It is the only admin power anywhere in this block.
+    var adm = g['__thornswoodIsAdmin'];
+    try { if (typeof adm === 'function' && adm(profileId)) { return true; } } catch (e2) { }
+    return false;
+  }
+
+  /** Named by a jarl, or a jarl themselves. */
+  function isSteward(profileId) {
+    var pid = Number(profileId) || 0;
+    if (!pid) { return false; }
+    if (stewards.indexOf(pid) !== -1) { return true; }
+    return isJarl(pid);
+  }
 
   /*
     Who holds this building, or null.
@@ -12183,7 +12248,101 @@ log('gamemode loaded:',
       if (!here(actorId)) { return false; }
       return claim(actorId, profileId, toProfile);
     }
+    if (word === '/steward') { return stewardCmd(parts, profileId, toProfile); }
+    if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     return false;
+  }
+
+  /*
+    A jarl names a steward, or takes the office back.
+
+        /steward                 who holds it
+        /steward 1893288986      name one
+        /steward -1893288986     take it back
+
+    A PROFILE ID AND NOT A NAME, and that is a limit rather than a choice: two
+    characters can carry the same name and this block has no way to tell them
+    apart. The id is what the register keys on everywhere else. It is on the
+    person's own K panel, so asking somebody for theirs is a sentence.
+  */
+  function stewardCmd(parts, profileId, toProfile) {
+    var who = [];
+    for (var i = 0; i < stewards.length; i++) { who.push(String(stewards[i])); }
+
+    var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
+    if (!arg) {
+      toProfile(profileId, who.length
+        ? 'Stewards: ' + who.join(', ') + '.'
+        : 'No stewards. A jarl names one with /steward and their profile id.');
+      return true;
+    }
+
+    if (!isJarl(profileId)) {
+      toProfile(profileId, 'Only a jarl names a steward.');
+      return true;
+    }
+
+    var drop = arg.charAt(0) === '-';
+    var pid = Number(drop ? arg.slice(1) : arg) || 0;
+    if (!pid) {
+      toProfile(profileId, 'That is not a profile id. It is the number on the K panel.');
+      return true;
+    }
+
+    var at = stewards.indexOf(pid);
+    if (drop) {
+      if (at === -1) { toProfile(profileId, pid + ' is not a steward.'); return true; }
+      stewards.splice(at, 1);
+      save();
+      plog('a jarl took the stewardship back from', pid);
+      toProfile(profileId, pid + ' is no longer a steward.');
+      return true;
+    }
+
+    if (at !== -1) { toProfile(profileId, pid + ' is already a steward.'); return true; }
+    stewards.push(pid);
+    save();
+    plog('a jarl named', pid, 'steward');
+    toProfile(profileId, pid + ' is a steward now.');
+    return true;
+  }
+
+  /*
+    The city takes a house back.
+
+    THE ONLY THING A STEWARD CAN DO THAT NOBODY ELSE CAN, and it ends a CLAIM
+    and nothing else. It does not touch what is in the house, because the
+    alternative is a server that deletes people's possessions on somebody's
+    say so, and the next holder inherits the containers as they stand. It does
+    not take back a key either: nothing in the engine can change which key a
+    door wants, so an evicted tenant who kept theirs can still walk in at
+    night, and the city's only answer is to deal with them like a person. That
+    is the squatter story Patrick asked for, and it falls out of the constraint
+    rather than being written.
+  */
+  function evict(actorId, profileId, toProfile) {
+    if (!isSteward(profileId)) {
+      toProfile(profileId, 'Only a steward ends a claim.');
+      return true;
+    }
+    var building = here(actorId);
+    if (!building) {
+      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      return true;
+    }
+    var held = holderOf(building);
+    if (!held) {
+      toProfile(profileId, 'Nobody holds ' + nameOf(building) + '.');
+      return true;
+    }
+    var was = held.name;
+    delete claims[building];
+    save();
+    pushAll();
+    plog('a steward ended', was + '\'s claim on', nameOf(building));
+    toProfile(profileId, 'You end ' + was + '\'s claim on ' + nameOf(building) +
+              '. What is inside is untouched, and any key they hold still works.');
+    return true;
   }
 
   ready();
@@ -12200,7 +12359,9 @@ log('gamemode loaded:',
     lapseDays: lapseDays, DEED: DEED, DOOR_MEMORY_MS: DOOR_MEMORY_MS,
     coversGround: coversGround, groundHere: groundHere,
     DOOR_PROPERTY: DOOR_PROPERTY,
-    claims: function () { return claims; }
+    claims: function () { return claims; },
+    isJarl: isJarl, isSteward: isSteward,
+    stewards: function () { return stewards.slice(); }
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
        Object.keys(BUILDING_NAME).length, 'buildings, and',
@@ -13420,7 +13581,8 @@ log('gamemode loaded:',
     */
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
-        word === '/unlock' || word === '/mold' || word === '/key') {
+        word === '/unlock' || word === '/mold' || word === '/key' ||
+        word === '/steward' || word === '/evict') {
       if (!actorId) {
         toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
         return true;
@@ -13710,6 +13872,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/pick', '/spend',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
+               '/steward', '/evict',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks'];
 
 /*
@@ -13718,7 +13881,14 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
   an invitation rather than a help.
 */
 const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
-                      '/deed', '/lock', '/unlock', '/mold', '/key', '/help'];
+                      '/deed', '/lock', '/unlock', '/mold', '/key',
+                      // Named to everybody on purpose. /steward with no
+                      // argument says who holds the office, which is a thing
+                      // anybody in a hold should be able to find out, and
+                      // /evict answers "only a steward ends a claim" to
+                      // everybody else, which is the rule stated rather than
+                      // a power hidden.
+                      '/steward', '/evict', '/help'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
