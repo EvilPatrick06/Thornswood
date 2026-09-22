@@ -287,13 +287,38 @@ if ($StartNow -and -not $NoTask) {
 
     Start-ScheduledTask -TaskName $TaskName
 
+    <#
+      THE PORT OF THE SERVER THIS SCRIPT JUST INSTALLED, NOT 3000.
+
+      This probed 127.0.0.1:3000 whatever it had installed. 3000 is the LIVE
+      server's resources port, and the live server is up, so a DEV install
+      asked the live server whether dev had started and was told yes. It would
+      have printed "the server is answering" with the dev server face down in
+      its own log, which is the one case this loop exists for.
+
+      Publish-Server had the identical fault in its own verify block and it was
+      fixed there on 21 September. This is the second copy of it. The rule is
+      written down in one more place now: skymp5-server/ts/ui.ts derives the
+      resources port as 3000 when the game port is 7777 and game port plus one
+      otherwise, so dev on 7787 serves on 7788.
+
+      Read out of the settings that were just unpacked, so it is right for any
+      root without anybody passing a number.
+    #>
+    $gamePort = 7777
+    try {
+        $cfg = Get-Content -LiteralPath (Join-Path $Root 'server-settings.json') -Raw | ConvertFrom-Json
+        if ($cfg.port) { $gamePort = [int]$cfg.port }
+    } catch { }
+    $resPort = if ($gamePort -eq 7777) { 3000 } else { $gamePort + 1 }
+
     # Wait for the resources port rather than a fixed few seconds, and when it
     # never opens, print the log instead of leaving the caller to guess.
     $up = $false
     for ($i = 0; $i -lt 30; $i++) {
         try {
             $c = New-Object Net.Sockets.TcpClient
-            $null = $c.BeginConnect('127.0.0.1', 3000, $null, $null).AsyncWaitHandle.WaitOne(500)
+            $null = $c.BeginConnect('127.0.0.1', $resPort, $null, $null).AsyncWaitHandle.WaitOne(500)
             $up = $c.Connected
             $c.Close()
         } catch { }
@@ -305,7 +330,7 @@ if ($StartNow -and -not $NoTask) {
     Write-Host ("task state: {0}" -f $t.State) -ForegroundColor DarkGray
 
     if ($up) {
-        Write-Host 'the server is answering on 3000' -ForegroundColor Green
+        Write-Host ("the server is answering on {0}, game port {1}" -f $resPort, $gamePort) -ForegroundColor Green
     }
     else {
         Write-Host ''
