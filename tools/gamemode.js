@@ -5002,6 +5002,19 @@ function farmActivate(actorId, refrId, baseDesc) {
  * explicit false counts as a block, so falling off the end of this function is
  * the safe answer and is what every ordinary door, chest and item gets.
  */
+/*
+  A container, by the record rather than by a list of base ids.
+
+  The spoils block already memoises every base it looks up, so asking it is one
+  hash lookup after the first press on a given base. Asking the engine again
+  here would be a second lookup for the same answer.
+*/
+function kindIsContainer(baseDesc) {
+  var sp = globalThis.__thornswoodSpoils;
+  if (!sp || !sp.kindOf) { return false; }
+  try { return sp.kindOf(idOf(baseDesc)) === 'CONT'; } catch (e) { return false; }
+}
+
 mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   if (!casterRefrId) return;
   let baseDesc;
@@ -5119,6 +5132,18 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     } catch (e) {
       log('the spoils rule threw, so the press goes on:', e);
     }
+  }
+
+  /*
+    WHICH CONTAINER THEY JUST OPENED, so /box knows which one they mean.
+
+    The same shape as the bench remembered for /key on the next line: one
+    write on a press that opened a container, and nothing on the rest. A hold's
+    box is designated by a steward standing at it rather than by a coordinate
+    in this file, so this is how the server knows what they are standing at.
+  */
+  if (prop && prop.touchedBox && kindIsContainer(baseDesc)) {
+    try { prop.touchedBox(casterRefrId, refrId); } catch (e) { }
   }
 
   if (prop && prop.touchedBench) {
@@ -11447,7 +11472,8 @@ log('gamemode loaded:',
       var dir = require('path').dirname(registerPath());
       try { require('fs').mkdirSync(dir, { recursive: true }); } catch (e) { }
       require('fs').writeFileSync(registerPath(),
-        JSON.stringify({ claims: claims, stewards: stewards }, null, 1));
+        JSON.stringify({ claims: claims, stewards: stewards, boxes: boxes,
+                        funds: funds, notices: notices }, null, 1));
     } catch (e) {
       plog('could not write the register:', e);
     }
@@ -12233,6 +12259,341 @@ log('gamemode loaded:',
     return null;
   }
 
+
+  /*
+    ---------------------------------------------- the drop box, and what it is for
+
+    Patrick's design, 21 September: the fee for a notice routes into the drop
+    box, which is the hold's money and only the City Court may draw from it,
+    and the same box takes rent, Merchant's Guild ledgers and Free Skyrim
+    Trading Company payment.
+
+    THE BOX IS MEASURED AND NOT INVENTED. mp.onPutItem(containerRefrId,
+    actorId, baseId, count) exists in the fork and PutItemEvent::OnFireSuccess
+    is the thing that removes the items, so returning false REFUSES the put and
+    the gold stays in the hand. The server knows who paid, what, and how much,
+    and can refuse anything that should not be in there. Nothing here needs a
+    new record or a client change.
+
+    WHICH CONTAINER IS A HOLD'S BOX is set in the world by a steward standing
+    at it, not by a coordinate in this file. The design asks for boards and
+    boxes at our own locations with placeholder coordinates until Patrick gives
+    exact ones; a steward pointing at a chest is better than a placeholder,
+    because it is right the moment it is done and it needs no records, no
+    placement pass and no release.
+
+    ONLY GOLD GOES IN. Everything else is handed back, because a box that
+    accepts a sword is a box somebody loses a sword in: the server has no way
+    to give it back to the right person later and no rule that says whose it
+    became. Refusing costs the person nothing at all, which is the whole point
+    of the event returning false.
+  */
+  var boxes = loadPart('boxes', {});
+  var funds = loadPart('funds', {});
+  var notices = loadPart('notices', {});
+  var BOX_PROPERTY = 'thornswoodBoxAt';
+  var GOLD_ID = 0x0000000F;
+  var NOTICE_FEE = 20;
+  var JOB_FEE = 30;
+
+  function loadPart(key, fallback) {
+    try {
+      var o = JSON.parse(require('fs').readFileSync(registerPath(), 'utf8'));
+      var v = o && o[key];
+      return (v && typeof v === 'object') ? v : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  /** The container somebody most recently pressed, so /box knows which. */
+  function touchedBox(actorId, refrId) {
+    try {
+      mp.set(actorId, BOX_PROPERTY, { refr: refrId, at: Date.now() });
+    } catch (e) { }
+  }
+
+  function boxAt(actorId) {
+    var v = null;
+    try { v = mp.get(actorId, BOX_PROPERTY); } catch (e) { v = null; }
+    if (!v || typeof v !== 'object') { return 0; }
+    if ((Date.now() - (Number(v.at) || 0)) > DOOR_MEMORY_MS) { return 0; }
+    return Number(v.refr) || 0;
+  }
+
+  /** Which hold's box this container is, or null. */
+  function holdOfBox(refrId) {
+    var id = Number(refrId) || 0;
+    if (!id) { return null; }
+    for (var hold in boxes) {
+      if (!Object.prototype.hasOwnProperty.call(boxes, hold)) { continue; }
+      if (Number(boxes[hold]) === id) { return hold; }
+    }
+    return null;
+  }
+
+  /*
+    /box whiterun      make the container you are at the hold's box
+    /box               say which hold's box you are standing at
+
+    A steward's word, because designating the city's treasury is city business.
+  */
+  function boxCmd(parts, actorId, profileId, toProfile) {
+    var at = boxAt(actorId);
+    var arg = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
+
+    if (!arg) {
+      var hold = at ? holdOfBox(at) : null;
+      toProfile(profileId, hold
+        ? 'This is ' + hold + '\'s box. It holds ' + (Number(funds[hold]) || 0) + ' gold.'
+        : (at ? 'That container is nobody\'s box.'
+              : 'Open a container first, then say that again.'));
+      return true;
+    }
+
+    if (!isSteward(profileId)) {
+      toProfile(profileId, 'Only a steward sets a hold\'s box.');
+      return true;
+    }
+    if (!at) {
+      toProfile(profileId, 'Open the container you mean, then say that again.');
+      return true;
+    }
+    boxes[arg] = at;
+    if (!Object.prototype.hasOwnProperty.call(funds, arg)) { funds[arg] = 0; }
+    save();
+    plog('a steward made', at.toString(16), 'the box for', arg);
+    toProfile(profileId, 'That container is ' + arg + '\'s box now. Rent and fees go in it.');
+    return true;
+  }
+
+  /*
+    THE ANSWER TO A PUT. False refuses it and the item stays in the hand.
+
+    Gold into a hold's box is money to the hold, and it pays down whatever rent
+    the payer owes first, because that is what somebody putting gold in the
+    city's box almost always means. What is left over stays as the hold's.
+  */
+  function putIn(containerRefrId, actorId, baseId, count) {
+    var hold = holdOfBox(containerRefrId);
+    if (!hold) { return; }
+
+    var n = Number(count) || 0;
+    if (Number(baseId) !== GOLD_ID || n <= 0) {
+      var back = 'Only coin goes in ' + hold + '\'s box. Anything else would be lost in there.';
+      notify(actorId, back);
+      say(actorId, back);
+      return false;
+    }
+
+    var pid = 0;
+    try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+
+    var owed = rentOwedBy(pid);
+    var paid = 0;
+    for (var i = 0; i < owed.length && n > 0; i++) {
+      var c = claims[owed[i]];
+      if (!c || !c.rent) { continue; }
+      var due = Number(c.rent.owed) || 0;
+      var take = (n >= due) ? due : n;
+      c.rent.owed = due - take;
+      if (c.rent.owed <= 0) { c.rent.owed = 0; c.rent.since = Date.now(); }
+      n -= take;
+      paid += take;
+    }
+
+    funds[hold] = (Number(funds[hold]) || 0) + (Number(count) || 0);
+    save();
+    plog(pid, 'put', count, 'gold in', hold + '\'s box', paid ? '(' + paid + ' of it rent)' : '');
+
+    var line = 'You put ' + count + ' gold in ' + hold + '\'s box.' +
+               (paid ? ' ' + paid + ' of it goes against your rent.' : '');
+    notify(actorId, line);
+    say(actorId, line);
+    return;
+  }
+
+  /*
+    ------------------------------------------------------------------- rent
+
+    A rented property is the same claim with an amount and a clock. The server
+    owns everybody's pack, so it could take the rent by force; it does not, and
+    that is deliberate. Patrick: rent is handed to a steward in person or put
+    in the box. Both are acts by a person. What the server does is COUNT, and
+    let the ordinary lapse do the rest.
+  */
+  function rentDue() {
+    var out = [];
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      var c = claims[b];
+      if (!c || !c.rent) { continue; }
+      var every = Number(c.rent.everyDays) || 7;
+      var since = Number(c.rent.since) || Number(c.at) || Date.now();
+      var periods = Math.floor((Date.now() - since) / (every * 86400000));
+      if (periods > 0) {
+        c.rent.owed = (Number(c.rent.owed) || 0) + periods * (Number(c.rent.amount) || 0);
+        c.rent.since = since + periods * every * 86400000;
+        out.push(b);
+      }
+    }
+    if (out.length) { save(); }
+    return out;
+  }
+
+  function rentOwedBy(profileId) {
+    rentDue();
+    var out = [];
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      var c = claims[b];
+      if (c && c.by === profileId && c.rent && (Number(c.rent.owed) || 0) > 0) {
+        out.push(b);
+      }
+    }
+    return out;
+  }
+
+  /*
+    /rent            what this place costs, and what is owed on it
+    /rent 50         a steward sets it, per week
+    /rent -          a steward waives it
+  */
+  function rentCmd(parts, actorId, profileId, toProfile) {
+    var building = here(actorId);
+    if (!building) {
+      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      return true;
+    }
+    var held = holderOf(building);
+    var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
+
+    if (!arg) {
+      if (!held || !held.rent) {
+        toProfile(profileId, nameOf(building) + ' has no rent on it.');
+        return true;
+      }
+      rentDue();
+      toProfile(profileId, nameOf(building) + ': ' + held.rent.amount + ' gold every ' +
+                (held.rent.everyDays || 7) + ' days, ' +
+                (Number(held.rent.owed) || 0) + ' owed.');
+      return true;
+    }
+
+    if (!isSteward(profileId)) {
+      toProfile(profileId, 'Only a steward sets rent.');
+      return true;
+    }
+    if (!held) {
+      toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is nobody to pay.');
+      return true;
+    }
+    if (arg === '-') {
+      delete held.rent;
+      save();
+      plog('a steward waived the rent on', nameOf(building));
+      toProfile(profileId, 'No rent on ' + nameOf(building) + ' now.');
+      return true;
+    }
+    var amount = Number(arg) || 0;
+    if (amount <= 0) {
+      toProfile(profileId, 'Give an amount in gold, or - to waive it.');
+      return true;
+    }
+    held.rent = { amount: amount, everyDays: 7, owed: 0, since: Date.now() };
+    save();
+    plog('a steward set the rent on', nameOf(building), 'to', amount);
+    toProfile(profileId, nameOf(building) + ' pays ' + amount + ' gold every 7 days now.');
+    return true;
+  }
+
+  /*
+    ---------------------------------------------------------- the boards
+
+    Twenty gold to post a notice, which is read only; thirty for a job, which
+    goes on the taker's list. The fee routes into the box.
+
+    THE BOARD IS NOT A PLACE YET AND THAT IS SAID OUT LOUD. The design puts one
+    outside each keep, at our own records at our own coordinates, and neither
+    the records nor the coordinates exist. So the words work wherever the hold
+    has a box, and the board becomes the place to say them the day it is
+    placed. The alternative was a placeholder coordinate nobody could stand at.
+  */
+  function takeGold(actorId, amount) {
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.baseId === GOLD_ID && (Number(e.count) || 0) >= amount) {
+        e.count -= amount;
+        if (e.count <= 0) { entries.splice(i, 1); }
+        try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return false; }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function post(parts, actorId, profileId, toProfile, isJob) {
+    var hold = null;
+    for (var h in boxes) {
+      if (Object.prototype.hasOwnProperty.call(boxes, h)) { hold = h; break; }
+    }
+    if (!hold) {
+      toProfile(profileId, 'No hold has a box yet, so there is nowhere for the fee to go. ' +
+                           'A steward sets one with /box.');
+      return true;
+    }
+    var text = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
+    if (!text) {
+      toProfile(profileId, isJob ? 'Say what the job is.' : 'Say what the notice says.');
+      return true;
+    }
+    var fee = isJob ? JOB_FEE : NOTICE_FEE;
+    if (!takeGold(actorId, fee)) {
+      toProfile(profileId, 'That costs ' + fee + ' gold and you do not have it.');
+      return true;
+    }
+    var who = 'somebody';
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { who = String(ap.name); }
+    } catch (e) { }
+
+    if (!notices[hold]) { notices[hold] = []; }
+    notices[hold].push({ by: profileId, name: who, text: text, at: Date.now(),
+                         job: !!isJob, taken: 0 });
+    funds[hold] = (Number(funds[hold]) || 0) + fee;
+    save();
+    plog(who, isJob ? 'posted a job in' : 'posted a notice in', hold, 'for', fee, 'gold');
+    toProfile(profileId, (isJob ? 'Your job is on the board in ' : 'Your notice is on the board in ') +
+                         hold + '. That cost ' + fee + ' gold.');
+    return true;
+  }
+
+  function board(parts, profileId, toProfile) {
+    var hold = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : null;
+    if (!hold) {
+      for (var h in boxes) {
+        if (Object.prototype.hasOwnProperty.call(boxes, h)) { hold = h; break; }
+      }
+    }
+    var list = (hold && notices[hold]) || [];
+    if (!list.length) {
+      toProfile(profileId, hold ? 'Nothing on the board in ' + hold + '.'
+                                : 'No board anywhere yet.');
+      return true;
+    }
+    var lines = [];
+    for (var i = 0; i < list.length && i < 10; i++) {
+      var n = list[i];
+      lines.push((n.job ? '[job] ' : '') + n.name + ': ' + n.text);
+    }
+    toProfile(profileId, 'The board in ' + hold + ':\n' + lines.join('\n'));
+    return true;
+  }
+
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
@@ -12250,6 +12611,11 @@ log('gamemode loaded:',
     }
     if (word === '/steward') { return stewardCmd(parts, profileId, toProfile); }
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
+    if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
+    if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
+    if (word === '/board') { return board(parts, profileId, toProfile); }
     return false;
   }
 
@@ -12361,6 +12727,10 @@ log('gamemode loaded:',
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; },
     isJarl: isJarl, isSteward: isSteward,
+    touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
+    rentDue: rentDue, funds: function () { return funds; },
+    boxes: function () { return boxes; },
+    notices: function () { return notices; },
     stewards: function () { return stewards.slice(); }
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
@@ -13582,7 +13952,9 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/key' ||
-        word === '/steward' || word === '/evict') {
+        word === '/steward' || word === '/evict' || word === '/box' ||
+        word === '/rent' || word === '/notice' || word === '/job' ||
+        word === '/board') {
       if (!actorId) {
         toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
         return true;
@@ -13872,7 +14244,8 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/pick', '/spend',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
-               '/steward', '/evict',
+               '/steward', '/evict', '/box', '/rent',
+               '/notice', '/job', '/board',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks'];
 
 /*
@@ -13888,7 +14261,13 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // /evict answers "only a steward ends a claim" to
                       // everybody else, which is the rule stated rather than
                       // a power hidden.
-                      '/steward', '/evict', '/help'];
+                      '/steward', '/evict',
+                      // The board and the box are everybody's. /rent with no
+                      // argument says what a place costs, which is the first
+                      // thing somebody standing at a door wants to know, and
+                      // the steward half answers "only a steward sets rent"
+                      // to everybody else.
+                      '/box', '/rent', '/notice', '/job', '/board', '/help'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
@@ -14682,3 +15061,21 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   console.log('[thornswood] chat commands running:', WORDS.join(', '));
 })();
 // ==== end thornswood chat commands ====
+
+
+/*
+  WHAT GOES IN A CONTAINER, and it exists so a hold can have a treasury.
+
+  mp.onPutItem(containerRefrId, actorId, baseId, count) fires before anything
+  moves, and PutItemEvent::OnFireSuccess is what removes the items, so
+  returning false REFUSES the put and the thing stays in the hand. Measured in
+  the fork rather than assumed.
+
+  It answers for one kind of container and says nothing at all about any other,
+  so every chest in Skyrim behaves exactly as it did.
+*/
+mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, count) {
+  var prop = globalThis.__thornswoodProperty;
+  if (!prop || !prop.putIn) { return; }
+  return prop.putIn(containerRefrId, actorId, baseId, count);
+});

@@ -193,8 +193,11 @@ if (evictBlock !== null) {
       /word === '\/steward' \|\| word === '\/evict'/.test(code));
   yes('a jarl is read from outside and never set in here',
       /__thornswoodIsJarl/.test(code) && !/stewards\.push\(.*jarl/i.test(code));
+  // What matters is that the stewards go in the same file as the claims, not
+  // the exact shape of that object: the box, the funds and the notices joined
+  // it the same evening and an exact match broke on all three.
   yes('the stewards are written to the register beside the claims',
-      /\{ claims: claims, stewards: stewards \}/.test(code));
+      /JSON\.stringify\(\{ claims: claims, stewards: stewards[,}]/.test(code));
 }
 
 console.log('');
