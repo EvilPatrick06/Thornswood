@@ -9040,13 +9040,59 @@ log('gamemode loaded:',
   // No file means no refreshing, and the door uses whatever allowed.json
   // already says. "enforce" is never touched by this: turning the door on is a
   // decision, not something a web request gets to make.
+  /*
+    SAID ONCE, AND SAYING WHAT TO DO ABOUT IT.
+
+    Patrick, 21 September, after an evening on this: "still can't tp says no
+    list", and before that "well it should pull the roles from discord
+    automaticlly bruh". It should, and it could not, and nothing anywhere said
+    why.
+
+    MEASURED with Check-Roster on both servers: private held characters.json
+    and nothing else. No door.json on live, none on dev, so the door has never
+    had a config to fetch WITH, allowed.json has never been written, and every
+    tier of every role check has been answering no to everybody on both
+    servers. Set-Door.ps1 -Connect is what writes that file, and every install
+    deleted the folder it lives in until that was fixed the same night, so it
+    was almost certainly written once and quietly wiped.
+
+    EVERY FAILURE ON THIS PATH WAS SILENT, which is the whole reason it cost an
+    evening. This function returned on a missing file, refresh is on a timer so
+    it returned again five minutes later, and /tp said "you are not on the
+    list" to the owner of the server. Three symptoms, one missing file, no line
+    anywhere.
+
+    So it says so, once, and names the script that fixes it. Once because this
+    runs every five minutes forever and a line each time is a log nobody reads.
+    The KEY IS NEVER TOUCHED HERE: the file is named, never its contents.
+  */
+  var doorSaid = false;
+
   function refresh() {
     var conf;
     try {
       conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8')
                           .replace(/^\uFEFF/, ''));
-    } catch (e) { return; }
-    if (!conf || !conf.site || !conf.key) return;
+    } catch (e) {
+      if (!doorSaid) {
+        doorSaid = true;
+        console.log('[thornswood] there is no ' + path.join(privDir, 'door.json') +
+                    ', so the door never fetches, allowed.json is never written, ' +
+                    'and every role check refuses everybody including the owner. ' +
+                    'Set-Door.ps1 -Connect writes it.');
+      }
+      return;
+    }
+    if (!conf || !conf.site || !conf.key) {
+      if (!doorSaid) {
+        doorSaid = true;
+        console.log('[thornswood] ' + path.join(privDir, 'door.json') +
+                    ' is there but has no site or no key, so the door cannot ' +
+                    'fetch. Set-Door.ps1 -Connect rewrites it.');
+      }
+      return;
+    }
+    doorSaid = false;
 
     var https;
     try { https = require('https'); } catch (e) { return; }
