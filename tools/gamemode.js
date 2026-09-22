@@ -9122,7 +9122,24 @@ log('gamemode loaded:',
             note('the site could not reach Discord, keeping the list as it was');
             return;
           }
-          if (!Array.isArray(doc.profiles)) return;
+          /*
+            THE LAST SILENT BRANCH IN THIS CHAIN, AND IT IS THE ONE THAT WOULD
+            HAVE HURT MOST.
+
+            Every other way this can fail already says so: a body that is not
+            JSON, a status that is not 200, Discord being unreachable, the
+            write failing, the request erroring, the timeout. This one returned
+            on a two hundred with a perfectly good JSON document that simply
+            had no profiles array in it, and said nothing at all. The door
+            would keep refreshing every five minutes, forever, and allowed.json
+            would never appear, which reads from the outside exactly like the
+            missing door.json that cost 21 September.
+          */
+          if (!Array.isArray(doc.profiles)) {
+            note('the site answered 200 but sent no profiles list. Keys it sent: ' +
+                 Object.keys(doc || {}).join(', '));
+            return;
+          }
 
           var enforce = false;
           try {
