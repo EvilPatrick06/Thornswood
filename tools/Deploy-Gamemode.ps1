@@ -181,7 +181,26 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $Gamemode) { $Gamemode = Join-Path $Here 'gamemode.js' }
 
 if (-not (Test-Path -LiteralPath $Gamemode)) { throw "not found: $Gamemode" }
-if (-not (Test-Path -LiteralPath $Dist))     { throw "server dist not found: $Dist" }
+
+# "server dist not found" read as a bug on any machine but the one that has
+# the fork built, which is every machine but Patrick's. It is not a bug: this
+# script writes the gamemode and the load order INTO a local skymp build tree,
+# and a machine with no build tree has nothing to write into. Say that, and
+# say what to do about it, rather than naming a path and stopping.
+if (-not (Test-Path -LiteralPath $Dist)) {
+    throw (
+        "No skymp server build at $Dist, so there is nothing to configure." + [Environment]::NewLine +
+        [Environment]::NewLine +
+        "This script does not talk to the VPS. It writes gamemode.js and the load order into a" + [Environment]::NewLine +
+        "LOCAL build of the server, and Deploy-Server.ps1 is what carries that build to the box." + [Environment]::NewLine +
+        [Environment]::NewLine +
+        "If you have the fork built somewhere else, point at it:" + [Environment]::NewLine +
+        "    .\tools\Deploy-Gamemode.ps1 -Dist <path to skymp\build\dist\server>" + [Environment]::NewLine +
+        [Environment]::NewLine +
+        "If you have not built the fork, this deploy is not yours to run. The build tree lives on" + [Environment]::NewLine +
+        "Patrick's machine, and .\tools\Check-ShipReady.ps1 says what this machine is missing."
+    )
+}
 
 Copy-Item -LiteralPath $Gamemode -Destination (Join-Path $Dist 'gamemode.js') -Force
 $kb = [math]::Round((Get-Item (Join-Path $Dist 'gamemode.js')).Length / 1KB)

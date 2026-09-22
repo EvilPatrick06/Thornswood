@@ -110,6 +110,25 @@ try {
 # writes during configure, and that copy is stale the moment the source is
 # edited without a reconfigure. Deploying the stale one is how a change gets
 # written, committed, shipped, and then quietly not happen.
+# The same prerequisite as Deploy-Gamemode, and the same message, because a
+# machine without the fork built hits this one first if it skips that step.
+# Unlike that script this one DOES reach the VPS, so it stops before anything
+# leaves the machine rather than part way through a copy.
+if (-not (Test-Path -LiteralPath $Dist)) {
+  throw (
+    "No skymp server build at $Dist, so there is nothing to send." + [Environment]::NewLine +
+    [Environment]::NewLine +
+    "This script copies a LOCAL build of the server to the VPS. Without the build there is" + [Environment]::NewLine +
+    "nothing to copy, and nothing has been sent." + [Environment]::NewLine +
+    [Environment]::NewLine +
+    "If you have the fork built somewhere else, point at it:" + [Environment]::NewLine +
+    "    .\tools\Deploy-Server.ps1 -Dist <path to skymp\build\dist\server>" + [Environment]::NewLine +
+    [Environment]::NewLine +
+    "If you have not built the fork, this deploy is not yours to run. The build tree lives on" + [Environment]::NewLine +
+    "Patrick's machine, and .\tools\Check-ShipReady.ps1 says what this machine is missing."
+  )
+}
+
 $src = Join-Path $Here 'gamemode.js'
 $built = Join-Path $Dist 'gamemode.js'
 if (Test-Path -LiteralPath $src) {
