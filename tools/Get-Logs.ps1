@@ -1,4 +1,4 @@
-<#
+﻿<#
   Get-Logs.ps1
 
   Brings the server's own logs down to this machine so they can be read whole.
@@ -33,8 +33,20 @@ param(
     [string]$User  = 'Administrator',
     [int]$Lines    = 4000,
     [switch]$All,
-    [int]$Port     = 7778,
+    [int]$Port     = 0,
     [string]$Out   = '',
+    <#
+      Which server's logs. Every path in here was the live one, written when
+      there was only one server, so the dev server's logs could not be fetched
+      at all and the voice health check asked the live service whichever you
+      meant. That is the third copy of the same shape in one evening, after
+      Publish-Server's verify block and the installer's own answer check.
+
+      -Dev takes the dev roots and the dev voice port. The files land in
+      logs\dev\ so a dev pull cannot overwrite a live one, which matters
+      because the interesting thing is usually the difference.
+    #>
+    [switch]$Dev,
     [switch]$NoPause
 )
 
@@ -47,20 +59,43 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $Out) { $Out = Join-Path (Split-Path -Parent $Here) 'logs' }
+if (-not $Out) {
+    $Out = Join-Path (Split-Path -Parent $Here) 'logs'
+    if ($Dev) { $Out = Join-Path $Out 'dev' }
+}
+# The dev voice service is its own process on its own port. See -Dev.
+if (-not $Port) { $Port = if ($Dev) { 7789 } else { 7778 } }
 if (-not (Test-Path -LiteralPath $Out)) { New-Item -ItemType Directory -Path $Out -Force | Out-Null }
 
 $target = "$User@$Vps"
 
 # Every log the server side writes, and what it is for. Adding one here is the
 # only change needed to have it come down with the rest.
+$srvRoot   = if ($Dev) { 'C:\Thornswood-Server-Dev' } else { 'C:\Thornswood-Server' }
+$voiceRoot = if ($Dev) { 'C:\Thornswood-Voice-Dev' }  else { 'C:\Thornswood-Voice' }
+Say ("  reading the {0} server at {1}" -f $(if ($Dev) { 'DEV' } else { 'live' }), $srvRoot) 'DarkGray'
+
 $logs = @(
-    @{ Name = 'server.log'; Path = 'C:\Thornswood-Server\server.log'; What = 'the game server' }
+    @{ Name = 'server.log'; Path = (Join-Path $srvRoot 'server.log'); What = 'the game server' }
     # Thornswood's own lines and nothing else. server.log is about four fifths
     # engine noise on a normal day, so this is the one to read first and
     # server.log is where you go when the answer is not in it.
-    @{ Name = 'thornswood.log'; Path = 'C:\Thornswood-Server\thornswood.log'; What = 'the gamemode, without the engine noise' }
-    @{ Name = 'voice.log';  Path = 'C:\Thornswood-Voice\voice.log';   What = 'voice and the character register' }
+    @{ Name = 'thornswood.log'; Path = (Join-Path $srvRoot 'thornswood.log'); What = 'the gamemode, without the engine noise' }
+    <#
+      THE DOOR'S OWN LOG, WHICH HAS NEVER COME DOWN WITH THE REST.
+
+      note() in the door block writes every line twice: once through
+      console.log, which lands in server.log among four fifths engine noise,
+      and once appended to private\door.log, which is the door's own story in
+      order with nothing else in it. That second file is the one to read when
+      the question is why nobody can get in, and until now there was no way to
+      look at it short of an ssh somebody typed by hand.
+
+      21 September: "still can't tp says no list". The answer to that was in
+      private, and nothing fetched private.
+    #>
+    @{ Name = 'door.log'; Path = (Join-Path $srvRoot 'private\door.log'); What = 'the door: who it let in and what the site said' }
+    @{ Name = 'voice.log';  Path = (Join-Path $voiceRoot 'voice.log');   What = 'voice and the character register' }
 )
 
 Head 'Pulling'
