@@ -590,7 +590,7 @@ var S = {
 var ROUTES = {
   '/hub':'home', '/hub/help':'help', '/news':'news', '/hub/known':'known', '/roadmap':'roadmap',
   '/suggestions':'suggestions', '/testthese':'tests',
-  '/uploads':'uploads', '/link':'link', '/linked':'linked', '/sessions':'sessions', '/chat':'chat',
+  '/uploads':'uploads', '/link':'link', '/linked':'linked', '/sessions':'sessions',
   '/active':'active', '/patrick':'todo', '/archive':'archive', '/inbox':'inbox'
 };
 var PATHS = {};
@@ -614,9 +614,8 @@ var ABOUT = {
   link:        'How getting in works, and what to do when the launcher says you are not linked.',
   linked:      'Everybody who has linked a Discord account to a copy of the game.',
   sessions:    'One card a person, newest first by when they last played. ' +
-               'Open one for every session they have had.',
-  chat:        'What people said, a day at a time. Search it by person or by ' +
-               'words, so a report can be answered by reading rather than by asking.'
+               'Open one for every session they have had, with its logs and ' +
+               'what they said in it.'
 };
 
 /*
@@ -632,7 +631,7 @@ var GROUPS = [
   { label:'Work',        keys:['patrick','inbox','active','testthese'] },
   { label:'Files',       keys:['uploads'] },
   { label:'On the site', keys:['roadmap','known','suggestions','help'] },
-  { label:'Records',     keys:['archive','linked','sessions','chat'] }
+  { label:'Records',     keys:['archive','linked','sessions'] }
 ];
 
 var el = function (id) { return document.getElementById(id); };
@@ -650,7 +649,6 @@ function label(k) {
   if (k === 'link') return 'Getting in';
   if (k === 'linked') return 'Linked accounts';
   if (k === 'sessions') return 'Play sessions';
-  if (k === 'chat') return 'What people said';
   return S.titles[k] || k;
 }
 function maySee(k) {
@@ -1110,6 +1108,70 @@ function drawLogs(box, sid, d) {
       (d.serverWhy ? ': ' + esc(d.serverWhy) : '.') + '</div>';
   }
 
+  /*
+    WHAT THEY SAID, IN THIS SESSION, here with the rest of it.
+
+    This was a page of its own: the whole chat log, a day at a time, for
+    everybody at once. Answering "what did this person do" meant reading a
+    session here, working out when it ran, going to that page, picking the
+    day, filtering by name, and holding the two together in your head. Patrick
+    on 22 September: put it under each person, split per session. The server
+    does the splitting, by profile number and this session's own window, so
+    what arrives is already only this person in only this session.
+
+    It is a details block like the log files, and it downloads like them, so
+    a report is one folder of files from one place. Slash commands are kept
+    and marked, because somebody typed those too and nobody else in the room
+    saw them. A line marked unproven came from a connection that could not
+    show a signed token for the profile it claimed: worth reading, not worth
+    hanging anybody on. Voice is not recorded, only text.
+  */
+  var chat = d.chat || [];
+  if (chat.length) {
+    /* The same lines as plain text, so Download gives a readable file rather
+       than the page's markup. Registered under a name that says whose and
+       from when, because it lands in somebody's downloads folder beside the
+       logs and has to still make sense there. */
+    var cn = 'chat-' + (row && row.profile ? row.profile : 'unknown') + '.txt';
+    LOGS[sid][cn] = chat.map(function (l) {
+      return new Date(l.at).toLocaleString() +
+        (l.kind === 'command' ? '  [command]' : '') +
+        (l.proven ? '' : '  [unproven]') +
+        (l.mode ? '  [' + l.mode + ']' : '') +
+        '  ' + (l.name || '(no name)') + ': ' + (l.text || '');
+    }).join('\n');
+
+    out += '<details class="logf">' +
+      '<summary>' +
+        '<span class="chev">&#9654;</span>' +
+        '<span class="nm">What they said</span>' +
+        '<span class="sz">' + chat.length + ' line(s)</span>' +
+        '<button class="btn small dl" data-s="' + esc(sid) + '" data-n="' + esc(cn) + '">Download</button>' +
+      '</summary>' +
+      '<div class="tablewrap"><table class="board"><thead><tr>' +
+        '<th>When</th><th>Said</th></tr></thead><tbody>';
+    chat.forEach(function (l) {
+      out += '<tr' + (l.kind === 'command' ? ' class="warn"' : '') + '>' +
+        '<td data-label="When"><div class="cell">' +
+          esc(new Date(l.at).toLocaleTimeString()) +
+          (l.proven ? '' : '<div class="said"><span class="pill fail">unproven</span></div>') +
+        '</div></td>' +
+        '<td data-label="Said"><div class="cell">' +
+          (l.kind === 'command' ? '<span class="pill warn">command</span> ' : '') +
+          esc(l.text || '') +
+          (l.mode ? '<div class="said">' + esc(l.mode) + '</div>' : '') +
+        '</div></td>' +
+      '</tr>';
+    });
+    out += '</tbody></table></div></details>';
+  } else {
+    out += '<div class="none">' +
+      (d.chatWhy
+        ? esc(d.chatWhy)
+        : 'They said nothing in this session. Voice is not recorded, only text.') +
+      '</div>';
+  }
+
   box.innerHTML = out;
 
   each(box, 'button.dl', function (b) {
@@ -1504,121 +1566,20 @@ function drawSessions() {
 
 /* -------------------------------------------------------- what was said -- */
 /*
-  A day of chat, searchable.
+  There was a page here: the whole chat log, a day at a time, for everybody at
+  once, with a day picker, a person box and a words box.
 
-  The shape follows what a report actually looks like. Nobody says "show me
-  everything"; they say "X said something to me on Tuesday", so the controls
-  are a day, a person and some words, and all three narrow the same list.
+  It is gone. Answering "what did this person do" meant reading a session on
+  /sessions, working out when it ran, coming here, picking the day, filtering
+  by name, and holding the two together in your head. What people said now
+  lives under the person who said it, inside the session they said it in, in
+  More details beside that session's own logs, and it downloads with them.
+  Decided by Patrick on 22 September.
 
-  Fetched per day rather than with the page, because a busy day is thousands
-  of lines and the page is opened for one of them.
+  The splitting is the server's: chatSlice in docs-app\server.js matches the
+  session's profile number and its own window, and /api/session-logs hands
+  the lines back with the rest of that session. drawLogs draws them.
 */
-var CHAT = { days: [], day: '', lines: [], total: 0, who: '', q: '', why: '' };
-
-function chatFetch() {
-  var u = '/api/chat?day=' + encodeURIComponent(CHAT.day || '') +
-          '&who=' + encodeURIComponent(CHAT.who || '') +
-          '&q=' + encodeURIComponent(CHAT.q || '');
-  saidNow('reading');
-  return api(u)
-    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-    .then(function (d) {
-      CHAT.days = d.days || [];
-      CHAT.day = d.day || '';
-      CHAT.lines = d.lines || [];
-      CHAT.total = d.total || 0;
-      CHAT.why = d.why || '';
-      saidNow('');
-      drawChat();
-    })
-    .catch(function (e) {
-      CHAT.why = (e === 403 ? 'not allowed' : 'could not read the chat log');
-      CHAT.lines = [];
-      saidNow('');
-      drawChat();
-    });
-}
-
-function drawChat() {
-  var out = head();
-
-  out += '<div class="bar" style="margin-bottom:16px">' +
-    '<select id="chatday" aria-label="Day">' +
-      (CHAT.days.length
-        ? CHAT.days.map(function (d) {
-            return '<option value="' + esc(d) + '"' + (d === CHAT.day ? ' selected' : '') + '>' + esc(d) + '</option>';
-          }).join('')
-        : '<option value="">no days yet</option>') +
-    '</select>' +
-    '<input type="search" id="chatwho" placeholder="A name or a profile id" value="' + esc(CHAT.who) + '">' +
-    '<input type="search" id="chatq" placeholder="Words in the message" value="' + esc(CHAT.q) + '">' +
-    '<button class="btn key" id="chatgo">Search</button>' +
-    '<button class="btn" id="chatclear">Clear</button>' +
-  '</div>';
-
-  if (CHAT.why) {
-    out += '<div class="empty">' + esc(CHAT.why) + '</div>';
-  } else if (!CHAT.lines.length) {
-    out += '<div class="empty">Nothing on that day' +
-      ((CHAT.who || CHAT.q) ? ' matching what you asked for.' : '.') + '</div>';
-  } else {
-    out += '<div class="tally">' +
-      '<span class="pill pass">' + CHAT.total + ' line(s)</span>' +
-      (CHAT.total > CHAT.lines.length
-        ? '<span class="pill left">showing the newest ' + CHAT.lines.length + ', narrow it to see the rest</span>'
-        : '') +
-    '</div>';
-
-    out += '<div class="tablewrap"><table class="board"><thead><tr>' +
-      '<th>When</th><th>Who</th><th>Said</th></tr></thead><tbody>';
-    CHAT.lines.forEach(function (l) {
-      out += '<tr' + (l.kind === 'command' ? ' class="warn"' : '') + '>' +
-        '<td data-label="When"><div class="cell">' +
-          esc(new Date(l.at).toLocaleTimeString()) + '</div></td>' +
-        '<td data-label="Who"><div class="cell">' +
-          esc(l.name || '(no name)') +
-          '<div class="said"><code>' + esc(l.profileId || 0) + '</code>' +
-          /* An unproven join could not show a signed token for that profile.
-             The line is still worth keeping and is not worth hanging anybody
-             on, so it says so rather than reading like the others. */
-          (l.proven ? '' : ' <span class="pill fail">unproven</span>') +
-          (l.mode ? ' ' + esc(l.mode) : '') +
-          '</div></td>' +
-        '<td data-label="Said"><div class="cell">' +
-          (l.kind === 'command' ? '<span class="pill warn">command</span> ' : '') +
-          esc(l.text || '') + '</div></td>' +
-      '</tr>';
-    });
-    out += '</tbody></table></div>';
-  }
-
-  out += '<p class="lede" style="margin-top:20px">Every line anybody typed in ' +
-    'chat, written down by the voice service as it goes through, one file a ' +
-    'day, appended and never rewritten. Slash commands are kept too and marked, ' +
-    'because somebody typed those as well; nobody else in the room saw them. ' +
-    'A line marked unproven came from a connection that could not show a signed ' +
-    'token for the profile it claimed, so it is worth reading and not worth ' +
-    'hanging anybody on. Voice is not recorded, only text.</p>';
-
-  el('page').innerHTML = out;
-
-  var go = function () {
-    CHAT.who = (el('chatwho') || {}).value || '';
-    CHAT.q = (el('chatq') || {}).value || '';
-    chatFetch();
-  };
-  if (el('chatgo')) el('chatgo').onclick = go;
-  if (el('chatday')) el('chatday').onchange = function () { CHAT.day = el('chatday').value; go(); };
-  if (el('chatclear')) el('chatclear').onclick = function () {
-    CHAT.who = ''; CHAT.q = ''; chatFetch();
-  };
-  each(el('page'), '#chatwho,#chatq', function (b) {
-    b.onkeydown = function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); go(); } };
-  });
-
-  /* First time on the page there is nothing yet, so ask once. */
-  if (!CHAT.days.length && !CHAT.why && !CHAT.asked) { CHAT.asked = true; chatFetch(); }
-}
 
 /* ---------------------------------------------------------------- draw -- */
 function draw() {
@@ -1634,7 +1595,6 @@ function draw() {
   if (S.at === 'link')    return drawLink();
   if (S.at === 'linked')  return drawLinked();
   if (S.at === 'sessions') return drawSessions();
-  if (S.at === 'chat')     return drawChat();
   if (isBoard(S.at))      return drawBoard();
   if (S.editing)          return drawEdit();
   drawDoc();

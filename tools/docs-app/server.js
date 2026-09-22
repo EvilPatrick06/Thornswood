@@ -159,7 +159,7 @@ const BOARDS = {
 const LEVEL = {
   tests: 'admin', help: 'admin', known: 'admin', roadmap: 'admin',
   suggestions: 'admin', files: 'admin', uploads: 'admin', report: 'admin',
-  news: 'admin', link: 'admin', linked: 'admin', sessions: 'admin', chat: 'admin',
+  news: 'admin', link: 'admin', linked: 'admin', sessions: 'admin',
   active: 'admin', archive: 'admin', todo: 'admin', inbox: 'admin'
 };
 
@@ -217,7 +217,6 @@ const PAGES = {
   '/link':        'link',
   '/linked':      'linked',
   '/sessions':    'sessions',
-  '/chat':        'chat',
   '/active':      'active',
   '/patrick':     'todo',
   '/archive':     'archive',
@@ -950,6 +949,61 @@ const SERVER_LOGS = {
    it owns the file and this only reads it, so there is one writer and no
    question about which copy is the real one. */
 const CHAT_DIR = process.env.THORNSWOOD_CHAT_DIR || 'C:\\Thornswood-Voice\\chat';
+
+/* What this person said during THIS session, and nothing else.
+
+   There used to be a page of its own for the chat log, a day at a time for
+   everybody at once. Answering "what did this person do" meant reading a
+   session on one page, working out when it ran, then going to another page,
+   picking the day and filtering by name, and holding the two together in your
+   head. Patrick, 22 September: put it under each person on /sessions, split
+   per session. So the page is gone and this is where it lives.
+
+   The split is the profile number and the session's own window. A chat line
+   carries profileId and at; a session carries profile, start and end. The
+   caller passes the same window it already widened by a minute either side
+   for the server log, because the launcher stamps the session and the voice
+   service stamps the line, and those moments are not the same moment.
+
+   A session that runs over midnight is in two files, so both days are read.
+   A line that will not parse is skipped rather than thrown: an append-only
+   log killed mid-write has a truncated last line by design, and one bad line
+   must not cost the rest. */
+function chatSlice(profileId, from, to) {
+  const want = Number(profileId) || 0;
+  if (!want) return { ok: true, why: '', lines: [] };
+  const days = {};
+  for (const at of [from, to]) {
+    const d = new Date(at);
+    const p = (n) => (n < 10 ? '0' : '') + n;
+    days[d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())] = 1;
+  }
+  const out = [];
+  let read = 0;
+  for (const day of Object.keys(days).sort()) {
+    let raw = '';
+    try { raw = fs.readFileSync(path.join(CHAT_DIR, day + '.jsonl'), 'utf8'); }
+    catch (e) { continue; }
+    read++;
+    for (const l of raw.split('\n')) {
+      if (!l.trim()) continue;
+      let o;
+      try { o = JSON.parse(l); } catch (e) { continue; }
+      if (!o) continue;
+      if (Number(o.profileId) !== want) continue;
+      const at = Number(o.at) || 0;
+      if (at < from || at > to) continue;
+      out.push({ at: at, kind: String(o.kind || ''), mode: String(o.mode || ''),
+                 name: String(o.name || ''), proven: !!o.proven, text: String(o.text || '') });
+      if (out.length > 4000) break;
+    }
+    if (out.length > 4000) break;
+  }
+  out.sort((a, b) => a.at - b.at);
+  /* "Nothing was said" and "the chat log is not on this box" look identical
+     once both are an empty list, and only one of them is a fault. */
+  return { ok: true, why: read ? '' : 'no chat log for those days on this box', lines: out };
+}
 
 function serverLogSlice(channel, from, to) {
   const file = SERVER_LOGS[channel === 'dev' ? 'dev' : 'main'];
@@ -2342,12 +2396,17 @@ async function handle(req, res) {
       const from = (Number(row.start) || Number(row.end) || 0) - 60000;
       const to = (Number(row.end) || Date.now()) + 60000;
       const server = serverLogSlice(row.channel, from, to);
+      const chat = chatSlice(row.profile, from, to);
 
       return sendJson(res, 200, {
         session: key,
         channel: row.channel,
         client,
         sent,
+        /* What they said, in this session only. The page shows it beside the
+           logs rather than on a page of its own. */
+        chat: chat.lines,
+        chatWhy: chat.why,
         /* Whether this one is held past the retention rule, so the button
            beside the provenance shows the right state. */
         keep: !!row.keep,
@@ -2358,54 +2417,14 @@ async function handle(req, res) {
       });
     }
 
-        /* What people said, so a report about behaviour can be answered.
-
-       The voice service writes one file a day under its own folder, one JSON
-       line a message, appended and never rewritten. This reads a day back,
-       newest first, and filters. Admins only.
-
-       A line that will not parse is SKIPPED rather than throwing, because an
-       append-only log killed mid-write has a truncated last line by design,
-       and one bad line must not cost the other four thousand. */
-    if (p === '/api/chat' && req.method === 'GET') {
-      const dir = CHAT_DIR;
-      let days = [];
-      try {
-        days = fs.readdirSync(dir)
-          .filter(f => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(f))
-          .map(f => f.slice(0, -6))
-          .sort().reverse();
-      } catch (e) { days = []; }
-
-      const day = /^\d{4}-\d{2}-\d{2}$/.test(String(url.searchParams.get('day') || ''))
-        ? url.searchParams.get('day') : days[0];
-      if (!day) return sendJson(res, 200, { days: [], day: '', lines: [], why: 'nothing has been said yet, or the chat log is not on this box' });
-
-      const who = String(url.searchParams.get('who') || '').trim();
-      const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
-
-      let lines = [];
-      try {
-        const raw = fs.readFileSync(path.join(dir, day + '.jsonl'), 'utf8');
-        for (const l of raw.split('\n')) {
-          if (!l.trim()) continue;
-          let o;
-          try { o = JSON.parse(l); } catch (e) { continue; }
-          if (!o) continue;
-          if (who && String(o.profileId) !== who && String(o.name || '') !== who) continue;
-          if (q && String(o.text || '').toLowerCase().indexOf(q) < 0) continue;
-          lines.push(o);
-        }
-      } catch (e) {
-        return sendJson(res, 200, { days, day, lines: [], why: String(e.message || e) });
-      }
-
-      /* Newest first, and capped, because a busy day is thousands of lines and
-         nobody reads a page that large. The filters are how you find the rest. */
-      lines.reverse();
-      const total = lines.length;
-      return sendJson(res, 200, { days, day, total, lines: lines.slice(0, 1000) });
-    }
+    /* /api/chat was here: the whole chat log, a day at a time, for everybody
+       at once, behind a page of its own. It is gone, and so is that page.
+       Answering "what did this person do" meant reading a session on one page,
+       working out when it ran, then going to another page, picking the day and
+       filtering by name, and holding the two together in your head. What it
+       did is now chatSlice, and the lines come back inside /api/session-logs
+       under the session they were said in, beside that session's other files.
+       Decided by Patrick on 22 September. */
 
     /* Hold one session's logs indefinitely, or let them age out again.
 
