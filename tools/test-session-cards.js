@@ -128,6 +128,47 @@ yes('the log row spans the whole table', onMain.indexOf('colspan="6"') >= 0);
 yes('the page has a download control for a log', src.indexOf('class="dl"') >= 0);
 yes('logs are fetched per session, not with the page', src.indexOf('/api/session-logs?session=') >= 0);
 
+/* ---- one session coloured, never the whole card ------------------------- */
+const red = sessionTable([{ who:'1', profile:7, channel:'main', start:1, end:2, minutes:5,
+  session:'ffffffff', trouble:'the game crashed', troubleAt:'bad' }]);
+const yel = sessionTable([{ who:'1', profile:7, channel:'main', start:1, end:2, minutes:5,
+  session:'gggggggg', trouble:'an update did not install', troubleAt:'warn' }]);
+const fine = sessionTable([{ who:'1', profile:7, channel:'main', start:1, end:2, minutes:5,
+  session:'hhhhhhhh' }]);
+
+yes('a crashed session is the red row', red.indexOf('<tr class="bad">') >= 0);
+yes('an update or load order failure is the yellow row', yel.indexOf('<tr class="warn">') >= 0);
+yes('a clean session is neither', fine.indexOf('class="bad"') < 0 && fine.indexOf('class="warn"') < 0);
+yes('red says went wrong', red.indexOf('>went wrong<') >= 0);
+yes('yellow says would not play, not went wrong',
+    yel.indexOf('>would not play<') >= 0 && yel.indexOf('>went wrong<') < 0);
+yes('the reason is shown beside the tag', red.indexOf('the game crashed') >= 0);
+
+/* The card itself must never be coloured: one bad evening out of forty does
+   not make a red person, and a red card buries the session worth reading. */
+yes('the person card has no colour rule of its own',
+    src.indexOf('.person.bad') < 0 && src.indexOf('.person.warn') < 0);
+
+/* ---- the launcher's own blockers and warnings --------------------------- */
+eval(grab('issuesHtml'));
+const withIssues = issuesHtml({
+  issues: [
+    { text:'SkyUI_SE.esp is not the server\'s copy', blocking:true, absent:false,
+      plugin:'SkyUI_SE.esp', wantSize:1234567, wantCrc:0x1a2b3c4d, wantIndex:42 },
+    { text:'_ResourcePack.esl is loaded on its own', blocking:false, absent:false, plugin:'' }
+  ],
+  checks: [{ name:'Voice', detail:'no microphone was chosen' }]
+});
+yes('a blocker is marked as one', withIssues.indexOf('>blocker</span>') >= 0);
+yes('a warning is marked as one', withIssues.indexOf('>warning</span>') >= 0);
+yes('a failing readiness check is listed too', withIssues.indexOf('no microphone was chosen') >= 0);
+yes('the plugin name is shown, which the launcher window does not',
+    withIssues.indexOf('SkyUI_SE.esp') >= 0);
+yes('the size the server wanted is shown', withIssues.indexOf('1,234,567 bytes') >= 0);
+yes('the crc is shown in hex', withIssues.indexOf('1a2b3c4d') >= 0);
+yes('the manifest index is shown', withIssues.indexOf('manifest index 42') >= 0);
+yes('a session with nothing wrong renders no issues block', issuesHtml({}) === '');
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

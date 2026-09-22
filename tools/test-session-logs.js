@@ -166,6 +166,62 @@ const missing = serverLogSlice('dev', from, to);
 yes('a server log that is not on this box says so rather than throwing',
     missing.ok === false && missing.lines.length === 0 && String(missing.why).length > 0);
 
+// ---- red against yellow ----------------------------------------------------
+/*
+  Two levels, because they want two different things done about them. Red is a
+  crash or a throw and the bot says so out loud. Yellow is a session that
+  failed for a reason already understood with a known fix, and says nothing in
+  Discord, because there are a lot of those and a channel full of them is a
+  channel nobody reads.
+*/
+/* The two marker lists, lifted whole, so the checks below run against the
+   real ones rather than a copy that drifts. */
+function grabConst(name) {
+  const at = src.indexOf('const ' + name);
+  if (at < 0) throw new Error('docs-app/server.js has no const ' + name);
+  const open = src.indexOf('[', at);
+  let d = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === '[') d++;
+    else if (src[i] === ']') { d--; if (d === 0) return src.slice(open, i + 1); }
+  }
+  throw new Error('unbalanced brackets reading ' + name);
+}
+const TROUBLE_BAD = eval(grabConst('TROUBLE_BAD'));
+const TROUBLE_WARN = eval(grabConst('TROUBLE_WARN'));
+eval([grab('lineAround'), grab('scanFor'), grab('readTrouble')].join('\n'));
+
+yes('the red list and the yellow list are both real and separate',
+    TROUBLE_BAD.length > 0 && TROUBLE_WARN.length > 0 &&
+    !TROUBLE_BAD.some(b => TROUBLE_WARN.some(w => w[0] === b[0])));
+
+const crash = readTrouble({ 'thornswood-front.log': 'fine\nUncaught TypeError: x is not a function\nmore\n' });
+yes('a throw in a game log is red', crash && crash.level === 'bad');
+yes('and the line it sat on is kept',
+    crash && crash.line.indexOf('Uncaught TypeError') >= 0);
+
+const upd = readTrouble({ 'launcher.log': 'fine\n2026-09-22 10:00:00  Update failed: the file was locked\n' });
+yes('an update that did not install is yellow, not red', upd && upd.level === 'warn');
+yes('it says what went wrong in plain words', upd && upd.why === 'an update did not install');
+
+const lo = readTrouble({ 'thornswood-front.log': 'LOAD ORDER ERROR\n' });
+yes('a load order refusal is yellow, not red', lo && lo.level === 'warn');
+
+const both = readTrouble({
+  'launcher.log': 'Update failed: locked\n',
+  'thornswood-front.log': 'Unhandled exception in the plugin\n'
+});
+yes('a session that both crashed and had a load order complaint is RED',
+    both && both.level === 'bad');
+
+yes('a clean session is neither', readTrouble({ 'launcher.log': 'started\nplayed\nclosed\n' }) === null);
+yes('no logs at all is neither', readTrouble({}) === null);
+
+/* The thing that would make this useless: a marker so loose that ordinary
+   lines match it. The word "error" appears in healthy logs all the time. */
+yes('the word error on its own does not colour a session',
+    readTrouble({ 'launcher.log': 'checked for errors, found none\n' }) === null);
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { }

@@ -326,6 +326,34 @@ table.board th .x:hover{color:var(--fail)}
 table.board td{padding:0;border-bottom:1px solid var(--line);vertical-align:top}
 table.board tr:last-child td{border-bottom:0}
 table.board tr.done .cell{color:var(--faint);text-decoration:line-through}
+/* One session that went wrong, so it can be found in a list of forty. The
+   card stays its normal colour: a person who had one bad evening is not a red
+   person, and a red card would bury the one session worth reading.
+
+   Red is a crash or a throw, which nobody could have done anything about and
+   which the bot also says out loud. Yellow is a session that failed for a
+   reason already understood and with a known fix, an update that did not
+   install or a load order that did not match, and those say nothing in
+   Discord because there are a lot of them. */
+table.board tr.bad td{background:rgba(192,90,78,.07)}
+table.board tr.bad td:first-child{box-shadow:inset 3px 0 0 var(--fail)}
+table.board tr.bad:hover td{background:rgba(192,90,78,.12)}
+table.board tr.warn td{background:rgba(201,162,75,.06)}
+table.board tr.warn td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+table.board tr.warn:hover td{background:rgba(201,162,75,.11)}
+.pill.warn{background:rgba(201,162,75,.18);color:var(--gold)}
+
+/* What the launcher itself was unhappy about, in more detail than its own
+   window shows. */
+.issues{margin-top:9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
+.issues .ihead{padding:8px 11px;border-bottom:1px solid var(--line);
+  font:600 11px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+.issues .i{padding:9px 11px;border-bottom:1px solid var(--line);display:grid;gap:3px}
+.issues .i:last-child{border-bottom:0}
+.issues .i .t{font-size:13.5px;color:var(--text)}
+.issues .i .d{font:11.5px var(--mono);color:var(--faint);word-break:break-word}
+.issues .i.blk{box-shadow:inset 3px 0 0 var(--fail)}
+.issues .i.wrn{box-shadow:inset 3px 0 0 var(--gold)}
 table.board tr:hover td{background:rgba(255,255,255,.012)}
 td.tick,th.tick{width:38px;text-align:center;padding:10px 0 0;vertical-align:top}
 td.tick input{width:16px;height:16px;accent-color:var(--pass);cursor:pointer}
@@ -922,8 +950,79 @@ function logFileHtml(sid, name, text) {
   '</details>';
 }
 
+/*
+  What the launcher itself was unhappy about, with MORE than its own window
+  shows.
+
+  The launcher shows the sentence and a Fix button, which is the right amount
+  in front of somebody who just wants to play. The Issue behind it always
+  carried more: which plugin, whether the file is absent or merely the wrong
+  bytes, and the size, CRC and manifest index the server expected. That detail
+  is noise on the launcher and is the whole point here, where the person is
+  not in the room to be asked.
+*/
+function issuesHtml(row) {
+  var issues = row.issues || [];
+  var checks = row.checks || [];
+  if (!issues.length && !checks.length) return '';
+
+  var blocking = issues.filter(function (i) { return i.blocking; }).length;
+  var out = '<div class="issues"><div class="ihead">' +
+    'The launcher at the end of this session: ' +
+    (blocking ? blocking + ' blocker(s)' : 'no blockers') +
+    (issues.length - blocking ? ', ' + (issues.length - blocking) + ' warning(s)' : '') +
+    (checks.length ? ', ' + checks.length + ' check(s) not passing' : '') +
+    '</div>';
+
+  issues.forEach(function (i) {
+    var d = [];
+    if (i.plugin) d.push(i.plugin);
+    if (i.absent) d.push('not in Data at all');
+    else if (i.plugin) d.push('the file is there and the bytes are not the server\'s');
+    if (i.wantSize) d.push('server wants ' + Number(i.wantSize).toLocaleString() + ' bytes');
+    if (i.wantCrc) d.push('crc ' + (i.wantCrc >>> 0).toString(16));
+    if (i.wantIndex) d.push('manifest index ' + i.wantIndex);
+    out += '<div class="i ' + (i.blocking ? 'blk' : 'wrn') + '">' +
+      '<span class="t">' + (i.blocking ? '<span class="pill fail">blocker</span> ' :
+                                         '<span class="pill warn">warning</span> ') +
+      esc(i.text) + '</span>' +
+      (d.length ? '<span class="d">' + esc(d.join('  ')) + '</span>' : '') +
+    '</div>';
+  });
+
+  checks.forEach(function (c) {
+    out += '<div class="i wrn">' +
+      '<span class="t"><span class="pill warn">check</span> ' + esc(c.name) + '</span>' +
+      (c.detail ? '<span class="d">' + esc(c.detail) + '</span>' : '') +
+    '</div>';
+  });
+
+  return out + '</div>';
+}
+
 function drawLogs(box, sid, d) {
   var out = '';
+
+  /* The row this belongs to, for the launcher's own blockers and warnings,
+     which came with the logs and live on the row rather than in the log set. */
+  var row = null;
+  for (var i = 0; i < S.sessions.length; i++) {
+    if (S.sessions[i].session === sid) { row = S.sessions[i]; break; }
+  }
+
+  /* The line that decided the colour, first, because it is the reason
+     somebody opened this. */
+  if (row && row.trouble && row.troubleLine) {
+    out += '<div class="issues"><div class="ihead">' +
+      (row.troubleAt === 'warn' ? 'Why this session is yellow' : 'Why this session is red') +
+      '</div><div class="i ' + (row.troubleAt === 'warn' ? 'wrn' : 'blk') + '">' +
+      '<span class="t">' + esc(row.trouble) + '</span>' +
+      '<span class="d">' + esc(row.troubleFile || '') + '</span>' +
+      '<span class="d">' + esc(row.troubleLine) + '</span>' +
+    '</div></div>';
+  }
+
+  if (row) out += issuesHtml(row);
 
   /* Where this came from, because the point of keeping it is to be able to
      say so later. A second set having been tried is worth shouting about. */
@@ -983,8 +1082,21 @@ function sessionTable(rows) {
     '<th>Stopped</th><th>For</th></tr></thead><tbody>';
   rows.forEach(function (s) {
     var open = sessionOpen(s);
-    out += '<tr>' +
+    /*
+      One session red, never the whole card. A person who had one bad evening
+      out of forty is not a red person, and colouring their card would bury
+      the session that actually needs reading among thirty-nine that do not.
+      The marker is set once when the logs arrive, by reading them, so nobody
+      has to open anything for it to be known.
+    */
+    out += '<tr' + (s.trouble ? ' class="' + (s.troubleAt === 'warn' ? 'warn' : 'bad') + '"' : '') + '>' +
       '<td data-label="Character"><div class="cell">' +
+        (s.trouble
+          ? (s.troubleAt === 'warn'
+              ? '<span class="pill warn">would not play</span>'
+              : '<span class="pill fail">went wrong</span>') +
+            '<div class="said">' + esc(s.trouble) + '</div>'
+          : '') +
         (s.profile ? '<code>' + esc(s.profile) + '</code>' : 'none picked') + '</div></td>' +
       '<td data-label="Build"><div class="cell">' + esc(s.version || 'not said') + '</div></td>' +
       /*

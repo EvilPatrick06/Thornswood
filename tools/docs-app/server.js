@@ -822,6 +822,114 @@ function pruneSessionLogs() {
 }
 
 /*
+  Did this session go wrong, and how badly?
+
+  Decided by reading the logs it sent, once, as they arrive, rather than by
+  asking somebody to go and look.
+
+  TWO LEVELS, because they want two different things done about them.
+
+  BAD is a crash or a throw: the session broke under the person and there was
+  nothing they could have done. That colours the session red and the bot says
+  so in the staff channel, because somebody should go and look now.
+
+  WARN is the session failing for a reason that is already understood and has
+  a known fix: an update that did not install, a load order that does not
+  match, a mod missing or in the wrong place. That colours the session yellow
+  and says NOTHING in Discord. These are common, they are self-inflicted by a
+  machine rather than by the code, and a message for each one would make the
+  staff channel unreadable, which is the same as having no channel.
+
+  THE MARKERS ARE DELIBERATELY FEW. A test that matches "error" anywhere turns
+  every session red, and a page where everything is red says exactly as much
+  as a page where nothing is.
+
+  Red is looked for first, so a session that both crashed AND had a load order
+  complaint is red. First match wins and the line is kept with it, because
+  "which session went wrong" is only half the question and "what did it say"
+  is the other half.
+*/
+const TROUBLE_BAD = [
+  ['Unhandled exception', 'something threw and nothing caught it'],
+  ['Unhandled Exception', 'something threw and nothing caught it'],
+  ['Uncaught ',           'a script threw and nothing caught it'],
+  ['TypeError:',          'a script hit a TypeError'],
+  ['ReferenceError:',     'a script hit a ReferenceError'],
+  ['has crashed',         'the game crashed'],
+  ['crashed with',        'the game crashed'],
+  ['FATAL',               'something fatal']
+];
+
+const TROUBLE_WARN = [
+  ['Update failed',                 'an update did not install'],
+  ['being used by another process', 'an update could not write a file something else had open'],
+  ['LOAD ORDER ERROR',              'the game refused them over the load order'],
+  ['load order is not the server',  'their load order did not match the server'],
+  ['does not match the server',     'their load order did not match the server'],
+  ['is missing, install it in Vortex', 'a mod is not installed'],
+  ['skymp5-client.js is missing',   'the client is not in place'],
+  ['plugins.txt is missing',        'their plugin list was missing'],
+  ['did not answer, so it is not known whether this build is current',
+                                    'the update feed did not answer, so Play stayed shut']
+];
+
+function lineAround(text, at) {
+  const from = text.lastIndexOf('\n', at) + 1;
+  let to = text.indexOf('\n', at);
+  if (to < 0) to = text.length;
+  return text.slice(from, to).trim().slice(0, 300);
+}
+
+function scanFor(logs, marks, level) {
+  for (const name of Object.keys(logs || {})) {
+    const text = String(logs[name] || '');
+    for (const [mark, why] of marks) {
+      const at = text.indexOf(mark);
+      if (at < 0) continue;
+      return { level, why, file: name, line: lineAround(text, at) };
+    }
+  }
+  return null;
+}
+
+/* Red before yellow: a session that crashed AND complained about its load
+   order is a crash, and the crash is the thing worth waking somebody for. */
+function readTrouble(logs) {
+  return scanFor(logs, TROUBLE_BAD, 'bad') || scanFor(logs, TROUBLE_WARN, 'warn');
+}
+
+/*
+  The short list of sessions that went wrong, for the bot to read.
+
+  A file rather than an endpoint, because the bot runs on this same box and a
+  file needs no ticket, no port and nothing to keep in step. Newest last, the
+  last 200, so it cannot grow without bound.
+*/
+const TROUBLE_FILE = path.join(DATA, 'trouble.json');
+const TROUBLE_KEEP = 200;
+
+function noteTrouble(row, found) {
+  try {
+    const list = jsonFile(TROUBLE_FILE, []);
+    const all = Array.isArray(list) ? list : [];
+    if (all.some(t => t && t.session === row.session)) return;
+    all.push({
+      session: row.session,
+      who: String(row.who),
+      name: String(row.name || ''),
+      channel: String(row.channel || ''),
+      profile: Number(row.profile) || 0,
+      version: String(row.version || ''),
+      at: Date.now(),
+      why: found.why,
+      file: found.file,
+      line: found.line
+    });
+    putJson(TROUBLE_FILE, all.slice(-TROUBLE_KEEP));
+  } catch (e) { }
+}
+
+/*
   The game server's log between two moments.
 
   Its lines start "[2026-09-22 10:02:10.155]", which is local time on this box
@@ -1808,11 +1916,63 @@ async function handle(req, res) {
        anybody linked could write a log set against any id they invented, and
        the folder would fill with sets belonging to no session. */
     const rows = sessionRows();
-    if (findSession(rows, key, t.d) < 0) return sendJson(res, 404, { ok: false, why: 'no such session' });
+    const at = findSession(rows, key, t.d);
+    if (at < 0) return sendJson(res, 404, { ok: false, why: 'no such session' });
 
-    const what = putSessionLogs(key, t.d, (o.logs && typeof o.logs === 'object') ? o.logs : {});
+    const logs = (o.logs && typeof o.logs === 'object') ? o.logs : {};
+    const what = putSessionLogs(key, t.d, logs);
     if (what === 'already') return sendJson(res, 409, { ok: false, why: 'already sent' });
     if (what === 'nothing') return sendJson(res, 200, { ok: true, stored: false });
+
+    /* Read them once, now, so the page can colour this one session and the
+       bot can say so in Discord. Done here rather than when somebody opens
+       the page, because the point is that nobody has to open the page for
+       anybody to find out.
+
+       The launcher's own blockers and warnings come with the logs, already
+       structured, and they carry more than the launcher's window shows: which
+       plugin, whether it is absent or merely wrong, and the size, CRC and
+       manifest index the server wanted. Those are kept whole. */
+    try {
+      const issues = Array.isArray(o.issues) ? o.issues.slice(0, 100).map(i => ({
+        text: String((i && i.text) || '').slice(0, 400),
+        blocking: !!(i && i.blocking),
+        absent: !!(i && i.absent),
+        plugin: String((i && i.plugin) || '').slice(0, 160),
+        wantSize: Number(i && i.wantSize) || 0,
+        wantCrc: Number(i && i.wantCrc) || 0,
+        wantIndex: Number(i && i.wantIndex) || 0
+      })).filter(i => i.text) : [];
+
+      const checks = Array.isArray(o.checks) ? o.checks.slice(0, 40).map(c => ({
+        name: String((c && c.name) || '').slice(0, 120),
+        detail: String((c && c.detail) || '').slice(0, 400)
+      })).filter(c => c.name) : [];
+
+      if (issues.length) rows[at].issues = issues;
+      if (checks.length) rows[at].checks = checks;
+
+      const found = readTrouble(logs);
+      if (found) {
+        rows[at].trouble = found.why;
+        rows[at].troubleAt = found.level;     /* 'bad' is red, 'warn' is yellow */
+        rows[at].troubleFile = found.file;
+        rows[at].troubleLine = found.line;
+      } else if (issues.length || checks.length) {
+        /* No crash, but the launcher was unhappy. Yellow, and never a message
+           in Discord: these are common, understood, and have a known fix. */
+        const blocking = issues.filter(i => i.blocking).length;
+        rows[at].trouble = blocking
+          ? (blocking + ' thing(s) would have stopped them connecting')
+          : (issues.length + checks.length) + ' thing(s) the launcher was unhappy about';
+        rows[at].troubleAt = 'warn';
+      }
+
+      if (rows[at].trouble) putSessions(rows);
+      /* Only a crash is worth saying out loud. */
+      if (found && found.level === 'bad') noteTrouble(rows[at], found);
+    } catch (e) { }
+
     return sendJson(res, 200, { ok: true, stored: true });
   }
 

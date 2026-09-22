@@ -138,6 +138,35 @@ def _int_env(name, fallback):
 WATCH_ID = _int_env('WATCH_CHANNEL_ID', _dev_channel_id())
 
 
+# The channel that hears about a session that went wrong.
+#
+# staff-channel.txt beside this file, the same shape and for the same reason as
+# dev-channel.txt: an id rather than a name, because a name lookup hands back
+# whichever channel the server lists first and this server already has two
+# called news.
+#
+# With no file it falls back to the watcher's channel, which is a real staff
+# channel that already works, rather than guessing at a name or going quiet.
+# TROUBLE_CHANNEL_ID in bot.env.json on the VPS overrides both.
+def _staff_channel_id():
+    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        with open(os.path.join(here, 'staff-channel.txt')) as f:
+            return int(f.read().strip())
+    except Exception:
+        return 0
+
+
+TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id() or _dev_channel_id())
+
+# Where the site writes the sessions that went wrong. The bot and the site run
+# on the same box, so this is a file rather than a request: no ticket, no port
+# and nothing to keep in step.
+TROUBLE_FILE = os.environ.get(
+    'TROUBLE_FILE', r'C:\Thornswood-Docs\data\trouble.json')
+TROUBLE_EVERY = _int_env('TROUBLE_EVERY', 120)
+
+
 WATCH_EVERY = _int_env('WATCH_EVERY', 300)
 # Two in a row rather than one. A single timeout is a moment of packet loss and
 # nobody wants to read about it. Two, five minutes apart, is the site being
@@ -955,6 +984,125 @@ async def watch_site():
         await asyncio.sleep(WATCH_EVERY)
 
 
+async def watch_trouble():
+    """
+    Say in the staff channel when a session goes wrong.
+
+    The site reads every session's logs as they arrive and appends the ones
+    that went wrong to trouble.json. This reads that file and says each new one
+    once. A file rather than a request because both run on this box.
+
+    WHAT IT REMEMBERS AND WHY. The session ids already in the file when this
+    starts are treated as said. Without that, every restart of the bot would
+    re-announce the last two hundred, which is the fastest way to make a staff
+    channel unreadable and therefore unread. It means a session that went wrong
+    while the bot was down is not announced, and that is the right trade: it is
+    still on the page, in red, which is where somebody looks.
+
+    Nothing in here may end the loop, for the same reason as the site watcher:
+    a watcher that dies quietly looks exactly like everything being fine.
+    """
+    await client.wait_until_ready()
+
+    def read_all():
+        try:
+            with open(TROUBLE_FILE, encoding='utf-8') as f:
+                rows = json.load(f)
+            return rows if isinstance(rows, list) else []
+        except Exception:
+            return []
+
+    loop = asyncio.get_running_loop()
+    said = set()
+    for row in await loop.run_in_executor(None, read_all):
+        if isinstance(row, dict) and row.get('session'):
+            said.add(row['session'])
+    ch = _trouble_channel()
+    log('trouble: watching %s every %ds, speaking in %s, %d already there and '
+        'treated as said'
+        % (TROUBLE_FILE, TROUBLE_EVERY,
+           ('#' + ch.name) if ch is not None else 'NOWHERE, see above',
+           len(said)))
+
+    while not client.is_closed():
+        try:
+            for row in await loop.run_in_executor(None, read_all):
+                if not isinstance(row, dict):
+                    continue
+                sid = row.get('session') or ''
+                if not sid or sid in said:
+                    continue
+                said.add(sid)
+
+                who = row.get('name') or row.get('who') or 'somebody'
+                where = row.get('channel') or ''
+                where = {'dev': 'the dev build', 'main': 'the main build'}.get(
+                    where, 'a build it did not name')
+                line = (row.get('line') or '').strip()
+                await trouble_say(
+                    '**A session went wrong.** %s, on %s%s.\n%s\n%s\n'
+                    'The logs are on the sessions page under that session, '
+                    'and it is the red one.'
+                    % (who,
+                       where,
+                       (', launcher %s' % row['version']) if row.get('version') else '',
+                       row.get('why') or 'something went wrong',
+                       ('```\n%s\n```' % line[:400]) if line else ''))
+        except Exception:
+            log('trouble: the check itself failed, carrying on:\n'
+                + traceback.format_exc())
+        await asyncio.sleep(TROUBLE_EVERY)
+
+
+def _trouble_channel():
+    """
+    The channel a session that went wrong is announced in.
+
+    An id wins, from staff-channel.txt or TROUBLE_CHANNEL_ID, because an id
+    cannot be ambiguous. With no id it falls back to the name staff-general,
+    AND ONLY WHEN EXACTLY ONE CHANNEL HAS THAT NAME.
+
+    That last part is the whole rule. This server has two channels called news,
+    one staff and one public, and discord.py's by-name lookup hands back
+    whichever is listed first, so a watcher matching on a name would eventually
+    announce staff business in public. One match is safe; two is not, and two
+    is silence plus a line in the log saying so rather than a guess.
+    """
+    if TROUBLE_ID:
+        ch = client.get_channel(TROUBLE_ID)
+        if ch is not None:
+            return ch
+        log('trouble: channel id %d is not one this bot can see.' % TROUBLE_ID)
+
+    found = []
+    for g in client.guilds:
+        for ch in getattr(g, 'text_channels', []):
+            if ch.name == 'staff-general':
+                found.append(ch)
+    if len(found) == 1:
+        return found[0]
+    if len(found) > 1:
+        log('trouble: %d channels are called staff-general, so nothing was '
+            'said. Put the right id in staff-channel.txt or set '
+            'TROUBLE_CHANNEL_ID.' % len(found))
+    else:
+        log('trouble: no channel called staff-general and no id given, so '
+            'nothing was said.')
+    return None
+
+
+async def trouble_say(text):
+    """Say it once, in the staff channel. Same rules as watch_say."""
+    ch = _trouble_channel()
+    if ch is None:
+        return
+    try:
+        await ch.send(text[:1900])
+    except Exception:
+        log('trouble: could not post in #%s:\n' % getattr(ch, 'name', '?')
+            + traceback.format_exc())
+
+
 # on_ready fires again on every reconnect, and a second loop would double every
 # message this ever sends.
 _watching = False
@@ -966,6 +1114,7 @@ async def on_ready():
     if not _watching:
         _watching = True
         asyncio.create_task(watch_site())
+        asyncio.create_task(watch_trouble())
 
     client.add_view(TicketPanel())          # so it keeps working after a restart
     client.add_view(TicketTools())          # and so does Close on every old ticket

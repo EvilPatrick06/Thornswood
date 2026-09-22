@@ -259,6 +259,10 @@ namespace Thornswood
             // install that already exists gets one on its next launch.
             try { Register.Ensure(cfg); } catch { }
 
+            // So the session report can run the readiness checks against the
+            // same config this launcher is using, without reaching in here.
+            try { Discord.UseConfig(cfg); } catch { }
+
             // Logs from a session that ended without sending them, sent now.
             // On a pool thread so nothing waits on the site, and BEFORE Play
             // can be pressed, because the game truncates its own logs under

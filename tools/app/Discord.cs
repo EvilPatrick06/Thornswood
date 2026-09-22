@@ -512,6 +512,8 @@ namespace Thornswood
                 var sb = new StringBuilder();
                 sb.Append("{\"ticket\":\"").Append(Escape(Ticket)).Append("\"");
                 sb.Append(",\"session\":\"").Append(Escape(session)).Append("\"");
+                sb.Append(",\"issues\":").Append(IssuesJson());
+                sb.Append(",\"checks\":").Append(ChecksJson());
                 sb.Append(",\"logs\":{");
                 int n = 0;
                 for (int i = 0; i < want.Length; i++)
@@ -545,6 +547,88 @@ namespace Thornswood
                 Note("Could not send this session's logs: " + ex.Message);
             }
         }
+
+        /// <summary>
+        /// Every blocker and warning the scan found, with MORE than the
+        /// launcher's own window shows.
+        ///
+        /// The window shows the sentence and a Fix button. The Issue carries
+        /// more than that and always has: which plugin it is about, whether
+        /// the file is absent or merely wrong, and the size, CRC and manifest
+        /// index the server expects. On the launcher that detail would be
+        /// noise in front of somebody who only wants to press Fix. On the
+        /// sessions page it is the difference between "their mods were wrong"
+        /// and "SkyUI_SE.esp is 402 bytes short of the server's copy", which
+        /// is the one worth reading when the person is not in the room.
+        ///
+        /// Read here rather than sent from the Play page, because a session
+        /// ends long after Play and the scan is cheap.
+        /// </summary>
+        static string IssuesJson()
+        {
+            var sb = new StringBuilder();
+            sb.Append("[");
+            try
+            {
+                int n = 0;
+                foreach (Issue i in Verify.Run())
+                {
+                    if (i == null) continue;
+                    if (n > 0) sb.Append(",");
+                    sb.Append("{\"text\":\"").Append(Escape(i.Text)).Append("\"");
+                    sb.Append(",\"blocking\":").Append(i.Blocking ? "true" : "false");
+                    sb.Append(",\"absent\":").Append(i.Absent ? "true" : "false");
+                    if (!string.IsNullOrEmpty(i.Plugin))
+                    {
+                        sb.Append(",\"plugin\":\"").Append(Escape(i.Plugin)).Append("\"");
+                        sb.Append(",\"wantSize\":").Append(i.WantSize.ToString(CultureInfo.InvariantCulture));
+                        sb.Append(",\"wantCrc\":").Append(i.WantCrc.ToString(CultureInfo.InvariantCulture));
+                        sb.Append(",\"wantIndex\":").Append(i.WantIndex.ToString(CultureInfo.InvariantCulture));
+                    }
+                    sb.Append("}");
+                    n++;
+                    if (n >= 100) break;   // a list this long is one fault, not a hundred
+                }
+            }
+            catch { }
+            sb.Append("]");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// The readiness rows the Play page shows, as they stood at the end of
+        /// the session. A row that is not Ok is why Play was shut, and that is
+        /// worth having against the session where somebody says they could not
+        /// get in.
+        /// </summary>
+        static string ChecksJson()
+        {
+            var sb = new StringBuilder();
+            sb.Append("[");
+            try
+            {
+                int n = 0;
+                foreach (Check c in Checks.All(cfgFor))
+                {
+                    if (c == null || c.Ok) continue;   // only what was wrong
+                    if (n > 0) sb.Append(",");
+                    sb.Append("{\"name\":\"").Append(Escape(c.Name)).Append("\"");
+                    sb.Append(",\"detail\":\"").Append(Escape(c.Detail)).Append("\"}");
+                    n++;
+                    if (n >= 40) break;
+                }
+            }
+            catch { }
+            sb.Append("]");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// The config the checks are run against. Set once by the shell so
+        /// this class does not have to reach into it.
+        /// </summary>
+        static Config cfgFor;
+        public static void UseConfig(Config c) { cfgFor = c; }
 
         /// <summary>
         /// The last of a log, or "" when there is nothing worth sending.

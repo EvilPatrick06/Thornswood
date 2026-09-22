@@ -178,6 +178,20 @@ foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt') {
   & scp @ssh $src "${User}@${Vps}:$Root/$f" | Out-Null
   Say "  $f" 'Green'
 }
+
+# staff-channel.txt the same way, when there is one. It holds the id of the
+# channel a session that went wrong is announced in. Unlike the file above it
+# is optional: with no id the bot falls back to the name staff-general, and
+# only when exactly one channel carries that name, so a missing file leaves a
+# working bot rather than a silent one. Put an id in it the moment two
+# channels ever share that name, which has already happened here with news.
+$staff = Join-Path $Here 'discord\staff-channel.txt'
+if (Test-Path $staff) {
+  & scp @ssh $staff "${User}@${Vps}:$Root/staff-channel.txt" | Out-Null
+  Say '  staff-channel.txt' 'Green'
+} else {
+  Say '  no staff-channel.txt, so the bot resolves staff-general by name' 'DarkGray'
+}
 $art = Join-Path $Here 'discord\assets\join-card.png'
 if (Test-Path $art) {
   & scp @ssh $art "${User}@${Vps}:$Root/assets/join-card.png" | Out-Null
