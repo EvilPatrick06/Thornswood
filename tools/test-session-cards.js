@@ -169,6 +169,70 @@ yes('the crc is shown in hex', withIssues.indexOf('1a2b3c4d') >= 0);
 yes('the manifest index is shown', withIssues.indexOf('manifest index 42') >= 0);
 yes('a session with nothing wrong renders no issues block', issuesHtml({}) === '');
 
+/* ---- searching and filtering -------------------------------------------- */
+/*
+  The risk here is a filter that hides something quietly. Every check below is
+  about the page showing what it claims to show.
+*/
+eval(grab('sessionMatches'));
+
+const mk = (o) => Object.assign({
+  who:'1', name:'Djinn', profile:7, version:'1.1.79', channel:'main',
+  start:1000, end:2000, minutes:5, session:'s1'
+}, o);
+
+const crashed = mk({ trouble:'the game crashed', troubleAt:'bad', troubleLine:'Uncaught TypeError: boom' });
+const wonting = mk({ trouble:'an update did not install', troubleAt:'warn' });
+const clean   = mk({});
+const openOne = mk({ end:0, minutes:0 });
+const keptOne = mk({ keep:true });
+const onDevW  = mk({ channel:'dev' });
+const stuckOn = mk({ profile:0 });
+
+yes('show=all keeps everything', ['all'].every(() =>
+  [crashed, wonting, clean, openOne].every(s => sessionMatches(s, '', 'all', 'all'))));
+yes('show=bad keeps only the crash',
+    sessionMatches(crashed,'','bad','all') && !sessionMatches(wonting,'','bad','all') && !sessionMatches(clean,'','bad','all'));
+yes('show=warn keeps only the would-not-play',
+    sessionMatches(wonting,'','warn','all') && !sessionMatches(crashed,'','warn','all'));
+yes('show=any keeps both kinds of trouble and not the clean one',
+    sessionMatches(crashed,'','any','all') && sessionMatches(wonting,'','any','all') && !sessionMatches(clean,'','any','all'));
+yes('show=clean keeps only the ones with nothing wrong',
+    sessionMatches(clean,'','clean','all') && !sessionMatches(crashed,'','clean','all'));
+yes('show=open keeps only a session that never reported an end',
+    sessionMatches(openOne,'','open','all') && !sessionMatches(clean,'','open','all'));
+yes('show=kept keeps only what is held as evidence',
+    sessionMatches(keptOne,'','kept','all') && !sessionMatches(clean,'','kept','all'));
+
+yes('where=main keeps a session that reached the main world',
+    sessionMatches(clean,'','all','main') && !sessionMatches(onDevW,'','all','main'));
+yes('where=dev keeps a session that reached dev',
+    sessionMatches(onDevW,'','all','dev') && !sessionMatches(clean,'','all','dev'));
+yes('where=stuck keeps only the ones that never reached a world',
+    sessionMatches(stuckOn,'','all','stuck') && !sessionMatches(clean,'','all','stuck'));
+yes('a session that never reached a world is NOT counted as main',
+    !sessionMatches(stuckOn,'','all','main'));
+
+yes('search finds a name', sessionMatches(clean,'djinn','all','all'));
+yes('search is not case sensitive', sessionMatches(clean,'DJINN','all','all'));
+yes('search finds a character id', sessionMatches(clean,'7','all','all'));
+yes('search finds a build', sessionMatches(clean,'1.1.79','all','all'));
+yes('search finds words from the fault itself, which is the point',
+    sessionMatches(crashed,'TypeError','all','all'));
+yes('search that matches nothing keeps nothing', !sessionMatches(clean,'zzzznope','all','all'));
+
+yes('a search and a filter narrow together rather than either winning',
+    sessionMatches(crashed,'djinn','bad','main') && !sessionMatches(wonting,'djinn','bad','main'));
+
+/* The page must always say what it is hiding, or a filter left on and an
+   empty server look identical and one of them is alarming. */
+yes('the page says how many are hidden', src.indexOf('Showing ') >= 0 && src.indexOf(' of ') >= 0);
+yes('and says so when a filter hides everything', src.indexOf('are hidden by the filters above') >= 0);
+
+/* One person's search is their own. */
+yes('a card keeps its own search, per Discord id', src.indexOf('SFIND.mine[') >= 0);
+yes('a card search only appears once there is enough to search', src.indexOf('n > 3') >= 0);
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

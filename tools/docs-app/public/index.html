@@ -1226,10 +1226,84 @@ function wireMore(root) {
   });
 }
 
+/*
+  What the page is filtered to. Held outside the draw so it survives one, and
+  so a filter set at the top and a search set inside one person's card are the
+  same idea rather than two.
+
+  ONE PERSON'S SEARCH IS ITS OWN. A card search is kept per Discord id in
+  `mine`, because looking through one person's forty sessions is a different
+  question from looking across everybody, and typing in one should not empty
+  somebody else's card.
+*/
+var SFIND = { q: '', show: 'all', chan: 'all', sort: 'recent', mine: {} };
+
+/* Does this session match what is being asked for? Used by both the global
+   filter and a card's own, with the card passing its own text. */
+function sessionMatches(s, q, show, chan) {
+  if (show === 'bad'   && s.troubleAt !== 'bad')  return false;
+  if (show === 'warn'  && s.troubleAt !== 'warn') return false;
+  if (show === 'any'   && !s.trouble)             return false;
+  if (show === 'clean' && s.trouble)              return false;
+  if (show === 'open'  && !sessionOpen(s))        return false;
+  if (show === 'kept'  && !s.keep)                return false;
+
+  if (chan === 'main' && !(s.profile && s.channel === 'main')) return false;
+  if (chan === 'dev'  && !(s.profile && s.channel === 'dev'))  return false;
+  if (chan === 'stuck' && s.profile)                           return false;
+
+  if (q) {
+    var hay = [
+      s.name, s.who, s.profile, s.version, s.channel,
+      s.trouble, s.troubleLine, s.troubleFile,
+      s.start ? new Date(s.start).toLocaleString() : '',
+      s.end ? new Date(s.end).toLocaleString() : ''
+    ].join(' ').toLowerCase();
+    if (hay.indexOf(q.toLowerCase()) < 0) return false;
+  }
+  return true;
+}
+
 function drawSessions() {
-  var list = S.sessions.slice().sort(function (a, b) { return sessionAt(b) - sessionAt(a); });
+  var all = S.sessions.slice().sort(function (a, b) { return sessionAt(b) - sessionAt(a); });
+  var list = all.filter(function (s) {
+    return sessionMatches(s, SFIND.q, SFIND.show, SFIND.chan);
+  });
   var t = sessionTotals(list);
+  var people0 = sessionPeople(list);
+
+  /*
+    The controls, shaped like the questions actually asked of this page:
+    who is this, what went wrong, and which build was it on. All three narrow
+    the same list, and the count under them says what is being hidden so a
+    filter left on is never mistaken for an empty server.
+  */
   var out = head() +
+    '<div class="tools" style="margin-bottom:14px">' +
+      '<input type="search" id="sfind" value="' + esc(SFIND.q) + '" ' +
+        'placeholder="A name, an id, a character, a build, anything in a fault">' +
+      '<select id="sshow" aria-label="Show">' +
+        [['all','Everything'],['any','Anything that went wrong'],['bad','Crashed only'],
+         ['warn','Would not play only'],['clean','Nothing wrong'],['open','Never reported an end'],
+         ['kept','Kept as evidence']].map(function (o) {
+          return '<option value="' + o[0] + '"' + (SFIND.show === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('') +
+      '</select>' +
+      '<select id="schan" aria-label="Where">' +
+        [['all','Anywhere'],['main','Reached main'],['dev','Reached dev'],
+         ['stuck','Never reached a world']].map(function (o) {
+          return '<option value="' + o[0] + '"' + (SFIND.chan === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('') +
+      '</select>' +
+      '<select id="ssort" aria-label="Sort">' +
+        [['recent','Last played'],['most','Most played'],['sessions','Most sessions'],
+         ['trouble','Most gone wrong'],['name','Name']].map(function (o) {
+          return '<option value="' + o[0] + '"' + (SFIND.sort === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('') +
+      '</select>' +
+      ((SFIND.q || SFIND.show !== 'all' || SFIND.chan !== 'all' || SFIND.sort !== 'recent')
+        ? '<button id="sreset">Reset</button>' : '') +
+    '</div>' +
     '<div class="tally">' +
       '<span class="pill pass">' + t.n + (t.n === 1 ? ' session' : ' sessions') +
         ' in the last seven days</span>' +
@@ -1238,15 +1312,48 @@ function drawSessions() {
       '<span class="pill left">' + t.people + (t.people === 1 ? ' person' : ' people') + '</span>' +
     '</div>';
 
-  if (!list.length) {
+  /* What is being hidden, always, because a filter left on and an empty
+     server look identical and one of them is alarming. */
+  if (list.length !== all.length) {
+    out += '<div class="said" style="margin:-8px 0 16px">Showing ' + list.length +
+      ' of ' + all.length + ' session(s), across ' + people0.length +
+      (people0.length === 1 ? ' person' : ' people') + '.</div>';
+  }
+
+  if (!all.length) {
     out += '<div class="empty">Nobody has played yet. A card lands here the ' +
       'moment somebody presses Play, and fills in when they stop.</div>';
+  } else if (!list.length) {
+    out += '<div class="empty">Nothing matches that. ' + all.length +
+      ' session(s) are hidden by the filters above.</div>';
   } else {
-    var people = sessionPeople(list);
+    var people = people0;
+
+    /* Most played and most gone wrong are what you want when deciding who to
+       talk to; last played is what you want the rest of the time, so it is
+       the default. */
+    if (SFIND.sort === 'most')          people.sort(function (a, b) { return b.mins - a.mins; });
+    else if (SFIND.sort === 'sessions') people.sort(function (a, b) { return b.rows.length - a.rows.length; });
+    else if (SFIND.sort === 'name')     people.sort(function (a, b) { return String(a.name || a.who).localeCompare(String(b.name || b.who)); });
+    else if (SFIND.sort === 'trouble')  people.sort(function (a, b) {
+      var c = function (p) { return p.rows.filter(function (s) { return s.trouble; }).length; };
+      return c(b) - c(a);
+    });
+
     out += '<div class="people">';
     people.forEach(function (p) {
+      /* This person's own search, so forty sessions can be narrowed without
+         touching the page filter or anybody else's card. */
+      var mq = SFIND.mine[p.who] || '';
+      var rows = mq
+        ? p.rows.filter(function (s) { return sessionMatches(s, mq, 'all', 'all'); })
+        : p.rows;
       var n = p.rows.length;
-      out += '<details class="person">' +
+      var bad = p.rows.filter(function (s) { return s.troubleAt === 'bad'; }).length;
+      var warn = p.rows.filter(function (s) { return s.troubleAt === 'warn'; }).length;
+      var kept = p.rows.filter(function (s) { return s.keep; }).length;
+
+      out += '<details class="person"' + (mq ? ' open' : '') + '>' +
         '<summary>' +
           '<span class="pf"><span class="lab">Discord name</span>' +
             '<span class="val nm">' + esc(p.name || 'not linked') + '</span></span>' +
@@ -1263,8 +1370,24 @@ function drawSessions() {
           '<div class="tally" style="padding:11px 16px 0">' +
             '<span class="pill pass">' + n + (n === 1 ? ' session' : ' sessions') + '</span>' +
             (p.open ? '<span class="pill left">' + p.open + ' with no end reported</span>' : '') +
+            (bad ? '<span class="pill fail">' + bad + ' went wrong</span>' : '') +
+            (warn ? '<span class="pill warn">' + warn + ' would not play</span>' : '') +
+            (kept ? '<span class="pill left">' + kept + ' kept as evidence</span>' : '') +
           '</div>' +
-          sessionTable(p.rows) +
+          /* Only worth a search box once there is enough to search. */
+          (n > 3
+            ? '<div class="tools" style="padding:9px 16px 0">' +
+                '<input type="search" class="findmine" data-w="' + esc(p.who) + '" ' +
+                  'value="' + esc(mq) + '" placeholder="Search this person\'s ' + n + ' sessions">' +
+                (mq ? '<button class="clearmine" data-w="' + esc(p.who) + '">Clear</button>' : '') +
+              '</div>'
+            : '') +
+          (rows.length
+            ? sessionTable(rows)
+            : '<div class="empty" style="padding:22px 0">Nothing of theirs matches that.</div>') +
+          (mq && rows.length !== n
+            ? '<div class="said" style="padding:0 16px 12px">' + rows.length + ' of ' + n + '</div>'
+            : '') +
         '</div>' +
       '</details>';
     });
@@ -1284,6 +1407,49 @@ function drawSessions() {
     'here is typed by the person playing.</p>';
   el('page').innerHTML = out;
   wireMore(el('page'));
+
+  /* Redrawn on every keystroke, which is fine: this is a few hundred rows in
+     memory and no request goes anywhere. The caret is put back afterwards or
+     typing a second letter would jump to the start. */
+  var refind = function (id, set) {
+    var box = el(id);
+    if (!box) return;
+    box.oninput = function () {
+      var at = box.selectionStart;
+      set(box.value);
+      drawSessions();
+      var again = el(id);
+      if (again) { again.focus(); try { again.setSelectionRange(at, at); } catch (e) { } }
+    };
+  };
+  refind('sfind', function (v) { SFIND.q = v; });
+  if (el('sshow')) el('sshow').onchange = function () { SFIND.show = this.value; drawSessions(); };
+  if (el('schan')) el('schan').onchange = function () { SFIND.chan = this.value; drawSessions(); };
+  if (el('ssort')) el('ssort').onchange = function () { SFIND.sort = this.value; drawSessions(); };
+  if (el('sreset')) el('sreset').onclick = function () {
+    SFIND.q = ''; SFIND.show = 'all'; SFIND.chan = 'all'; SFIND.sort = 'recent';
+    drawSessions();
+  };
+
+  /* One person's own search. Same shape, kept per Discord id, and the card it
+     belongs to is reopened after the redraw because a details element closes
+     when its HTML is replaced. */
+  each(el('page'), 'input.findmine', function (box) {
+    box.oninput = function () {
+      var at = box.selectionStart, who = box.dataset.w;
+      SFIND.mine[who] = box.value;
+      if (!box.value) delete SFIND.mine[who];
+      drawSessions();
+      each(el('page'), 'input.findmine', function (b2) {
+        if (b2.dataset.w !== who) return;
+        b2.focus();
+        try { b2.setSelectionRange(at, at); } catch (e) { }
+      });
+    };
+  });
+  each(el('page'), 'button.clearmine', function (b) {
+    b.onclick = function () { delete SFIND.mine[b.dataset.w]; drawSessions(); };
+  });
 }
 
 /* -------------------------------------------------------- what was said -- */
