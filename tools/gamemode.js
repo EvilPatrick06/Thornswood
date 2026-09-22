@@ -1737,6 +1737,128 @@ function isVein(baseDesc) {
  * engine never depletes, and the case for the numbers is written over the
  * table itself.
  */
+
+/*
+  ============================ a seam holds twenty, and gives one at a time ===
+
+  Patrick, 21 September, after playing it: "make each quarry have up to 20 ore
+  and not skip the animation and the same with chopping where you get an ore
+  each time you hit it you know not all at omce so you can stay for a little
+  and get a little or stay andd get all 20", with ten minutes to come back for
+  iron, gold, corundum and silver and thirty for moonstone, quicksilver,
+  orichalcum, ebony and malachite.
+
+  WHAT THIS REPLACES. A seam handed over its whole yield on one press and then
+  refused everybody for between ten minutes and four hours. So a seam was a
+  vending machine with a long queue: one strike, a pile of ore, and nothing to
+  come back to. A deposit is a pile of twenty that anybody may work down one
+  swing at a time, and it is the same seam for whoever is standing there, so
+  two miners share a vein rather than each having their own.
+
+  AND THE ANIMATION IS NOT CANCELLED. Every branch of the activate chain ends
+  at `return false`, which blocks the engine's own handover, and for a seam
+  that is what threw the mining animation away. Mining answers ALLOW now, which
+  says "I have handled the yield, let the press go on being a press", and the
+  chain returns undefined for it.
+
+  THE POOL LIVES ON THE REFERENCE, not on the person, because a seam is worked
+  out for everybody or for nobody. It is written with the reference's own
+  property, the same way the spoils block marks a container it has emptied.
+*/
+/*
+  "I HAVE HANDLED THIS, LET THE PRESS GO ON BEING A PRESS."
+
+  Every branch of the activate chain ends at `return false`, which blocks the
+  engine's own handover. For a container or a plant that is exactly right: the
+  server has already given what there was to give. For a SEAM it threw away the
+  mining animation, which is the thing Patrick asked for back.
+
+  A branch that answers this has taken care of the yield and wants the press to
+  carry on, so the chain returns undefined for it and Skyrim swings the pick.
+*/
+const ALLOW = { thornswoodAllow: true };
+
+const DEPOSIT_SIZE = 20;
+const DEPOSIT_PROPERTY = 'thornswoodDeposit';
+
+/*
+  How long a worked out seam takes to come back, by what it gives.
+
+  Patrick's two numbers, and the ores he named for each. Anything the list does
+  not name falls to the LONGER one, because a seam nobody has classified being
+  the cheapest tap in the province is the failure that matters.
+*/
+const DEPOSIT_BACK_MS = { quick: 10 * 60000, slow: 30 * 60000 };
+const DEPOSIT_QUICK = ['iron', 'gold', 'corundum', 'silver'];
+/*
+  THE SLOW LIST IS CHECKED FIRST, AND QUICKSILVER IS WHY.
+
+  'Quicksilver' CONTAINS 'silver'. Matching the quick list first put a
+  quicksilver seam on the ten minute clock, which is one of the five Patrick
+  named for thirty. Caught by the harness on the first run, which is the only
+  reason it is not live: it reads perfectly and is wrong.
+
+  So the long list wins any tie, and the default is long too. Both point the
+  same way on purpose: a seam nobody has classified being the cheapest tap in
+  the province is the failure that matters.
+*/
+const DEPOSIT_SLOW = ['moonstone', 'quicksilver', 'orichalcum', 'ebony', 'malachite'];
+
+function depositBackMs(name) {
+  const n = String(name || '').toLowerCase();
+  for (let i = 0; i < DEPOSIT_SLOW.length; i++) {
+    if (n.indexOf(DEPOSIT_SLOW[i]) !== -1) { return DEPOSIT_BACK_MS.slow; }
+  }
+  for (let j = 0; j < DEPOSIT_QUICK.length; j++) {
+    if (n.indexOf(DEPOSIT_QUICK[j]) !== -1) { return DEPOSIT_BACK_MS.quick; }
+  }
+  return DEPOSIT_BACK_MS.slow;
+}
+
+/**
+ * How many are left in this deposit right now, refilling it when its time is up.
+ *
+ * Reading is what refills it, the same choice the property lapse and the farm
+ * claims made: there is no tick that would notice sooner and nothing in the
+ * world changes until somebody asks.
+ */
+function depositLeft(refrId, backMs) {
+  let d = null;
+  try { d = mp.get(refrId, DEPOSIT_PROPERTY); } catch (e) { d = null; }
+  if (!d || typeof d !== 'object') { return DEPOSIT_SIZE; }
+  const left = Number(d.left);
+  const at = Number(d.at) || 0;
+  if (!(left >= 0)) { return DEPOSIT_SIZE; }
+  if (left > 0) { return left; }
+  // Empty, so the only question is whether it has had long enough.
+  if (at && (Date.now() - at) >= backMs) { return DEPOSIT_SIZE; }
+  return 0;
+}
+
+/** Take one out, and stamp the moment it ran dry. */
+function takeFromDeposit(refrId, backMs) {
+  const left = depositLeft(refrId, backMs);
+  if (left <= 0) { return 0; }
+  const now = left - 1;
+  try {
+    mp.set(refrId, DEPOSIT_PROPERTY, { left: now, at: now === 0 ? Date.now() : 0 });
+  } catch (e) {
+    log('could not write the deposit on', refrId.toString(16) + ':', e);
+  }
+  return now + 1;
+}
+
+/** What to say when a seam is empty, in minutes rather than seconds. */
+function depositBackIn(refrId, backMs) {
+  let d = null;
+  try { d = mp.get(refrId, DEPOSIT_PROPERTY); } catch (e) { d = null; }
+  const at = (d && Number(d.at)) || 0;
+  if (!at) { return 'It will come back.'; }
+  const left = Math.max(0, backMs - (Date.now() - at));
+  const mins = Math.ceil(left / 60000);
+  return 'It comes back in about ' + mins + (mins === 1 ? ' minute.' : ' minutes.');
+}
+
 function mineOre(actorId, refrId, baseDesc) {
   if (!isVein(baseDesc)) return null;
   const seam = ORES_BY_BASE[baseDesc];
@@ -1762,21 +1884,28 @@ function mineOre(actorId, refrId, baseDesc) {
            ' Miner. Work the seams you can until you are one.';
   }
 
-  // The wait is the seam's own, off MINE_COOLDOWN_MS, and not the twenty
-  // seconds the quarry runs on. The case for that is written out over that
-  // table: this is the only thing standing between a Master Miner and every
-  // gem seam in the province, because nothing in the engine ever depletes one.
-  // A rank the table does not name falls back to the longest wait rather than
-  // the shortest, so a row that arrives with a rank nobody knows cannot be the
-  // cheapest tap in the game.
-  const span = Object.prototype.hasOwnProperty.call(MINE_COOLDOWN_MS, seam.rank)
-    ? MINE_COOLDOWN_MS[seam.rank] : MINE_COOLDOWN_MS.master;
-  const wait = cooldownLeft(actorId, refrId, span);
-  if (wait > 0) {
-    return 'This seam is worked out for now. ' + waitWord(wait) + ' to go.';
+  /*
+    THE DEPOSIT, IN PLACE OF THE OLD PER-PERSON COOLDOWN.
+
+    MINE_COOLDOWN_MS used to refuse the person for between ten minutes and four
+    hours after one strike, and it was the only thing standing between a Master
+    Miner and every gem seam in the province, because nothing in the engine
+    depletes one. A deposit does that job better and reads as a place rather
+    than a punishment: twenty in the seam, one a swing, and it comes back on
+    its own clock for everybody at once.
+
+    The clock is Patrick's: ten minutes for iron, gold, corundum and silver,
+    thirty for everything else, with anything unnamed taking the longer one.
+  */
+  const backMs = depositBackMs(seam.name);
+  const took = takeFromDeposit(refrId, backMs);
+  if (!took) {
+    return 'This seam is worked out. ' + depositBackIn(refrId, backMs);
   }
 
-  const yielded = randInt(pair[0], pair[1]);
+  // One a swing, not the whole pile. The rank still decides WHICH seams are
+  // workable at all, which is what seam.yield's pair of zeroes says.
+  const yielded = 1;
   // addItem answers false in one case only, which is idOf returning 0 because
   // the plugin that owns this ore is not in the load order. The quarry says
   // 'nothing you can carry' there, which would send somebody off to empty
@@ -1787,11 +1916,25 @@ function mineOre(actorId, refrId, baseDesc) {
     return 'The seam gives up ' + seam.name + ' and there is nothing in this load ' +
            'order to put in your hands. Say so in the dev channel.';
   }
-  stampCooldown(actorId, refrId);
   const rank = creditWork(actorId, 'mine');
   const worn = wearTool(actorId, 'miner');
-  return 'You work ' + yielded + ' ' + seam.name + ' out of the seam.' +
-         (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
+  /*
+    NOTHING SAID FOR AN ORDINARY SWING. Patrick on the chopping block, and it
+    is the same complaint: "I dont want that spam everytime". A swing a second
+    with a line each is a wall of text over the thing you are trying to watch.
+
+    The three worth interrupting somebody for are kept: a rank going up, a tool
+    about to break, and the last one out of the seam, because that is the
+    moment it is worth walking away from.
+  */
+  const last = (took === 1)
+    ? 'That is the last of this seam. ' + depositBackIn(refrId, backMs) : '';
+  const saying = [rank, worn, last].filter(function (x) { return !!x; }).join(' ');
+  if (saying) {
+    notify(actorId, saying);
+    say(actorId, saying);
+  }
+  return ALLOW;
 }
 
 /**
@@ -1876,8 +2019,14 @@ function chopWood(actorId, refrId) {
   const tool = toolGate(actorId, 'woodworker');
   if (tool) return tool;
 
-  const wait = cooldownLeft(actorId, refrId);
-  if (wait > 0) return 'You have only just worked this block. ' + wait + ' seconds.';
+  /*
+    NO WAIT BETWEEN SWINGS, because a swing is the unit now.
+
+    There was twenty seconds between presses, which is right for a press that
+    hands over a pile and wrong for one that hands over a split. Patrick asked
+    for wood each time the axe falls, so the only thing left to limit it is how
+    long somebody wants to stand there swinging, which is the point.
+  */
 
   /*
     TWO A SPLIT, EVERY SPLIT, AND NOTHING SAID ABOUT IT.
@@ -1908,14 +2057,16 @@ function chopWood(actorId, refrId) {
     return 'The block gives up firewood and there is nothing in this load order to ' +
            'put in your hands. Say so in #bugs.';
   }
-  stampCooldown(actorId, refrId);
   const rank = creditWork(actorId, 'woodwright');
   const worn = wearTool(actorId, 'woodworker');
-  // Only when there is something worth interrupting them for.
-  if (rank || worn) {
-    return ((rank || '') + (rank && worn ? ' ' : '') + (worn || '')).trim();
+  // Only when there is something worth interrupting them for, and the press
+  // goes on being a press so Skyrim swings the axe.
+  const saying = ((rank || '') + (rank && worn ? ' ' : '') + (worn || '')).trim();
+  if (saying) {
+    notify(actorId, saying);
+    say(actorId, saying);
   }
-  return null;
+  return ALLOW;
 }
 
 function burnCharcoal(actorId, refrId) {
@@ -5269,6 +5420,13 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     if (off === null) return;
     message = off;
   }
+
+  /*
+    A branch that answered ALLOW has already done its work and wants the press
+    to go on. Nothing is said and nothing is blocked, so Skyrim runs the
+    animation it would have run if this file did not exist.
+  */
+  if (message === ALLOW) { return; }
 
   if (message) {
     notify(casterRefrId, message);
