@@ -712,9 +712,25 @@
     strayFocusSince = 0;
   }
 
+  /*
+    WHEN EACH CLAIM WENT UP, so the cap below can cover all of them.
+
+    Focus withholds DirectInput, so a claim that goes up and never comes down
+    is indistinguishable from the game freezing: the keyboard stops reaching
+    the game AND stops reaching every plugin that would otherwise notice.
+    There were three watchdogs and every one of them tested claims.chat, so the
+    K panel and the emote wheel could each leave somebody with a dead keyboard
+    and nothing would ever take it back. Djinn has twice reported the game
+    going down with no crash log, once on pressing K.
+
+    Found by the audit of 21 September.
+  */
+  const claimedAt = {};
+
   T.claimFocus = function (who, on) {
     if (!!claims[who] === !!on) return;
     claims[who] = !!on;
+    claimedAt[who] = on ? Date.now() : 0;
     // Logged every time, because a claim that goes up and does not come down is
     // indistinguishable from the game freezing: focus withholds DirectInput,
     // so the keyboard stops reaching the game AND stops reaching every plugin
@@ -2483,6 +2499,30 @@
       T.js('try{window.thornswoodChat&&window.thornswoodChat.blurInput();}catch(e){}');
       T.claimFocus('chat', false);
       log('the chat box has held the keyboard for two minutes, taking it back');
+    }
+
+    /*
+      THE SAME CAP FOR EVERY OTHER CLAIM, which had none at all.
+
+      The three watchdogs above all test claims.chat. The chat box is not the
+      only thing that takes the keyboard: the K panel claims 'skills' and the
+      emote wheel claims 'wheel', and neither had a way back. A panel that
+      never says it closed, a page that reloads with the wheel up, or any
+      throw between raising the claim and lowering it left the person unable to
+      move, with no key able to reach the plugin that would have fixed it.
+
+      Two minutes, the same number and the same reasoning: far longer than
+      anybody spends in a menu, far shorter than giving up on the game. The
+      claim is released by name so the log says which one it was, which is the
+      only evidence anybody will have next time.
+    */
+    for (const who in claimedAt) {
+      if (who === 'chat') { continue; }
+      if (!claims[who] || !claimedAt[who]) { continue; }
+      if (now - claimedAt[who] > 120000) {
+        log('the ' + who + ' claim has held the keyboard for two minutes, taking it back');
+        T.claimFocus(who, false);
+      }
     }
 
     checkServer(now);

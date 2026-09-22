@@ -7583,24 +7583,78 @@ var RECIPELESS = {
 };
 
 function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
-  var spoils = globalThis.__thornswoodSpoils;
-  var kind = '';
-  try {
-    kind = (spoils && spoils.kindOf) ? spoils.kindOf(craftedItemBaseId) : '';
-  } catch (e) {
-    kind = '';
+  /*
+    WHAT MADE IT, NOT WHAT IT IS.
+
+    The first version of this decided on the output's record type and all three
+    of its faults came from that one choice.
+
+    A BREWED POTION HAS NO RECORD. The engine's own rule, written down in the
+    spoils block: a form id below 0xff000000 was placed by a plugin and one
+    above it was made at runtime. Mixing a potion and enchanting an item both
+    MAKE A NEW FORM, so the id is above the line and kindOf, which reads plugin
+    records, answers nothing at all. The gate refused every brew and every
+    enchantment: the change written to let the Alchemist work was the thing
+    stopping it.
+
+    AND TEMPERING ARRIVES HERE NOW. recipes.json still says the server is never
+    asked about a temper, and that was true when it was written: CraftService
+    throws out the armour table and the sharpening wheel before it considers a
+    recipe. But throwing out every candidate leaves the recipe list EMPTY, and
+    an empty list is exactly what the fork patch now reports rather than drops.
+    A tempered sword is a WEAP, so it read as an enchantment and was refused to
+    every smith in the world.
+
+    So the runtime line is the discriminator, and it is the only one that is
+    reliable. Above it, something was made from nothing: a brew or an
+    enchantment, and the bench says which. Below it, the item already existed
+    and this is tempering or something else the recipe gate has already had its
+    say about, so it is not this gate's business.
+
+    Found by the audit of 21 September, all three.
+  */
+  var RUNTIME = 0xff000000;
+  var madeFromNothing = (Number(craftedItemBaseId) || 0) >= RUNTIME;
+
+  if (!madeFromNothing) {
+    /*
+      A thing that already existed, with no recipe behind it. Tempering is the
+      case that matters and there is nothing here to gate: the recipe gate owns
+      plugin forms and it answered, and the rulebook's Mastercraft perk is about
+      tempering and was never enforceable anyway. Let it through and say so
+      once, so the log shows this path being used rather than being silent.
+    */
+    log(actorId.toString(16), 'worked', craftedItemBaseId.toString(16),
+        'with no recipe at bench', (workbenchId || 0).toString(16) +
+        ', which is tempering or the like. Allowed.');
+    return;
   }
 
-  var rule = Object.prototype.hasOwnProperty.call(RECIPELESS, kind)
-    ? RECIPELESS[kind] : null;
-  if (!rule) {
-    // Not a brew and not an enchantment, and there is no record saying what it
-    // is. Nothing legitimate reaches here, so it is refused and named.
-    log(actorId.toString(16), 'asked to make', craftedItemBaseId.toString(16),
-        'of kind', (kind || 'unknown'), 'with no recipe, at bench',
-        (workbenchId || 0).toString(16) + '. Refused.');
-    return false;
+  /*
+    WHICH BENCH, because only the bench can tell a brew from an enchantment
+    once the output is a form that did not exist a second ago.
+
+    Read off the workbench's own record rather than a list of form ids, because
+    every alchemy lab and arcane enchanter in the load order, ours and every
+    mod's, answers to the same two words in its editor id. An unknown bench is
+    not refused: it is allowed for anybody holding either profession, because
+    refusing somebody at a bench nobody has classified is a fault in this table
+    and should not cost them their materials.
+  */
+  var whatBench = '';
+  try {
+    var bdesc = mp.get(workbenchId, 'baseDesc');
+    var bres = bdesc ? mp.lookupEspmRecordById(idOf(bdesc)) : null;
+    if (bres && bres.record && bres.record.editorId) {
+      whatBench = String(bres.record.editorId).toLowerCase();
+    }
+  } catch (e) {
+    whatBench = '';
   }
+
+  var want = null;
+  if (whatBench.indexOf('alchemy') !== -1) { want = 'alchemist'; }
+  else if (whatBench.indexOf('enchant') !== -1) { want = 'enchanter'; }
 
   var C = globalThis.__thornswoodCharacter;
   if (!C || !C.stateOf) {
@@ -7618,34 +7672,72 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
   // keeps: a character with no profession yet is let through.
   if (!s || !s.prof) { return; }
 
-  if (s.prof === rule.prof) { return; }
-
-  /*
-    A half of that profession taught by a Master counts, because the rulebook
-    says what a Master teaches you is yours to work at novice, and everything
-    on this path is novice work.
-
-    The halves come out of the rulebook through halvesOf rather than being
-    written down again here. Two copies of that list is how a profession ends
-    up existing in one place and not the other, which is already an entry.
-  */
   var P = globalThis.__thornswoodProgression;
-  var halves = [];
-  try { halves = (P && P.halvesOf) ? (P.halvesOf(rule.prof) || []) : []; } catch (e) { halves = []; }
-  var taught = (s.taught || []);
-  for (var i = 0; i < taught.length; i++) {
-    for (var j = 0; j < halves.length; j++) {
-      if (String(taught[i]).toLowerCase() === String(halves[j]).toLowerCase()) { return; }
+
+  /** The half of that profession this person may work at, or null. */
+  function heldHalf(prof) {
+    var halves = [];
+    try { halves = (P && P.halvesOf) ? (P.halvesOf(prof) || []) : []; } catch (e) { halves = []; }
+    if (s.prof === prof) {
+      // Their own half, or either of them if they somehow hold none.
+      if (s.half) { return s.half; }
+      return halves.length ? halves[0] : null;
     }
+    /*
+      A half taught by a Master of another profession counts, because the
+      rulebook says what a Master teaches you is yours to work at novice, and
+      everything on this path is novice work.
+    */
+    var taught = (s.taught || []);
+    for (var i = 0; i < taught.length; i++) {
+      for (var j = 0; j < halves.length; j++) {
+        if (String(taught[i]).toLowerCase() === String(halves[j]).toLowerCase()) {
+          return String(taught[i]).toLowerCase();
+        }
+      }
+    }
+    return null;
   }
 
-  var name = C.nameOf ? C.nameOf(rule.prof) : rule.prof;
-  var refusal = 'Only ' + aWord(name) + ' can ' + rule.verb + '. Making ' +
-                rule.made + ' is ' + name + ' work, and it is not yours.';
-  notify(actorId, refusal);
-  say(actorId, refusal);
-  log(actorId.toString(16), 'was refused', rule.verb + 'ing', '(' + kind + ')');
-  return false;
+  var half = null;
+  if (want) {
+    half = heldHalf(want);
+  } else {
+    // An unclassified bench: either profession will do, and which one they
+    // hold decides which half gets the credit.
+    half = heldHalf('alchemist') || heldHalf('enchanter');
+    if (half) { want = heldHalf('alchemist') ? 'alchemist' : 'enchanter'; }
+  }
+
+  if (!half) {
+    var name = (C.nameOf && want) ? C.nameOf(want) : (want || 'somebody else');
+    var refusal = want
+      ? 'Only ' + aWord(name) + ' can work this bench. That is ' + name +
+        ' work, and it is not yours.'
+      : 'That is not your trade.';
+    notify(actorId, refusal);
+    say(actorId, refusal);
+    log(actorId.toString(16), 'was refused a recipeless craft at bench',
+        (workbenchId || 0).toString(16), '(' + (whatBench || 'unknown bench') + ')');
+    return false;
+  }
+
+  /*
+    AND THE WORK COUNTS, which it did not.
+
+    creditWork is the only road to addWork and addWork is the only road to
+    rankUp, so a half whose work is never credited can never leave novice. Every
+    other verb in the file credits: the recipe gate, the sawing station and the
+    kiln. This one allowed the craft with a bare return, so a Blightbrewer could
+    brew for the rest of their life and stay a novice for ever.
+  */
+  try {
+    var ch = globalThis.__thornswoodCharacter;
+    if (ch && ch.credit) { ch.credit(actorId, half); }
+  } catch (e) {
+    log('could not credit', half, 'for a recipeless craft:', e);
+  }
+  return;
 }
 
 mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId) {
@@ -9155,7 +9247,23 @@ log('gamemode loaded:',
     perPoint: {
       vitality:   { health: 10 },
       fortitude:  { healRateMult: 10 },
-      might:      { attackDamageMult: 5 },
+      /*
+        A FRACTION, BECAUSE THIS ONE IS A MULTIPLIER AND NOT A POINTS TOTAL.
+
+        It was 5, and the client adds the total onto the value it reads, so one
+        point took attackDamageMult from its base of 1 to 6 and a filled Might
+        took it to 26. That is six times melee damage for one point. The
+        client's own code sets this value to 0 to make an actor deal no damage
+        at all, which is what settles that it scales rather than adds.
+
+        0.05 a point, so five points is a quarter more damage and a filled Might
+        is a quarter again on top. The unit is said here because every other
+        entry in this table IS a flat amount and this one is not.
+
+        Found by the audit of 21 September. A tester can check it in one go:
+        player.getav attackdamagemult before and after spending a point.
+      */
+      might:      { attackDamageMult: 0.05 },
       resilience: { damageResist: 10 },
       toughness:  { poisonResist: 10, diseaseResist: 10 },
       capacity:   { magicka: 10 },
@@ -11388,6 +11496,33 @@ log('gamemode loaded:',
         updateOwner: '', updateNeighbor: ''
       });
     } catch (e) { }
+    /*
+      THE ONE THAT WAS MISSED, AND IT KILLED THE WHOLE DROP BOX.
+
+      Every custom property has to be made before it can be set. ScampServer
+      routes any name that is not a standard binding to CustomPropertyBinding,
+      whose Set calls EnsurePropertyExists and throws "Property
+      'thornswoodBoxAt' doesn't exist" for anything that was never created and
+      does not start with "private.".
+
+      So touchedBox's mp.set threw into its own empty catch on every container
+      press, boxAt's mp.get threw and answered 0 every time, and /box with a
+      hold name always came back "Open the container you mean, then say that
+      again." No container could ever be designated, so no hold could have a
+      box, so rent had nowhere to be paid and no notice could be posted. The
+      entire block was dead and nothing said a word, because both failures are
+      inside catches that are right to be there.
+
+      Found by the audit of 21 September. The other three properties in this
+      block were made here from the day they were written; this one was added
+      the same night as the box and did not come with it.
+    */
+    try {
+      mp.makeProperty(BOX_PROPERTY, {
+        isVisibleByOwner: false, isVisibleByNeighbors: false,
+        updateOwner: '', updateNeighbor: ''
+      });
+    } catch (e) { }
     try {
       /*
         The one property here the client reads. Visible to its owner and to
@@ -11459,7 +11594,51 @@ log('gamemode loaded:',
       var at = Number(c.at) || 0;
       var touched = Number(c.touched) || at;
       if (!by || !at) { dropped++; continue; }
-      out[k] = { by: by, name: String(c.name || 'somebody'), at: at, touched: touched };
+      /*
+        THREE FIELDS THAT WERE WRITTEN AND NEVER READ BACK, AND A RESTART ATE
+        ALL THREE.
+
+        save() writes the whole claim object, so locked, ground and rent were
+        on disk the whole time. This rebuilt each row field by field, which is
+        the right discipline and the reason nothing malformed ever gets in, and
+        it only ever copied four of them. So every deploy and every restart
+        silently unlocked every locked house, broke every home-and-farm link
+        back into two claims, and wiped every rent record and the arrears with
+        it. Nothing said a word, because a claim with no lock is a perfectly
+        valid claim.
+
+        Found by the audit of 21 September. Each one is rebuilt rather than
+        trusted, the same as the four above: a lock is a boolean, ground has to
+        look like ground, and a rent row has to be four numbers.
+      */
+      var row = { by: by, name: String(c.name || 'somebody'), at: at, touched: touched,
+                  locked: !!c.locked };
+
+      // Ground is a cell descriptor and a point in it, or it is not ground.
+      if (c.ground && typeof c.ground === 'object' && c.ground.cell &&
+          Object.prototype.toString.call(c.ground.pos) === '[object Array]' &&
+          c.ground.pos.length === 3) {
+        row.ground = { cell: String(c.ground.cell),
+                       pos: [Number(c.ground.pos[0]) || 0,
+                            Number(c.ground.pos[1]) || 0,
+                            Number(c.ground.pos[2]) || 0] };
+      } else if (typeof c.ground === 'string' && c.ground) {
+        // The farming block's own shape, which is a plot key.
+        row.ground = c.ground;
+      }
+
+      // Rent is an amount, a period, what is owed and when it was last counted.
+      if (c.rent && typeof c.rent === 'object') {
+        var amount = Number(c.rent.amount) || 0;
+        if (amount > 0) {
+          row.rent = { amount: amount,
+                       everyDays: Number(c.rent.everyDays) || 7,
+                       owed: Number(c.rent.owed) || 0,
+                       since: Number(c.rent.since) || at };
+        }
+      }
+
+      out[k] = row;
       kept++;
     }
     if (dropped) { plog('dropped', dropped, 'row(s) that were not claims'); }
@@ -11565,6 +11744,18 @@ log('gamemode loaded:',
     if (days > 0 && (Date.now() - c.touched) > days * 86400000) {
       delete claims[building];
       save();
+      /*
+        AND PUSH IT, WHICH THIS WAS THE ONLY CLAIM CHANGE NOT DOING.
+
+        Every other mutation in this block pushes: claiming, the deed
+        transfer, locking and eviction. A lapse did not, so a locked house
+        that lapsed stayed locked on every client until something else
+        happened to trigger a push. And it could not be the door itself that
+        fixed it, because a locked reference is never announced to this
+        server at all, on purpose, so pressing the very door that is wrongly
+        shut is the one action that cannot put it right.
+      */
+      pushAll();
       plog('the claim on', nameOf(building), 'held by', c.name, 'lapsed after', days,
            'days with nobody going in');
       return null;
@@ -12345,7 +12536,25 @@ log('gamemode loaded:',
     if (!arg) {
       var hold = at ? holdOfBox(at) : null;
       toProfile(profileId, hold
-        ? 'This is ' + hold + '\'s box. It holds ' + (Number(funds[hold]) || 0) + ' gold.'
+        /*
+          WHAT THIS NUMBER IS, said accurately rather than conveniently.
+
+          It used to read "It holds N gold" and that was wrong twice over.
+          funds is a LEDGER of what has been paid in, not the contents of the
+          chest, and the two are not the same thing: gold put in the box is
+          physically moved into the chest by the engine AND counted here, so it
+          exists in both places, while a notice fee is taken out of the pack and
+          only counted, so it exists in neither. Nothing subtracts from it
+          either, because there is no withdrawal word and no take handler, so it
+          only ever goes up.
+
+          Making it the truth is a decision about which one is the treasury and
+          it is on the list. Until then it says what it actually is, because a
+          steward reading "it holds 400 gold" and finding 120 in the chest is
+          worse than a steward who was told plainly.
+        */
+        ? 'This is ' + hold + '\'s box. ' + (Number(funds[hold]) || 0) +
+          ' gold has been paid into it. Open it to see what is actually in there.'
         : (at ? 'That container is nobody\'s box.'
               : 'Open a container first, then say that again.'));
       return true;
@@ -12676,29 +12885,75 @@ log('gamemode loaded:',
       }
       return moveBoard(standing, actorId, profileId, toProfile);
     }
-    if (arg && arg !== 'here' && Object.prototype.hasOwnProperty.call(boards, arg)) {
-      // A steward naming a hold moves THAT hold's board to where they stand,
-      // which is how a board gets put somewhere for the first time.
-      if (isSteward(profileId)) { return moveBoard(arg, actorId, profileId, toProfile); }
+    /*
+      MOVING NEEDS THE WORD 'move', AND READING IS THE DEFAULT.
+
+      This used to move a hold's board whenever a STEWARD named that hold. So a
+      steward standing in Riften who said '/board whiterun' to see what was on
+      Whiterun's board picked it up and put it down in Riften, was told only
+      "whiterun's board is here now", and it was saved. There was no
+      confirmation, no way back but walking to the right spot, and no way for a
+      steward to read another hold's board at all. The destructive reading of
+      the word was the default one, and only for the people trusted with it.
+
+      Found by the audit of 21 September. Placing a board is rare and reading
+      one is constant, so the rare thing is the one that has to be spelled out.
+    */
+    if (arg === 'move') {
+      var which = (parts && parts.length > 2)
+        ? String(parts[2]).trim().toLowerCase() : standing;
+      if (!which) {
+        toProfile(profileId, 'Say which board: /board move <hold>, standing where you want it.');
+        return true;
+      }
+      return moveBoard(which, actorId, profileId, toProfile);
     }
 
-    var hold = standing || arg || null;
-    var list = (hold && notices[hold]) || [];
+    /*
+      THE WORD BEATS THE PLACE WHEN A WORD WAS GIVEN.
+
+      This read `standing || arg`, so anybody at a board who named a different
+      hold was shown the one in front of them with no hint the argument had
+      been thrown away, while the prompt below told them to 'name a hold'. The
+      message advertised exactly what the expression prevented.
+    */
+    var named = (arg && Object.prototype.hasOwnProperty.call(boards, arg)) ? arg : null;
+    var hold = named || standing || null;
     if (!hold) {
-      toProfile(profileId, 'Stand at a board, or name a hold.');
+      toProfile(profileId, arg
+        ? 'No board in ' + arg + '. Stand at a board, or name a hold that has one.'
+        : 'Stand at a board, or name a hold.');
       return true;
     }
+    var list = notices[hold] || [];
     if (!list.length) {
       toProfile(profileId, 'Nothing on the board in ' + hold + '.');
       return true;
     }
+    /*
+      THE NEWEST TEN, NUMBERED BY WHERE THEY REALLY ARE.
+
+      Two faults in one loop. It showed the OLDEST ten, so the eleventh paid
+      posting in a hold was invisible for ever and the fee was taken first. And
+      it numbered the lines 1..10 by their position in the listing while /take
+      indexes the real array, so the moment anything was hidden the numbers a
+      person could read stopped being the numbers they could take.
+
+      Nothing takes a notice down yet, which is its own entry; showing the
+      newest is what keeps a board usable until something does.
+    */
     var lines = [];
-    for (var i = 0; i < list.length && i < 10; i++) {
+    var shown = 0;
+    for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
       var n = list[i];
-      lines.push('[' + (i + 1) + '] ' + (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') +
+      lines.push('[' + (i + 1) + '] ' +
+                 (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') +
                  n.name + ': ' + n.text);
+      shown++;
     }
-    toProfile(profileId, 'The board in ' + hold + ':\n' + lines.join('\n'));
+    var more = list.length > shown
+      ? '\n(' + (list.length - shown) + ' older, and /take uses the numbers shown)' : '';
+    toProfile(profileId, 'The board in ' + hold + ':\n' + lines.join('\n') + more);
     return true;
   }
 
