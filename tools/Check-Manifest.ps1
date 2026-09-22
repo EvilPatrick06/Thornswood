@@ -25,6 +25,18 @@ param(
 $ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
 
+# The one rule for what the game loads and in what order, shared with the
+# launcher's LoadOrder.cs and with Publish-Update.ps1. This script used to
+# build its own list and got it wrong in the one way that matters: it compared
+# the server's 60 full plugins against every enabled line in plugins.txt,
+# light ones included, so on 17 September it reported the two lists parting
+# company at slot 6, server Water for ENB.esm against Expressive Facegen
+# Morphs.esl, two lines after saying you had every plugin the server wants. It
+# then advised redeploying a server that was already correct, which is worse
+# than having no check at all. The server drops light plugins on purpose:
+# Game.getModCount gives them no index, so they hold no place in the order.
+. (Join-Path $PSScriptRoot 'LoadOrder.ps1')
+
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 
@@ -148,18 +160,38 @@ Head 'Against the load order you play with'
 if (-not (Test-Path -LiteralPath $plug)) {
   Say "  No plugins.txt at $plug" 'Yellow'
 } else {
-  $mine = @()
+  $enabled = @()
   foreach ($l in (Get-Content -LiteralPath $plug)) {
-    $t = "$l".Trim()
-    if ($t.Length -eq 0 -or $t.StartsWith('#')) { continue }
-    if ($t.StartsWith('*')) { $mine += $t.Substring(1) }
+    $n = Get-LoadOrderEnabledName $l
+    if ($n) { $enabled += $n }
   }
-  # Bethesda's five are always first on the server and are not in plugins.txt.
-  $vanilla = @('Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm')
-  $mineFull = @($vanilla + $mine)
+
+  # The game's own order: the five masters, then every plugin Skyrim.ccc
+  # names that is in Data in that file's order, then the enabled lines. Light
+  # plugins are skipped throughout, because the server gives them no index.
+  # The Skyrim.ccc half is not decoration: on 19 September two Creation Club
+  # masters the list never mentions put every plugin after Dragonborn.esm two
+  # places off, and any check that reads plugins.txt alone passes that.
+  $gameDir = Join-Path $Client 'Game'
+  $data    = Join-Path $gameDir 'Data'
+  $ccc     = @()
+  $cccFile = Join-Path $gameDir 'Skyrim.ccc'
+  if (Test-Path -LiteralPath $cccFile) {
+    foreach ($raw in (Get-Content -LiteralPath $cccFile)) {
+      $t = "$raw".Trim()
+      if ($t.Length -and -not $t.StartsWith('#')) { $ccc += $t }
+    }
+  }
+  $isLightOrMissing = { param($n) $f = Join-Path $data $n; (-not (Test-Path -LiteralPath $f)) -or (Test-LoadOrderLight $f) }
+  $exists           = { param($n) Test-Path -LiteralPath (Join-Path $data $n) }
+  # Assigned, not wrapped in @(): the function hands back one array and @()
+  # around it would nest that array inside another.
+  $mineFull = Get-LoadOrderGame $enabled $isLightOrMissing $ccc $exists
+  $dropped  = ($enabled.Count + 5) - $mineFull.Count
 
   Say ("  server wants  {0} plugins" -f $serverOrder.Count)
-  Say ("  you have      {0} enabled (five Bethesda masters included)" -f $mineFull.Count)
+  Say ("  you have      {0} that take a place in the order (five Bethesda masters included)" -f $mineFull.Count)
+  Say ("  {0} enabled lines carry no index and are left out of both lists, because they are light" -f $dropped) 'DarkGray'
   Write-Host ''
 
   $extra   = @($mineFull | Where-Object { $serverOrder -notcontains $_ })
@@ -176,31 +208,35 @@ if (-not (Test-Path -LiteralPath $plug)) {
     Say ("  {0} you have that the server does NOT list:" -f $extra.Count) 'Yellow'
     $extra | ForEach-Object { Say "    $_" 'DarkGray' }
     Write-Host ''
-    Say '  Those are the ones that could be optional in a collection, IF the' 'DarkGray'
-    Say '  client tolerates them. The first mismatched position below says' 'DarkGray'
-    Say '  whether it does.' 'DarkGray'
+    Say '  Each of these takes a place in your order that it does not take in' 'DarkGray'
+    Say '  the server''s, so everything after it sits one place off. The first' 'DarkGray'
+    Say '  mismatched position below says where that starts.' 'DarkGray'
   } else {
     Say '  you have nothing the server does not list' 'Green'
   }
 
   Write-Host ''
-  $n = [Math]::Min($serverOrder.Count, $mineFull.Count)
-  $firstBad = -1
-  for ($i = 0; $i -lt $n; $i++) {
-    if ($serverOrder[$i] -ne $mineFull[$i]) { $firstBad = $i; break }
-  }
-  if ($firstBad -lt 0 -and $serverOrder.Count -eq $mineFull.Count) {
+  $firstBad = Get-LoadOrderFirstMismatch $mineFull $serverOrder
+  if ($firstBad -lt 0) {
     Say '  POSITION BY POSITION: identical.' 'Green'
-  } elseif ($firstBad -lt 0) {
-    Say ("  POSITION BY POSITION: the first {0} match, then one list runs out." -f $n) 'Yellow'
+  } elseif ($firstBad -ge $serverOrder.Count -or $firstBad -ge $mineFull.Count) {
+    Say ("  POSITION BY POSITION: the first {0} match, then one list runs out." -f $firstBad) 'Yellow'
+    Say '  The shorter list is missing plugins the other has. They are named above.' 'Yellow'
   } else {
     Say ("  POSITION BY POSITION: they part company at slot {0}." -f ($firstBad + 1)) 'Red'
     Say ("    server: " + $serverOrder[$firstBad]) 'Red'
     Say ("    you:    " + $mineFull[$firstBad]) 'Red'
     Write-Host ''
-    Say '  If you can still connect with this, the client is NOT comparing' 'Yellow'
-    Say '  strictly by position, and a collection can have optional plugins.' 'Yellow'
-    Say '  If you cannot, the server manifest is stale and needs regenerating.' 'Yellow'
+    # Not advice to redeploy. Until 17 September this ended by telling you to
+    # regenerate a server manifest that was correct, on the strength of a
+    # comparison that was wrong. The server's order is the one to keep: the
+    # world database keys every changed form on the position in that list, so
+    # moving the server re-keys every saved chest, door and body after it.
+    Say '  This machine follows the server, not the other way round. Press Fix' 'Yellow'
+    Say '  in the launcher: it puts the server''s order into this build''s plugin' 'Yellow'
+    Say '  list and downloads nothing.' 'Yellow'
+    Say '  Do not redeploy the server to make this match. The world keys every' 'Yellow'
+    Say '  saved form on its position in that list, so moving it re-keys them.' 'Yellow'
   }
 }
 
