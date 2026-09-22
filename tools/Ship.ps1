@@ -33,6 +33,10 @@ param(
     [switch]$DryRun,
     [switch]$Package,
     [string]$Root = 'C:\Thornswood'
+    # Where releases are staged and zipped, passed straight through to
+    # Publish-Update and Package-Thornswood so all three agree. Not under
+    # $Root: that is the folder people play from.
+    ,[string]$DistRoot = 'C:\Thornswood-Dev\dist'
     ,[switch]$MoveServer
     # So this can be chained after something else without stopping to wait for
     # a keypress nobody is there to give.
@@ -425,7 +429,7 @@ if ($LASTEXITCODE -ne 0) {
 Head 'Publishing'
 # A hashtable, not an array. Splatting an array passes everything positionally,
 # so '-Notes' binds as a value rather than a parameter name.
-$pubArgs = @{ Notes = $Notes; Root = $Root; RepoDir = $RepoDir; ReleaseDir = $ReleaseDir; NoPause = $true }
+$pubArgs = @{ Notes = $Notes; Root = $Root; RepoDir = $RepoDir; ReleaseDir = $ReleaseDir; DistRoot = $DistRoot; NoPause = $true }
 if ($MoveServer) { $pubArgs['MoveServer'] = $true }
 if (-not $ModsOnly) { $pubArgs['Launcher'] = $true }
 if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
@@ -547,7 +551,17 @@ if (-not $DryRun -and -not $ModsOnly) {
   leave, and the package quietly stays another release behind. A count that
   only appears on the runs where it is least urgent is not a warning.
 #>
-$zip = Join-Path $Root '_dist\Thornswood-Setup.zip'
+# Staged out of the play install since 22 September: one folder per install
+# root under the dev tree, the same shape Publish-Update and
+# Package-Thornswood use, so the three agree on one answer. -DistRoot moves
+# the lot. The old $Root\_dist is still read when it is the only one there, so
+# a machine that has not published since the move still finds its installer.
+$DistDir = Join-Path (Join-Path $DistRoot (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
+$zip = Join-Path $DistDir 'Thornswood-Setup.zip'
+if (-not (Test-Path -LiteralPath $zip)) {
+    $wasZip = Join-Path $Root '_dist\Thornswood-Setup.zip'
+    if (Test-Path -LiteralPath $wasZip) { $zip = $wasZip }
+}
 $behind = 0
 $haveZip = Test-Path $zip
 
@@ -639,7 +653,7 @@ if ($Dev) {
 }
 elseif ($Package) {
     Head 'Rebuilding the installer'
-    & (Join-Path $Here 'Package-Thornswood.ps1') -Root $Root -NoPause
+    & (Join-Path $Here 'Package-Thornswood.ps1') -Root $Root -OutDir $DistDir -NoPause
 }
 else {
     Show-Installer

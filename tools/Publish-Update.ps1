@@ -12,6 +12,15 @@
 [CmdletBinding()]
 param(
     [string]$Root    = 'C:\Thornswood',
+    # Where releases are staged and zipped. Deliberately NOT under $Root: that
+    # is the folder people play from, and staging there put 10.9 GB of old
+    # packs on the game drive. The dev tree is where build output belongs.
+    [string]$DistRoot = 'C:\Thornswood-Dev\dist',
+    # How many built packs to keep. They are all uploaded to the releases
+    # repository the moment they are made, so the copies here are a local
+    # convenience and nothing depends on an old one. Nothing pruned them until
+    # 22 September and 62 of them had piled up. 0 keeps everything.
+    [int]$KeepPacks = 10,
     # A release deleting more than this many files off everybody is treated as
     # a mistake until somebody says otherwise.
     [int]$MaxRemovals = 200,
@@ -154,7 +163,36 @@ if (-not (Test-Path (Join-Path $ReleaseDir 'version.json'))) {
 
 $GameDir    = Join-Path $Root 'Game'
 $ProfileDir = Join-Path $Root 'Profile'
-$DistDir    = Join-Path $Root '_dist'
+
+# Where a release is staged and zipped. NOT under $Root any more.
+#
+# It was $Root\_dist, which is inside the folder Patrick plays from, because
+# $Root was the only path in scope when it was written. Nothing about the game
+# needs it there and it grew: on 22 September C:\Thornswood\_dist held 941
+# files and 10,936.8 MB, 62 pack zips going back to 15 September because
+# nothing ever pruned them, on a drive with 22.3 GB free. Measure-Reclaim
+# says every byte of it is this folder's alone, so it was 10.9 GB of the game
+# drive spent on output nobody reads twice.
+#
+# One folder per install root, so the main install and the dev build keep the
+# separate staging areas they have always had and cannot tread on each other.
+# -DistRoot moves the lot for a machine laid out differently.
+$DistDir    = Join-Path (Join-Path $DistRoot (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
+if (-not (Test-Path -LiteralPath $DistDir)) {
+    New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
+}
+
+# The old location, so a machine that has one is told rather than left with
+# 10.9 GB it will never look at again. Said once, never deleted here: this
+# script publishes, and deleting ten gigabytes is not a thing a publish should
+# do quietly.
+$OldDist = Join-Path $Root '_dist'
+if (Test-Path -LiteralPath $OldDist) {
+    $oldMb = 0
+    try { $oldMb = ((Get-ChildItem -LiteralPath $OldDist -Recurse -File -EA SilentlyContinue | Measure-Object Length -Sum).Sum / 1MB) } catch { }
+    Write-Host ("  releases stage in $DistDir now, not in $OldDist") -ForegroundColor DarkGray
+    Write-Host ("  the old one still holds {0:N1} MB. Check it with .\tools\Measure-Reclaim.ps1 -Path `"$OldDist`", then remove it." -f $oldMb) -ForegroundColor Yellow
+}
 
 # This is the machine that ships, so its launcher must not put the kept copy
 # of a plugin back over an edit that is about to be published. Keep reads this
@@ -1286,6 +1324,32 @@ if ($profileChanged.Count) {
         } else {
             Say ("  The server has every one of the {0} full plugins this list enables, in the order the pack ships. Nothing to deploy." -f $game.Count) 'Gray'
         }
+    }
+}
+
+# ------------------------------------------------------- old packs go
+#
+# After the upload, never before it. A pack is on the releases repository the
+# moment it is made and nothing in the update path reads an old one off this
+# disk, so the copies here are a local convenience. Nothing pruned them until
+# 22 September, by which time 62 of them had piled up inside the folder
+# Patrick plays from and come to 10.9 GB.
+#
+# Newest kept by name, which sorts correctly because every id is
+# pack-YYYYMMDD-HHMM. The one just built is the newest, so it is never the one
+# that goes. -KeepPacks 0 keeps everything, for a machine that wants them.
+if ($KeepPacks -gt 0) {
+    try {
+        $packs = @(Get-ChildItem -LiteralPath $DistDir -Filter 'pack-*.zip' -File -EA SilentlyContinue |
+                   Sort-Object Name -Descending)
+        if ($packs.Count -gt $KeepPacks) {
+            $go = $packs | Select-Object -Skip $KeepPacks
+            $mb = (($go | Measure-Object Length -Sum).Sum / 1MB)
+            foreach ($f in $go) { Remove-Item -LiteralPath $f.FullName -Force -EA SilentlyContinue }
+            Say ("  {0} older pack(s) removed from $DistDir, {1:N1} MB. They are all on the releases repository." -f $go.Count, $mb) 'DarkGray'
+        }
+    } catch {
+        Say "  could not tidy the old packs: $_" 'DarkGray'
     }
 }
 
