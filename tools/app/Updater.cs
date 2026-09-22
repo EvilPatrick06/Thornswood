@@ -12,6 +12,17 @@ namespace Thornswood
     {
         public const string Version = "1.1.80";
 
+        /// <summary>
+        /// The collection revision the last feed named, or 0 when it named
+        /// none. Set by OnVersionDoc as the document arrives, so anything that
+        /// asks after that is asking about the release that is actually live.
+        ///
+        /// Held here rather than in Config because it is not a setting: it is
+        /// a fact about the server, and writing it into config.json would mean
+        /// a stale copy outliving the release it came from.
+        /// </summary>
+        public static int FeedCollectionRevision;
+
         // WebClient has no timeout worth the name, and the default is long
         // enough that a GitHub which accepts the connection and then says
         // nothing looks like a hung launcher. The same helper Online and

@@ -4242,6 +4242,12 @@ namespace Thornswood
                 StartPing();
             }
 
+            // Which collection revision this release agrees with. Not a
+            // setting and never written to config.json: it is a fact about the
+            // server that belongs to the feed it came from, and a stale copy
+            // outliving its release is exactly the failure this replaced.
+            Updater.FeedCollectionRevision = v.collectionRevision;
+
             // Quietly, and without a line in the log. Nobody set these and
             // nobody needs telling they changed.
             bool quiet = false;
@@ -4474,10 +4480,34 @@ namespace Thornswood
             try
             {
                 if (Checks.EnabledPlugins() <= 40) return "none";
-                // Named files the collection provides that carry no plugin, so
-                // the count cannot see them. Absent means the collection is
-                // behind, not that somebody deleted one by hand.
-                if (!Checks.StartOnSaveInstalled()) return "stale";
+
+                // THE REVISION, NOT A NAMED FILE.
+                //
+                // This used to ask whether po3_StartOnSave.dll was present and
+                // call the collection stale when it was not. That was wrong in
+                // both directions, and on 22 September it was wrong on
+                // Patrick's own machine in the quietest possible way.
+                //
+                // The file is not in the collection and never has been:
+                // Add-Characters.ps1 puts it into a build by hand. So anybody
+                // who installed the collection correctly and never ran that
+                // script read as behind, and Patrick, who had run it, read as
+                // fine while sitting two revisions behind the collection he
+                // publishes. Nothing on screen said a word.
+                //
+                // Vortex names the collection's own mod folder with the
+                // revision, so there is a number to compare, and the feed
+                // carries the revision the SERVER was built against. Behind
+                // and ahead are different problems and get different words:
+                // behind means update, ahead means the server has not caught
+                // up with you yet and Play will refuse you on the load order.
+                int mine = Checks.CollectionRevision(cfg);
+                int wants = Updater.FeedCollectionRevision;
+                if (mine > 0 && wants > 0)
+                {
+                    if (mine < wants) return "stale";
+                    if (mine > wants) return "ahead";
+                }
             }
             catch { return ""; }
             return "";
@@ -4497,15 +4527,34 @@ namespace Thornswood
         /// </summary>
         static void ShowCollectionBar()
         {
-            bool stale = CollectionProblem() == "stale";
+            string problem = CollectionProblem();
+            bool stale = problem == "stale";
 
             if (stale)
             {
+                int mine = Checks.CollectionRevision(cfg);
+                int wants = Updater.FeedCollectionRevision;
                 txtUpdateTitle.Text = "Your mods need updating";
                 txtUpdateNote.Text =
-                    "The collection has moved on and this copy is behind, so part of what the " +
-                    "server expects is not installed. Open it and let Vortex bring it up to " +
-                    "date. It is one button there and it takes the lot in one go.";
+                    "The collection is on revision " + wants + " and this copy is on " + mine +
+                    ", so part of what the server expects is not installed. Open it and let " +
+                    "Vortex bring it up to date. It is one button there and it takes the lot " +
+                    "in one go.";
+            }
+            else if (problem == "ahead")
+            {
+                // The other direction, which nothing used to say at all. The
+                // person has done everything right and is further forward than
+                // the server; Play will still refuse them, on the load order,
+                // and without this that reads as their fault.
+                int mine = Checks.CollectionRevision(cfg);
+                int wants = Updater.FeedCollectionRevision;
+                txtUpdateTitle.Text = "The server has not caught up with you";
+                txtUpdateNote.Text =
+                    "You are on collection revision " + mine + " and the server was built " +
+                    "against revision " + wants + ". Nothing is wrong with your install. Play " +
+                    "will refuse you over the load order until the server is rebuilt, which is " +
+                    "ours to do, so say so in the Discord if nobody has.";
             }
             else
             {

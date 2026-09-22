@@ -19,6 +19,54 @@
 
 $script:LoadOrderMasters = 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'
 
+<#
+  Which revision of the collection this machine has installed, or 0.
+
+  Vortex names the collection's own mod folder for it:
+
+      %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
+                                                slug  ^ revision
+
+  The same rule as Checks.CollectionRevision in the launcher, and it is here
+  because the SHIPPING machine's answer is the one that goes in the feed: the
+  server's load order and the reference plugin list are both derived from this
+  machine's Vortex deployment, so the revision it is on is the revision the
+  release agrees with.
+
+  Found on 22 September, and this is why it exists: this machine was on
+  revision 2 while the collection on Nexus was on 4. Nothing said so, because
+  the only test was whether one named file existed and that file was not in
+  the collection at all. Two revisions of drift, on the machine that builds
+  the server.
+#>
+function Get-CollectionRevision([string]$Slug) {
+    if (-not $Slug) { return 0 }
+    $dir = Join-Path $env:APPDATA 'Vortex\skyrimse\mods'
+    if (-not (Test-Path -LiteralPath $dir)) { return 0 }
+    $best = 0
+    foreach ($d in (Get-ChildItem -LiteralPath $dir -Directory -Filter ("collection_" + $Slug + "_*") -EA SilentlyContinue)) {
+        $rest = $d.Name.Substring(("collection_" + $Slug + "_").Length)
+        $cut = $rest.IndexOf('_')
+        if ($cut -le 0) { continue }
+        $n = 0
+        if (-not [int]::TryParse($rest.Substring(0, $cut), [ref]$n)) { continue }
+        if ($n -gt $best) { $best = $n }
+    }
+    return $best
+}
+
+# "ombo2a" out of https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a
+function Get-CollectionSlug([string]$Url) {
+    if (-not $Url) { return '' }
+    $at = $Url.LastIndexOf('/collections/', [StringComparison]::OrdinalIgnoreCase)
+    if ($at -lt 0) { return '' }
+    $s = $Url.Substring($at + '/collections/'.Length).Trim()
+    $q = $s.IndexOfAny([char[]]('/', '?', '#'))
+    if ($q -ge 0) { $s = $s.Substring(0, $q) }
+    if ($s -notmatch '^[A-Za-z0-9]+$') { return '' }
+    return $s
+}
+
 function Test-LoadOrderMaster([string]$Name) {
     $n = "$Name".Trim()
     foreach ($m in $script:LoadOrderMasters) {

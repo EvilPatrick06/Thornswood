@@ -30,6 +30,76 @@ namespace Thornswood
             catch { return false; }
         }
 
+        /// <summary>
+        /// Which revision of the collection this machine has installed, or 0.
+        ///
+        /// Vortex names the collection's own mod folder for it:
+        ///
+        ///     %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
+        ///                                               slug  ^ revision
+        ///
+        /// This replaces asking whether one named file exists, which is what
+        /// decided "your collection is behind" until 22 September. That test
+        /// was wrong in both directions. It named po3_StartOnSave.dll, which
+        /// Add-Characters.ps1 puts into a build BY HAND and which the
+        /// collection has never carried, so anybody who installed the
+        /// collection correctly and never ran that script read as behind, and
+        /// anybody genuinely two revisions behind read as fine as long as the
+        /// file was there.
+        ///
+        /// A number is the honest answer to a question about a revision. The
+        /// newest folder wins, because an upgrade leaves the old one until
+        /// Vortex tidies it.
+        /// </summary>
+        public static int CollectionRevision(Config cfg)
+        {
+            try
+            {
+                string slug = CollectionSlug(cfg);
+                if (slug.Length == 0) return 0;
+                string dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Vortex\\skyrimse\\mods");
+                if (!Directory.Exists(dir)) return 0;
+
+                int best = 0;
+                foreach (string d in Directory.GetDirectories(dir, "collection_" + slug + "_*"))
+                {
+                    string name = Path.GetFileName(d);
+                    // collection_<slug>_<rev>_<when>
+                    string rest = name.Substring(("collection_" + slug + "_").Length);
+                    int cut = rest.IndexOf('_');
+                    if (cut <= 0) continue;
+                    int n = 0;
+                    if (!int.TryParse(rest.Substring(0, cut), out n)) continue;
+                    if (n > best) best = n;
+                }
+                return best;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// The collection's slug out of its address, "ombo2a" from
+        /// .../collections/ombo2a. Read from the config so a machine pointed at
+        /// a different collection still answers about its own.
+        /// </summary>
+        public static string CollectionSlug(Config cfg)
+        {
+            try
+            {
+                string url = cfg == null ? "" : (cfg.CollectionUrl ?? "");
+                int at = url.LastIndexOf("/collections/", StringComparison.OrdinalIgnoreCase);
+                if (at < 0) return "";
+                string s = url.Substring(at + "/collections/".Length).Trim();
+                int q = s.IndexOfAny(new char[] { '/', '?', '#' });
+                if (q >= 0) s = s.Substring(0, q);
+                foreach (char c in s) { if (!char.IsLetterOrDigit(c)) return ""; }
+                return s;
+            }
+            catch { return ""; }
+        }
+
         public static int EnabledPlugins()
         {
             try

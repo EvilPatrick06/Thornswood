@@ -1013,6 +1013,33 @@ if (Test-Path $cfgPath) {
             if ($mo -gt 0) { Set-Prop $doc 'maxOnline' $mo }
         }
 
+        # Which collection revision this release agrees with.
+        #
+        # Read off THIS machine's Vortex install, because this machine's
+        # deployment is what the server's load order and the reference plugin
+        # list were both derived from. It is not a claim about what is newest
+        # on Nexus; it is a statement of what this release matches, and the
+        # launcher compares its own installed revision against it and says
+        # behind or ahead.
+        #
+        # There was no number at all before 22 September. The launcher guessed
+        # from whether po3_StartOnSave.dll existed, a file Add-Characters.ps1
+        # installs by hand and the collection has never carried, so the test
+        # was wrong both ways: anybody who installed the collection properly
+        # and skipped that script read as behind, and this machine sat on
+        # revision 2 while Nexus was on 4 and nothing said a word.
+        #
+        # Silence when it cannot be read, never a guess: a wrong number here
+        # tells everybody to reinstall a collection that is already right.
+        $slug = Get-CollectionSlug ([string]$cfg.CollectionUrl)
+        $rev = Get-CollectionRevision $slug
+        if ($rev -gt 0) {
+            Set-Prop $doc 'collectionRevision' $rev
+            Say "  collection revision $rev (what this release was built against)" 'Green'
+        } else {
+            Say '  could not read the collection revision from Vortex, so the feed keeps what it had' 'Yellow'
+        }
+
         # The server password does NOT ride along, and it used to.
         #
         # version.json is published into the PUBLIC releases repository, which

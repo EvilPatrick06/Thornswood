@@ -454,6 +454,26 @@ namespace Thornswood
         [DataMember] public string launcherSha256 = "";
         [DataMember] public string serverAddress = "";
         [DataMember] public string collectionUrl = "";
+
+        /// <summary>
+        /// Which revision of the collection the SERVER was built against.
+        ///
+        /// Written by Publish-Update from the shipping machine's own Vortex
+        /// install, because that is the deployment the server's load order and
+        /// the reference plugin list were both derived from. So this is not an
+        /// opinion about which revision is newest on Nexus; it is a statement
+        /// of which one this release agrees with.
+        ///
+        /// The launcher compares it with its own installed revision and says
+        /// behind or ahead. Before 22 September there was no number at all: it
+        /// guessed from whether one named file existed, and that file was not
+        /// even in the collection, so Patrick sat two revisions behind his own
+        /// collection with nothing on screen saying so.
+        ///
+        /// 0 from an older feed, which means say nothing rather than guess.
+        /// </summary>
+        [DataMember] public int collectionRevision;
+
         [DataMember] public string serverPort = "";
         [DataMember] public int maxOnline;
         [DataMember] public string serverPassword = "";
