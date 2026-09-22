@@ -30,18 +30,52 @@
 param(
     [Parameter(Position = 0)][string]$Notes = '',
     [string]$RepoDir,
+    <#
+      Which server this goes to. 'main' is the one everybody plays on.
+
+      WHY THIS EXISTS, 21 September. Everything else here has a dev form:
+      Ship.ps1 -Channel dev, Deploy-DevGamemode.ps1. This did not, so an
+      engine change had one route and that route was live. Patrick, on being
+      told that: "why is there no dev version that's a bigggggg issue". He is
+      right, and it was worse than missing: the CAPABILITY was always here,
+      because -VpsRoot and -TaskName are parameters and the dev server is
+      C:\Thornswood-Server-Dev under 'Thornswood Dev Server'. Nothing was
+      stopping a dev publish except that nobody could know it without reading
+      this block, so the obvious command was the live one and that is the one
+      that got run.
+
+      A dev publish also writes no news and pushes nothing, because a news
+      entry saying the server changed belongs to the server everybody is on.
+    #>
+    [ValidateSet('main', 'dev')][string]$Channel = 'main',
     [switch]$NoNews,
     [switch]$NoPush,
     [string]$VpsHost  = '192.135.112.23',
     [string]$VpsUser  = 'Administrator',
     [string]$Dist     = 'C:\Thornswood-Dev\skymp\build\dist\server',
     [string]$Zip      = 'C:\Thornswood-Dev\thornswood-server.zip',
-    [string]$VpsRoot  = 'C:\Thornswood-Server',
-    [string]$TaskName = 'Thornswood Server',
+    [string]$VpsRoot,
+    [string]$TaskName,
     [switch]$FreshWorld,
     [switch]$SkipBuild,
     [switch]$NoPause
 )
+
+# The two that the channel decides, unless they were given outright. An
+# explicit -VpsRoot still wins, the same way Ship.ps1 lets -Root win.
+$IsDev = ($Channel -eq 'dev')
+if (-not $PSBoundParameters.ContainsKey('VpsRoot')) {
+    $VpsRoot = if ($IsDev) { 'C:\Thornswood-Server-Dev' } else { 'C:\Thornswood-Server' }
+}
+if (-not $PSBoundParameters.ContainsKey('TaskName')) {
+    $TaskName = if ($IsDev) { 'Thornswood Dev Server' } else { 'Thornswood Server' }
+}
+if ($IsDev) {
+    # A dev release is not news and is not a source commit. Said out loud
+    # rather than done quietly, so a dev run reads differently from a main one.
+    $NoNews = $true
+    $NoPush = $true
+}
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
