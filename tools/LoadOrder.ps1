@@ -55,6 +55,67 @@ function Get-CollectionRevision([string]$Slug) {
     return $best
 }
 
+<#
+  The newest collection revision VORTEX KNOWS ABOUT, or 0.
+
+  This is the half that was missing, and it is the answer to "why was the
+  server derived from something out of date".
+
+  The server's load order and the reference plugin list are both derived from
+  whatever Vortex has DEPLOYED on the shipping machine. Nothing ever asked
+  whether that deployment was current. It did not have to go and look: Vortex
+  polls Nexus itself and writes down what it finds, and on 22 September its
+  own state held, in order:
+
+      "newestVersion","from":"2","to":"3"
+      "newestVersion","from":"3","to":"4"
+
+  So the machine knew revision 4 existed, and had known for days, while every
+  release went out built against revision 2. The information was there and
+  nothing read it.
+
+  Read out of Vortex's state as text rather than by opening the database,
+  because this only needs a number and must never be the reason a deploy
+  fails. Every transition is scanned and the highest destination wins, since
+  the log holds the whole history. 0 when nothing can be read, which means say
+  nothing: a wrong number here would stop a deploy that is perfectly correct.
+#>
+function Get-CollectionNewest {
+    $st = Join-Path $env:APPDATA 'Vortex\state.v2'
+    if (-not (Test-Path -LiteralPath $st)) { return 0 }
+    $best = 0
+    foreach ($f in (Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)) {
+        try {
+            $txt = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($f.FullName))
+            foreach ($m in [regex]::Matches($txt, '"newestVersion"\s*,\s*"from"\s*:\s*"(\d+)"\s*,\s*"to"\s*:\s*"(\d+)"')) {
+                $n = 0
+                if ([int]::TryParse($m.Groups[2].Value, [ref]$n) -and $n -gt $best) { $best = $n }
+            }
+        } catch { }
+    }
+    return $best
+}
+
+<#
+  Is this machine's collection behind what Vortex knows is out there?
+
+  Returns a small object rather than a bool, because every caller wants to
+  say the two numbers and a bool cannot. Behind is $false when either number
+  is unknown: silence beats a guess in both directions.
+#>
+function Get-CollectionState([string]$Url) {
+    $slug = Get-CollectionSlug $Url
+    $have = Get-CollectionRevision $slug
+    $newest = Get-CollectionNewest
+    return [pscustomobject]@{
+        Slug     = $slug
+        Have     = $have
+        Newest   = $newest
+        Behind   = ($have -gt 0 -and $newest -gt 0 -and $have -lt $newest)
+        Known    = ($have -gt 0 -and $newest -gt 0)
+    }
+}
+
 # "ombo2a" out of https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a
 function Get-CollectionSlug([string]$Url) {
     if (-not $Url) { return '' }

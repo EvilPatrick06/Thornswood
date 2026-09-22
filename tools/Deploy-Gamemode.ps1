@@ -118,7 +118,12 @@ param(
         -Devs 123456789,987654321 -Playtesters 555,666
     #>
     [long[]]$Devs        = @(),
-    [long[]]$Playtesters = @()
+    [long[]]$Playtesters = @(),
+    # Deploy even though the collection installed here is behind the one
+    # Vortex knows is out. For the case where that is deliberate; it is a
+    # refusal rather than a warning because a warning in a long run is a line
+    # nobody reads.
+    [switch]$IgnoreRevision
 )
 
 # ---------------------------------------------------------------- -Vortex ---
@@ -262,6 +267,51 @@ $wanted = if ($MinimalLoadOrder) {
     # plugins.txt omits the always-on masters; the server needs them spelled out
     $implicit = 'Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm'
     @($implicit | Where-Object { $fromFile -notcontains $_ }) + $fromFile
+}
+
+# IS THE COLLECTION THIS IS BEING DERIVED FROM ACTUALLY CURRENT?
+#
+# This is the question nothing asked, and it is why the live server spent a
+# week built against a collection two revisions old.
+#
+# The server's load order comes from whatever Vortex has DEPLOYED on this
+# machine. That is the right source: it is what the game actually loads. But
+# it is only right if the deployment is current, and nothing checked. Vortex
+# knew: its own state recorded newestVersion going 2 to 3 and then 3 to 4
+# while every deploy took the revision 2 files without a word.
+#
+# A stale deploy is not a small thing. The world keys every changed form on
+# the plugin's position in this list, so deploying from an old collection and
+# then updating means moving the order twice. And everybody who installs the
+# collection correctly gets a mod set the server has never seen and is
+# refused at the door, which is exactly what was happening.
+#
+# It refuses rather than warns, because a warning in the middle of a long run
+# is a line nobody reads. -IgnoreRevision is there for the case where the
+# answer is genuinely "yes I know, do it anyway".
+$lo = Join-Path $PSScriptRoot 'LoadOrder.ps1'
+if (Test-Path -LiteralPath $lo) {
+    . $lo
+    $cfgPath = Join-Path (Split-Path -Parent $Data) 'config.json'
+    if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgPath = 'C:\Thornswood\config.json' }
+    $colUrl = ''
+    try { $colUrl = [string](Get-Content -LiteralPath $cfgPath -Raw | ConvertFrom-Json).CollectionUrl } catch { }
+    $cs = Get-CollectionState $colUrl
+    if ($cs.Known) {
+        if ($cs.Behind -and -not $IgnoreRevision) {
+            Write-Host ''
+            Write-Host ("  STOP. This machine has collection revision {0} and Vortex says {1} is out." -f $cs.Have, $cs.Newest) -ForegroundColor Red
+            Write-Host '  The server''s load order is derived from what Vortex has deployed here, so' -ForegroundColor Red
+            Write-Host '  deploying now builds the server against a collection two steps behind the' -ForegroundColor Red
+            Write-Host '  one everybody else installs. They get a mod set the server has never seen' -ForegroundColor Red
+            Write-Host '  and are refused at the door.' -ForegroundColor Red
+            Write-Host ''
+            Write-Host '  Update the collection in Vortex, let it deploy, then run this again.' -ForegroundColor Yellow
+            Write-Host '  -IgnoreRevision if you mean to deploy from the old one anyway.' -ForegroundColor DarkGray
+            throw ("collection revision {0} installed, {1} available" -f $cs.Have, $cs.Newest)
+        }
+        Write-Host ("  collection revision {0}{1}" -f $cs.Have, $(if ($cs.Behind) { " (BEHIND $($cs.Newest), carrying on because -IgnoreRevision)" } else { ', which is the newest Vortex knows of' })) -ForegroundColor $(if ($cs.Behind) { 'Yellow' } else { 'Green' })
+    }
 }
 
 $info = @{}; $missing = @()
