@@ -272,8 +272,40 @@ if (-not $SkipServer) {
   if (Port $Vps 3000 2500) { Note 'game server: answering on 3000' }
   else { Bad 'game server: NOTHING on 3000' }
 
-  if (Port $Vps 7778 2500) { Note 'voice service: answering on 7778' }
-  else { Bad 'voice service: NOTHING on 7778' }
+  # Voice is asked through Caddy on the public name, never on the raw port.
+  #
+  # This used to open a TCP socket to 7778 on the VPS address and call it dead
+  # when nothing answered. Nothing ever answers: the voice service binds
+  # 127.0.0.1 and Caddy carries /voice/ to it, exactly as the docs site binds
+  # 3001 behind the certificate. So this printed "voice service: NOTHING on
+  # 7778" in red on every single run while voice was up and working, and on
+  # 22 September that red line was read as an outage and chased.
+  #
+  # It is the same mistake as asking whether a process is running and calling
+  # that the site being up, pointing the other way: a port being shut from
+  # outside says nothing about a service that was never meant to be reachable
+  # there. The health endpoint through the public name is the only question
+  # that has the same answer a customer would get.
+  #
+  # The game server IS asked on its raw port above, and that is right: 3000
+  # binds every interface because the game client connects to it directly.
+  function VoiceUp($url) {
+    try {
+      $r = Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 8
+      if ($r.StatusCode -ne 200) { return $null }
+      return $r.Content
+    } catch { return $null }
+  }
+  $voiceUrl = 'https://thornswood.net/voice/health'
+  $vh = VoiceUp $voiceUrl
+  if ($vh) {
+    $peers = ''
+    try { $peers = '  ' + ([string](($vh | ConvertFrom-Json).peers)) + ' peer(s)' } catch { }
+    Note ('voice service: answering at /voice/' + $peers)
+  } else {
+    Bad "voice service: NOTHING at $voiceUrl"
+    Bad '  that is Caddy or the service itself; the raw port is shut on purpose and proves nothing'
+  }
 
   <#
     The voice service carries text chat now as well as audio, so it has to be
