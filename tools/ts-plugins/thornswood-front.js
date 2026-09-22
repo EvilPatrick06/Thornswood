@@ -1075,6 +1075,46 @@
     // before its line: every door press threw "Cannot access 'now'
     // before initialization" and the door rescue below never ran.
     const now = Date.now();
+
+    /*
+      SOMEBODY ELSE'S PRESS IS NOT OURS.
+
+      Patrick, 21 September, from playing it: "Theres a weird thing when yoiu
+      walk my quarries an npc will spawn and force you to start mining when one
+      you didnt click on it and two you have no pickaxe and arent a miner".
+      His clip shows him walking past the quarry with nothing under the
+      crosshair while the server says "Only a miner can work a seam. Ask one."
+      four times over, and "Only a farmer can bring a crop in" three times.
+
+      This event fires for EVERY activation in the loaded area, by anybody. The
+      comment on the log line below already said so: "every door an NPC opens
+      and every crate anybody walks past". Whiterun's own miners and farmhands
+      work their seams and their crops all day, and every one of those strikes
+      arrived here.
+
+      And then the ACTI branch at the bottom re-activated the thing AS THE
+      PERSON: `e.target.activate(pc, false)`, with pc fetched from
+      Game.getPlayer(). So an NPC swinging at a vein made us activate that vein
+      on the person's behalf, which ran the vanilla mine script on them, which
+      is the animation and the marker Patrick read as an NPC spawning and
+      forcing him to mine. The same call is forwarded to the server, which is
+      where the four refusals came from: the server was answering presses he
+      never made.
+
+      caster is the actionRef out of TESActivateEvent, set in EventHandler.cpp
+      next to target. 0x14 is the person's own reference and is fixed for every
+      Skyrim there has ever been. An activation with no actionRef at all
+      (caster 0) is the game activating something while a cell loads, which is
+      likewise not a press, so it is dropped with the rest.
+
+      lastActivateAt is set AFTER this, not before. It feeds the focus
+      watchdog's "activated something Xms ago", and a farmhand's day of work
+      is not a reason to believe the person is busy.
+    */
+    let casterId = 0;
+    try { casterId = e.caster ? e.caster.getFormID() : 0; } catch (err) { }
+    if (casterId !== 0x14) { return; }
+
     lastActivateAt = now;
     if (reActivating) { return; }
 
