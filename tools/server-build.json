@@ -1,15 +1,15 @@
 {
   "_note": "What the server binary in this release is, and the source it was built from. Deploy-Server.ps1 refuses to ship a binary whose sha256 is not this one. Regenerate with tools\\New-ServerBuildRecord.ps1 after every rebuild.",
   "binary": "scam_native.node",
-  "sha256": "10865561b4f039081c8e1c8152f09722ebe737b93379e737843ea4c6dfa0ba3a",
-  "bytes": 5573632,
-  "builtUtc": "2026-09-21T05:05:01Z",
+  "sha256": "a1ae3a330330faead43f98a6c49284c1b30b7625b1d0dd91e035c73a4257adae",
+  "bytes": 5574144,
+  "builtUtc": "2026-09-22T00:15:13Z",
   "source": {
     "repo": "https://github.com/EvilPatrick06/skymp.git",
     "branch": "thornswood/engine-changes",
-    "commit": "2943c910e930fc87982290a592aae03a562ff527",
+    "commit": "8bce01a0904808ba6c7e33df19bb01744144da97",
     "upstream": "https://github.com/skyrim-multiplayer/skymp.git",
     "upstreamBase": ""
   },
-  "recorded": "2026-09-20"
+  "recorded": "2026-09-21"
 }

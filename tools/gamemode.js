@@ -7517,7 +7517,121 @@ function craftAnswer(actorId, row) {
   say, because notify resolves its actor through the Papyrus stack and therefore
   does nothing from here, and say is the one that actually lands.
 */
-mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId) {
+/*
+  A CRAFT WITH NO RECIPE, WHICH IS EVERY BREW AND EVERY ENCHANTMENT.
+
+  Alchemy and enchanting have no COBJ record anywhere in the game. A potion is
+  worked out from the effects the ingredients share, inside a menu, with nothing
+  in the files to match against, and enchanting is the same shape. So the
+  server's FindRecipe came back empty for both, and until 21 September what
+  happened next was a log line and nothing else: the inputs were never removed
+  and the output was never added, so the potion somebody watched themselves make
+  was undone by the next inventory the server sent.
+
+  Check-Balance.ps1 is what found it, in one line: "the Alchemist owns no recipe
+  in this build at all, so there is nothing for anybody to supply it." Two of
+  the eight professions could be picked and could make nothing.
+
+  The fork now asks instead of dropping it: recipeId is 0, the workbench is the
+  fifth argument, and CraftEvent::OnFireSuccess removes the inputs and adds the
+  output from the event's own data, which is all a brew has. Fork commit
+  8bce01a0.
+
+  REFUSING IS THE DEFAULT HERE AND THAT IS DELIBERATE. Without a record there is
+  nothing to check the claim against: the server is taking the client's word for
+  what went in and what came out. So only two shapes are allowed through, both
+  of them things the person could already do in their own game, and anything
+  else is refused and said out loud. A potion is a potion; a weapon or a piece
+  of armour with no recipe behind it is an enchantment, because every forge
+  craft HAS a recipe and would never reach this path.
+
+  THE RANK IS NOT SET HERE, and that is a knob rather than an oversight. There
+  is no record to carry a rank, so every brew and every enchantment is novice
+  work to anybody who holds the profession. Whether a Master should brew
+  something a novice cannot is a question for the rulebook, and it needs a
+  record or a table before it can be answered.
+*/
+var RECIPELESS = {
+  ALCH: { prof: 'alchemist', made: 'a potion', verb: 'brew' },
+  WEAP: { prof: 'enchanter', made: 'an enchanted weapon', verb: 'enchant' },
+  ARMO: { prof: 'enchanter', made: 'enchanted armour', verb: 'enchant' }
+};
+
+function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
+  var spoils = globalThis.__thornswoodSpoils;
+  var kind = '';
+  try {
+    kind = (spoils && spoils.kindOf) ? spoils.kindOf(craftedItemBaseId) : '';
+  } catch (e) {
+    kind = '';
+  }
+
+  var rule = Object.prototype.hasOwnProperty.call(RECIPELESS, kind)
+    ? RECIPELESS[kind] : null;
+  if (!rule) {
+    // Not a brew and not an enchantment, and there is no record saying what it
+    // is. Nothing legitimate reaches here, so it is refused and named.
+    log(actorId.toString(16), 'asked to make', craftedItemBaseId.toString(16),
+        'of kind', (kind || 'unknown'), 'with no recipe, at bench',
+        (workbenchId || 0).toString(16) + '. Refused.');
+    return false;
+  }
+
+  var C = globalThis.__thornswoodCharacter;
+  if (!C || !C.stateOf) {
+    log('the character block is not loaded, so the recipeless craft gate is open');
+    return;
+  }
+  var s = null;
+  try {
+    s = C.stateOf(actorId);
+  } catch (e) {
+    log('the recipeless craft gate threw reading the character, so it is open:', e);
+    return;
+  }
+  // Nobody is stranded on their first evening, the same rule the recipe gate
+  // keeps: a character with no profession yet is let through.
+  if (!s || !s.prof) { return; }
+
+  if (s.prof === rule.prof) { return; }
+
+  /*
+    A half of that profession taught by a Master counts, because the rulebook
+    says what a Master teaches you is yours to work at novice, and everything
+    on this path is novice work.
+
+    The halves come out of the rulebook through halvesOf rather than being
+    written down again here. Two copies of that list is how a profession ends
+    up existing in one place and not the other, which is already an entry.
+  */
+  var P = globalThis.__thornswoodProgression;
+  var halves = [];
+  try { halves = (P && P.halvesOf) ? (P.halvesOf(rule.prof) || []) : []; } catch (e) { halves = []; }
+  var taught = (s.taught || []);
+  for (var i = 0; i < taught.length; i++) {
+    for (var j = 0; j < halves.length; j++) {
+      if (String(taught[i]).toLowerCase() === String(halves[j]).toLowerCase()) { return; }
+    }
+  }
+
+  var name = C.nameOf ? C.nameOf(rule.prof) : rule.prof;
+  var refusal = 'Only ' + aWord(name) + ' can ' + rule.verb + '. Making ' +
+                rule.made + ' is ' + name + ' work, and it is not yours.';
+  notify(actorId, refusal);
+  say(actorId, refusal);
+  log(actorId.toString(16), 'was refused', rule.verb + 'ing', '(' + kind + ')');
+  return false;
+}
+
+mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId) {
+  /*
+    NO RECIPE AT ALL, which the fork now reports rather than dropping.
+    Everything below this line assumes a recipe id that names a record.
+  */
+  if (!recipeId) {
+    return recipelessCraft(actorId, craftedItemBaseId, workbenchId);
+  }
+
   /*
     THE NUMBER TO THE DESCRIPTOR, AND EVERYTHING ABOUT THIS IS THE WRAP.
     recipeId is a number and every key in the table is a string. A lookup
@@ -7563,7 +7677,8 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
     that". The pickaxe, the axe and the shovel ask for one in the records, which
     is where a requirement belongs. The "other items" are the problem: there are
     Counted rather than guessed, 21 September: 277 of the 3,439 owned rows in
-    toolsecipes.json are hafted, and 126 of those are rows the server is
+    tools
+ecipes.json are hafted, and 126 of those are rows the server is
     actually asked about. They come out of Bethesda's five plugins and half a
     dozen mods.
 
