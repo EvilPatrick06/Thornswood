@@ -23,6 +23,8 @@ const el = (id) => document.getElementById(id);
 const state = el('state'), rows = el('rows');
 
 let ws = null, ctx = null, mic = null, myPeer = 0;
+/* Why the server last refused this page, '' when it has not. See onclose. */
+let deniedWhy = '';
 let muted = false;
 let lastWho = {};
 const conns = new Map();   // peerId -> {pc, panner, gain, el, profileId, name, analyser, data}
@@ -76,14 +78,43 @@ function connect() {
   };
 
   ws.onclose = () => {
-    say('Lost the voice server. Trying again in five seconds.');
     for (const [id] of conns) drop(id);
+    /*
+      A REFUSAL IS NOT A DROPPED CONNECTION, AND THIS TREATED THEM THE SAME.
+
+      Measured 22 September in the live voice log: 3,999 of its 4,000 lines are
+      "REFUSED a join for profile ...: an expired token", for three profiles.
+      The service was right to refuse and right to say so; it sends
+      { t: 'denied', why } and closes. This page never handled that message, so
+      the refusal fell through the switch in onmessage, the socket closed, this
+      ran, and it reconnected five seconds later with the same dead token. Five
+      seconds apart for hours, which is the whole log.
+
+      Retrying a token the server has just called expired cannot work: the page
+      holds one string and reconnecting does not fetch another. The plugin
+      rewrites it on a five minute tick, so a minute is the right wait, and the
+      person is told what is happening instead of watching a line that says the
+      server keeps going away.
+    */
+    if (deniedWhy) {
+      say('The voice server would not let this page in: ' + deniedWhy +
+          '. Trying again in a minute with a fresh token.');
+      setTimeout(connect, 60000);
+      return;
+    }
+    say('Lost the voice server. Trying again in five seconds.');
     setTimeout(connect, 5000);
   };
 
   ws.onmessage = (ev) => {
     let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-    if (m.t === 'welcome') { myPeer = m.peer; return; }
+    /*
+      The one message this page did not know about. See onclose.
+      Cleared on a welcome, so a page that gets in after a bad spell goes back
+      to the ordinary five second retry.
+    */
+    if (m.t === 'denied') { deniedWhy = String(m.why || 'it did not say why'); return; }
+    if (m.t === 'welcome') { myPeer = m.peer; deniedWhy = ''; return; }
     if (m.t === 'peers') { reconcile(m.peers); return; }
     if (m.t === 'pos') { lastWho = m.who || {}; place(); return; }
     if (m.t === 'sdp') { onSdp(m); return; }

@@ -9119,7 +9119,19 @@ log('gamemode loaded:',
           // while Discord was unreachable would turn away everybody missing
           // from it.
           if (doc.lookupFailed) {
-            note('the site could not reach Discord, keeping the list as it was');
+            /*
+              AND WHY. This said only that the site could not reach Discord,
+              and on 22 September that one line was the whole of what anybody
+              knew after an evening of looking. The site works the reason out
+              in plain words and used to throw it away one line after it knew
+              it; it sends it now. A wrong token, a bot that may not read
+              members, a rate limit and no token at all are four different
+              fixes and they read identically without this.
+            */
+            note('the site could not reach Discord, keeping the list as it was' +
+                 (doc.lookupFailedWhy ? ': ' + doc.lookupFailedWhy
+                                      : '. The site did not say why, so it is ' +
+                                        'running a build older than 22 September.'));
             return;
           }
           /*

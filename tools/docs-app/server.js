@@ -1661,7 +1661,7 @@ async function handle(req, res) {
       return sendJson(res, 401, { error: 'no' });
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
@@ -1672,7 +1672,19 @@ async function handle(req, res) {
       if (!profiles.length) continue;
       let st;
       try { st = await standingCached(String(d)); } catch (e) { st = { lookupFailed: String(e) }; }
-      if (st.lookupFailed) { out.lookupFailed = true; continue; }
+      if (st.lookupFailed) {
+        /* WHY, NOT JUST THAT. This reduced a specific reason to a boolean, so
+           the game server could only ever say "the site could not reach
+           Discord" and the door log on 22 September said exactly that and no
+           more. discordGet already works the reason out in plain words: a
+           wrong token, a bot that may not read members, a rate limit, no token
+           at all. Those are four different fixes and the difference was being
+           thrown away one line after it was known. The first one seen is
+           enough; a list where every lookup fails fails for one reason. */
+        out.lookupFailed = true;
+        if (!out.lookupFailedWhy) { out.lookupFailedWhy = String(st.lookupFailed); }
+        continue;
+      }
       if (!st.play || st.banned) continue;
       if (devDoor && !st.dev) continue;
       for (const n of profiles) if (!seen.has(n)) { seen.add(n); out.profiles.push(n); }
