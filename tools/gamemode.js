@@ -11542,8 +11542,64 @@ log('gamemode loaded:',
     push(actorId, mine);
 
     var held = holderOf(building);
-    if (!held) { return; }
     try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
+
+    /*
+      THE DEED IS THE TITLE, AND UNTIL NOW THAT WAS ONLY A PROMISE.
+
+      /claim already tells the person "Whoever carries it holds the place, so
+      keep it somewhere a thief will not look", and nothing in the file did
+      that: holderOf read the register and the register only, so a stolen deed
+      was a piece of paper. Patrick asked for a thief who lifts the deed to
+      take the house, and for the transfer to be an act at a door between two
+      people rather than something an item does in a pocket.
+
+      THIS IS THAT ACT. Carrying the deed and opening the door is the act. It
+      cannot happen in a pocket, because it needs the door; it cannot be done
+      from across the hold; and handing somebody the deed is the same gesture
+      whether it is a sale, a gift or a theft, which is the point. The server
+      does not need to tell those apart and should not try.
+
+      WHY THE DOOR IS SAFE TO HANG IT ON, measured rather than assumed: a
+      LOCKED door is never announced to this server at all, on purpose, so
+      that Skyrim's own lockpicking keeps working. So every press that reaches
+      here is a door that was already open to whoever pressed it. They own it,
+      they were let in, they hold a key, or they picked it. A thief with the
+      deed still has to get through the door, which is exactly the story
+      Patrick described rather than a hole in it.
+
+      THE OLD HOLDER IS NOT TOLD BY THE SERVER. They find out the way they
+      would in the world, by trying their own door, and their deed is gone
+      from their pack because that is how it left. A notification here would
+      turn a theft into an alarm system.
+    */
+    if (mine && holdsDeed(actorId, building) && (!held || held.by !== mine)) {
+      var was = held ? held.name : null;
+      var now2 = Date.now();
+      var who2 = 'somebody';
+      try {
+        var ap = mp.get(actorId, 'appearance');
+        if (ap && ap.name) { who2 = String(ap.name); }
+      } catch (e2) { }
+      // The ground goes with the house, because a home and its farm are one
+      // claim. Kept from the old record when there is one, so a transfer does
+      // not quietly drop the field behind the house.
+      var keepGround = held ? held.ground : groundHere(actorId);
+      claims[building] = { by: mine, name: who2, at: now2, touched: now2,
+                           locked: held ? !!held.locked : false,
+                           ground: keepGround };
+      save();
+      pushAll();
+      plog(who2, 'presented the deed at', nameOf(building), 'and now holds it',
+           was ? '(it was ' + was + '\'s)' : '(it was nobody\'s)');
+      var told = 'You present the deed at ' + nameOf(building) +
+                 '. It is yours now' + (was ? ', and no longer ' + was + '\'s' : '') + '.';
+      notify(actorId, told);
+      say(actorId, told);
+      return;
+    }
+
+    if (!held) { return; }
     if (mine && held.by === mine && (Date.now() - held.touched) > 3600000) {
       // Once an hour at most. A door is opened a great many times and the
       // register does not need writing on every one of them.

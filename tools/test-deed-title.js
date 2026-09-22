@@ -1,0 +1,158 @@
+// test-deed-title.js
+//
+// The deed is the title. Carrying it to the door takes the property.
+//
+// /claim has told people this since it was written: "Whoever carries it holds
+// the place, so keep it somewhere a thief will not look." Nothing in the file
+// did it. holderOf read the register and the register only, so a stolen deed
+// was a piece of paper and the message was a promise the code did not keep.
+//
+// Patrick's design, 21 September: a thief who lifts the deed takes the house,
+// and a transfer is an act at a door between two people rather than something
+// an item does in a pocket. Carrying the deed and opening the door IS that act.
+// It cannot happen in a pocket because it needs the door, and handing somebody
+// the deed is the same gesture whether it is a sale, a gift or a theft, which
+// is the point: the server does not need to tell those apart.
+//
+// WHY THE DOOR IS SAFE TO HANG IT ON, and this is measured rather than chosen:
+// a LOCKED door is never announced to the server at all, on purpose, so that
+// Skyrim's own lockpicking keeps working. So every press that reaches this code
+// is a door that was already open to whoever pressed it.
+//
+// Read only.
+const fs = require('fs');
+const path = require('path');
+const SRC = process.env.GM || path.join(__dirname, 'gamemode.js');
+const CR = String.fromCharCode(13);
+const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+
+const START = '    if (mine && holdsDeed(actorId, building) && (!held || held.by !== mine)) {';
+const END = '\n    }\n';
+const a = src.indexOf(START);
+const b = a < 0 ? -1 : src.indexOf(END, a);
+const block = (a >= 0 && b >= 0) ? src.slice(a, b + END.length) : null;
+
+yes('the deed title rule is in the gamemode', block !== null);
+
+const HOUSE = 'breezehome';
+
+/**
+ * Drive the real block for one door press.
+ *
+ * Only the register, the pack and the two ways of speaking are replaced. The
+ * decision itself is the shipped text.
+ */
+function press(opts) {
+  const said = [];
+  const logs = [];
+  const claims = {};
+  if (opts.held) { claims[HOUSE] = opts.held; }
+
+  const fn = new Function(
+    'mine', 'actorId', 'building', 'held', 'claims', 'holdsDeed', 'holderOf',
+    'nameOf', 'groundHere', 'save', 'pushAll', 'plog', 'notify', 'say', 'mp',
+    block + '\nreturn { moved: false, claims: claims };');
+
+  const out = fn(
+    opts.mine, 0xff000058, HOUSE, opts.held || null, claims,
+    function () { return !!opts.hasDeed; },
+    function () { return opts.held || null; },
+    function () { return 'Breezehome'; },
+    function () { return opts.groundNow || null; },
+    function () { }, function () { },
+    function () { logs.push(Array.prototype.join.call(arguments, ' ')); },
+    function (id, m) { said.push(m); },
+    function (id, m) { said.push(m); },
+    { get: function () { return { name: opts.who || 'Somebody' }; } });
+
+  return { claim: claims[HOUSE], said: said, logs: logs };
+}
+
+if (block !== null) {
+  const ALICE = 101, BOB = 202;
+  const alicesHouse = { by: ALICE, name: 'Alice', at: 1, touched: 1,
+                        locked: true, ground: 'the field' };
+
+  // S1: THE WHOLE POINT. Bob has Alice's deed and opens her door. It is his.
+  {
+    const r = press({ mine: BOB, who: 'Bob', hasDeed: true, held: alicesHouse });
+    yes('S1 carrying the deed to the door takes the property',
+        r.claim && r.claim.by === BOB);
+    yes('S1 and the new holder is named on the claim', r.claim.name === 'Bob');
+    yes('S1 and they are told it is theirs',
+        r.said.length > 0 && r.said[0].indexOf('It is yours now') !== -1);
+    yes('S1 and told whose it was, because that is the story',
+        r.said[0].indexOf('Alice') !== -1);
+  }
+
+  // S2: THE LOCK SURVIVES THE TRANSFER. A house that was locked stays locked,
+  //     or taking a deed would fling every door in it open.
+  {
+    const r = press({ mine: BOB, hasDeed: true, held: alicesHouse });
+    yes('S2 a locked house is still locked after it changes hands',
+        r.claim.locked === true);
+  }
+
+  // S3: AND THE GROUND GOES WITH THE HOUSE. A home and its farm are one claim,
+  //     so a transfer must not quietly drop the field behind it.
+  {
+    const r = press({ mine: BOB, hasDeed: true, held: alicesHouse });
+    yes('S3 the ground is kept from the old record',
+        r.claim.ground === 'the field');
+  }
+
+  // S4: an unheld building with a deed in hand is taken the same way. A deed
+  //     can outlive a lapsed claim, and it should still open the door to it.
+  {
+    const r = press({ mine: BOB, who: 'Bob', hasDeed: true, held: null });
+    yes('S4 a deed to nobody\'s house still takes it', r.claim && r.claim.by === BOB);
+    yes('S4 and nobody is named as the loser',
+        r.said.length > 0 && r.said[0].indexOf('no longer') === -1);
+  }
+
+  // S5: NOTHING HAPPENS WITHOUT THE DEED. This is the half that keeps a house
+  //     yours: opening somebody's door is not taking it, and a person who was
+  //     let in, or picked the lock, changes nothing by walking through.
+  {
+    const r = press({ mine: BOB, hasDeed: false, held: alicesHouse });
+    yes('S5 opening a door without the deed takes nothing',
+        r.claim && r.claim.by === ALICE);
+    yes('S5 and says nothing to anybody', r.said.length === 0);
+  }
+
+  // S6: and the holder walking through their own door is not a transfer.
+  {
+    const r = press({ mine: ALICE, hasDeed: true, held: alicesHouse });
+    yes('S6 the holder presenting their own deed changes nothing',
+        r.claim.by === ALICE && r.said.length === 0);
+  }
+
+  // S7: somebody with no profile id at all does nothing. A read that failed is
+  //     not a reason to move a house.
+  {
+    const r = press({ mine: 0, hasDeed: true, held: alicesHouse });
+    yes('S7 a press with no profile id takes nothing', r.claim.by === ALICE);
+  }
+}
+
+// ---------------------------------------------------------------- structure
+{
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ');
+  yes('the rule is reached before the once-an-hour touch write',
+      code.indexOf('holdsDeed(actorId, building) && (!held || held.by !== mine)') <
+      code.indexOf('held.touched = Date.now()'));
+  yes('and it speaks through the two the rest of the file uses',
+      /notify\(actorId, told\)/.test(code) && /say\(actorId, told\)/.test(code));
+}
+
+console.log('');
+console.log(pass + ' passed, ' + fail + ' failed');
+process.exit(fail ? 1 : 0);
