@@ -836,26 +836,29 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// A test track, dev build only. Asked for by Patrick on 20 September
-        /// for the launcher, the game's main menu and the loading screen, and
-        /// only on dev even when everything around it goes to main, out of
-        /// respect for the artist: the track is not the final one. So it plays
-        /// from the same file the game's menu plays, Data\Platform\UI\
-        /// thornswood-dev-theme.mp3, which dev packs carry and main packs and
-        /// the installer never do (Ship-Rules), and this refuses to play it on
-        /// anything but the dev build even when a copy is lying about.
+        /// The theme, for the launcher, the game's main menu and the loading
+        /// screen. Asked for by Patrick on 20 September, and held to the dev
+        /// build until 22 September out of respect for the artist, because the
+        /// track was not the final one. He supplied the final version that day
+        /// and said it goes to main, so the dev-only rule is gone: the file is
+        /// Data\Platform\UI\thornswood-theme.mp3, every pack and the installer
+        /// carry it, and it plays on every build.
+        ///
+        /// It plays from the same file the game's menu plays, so there is one
+        /// track on disk and not two.
         ///
         /// On a loop while the launcher is open and the game is not running:
         /// the game's own menu takes over the moment Play is pressed, and the
         /// launcher picks it up again when the game closes. Paused while the
         /// window is minimised, because music from a window nobody can see is
-        /// a puzzle rather than a mood.
+        /// a puzzle rather than a mood. Off entirely when the person has turned
+        /// it off in Settings, which is what MusicDecide reads.
         /// </summary>
         static MediaPlayer music;
         static void StartMenuMusic()
         {
-            if (cfg == null || !cfg.IsDev) return;
-            string src = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-dev-theme.mp3");
+            if (cfg == null) return;
+            string src = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-theme.mp3");
             if (!File.Exists(src)) return;
 
             // Played from a copy under Profile, never from the game folder. A
@@ -870,7 +873,7 @@ namespace Thornswood
             {
                 string dir = Path.Combine(Paths.ProfileDir, "Music");
                 Directory.CreateDirectory(dir);
-                file = Path.Combine(dir, "thornswood-dev-theme.mp3");
+                file = Path.Combine(dir, "thornswood-theme.mp3");
                 var a = new FileInfo(src);
                 var b = new FileInfo(file);
                 if (!b.Exists || b.Length != a.Length || b.LastWriteTimeUtc != a.LastWriteTimeUtc)
@@ -897,7 +900,7 @@ namespace Thornswood
                 music.Open(new Uri(file));
                 MusicDecide();
                 win.StateChanged += delegate { MusicDecide(); };
-                Stamp("Menu music: the dev test track is on, from " + file);
+                Stamp("Menu music: the theme is on, from " + file);
             }
             catch (Exception ex)
             {

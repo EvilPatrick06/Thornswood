@@ -33,9 +33,10 @@
   drops the character from its list; the character itself stays on the
   server, the way the old launcher's Delete worked.
 
-  MUSIC, dev only: the plugin passes a file name when the dev build carries
-  one, and the page plays it on a loop from the menu through the loading
-  screen. The page is reloaded once the world is up, which is what stops it.
+  MUSIC: the launcher passes a file name when the build carries the theme,
+  and the page plays it on a loop from the menu through the loading screen.
+  The page is reloaded once the world is up, which is what stops it. This was
+  dev only until 22 September, when the final track arrived and went to main.
 
   Same rule as every overlay: nothing calls loadUrl, this mounts itself and
   hides itself. Same look as the K panel next door.

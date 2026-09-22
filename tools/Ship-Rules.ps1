@@ -105,13 +105,20 @@ $ShipMachineFiles = @(
 )
 
 # Dev only. A path here rides in dev packs and never in a main pack or the
-# installer, whatever else goes to main. The one entry is the test track for
-# the launcher, the main menu and the loading screen, 20 September: the
-# artist has not signed it off, so it stays on dev out of respect for them
-# until they do. The launcher and the plugin also refuse to play it on
-# anything but the dev build, so a stray copy on a main install is silent.
+# installer, whatever else goes to main.
+#
+# EMPTY SINCE 22 SEPTEMBER, and the list stays because the reason for it will
+# come round again. Its one entry was thornswood-dev-theme.mp3, the test track
+# for the launcher, the main menu and the loading screen. It was held on dev
+# from 20 September because the artist had not signed it off, and holding it
+# was the whole point of this list. Patrick supplied the final version on
+# 22 September and said it goes to main, so the track is now
+# Data\Platform\UI\thornswood-theme.mp3, it ships everywhere, and the dev-only
+# name went with the dev-only rule.
+#
+# Put a path back here the next moment something is playable on dev but not
+# ours to give out yet. Do not take one out without the owner's word.
 $ShipDevOnlyFiles = @(
-    'Data\Platform\UI\thornswood-dev-theme.mp3'
 )
 
 function Test-ShipDevOnly([string]$rel) {
