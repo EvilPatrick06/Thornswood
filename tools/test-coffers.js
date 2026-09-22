@@ -146,7 +146,7 @@ if (postBlock !== null) {
     const fn = new Function(
       'parts', 'actorId', 'profileId', 'toProfile', 'isJob',
       'boxes', 'notices', 'funds', 'takeGold', 'save', 'plog', 'mp',
-      'NOTICE_FEE', 'JOB_FEE', 'Number',
+      'NOTICE_FEE', 'JOB_FEE', 'Number', 'boardHere',
       postBlock + '\nreturn post;');
     const call = fn(
       null, null, null, null, null,
@@ -158,7 +158,10 @@ if (postBlock !== null) {
       },
       function () { }, function () { },
       { get: function () { return { name: 'Alice' }; } },
-      20, 30, Number);
+      20, 30, Number,
+      // Standing at Whiterun's board unless the test says otherwise. The
+      // board is what makes /notice a board rather than a command.
+      function () { return opts.noBoard ? null : 'whiterun'; });
     call(opts.parts, 0xff000058, ALICE,
          function (pid, m) { told.push(m); }, !!opts.isJob);
     return { told: told, notices: notices, funds: funds, took: took.n };
@@ -190,18 +193,96 @@ if (postBlock !== null) {
     yes('S8 and is told the price', r.told[0].indexOf('20 gold') !== -1);
   }
 
-  // S9: and with nowhere for the fee to go, it says so rather than taking it.
+  // S9: AWAY FROM A BOARD NOTHING IS POSTED AND NOTHING IS CHARGED. This is
+  //     what makes it a board rather than a command you can say anywhere.
   {
-    const r = posting({ parts: ['/notice', 'Room'], noBox: true });
-    yes('S9 with no box anywhere the fee is not taken', r.took === 0);
-    yes('S9 and it says a steward sets one',
-        r.told[0].indexOf('/box') !== -1);
+    const r = posting({ parts: ['/notice', 'Room'], noBoard: true });
+    yes('S9 away from a board the fee is not taken', r.took === 0);
+    yes('S9 and it says to stand at one',
+        r.told[0].indexOf('notice board') !== -1);
   }
 
   // S10: an empty notice is not a twenty gold blank.
   {
     const r = posting({ parts: ['/notice'] });
     yes('S10 an empty notice costs nothing', r.took === 0);
+  }
+}
+
+// ------------------------------------------------------ the taker's list
+//
+// Patrick: thirty gold for a job, "which goes on the taker's list". A job is
+// the one thing on a board with a second half. The server records who took
+// what and takes it off the open board so two people do not both go and do it.
+// It does NOT pay anybody and there is no /done: the poster paid to put it up,
+// and whether it was done is between the two of them, the same way rent is
+// handed to a steward in person. A server that judged whether a job was
+// finished would be refereeing roleplay.
+{
+  const takeBlock = lift('  function take(parts, actorId, profileId, toProfile) {', '\n  }\n');
+  yes('the taker\'s list is in the gamemode', takeBlock !== null);
+
+  function taking(opts) {
+    const told = [];
+    const notices = { whiterun: opts.list };
+    const fn = new Function(
+      'parts', 'actorId', 'profileId', 'toProfile',
+      'boardHere', 'notices', 'save', 'plog', 'mp', 'Number',
+      takeBlock + '\nreturn take;');
+    const call = fn(
+      null, null, null, null,
+      function () { return opts.noBoard ? null : 'whiterun'; },
+      notices, function () { }, function () { },
+      { get: function () { return { name: opts.who || 'Bob' }; } },
+      Number);
+    call(opts.parts, 0xff000058, opts.by,
+         function (pid, m) { told.push(m); });
+    return { told: told, list: notices.whiterun };
+  }
+
+  if (takeBlock !== null) {
+    const job = () => ({ by: ALICE, name: 'Alice', text: 'Clear the cellar',
+                         at: 1, job: true, taken: 0 });
+    const notice = () => ({ by: ALICE, name: 'Alice', text: 'Room to let',
+                            at: 1, job: false, taken: 0 });
+
+    // S11: taking a job puts your name on it.
+    {
+      const r = taking({ by: 202, parts: ['/take', '1'], list: [job()] });
+      yes('S11 a job can be taken', r.list[0].taken === 202);
+      yes('S11 and the taker is named on it', r.list[0].takenName === 'Bob');
+      yes('S11 and is sent to the person who posted it',
+          r.told[0].indexOf('Alice') !== -1);
+    }
+
+    // S12: and only one person gets it.
+    {
+      const held = job(); held.taken = 303; held.takenName = 'Cyrus';
+      const r = taking({ by: 202, parts: ['/take', '1'], list: [held] });
+      yes('S12 a job somebody already has cannot be taken again',
+          r.list[0].taken === 303);
+      yes('S12 and says who has it', r.told[0].indexOf('Cyrus') !== -1);
+    }
+
+    // S13: a notice is not a job.
+    {
+      const r = taking({ by: 202, parts: ['/take', '1'], list: [notice()] });
+      yes('S13 a notice cannot be taken', r.list[0].taken === 0);
+      yes('S13 and says so', r.told[0].indexOf('not a job') !== -1);
+    }
+
+    // S14: and you cannot take your own.
+    {
+      const r = taking({ by: ALICE, parts: ['/take', '1'], list: [job()] });
+      yes('S14 your own job is not takeable', r.list[0].taken === 0);
+    }
+
+    // S15: away from the board, nothing.
+    {
+      const r = taking({ by: 202, parts: ['/take', '1'], list: [job()],
+                         noBoard: true });
+      yes('S15 a job cannot be taken from across Skyrim', r.list[0].taken === 0);
+    }
   }
 }
 

@@ -11473,7 +11473,7 @@ log('gamemode loaded:',
       try { require('fs').mkdirSync(dir, { recursive: true }); } catch (e) { }
       require('fs').writeFileSync(registerPath(),
         JSON.stringify({ claims: claims, stewards: stewards, boxes: boxes,
-                        funds: funds, notices: notices }, null, 1));
+                        funds: funds, notices: notices, boards: boards }, null, 1));
     } catch (e) {
       plog('could not write the register:', e);
     }
@@ -12507,6 +12507,96 @@ log('gamemode loaded:',
     return true;
   }
 
+
+  /*
+    ------------------------------------------------------- where a board is
+
+    Patrick asked for the physical boards with guessed coordinates, to be
+    adjusted later. THESE COORDINATES ARE NOT GUESSED, and that is better than
+    what was asked for: they are the nine arrival points out of the chargen
+    table, one inn per hold, which are real positions that people are already
+    teleported to and stood up at every time a character is made. A number I
+    invented for the ground outside a keep would be a number nobody had ever
+    stood on, and the first thing anybody would find is that the board is
+    inside a rock.
+
+    So the board in each hold starts at that hold's inn, which is where a
+    notice board belongs anyway, and a steward moves it with /board here the
+    moment somebody decides it should be by the keep instead. That is the
+    adjustment Patrick asked for, done by walking to the spot rather than by
+    editing a file and shipping a release.
+
+    NO NEW RECORD AND NO PLACED REFERENCE. A board is a PLACE: a cell and a
+    point in it. Adding an activator to Thornswood-Content.esp and placing nine
+    references would need the plugin rebuilt, sent to the server and packed to
+    every client, and a corrupt plugin takes the whole server down for
+    everybody. A place needs none of that and reads the same from the chair:
+    stand by the board, say /notice, and it goes up.
+  */
+  var BOARD_REACH = 400;
+  var boards = loadPart('boards', null) || seededBoards();
+
+  function seededBoards() {
+    var out = {};
+    /*
+      Straight out of PASSAGES, which is the chargen table and is top level in
+      this file. Each town's arrival carries the interior cell descriptor and
+      the exact point somebody is stood up at when they pick that home, so
+      these are positions the server has already put people on, over and over.
+      That is why they are not guesses.
+    */
+    try {
+      for (var desc in PASSAGES) {
+        if (!Object.prototype.hasOwnProperty.call(PASSAGES, desc)) { continue; }
+        var t = PASSAGES[desc];
+        if (t && t.key && t.arrival && t.arrival.desc && t.arrival.pos) {
+          out[t.key] = { cell: t.arrival.desc,
+                         pos: [t.arrival.pos[0], t.arrival.pos[1], t.arrival.pos[2]],
+                         where: t.town || t.key };
+        }
+      }
+    } catch (e) {
+      plog('could not seed the boards from the town table:', e);
+    }
+    return out;
+  }
+
+  /** The hold whose board somebody is standing at, or null. */
+  function boardHere(actorId) {
+    var cell = null, pos = null;
+    try { cell = mp.get(actorId, 'worldOrCellDesc'); } catch (e) { return null; }
+    try { pos = mp.get(actorId, 'pos'); } catch (e) { return null; }
+    if (!cell || !pos) { return null; }
+    for (var hold in boards) {
+      if (!Object.prototype.hasOwnProperty.call(boards, hold)) { continue; }
+      var b = boards[hold];
+      if (!b || b.cell !== cell || !b.pos) { continue; }
+      var dx = pos[0] - b.pos[0], dy = pos[1] - b.pos[1], dz = pos[2] - b.pos[2];
+      if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= BOARD_REACH) { return hold; }
+    }
+    return null;
+  }
+
+  /** A steward moves a hold's board to where they stand. */
+  function moveBoard(hold, actorId, profileId, toProfile) {
+    if (!isSteward(profileId)) {
+      toProfile(profileId, 'Only a steward moves a board.');
+      return true;
+    }
+    var cell = null, pos = null;
+    try { cell = mp.get(actorId, 'worldOrCellDesc'); } catch (e) { cell = null; }
+    try { pos = mp.get(actorId, 'pos'); } catch (e) { pos = null; }
+    if (!cell || !pos) {
+      toProfile(profileId, 'The server cannot tell where you are standing.');
+      return true;
+    }
+    boards[hold] = { cell: cell, pos: [pos[0], pos[1], pos[2]], where: hold };
+    save();
+    plog('a steward put', hold + '\'s board where they stood');
+    toProfile(profileId, hold + '\'s board is here now.');
+    return true;
+  }
+
   /*
     ---------------------------------------------------------- the boards
 
@@ -12536,13 +12626,15 @@ log('gamemode loaded:',
   }
 
   function post(parts, actorId, profileId, toProfile, isJob) {
-    var hold = null;
-    for (var h in boxes) {
-      if (Object.prototype.hasOwnProperty.call(boxes, h)) { hold = h; break; }
-    }
+    /*
+      AT THE BOARD, because that is what makes it a board rather than a
+      command. It is the same rule as claiming at a door: the place is the
+      thing that makes it real, and a notice posted from the other side of
+      Skyrim is a text message.
+    */
+    var hold = boardHere(actorId);
     if (!hold) {
-      toProfile(profileId, 'No hold has a box yet, so there is nowhere for the fee to go. ' +
-                           'A steward sets one with /box.');
+      toProfile(profileId, 'Stand at a hold\'s notice board to put something on it.');
       return true;
     }
     var text = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
@@ -12572,25 +12664,143 @@ log('gamemode loaded:',
     return true;
   }
 
-  function board(parts, profileId, toProfile) {
-    var hold = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : null;
-    if (!hold) {
-      for (var h in boxes) {
-        if (Object.prototype.hasOwnProperty.call(boxes, h)) { hold = h; break; }
+  function board(parts, actorId, profileId, toProfile) {
+    var arg = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
+    var standing = boardHere(actorId);
+
+    // /board here moves it, and only a steward may.
+    if (arg === 'here') {
+      if (!standing) {
+        toProfile(profileId, 'Say which hold: /board here needs you at the board you are moving.');
+        return true;
       }
+      return moveBoard(standing, actorId, profileId, toProfile);
     }
+    if (arg && arg !== 'here' && Object.prototype.hasOwnProperty.call(boards, arg)) {
+      // A steward naming a hold moves THAT hold's board to where they stand,
+      // which is how a board gets put somewhere for the first time.
+      if (isSteward(profileId)) { return moveBoard(arg, actorId, profileId, toProfile); }
+    }
+
+    var hold = standing || arg || null;
     var list = (hold && notices[hold]) || [];
+    if (!hold) {
+      toProfile(profileId, 'Stand at a board, or name a hold.');
+      return true;
+    }
     if (!list.length) {
-      toProfile(profileId, hold ? 'Nothing on the board in ' + hold + '.'
-                                : 'No board anywhere yet.');
+      toProfile(profileId, 'Nothing on the board in ' + hold + '.');
       return true;
     }
     var lines = [];
     for (var i = 0; i < list.length && i < 10; i++) {
       var n = list[i];
-      lines.push((n.job ? '[job] ' : '') + n.name + ': ' + n.text);
+      lines.push('[' + (i + 1) + '] ' + (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') +
+                 n.name + ': ' + n.text);
     }
     toProfile(profileId, 'The board in ' + hold + ':\n' + lines.join('\n'));
+    return true;
+  }
+
+  /*
+    ------------------------------------------------------ the taker's list
+
+    Patrick: thirty gold for a job, "which goes on the taker's list". So a job
+    is the one thing on a board that has a second half: somebody takes it, and
+    from then on it is theirs.
+
+    WHAT THE SERVER DOES AND DOES NOT DO. It records who took what and when,
+    and it takes the job off the open board so two people do not both go and
+    do it. It does NOT pay anybody, and there is no /done. The poster paid to
+    put the job up; what it is worth and whether it was done is between the
+    two of them, the same way rent is handed to a steward in person. A server
+    that judged whether a job was finished would be a server refereeing
+    roleplay, which is the one thing Patrick has been clear it should not do.
+
+    A taker can hand it back with /drop, because somebody who takes a job and
+    then cannot do it should not leave it dead on the board for ever.
+  */
+  function take(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at a board to take a job off it.');
+      return true;
+    }
+    var list = notices[hold] || [];
+    var at = Number((parts && parts[1]) || 0) - 1;
+    if (!(at >= 0 && at < list.length)) {
+      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      return true;
+    }
+    var n = list[at];
+    if (!n.job) {
+      toProfile(profileId, 'That is a notice, not a job. There is nothing to take.');
+      return true;
+    }
+    if (n.taken) {
+      toProfile(profileId, n.takenName + ' has that one.');
+      return true;
+    }
+    if (n.by === profileId) {
+      toProfile(profileId, 'That is your own job.');
+      return true;
+    }
+    var who = 'somebody';
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { who = String(ap.name); }
+    } catch (e) { }
+    n.taken = profileId;
+    n.takenName = who;
+    n.takenAt = Date.now();
+    save();
+    plog(who, 'took a job in', hold + ':', n.text);
+    toProfile(profileId, 'You take it: ' + n.text + '. Go and see ' + n.name + ' about it.');
+    return true;
+  }
+
+  /** What somebody is carrying off the boards, anywhere in Skyrim. */
+  function jobs(profileId, toProfile) {
+    var lines = [];
+    for (var hold in notices) {
+      if (!Object.prototype.hasOwnProperty.call(notices, hold)) { continue; }
+      var list = notices[hold];
+      for (var i = 0; i < list.length; i++) {
+        var n = list[i];
+        if (n.job && n.taken === profileId) {
+          lines.push(hold + ': ' + n.text + ' (for ' + n.name + ')');
+        }
+      }
+    }
+    toProfile(profileId, lines.length
+      ? 'You have taken:\n' + lines.join('\n')
+      : 'You have taken no jobs.');
+    return true;
+  }
+
+  /** Hand one back, so it does not sit dead on the board. */
+  function dropJob(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at the board you took it from.');
+      return true;
+    }
+    var list = notices[hold] || [];
+    var at = Number((parts && parts[1]) || 0) - 1;
+    if (!(at >= 0 && at < list.length)) {
+      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      return true;
+    }
+    var n = list[at];
+    if (!n.job || n.taken !== profileId) {
+      toProfile(profileId, 'That is not one of yours.');
+      return true;
+    }
+    n.taken = 0;
+    n.takenName = null;
+    save();
+    plog(profileId, 'gave a job back in', hold);
+    toProfile(profileId, 'You put it back on the board.');
     return true;
   }
 
@@ -12615,7 +12825,10 @@ log('gamemode loaded:',
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
-    if (word === '/board') { return board(parts, profileId, toProfile); }
+    if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
+    if (word === '/take') { return take(parts, actorId, profileId, toProfile); }
+    if (word === '/jobs') { return jobs(profileId, toProfile); }
+    if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
     return false;
   }
 
@@ -12731,6 +12944,7 @@ log('gamemode loaded:',
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
     notices: function () { return notices; },
+    boards: function () { return boards; }, boardHere: boardHere,
     stewards: function () { return stewards.slice(); }
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
@@ -13954,7 +14168,8 @@ log('gamemode loaded:',
         word === '/unlock' || word === '/mold' || word === '/key' ||
         word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/notice' || word === '/job' ||
-        word === '/board') {
+        word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/dropjob') {
       if (!actorId) {
         toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
         return true;
@@ -14245,7 +14460,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
                '/steward', '/evict', '/box', '/rent',
-               '/notice', '/job', '/board',
+               '/notice', '/job', '/board', '/take', '/jobs', '/dropjob',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks'];
 
 /*
@@ -14267,7 +14482,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // thing somebody standing at a door wants to know, and
                       // the steward half answers "only a steward sets rent"
                       // to everybody else.
-                      '/box', '/rent', '/notice', '/job', '/board', '/help'];
+                      '/box', '/rent', '/notice', '/job', '/board',
+                      '/take', '/jobs', '/dropjob', '/help'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
