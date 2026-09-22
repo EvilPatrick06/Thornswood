@@ -1013,6 +1013,67 @@ function sessionRow(t, o, key) {
   };
 }
 
+/* The whole member list in ONE request instead of one request per person.
+
+   /api/allowed walks every linked account and asked Discord about each one
+   separately. standingCached holds an answer for sixty seconds and both doors
+   ask every five minutes, so the cache was always cold by the time they came
+   back: about forty lookups per door, two doors, every five minutes, in a
+   burst. The live server's log read "the site could not reach Discord, keeping
+   the list as it was: rate limited by Discord" at 16:44, 16:49, 16:54, 16:59,
+   17:04 and 17:09 on 22 September, once per refresh, which is what that burst
+   looks like from the other end.
+
+   One request answers for everybody. Cached the same sixty seconds, so a page
+   that asks about several people in a row still only asks Discord once.
+
+   It needs the Server Members intent, which is a switch in the Discord
+   developer portal and may be off. A 403 comes back, byId stays null, and
+   every caller falls through to the single lookup it used before, so this can
+   only make things better or leave them exactly as they were. */
+let membersCache = { at: 0, byId: null };
+async function guildMembers() {
+  /* Keyed on WHEN it was asked, not on what came back. Testing byId meant a
+     failure was never remembered, because a failure stores null and null is
+     falsy, so a guild with the intent switched off asked for the whole list
+     once per person: ten people, ten refused list requests, on top of their
+     ten single lookups. That is worse than not having this at all, and the
+     comment below claimed the opposite until test-discord-members.js was run
+     against it. */
+  if (membersCache.at && Date.now() - membersCache.at < 60000) return membersCache.byId;
+  if (!cfg.discord.botToken || !cfg.discord.guildId) return null;
+  const r = await discordGet('/guilds/' + cfg.discord.guildId + '/members?limit=1000');
+  if (!r.ok || !Array.isArray(r.body)) {
+    // Remembered as a failure for the same sixty seconds. Without this, a
+    // guild with the intent switched off asks for the whole list once per
+    // person and doubles the very thing this is here to stop.
+    membersCache = { at: Date.now(), byId: null };
+    return null;
+  }
+  const byId = {};
+  r.body.forEach(function (m) { if (m && m.user && m.user.id) byId[String(m.user.id)] = m; });
+  membersCache = { at: Date.now(), byId: byId };
+  return byId;
+}
+
+/* One member, out of the cached list when it is there and by name when it is
+   not. Answers in the same shape discordGet does, so callers do not change. */
+async function memberOf(discordId) {
+  const all = await guildMembers();
+  if (all) {
+    const hit = all[String(discordId)];
+    if (hit) return { ok: true, status: 200, body: hit };
+    /* Absent from a COMPLETE list means not in the server, which is a 404 and
+       is the one answer callers treat as certain. A list of exactly 1000 is
+       the page limit rather than the whole guild, so it proves nothing about
+       who is missing and the single lookup has to be asked. */
+    if (Object.keys(all).length < 1000) {
+      return { ok: false, status: 404, body: null, why: 'not found' };
+    }
+  }
+  return await discordGet('/guilds/' + cfg.discord.guildId + '/members/' + discordId);
+}
+
 /* What this person is allowed to do, decided by their roles in the Discord and
    nothing else. Leaving the server, or being given the Banned role, takes
    everything away at once, which is the whole reason for doing it this way. */
@@ -1027,7 +1088,7 @@ async function standing(discordId) {
   if (cfg.admins.indexOf(String(discordId)) >= 0) {
     out.admin = true; out.play = true; out.inGuild = true; out.dev = true;
     if (cfg.discord.botToken && cfg.discord.guildId) {
-      const r = await discordGet('/guilds/' + cfg.discord.guildId + '/members/' + discordId);
+      const r = await memberOf(discordId);
       if (r.ok) {
         const me = r.body;
         out.name = (me.nick || (me.user && (me.user.global_name || me.user.username)) || '');
@@ -1047,7 +1108,7 @@ async function standing(discordId) {
     out.play = true;
     return out;
   }
-  const r = await discordGet('/guilds/' + cfg.discord.guildId + '/members/' + discordId);
+  const r = await memberOf(discordId);
   if (!r.ok) {
     // A real 404 is the only one that means "not in the server". Everything
     // else is the site's problem and has to say so, or somebody who IS in the
