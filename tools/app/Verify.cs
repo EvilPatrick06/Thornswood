@@ -606,9 +606,25 @@ namespace Thornswood
         /// </summary>
         public static int Fix() { return Fix(null, null); }
 
-        public static int Fix(Config cfg, Action<string> say)
+        /// <summary>
+        /// The reference plugin list into the file the game actually reads.
+        /// How many files were copied.
+        ///
+        /// Its own method because it is also run straight after an update that
+        /// carried one, and it is the ONLY part of Fix that may be. Until
+        /// 22 September a pack's profile entry landed in Profile\Default and
+        /// stopped there, so a release that moved the load order installed
+        /// cleanly and then refused the person at the door until they went
+        /// back to the launcher and pressed Fix. A first time person reads
+        /// that as the game being broken, and they are not wrong to.
+        ///
+        /// Nothing else in Fix may run on that path. IsolateForeign and
+        /// IsolateCreations move other people's files aside and PutInServerOrder
+        /// asks the server, and none of that is wanted unprompted after every
+        /// pack.
+        /// </summary>
+        public static int SettleLoadOrder()
         {
-            if (say == null) say = delegate(string m) { };
             int n = 0;
             foreach (string f in new string[] { "plugins.txt", "loadorder.txt" })
             {
@@ -618,6 +634,13 @@ namespace Thornswood
                 File.Copy(src, Path.Combine(Paths.Live, f), true);
                 n++;
             }
+            return n;
+        }
+
+        public static int Fix(Config cfg, Action<string> say)
+        {
+            if (say == null) say = delegate(string m) { };
+            int n = SettleLoadOrder();
 
             // Fix means make this install match what the server expects, and
             // another server's client running the main menu is the furthest
