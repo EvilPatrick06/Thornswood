@@ -923,7 +923,19 @@ if (PAGES[here]) {
              '<p>Open a ticket saying who you are and why you want in. It is a few ' +
              'lines, not an essay, and somebody answers. If you are accepted your ' +
              'Discord account is what lets you through, so there is nothing else to ' +
-             'sign up for.</p></div></div>' +
+             'sign up for.</p>' +
+             // The first step is the only one that had no way to do it from
+             // here. The installer has its two buttons and the collection has
+             // one, and this said come into the Discord without a door. The
+             // invite comes from version.json by way of the feed, the same as
+             // the collection's address, so there is one copy of it.
+             (d.invite
+               ? '<div class="grab"><a class="btn first" href="' + esc(d.invite) +
+                 '" target="_blank" rel="noopener">Open the Discord</a>' +
+                 '<p class="also faintly">The invite never expires. Open a ticket ' +
+                 'once you are in.</p></div>'
+               : '') +
+             '</div></div>' +
            '<div class="step"><div><h3>Take the installer</h3>' +
              '<p>One file. Download it and run it. It is small because the mods are ' +
              'not in it, and it fetches what it needs while you watch, so a ' +
