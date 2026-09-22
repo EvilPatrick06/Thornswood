@@ -194,9 +194,19 @@ function Read-PluginHeader([string]$path) {
     [void]$fs.Read($b, 0, $len)
     $fs.Close()
 
-    $light = ($path -match '\.esl$')
+    # Two bits in the same dword at offset 8, and until 22 September only one
+    # of them was read. 0x200 is light, which gets no index. 0x1 is master,
+    # which the game honours BEFORE the list order: a master-flagged plugin is
+    # hoisted to the front whatever position the list gives it. An .esm is
+    # master by extension whether or not the bit is set, and an .esp can carry
+    # the bit, which is the silent case: the game moves it, the server does
+    # not, and every form id after it is computed from the wrong position.
+    $light  = ($path -match '\.esl$')
+    $master = ($path -match '\.esm$')
     if ($len -ge 12 -and [Text.Encoding]::ASCII.GetString($b,0,4) -eq 'TES4') {
-        if (([BitConverter]::ToUInt32($b,8) -band 0x200) -ne 0) { $light = $true }
+        $flags = [BitConverter]::ToUInt32($b,8)
+        if (($flags -band 0x200) -ne 0) { $light  = $true }
+        if (($flags -band 0x1)   -ne 0) { $master = $true }
     }
 
     $masters = @()
@@ -209,7 +219,17 @@ function Read-PluginHeader([string]$path) {
             }
         }
     }
-    [pscustomobject]@{ Light = $light; Masters = ($masters | Select-Object -Unique) }
+    [pscustomobject]@{ Light = $light; Master = $master; Masters = ($masters | Select-Object -Unique) }
+}
+
+# The master-flagged entries first, in the order they already have, then the
+# rest in the order they already have. Stable both sides, because LOOT's
+# ordering within each block is meaningful and a sort that shuffles it is a
+# worse bug than the one being fixed.
+function Sort-MastersFirst($names, $info) {
+    $first = @($names | Where-Object { $info[$_] -and $info[$_].Master })
+    $rest  = @($names | Where-Object { -not ($info[$_] -and $info[$_].Master) })
+    return @($first + $rest)
 }
 
 # ---- build the load order --------------------------------------------------
@@ -248,6 +268,15 @@ if (-not $FullLoadOrder) {
 } else { $lightCount = 0 }
 
 $keep  = @($wanted | Where-Object { $info[$_] -and -not $drop.Contains($_) })
+
+# A plugin the list names that is not in Data. It was collected and then
+# thrown away, so a list naming a plugin nobody has said nothing at all and
+# the server quietly shipped an order one shorter than the one being read.
+if ($missing.Count) {
+    Write-Host ("  {0} plugin(s) the list names are not in {1}:" -f $missing.Count, $Data) -ForegroundColor Yellow
+    foreach ($m in $missing) { Write-Host "    $m" -ForegroundColor Yellow }
+    Write-Host '    They take no place in the server list. Every machine that has them is one place off from here on.' -ForegroundColor Yellow
+}
 
 # ---- the order the server already runs stays ------------------------------
 #
@@ -289,8 +318,36 @@ if ($prior.Count) {
     Write-Host ("  order kept from the server's own list: {0} in place, {1} new on the end, {2} gone" -f $ordered.Count, $added.Count, $removed.Count) -ForegroundColor Cyan
     foreach ($a in $added)   { Write-Host "    + $a" -ForegroundColor Green }
     foreach ($r in $removed) { Write-Host "    - $r   every plugin after it moves up one; the world's saved forms from those plugins are re-keyed" -ForegroundColor Yellow }
-} elseif ($NewOrder) {
-    Write-Host "  -NewOrder: the plugin list's order is taken as it is" -ForegroundColor Yellow
+
+    # The order is not re-sorted here, deliberately. A master that is already
+    # in the server's list is where the world's form ids say it is, and
+    # hoisting it now would re-key every saved form after it. But a NEW
+    # master-flagged plugin goes on the end, and the game will load it at the
+    # front, so client and server disagree from that plugin's own position
+    # onwards the moment anybody starts the game. Say so rather than deploy it
+    # quietly; -NewOrder with a wipe is the way out.
+    $newMasters = @($added | Where-Object { $info[$_] -and $info[$_].Master })
+    if ($newMasters.Count) {
+        Write-Host ''
+        Write-Host ("  STOP. {0} new plugin(s) carry the master flag:" -f $newMasters.Count) -ForegroundColor Red
+        foreach ($m in $newMasters) { Write-Host "    $m" -ForegroundColor Red }
+        Write-Host '  The game loads a master-flagged plugin at the front whatever the list says,' -ForegroundColor Red
+        Write-Host '  so it cannot go on the end of an order the world is already keyed to.' -ForegroundColor Red
+        Write-Host '  Either take it out of the collection, or wipe the world and rebuild the' -ForegroundColor Red
+        Write-Host '  order with -NewOrder, which re-keys everything on purpose.' -ForegroundColor Red
+        throw 'a new master-flagged plugin cannot be appended to the live order'
+    }
+} else {
+    # Nothing to follow, so this is where the order is decided. The game puts
+    # every master-flagged plugin first, so the server's list has to as well
+    # or the two disagree from the first non-master onwards.
+    $before = $keep
+    $keep = Sort-MastersFirst $keep $info
+    $movedMasters = 0
+    for ($i = 0; $i -lt $keep.Count; $i++) { if ($keep[$i] -ne $before[$i]) { $movedMasters++ } }
+    $masterCount = @($keep | Where-Object { $info[$_] -and $info[$_].Master }).Count
+    if ($NewOrder) { Write-Host "  -NewOrder: the plugin list's order is taken as it is" -ForegroundColor Yellow }
+    Write-Host ("  masters first: {0} master-flagged, {1} position(s) changed" -f $masterCount, $movedMasters) -ForegroundColor Cyan
 }
 
 $paths = @($keep | ForEach-Object { (Join-Path $Data $_) -replace '\\', '/' })
