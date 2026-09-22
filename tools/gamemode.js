@@ -2341,8 +2341,26 @@ function beginChoosing(actorId, state, why) {
   setChargen(actorId, state);
   closeRaceMenu(actorId);
   const opened = openCreation(actorId);
-  say(actorId, 'Welcome to Thornswood. Press K to choose where you will start. ' +
-               'Your class and profession can be chosen there too, or later in the world.');
+  /*
+    THE LINE IS FOR THE PANEL THAT DID NOT OPEN, AND FOR NOBODY ELSE.
+
+    Patrick, 21 September: "during creation it shouldnt put in chat to press k
+    to begin blah blah because it brings the menu up automically and that is
+    chat spam and is unnescery". His own clips show it twice over, because the
+    reminder below says it again every thirty seconds.
+
+    openCreation pushes the panel onto the screen and answers whether it went.
+    When it went, the person is looking at the thing the sentence describes and
+    being told to press a key to open what is already open is noise. When it
+    did NOT go, the sentence is the only way out of the room, so it is said
+    then, and it says what has actually happened rather than pretending this is
+    the normal greeting.
+  */
+  if (!opened) {
+    say(actorId, 'Welcome to Thornswood. The starting panel did not open by ' +
+                 'itself. Press K to choose where you will start. Your class ' +
+                 'and profession can be chosen there too, or later in the world.');
+  }
   log('chargen', actorId.toString(16), '-> choosing (' + why + ')' +
       (opened ? ', panel opened' : ', panel NOT opened'));
 }
@@ -2862,8 +2880,20 @@ function chargenTick() {
       if (now < (state.remindAt || 0)) { continue; }
       state.remindAt = now + CHOOSE_REMIND_MS;
       setChargen(actorId, state);
-      openCreation(actorId);
-      say(actorId, 'Press K to choose where you will start. Your class and profession can wait until you are there.');
+      /*
+        THE REMINDER STILL PUSHES THE PANEL, SILENTLY. See beginChoosing.
+
+        This is the rescue for a panel that never arrived, and pushing it again
+        costs the person nothing. Saying so every thirty seconds cost them a
+        chat window, which is what Patrick's clips show. The sentence is kept
+        for the case it was written for: the push failed, so there is nothing
+        on their screen and a key press is the only way on.
+      */
+      if (!openCreation(actorId)) {
+        say(actorId, 'The starting panel did not open. Press K to choose where ' +
+                     'you will start. Your class and profession can wait until ' +
+                     'you are there.');
+      }
       continue;
     }
 
