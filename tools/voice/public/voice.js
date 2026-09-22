@@ -104,6 +104,8 @@ function reconcile(list) {
     // lower peer id is the one that starts, which every pair agrees on without
     // having to be told.
     open(id, p, myPeer < id);
+    // Anything that arrived for them before now. See hold().
+    replay(id);
   }
   draw();
 }
@@ -155,6 +157,44 @@ function open(id, info, initiator) {
     }
   };
 
+  /*
+    IS ANYBODY ACTUALLY GETTING MY VOICE.
+
+    Patrick, 21 September, on the dev server: "for voice I could here Djinn on
+    Dev server but he couldnt hear me, my indicator ashowed green but he coudnt
+    hear me at all".
+
+    THE GREEN DOT HAS NEVER MEANT THAT. Read draw(): the dot's class comes from
+    rec.dist, so green means "this person is standing near me in the world" and
+    nothing else, and the bar beside it is THEIR level coming in. There was no
+    indication anywhere on this page of whether your own voice was leaving the
+    machine. So the one fault a proximity voice system can have that nobody can
+    self diagnose was also the one the page could not show.
+
+    outbound-rtp packetsSent is the ground truth: it is counted by the sender's
+    own stack once media is actually going out on that connection. If it is
+    climbing, they are receiving audio and the problem is at their end. If it
+    is stuck, it is at ours, and which one it is is the whole diagnosis.
+  */
+  rec.sent = null;
+  rec.sending = false;
+  const poll = setInterval(() => {
+    if (!conns.has(id)) { clearInterval(poll); return; }
+    pc.getStats(null).then((report) => {
+      report.forEach((r) => {
+        if (r.type !== 'outbound-rtp' || r.kind !== 'audio') { return; }
+        const n = Number(r.packetsSent) || 0;
+        // Climbing, not merely non-zero. A connection that sent a little and
+        // then stopped is the exact fault being looked for, and a raw count
+        // would keep saying yes forever.
+        rec.sending = (rec.sent !== null && n > rec.sent);
+        rec.sent = n;
+      });
+      draw();
+    }).catch(() => { });
+  }, 2000);
+  rec.poll = poll;
+
   pc.ontrack = (e) => {
     const src = ctx.createMediaStreamSource(e.streams[0]);
     src.connect(panner);
@@ -170,39 +210,129 @@ function open(id, info, initiator) {
     draw();
   };
 
-  if (initiator) {
-    pc.onnegotiationneeded = async () => {
+  /*
+    BOTH SIDES CAN RENEGOTIATE, AND ONE OF THEM IS POLITE ABOUT IT.
+
+    This block used to be wrapped in `if (initiator)`, so the answering side
+    had NO renegotiation path at all, ever. Its tracks went out in the first
+    answer or they never went out. Anything that changed its sending state
+    after that, a track added a moment late, a device that came back, a
+    connection that had to be rebuilt, was permanent and silent and in one
+    direction only, which is exactly the shape Patrick reported.
+
+    Wiring both sides means both can offer, and two offers crossing is a glare
+    collision that breaks the connection outright. The standard answer is
+    perfect negotiation: one side is polite and gives way, the other is not.
+    The roles come from the same comparison that used to pick the initiator,
+    so every pair still agrees without being told: the lower peer id is the
+    impolite one and keeps its offer.
+  */
+  rec.polite = !initiator;
+  rec.making = false;
+  rec.ignoring = false;
+
+  pc.onnegotiationneeded = async () => {
+    try {
+      rec.making = true;
+      await pc.setLocalDescription();
+      if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ t: 'sdp', to: id, sdp: pc.localDescription }));
+      }
+    } catch (e) {
+      // Older browsers want the offer made by hand. Same message either way.
       try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        ws.send(JSON.stringify({ t: 'sdp', to: id, sdp: pc.localDescription }));
-      } catch (e) { }
-    };
+        if (ws && ws.readyState === 1) {
+          ws.send(JSON.stringify({ t: 'sdp', to: id, sdp: pc.localDescription }));
+        }
+      } catch (e2) { }
+    } finally {
+      rec.making = false;
+    }
+  };
+}
+
+/*
+  SIGNALLING THAT ARRIVES BEFORE THE PEER IS KNOWN IS KEPT, NOT DROPPED.
+
+  Both of these began `const rec = conns.get(m.from); if (!rec) return;`. A
+  connection is only opened by reconcile(), off a 'peers' message, so an offer
+  or a candidate that arrived before our own peer list caught up was thrown
+  away in silence. Nothing ever retried it: the sender had already fired its
+  one negotiation. The pair then had no media, or media one way only if some
+  of the candidates landed and some did not.
+
+  So anything for a peer we have not opened yet is held for twenty seconds and
+  replayed the moment reconcile() opens them. Twenty seconds because a 'peers'
+  message follows a join closely; anything older than that is for somebody who
+  has already gone.
+*/
+const pending = new Map();   // peerId -> [{at, m}]
+
+function hold(m) {
+  const list = pending.get(m.from) || [];
+  list.push({ at: Date.now(), m });
+  pending.set(m.from, list);
+}
+
+function replay(id) {
+  const list = pending.get(id);
+  if (!list) { return; }
+  pending.delete(id);
+  const now = Date.now();
+  for (const held of list) {
+    if (now - held.at > 20000) { continue; }
+    if (held.m.t === 'sdp') { onSdp(held.m); } else { onIce(held.m); }
   }
 }
 
 async function onSdp(m) {
   const rec = conns.get(m.from);
-  if (!rec) return;
+  if (!rec) { hold(m); return; }
   try {
+    /*
+      The polite half of perfect negotiation. See open(). If an offer arrives
+      while we are making our own, the polite side rolls back and takes theirs
+      and the impolite side ignores it, so the pair always settles on one.
+    */
+    const offerCollision = m.sdp.type === 'offer' &&
+      (rec.making || rec.pc.signalingState !== 'stable');
+    rec.ignoring = !rec.polite && offerCollision;
+    if (rec.ignoring) { return; }
+
     await rec.pc.setRemoteDescription(m.sdp);
     if (m.sdp.type === 'offer') {
-      const answer = await rec.pc.createAnswer();
-      await rec.pc.setLocalDescription(answer);
-      ws.send(JSON.stringify({ t: 'sdp', to: m.from, sdp: rec.pc.localDescription }));
+      await rec.pc.setLocalDescription();
+      if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ t: 'sdp', to: m.from, sdp: rec.pc.localDescription }));
+      }
     }
-  } catch (e) { }
+  } catch (e) {
+    // Older browsers want the answer made by hand.
+    try {
+      if (m.sdp.type === 'offer') {
+        const answer = await rec.pc.createAnswer();
+        await rec.pc.setLocalDescription(answer);
+        if (ws && ws.readyState === 1) {
+          ws.send(JSON.stringify({ t: 'sdp', to: m.from, sdp: rec.pc.localDescription }));
+        }
+      }
+    } catch (e2) { }
+  }
 }
 
 async function onIce(m) {
   const rec = conns.get(m.from);
-  if (!rec) return;
-  try { await rec.pc.addIceCandidate(m.candidate); } catch (e) { }
+  if (!rec) { hold(m); return; }
+  try { await rec.pc.addIceCandidate(m.candidate); }
+  catch (e) { if (!rec.ignoring) { /* a candidate for an offer we ignored */ } }
 }
 
 function drop(id) {
   const rec = conns.get(id);
   if (!rec) return;
+  try { if (rec.poll) { clearInterval(rec.poll); } } catch (e) { }
   try { rec.pc.close(); } catch (e) { }
   try { if (rec.el) { rec.el.pause(); rec.el.srcObject = null; } } catch (e) { }
   conns.delete(id);
@@ -257,7 +387,7 @@ function setPos(panner, x, y, z) {
 // ------------------------------------------------------------------- draw --
 function draw() {
   if (conns.size === 0) {
-    rows.innerHTML = '<tr><td colspan="3" class="note" style="border-top:none">Nobody yet.</td></tr>';
+    rows.innerHTML = '<tr><td colspan="4" class="note" style="border-top:none">Nobody yet.</td></tr>';
     return;
   }
   const parts = [];
@@ -273,9 +403,21 @@ function draw() {
     const cls = rec.dist == null ? '' : (near ? 'on' : 'far');
     const who = rec.name || ('profile ' + rec.profileId);
     const d = rec.dist == null ? 'elsewhere' : (rec.dist < 1 ? 'right here' : Math.round(rec.dist) + ' m');
+    /*
+      WHETHER THEY ARE GETTING YOUR VOICE, said in words.
+
+      The dot is proximity and the bar is what is coming IN, and neither has
+      ever said anything about what is going OUT. This column does, off
+      packetsSent. 'starting' is the first couple of seconds before there are
+      two samples to compare, and is not a fault.
+    */
+    const out = rec.sent === null ? 'starting'
+              : (rec.sending ? 'hears you' : 'CANNOT hear you');
+    const outCls = rec.sent === null ? '' : (rec.sending ? 'on' : 'far');
     parts.push('<tr><td><span class="dot ' + cls + '"></span>' + esc(who) + '</td>' +
                '<td class="n">' + d + '</td>' +
-               '<td class="n"><span class="bar"><i style="width:' + lvl + '%"></i></span></td></tr>');
+               '<td class="n"><span class="bar"><i style="width:' + lvl + '%"></i></span></td>' +
+               '<td class="n"><span class="dot ' + outCls + '"></span>' + out + '</td></tr>');
   }
   rows.innerHTML = parts.join('');
 }
