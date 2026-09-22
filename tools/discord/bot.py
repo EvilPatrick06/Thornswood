@@ -157,7 +157,17 @@ def _staff_channel_id():
         return 0
 
 
-TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id() or _dev_channel_id())
+# No fallback to the watcher's channel here, and that is the whole point.
+#
+# It used to read `_staff_channel_id() or _dev_channel_id()`, so with no
+# staff-channel.txt it took the watcher's id and never reached the name lookup
+# below. The first deploy on 22 September logged "speaking in #news", which is
+# the staff news channel: right kind of place, wrong place, and it would have
+# put every crash report in with the release announcements.
+#
+# 0 when there is no file, so _trouble_channel falls through to looking
+# staff-general up by name, which is what was wanted.
+TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
 
 # Where the site writes the sessions that went wrong. The bot and the site run
 # on the same box, so this is a file rather than a request: no ticket, no port
@@ -1085,9 +1095,9 @@ def _trouble_channel():
         log('trouble: %d channels are called staff-general, so nothing was '
             'said. Put the right id in staff-channel.txt or set '
             'TROUBLE_CHANNEL_ID.' % len(found))
-    else:
-        log('trouble: no channel called staff-general and no id given, so '
-            'nothing was said.')
+        return None
+
+    log('trouble: no channel called staff-general and no id given.')
     return None
 
 
