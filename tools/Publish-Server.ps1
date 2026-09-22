@@ -140,6 +140,39 @@ if ((Test-Path -LiteralPath $gmSrc) -and (Test-Path -LiteralPath $Dist)) {
 # about to be zipped, and a publish that quietly rewrites its own input is
 # worse than one that stops and names the command that fixes it.
 $settingsPath = Join-Path $Dist 'server-settings.json'
+
+<#
+  A DEV PUBLISH REWRITES THE PORTS BEFORE ANYTHING IS PACKED.
+
+  The build's server-settings.json is the LIVE one: port 7777, name
+  Thornswood. Unpacked into the dev root unchanged it brings the dev server up
+  on the live port, which is what happened the first time this channel was
+  run. vps-dev-instance.ps1 is where these two numbers come from, and they are
+  the same ones Deploy-DevGamemode.ps1 checks for.
+
+  Written into the DIST copy rather than on the box, so what is packed is what
+  runs, and a publish that fails half way has not left a live port in a dev
+  folder.
+#>
+if ($IsDev -and (Test-Path -LiteralPath $settingsPath)) {
+    try {
+        $devJson = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $devJson.port = 7787
+        if ($devJson.PSObject.Properties.Name -contains 'name') {
+            $devJson.name = 'Thornswood Dev'
+        }
+        if ($devJson.PSObject.Properties.Name -contains 'thornswoodVoicePort') {
+            $devJson.thornswoodVoicePort = 7789
+        } else {
+            $devJson | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue 7789
+        }
+        $devJson | ConvertTo-Json -Depth 20 |
+            Set-Content -LiteralPath $settingsPath -Encoding UTF8
+        Say '  dev channel: port 7787, voice 7789, name Thornswood Dev' 'Green'
+    } catch {
+        throw "Could not set the dev ports in $settingsPath : $_"
+    }
+}
 if (Test-Path -LiteralPath $settingsPath) {
     Head 'Where new characters start'
     $hallPlugin = 'Skyrim Unbound.esp'
@@ -225,11 +258,25 @@ Head 'Stopping the server up there'
 $stopRemote = @'
 $ProgressPreference = 'SilentlyContinue'
 Stop-ScheduledTask -TaskName '@@TASK@@' -ErrorAction SilentlyContinue
+<#
+  BY THE FOLDER, NOT BY THE WORD skymp5-server.
+
+  This used to match every node process carrying 'skymp5-server' on its
+  command line. On the live server that is the live server and nothing else,
+  so it was right for years. The moment this script gained a dev channel it
+  was the thing that took the LIVE server down while publishing to dev, on
+  21 September, exactly as Deploy-DevGamemode.ps1's header warns it would.
+
+  The trailing backslash is the whole of the fix and it is not decoration:
+  'C:\Thornswood-Server' is a prefix of 'C:\Thornswood-Server-Dev', so
+  matching without it means a live publish also kills the dev server, and the
+  bug simply changes direction.
+#>
 Get-CimInstance Win32_Process -EA SilentlyContinue |
-  Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*skymp5-server*' } |
+  Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*@@ROOT@@\*' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }
 'stopped'
-'@ -replace '@@TASK@@', $TaskName
+'@ -replace '@@TASK@@', $TaskName -replace '@@ROOT@@', $VpsRoot.TrimEnd('\')
 
 $stopEnc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($stopRemote))
 & ssh $target "powershell -NoProfile -EncodedCommand $stopEnc"
