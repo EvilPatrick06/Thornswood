@@ -180,6 +180,81 @@ function owns(ticket, profileId, then) {
 // keeping across a restart.
 const commands = [];
 
+/* ------------------------------------------------------------- chat log ---
+ *
+ * What people said, written down, so a report about somebody's behaviour can
+ * be answered by reading it rather than by asking both of them and believing
+ * whoever is more convincing.
+ *
+ * WHY IT LIVES HERE. Chat rides this socket, so this is the only process that
+ * sees every line. The game server cannot: chat goes this way round precisely
+ * because adding a packet type to skymp5-client would mean recompiling it.
+ *
+ * ONE FILE A DAY, ONE LINE A MESSAGE, APPENDED AND NEVER REWRITTEN. A log
+ * that gets rewritten is not evidence, and an append is also the only shape
+ * that survives this process being killed mid-write: the worst case is one
+ * truncated last line rather than a file nobody can parse. The reader skips a
+ * line it cannot read for exactly that reason.
+ *
+ * THE PROFILE ID COMES OFF THE TOKEN, not off the message. onJoin already
+ * does that work and records whether it was proven, and that flag is written
+ * with every line: a line from an unproven join is still worth keeping and is
+ * not worth hanging anybody on.
+ *
+ * SLASH COMMANDS ARE KEPT TOO. They are queued for the game server rather
+ * than broadcast, so nobody else sees them, but somebody typed them and
+ * "what did they run" is the same kind of question as "what did they say".
+ */
+const CHAT_DIR = process.env.THORNSWOOD_CHAT_DIR || path.join(HERE, 'chat');
+const CHAT_DAYS = Number(process.env.THORNSWOOD_CHAT_DAYS || 365);
+
+/* Local time, because every other stamp on this box is local and an evening's
+   argument that straddles midnight UTC should not straddle two files. */
+function chatDay(at) {
+  const d = new Date(at);
+  const p = (n) => (n < 10 ? '0' : '') + n;
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+function chatWrite(kind, peerId, me, text) {
+  try {
+    if (!fs.existsSync(CHAT_DIR)) fs.mkdirSync(CHAT_DIR, { recursive: true });
+    const at = Date.now();
+    const line = JSON.stringify({
+      at: at,
+      kind: kind,                                   /* say or command */
+      peer: peerId,
+      profileId: me ? me.profileId : 0,
+      name: (me && me.name) || '',
+      proven: !!(me && me.proven),
+      mode: (me && me.mode) || '',
+      text: text
+    });
+    fs.appendFileSync(path.join(CHAT_DIR, chatDay(at) + '.jsonl'), line + '\n');
+  } catch (e) {
+    /* Never let writing the log stop the message going out. Somebody losing
+       chat because a disk was full would be a worse fault than a gap here. */
+    console.log('[voice] could not write the chat log: ' + (e && e.message));
+  }
+}
+
+/* Whole days go, never lines out of a day, so a file is either all there or
+   not there at all and nobody has to wonder whether it was edited. */
+function chatPrune() {
+  try {
+    if (!fs.existsSync(CHAT_DIR)) return;
+    const cutoff = Date.now() - CHAT_DAYS * 86400000;
+    for (const f of fs.readdirSync(CHAT_DIR)) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})\.jsonl$/.exec(f);
+      if (!m) continue;
+      const at = new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+      if (at < cutoff) { try { fs.unlinkSync(path.join(CHAT_DIR, f)); } catch (e) { } }
+    }
+  } catch (e) { }
+}
+setInterval(chatPrune, 6 * 3600000);
+chatPrune();
+
 // ------------------------------------------------------------ websocket ----
 // RFC 6455, the parts a small JSON relay needs: the handshake, masked text
 // frames from the client, unmasked text frames back, close and ping.
@@ -884,6 +959,7 @@ server.on('upgrade', (req, socket, head) => {
       // placeatme, disable, mp) and coc is not one of them, so a coc moves you
       // in your own game and the server puts you straight back.
       if (text.charAt(0) === '/') {
+        chatWrite('command', myId, me, text);
         commands.push({
           profileId: me ? me.profileId : 0,
           name: (me && me.name) || '',
@@ -893,6 +969,12 @@ server.on('upgrade', (req, socket, head) => {
         while (commands.length > 200) commands.shift();
         return;
       }
+
+      /* Written before it is sent, so a line that reached the room is always
+         in the log. The other way round loses the last thing somebody said
+         before this process went down, which is exactly the line an argument
+         turns on. */
+      chatWrite('say', myId, me, text);
 
       const out = {
         t: 'chat',

@@ -286,6 +286,19 @@ After that, a Moderator gets involved. After that, a Gamemaster.
 
 Rules 8 and 9 skip to the end.
 
+### Chat is written down
+
+Text chat is kept, with the name and the time. Nothing else is: **voice is not
+recorded**, and nothing reads your machine.
+
+It is there so that when somebody reports what was said to them, it can be
+answered by reading it rather than by asking both people and believing
+whichever of them is more convincing. That protects you as much as it protects
+anybody: if you did not say the thing you are accused of, the log is what shows
+it.
+
+Only moderators and above can read it. It is kept for a year.
+
 ---
 
 *Something happened and you would rather not post it in public: open a ticket

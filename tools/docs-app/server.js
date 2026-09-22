@@ -159,7 +159,7 @@ const BOARDS = {
 const LEVEL = {
   tests: 'admin', help: 'admin', known: 'admin', roadmap: 'admin',
   suggestions: 'admin', files: 'admin', uploads: 'admin', report: 'admin',
-  news: 'admin', link: 'admin', linked: 'admin', sessions: 'admin',
+  news: 'admin', link: 'admin', linked: 'admin', sessions: 'admin', chat: 'admin',
   active: 'admin', archive: 'admin', todo: 'admin', inbox: 'admin'
 };
 
@@ -217,6 +217,7 @@ const PAGES = {
   '/link':        'link',
   '/linked':      'linked',
   '/sessions':    'sessions',
+  '/chat':        'chat',
   '/active':      'active',
   '/patrick':     'todo',
   '/archive':     'archive',
@@ -944,6 +945,11 @@ const SERVER_LOGS = {
   main: 'C:\\Thornswood-Server\\server.log',
   dev:  'C:\\Thornswood-Server-Dev\\server.log'
 };
+
+/* Where the voice service writes what people said. Its folder, not this one:
+   it owns the file and this only reads it, so there is one writer and no
+   question about which copy is the real one. */
+const CHAT_DIR = process.env.THORNSWOOD_CHAT_DIR || 'C:\\Thornswood-Voice\\chat';
 
 function serverLogSlice(channel, from, to) {
   const file = SERVER_LOGS[channel === 'dev' ? 'dev' : 'main'];
@@ -2285,6 +2291,55 @@ async function handle(req, res) {
         serverWhy: server.ok ? '' : server.why,
         clientSent: Object.keys(client).length > 0
       });
+    }
+
+        /* What people said, so a report about behaviour can be answered.
+
+       The voice service writes one file a day under its own folder, one JSON
+       line a message, appended and never rewritten. This reads a day back,
+       newest first, and filters. Admins only.
+
+       A line that will not parse is SKIPPED rather than throwing, because an
+       append-only log killed mid-write has a truncated last line by design,
+       and one bad line must not cost the other four thousand. */
+    if (p === '/api/chat' && req.method === 'GET') {
+      const dir = CHAT_DIR;
+      let days = [];
+      try {
+        days = fs.readdirSync(dir)
+          .filter(f => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(f))
+          .map(f => f.slice(0, -6))
+          .sort().reverse();
+      } catch (e) { days = []; }
+
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(String(url.searchParams.get('day') || ''))
+        ? url.searchParams.get('day') : days[0];
+      if (!day) return sendJson(res, 200, { days: [], day: '', lines: [], why: 'nothing has been said yet, or the chat log is not on this box' });
+
+      const who = String(url.searchParams.get('who') || '').trim();
+      const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
+
+      let lines = [];
+      try {
+        const raw = fs.readFileSync(path.join(dir, day + '.jsonl'), 'utf8');
+        for (const l of raw.split('\n')) {
+          if (!l.trim()) continue;
+          let o;
+          try { o = JSON.parse(l); } catch (e) { continue; }
+          if (!o) continue;
+          if (who && String(o.profileId) !== who && String(o.name || '') !== who) continue;
+          if (q && String(o.text || '').toLowerCase().indexOf(q) < 0) continue;
+          lines.push(o);
+        }
+      } catch (e) {
+        return sendJson(res, 200, { days, day, lines: [], why: String(e.message || e) });
+      }
+
+      /* Newest first, and capped, because a busy day is thousands of lines and
+         nobody reads a page that large. The filters are how you find the rest. */
+      lines.reverse();
+      const total = lines.length;
+      return sendJson(res, 200, { days, day, total, lines: lines.slice(0, 1000) });
     }
 
     /* Hold one session's logs indefinitely, or let them age out again.
