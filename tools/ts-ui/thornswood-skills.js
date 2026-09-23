@@ -736,6 +736,29 @@
   */
   var STARTING_SPELL_POINTS = 2;   // the rulebook's, classes.md: two starting spells
   function spellPoints() {
+    /*
+      WHILE CREATING, THE SERVER'S NUMBER IS ABOUT SOMEBODY WHO HAS NOT
+      CHOSEN YET, AND THAT IS WHY IT HAD TO BE IGNORED HERE.
+
+      Patrick, 22 September: mages "got their points after creation but had 0
+      during creation". Exactly that. The server sends spellPoints on every
+      panel, out of the rules, and the rules are right: a character with no
+      profession is not a mage and has no points, so during creation it sends
+      0. Nobody is a mage until Confirm.
+
+      The fallback below was written for this and could never fire, because it
+      only answers when the server has said NOTHING and the server always says
+      something. So the book drew with no points, and a mage picked their two
+      starting spells by not being able to.
+
+      bookSchools right underneath already reads the lit Mage card while
+      creating rather than the server's empty answer. This is the same
+      question about the same card and now it is answered the same way. Once
+      the profession is confirmed, mine.profession is set, isMage stops
+      reading the card, and the server's number is the only one used: a Master
+      with three spells must never be told they have two.
+    */
+    if (creating() && !(mine && mine.profession) && isMage()) return STARTING_SPELL_POINTS;
     if (mine && mine.spellPoints !== undefined && mine.spellPoints !== null) return Number(mine.spellPoints) || 0;
     var got = mine && mine.spells;
     if (got && typeof got === 'object' && !Array.isArray(got) && got.points !== undefined && got.points !== null) {
