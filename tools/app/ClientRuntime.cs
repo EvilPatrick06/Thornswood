@@ -295,6 +295,12 @@ namespace Thornswood
                                 string dest = Full(rel);
                                 string dir = Path.GetDirectoryName(dest);
                                 if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                                // In a game folder made of hard links, writing
+                                // over a linked file rewrites Vortex's copy in
+                                // the Steam install with it. Updater.Install
+                                // breaks the link first for exactly this and so
+                                // does this.
+                                if (File.Exists(dest)) { try { OwnGame.Unshare(dest); } catch { } }
                                 en.ExtractToFile(dest, true);
                                 if (!Matches(rel, Sha256Of(dest)))
                                 {
@@ -328,17 +334,37 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The entry for a path, whichever slash the zip was written with.
-        /// A zip made on Windows can hold either, and a pack that used the
-        /// wrong one would look like a pack that does not carry the file.
+        /// The entry for a path inside a pack.
+        ///
+        /// A PACK PUTS EVERY GAME FILE UNDER "game/", and the first version of
+        /// this looked for a bare "Data/...". It found nothing in a pack that
+        /// was carrying all six, which is the quietest possible failure: the
+        /// launcher downloads the right zip, looks inside, and says the file is
+        /// not there. Caught by opening pack-20260922-2202.zip and reading the
+        /// entry names instead of trusting what they ought to be.
+        ///
+        /// Updater.Install is the other half of this convention: "game\" is
+        /// stripped and the rest lands under Paths.Game, "profile\" goes to the
+        /// golden profile. Change the two together.
+        ///
+        /// The bare form is still accepted, because a zip that carries a plain
+        /// Data path is a correct copy of the file whatever else is true of it,
+        /// and refusing it would be refusing the thing we came for. Slashes
+        /// either way: a zip written on Windows can hold either.
         /// </summary>
         static ZipArchiveEntry Find(ZipArchive ar, string rel)
         {
-            string a = rel.Replace('\\', '/');
+            string bare = rel.Replace('\\', '/');
+            string prefixed = "game/" + bare;
             foreach (ZipArchiveEntry en in ar.Entries)
             {
                 string n = en.FullName.Replace('\\', '/');
-                if (n.Equals(a, StringComparison.OrdinalIgnoreCase)) return en;
+                if (n.Equals(prefixed, StringComparison.OrdinalIgnoreCase)) return en;
+            }
+            foreach (ZipArchiveEntry en in ar.Entries)
+            {
+                string n = en.FullName.Replace('\\', '/');
+                if (n.Equals(bare, StringComparison.OrdinalIgnoreCase)) return en;
             }
             return null;
         }
