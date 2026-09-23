@@ -13,7 +13,41 @@
 const UNITS_PER_METRE = 70;
 const REF_DISTANCE = 4;    // metres at full volume
 const MAX_DISTANCE = 30;   // metres to silence
-const ROLLOFF = 1.4;
+
+/*
+  HOW LOUD SOMEBODY IS AT A GIVEN DISTANCE, worked out here rather than left to
+  the panner.
+
+  MAX_DISTANCE USED TO BE A LIE. It was handed to a panner whose distanceModel
+  is 'inverse', and WebAudio's inverse model does not read maxDistance at all;
+  only the linear model does. So there was no silence at thirty metres or at
+  any other distance: a voice got quieter for ever and never stopped. The
+  overlay this page is the plain browser twin of had the same defect and it is
+  on the To Do List as "Whisper, local and yell all carry the same distance,
+  because the page changes a number WebAudio does not read".
+
+  So the panner does direction and nothing else, and this does the level: full
+  strength to REF_DISTANCE, then a natural 1/d falloff scaled to reach exactly
+  nothing at MAX_DISTANCE.
+
+  WHAT THIS PAGE STILL DOES NOT HAVE is the three speaking modes. It is a
+  second client with a smaller feature set, reachable by anybody who opens the
+  address, and giving it modes means carrying the vmode protocol here too.
+  That is its own piece of work; this is the half that was simply wrong.
+*/
+function levelFor(metres) {
+  let d = Number(metres);
+  if (!isFinite(d) || d < 0) { d = 0; }
+  if (d >= MAX_DISTANCE) { return 0; }
+  if (d <= REF_DISTANCE) { return 1; }
+  return (REF_DISTANCE / d) * (1 - ((d - REF_DISTANCE) / (MAX_DISTANCE - REF_DISTANCE)));
+}
+
+/* Ramped rather than assigned: a gain that jumps clicks. */
+function setGain(node, want) {
+  try { node.gain.setTargetAtTime(want, ctx ? ctx.currentTime : 0, 0.04); }
+  catch (e) { try { node.gain.value = want; } catch (e2) { } }
+}
 
 const qs = new URLSearchParams(location.search);
 const MY_PROFILE = Number(qs.get('profile') || 1);
@@ -167,10 +201,11 @@ function open(id, info, initiator) {
   const gain = ctx.createGain();
   const panner = ctx.createPanner();
   panner.panningModel = 'HRTF';
+  // Direction only: rolloffFactor 0 makes the inverse model return 1 at every
+  // distance, and levelFor does the rest. See levelFor.
   panner.distanceModel = 'inverse';
-  panner.refDistance = REF_DISTANCE;
-  panner.maxDistance = MAX_DISTANCE;
-  panner.rolloffFactor = ROLLOFF;
+  panner.refDistance = 1;
+  panner.rolloffFactor = 0;
   panner.connect(gain).connect(ctx.destination);
 
   const analyser = ctx.createAnalyser();
@@ -383,10 +418,10 @@ function place() {
 
   for (const [, rec] of conns) {
     const them = lastWho[rec.profileId];
-    if (!them || !them.pos || !me.pos) { rec.gain.gain.value = 0; rec.dist = null; continue; }
+    if (!them || !them.pos || !me.pos) { setGain(rec.gain, 0); rec.dist = null; continue; }
 
     // A wall is not a distance. Different cell, no sound, whatever the maths says.
-    if (String(them.cell) !== String(me.cell)) { rec.gain.gain.value = 0; rec.dist = null; continue; }
+    if (String(them.cell) !== String(me.cell)) { setGain(rec.gain, 0); rec.dist = null; continue; }
 
     const dx = (them.pos[0] - me.pos[0]) / UNITS_PER_METRE;
     const dy = (them.pos[1] - me.pos[1]) / UNITS_PER_METRE;
@@ -400,9 +435,9 @@ function place() {
     const right = dx * cos - dy * sin;
     const forward = dx * sin + dy * cos;
 
-    rec.gain.gain.value = 1;
-    setPos(rec.panner, right, dz, -forward);
     rec.dist = Math.sqrt(right * right + forward * forward + dz * dz);
+    setGain(rec.gain, levelFor(rec.dist));
+    setPos(rec.panner, right, dz, -forward);
   }
   draw();
 }

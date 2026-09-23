@@ -30,7 +30,6 @@
   if (window.thornswoodVoice) return;   // injected twice, which is harmless
 
   var UNITS_PER_METRE = 70;
-  var ROLLOFF = 1.4;
 
   /*
    * Three ranges, named rather than numbered.
@@ -46,19 +45,77 @@
    * a room does.
    */
   var MODES = {
-    whisper: { ref: 1.5, max: 7,  label: 'Whisper' },
-    local:   { ref: 4,   max: 30, label: 'Local' },
-    yell:    { ref: 9,   max: 85, label: 'Yell' }
+    whisper: { ref: 1.5, max: 7,  gain: 0.8, label: 'Whisper' },
+    local:   { ref: 4,   max: 30, gain: 1.0, label: 'Local' },
+    yell:    { ref: 9,   max: 85, gain: 1.3, label: 'Yell' }
   };
   var MODE_ORDER = ['whisper', 'local', 'yell'];
   var myMode = 'local';
 
   function modeOf(name) { return MODES[name] || MODES.local; }
 
+  /*
+    HOW LOUD SOMEBODY IS AT A GIVEN DISTANCE, worked out here rather than left
+    to the panner.
+
+    THE PANNER CANNOT DO IT, and that is the whole of this defect. The three
+    modes were applied by setting refDistance and maxDistance on a panner whose
+    distanceModel is 'inverse', and WEBAUDIO'S INVERSE MODEL DOES NOT READ
+    maxDistance AT ALL. Only the linear model does. So the number changed with
+    every mode and the only thing that actually differed was refDistance: there
+    was no cut off anywhere, a whisper never stopped being audible, and a yell
+    was not meaningfully louder than a whisper at the same distance. It is on
+    the To Do List as "Whisper, local and yell all carry the same distance,
+    because the page changes a number WebAudio does not read", found 19
+    September against the launcher's old page; the overlay that replaced that
+    page inherited it.
+
+    So the panner is told to apply no distance attenuation of its own,
+    rolloffFactor 0, which makes the inverse model return exactly 1 at every
+    distance. It keeps HRTF, so direction still works, and the level comes
+    from here.
+
+    THE SHAPE. Full strength out to ref, then a natural 1/d falloff scaled so
+    it reaches exactly nothing at max rather than trailing off for ever. And a
+    per mode weight on top, so a yell IS louder than a whisper standing in the
+    same place, which is what anybody would expect and what the old
+    arrangement could not express at all.
+  */
+  function levelFor(name, metres) {
+    var m = modeOf(name);
+    var d = Number(metres);
+    if (!isFinite(d) || d < 0) { d = 0; }
+    if (d >= m.max) { return 0; }
+    if (d <= m.ref) { return m.gain; }
+    var fade = 1 - ((d - m.ref) / (m.max - m.ref));
+    return m.gain * (m.ref / d) * fade;
+  }
+
+  /*
+    Ramped rather than assigned, because a gain that jumps clicks.
+
+    Four hundredths of a second, which is well under the position feed's own
+    200ms beat, so a ramp has always finished before the next one starts and
+    never lags behind somebody walking.
+  */
+  function setGain(node, want) {
+    try {
+      var now = ctx ? ctx.currentTime : 0;
+      node.gain.setTargetAtTime(want, now, 0.04);
+    } catch (e) {
+      try { node.gain.value = want; } catch (e2) { }
+    }
+  }
+
+
   var cfg = { host: '', port: 7778, profileId: 0, name: '', pushToTalk: true,
               microphone: true, micName: '' };
 
   var ctx = null, mic = null, myPeer = 0;
+  /* The one listener this page puts on the chat's shared socket, kept in a
+     variable so it can be taken off again when the launcher takes the audio.
+     See enterRelay. */
+  var onNet = null;
   var talking = false, joined = false, wired = false;
 
   /*
@@ -649,7 +706,7 @@
 
     myPeer = n.peer();
 
-    n.on(function (m) {
+    onNet = function (m) {
       if (!m || !m.t) { return; }
       if (m.t === 'welcome') { myPeer = Number(m.peer) || 0; return; }
       if (m.t === 'peers') { reconcile(m.peers); return; }
@@ -658,11 +715,18 @@
         var rec = conns.get(Number(m.from));
         if (rec) {
           rec.mode = m.mode;
-          setRange(rec.panner, m.mode);
+          setRange(rec, m.mode);
           draw();
         }
         return;
       }
+      /*
+        Once the launcher holds the audio, this page is a HUD and must not
+        answer for the connection. It used to, which is the other half of the
+        handoff defect below: relay mode dropped the connections and then
+        rebuilt them from the very next offer that arrived.
+      */
+      if (inRelay() && (m.t === 'sdp' || m.t === 'ice' || m.t === 'peers')) { return; }
       if (m.t === 'sdp') { onSdp(m); return; }
       if (m.t === 'ice') { onIce(m); return; }
       if (m.t === '__closed') {
@@ -670,7 +734,8 @@
         conns.forEach(function (_, id) { drop(id); });
         return;
       }
-    });
+    };
+    n.on(onNet);
   }
 
   function reconcile(list) {
@@ -684,7 +749,7 @@
         had.name = p.name;
         if (p.mode && p.mode !== had.mode) {
           had.mode = p.mode;
-          setRange(had.panner, p.mode);
+          setRange(had, p.mode);
         }
         return;
       }
@@ -701,9 +766,15 @@
     var gain = ctx.createGain();
     var panner = ctx.createPanner();
     panner.panningModel = 'HRTF';
+    /*
+      Direction only. rolloffFactor 0 makes the inverse model return 1 at
+      every distance, so the panner places the voice and levelFor decides how
+      loud it is. See levelFor for why the panner cannot be trusted with the
+      distance.
+    */
     panner.distanceModel = 'inverse';
-    panner.rolloffFactor = ROLLOFF;
-    setRange(panner, info.mode);
+    panner.rolloffFactor = 0;
+    panner.refDistance = 1;
     panner.connect(gain).connect(ctx.destination);
 
     var rec = { pc: pc, panner: panner, gain: gain, mode: info.mode || 'local',
@@ -880,10 +951,10 @@
 
     conns.forEach(function (rec) {
       var them = lastWho[rec.profileId];
-      if (!them || !them.pos || !me.pos) { rec.gain.gain.value = 0; rec.dist = null; return; }
+      if (!them || !them.pos || !me.pos) { setGain(rec.gain, 0); rec.dist = null; return; }
 
       // A wall is not a distance. Different cell, no sound.
-      if (String(them.cell) !== String(me.cell)) { rec.gain.gain.value = 0; rec.dist = null; return; }
+      if (String(them.cell) !== String(me.cell)) { setGain(rec.gain, 0); rec.dist = null; return; }
 
       var dx = (them.pos[0] - me.pos[0]) / UNITS_PER_METRE;
       var dy = (them.pos[1] - me.pos[1]) / UNITS_PER_METRE;
@@ -892,20 +963,27 @@
       var right = dx * cos - dy * sin;
       var forward = dx * sin + dy * cos;
 
-      // Muted beats distance: somebody standing next to you and muted is
-      // silent, which is the whole point of the key.
-      rec.gain.gain.value = muted[rec.profileId] ? 0 : 1;
-      setPos(rec.panner, right, dz, -forward);
       rec.dist = Math.sqrt(right * right + forward * forward + dz * dz);
+      // Muted beats distance: somebody standing next to you and muted is
+      // silent, which is the whole point of the key. Otherwise it is the
+      // speaker's own mode that decides, at the distance they are standing.
+      setGain(rec.gain, muted[rec.profileId] ? 0 : levelFor(rec.mode, rec.dist));
+      setPos(rec.panner, right, dz, -forward);
     });
     draw();
   }
 
-  /** Point one panner at one mode's distances. */
-  function setRange(panner, name) {
-    var m = modeOf(name);
-    panner.refDistance = m.ref;
-    panner.maxDistance = m.max;
+  /*
+    The mode a connection is carrying, which is the speaker's and not yours.
+
+    It used to write refDistance and maxDistance onto the panner, which is the
+    defect levelFor describes: the panner ignored one of them outright. It
+    records the mode on the connection instead, and place() reads it on the
+    next beat, which is at most a fifth of a second away.
+  */
+  function setRange(rec, name) {
+    if (!rec) { return; }
+    rec.mode = MODES[name] ? name : 'local';
   }
 
   function setPos(panner, x, y, z) {
@@ -937,7 +1015,22 @@
       mic = null;
     } catch (e) { }
     micError = '';
-    try { var n = net(); if (n && n.leave) n.leave(); } catch (e) { }
+    /*
+      OFF THE BUS, PROPERLY.
+
+      This line used to read `if (n && n.leave) n.leave()`. thornswoodNet has
+      never had a leave, so the guard was always false and the call never
+      happened: the page kept being handed every voice message on the shared
+      socket and rebuilt its peer connections from the next offer. Nothing
+      said so, because a guard that is false reads exactly like a call that
+      worked.
+
+      It cannot CLOSE the socket either, which is why leave was the wrong idea
+      rather than a missing one: the socket belongs to the chat and voice is a
+      passenger on it. What it can do is stop listening, which is what off is
+      for, and the relay guard in the handler above is the belt to this braces.
+    */
+    try { var n = net(); if (n && n.off && onNet) { n.off(onNet); onNet = null; } } catch (e) { }
     joined = false;
     draw();
   }
