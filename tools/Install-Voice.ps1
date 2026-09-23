@@ -356,8 +356,46 @@ if (-not `$up) {
 }
 "@
 
+# THIS BLOCK HAS NEVER ARRIVED WHOLE, measured 23 September.
+#
+# sshd on Windows hands the command to cmd.exe, which stops at 8,191
+# characters. Base64 of UTF-16 is about 2.7 times the script, and $remote is
+# 9,117 characters, so what went up the wire was 24,350 characters and the far
+# end saw roughly the first third of it. PowerShell then complains about a
+# brace or a token in a script nobody can see, fifteen lines above the line
+# that was actually cut.
+#
+# Deploy-Docs.ps1 found this on 17 September and sixteen scripts were given the
+# fix on 20 September. This one was not among them and is the worst case in the
+# repo: it is the whole install of the voice service.
+#
+# Under the limit it goes on the command line as before, because that is one
+# round trip. Over it, the script is sent as a file and run from there, which
+# has no length to run into. The exit code is kept across the tidy up, because
+# the Remove-Item afterwards would otherwise be the code this reads, which is
+# the fault entry 118 is about.
 $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-& ssh $target "powershell -NoProfile -EncodedCommand $b64"
+$cmd = "powershell -NoProfile -EncodedCommand $b64"
+if ($cmd.Length -le 6000) {
+    & ssh $target $cmd
+}
+else {
+    $far = 'C:/Windows/Temp/thornswood-install-voice.ps1'
+    $tmp = [IO.Path]::GetTempFileName()
+    try {
+        Set-Content -LiteralPath $tmp -Value $remote -Encoding UTF8
+        & scp $tmp "${target}:$far"
+        if ($LASTEXITCODE -ne 0) { Die "could not send the install script to $VpsHost" }
+        # The path goes across as it is: Windows PowerShell takes forward
+        # slashes, and converting them is how a sister script once shipped
+        # with the slashes stripped out entirely.
+        & ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'"
+        $rc = $LASTEXITCODE
+        & ssh $target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" | Out-Null
+        $global:LASTEXITCODE = $rc
+    }
+    finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
+}
 if ($LASTEXITCODE -ne 0) { Die "the install on the VPS exited with $LASTEXITCODE" }
 
 # ---------------------------------------------------------------- verify ----
