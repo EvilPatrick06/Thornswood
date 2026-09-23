@@ -95,7 +95,44 @@ function say(text) {
   log(text);
 }
 
+/*
+  AND ONLY FOR SOMEBODY THE SITE CALLS A DEV.
+
+  This is internal tooling. It writes coordinates out of the world so the
+  arrival points and the notice boards can be measured rather than typed, and
+  it has been shipping to every customer bound to an unmodified F8 since it was
+  written. Nothing it does is dangerous, but a retail client should not carry a
+  developer tool on a function key, and the next one like it might not be
+  harmless.
+
+  THE FLAG ALREADY EXISTS AND IS NOT THIS FILE'S TO INVENT. The launcher asks
+  the site whether this person may use the dev build, and Discord.cs writes
+  Profile\dev-allowed.txt when the answer is yes and DELETES it when the answer
+  is no. So the file being there is the site's answer, kept on disk, and it is
+  the same answer the dev build itself is gated on.
+
+  Relative to the game folder, because that is where the process stands: the
+  paths above are Data/Platform/... for the same reason, and Profile sits
+  beside Game rather than inside it. Relative also means the dev build reads
+  its own Profile rather than the play install's.
+
+  THE FILE STILL SHIPS, deliberately. Ship refuses a release when the plugin
+  folder and the source differ by a byte, and a half done removal stops every
+  release, which is what the entry's own trap says. MarkKey stays in the ini
+  for the same reason: the ini is not packed, so taking it out would change
+  nothing for anybody who already has one. The guard is the fix; the key is
+  simply never bound for anybody the site has not named.
+*/
+let markAllowed = false;
+try {
+  require('fs').readFileSync('../Profile/dev-allowed.txt', 'utf8');
+  markAllowed = true;
+} catch (e) {
+  markAllowed = false;
+}
+
 sp.on('buttonEvent', guard('mark', (e) => {
+  if (!markAllowed) { return; }
   if (!e.isDown || e.isUp || e.code !== markKey) { return; }
 
   let pc = null;
@@ -149,6 +186,8 @@ sp.on('buttonEvent', guard('mark', (e) => {
   say('Marked ' + label + ' at ' + round(x) + ', ' + round(y) + ', ' + round(z));
 }));
 
-log('loaded, mark key is scan code', markKey);
+log(markAllowed
+  ? ('loaded, mark key is scan code ' + markKey)
+  : 'loaded and idle: this build is not a dev one, so the mark key is not bound');
 
 })();
