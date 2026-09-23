@@ -1311,6 +1311,24 @@ function halfGate(actorId, half, rank, refusal) {
  * somebody's salt, so it is swallowed.
  */
 function creditWork(actorId, key) {
+  /*
+    Every piece of work is also a piece of tiredness.
+
+    Blade: "When doing your skilled profession, it drains your Exhaustion
+    faster. As you level up your skill it doesn't drain your exhaustion meter
+    as fast." This is the one place every trade already passes through, so it
+    is the one place that has to know: the seam, the chopping block, the kiln,
+    the plot, the river and the hunt all call it, and anything added later
+    gets the same treatment for nothing.
+
+    Guarded and silent. A needs block that is not loaded yet, or a hot reload
+    mid-tick, must not stop somebody's work being counted.
+  */
+  try {
+    const needs = globalThis.__thornswoodNeeds;
+    if (needs && needs.worked) { needs.worked(actorId); }
+  } catch (e) { }
+
   const c = globalThis.__thornswoodCharacter;
   if (!c || !c.credit) { return null; }
   try {
@@ -15288,7 +15306,45 @@ log('gamemode loaded:',
     return rows;
   }
 
-  function forPanel(s, creating) {
+  /*
+    actorId is here for the needs block and nothing else: hunger, thirst and
+    exhaustion live on the character rather than in the rules state, because
+    they move with the clock rather than with a choice. Everything else in
+    this function reads s. A null actorId simply leaves the meters off the
+    view, which is what a caller with no character in hand should get.
+  */
+  /*
+    The needs block's two answers, asked for safely.
+
+    Both are guarded rather than assumed, because this block loads before the
+    needs block at the end of the file and a hot reload can leave either one
+    missing for a tick. A character sheet that draws without the meters is a
+    small loss; one that throws is the whole panel gone.
+  */
+  function withNeeds(actorId, base) {
+    var n = g.__thornswoodNeeds;
+    if (!n || !actorId) { return base; }
+    var out = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) { out[k] = base[k]; }
+    }
+    try {
+      var pen = n.effects(actorId, n.settle(actorId));
+      for (var av in pen) {
+        if (!Object.prototype.hasOwnProperty.call(pen, av)) { continue; }
+        out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + pen[av];
+      }
+    } catch (e) { return base; }
+    return out;
+  }
+
+  function needsView(actorId) {
+    var n = g.__thornswoodNeeds;
+    if (!n || !actorId) { return null; }
+    try { return n.view(actorId); } catch (e) { return null; }
+  }
+
+  function forPanel(s, creating, actorId) {
     if (!s) { return null; }
     var chargen = g.__thornswoodChargen;
     var view = {
@@ -15317,7 +15373,23 @@ log('gamemode loaded:',
         which is the whole reason there is a contract, so this one is spelled
         the way the reader spells it.
       */
-      effects: P.treeApplies(s),
+      /*
+        The tree's totals AND what hunger, thirst and exhaustion take off
+        them, added together into the one map the client already applies.
+
+        Folded here rather than sent separately because treeApplyNow SETS each
+        value to the total it is given: two maps would mean the second one
+        overwriting the first, and whichever arrived last would be the only one
+        that counted. One map, one total, and a penalty is simply a negative
+        number in it. See the needs block at the end of this file.
+      */
+      effects: withNeeds(actorId, P.treeApplies(s)),
+      /*
+        The three meters, for the panel to draw. Absent entirely when there is
+        no character in hand or the needs block is not loaded, so a page from
+        before this existed draws exactly what it drew.
+      */
+      needs: needsView(actorId),
       // The book and what is left to spend on it. The page reads spells by
       // name and spellPoints as a number; both names are the client's.
       spells: spellMap(s),
@@ -15456,7 +15528,7 @@ log('gamemode loaded:',
     // forPanel is what the client sees; the rules state is what is stored.
     // Both travel in the one property so the panel never sees a half state.
     var chargen = g.__thornswoodChargen;
-    var view = forPanel(s, !!(chargen && chargen.isChoosing(actorId)));
+    var view = forPanel(s, !!(chargen && chargen.isChoosing(actorId)), actorId);
     /*
       The property page needs the actor and the profile, which forPanel is not
       handed: it is given the rules state and the rules know nothing about
@@ -16058,7 +16130,11 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                  would be inviting people to type it, and choppedSwing is what
                  makes typing it worth nothing.
                */
-               '/chopped'];
+               '/chopped',
+               // Hunger, thirst and exhaustion. See the needs block at the end
+               // of this file; the numbers there are invented and meant to be
+               // argued with.
+               '/needs', '/rest', '/eat', '/drink', '/bard'];
 
 /*
   The ones a person who is not a playtester is told about. /tp, /goto, /face,
@@ -16080,7 +16156,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // the steward half answers "only a steward sets rent"
                       // to everybody else.
                       '/box', '/rent', '/notice', '/job', '/board',
-                      '/take', '/jobs', '/dropjob', '/help'];
+                      '/take', '/jobs', '/dropjob', '/help',
+                      // Everybody's, and they need to be findable: a meter
+                      // nobody knows how to act on is only a penalty.
+                      '/needs', '/rest', '/eat', '/drink', '/bard'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
@@ -16275,6 +16354,64 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       place. The rank line and the tool warning still come through, because
       choppedSwing answers them the same way a press does.
     */
+    /*
+      ------------------------------------------------- hunger, thirst, rest
+
+      The words that drive the needs block. They exist BEFORE anything in the
+      world does, deliberately: a meter nobody can act on is a punishment, and
+      the client side that will notice a chair and a plate of food is its own
+      piece of work. These make the whole thing playable and tunable tonight,
+      and the world hooks replace them rather than joining them.
+
+      /needs   what the three meters say
+      /rest    sit, campfire, inn or bed; /rest up to stop
+      /eat     a meal; /drink water; /drink ale for the good and the bad of it
+      /bard    say you are playing, which helps everyone resting near you
+    */
+    if (word === '/needs' || word === '/rest' || word === '/eat' ||
+        word === '/drink' || word === '/bard') {
+      var needs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
+      if (!needs) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      if (!needCharacter()) { return true; }
+
+      if (word === '/needs') {
+        var v = needs.view(actorId);
+        toProfile(profileId, 'Food ' + v.food + ' (' + v.foodBand + '), drink ' + v.drink +
+                  ' (' + v.drinkBand + '), rest ' + v.rest + ' (' + v.restBand + ')' +
+                  (v.resting ? ', resting at a ' + v.resting + '.' : '.'));
+        return true;
+      }
+      if (word === '/bard') { toProfile(profileId, needs.bard(actorId)); return true; }
+      if (word === '/rest') {
+        var where = String(parts[1] || '').toLowerCase();
+        if (where === 'up' || where === 'stop') {
+          needs.resting(actorId, '');
+          toProfile(profileId, 'You get up.');
+          return true;
+        }
+        if (!where) {
+          toProfile(profileId, 'Rest where? sit, campfire, inn or bed. /rest up to get going again.');
+          return true;
+        }
+        var said = needs.resting(actorId, where);
+        toProfile(profileId, said || ('There is no resting at a ' + where + '. Try sit, campfire, inn or bed.'));
+        return true;
+      }
+      // /eat and /drink
+      var what = String(parts[1] || '').toLowerCase();
+      var line;
+      if (word === '/drink') {
+        line = needs.ate(actorId, what === 'ale' ? 'ale' : 'drink');
+        toProfile(profileId, what === 'ale'
+          ? ('You drink the ale. It goes down well and you will feel it later.' + (line ? ' ' + line : ''))
+          : ('You drink.' + (line ? ' ' + line : '')));
+        return true;
+      }
+      line = needs.ate(actorId, 'food');
+      toProfile(profileId, 'You eat.' + (line ? ' ' + line : ''));
+      return true;
+    }
+
     if (word === '/chopped') {
       var swung = choppedSwing(actorId);
       if (swung && swung !== ALLOW) {
@@ -16910,3 +17047,499 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   if (!prop || !prop.putIn) { return; }
   return prop.putIn(containerRefrId, actorId, baseId, count);
 });
+
+
+// ==== thornswood needs: hunger, thirst and exhaustion ====
+/*
+  ============================================================================
+  HUNGER, THIRST AND EXHAUSTION, AND THE NUMBERS ARE INVENTED ON PURPOSE.
+
+  Blade Da Razor, 22 September, in the Proffesions/Classes forum, "a mix of
+  mine and patrick's pitch for the system":
+
+    Hunger   standard, different foods replenish different amounts, the meter
+             deteriorates over time, and low hunger gives negative effects to
+             movement, attacks, mana and blocking.
+    Thirst   standard but depletes twice as fast. Ale fills it faster and has
+             negative effects. Low thirst hits mana and movement.
+    Exhaust  "standard, takes hours to completely deplete... it would be over 3
+             times larger than the hunger meter. (3 meals get it? Lol)". Rest
+             by sitting, at a campfire, or at an inn, which is faster; lying in
+             a bed at an inn or your home WHEN YOU LOG OUT gives a bonus when
+             you come back. Low exhaustion has negative effects to everything
+             including your ability to craft. Working your skilled profession
+             drains it faster, and a higher rank drains it slower.
+
+  Grim Reefer added the bard, and Patrick said yes to it: somebody playing
+  music in an inn makes everyone there recover faster. "It would encourage
+  people to hang out at taverns." Patrick: "I like that Idea too!"
+
+  Patrick, 22 September: "I want for the exhaustion to be able to actually
+  sleep in beds and stuff", and then, asked for the balance: "you csn invent
+  the balance and we an go form there".
+
+  SO EVERY NUMBER BELOW IS MINE AND NONE OF IT IS MEASURED. That is the point
+  of this block existing before it is right: there is nothing to argue with
+  until there is something to play. They are gathered in NEEDS so one table is
+  the whole of the balance, and moving a number here is the whole of a change.
+
+  WHAT IS DELIBERATELY NOT HERE. No death, no collapse, no forced sleep.
+  Nothing in this block can kill anybody or take a turn away from them, and an
+  empty meter is a person who is worse at things rather than a person who
+  stops playing. A roleplay server people leave running while they talk is the
+  wrong place for a meter that punishes being idle, and this is the first
+  version of something nobody has felt yet.
+  ============================================================================
+*/
+(function () {
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  function nlog() {
+    var a = ['[thornswood needs]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  var NEEDS_PROPERTY = 'thornswoodNeeds';
+
+  /*
+    THE WHOLE OF THE BALANCE, IN ONE TABLE.
+
+    Meters run 0 to 100 and 100 is full. Everything is per REAL hour, because
+    a person's session is real time and Skyrim's clock runs twenty times
+    faster: a meter on game time would empty while somebody read a sign.
+
+    THE THREE RATES ARE BLADE'S SHAPE. Food empties in six hours, drink in
+    three because it goes twice as fast, and rest in twenty, which is over
+    three times the food meter as he asked. Six hours is longer than most
+    sessions on purpose: the first version should be felt at the end of a long
+    evening, not at the end of an hour.
+  */
+  var NEEDS = {
+    // Per real hour, out of 100.
+    drain: { food: 100 / 6, drink: 100 / 3, rest: 100 / 20 },
+
+    /*
+      Working your trade costs rest faster, and rank pays it back.
+
+      Blade: "When doing your skilled profession, it drains your Exhaustion
+      faster. As you level up your skill it doesn't drain your exhaustion
+      meter as fast." A multiplier on the rest drain while somebody is working,
+      for the two minutes after each piece of work.
+    */
+    workRest: { novice: 2.0, advanced: 1.75, expert: 1.5, master: 1.25 },
+    workFor: 120000,   // how long one swing counts as still working
+
+    /*
+      Recovery, per real hour, by where somebody is resting.
+
+      A bed is four times a chair, which is what makes going to an inn worth
+      the walk. The bard is added on top of whatever the place already gives,
+      so a bard in an inn is 75 an hour and is the best rest in the game, which
+      is the point Grim was making.
+    */
+    recover: { sit: 20, campfire: 35, inn: 50, bed: 80 },
+    bard: 25,
+
+    /*
+      Logging out in a bed. Blade: "laying down in a bed in an inn or your home
+      when you log out will give you bonuses when you come back."
+
+      Full rest on return, and RESTED_FOR of the wear taken off the other two
+      as well, because somebody who slept properly did not also starve. It is
+      not a bonus stat: a stat bonus for logging out correctly is a rule about
+      when to play, and this is a rule about where to sleep.
+    */
+    sleptRest: 100,
+    sleptAlso: 25,
+
+    /*
+      What a thing is worth. The default is what an unlisted food or drink
+      gives, so the table never has to be complete for the system to work, and
+      an ingredient nobody thought about is a small meal rather than nothing.
+
+      ALE IS THE ONE THAT COSTS SOMETHING, which is Blade's "Ale fills your
+      thirst meter faster but has negative effects (TBD)". It is the best drink
+      in the game and it takes rest off you, so a night at the inn is a real
+      choice rather than a free one.
+    */
+    food: { def: 15 },
+    drink: { def: 20 },
+    ale: { drink: 30, rest: -8 },
+
+    /*
+      The bands, and what each one costs.
+
+      Nothing at all above 50, so half a meter is not a penalty and most of a
+      session is unaffected. Then three steps. The names are what a person is
+      told they are, because a number on a panel is not a feeling and "you are
+      starving" is.
+    */
+    bands: [
+      { at: 50, name: 'fine' },
+      { at: 25, name: 'weary' },
+      { at: 10, name: 'bad' },
+      { at: 0, name: 'spent' }
+    ]
+  };
+
+  /*
+    WHAT EACH BAND DOES TO A CHARACTER, by meter.
+
+    Every name here is an engine actor value that this repo has already proved
+    it can set: they are the same names TUNING.perPoint uses, which the client
+    applies through treeApplyNow. Nothing invents an actor value, because a
+    name the game cannot resolve is set to 0 quietly and nothing says so, which
+    is written out at length over perPoint and is not a lesson worth learning
+    twice.
+
+    attackDamageMult is a MULTIPLIER and everything else is a flat amount. That
+    is why its numbers are small and the rest are not. Also written out over
+    perPoint, where a 5 was once six times melee damage.
+
+    Hunger takes your strength, thirst takes your magic and your legs, and
+    exhaustion takes a little of everything, which is Blade's split.
+  */
+  var COST = {
+    food: {
+      fine:  {},
+      weary: { stamina: -20, attackDamageMult: -0.05 },
+      bad:   { stamina: -40, attackDamageMult: -0.10 },
+      spent: { stamina: -60, attackDamageMult: -0.20, health: -20 }
+    },
+    drink: {
+      fine:  {},
+      weary: { magicka: -20, speedMult: -3 },
+      bad:   { magicka: -40, speedMult: -7 },
+      spent: { magicka: -60, speedMult: -12, magickaRateMult: -30 }
+    },
+    rest: {
+      fine:  {},
+      weary: { stamina: -10, magicka: -10, speedMult: -2 },
+      bad:   { health: -15, stamina: -25, magicka: -25, speedMult: -5, attackDamageMult: -0.05 },
+      spent: { health: -30, stamina: -45, magicka: -45, speedMult: -10, attackDamageMult: -0.15 }
+    }
+  };
+
+  /* Below this, a person is too tired to make anything. Blade: low exhaustion
+     hits "everything including your ability to craft". A gate rather than a
+     number, because a half made sword is not a thing. */
+  var CRAFT_REST = 15;
+
+  function clamp(n) {
+    n = Number(n);
+    if (!isFinite(n)) { return 100; }
+    return n < 0 ? 0 : (n > 100 ? 100 : n);
+  }
+
+  /** The band a meter is in. See NEEDS.bands. */
+  function bandOf(v) {
+    v = clamp(v);
+    for (var i = 0; i < NEEDS.bands.length; i++) {
+      if (v >= NEEDS.bands[i].at) { return NEEDS.bands[i].name; }
+    }
+    return 'spent';
+  }
+
+  function fresh() {
+    return { food: 100, drink: 100, rest: 100, at: Date.now(), resting: '', worked: 0 };
+  }
+
+  function read(actorId) {
+    var v = null;
+    try { v = mp.get(actorId, NEEDS_PROPERTY); } catch (e) { v = null; }
+    if (!v || typeof v !== 'object') { return null; }
+    return {
+      food: clamp(v.food), drink: clamp(v.drink), rest: clamp(v.rest),
+      at: Number(v.at) || Date.now(),
+      resting: String(v.resting || ''),
+      worked: Number(v.worked) || 0
+    };
+  }
+
+  function write(actorId, n) {
+    try { mp.set(actorId, NEEDS_PROPERTY, n); return true; }
+    catch (e) { return false; }
+  }
+
+  /*
+    Bring a character's meters up to now, and answer them.
+
+    Everything is worked out from ELAPSED REAL TIME rather than ticked, so a
+    server restart, a slow tick or somebody logging back in after a day all
+    land on the same number. The tick below only exists to make the change
+    visible and to notice a band crossing; the arithmetic does not need it.
+  */
+  function settle(actorId, now) {
+    now = now || Date.now();
+    var n = read(actorId);
+    if (!n) { n = fresh(); write(actorId, n); return n; }
+
+    var hours = (now - n.at) / 3600000;
+    if (hours <= 0) { return n; }
+    // A session that has been away for a week does not starve to death twice
+    // over; the meters bottom out at 0 anyway, and this keeps the arithmetic
+    // sane for anything that reads the difference.
+    if (hours > 48) { hours = 48; }
+
+    n.food = clamp(n.food - NEEDS.drain.food * hours);
+    n.drink = clamp(n.drink - NEEDS.drain.drink * hours);
+
+    var restRate = NEEDS.drain.rest;
+    if (n.worked && (now - n.worked) < NEEDS.workFor) {
+      restRate = restRate * workMultiplier(actorId);
+    }
+    var gain = restingGain(actorId, n);
+    n.rest = clamp(n.rest + (gain - restRate) * hours);
+
+    n.at = now;
+    write(actorId, n);
+    return n;
+  }
+
+  /** How much faster working drains rest, by the best rank this person holds. */
+  function workMultiplier(actorId) {
+    var best = 'novice';
+    try {
+      var P = g.__thornswoodProgression;
+      var C = g.__thornswoodCharacter;
+      if (P && C && C.stateOf) {
+        var s = C.stateOf(actorId);
+        var ranks = (s && s.ranks) || {};
+        var order = ['novice', 'advanced', 'expert', 'master'];
+        for (var k in ranks) {
+          if (!Object.prototype.hasOwnProperty.call(ranks, k)) { continue; }
+          if (order.indexOf(ranks[k]) > order.indexOf(best)) { best = ranks[k]; }
+        }
+      }
+    } catch (e) { }
+    return NEEDS.workRest[best] || NEEDS.workRest.novice;
+  }
+
+  /** What this person is recovering per hour, by where they are resting. */
+  function restingGain(actorId, n) {
+    if (!n.resting) { return 0; }
+    var base = NEEDS.recover[n.resting] || 0;
+    if (!base) { return 0; }
+    if (bardNear(actorId)) { base += NEEDS.bard; }
+    return base;
+  }
+
+  /*
+    A bard playing where this person is resting.
+
+    Grim's idea and Patrick's yes. Somebody counts as a bard for this when they
+    have said so with /bard, they are in the same cell, and they said it in the
+    last few minutes. There is no bard profession in the rulebook to read, and
+    inventing one here would be settling a design question that is Patrick's,
+    so this asks the cheapest honest question instead: is somebody here saying
+    they are playing.
+  */
+  var BARDS = {};
+  var BARD_FOR = 300000;
+
+  function bardNear(actorId) {
+    var myCell = null;
+    try { myCell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { return false; }
+    if (!myCell) { return false; }
+    var now = Date.now();
+    for (var id in BARDS) {
+      if (!Object.prototype.hasOwnProperty.call(BARDS, id)) { continue; }
+      if (now - BARDS[id] > BARD_FOR) { delete BARDS[id]; continue; }
+      var who = Number(id);
+      if (who === actorId) { continue; }
+      var theirs = null;
+      try { theirs = String(mp.get(who, 'worldOrCellDesc') || ''); } catch (e) { continue; }
+      if (theirs && theirs === myCell) { return true; }
+    }
+    return false;
+  }
+
+  /*
+    The actor value changes the three meters add up to, for the client.
+
+    Folded into the same map the skill tree already sends, so nothing new is
+    needed on the client at all: thornswood-front.js reads panel.effects and
+    sets every name in it. A penalty is a negative number in the same map.
+  */
+  function effects(actorId, n) {
+    var out = {};
+    if (!n) { return out; }
+    var meters = ['food', 'drink', 'rest'];
+    for (var i = 0; i < meters.length; i++) {
+      var cost = COST[meters[i]][bandOf(n[meters[i]])] || {};
+      for (var av in cost) {
+        if (!Object.prototype.hasOwnProperty.call(cost, av)) { continue; }
+        out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + cost[av];
+      }
+    }
+    return out;
+  }
+
+  /** What the panel draws. */
+  function view(actorId) {
+    var n = settle(actorId);
+    return {
+      food: Math.round(n.food), drink: Math.round(n.drink), rest: Math.round(n.rest),
+      foodBand: bandOf(n.food), drinkBand: bandOf(n.drink), restBand: bandOf(n.rest),
+      resting: n.resting || ''
+    };
+  }
+
+  // ------------------------------------------------------------ the verbs --
+
+  /** Something was eaten or drunk. Answers a line worth saying, or ''. */
+  function ate(actorId, kind, amount) {
+    var n = settle(actorId);
+    var was = { food: bandOf(n.food), drink: bandOf(n.drink), rest: bandOf(n.rest) };
+    if (kind === 'ale') {
+      n.drink = clamp(n.drink + NEEDS.ale.drink);
+      n.rest = clamp(n.rest + NEEDS.ale.rest);
+    } else if (kind === 'drink') {
+      n.drink = clamp(n.drink + (Number(amount) || NEEDS.drink.def));
+    } else {
+      n.food = clamp(n.food + (Number(amount) || NEEDS.food.def));
+    }
+    write(actorId, n);
+    return crossed(actorId, was, n);
+  }
+
+  /** Sitting down, or getting up. kind is '' to stop. */
+  function resting(actorId, kind) {
+    var n = settle(actorId);
+    kind = String(kind || '');
+    if (kind && !NEEDS.recover[kind]) { return ''; }
+    if (n.resting === kind) { return ''; }
+    n.resting = kind;
+    write(actorId, n);
+    if (!kind) { return ''; }
+    var extra = bardNear(actorId) ? ' The music helps.' : '';
+    return 'You settle down to rest.' + extra;
+  }
+
+  /** A piece of work was done, so rest drains faster for a while. */
+  function worked(actorId) {
+    var n = settle(actorId);
+    n.worked = Date.now();
+    write(actorId, n);
+  }
+
+  /** Somebody says they are playing. See bardNear. */
+  function bard(actorId) {
+    BARDS[actorId] = Date.now();
+    return 'You strike up a tune. Anyone resting here recovers faster for a while.';
+  }
+
+  /*
+    They logged out in a bed, so they come back rested. Blade's bonus.
+
+    Called when somebody arrives, from the character block's first sight of
+    them: if the meters say they were in a bed when they were last seen, the
+    sleep counted.
+  */
+  function arrived(actorId) {
+    var n = read(actorId);
+    if (!n) { write(actorId, fresh()); return ''; }
+    if (n.resting !== 'bed') { settle(actorId); return ''; }
+    n.rest = NEEDS.sleptRest;
+    n.food = clamp(n.food + NEEDS.sleptAlso);
+    n.drink = clamp(n.drink + NEEDS.sleptAlso);
+    n.resting = '';
+    n.at = Date.now();
+    write(actorId, n);
+    return 'You slept well. You are rested.';
+  }
+
+  /** Too tired to make anything. See CRAFT_REST. */
+  function tooTiredToCraft(actorId) {
+    var n = settle(actorId);
+    return n.rest < CRAFT_REST;
+  }
+
+  /*
+    A band crossing is the only thing worth interrupting somebody for.
+
+    The same rule the seam and the chopping block settled on: a line every time
+    a number moves is a wall of text over the thing you are trying to watch. A
+    meter that has dropped a band has changed what the character can do, and
+    that is news; a meter that went from 61 to 60 is not.
+  */
+  function crossed(actorId, was, n) {
+    var say = [];
+    var now = { food: bandOf(n.food), drink: bandOf(n.drink), rest: bandOf(n.rest) };
+    var words = {
+      food: { weary: 'You are getting hungry.', bad: 'You are hungry.', spent: 'You are starving.', fine: 'You have eaten enough.' },
+      drink: { weary: 'You are getting thirsty.', bad: 'You are thirsty.', spent: 'You are parched.', fine: 'Your thirst is gone.' },
+      rest: { weary: 'You are tiring.', bad: 'You are tired.', spent: 'You are exhausted.', fine: 'You feel rested.' }
+    };
+    var order = ['fine', 'weary', 'bad', 'spent'];
+    for (var k in words) {
+      if (!Object.prototype.hasOwnProperty.call(words, k)) { continue; }
+      if (was[k] === now[k]) { continue; }
+      // Only say it when it got worse, or when it came all the way back to
+      // fine. Every step of recovery is a sentence nobody asked for.
+      if (order.indexOf(now[k]) > order.indexOf(was[k]) || now[k] === 'fine') {
+        say.push(words[k][now[k]]);
+      }
+    }
+    return say.join(' ');
+  }
+
+  // --------------------------------------------------------------- the tick
+
+  /*
+    Once a minute, for everybody online.
+
+    The meters do not need this: settle works the arithmetic out from elapsed
+    time whenever anybody asks. What this is for is NOTICING, so somebody who
+    has been standing still for an hour is told they are hungry rather than
+    finding out when they next open the panel.
+  */
+  var TICK_MS = 60000;
+
+  function tick() {
+    var online = [];
+    try { online = mp.getOnlinePlayers() || []; } catch (e) { return; }
+    for (var i = 0; i < online.length; i++) {
+      var who = online[i];
+      try {
+        var before = read(who);
+        if (!before) { settle(who); continue; }
+        var was = { food: bandOf(before.food), drink: bandOf(before.drink), rest: bandOf(before.rest) };
+        var n = settle(who, Date.now());
+        var line = crossed(who, was, n);
+        if (line) {
+          try { notify(who, line); } catch (e) { }
+          try { say(who, line); } catch (e) { }
+        }
+      } catch (e) { }
+    }
+  }
+
+  try {
+    mp.makeProperty(NEEDS_PROPERTY, {
+      isVisibleByOwner: false,
+      isVisibleByNeighbors: false,
+      updateOwner: '',
+      updateNeighbor: ''
+    });
+  } catch (e) {
+    // Already made by a previous load, which is what a hot reload looks like.
+  }
+
+  if (g.__thornswoodNeedsTimer) { try { clearInterval(g.__thornswoodNeedsTimer); } catch (e) { } }
+  g.__thornswoodNeedsTimer = setInterval(guard('needsTick', tick), TICK_MS);
+
+  g.__thornswoodNeeds = {
+    NEEDS: NEEDS, COST: COST, CRAFT_REST: CRAFT_REST,
+    bandOf: bandOf, settle: settle, view: view, effects: effects,
+    ate: ate, resting: resting, worked: worked, bard: bard, arrived: arrived,
+    tooTiredToCraft: tooTiredToCraft,
+    fresh: fresh, clamp: clamp
+  };
+
+  nlog('ready: food empties in', Math.round(100 / NEEDS.drain.food) + 'h,',
+       'drink in', Math.round(100 / NEEDS.drain.drink) + 'h,',
+       'rest in', Math.round(100 / NEEDS.drain.rest) + 'h');
+})();
+// ==== end thornswood needs ====
