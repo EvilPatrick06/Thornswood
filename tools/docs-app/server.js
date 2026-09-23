@@ -175,7 +175,12 @@ const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/join',
                       // in the data folder, read through /api/page like the
                       // site pages. The hub's own pages moved to /hub/known
                       // and /hub/help to make room.
-                      '/known', '/help'];
+                      '/known', '/help',
+                      // What is kept about somebody and what they are
+                      // agreeing to cannot sit behind a sign in, because
+                      // the person deciding whether to sign up is the one
+                      // who needs to read them.
+                      '/privacy', '/terms'];
 const PUBLIC_DOCS = ['known', 'help'];
 /* The public pages are markdown on disk like everything else here, so the
    wording can be fixed from the site rather than by a deploy. */
@@ -199,7 +204,9 @@ const BLURB = {
   '/roadmap':   ['Roadmap', 'What is being worked on and roughly in what order.'],
   '/news':      ['Every release', 'What changed, newest first. The same list the launcher shows.'],
   '/report':    ['Report a problem', 'Something broken, or an idea. No account needed.'],
-  '/gallery':   ['From the world', 'Pictures taken by people playing.']
+  '/gallery':   ['From the world', 'Pictures taken by people playing.'],
+  '/privacy':   ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no analytics.'],
+  '/terms':     ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.']
 };
 const escAttr = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;')

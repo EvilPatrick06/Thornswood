@@ -668,6 +668,8 @@ try {
         <a href="/hub">Admin login</a>
         <a href="/news">Release notes</a>
         <a href="/credits">Credits</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
       </div>
     </div>
     <div class="base">
@@ -698,7 +700,8 @@ Array.prototype.forEach.call(nav.querySelectorAll('a'), function(a){ a.onclick =
   to a file rather than a deploy.
 */
 var PAGES = { '/world':1, '/rules':1, '/join':1, '/credits':1,
-              '/classes':1, '/known':1, '/help':1 };
+              '/classes':1, '/known':1, '/help':1,
+              '/privacy':1, '/terms':1 };
 var here = location.pathname.replace(/\/+$/, '').toLowerCase() || '/';
 
 /* What each address says when it is pasted into a channel. A crawler reads the
@@ -717,7 +720,9 @@ var BLURB = {
   '/roadmap': ['Roadmap', 'What is being worked on and roughly in what order.'],
   '/news':    ['Every release', 'What changed, newest first. The same list the launcher shows.'],
   '/report':  ['Report a problem', 'Something broken, or an idea. No account needed.'],
-  '/gallery': ['From the world', 'Pictures taken by people playing.']
+  '/gallery': ['From the world', 'Pictures taken by people playing.'],
+  '/privacy': ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no analytics.'],
+  '/terms':   ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.']
 };
 (function () {
   var b = BLURB[here];
