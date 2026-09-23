@@ -1957,14 +1957,72 @@
     apart, which is the only thing keeping a hand edit here honest.
   */
   const FIRE_BASES = [
-    0xd61b6, 0xd61be, 0xef77f, 0xf2ac6, 0x42521, 0x35f49, 0x35f47,
-    0xa9230, 0x90ca4, 0x10d820, 0xc2bf1, 0xdb682, 0xc6918, 0xfb9b0,
-    0xcbb23, 0xb6c08, 0x951d8, 0xe7c9a, 0xcbb2f, 0x101a51, 0xcae0b,
-    0xbbcf1, 0x48748, 0xbf9e1, 0x68adb, 0x9c6ce, 0x35f4a, 0x13b40,
-    0x13b42, 0x1094ab, 0xcd824, 0xcd823, 0xaa71c, 0x33da4, 0x106112,
-    0x1092e2, 0x33da9, 0x4318b, 0x51577, 0xf597f, 0xf6304, 0x10acc0,
-    0x4c5ce, 0x4c5cf
+    ['Skyrim.esm', 0x13b40],   // FXFire01
+    ['Skyrim.esm', 0x13b42],   // FXFire02
+    ['Skyrim.esm', 0x33da4],   // FXfireWithEmbersHeavy
+    ['Skyrim.esm', 0x33da9],   // FXfireWithEmbersLight
+    ['Skyrim.esm', 0x35f47],   // Campfire01LandBurning
+    ['Skyrim.esm', 0x35f49],   // Campfire01Burning
+    ['Skyrim.esm', 0x35f4a],   // FireplaceWood01Burning
+    ['Skyrim.esm', 0x42521],   // bwcStatuePuzzleFlame
+    ['Skyrim.esm', 0x4318b],   // FXfireWithEmbersLogs01
+    ['Skyrim.esm', 0x48748],   // CraftingBlacksmithForgeSTATIC
+    ['Skyrim.esm', 0x4c5ce],   // GiantCampfire01BurningSnow01
+    ['Skyrim.esm', 0x4c5cf],   // GiantCampfire01BurningSnow01B
+    ['Skyrim.esm', 0x51577],   // GiantCampfire01Burning
+    ['Skyrim.esm', 0x68adb],   // CraftingCookingFireSpit
+    ['Skyrim.esm', 0x90ca4],   // Campfire01LandBurning_ReachDirt01
+    ['Skyrim.esm', 0x951d8],   // Campfire01LandBurningReachDirt01
+    ['Skyrim.esm', 0x9c6ce],   // CraftingSmelterMarker1
+    ['Skyrim.esm', 0xa9230],   // Campfire01LandBurning_Heavy_SN
+    ['Skyrim.esm', 0xaa71c],   // FXfireWithEmbers02Toggle
+    ['Skyrim.esm', 0xb6c08],   // Campfire01LandBurningPineForest01
+    ['Skyrim.esm', 0xbbcf1],   // CraftingBlackSmithForgeSkyforge
+    ['Skyrim.esm', 0xbf9e1],   // CraftingBlackSmithForgeWR
+    ['Skyrim.esm', 0xc2bf1],   // Campfire01LandBurningCoastalBeach01
+    ['Skyrim.esm', 0xc6918],   // Campfire01LandBurningFallForestDirt01
+    ['Skyrim.esm', 0xcae0b],   // CraftingBlackSmithForge
+    ['Skyrim.esm', 0xcbb23],   // Campfire01LandBurningFrozenMarshDirtSlope01
+    ['Skyrim.esm', 0xcbb2f],   // Campfire01LandBurningRocks01
+    ['Skyrim.esm', 0xcd823],   // FXfireWithEmbers01_lite
+    ['Skyrim.esm', 0xcd824],   // FXfireWithEmbers01_Cheap
+    ['Skyrim.esm', 0xd61b6],   // BFXFireVol01
+    ['Skyrim.esm', 0xd61be],   // BFXFireVolCorner
+    ['Skyrim.esm', 0xdb682],   // Campfire01LandBurningDirt01
+    ['Skyrim.esm', 0xe7c9a],   // Campfire01LandBurningRiverBedEdge01
+    ['Skyrim.esm', 0xef77f],   // BFXFireVolCornerRound
+    ['Skyrim.esm', 0xf2ac6],   // BFXFireVolCornerRoundNoFloor
+    ['Skyrim.esm', 0xf597f],   // GiantCampfire01BurningDirt01
+    ['Skyrim.esm', 0xf6304],   // GiantCampfire01BurningDirt02Blank
+    ['Skyrim.esm', 0xfb9b0],   // Campfire01LandBurningFieldGrass01
+    ['Skyrim.esm', 0x101a51],   // Campfire01LandBurningTundra01
+    ['Skyrim.esm', 0x106112],   // FXfireWithEmbersHeavySCALED
+    ['Skyrim.esm', 0x1092e2],   // FXfireWithEmbersHeavyToggle
+    ['Skyrim.esm', 0x1094ab],   // FXFireSovngarde
+    ['Skyrim.esm', 0x10acc0],   // GiantCampfire01BurningNoLand
+    ['Skyrim.esm', 0x10d820],   // Campfire01LandBurningCaveBaseGround02
+    ['Dawnguard.esm', 0x1838f],   // DLC1VC_EmbersToggleable
+    ['Dragonborn.esm', 0x18616],   // Campfire01LandBurning_SnowRocks
+    ['Dragonborn.esm', 0x18619],   // Campfire01LandBurning_LDirtSnowPath
+    ['Dragonborn.esm', 0x289e8],   // Campfire01LandBurning_Ash
+    ['Dragonborn.esm', 0x2c0b0],   // Campfire01LandBurningDirtPath01
+    ['Embers XD.esm', 0x13010e],   // GiantCampfire01BurningDirt02
+    ['Embers XD.esp', 0x6a956],   // FXfireWithEmbersLight04
+    ['Embers XD.esp', 0x982a3],   // FXfireWithEmbersLogs02
+    ['Embers XD.esp', 0xc5bb1],   // FXfireWithEmbersLogs03
+    ['Embers XD.esp', 0xe92ff],   // FXfireWithEmbersLogs04
+    ['Embers XD.esp', 0x102800],   // Campfire01LandBurningCaveBaseGround01
+    ['Embers XD.esp', 0x13010e],   // GiantCampfire01BurningDirt02
+    ['Embers XD.esp', 0x135210],   // FXFirepit01
+    ['Embers XD.esp', 0x171e23],   // Campfire01LandBurningMineFloorDirt01
+    ['Embers XD.esp', 0x17c025],   // Campfire01LandBurningGrassSnow01
+    ['Embers XD.esp', 0x17c026],   // FXfireWithEmbersLightSilent
+    ['Embers XD.esp', 0x19f73f],   // FXfireWithEmbersLight02
+    ['Embers XD.esp', 0x19f741],   // FXfireWithEmbers01_brazier
   ];
+  // The plugins the list spans, for the log line when they are resolved.
+  const FIRE_FILES = ["Skyrim.esm","Dawnguard.esm","Dragonborn.esm","Embers XD.esm","Embers XD.esp"];
+
   // Standing at a fire, and standing IN one. A campfire is about a hundred
   // units across, so 300 is warming your hands and 90 is in the coals.
   const FIRE_REACH = 300;
@@ -2016,21 +2074,59 @@
     into the heartbeat line, so one session answers which of the two it is and
     what the error was if it is the first.
   */
-  let fireBases = 0;      // how many of the 44 resolved to a form at all
+  let fireBases = 0;      // how many of them resolved to a form at all
   let fireHits = 0;       // how many had a reference within reach
   let fireThrew = 0;      // how many threw
   let fireWhy = '';       // the first thing one of them threw
   let placeBeat = 0;      // when the heartbeat last wrote
 
+  /*
+    THE FORMS, RESOLVED ONCE.
+
+    A fire from a mod cannot be reached by its runtime id, because that id is
+    the plugin's place in the order and moves whenever anybody adds a mod.
+    Game.getFormFromFile is the engine's own answer: the file and the id inside
+    it, which do not move. Skyrim.esm is index 00 always, so those go the
+    direct way and it is the same call underneath.
+
+    Done once and kept, because the answer cannot change inside a session and
+    doing it per tick is sixty three lookups a second for nothing.
+  */
+  let fireForms = null;
+
+  function fireFormList() {
+    if (fireForms) { return fireForms; }
+    const out = [];
+    for (let i = 0; i < FIRE_BASES.length; i++) {
+      const file = FIRE_BASES[i][0];
+      const local = FIRE_BASES[i][1];
+      try {
+        const raw = (file === 'Skyrim.esm')
+          ? sp.Game.getFormEx(local)
+          : sp.Game.getFormFromFile(local, file);
+        const base = sp.Form.from(raw);
+        if (base) { out.push(base); }
+      } catch (e) {
+        if (!fireWhy) { fireWhy = String((e && e.message) || e); }
+      }
+    }
+    // Nothing at all means the world is not up yet, so it is worth asking
+    // again rather than remembering an empty answer for the session.
+    if (!out.length) { return []; }
+    fireForms = out;
+    log('fires: ' + out.length + ' of ' + FIRE_BASES.length +
+        ' bases resolved, across ' + FIRE_FILES.length + ' plugin(s)');
+    return fireForms;
+  }
+
   /** How far the nearest lit fire is, or -1 when there is none in reach. */
   function fireDistance(px, py, pz) {
     let best = -1;
-    fireBases = 0; fireHits = 0; fireThrew = 0;
-    for (let i = 0; i < FIRE_BASES.length; i++) {
+    const forms = fireFormList();
+    fireBases = forms.length; fireHits = 0; fireThrew = 0;
+    for (let i = 0; i < forms.length; i++) {
       try {
-        const base = sp.Form.from(sp.Game.getFormEx(FIRE_BASES[i]));
-        if (!base) { continue; }
-        fireBases++;
+        const base = forms[i];
         const ref = sp.Game.findClosestReferenceOfType(base, px, py, pz, FIRE_REACH);
         if (!ref) { continue; }
         fireHits++;
@@ -2045,9 +2141,9 @@
         if (best < 0 || d < best) { best = d; }
         if (best <= FIRE_INSIDE) { break; }
       } catch (e) {
-        // One base that will not resolve is not the end of it, but forty four
-        // of them is the whole feature, so it is counted and the first reason
-        // is kept for the heartbeat rather than thrown away.
+        // One base that will not answer is not the end of it, but all of them
+        // is the whole feature, so it is counted and the first reason is kept
+        // for the heartbeat rather than thrown away.
         fireThrew++;
         if (!fireWhy) { fireWhy = String((e && e.message) || e); }
       }

@@ -73,19 +73,53 @@ const OUT = opt('out', path.join(__dirname, 'fires.json'));
 const PRINT = args.indexOf('--print') !== -1;
 
 /*
-  ONLY THE FIVE BETHESDA MASTERS, AND THAT IS A LIMIT WORTH SAYING OUT LOUD.
+  EVERY PLUGIN IN THE ORDER, WHICH IS THE WHOLE POINT, and this used to be
+  Skyrim.esm alone.
 
-  A form id is only the number the game uses when the plugin it came from is
-  at load index 00, which is Skyrim.esm and nothing else. Dawnguard,
-  HearthFires and Dragonborn sit wherever the load order puts them, so their
-  ids would have to be rebuilt per machine, and a mod's ids move whenever
-  anybody adds a mod.
-  So this reads Skyrim.esm, which holds every fire in the base game: the inn
-  fires, the braziers, the campfires, the forges and the smelters. A fire
-  added by a mod is not in here and will not warm anybody, which is a real
-  gap and is written down rather than papered over.
+  WHAT THE OLD LIMIT COST, measured 23 September. Patrick walked into a fire
+  and the temperature did not move. The plugin log showed the place tick alive
+  and its fire distance never leaving nothing, so no fire of ours was ever
+  within three hundred units of somebody standing in one. This collection has
+  EMBERS XD, which is a fire overhaul, and Embers XD.esp defines SIXTEEN lit
+  fire bases of its own: FXfireWithEmbersLogs02, 03 and 04, FXFirepit01,
+  FXfireWithEmbersLight02 and 04, its own Campfire01LandBurning variants and
+  the rest. Those are the fires people actually stand next to in this build,
+  and none of them was in a table read out of Skyrim.esm.
+
+  THE REASON THE LIMIT EXISTED WAS REAL and it is answered rather than
+  ignored: a form id is only the number the game uses when its plugin is at
+  load index 00. A mod's ids move whenever anybody adds a mod. So the table no
+  longer carries runtime ids for anything but Skyrim.esm. It carries the FILE
+  and the LOCAL id, and the client resolves them with Game.getFormFromFile,
+  which is the engine's own answer to this question and exists in the client
+  build (Modules\skyrimPlatform.ts, Game.getFormFromFile).
+
+  A record that OVERRIDES a master's is credited to the master that defines
+  it, because that is the file the engine resolves it from and the override is
+  what it hands back.
 */
-const PLUGINS = ['Skyrim.esm'];
+const BETHESDA = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm',
+                  'HearthFires.esm', 'Dragonborn.esm'];
+
+const PLUGINS_TXT = opt('plugins', 'C:\\Thornswood\\Profile\\Default\\plugins.txt');
+
+function loadOrder() {
+  const out = BETHESDA.slice();
+  let raw = '';
+  try { raw = fs.readFileSync(PLUGINS_TXT, 'utf8'); }
+  catch (e) { return out; }
+  raw.split(/\r?\n/).forEach(function (line) {
+    const t = line.trim();
+    if (!t || t[0] === '#') { return; }
+    // A leading * is "enabled" in the modern plugins.txt.
+    const name = t[0] === '*' ? t.slice(1).trim() : t;
+    if (!name) { return; }
+    if (out.indexOf(name) === -1) { out.push(name); }
+  });
+  return out;
+}
+
+const PLUGINS = loadOrder();
 
 // The form types a fire can be. STAT is in the scan so the unlit versions are
 // seen and counted as dropped rather than silently missing.
@@ -114,7 +148,17 @@ const CRAFT_HEAT = [
 ];
 
 // Rule 3: not when it is out.
-const OUT_OF = /(off|out)\d*$/i;
+/*
+  NOT WHEN IT IS OUT, and the ends of the names are not the whole of it.
+
+  Off and Out were enough while this read Skyrim.esm alone. Reading the whole
+  order on 23 September brought in Embers XD, which names its unlit variants
+  differently: FXfireWithEmbersLogs01NoFire is a fire pit with no flame in it,
+  and it would have warmed somebody standing at a cold hearth. NoFire, Unlit
+  and Dead are added for that, anywhere in the name rather than only at the
+  end, because that is where Embers puts them.
+*/
+const OUT_OF = /((off|out)\d*$)|nofire|unlit|dead(fire|hearth)?\d*$/i;
 
 /*
   How far each kind reaches, in game units. A campfire is about 100 units
@@ -128,6 +172,24 @@ const INSIDE = 90;
 function fail(msg) {
   console.error('FAIL  ' + msg);
   process.exitCode = 1;
+}
+
+/*
+  The masters a plugin declares, in order. A record's high byte is an index
+  into this list, and anything past the end is the plugin's own.
+*/
+function mastersOf(b) {
+  const out = [];
+  let k = 24;
+  const end = 24 + b.readUInt32LE(4);
+  while (k + 6 <= end) {
+    const sub = b.toString('ascii', k, k + 4);
+    const sz = b.readUInt16LE(k + 4);
+    k += 6;
+    if (sub === 'MAST' && sz > 1) { out.push(b.toString('latin1', k, k + sz - 1)); }
+    k += sz;
+  }
+  return out;
 }
 
 function subrecords(rec) {
@@ -149,6 +211,10 @@ function subrecords(rec) {
 
 const rows = [];
 const dropped = [];
+const seen = {};
+const missing = [];
+// Which plugin the walk is inside, and what it declares as its masters.
+const here = { file: '', masters: [] };
 let scanned = 0;
 
 function walk(b, start, end) {
@@ -196,10 +262,20 @@ function walk(b, start, end) {
           if (OUT_OF.test(s.EDID) || OUT_OF.test(s.MODL.replace(/\.nif$/i, ''))) {
             dropped.push({ id: formId, edid: s.EDID, modl: s.MODL });
           } else {
-            rows.push({
-              id: '0x' + formId.toString(16),
-              type: type, kind: kind, edid: s.EDID, modl: s.MODL, why: why
-            });
+            // Which file the engine will resolve this from, and the id within
+            // it. An index inside the master list means the record belongs to
+            // that master and this plugin is only changing it.
+            const idx = (formId >>> 24) & 0xff;
+            const local = formId & 0x00ffffff;
+            const file = idx < here.masters.length ? here.masters[idx] : here.file;
+            const key = file.toLowerCase() + ':' + local;
+            if (!seen[key]) {
+              seen[key] = true;
+              rows.push({
+                file: file, local: '0x' + local.toString(16),
+                type: type, kind: kind, edid: s.EDID, modl: s.MODL, why: why
+              });
+            }
           }
         }
       }
@@ -210,9 +286,13 @@ function walk(b, start, end) {
 
 for (const pl of PLUGINS) {
   const p = path.join(DATA, pl);
-  if (!fs.existsSync(p)) { fail('no such plugin: ' + p); continue; }
+  // A name in plugins.txt with no file behind it is somebody's list being
+  // ahead of their mods, which is not this script's problem to fail over.
+  if (!fs.existsSync(p)) { missing.push(pl); continue; }
   const b = fs.readFileSync(p);
   if (b.toString('ascii', 0, 4) !== 'TES4') { fail('not a plugin: ' + p); continue; }
+  here.file = pl;
+  here.masters = mastersOf(b);
   walk(b, 24 + b.readUInt32LE(4), b.length);
 }
 
@@ -227,11 +307,18 @@ if (!rows.length) { fail('the table came out empty'); }
 
 rows.sort(function (a, b) { return a.edid.toLowerCase() < b.edid.toLowerCase() ? -1 : 1; });
 
+console.log(PLUGINS.length + ' plugins in the order, ' + missing.length + ' not installed');
 console.log(scanned + ' records read, ' + rows.length + ' are lit fires, ' +
             dropped.length + ' dropped for being out');
+{
+  const byFile = {};
+  rows.forEach(function (r) { byFile[r.file] = (byFile[r.file] || 0) + 1; });
+  Object.keys(byFile).sort(function (a, b) { return byFile[b] - byFile[a]; })
+    .forEach(function (f) { console.log('  ' + String(byFile[f]).padStart(4) + '  ' + f); });
+}
 if (PRINT) {
   for (const r of rows) {
-    console.log('  ' + r.kind.padEnd(6) + r.id.padEnd(10) + r.edid);
+    console.log('  ' + r.kind.padEnd(6) + r.local.padEnd(10) + r.edid.padEnd(38) + r.file);
   }
 }
 
@@ -240,6 +327,7 @@ if (process.exitCode === 1) {
 } else {
   const doc = {
     builtFrom: PLUGINS,
+    notInstalled: missing,
     builtAt: new Date().toISOString(),
     reach: REACH,
     inside: INSIDE,
