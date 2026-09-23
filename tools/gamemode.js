@@ -2696,6 +2696,30 @@ const MOVED_DEGREES = 10;
  * creation begins; this is for the person who closed it, or whose page had
  * not mounted it yet when the server first asked. */
 const CHOOSE_REMIND_MS = 30000;
+/*
+  How long the reminder holds off once somebody has CLOSED the panel on
+  purpose.
+
+  Djinn, 21 September, in "Beack out option": "There is no way to leave the
+  character creation screen except to make a character then log out. this
+  needs a resolution." He is right, and the reason is this constant. Escape
+  and K have always shut the panel; thirty seconds later the reminder above
+  pushed it straight back, so closing it did nothing and the only real exit
+  was finishing a character you did not want and quitting.
+
+  THE REMINDER IS NOT THE PROBLEM AND IT STAYS. It exists for the person
+  whose panel never arrived, who has nothing on screen and no way on: see
+  openCreation's fallback sentence. That case is real and it is why this is a
+  BACK OFF rather than an off switch.
+
+  What was missing is the difference between a panel that failed to arrive
+  and one somebody read and shut. The first needs pushing again; the second
+  is a person saying not now, and pushing it back at them is the whole
+  complaint. So a deliberate close says so, and the reminder waits ten
+  minutes instead of thirty seconds. K still opens it the moment they want
+  it, and nothing about their character has been decided either way.
+*/
+const CHOOSE_LATER_MS = 600000;
 /* Five minutes, not forty five seconds. This exists so nobody is stranded when
  * the race menu never opens, and it used to be short enough to fire on somebody
  * who was simply still making their face: it would give up and start them
@@ -2900,6 +2924,23 @@ globalThis.__thornswoodChargen = {
     st.faceDone = Date.now();
     setChargen(actorId, st);
     log('chargen', actorId.toString(16), 'the plugin says the race menu closed');
+    return true;
+  },
+  /*
+    The panel was closed on purpose, so hold the reminder off. See
+    CHOOSE_LATER_MS and the 'later' branch of /pick.
+
+    Only while choosing. During appearance the panel is not what is on screen
+    and the race menu machinery has its own timers; answering false there
+    means the person is simply told to press K, which is true and harmless.
+  */
+  remindLater: function (actorId) {
+    const st = chargenOf(actorId);
+    if (!st || st.stage !== 'choosing') { return false; }
+    st.remindAt = Date.now() + CHOOSE_LATER_MS;
+    setChargen(actorId, st);
+    log('chargen', actorId.toString(16), 'closed the panel on purpose; not reminding for',
+        Math.round(CHOOSE_LATER_MS / 60000) + ' minutes');
     return true;
   },
   arrive: arriveAt
@@ -15713,6 +15754,30 @@ log('gamemode loaded:',
         // A refresh asks for the panel outright, so it is sent whether
         // anything changed or not: that is the whole point of the command.
         writeState(actorId, s, true);   // the write is what fires updateOwner
+        return true;
+      }
+      /*
+        'Not now.' The panel was closed on purpose, so stop pushing it back.
+
+        Djinn: "There is no way to leave the character creation screen except
+        to make a character then log out." Escape and K always shut it and the
+        reminder reopened it thirty seconds later, which is the same as not
+        being able to shut it.
+
+        NOTHING ABOUT THE CHARACTER IS DECIDED HERE. No class, no profession,
+        no home, no half made character left behind, which is the trap the
+        four stamped-done-with-no-face characters fell into. It moves one
+        timestamp. The reminder still comes, ten minutes later instead of
+        thirty seconds, because somebody who shut the panel and then forgot
+        about it still has to be told how to get back to it.
+      */
+      if (what === 'later') {
+        var pushed = false;
+        try { pushed = !!(chargen && chargen.remindLater && chargen.remindLater(actorId)); }
+        catch (e) { pushed = false; }
+        toProfile(profileId, pushed
+          ? 'Closed. Press K when you want it back; nothing has been chosen.'
+          : 'Closed. Press K to open it again.');
         return true;
       }
       if (what === 'class') {
