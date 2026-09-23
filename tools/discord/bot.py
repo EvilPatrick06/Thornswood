@@ -188,7 +188,29 @@ if not TOKEN:
     raise SystemExit('No DISCORD_TOKEN. Install-Bot.ps1 sets it.')
 
 intents = discord.Intents(guilds=True, members=True)
-client = discord.Client(intents=intents)
+
+
+class Thornswood(discord.Client):
+    async def setup_hook(self):
+        """
+        Everything that has to happen once per process, and not once per
+        reconnect.
+
+        discord.py runs this inside login(), before the gateway is connected
+        and before any event is dispatched. on_ready is the other thing, and
+        it is not the same thing: it fires again every time the connection
+        drops and comes back, which on a bad evening is repeatedly.
+
+        A persistent view is registered against its custom_id so a button on
+        a message from last week still works after a restart. Registering it
+        a second time is not free and is not meaningful, and the two lines
+        were sitting in on_ready where every reconnect did it again.
+        """
+        self.add_view(TicketPanel())          # so it keeps working after a restart
+        self.add_view(TicketTools())          # and so does Close on every old ticket
+
+
+client = Thornswood(intents=intents)
 tree = discord.app_commands.CommandTree(client)
 
 
@@ -802,6 +824,47 @@ PANEL = ('**Open a ticket**\n\n'
          'Applying for one does not give you it. Somebody reads it and answers.')
 
 
+def _panel_options(msg):
+    """
+    The value and label of every option the POSTED dropdown is offering.
+
+    Read off the message rather than off KINDS, because the two are exactly
+    what can drift: the options a dropdown offers live in the message that was
+    posted, not in the View this process builds on startup.
+
+    An empty list when the components cannot be read, which does not match the
+    wanted list, so the panel is edited. That is the right way round to fail:
+    an edit nobody needed costs one audit log line, and a kind that never
+    appears costs somebody a ticket they cannot open.
+    """
+    pairs = []
+    try:
+        for row in getattr(msg, 'components', None) or []:
+            for item in getattr(row, 'children', None) or []:
+                for o in getattr(item, 'options', None) or []:
+                    pairs.append((getattr(o, 'value', ''), getattr(o, 'label', '')))
+    except Exception:
+        return []
+    return pairs
+
+
+def _panel_wanted():
+    return [(k, lab) for k, lab, _ in KINDS]
+
+
+def panel_is_current(msg):
+    """
+    True when the posted panel already says what it should, text and options.
+
+    Its own function so it can be run without a Discord to run it against:
+    tools/discord/test-ready.py drives it with a made up message. The decision
+    is the part worth pinning, because getting it wrong in either direction is
+    a real fault: too eager and the panel is edited on every reconnect, too
+    lazy and a ticket kind added later never appears for anybody.
+    """
+    return getattr(msg, 'content', None) == PANEL and _panel_options(msg) == _panel_wanted()
+
+
 async def ensure_panel(guild):
     ch = by_name(guild, TICKETS)
     if ch is None:
@@ -855,6 +918,18 @@ async def ensure_panel(guild):
                 # added later never appeared for anybody: the code had it, the
                 # message did not. Editing in place keeps the same message and
                 # its spot in the channel and puts the current list on it.
+                #
+                # BUT ONLY WHEN THERE IS SOMETHING TO CHANGE. This ran on every
+                # reconnect, so a flaky evening was a stream of edits to the
+                # same message, each one an entry in the audit log and a write
+                # against the rate limit the bot is already fighting. The text
+                # and the option list are compared first, and both are
+                # compared: comparing the text alone puts back the bug above,
+                # where a kind added later never appeared because the words
+                # around it had not changed.
+                if panel_is_current(m):
+                    log('ticket panel is already current in #%s' % ch.name)
+                    return
                 await m.edit(content=PANEL, view=TicketPanel())
                 log('ticket panel updated in #%s' % ch.name)
                 return
@@ -1118,33 +1193,80 @@ async def trouble_say(text):
 _watching = False
 
 
-@client.event
-async def on_ready():
-    global _watching
-    if not _watching:
-        _watching = True
-        asyncio.create_task(watch_site())
-        asyncio.create_task(watch_trouble())
+# What was last registered with Discord, so a restart does not do it all
+# again. Next to the code, because that folder is the bot's own and a deploy
+# that replaces it is a deploy that may have changed the commands anyway.
+STAMP = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                     'commands-synced.json')
 
-    client.add_view(TicketPanel())          # so it keeps working after a restart
-    client.add_view(TicketTools())          # and so does Close on every old ticket
-    log('up as %s' % client.user)
+# Set FORCE_COMMAND_SYNC=1 in bot.env.json to make the next start register them
+# whatever the stamp says. For the case where Discord has them and this file
+# does not, which is a deploy that landed on a fresh folder.
+FORCE_SYNC = _int_env('FORCE_COMMAND_SYNC', 0)
 
-    # A global sync can take an hour to reach everybody, and it reaches people
-    # unevenly while it does, which looks exactly like one person's Discord
-    # being broken. Copying the commands onto the server itself and syncing
-    # that is immediate and the same for everyone in it.
-    #
-    # Registering both, which is what this did first, puts the command in the
-    # picker twice: Discord lists the server copy and the global copy as two
-    # separate entries and there is no way to tell them apart. So the guild
-    # copy is the one kept, and the global list is emptied straight after.
-    # Clearing globals is done last because copy_global_to reads that same
-    # list, and clearing it first would copy nothing.
+
+def _command_names():
+    return sorted(c.name for c in tree.get_commands())
+
+
+def _stamp_read():
+    try:
+        with open(STAMP) as f:
+            d = json.load(f)
+        return list(d.get('commands') or []), [int(x) for x in (d.get('guilds') or [])]
+    except Exception:
+        return [], []
+
+
+def _stamp_write(names, guilds):
+    try:
+        with open(STAMP, 'w') as f:
+            json.dump({'commands': names, 'guilds': sorted(guilds)}, f)
+    except Exception:
+        log('could not write ' + STAMP + ', so the commands will be registered '
+            'again on the next start:\n' + traceback.format_exc())
+
+
+async def register_commands():
+    """
+    Put the slash commands on every server, once, and not again until they
+    change.
+
+    A global sync can take an hour to reach everybody, and it reaches people
+    unevenly while it does, which looks exactly like one person's Discord
+    being broken. Copying the commands onto the server itself and syncing that
+    is immediate and the same for everyone in it.
+
+    Registering both, which is what this did first, puts the command in the
+    picker twice: Discord lists the server copy and the global copy as two
+    separate entries and there is no way to tell them apart. So the guild copy
+    is the one kept, and the global list is emptied straight after. Clearing
+    globals is done last because copy_global_to reads that same list, and
+    clearing it first would copy nothing.
+
+    WHY IT IS BEHIND A STAMP. This was three writes to Discord per reconnect,
+    doing nothing new every time, and a sync is one of the calls Discord rate
+    limits hardest. A reconnect is not a new set of commands; a deploy is. So
+    the names that were registered are written down beside the code, and this
+    runs when that list differs, when a server appears that is not in it, or
+    when FORCE_COMMAND_SYNC says to. A rate limited sync used to write a
+    traceback on an evening that was already going badly.
+    """
+    want = _command_names()
+    had, done = _stamp_read()
+    fresh = [g for g in client.guilds if g.id not in done]
+
+    if want == had and not fresh and not FORCE_SYNC:
+        log('slash commands already registered: %s' % (', '.join(want) or 'none'))
+        return
+
+    synced = list(done)
     for g in client.guilds:
         try:
             tree.copy_global_to(guild=g)
             await tree.sync(guild=g)
+            if g.id not in synced:
+                synced.append(g.id)
             log('/close is registered in "%s"' % g.name)
         except Exception:
             log('could not register /close in "%s", the Close button still '
@@ -1155,6 +1277,21 @@ async def on_ready():
     except Exception:
         log('could not clear the global commands, so /close may appear twice '
             'in the picker:\n' + traceback.format_exc())
+
+    _stamp_write(want, synced)
+
+
+@client.event
+async def on_ready():
+    global _watching
+    if not _watching:
+        _watching = True
+        asyncio.create_task(watch_site())
+        asyncio.create_task(watch_trouble())
+
+    log('up as %s' % client.user)
+
+    await register_commands()
 
     for g in client.guilds:
         await ensure_panel(g)
