@@ -19,6 +19,11 @@
   nobody ever finds out about.
 
   What it checks:
+    caddy     https://thornswood.net answers, which is the only one of these
+              a visitor actually touches. Asked over the public name and the
+              certificate on purpose: on 21 September Caddy was stopped for
+              hours while node sat there answering 3001 perfectly, and a
+              check of 3001 says everything is fine right through that.
     website   answers on 3001, which is what Caddy puts on 443
     game      answers on 3000, which is the resources the client pulls
     voice     answers on 7778
@@ -117,6 +122,24 @@ function Answers($port) {
   } catch { return $false }
 }
 
+# Caddy holds 443 and is the only thing here a visitor touches. It is asked
+# over the public name rather than over a loopback port, because the failure
+# this is for looks perfect from inside: on 21 September Caddy was stopped and
+# staying stopped while node answered 3001 all night.
+#
+# ANY HTTP ANSWER COUNTS, including a 502. A 502 is Caddy up and something
+# behind it down, and what is behind it has its own check on the line below.
+# Treating a 502 as Caddy being down would restart the wrong thing.
+function SiteAnswers($url) {
+  try {
+    $null = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 10 -MaximumRedirection 5
+    return $true
+  } catch {
+    try { if ($_.Exception.Response) { return $true } } catch { }
+    return $false
+  }
+}
+
 function BotAlive() {
   foreach ($p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA SilentlyContinue)) {
     if ("$($p.CommandLine)" -match 'Thornswood-Bot') { return $true }
@@ -139,17 +162,26 @@ if (Test-Path $hist) {
   }
 }
 
+# Caddy first, because it is the one the outside world meets and because a
+# website answering on 3001 means nothing while 443 is unserved.
 $checks = @(
+  @{ Name = 'caddy';   Task = 'Thornswood Web';    Port = 0; Url = 'https://thornswood.net/' },
   @{ Name = 'website'; Task = 'Thornswood Docs';   Port = 3001 },
   @{ Name = 'game';    Task = 'Thornswood Server'; Port = 3000 },
   @{ Name = 'voice';   Task = 'Thornswood Voice';  Port = 7778 },
   @{ Name = 'bot';     Task = 'Thornswood Bot';    Port = 0    }
 )
 
+# One place that knows how each of them is asked.
+function IsUp($c) {
+  if ($c.ContainsKey('Url')) { return (SiteAnswers $c.Url) }
+  if ($c.Port -eq 0) { return (BotAlive) }
+  return (Answers $c.Port)
+}
+
 $fresh = @()
 foreach ($c in $checks) {
-  $up = if ($c.Port -eq 0) { BotAlive } else { Answers $c.Port }
-  if ($up) { continue }
+  if (IsUp $c) { continue }
 
   $already = 0
   if ($recent.ContainsKey($c.Name)) { $already = $recent[$c.Name] }
@@ -168,10 +200,11 @@ foreach ($c in $checks) {
     continue
   }
 
-  Start-Sleep -Seconds 25
-  $up2 = if ($c.Port -eq 0) { BotAlive } else { Answers $c.Port }
-  if ($up2) { Note ($c.Name + ' is back') }
-  else { Note ($c.Name + ' did not come back within 25 seconds') }
+  # Caddy's first start after a gap waits on its certificate, so it is given
+  # longer before the watcher decides it did not come back.
+  Start-Sleep -Seconds $(if ($c.ContainsKey('Url')) { 45 } else { 25 })
+  if (IsUp $c) { Note ($c.Name + ' is back') }
+  else { Note ($c.Name + ' did not come back in time') }
 }
 
 if ($fresh.Count -gt 0) { Add-Content -LiteralPath $hist -Value $fresh }
@@ -259,10 +292,23 @@ function Answers(`$port) {
     return `$up
   } catch { return `$false }
 }
+# Asked the way a visitor asks, for the reason in the header. Any HTTP
+# answer counts, a 502 included: that is Caddy up with something behind it
+# down, and the line under it says which.
+function SiteAnswers(`$url) {
+  try {
+    `$null = Invoke-WebRequest -Uri `$url -UseBasicParsing -TimeoutSec 10 -MaximumRedirection 5
+    return `$true
+  } catch {
+    try { if (`$_.Exception.Response) { return `$true } } catch { }
+    return `$false
+  }
+}
 `$bot = `$false
 foreach (`$p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA SilentlyContinue)) {
   if ("`$(`$p.CommandLine)" -match 'Thornswood-Bot') { `$bot = `$true }
 }
+'caddy     ' + `$(if (SiteAnswers 'https://thornswood.net/') { 'up' } else { 'DOWN' })
 'website   ' + `$(if (Answers 3001) { 'up' } else { 'DOWN' })
 'game      ' + `$(if (Answers 3000) { 'up' } else { 'DOWN' })
 'voice     ' + `$(if (Answers 7778) { 'up' } else { 'DOWN' })
