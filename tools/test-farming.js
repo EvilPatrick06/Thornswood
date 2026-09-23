@@ -120,12 +120,21 @@ function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 var P = { has: own, TABLE: { tuning: { farming: farmingTuning } } };
 globalThis.__thornswoodProgression = P;
 
-// The block writes data/farm-claims.json beside the process, so run in a temp dir.
-var work = path.join(__dirname, 'work');
-try { fs.mkdirSync(work); } catch (e) { }
-try { fs.mkdirSync(path.join(work, 'data')); } catch (e) { }
+// The block writes data/farm-claims.json beside the process, so run in a temp
+// folder. NOT tools\\work inside the repo, which is where this used to put it:
+// the folder stayed behind after every run, showed up untracked in git status
+// on both machines, and an untracked file a branch later adds is exactly what
+// stops a git pull. The OS temp folder is nobody's working copy.
+var work = fs.mkdtempSync(path.join(require('os').tmpdir(), 'thornswood-farm-'));
+fs.mkdirSync(path.join(work, 'data'));
+var startedIn = process.cwd();
 process.chdir(work);
-try { fs.unlinkSync(path.join('data', 'farm-claims.json')); } catch (e) { }
+// Leave nothing behind whichever way the run ends, including a failed check,
+// because process.exit does not unwind anything.
+process.on('exit', function () {
+  try { process.chdir(startedIn); } catch (e) { }
+  try { fs.rmSync(work, { recursive: true, force: true }); } catch (e) { }
+});
 
 eval(cropCode + '\n' + farmCode);
 var F = globalThis.__thornswoodFarming;
