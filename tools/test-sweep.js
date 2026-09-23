@@ -21,10 +21,27 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const gm = fs.readFileSync(path.join(__dirname, 'gamemode.js'), 'utf8');
-const chat = fs.readFileSync(path.join(__dirname, 'ts-ui', 'thornswood-chat.js'), 'utf8');
-const voice = fs.readFileSync(path.join(__dirname, 'ts-ui', 'thornswood-voice.js'), 'utf8');
-const svc = fs.readFileSync(path.join(__dirname, 'voice', 'voice-server.js'), 'utf8');
+/*
+  CARRIAGE RETURNS OUT FIRST, and this file learned that the hard way.
+
+  Every other harness in this folder starts by stripping them and none of them
+  says why. This one did not, and the check below that matches across a line
+  break passed on a working copy with Unix endings and failed on the GitHub
+  runner, which checks out CRLF: `\n` does not match `\r\n`, so it counted
+  zero of fourteen and called a deliberate pattern a slip.
+
+  It is the right failure in the wrong place. Read the file the same way
+  everywhere rather than writing every regex twice.
+*/
+const CR = String.fromCharCode(13);
+function read(...bits) {
+  return fs.readFileSync(path.join(__dirname, ...bits), 'utf8').split(CR).join('');
+}
+
+const gm = read('gamemode.js');
+const chat = read('ts-ui', 'thornswood-chat.js');
+const voice = read('ts-ui', 'thornswood-voice.js');
+const svc = read('voice', 'voice-server.js');
 
 /* Comments in this repo quote old code on purpose, so a check that reads them
    as code is a check that punishes writing them. */
