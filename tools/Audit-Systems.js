@@ -193,10 +193,73 @@ if (!PROFESSIONS) {
       byHalf[half].ranks[rk] = (byHalf[half].ranks[rk] || 0) + 1;
     });
 
+    /*
+      A RECIPE IS NOT THE ONLY WAY TO CLIMB, and asking only about recipes made
+      this report wrong about five halves out of sixteen.
+
+      It said bulwark, berserker, blightbrewer, physicker and wardweaver "OWN
+      NO RECIPE AT ALL, so somebody can pick it and make nothing". The first
+      half of that is true and the second is now false, and the difference
+      matters because the question anybody actually has is whether a half can
+      be picked and then never climb.
+
+      THERE ARE THREE WAYS TO CLIMB and the file knows about all of them:
+
+        A RECIPE. Most halves. The recipe gate credits the half that owns it.
+
+        A BENCH WITH NO RECIPES BEHIND IT. Skyrim has no COBJ records for
+        alchemy or enchanting: a potion is worked out from the effects the
+        ingredients share, inside a menu, with no record involved. So the
+        gamemode reads the BENCH instead, in recipelessCraft, and credits the
+        half that owns it. blightbrewer, physicker, wardweaver and bladebinder
+        climb that way and have since the recipeless path learned to credit.
+
+        A VERB. The server sees a death with its killer, so a Warrior's work
+        is the fight: mp.onDeath credits bulwark or berserker for an NPC they
+        killed. Added 23 September for exactly this report.
+
+      So the check reads the gamemode for the other two rather than assuming
+      the recipe table is the whole world. A half with none of the three is
+      still a real failure and still says so.
+    */
+    // src is the gamemode, already read at the top of this file.
+    const gm = src;
+    const benched = {};
+    if (gm) {
+      const access = /const BENCH_ACCESS = (\{[\s\S]*?\});/.exec(gm);
+      if (access) {
+        try {
+          const table = JSON.parse(access[1]);
+          Object.keys(table).forEach(function (k) {
+            const halves = (table[k] && table[k].halves) || {};
+            Object.keys(halves).forEach(function (hh) {
+              (benched[hh.toLowerCase()] = benched[hh.toLowerCase()] || []).push(table[k].name || k);
+            });
+          });
+        } catch (e) { /* a table that will not parse is reported by its own check */ }
+      }
+    }
+    // The halves a verb credits, read out of the file rather than listed here,
+    // so this cannot say yes to something that was taken out again.
+    const verbed = {};
+    if (gm && /st\.prof === 'warrior' && st\.half/.test(gm)) {
+      verbed.bulwark = 'a kill'; verbed.berserker = 'a kill';
+    }
+
     halvesSeen.forEach(function (h) {
       const b = byHalf[h];
       if (!b || !b.total) {
-        BAD(h + ' OWNS NO RECIPE AT ALL, so somebody can pick it and make nothing');
+        if (benched[h]) {
+          OK(h + ' owns no recipe, and does not need one: it climbs at ' +
+             benched[h].join(' and ') + ', through the recipeless craft path');
+          return;
+        }
+        if (verbed[h]) {
+          OK(h + ' owns no recipe, and does not need one: it climbs on ' + verbed[h]);
+          return;
+        }
+        BAD(h + ' owns no recipe, no bench and no verb, so somebody can pick it ' +
+            'and never climb at all');
         return;
       }
       if (!b.fires) {
