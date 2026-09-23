@@ -56,6 +56,23 @@ TOKEN = os.environ.get('DISCORD_TOKEN', '').strip()
 # Deleting is off unless asked for, because a script that quietly removes
 # channels is a script nobody should run twice.
 PRUNE = os.environ.get('DISCORD_PRUNE', '') == '1'
+
+# ROLES AND NOTHING ELSE.
+#
+# The whole script is safe to re-run and deletes nothing without
+# DISCORD_PRUNE, but safe to re-run is not the same as changes only what I
+# meant. It also creates any channel or category the plan names and the
+# server has not got, rewrites the read-only posts out of content.py, and
+# edits the guild's system and AFK channel settings.
+#
+# On 23 September the only thing wanted was the Banned role, which had
+# never been created, and the permission given was for exactly that: add
+# that role and reorder roles, add nothing else and remove nothing. So
+# there is a switch that means it, rather than a promise that the rest
+# would probably be a no-op.
+#
+#     python Build-Discord.py --roles-only
+ROLES_ONLY = ('--roles-only' in sys.argv) or os.environ.get('DISCORD_ROLES_ONLY', '') == '1'
 # Rewriting the read only posts means deleting the bot's old messages and
 # sending them again, in seven channels. Doing that on every run makes a one
 # channel change look like the server being rebuilt, so it is opt in now.
@@ -481,6 +498,17 @@ async def on_ready():
         print('\n  Building %s\n' % guild.name)
 
         roles = await ensure_roles(guild)
+
+        if ROLES_ONLY:
+            # Nothing below this line runs: no category, no channel, no
+            # post, no webhook, no guild setting. ensure_roles has already
+            # made anything missing and put every role in its place, and
+            # the tally below says which of those it did.
+            say('roles only', 'nothing else was touched')
+            print('')
+            print('  made %d, already there %d' % (len(made), len(kept)))
+            return await client.close()
+
         found = {}
         posts = []
 
