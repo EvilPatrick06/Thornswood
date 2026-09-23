@@ -1363,15 +1363,58 @@ function creditWork(actorId, key) {
     if (needs && needs.worked) { needs.worked(actorId); }
   } catch (e) { }
 
+  /*
+    And work done with your party standing next to you counts for more.
+
+    Blade's pitch had an experience bonus for playing together and Patrick
+    said yes to it. This is the one place every trade already passes through,
+    the same reason the tiredness above is here.
+
+    PAID AS A WHOLE EXTRA PIECE, NOT AS A FRACTION. Work is counted in pieces:
+    one seam, one log, one fish. There is no such thing as 1.15 of a log, and
+    rolling a die for it would make the same work worth different amounts on
+    different swings with nothing on the screen explaining why. So the bonus
+    is banked per character and paid out as one extra piece when it reaches a
+    whole one, which at fifteen percent is every seventh piece. Deterministic,
+    and a sentence somebody can be told.
+
+    IT IS ON BEING TOGETHER rather than on being in a party: partyNear asks
+    whether anybody from your party is in the same cell. A bonus for being
+    listed together is a checkbox everybody ticks once and never thinks about
+    again.
+  */
+  let extra = false;
+  try {
+    const soc = globalThis.__thornswoodSocial;
+    if (soc && soc.workBonus) {
+      const over = soc.workBonus(actorId) - 1;
+      if (over > 0) {
+        PARTY_BANK[actorId] = (PARTY_BANK[actorId] || 0) + over;
+        if (PARTY_BANK[actorId] >= 1) { PARTY_BANK[actorId] -= 1; extra = true; }
+      }
+    }
+  } catch (e) { }
+
   const c = globalThis.__thornswoodCharacter;
   if (!c || !c.credit) { return null; }
   try {
-    return c.credit(actorId, key);
+    let line = c.credit(actorId, key);
+    if (extra) {
+      // The second piece's answer wins when it has one, because a rank raised
+      // by the bonus piece is the thing worth saying.
+      const more = c.credit(actorId, key);
+      if (more) { line = more; }
+    }
+    return line;
   } catch (e) {
     log('could not count', key, 'work for', actorId.toString(16) + ':', e);
     return null;
   }
 }
+
+/* What each character is owed of the party bonus, in fractions of a piece.
+   In memory: a party is a session, so its bonus is too. */
+const PARTY_BANK = {};
 
 /**
  * The rank somebody holds in one class, half or school, as a step: 0 for a
@@ -14921,7 +14964,45 @@ log('gamemode loaded:',
     var baseId = idOf(baseDesc);
     if (!baseId) { return null; }
     if (kindOf(baseId) === 'CONT') {
-      strip(refrId);
+      /*
+        AND IF IT READ EMPTY, COME BACK IN A MOMENT, because otherwise the
+        first person to open any chest in Skyrim loots it.
+
+        Patrick, 22 September: "goldf, weaops, and armor are propley not able
+        to be picked up off the ground but are still found in chests and able
+        to be looted when they shouoldnt be."
+
+        The note over strip() had half of this already: a container's contents
+        are copied out of the plugin lazily, so the read here often comes back
+        empty and nothing is taken. What it then says is "the next press reads
+        it again, by which time the engine has filled it, and that is the one
+        that empties it". THERE IS NO SECOND PRESS. Read the engine's own
+        handler, MpObjectReference::Activate:
+
+            } else if (t == espm::CONT::kType && actorActivator) {
+              EnsureBaseContainerAdded(loader);
+
+        That runs AFTER this hook, on the same press, and then the container
+        opens with everything Bethesda put in it on the screen. Nobody presses
+        a chest, closes it and presses it again; they take the sword. The
+        second press only ever emptied a chest that had already been looted.
+
+        So an empty read schedules another one. The engine fills the container
+        synchronously inside the same Activate, so a timer of zero lands after
+        it with the contents there. The second at a quarter of a second is for
+        a fill that went round the event loop, and it costs one property read
+        on a chest that is already marked.
+
+        THE MARK STILL ONLY GOES ON A REAL READ, which is what stops this
+        eating somebody's own chest: strip() writes nothing when the inventory
+        comes back empty, so a chest that is genuinely empty is looked at
+        again next time rather than being recorded as done.
+      */
+      if (strip(refrId) === 0) {
+        var again = function () { try { strip(refrId); } catch (e) { } };
+        try { setTimeout(again, 0); } catch (e) { }
+        try { setTimeout(again, 250); } catch (e) { }
+      }
       return null;
     }
     // Made at runtime rather than placed by a plugin, so somebody put it there.
@@ -16338,7 +16419,11 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/needs', '/rest', '/eat', '/drink', '/bard',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
-               '/place', '/burn'];
+               '/place', '/burn',
+               // Friends, parties, mutes, trade and journals. See the
+               // social block at the end of this file.
+               '/friend', '/party', '/mute', '/trade', '/journal',
+               '/yes', '/no'];
 
 /*
   The ones a person who is not a playtester is told about. /tp, /goto, /face,
@@ -16363,7 +16448,11 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       '/take', '/jobs', '/dropjob', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty.
-                      '/needs', '/rest', '/eat', '/drink', '/bard'];
+                      '/needs', '/rest', '/eat', '/drink', '/bard',
+                      // Everybody's, and they have to be findable: a key
+                      // prompt nobody sees is a feature nobody has.
+                      '/friend', '/party', '/mute', '/trade', '/journal',
+                      '/yes', '/no'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
@@ -16802,6 +16891,107 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
 
   function round1(v) { return Math.round(Number(v) * 10) / 10; }
 
+  /*
+    The journal verbs, which the J panel speaks and a person can type.
+
+    Patrick asked for "multiple journals, pages inside them, and sharing
+    either a whole journal or a single page with a friend", so the shape is
+    journal, page, share, and the panel sends exactly these lines rather than
+    having a protocol of its own. That is the same choice the K panel made
+    with /pick: one way in, and a person who would rather type can.
+
+    The separator is two colons because a page has a title and a body and a
+    body has newlines in it, and the chat socket is line based. Everything
+    after the first :: is the page.
+  */
+  function journalCommand(soc, actorId, profileId, parts) {
+    var verb = String(parts[1] || '').toLowerCase();
+    var s = soc.stateOf(actorId);
+
+    if (!verb || verb === 'list') {
+      if (!s.journals.length) { return 'No journals yet. /journal new <title>, or press J.'; }
+      var names = [];
+      for (var i = 0; i < s.journals.length; i++) {
+        names.push(s.journals[i].title + ' (' + s.journals[i].pages.length + ')');
+      }
+      return 'Journals: ' + names.join(', ');
+    }
+
+    if (verb === 'new') {
+      var made = soc.newJournal(actorId, parts.slice(2).join(' '));
+      return made.why || ('Started ' + made.journal.title + '.');
+    }
+
+    if (verb === 'drop') {
+      return soc.dropJournal(actorId, String(parts[2] || '')) ? 'Thrown away.' : 'No such journal.';
+    }
+
+    if (verb === 'page') {
+      var line = parts.slice(2).join(' ');
+      var cut = line.indexOf('::');
+      var head = (cut === -1 ? line : line.slice(0, cut)).trim().split(/\s+/);
+      var body = cut === -1 ? '' : line.slice(cut + 2);
+      var jid = head.shift() || '';
+      var pid = head.shift() || '-';
+      var title = head.join(' ');
+      /*
+        THE CHANNEL IS LINE BASED, so the panel sends a page's newlines as the
+        two characters backslash n and they are put back here. A page with
+        paragraphs in it would otherwise arrive as several chat lines and the
+        second one would be read as a command.
+      */
+      var why = soc.writePage(actorId, jid, pid === '-' ? '' : pid, title,
+                              body.split('\\n').join('\n'));
+      return why || '';
+    }
+
+    if (verb === 'title') {
+      var s3 = soc.stateOf(actorId);
+      var b3 = soc.findJournal(s3, String(parts[2] || ''));
+      if (!b3) { return 'No such journal.'; }
+      var want = parts.slice(3).join(' ').trim();
+      if (!want) { return 'Call it what?'; }
+      b3.title = want.slice(0, 60);
+      soc.write(actorId, s3);
+      return '';
+    }
+
+    if (verb === 'share' || verb === 'unshare') {
+      var jid2 = String(parts[2] || '');
+      var pid2 = String(parts[3] || '-');
+      var who = parts.slice(4).join(' ').trim();
+      var s2 = soc.stateOf(actorId);
+      var book = soc.findJournal(s2, jid2);
+      if (!book) { return 'No such journal.'; }
+
+      if (verb === 'unshare') {
+        if (pid2 === '-') { book.shared = {}; }
+        else {
+          for (var p = 0; p < book.pages.length; p++) {
+            if (book.pages[p].id === pid2) { book.pages[p].shared = {}; }
+          }
+        }
+        soc.write(actorId, s2);
+        return 'Not shared any more.';
+      }
+
+      var target = soc.findPerson(who);
+      if (!target.actorId) { return target.why; }
+      var tp = soc.profileOf(target.actorId);
+      var refused = soc.share(actorId, jid2, pid2 === '-' ? '' : pid2, tp);
+      if (refused) { return refused; }
+      try {
+        say(target.actorId, soc.nameOfPerson(actorId) + ' shared ' +
+            (pid2 === '-' ? 'a journal' : 'a page') + ' with you. Press J.');
+      } catch (e) { }
+      return 'Shared with ' + soc.nameOfPerson(target.actorId) + '.';
+    }
+
+    return 'journal: new, title, page, share, unshare, drop, list.';
+  }
+
+
+
   function handle(cmd) {
     var profileId = Number(cmd.profileId) || 0;
     if (!profileId) { return; }
@@ -16920,6 +17110,211 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (bn && bn.setBurning && actorId) {
         try { bn.setBurning(actorId, String(parts[1] || '') === '1'); } catch (e) { }
       }
+      return true;
+    }
+
+    /*
+      ------------------------------------------- friends, parties and mutes
+
+      Patrick, 22 September: "when you look at someone, you are prompted to
+      press buttons: one for friend, one for trade, and one for mute... I just
+      want to press a key while looking at them."
+
+      EVERY ONE OF THESE TAKES A FORM ID OR A NAME, and the form id is the one
+      that matters. A key press while looking at somebody sends the hex form
+      id of whatever is under the crosshair, which is exact. A typed name is
+      the same command for people who would rather type, and it refuses an
+      ambiguous one rather than guessing which Bjorn was meant.
+
+      They are in PLAYER_WORDS on purpose, unlike /place and /burn: a key
+      prompt nobody has been told about is a feature nobody has.
+    */
+    if (word === '/friend' || word === '/party' || word === '/mute' ||
+        word === '/trade' || word === '/journal' ||
+        word === '/yes' || word === '/no') {
+      var soc = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodSocial;
+      if (!soc) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      if (!actorId) { toProfile(profileId, 'You are not in the world yet.'); return true; }
+      var mine = soc.profileOf(actorId);
+      var rest = parts.slice(1).join(' ').trim();
+
+      /* Say yes to whatever is standing. One word for all three offers,
+         because somebody being asked does not care which system asked. */
+      if (word === '/yes' || word === '/no') {
+        var o = soc.standingOffer(mine);
+        if (!o) { toProfile(profileId, 'Nobody has asked you anything.'); return true; }
+        delete soc.offers[mine];
+        var themActor = soc.actorForProfile(o.from);
+        if (word === '/no') {
+          toProfile(profileId, 'You turned ' + o.fromName + ' down.');
+          if (themActor) { say(themActor, soc.nameOfPerson(actorId) + ' said no.'); }
+          return true;
+        }
+        if (!themActor) { toProfile(profileId, o.fromName + ' has gone.'); return true; }
+        if (o.kind === 'friend') {
+          /* BOTH SIDES, because a friends list with one name in it is a
+             follower list. Somebody who said yes is a friend of the person
+             who asked and the other way round, and unfriending is one sided
+             on purpose: you can drop somebody without telling them. */
+          soc.addFriend(actorId, themActor);
+          soc.addFriend(themActor, actorId);
+          toProfile(profileId, 'You and ' + o.fromName + ' are friends.');
+          say(themActor, soc.nameOfPerson(actorId) + ' accepted. You are friends.');
+        } else if (o.kind === 'party') {
+          var joined = soc.joinParty(o.from, mine);
+          if (joined) { toProfile(profileId, joined); return true; }
+          toProfile(profileId, 'You joined ' + o.fromName + "'s party.");
+          say(themActor, soc.nameOfPerson(actorId) + ' joined your party.');
+        } else if (o.kind === 'trade') {
+          var tr = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodTrade;
+          if (!tr || !tr.begin) { toProfile(profileId, 'Trading is not running on this server.'); return true; }
+          var started = tr.begin(themActor, actorId);
+          if (started) { toProfile(profileId, started); return true; }
+        }
+        soc.push(actorId);
+        if (themActor) { soc.push(themActor); }
+        return true;
+      }
+
+      if (word === '/journal') {
+        var jr = journalCommand(soc, actorId, profileId, parts);
+        if (jr) { toProfile(profileId, jr); }
+        soc.push(actorId);
+        return true;
+      }
+
+      /* /party with nothing after it is about your own party rather than
+         about somebody else, so those two go first. */
+      if (word === '/party' && (rest === '' || rest === 'list')) {
+        var pp = soc.partyOf(mine);
+        if (!pp) { toProfile(profileId, 'You are not in a party. Look at somebody and press the party key, or /party <name>.'); return true; }
+        var names = [];
+        for (var pi = 0; pi < pp.members.length; pi++) {
+          var pa = soc.actorForProfile(pp.members[pi]);
+          names.push(pa ? soc.nameOfPerson(pa) : 'somebody offline');
+        }
+        toProfile(profileId, 'Your party: ' + names.join(', ') +
+                  '. ' + soc.partyNear(actorId) + ' of them here with you.');
+        return true;
+      }
+      if (word === '/party' && rest === 'leave') {
+        if (soc.leaveParty(mine)) { toProfile(profileId, 'You left the party.'); }
+        else { toProfile(profileId, 'You are not in a party.'); }
+        soc.push(actorId);
+        return true;
+      }
+      if (word === '/friend' && (rest === '' || rest === 'list')) {
+        var sv = soc.view(actorId);
+        if (!sv.friends.length) { toProfile(profileId, 'No friends yet. Look at somebody and press the friend key.'); return true; }
+        var line = [];
+        for (var fi = 0; fi < sv.friends.length; fi++) {
+          line.push(sv.friends[fi].name + (sv.friends[fi].on ? '' : ' (away)'));
+        }
+        toProfile(profileId, 'Friends: ' + line.join(', '));
+        return true;
+      }
+      if (word === '/mute' && (rest === '' || rest === 'list')) {
+        var sm = soc.stateOf(actorId);
+        var mn = [];
+        for (var mk in sm.muted) {
+          if (!Object.prototype.hasOwnProperty.call(sm.muted, mk)) { continue; }
+          mn.push(typeof sm.muted[mk] === 'string' ? sm.muted[mk] : mk);
+        }
+        toProfile(profileId, mn.length ? ('Muted: ' + mn.join(', ')) : 'You have nobody muted.');
+        return true;
+      }
+
+      /* Taking somebody off a list does not need them to be standing there. */
+      if (word === '/friend' && rest.indexOf('remove ') === 0) {
+        var gone = rest.slice(7).trim().toLowerCase();
+        var sf = soc.stateOf(actorId);
+        var dropped = '';
+        for (var fk in sf.friends) {
+          if (!Object.prototype.hasOwnProperty.call(sf.friends, fk)) { continue; }
+          var fname = String((sf.friends[fk] && sf.friends[fk].name) || '');
+          if (fname.toLowerCase() === gone || fname.toLowerCase().indexOf(gone) === 0) {
+            soc.dropFriend(actorId, Number(fk));
+            dropped = fname;
+            break;
+          }
+        }
+        toProfile(profileId, dropped ? (dropped + ' is no longer on your list.') : 'Nobody on your list by that name.');
+        soc.push(actorId);
+        return true;
+      }
+
+      /*
+        A trade that is already open takes verbs rather than a name.
+
+        add, remove, gold, ok and cancel, and the panel sends exactly the same
+        lines, the same way the J panel sends /journal. One way in.
+      */
+      if (word === '/trade') {
+        var tr2 = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodTrade;
+        if (!tr2) { toProfile(profileId, 'Trading is not running on this server.'); return true; }
+        var live = tr2.tradeOf(actorId);
+        var verb = String(parts[1] || '').toLowerCase();
+        if (live || verb === 'cancel' || verb === 'ok' || verb === 'add' ||
+            verb === 'remove' || verb === 'gold' || verb === 'pack') {
+          if (!live) { toProfile(profileId, 'You are not trading.'); return true; }
+          var out = '';
+          if (verb === 'cancel') { out = tr2.cancel(actorId); }
+          else if (verb === 'ok') { out = tr2.confirm(actorId); }
+          else if (verb === 'gold') { out = tr2.gold(actorId, parts[2]); }
+          else if (verb === 'remove') { out = tr2.remove(actorId, parts.slice(2).join(' ')); }
+          else if (verb === 'add') {
+            /* The count is the last word when it is a number, the same rule
+               /give uses, so "add iron ore 2" and "add iron ore" both work. */
+            var bits = parts.slice(2);
+            var n = 1;
+            if (bits.length > 1 && /^[0-9]+$/.test(bits[bits.length - 1])) {
+              n = Number(bits.pop());
+            }
+            out = tr2.add(actorId, bits.join(' '), n);
+          } else {
+            out = 'trade: add, remove, gold, ok, cancel.';
+          }
+          if (out) { toProfile(profileId, out); }
+          return true;
+        }
+      }
+
+      var found = soc.findPerson(rest);
+      if (!found.actorId) { toProfile(profileId, found.why); return true; }
+      var them = found.actorId;
+      if (them === actorId) { toProfile(profileId, 'That is you.'); return true; }
+      var theirPid = soc.profileOf(them);
+      var theirName = soc.nameOfPerson(them);
+
+      if (word === '/mute') {
+        /* NO OFFER AND NO TELLING THEM. A mute is a decision about your own
+           ears; asking permission to stop listening would be absurd, and
+           telling somebody they have been muted turns it into an argument. */
+        var on = soc.toggleMute(actorId, theirPid, theirName);
+        toProfile(profileId, on ? ('You muted ' + theirName + '.') : ('You unmuted ' + theirName + '.'));
+        soc.push(actorId);
+        return true;
+      }
+
+      if (word === '/friend' && soc.isFriend(actorId, theirPid)) {
+        soc.dropFriend(actorId, theirPid);
+        toProfile(profileId, theirName + ' is no longer on your list.');
+        soc.push(actorId);
+        return true;
+      }
+
+      var kind = word === '/friend' ? 'friend' : (word === '/party' ? 'party' : 'trade');
+      var refused = soc.offer(kind, actorId, them);
+      if (refused) { toProfile(profileId, refused); return true; }
+      var asked = kind === 'friend' ? 'wants to be friends'
+                : (kind === 'party' ? 'is asking you to join their party'
+                                    : 'is offering to trade');
+      say(them, soc.nameOfPerson(actorId) + ' ' + asked + '. /yes or /no.');
+      notify(them, soc.nameOfPerson(actorId) + ' ' + asked);
+      toProfile(profileId, 'Asked ' + theirName + '. They have ' +
+                Math.round(soc.SOCIAL.offerFor / 1000) + ' seconds.');
+      soc.push(actorId);
+      soc.push(them);
       return true;
     }
 
@@ -19231,3 +19626,1218 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
        'rest in', Math.round(100 / NEEDS.drain.rest) + 'h');
 })();
 // ==== end thornswood needs ====
+
+// ==== thornswood social: friends, parties, mutes and journals ====
+/*
+  ============================================================================
+  THE PEOPLE AROUND YOU, AND WHAT YOU CAN DO ABOUT THEM.
+
+  Patrick, 22 September, in one message:
+
+    "Friend/Party System & Journals - P for the Party menu... J for Journal...
+     Add it so that when you look at someone, you are prompted to press
+     buttons: one for friend, one for trade, and one for mute. Currently the
+     looking at people doesnt have the trade menu and when it did you had to
+     use youyr cursor and a bunch of other bs I just want to press a key while
+     looking at them."
+
+  THE TRADE MENU HE REMEMBERS IS GONE AND IS NOT COMING BACK. It was
+  TradeTogether, a Skyrim Together mod: the launcher still carries six key
+  bindings for it (Keys.cs, "Start a trade", "Offer the selected item") and
+  writes them into Data\SKSE\Plugins\TradeTogether.ini. That file does not
+  exist in this build and neither does the DLL, checked on 23 September. So
+  every one of those rows on the controls page has been setting a key in a
+  file nobody reads, which is why looking at somebody does nothing, and it is
+  also the cursor he remembers: that mod's menu was a mouse menu.
+
+  WHY THIS IS ONE BLOCK AND NOT THREE. A friend request, a trade offer and a
+  mute all start with the same question, "who am I looking at", and the answer
+  is split across the two machines in a way neither can fix alone:
+
+    the client  knows what is under the crosshair. It is an ObjectReference
+                with a form id and nothing else: no name, no profile, no way
+                to tell a person from a bandit.
+    the server  knows every profile, every name and where everybody is
+                standing, and cannot see a crosshair at all.
+
+  So the server publishes WHO IS NEAR YOU, as form id to name, on a property;
+  the client matches the crosshair against that list and draws the prompt; a
+  key press sends the form id back. That one loop is what all three verbs
+  ride on, and it is the same shape the chopping block and the temperature
+  both use.
+
+  WHAT IS PERSISTENT AND WHAT IS NOT, decided here rather than discovered
+  later. Friends, mutes and journals are on the character and survive a
+  restart, because losing your friends list to a deploy is not a thing anybody
+  would forgive. A PARTY IS A SESSION, held in memory and gone when the server
+  bounces, because a party is who you are playing with this evening and a
+  party that survived a restart would have you in a group with four people who
+  logged off hours ago.
+  ============================================================================
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  function slog() {
+    var a = ['[thornswood social]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  var SOCIAL_PROPERTY = 'thornswoodSocial';
+  var NEAR_PROPERTY = 'thornswoodNear';
+
+  /*
+    THE NUMBERS, in one table, the same way the needs block keeps its balance.
+  */
+  var SOCIAL = {
+    // How close somebody has to be to appear in your nearby list at all. The
+    // crosshair reaches about this far and a list of everybody in Whiterun
+    // would be a property update a second for no reason.
+    nearReach: 2600,
+    // How often the nearby list is rebuilt. Fast enough that walking up to
+    // somebody prompts within a step, slow enough to be free.
+    nearEvery: 1500,
+    // How long a friend request, a party invite or a trade offer stands.
+    offerFor: 45000,
+    // The most friends one character can hold. Not a rule anybody asked for,
+    // it is a size limit on a property that has to be sent to a client.
+    mostFriends: 120,
+    // Journals, pages, and how much can go in one page. Same reason.
+    mostJournals: 12,
+    mostPages: 60,
+    pageChars: 4000,
+    /*
+      What playing together is worth. Blade's pitch had an experience bonus
+      for a party and Patrick said yes to it. A flat multiplier on work credit
+      while at least one other person in your party is in the same cell: it
+      has to be BEING together rather than being listed together, or the bonus
+      is a checkbox everybody ticks once and forgets.
+    */
+    partyBonus: 0.15,
+    mostParty: 6
+  };
+
+  // ------------------------------------------------------------- storage --
+
+  function fresh() {
+    return { friends: {}, muted: {}, journals: [], at: 0 };
+  }
+
+  function read(actorId) {
+    var v = null;
+    try { v = mp.get(actorId, SOCIAL_PROPERTY); } catch (e) { v = null; }
+    if (!v || typeof v !== 'object') { return null; }
+    /*
+      Rebuilt field by field rather than handed back, the same as the needs
+      block. That one learned the hard way that this is also where fields get
+      silently dropped, so anything added to fresh() has to be added here too
+      or it lives for exactly one call.
+    */
+    var out = fresh();
+    if (v.friends && typeof v.friends === 'object') { out.friends = v.friends; }
+    if (v.muted && typeof v.muted === 'object') { out.muted = v.muted; }
+    if (Array.isArray(v.journals)) { out.journals = v.journals; }
+    out.at = Number(v.at) || 0;
+    return out;
+  }
+
+  function write(actorId, s) {
+    s.at = Date.now();
+    try { mp.set(actorId, SOCIAL_PROPERTY, s); return true; }
+    catch (e) { return false; }
+  }
+
+  function stateOf(actorId) {
+    var s = read(actorId);
+    if (!s) { s = fresh(); write(actorId, s); }
+    return s;
+  }
+
+  // ------------------------------------------------------------- people --
+
+  function profileOf(actorId) {
+    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+  }
+
+  function nameOfPerson(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      var n = String((ap && ap.name) || '');
+      if (n) { return n; }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  function online() {
+    try { return mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+  }
+
+  function actorForProfile(pid) {
+    var all = online();
+    for (var i = 0; i < all.length; i++) {
+      if (profileOf(all[i]) === pid) { return all[i]; }
+    }
+    return 0;
+  }
+
+  /*
+    Find somebody by what a person typed, or by the form id the crosshair gave.
+
+    THE FORM ID IS THE ONE THAT MATTERS and the name is the fallback. A key
+    press while looking at somebody sends a hex form id, which is exact. A
+    typed name is a convenience for the chat and is matched case insensitively
+    on a prefix, so two people called Bjorn are an ambiguity rather than a
+    coin toss.
+  */
+  function findPerson(whoever) {
+    var want = String(whoever || '').trim();
+    if (!want) { return { actorId: 0, why: 'Who?' }; }
+
+    var all = online();
+    var asId = parseInt(want, 16);
+    if (isFinite(asId) && asId > 0) {
+      for (var i = 0; i < all.length; i++) {
+        if (all[i] === asId) { return { actorId: all[i], why: '' }; }
+      }
+    }
+
+    var low = want.toLowerCase();
+    var exact = [], part = [];
+    for (var j = 0; j < all.length; j++) {
+      var n = nameOfPerson(all[j]).toLowerCase();
+      if (n === low) { exact.push(all[j]); }
+      else if (n.indexOf(low) === 0) { part.push(all[j]); }
+    }
+    var hit = exact.length ? exact : part;
+    if (hit.length === 1) { return { actorId: hit[0], why: '' }; }
+    if (hit.length > 1) {
+      return { actorId: 0, why: 'More than one person here answers to that. Look at them and press the key instead.' };
+    }
+    return { actorId: 0, why: 'Nobody here by that name.' };
+  }
+
+  // ------------------------------------------------------- what is near --
+  /*
+    WHO IS CLOSE ENOUGH TO LOOK AT, published to each person's own client.
+
+    The client cannot ask "is this a person", so it is told. One entry per
+    person in the same cell and within reach, keyed by the form id the
+    crosshair will hand back, carrying their name and what they already are to
+    you, so the prompt can say "Remove friend" rather than "Add friend"
+    without a round trip.
+
+    EDGE TRIGGERED ON A SIGNATURE. This is a property and updateOwner runs
+    every frame, so the script compares a string and does nothing the rest of
+    the time; and the server only writes when the signature changes, so
+    standing still in a room costs one build and no writes.
+  */
+  var nearWas = {};
+
+  function nearScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || typeof v !== "object") { return; }',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    if (st.thornswoodNearAt === v.at) { return; }',
+      '    st.thornswoodNearAt = v.at;',
+      // The plugin reads this. updateOwner bodies are compiled with
+      // new Function in the client's own global, so this is the same
+      // globalThis a plugin sees; see the note over thornswoodCatchFire.
+      '    try { globalThis.thornswoodNear = v.w || {}; } catch (e) { }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  function nearTick() {
+    var all = online();
+    if (!all.length) { return; }
+
+    // Position and cell once per person per tick, rather than once per pair.
+    var at = [];
+    for (var i = 0; i < all.length; i++) {
+      var id = all[i];
+      var pos = null, cell = '';
+      try { pos = mp.get(id, 'pos'); cell = String(mp.get(id, 'worldOrCellDesc') || ''); }
+      catch (e) { continue; }
+      if (!pos || !cell) { continue; }
+      at.push({ id: id, pos: pos, cell: cell, pid: profileOf(id), name: nameOfPerson(id) });
+    }
+
+    var reach = SOCIAL.nearReach * SOCIAL.nearReach;
+    for (var a = 0; a < at.length; a++) {
+      var me = at[a];
+      var s = read(me.id) || fresh();
+      var party = partyOf(me.pid);
+      var w = {};
+      for (var b = 0; b < at.length; b++) {
+        if (a === b) { continue; }
+        var them = at[b];
+        if (them.cell !== me.cell) { continue; }
+        var dx = them.pos[0] - me.pos[0];
+        var dy = them.pos[1] - me.pos[1];
+        var dz = them.pos[2] - me.pos[2];
+        if ((dx * dx + dy * dy + dz * dz) > reach) { continue; }
+        w[them.id.toString(16)] = {
+          n: them.name,
+          p: them.pid,
+          f: s.friends[them.pid] ? 1 : 0,
+          m: s.muted[them.pid] ? 1 : 0,
+          y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0
+        };
+      }
+      var sig = JSON.stringify(w);
+      if (nearWas[me.id] === sig) { continue; }
+      nearWas[me.id] = sig;
+      try { mp.set(me.id, NEAR_PROPERTY, { w: w, at: Date.now() }); } catch (e) { }
+    }
+
+    // Anybody who has gone offline should not keep a slot in the signature
+    // table, or a reconnect would be told nothing is near them.
+    var here = {};
+    for (var k = 0; k < all.length; k++) { here[all[k]] = true; }
+    for (var had in nearWas) {
+      if (!Object.prototype.hasOwnProperty.call(nearWas, had)) { continue; }
+      if (!here[had]) { delete nearWas[had]; }
+    }
+  }
+
+  // -------------------------------------------------------------- offers --
+  /*
+    A friend request, a party invite and a trade offer are the same thing with
+    a different word on it: somebody asked, it stands for a while, and the
+    other person says yes or it lapses.
+
+    In memory rather than on the character, because an offer that survived a
+    restart would be a request from somebody who is not here any more.
+  */
+  var offers = {};   // toProfileId -> { kind, from, fromName, at }
+
+  function offer(kind, fromActor, toActor) {
+    var fromPid = profileOf(fromActor);
+    var toPid = profileOf(toActor);
+    if (!fromPid || !toPid) { return 'That person is not here.'; }
+    if (fromPid === toPid) { return 'That is you.'; }
+    offers[toPid] = { kind: kind, from: fromPid, fromName: nameOfPerson(fromActor), at: Date.now() };
+    return '';
+  }
+
+  function standingOffer(toPid) {
+    var o = offers[toPid];
+    if (!o) { return null; }
+    if (Date.now() - o.at > SOCIAL.offerFor) { delete offers[toPid]; return null; }
+    return o;
+  }
+
+  // ------------------------------------------------------------ friends --
+
+  function addFriend(actorId, otherActor) {
+    var s = stateOf(actorId);
+    var pid = profileOf(otherActor);
+    if (!pid) { return 'That person is not here.'; }
+    if (Object.keys(s.friends).length >= SOCIAL.mostFriends) {
+      return 'Your friends list is full.';
+    }
+    s.friends[pid] = { name: nameOfPerson(otherActor), since: Date.now() };
+    write(actorId, s);
+    return '';
+  }
+
+  function dropFriend(actorId, pid) {
+    var s = stateOf(actorId);
+    if (!s.friends[pid]) { return false; }
+    delete s.friends[pid];
+    write(actorId, s);
+    return true;
+  }
+
+  function isFriend(actorId, pid) {
+    var s = read(actorId);
+    return !!(s && s.friends[pid]);
+  }
+
+  // -------------------------------------------------------------- mutes --
+  /*
+    MUTE IS THE SERVER'S TO REMEMBER AND THE CLIENT'S TO DO.
+
+    The gain node that would silence somebody is in thornswood-voice.js, in
+    the overlay, one per peer, already built and already being written to five
+    times a second by the distance mixing. So the server keeps the list, sends
+    it to the owner with everything else, and the page multiplies by zero.
+
+    It is NOT a server side mute: the server never sees audio, and a mute the
+    server enforced would be a mute everybody got, which is a moderation tool
+    and not what was asked for.
+  */
+  function toggleMute(actorId, pid, name) {
+    var s = stateOf(actorId);
+    var on = !s.muted[pid];
+    if (on) { s.muted[pid] = name || true; } else { delete s.muted[pid]; }
+    write(actorId, s);
+    return on;
+  }
+
+  // ------------------------------------------------------------ parties --
+  /*
+    A PARTY IS A SESSION AND LIVES IN MEMORY. See the block comment.
+
+    Held as one table of parties rather than a field on each character,
+    because every question anybody asks of a party is about the whole of it:
+    who is in it, is anybody near me, dissolve it. A field per member would be
+    the same facts written five times and five chances to disagree.
+  */
+  var parties = {};      // partyId -> { leader, members: [pid], at }
+  var inParty = {};      // pid -> partyId
+  var nextParty = 1;
+
+  function partyOf(pid) {
+    var id = inParty[pid];
+    if (!id) { return null; }
+    var p = parties[id];
+    if (!p) { delete inParty[pid]; return null; }
+    return p;
+  }
+
+  function joinParty(leaderPid, pid) {
+    var p = partyOf(leaderPid);
+    if (!p) {
+      var id = 'p' + (nextParty++);
+      p = { leader: leaderPid, members: [leaderPid], at: Date.now() };
+      parties[id] = p;
+      inParty[leaderPid] = id;
+    }
+    if (p.members.length >= SOCIAL.mostParty) { return 'That party is full.'; }
+    if (p.members.indexOf(pid) !== -1) { return 'They are already with you.'; }
+    leaveParty(pid);
+    p.members.push(pid);
+    inParty[pid] = inParty[leaderPid];
+    return '';
+  }
+
+  function leaveParty(pid) {
+    var p = partyOf(pid);
+    if (!p) { return false; }
+    var id = inParty[pid];
+    var at = p.members.indexOf(pid);
+    if (at !== -1) { p.members.splice(at, 1); }
+    delete inParty[pid];
+    if (p.leader === pid) { p.leader = p.members[0] || 0; }
+    // A party of one is not a party.
+    if (p.members.length < 2) {
+      for (var i = 0; i < p.members.length; i++) { delete inParty[p.members[i]]; }
+      delete parties[id];
+    }
+    return true;
+  }
+
+  /*
+    Is anybody from your party standing with you.
+
+    This is what the experience bonus is paid on, rather than on being in a
+    party at all: a bonus for being listed together is a checkbox everybody
+    ticks once, and a bonus for BEING together is a reason to travel together,
+    which is the thing Blade and Patrick were both after.
+  */
+  function partyNear(actorId) {
+    var pid = profileOf(actorId);
+    var p = partyOf(pid);
+    if (!p || p.members.length < 2) { return 0; }
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { return 0; }
+    if (!cell) { return 0; }
+    var n = 0;
+    for (var i = 0; i < p.members.length; i++) {
+      if (p.members[i] === pid) { continue; }
+      var them = actorForProfile(p.members[i]);
+      if (!them) { continue; }
+      try {
+        if (String(mp.get(them, 'worldOrCellDesc') || '') === cell) { n++; }
+      } catch (e) { }
+    }
+    return n;
+  }
+
+  /** The multiplier work credit is paid at, for somebody with their party. */
+  function workBonus(actorId) {
+    return partyNear(actorId) > 0 ? (1 + SOCIAL.partyBonus) : 1;
+  }
+
+  // ----------------------------------------------------------- journals --
+  /*
+    Patrick: "J for Journal... multiple journals, pages inside them, and
+    sharing either a whole journal or a single page with a friend."
+
+    Stored on the character, because a journal that did not survive a restart
+    would be worse than no journal at all. Sharing is by profile id and is
+    one directional: sharing a page with somebody puts it in their list of
+    things shared with them, and it stays yours.
+  */
+  function newJournal(actorId, title) {
+    var s = stateOf(actorId);
+    if (s.journals.length >= SOCIAL.mostJournals) {
+      return { why: 'You are carrying as many journals as you can.' };
+    }
+    var j = {
+      id: 'j' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36),
+      title: String(title || 'Journal').slice(0, 60),
+      pages: [], shared: {}, at: Date.now()
+    };
+    s.journals.push(j);
+    write(actorId, s);
+    return { journal: j, why: '' };
+  }
+
+  function findJournal(s, id) {
+    for (var i = 0; i < s.journals.length; i++) {
+      if (s.journals[i].id === id) { return s.journals[i]; }
+    }
+    return null;
+  }
+
+  function writePage(actorId, journalId, pageId, title, text) {
+    var s = stateOf(actorId);
+    var j = findJournal(s, journalId);
+    if (!j) { return 'No such journal.'; }
+    var body = String(text || '').slice(0, SOCIAL.pageChars);
+    var page = null;
+    for (var i = 0; i < j.pages.length; i++) {
+      if (j.pages[i].id === pageId) { page = j.pages[i]; break; }
+    }
+    if (!page) {
+      if (j.pages.length >= SOCIAL.mostPages) { return 'That journal is full.'; }
+      page = { id: 'p' + Date.now().toString(36) + j.pages.length, shared: {} };
+      j.pages.push(page);
+    }
+    page.title = String(title || 'Page').slice(0, 60);
+    page.text = body;
+    page.at = Date.now();
+    write(actorId, s);
+    return '';
+  }
+
+  function dropJournal(actorId, journalId) {
+    var s = stateOf(actorId);
+    for (var i = 0; i < s.journals.length; i++) {
+      if (s.journals[i].id === journalId) {
+        s.journals.splice(i, 1);
+        write(actorId, s);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function share(actorId, journalId, pageId, pid) {
+    var s = stateOf(actorId);
+    var j = findJournal(s, journalId);
+    if (!j) { return 'No such journal.'; }
+    if (!s.friends[pid]) { return 'You can only share with a friend.'; }
+    if (!pageId) {
+      j.shared[pid] = true;
+    } else {
+      var found = null;
+      for (var i = 0; i < j.pages.length; i++) {
+        if (j.pages[i].id === pageId) { found = j.pages[i]; break; }
+      }
+      if (!found) { return 'No such page.'; }
+      if (!found.shared) { found.shared = {}; }
+      found.shared[pid] = true;
+    }
+    write(actorId, s);
+    return '';
+  }
+
+  /*
+    What other people have shared with you, gathered when the panel is drawn.
+
+    Held nowhere: it is read off the people who shared it, every time, so
+    unsharing works by deleting one flag rather than by chasing copies. It only
+    finds people who are ONLINE, which is a real limit and is written down
+    rather than papered over: a page a friend shared last week is theirs to
+    show you again when they are here.
+  */
+  function sharedWithMe(actorId) {
+    var mine = profileOf(actorId);
+    var out = [];
+    var all = online();
+    for (var i = 0; i < all.length; i++) {
+      if (all[i] === actorId) { continue; }
+      var theirs = read(all[i]);
+      if (!theirs) { continue; }
+      var who = nameOfPerson(all[i]);
+      for (var j = 0; j < theirs.journals.length; j++) {
+        var book = theirs.journals[j];
+        var pages = [];
+        var whole = !!(book.shared && book.shared[mine]);
+        for (var p = 0; p < book.pages.length; p++) {
+          var page = book.pages[p];
+          if (whole || (page.shared && page.shared[mine])) {
+            pages.push({ id: page.id, title: page.title, text: page.text, at: page.at });
+          }
+        }
+        if (pages.length) {
+          out.push({ from: who, title: book.title, whole: whole, pages: pages });
+        }
+      }
+    }
+    return out;
+  }
+
+  // -------------------------------------------------------- the panel view --
+
+  function view(actorId) {
+    var s = stateOf(actorId);
+    var mine = profileOf(actorId);
+    var p = partyOf(mine);
+    var here = {};
+    var all = online();
+    for (var i = 0; i < all.length; i++) { here[profileOf(all[i])] = nameOfPerson(all[i]); }
+
+    var friends = [];
+    for (var pid in s.friends) {
+      if (!Object.prototype.hasOwnProperty.call(s.friends, pid)) { continue; }
+      var n = Number(pid);
+      friends.push({
+        p: n,
+        name: (s.friends[pid] && s.friends[pid].name) || here[n] || 'somebody',
+        on: !!here[n],
+        muted: !!s.muted[pid],
+        party: !!(p && p.members.indexOf(n) !== -1)
+      });
+    }
+    friends.sort(function (a, b) {
+      if (a.on !== b.on) { return a.on ? -1 : 1; }
+      return a.name < b.name ? -1 : 1;
+    });
+
+    var party = [];
+    if (p) {
+      for (var k = 0; k < p.members.length; k++) {
+        var mp2 = p.members[k];
+        party.push({
+          p: mp2, name: here[mp2] || 'somebody',
+          leader: mp2 === p.leader, on: !!here[mp2], me: mp2 === mine
+        });
+      }
+    }
+
+    var offerNow = standingOffer(mine);
+    return {
+      me: mine,
+      friends: friends,
+      party: party,
+      together: partyNear(actorId),
+      bonus: Math.round(SOCIAL.partyBonus * 100),
+      offer: offerNow ? { kind: offerNow.kind, from: offerNow.from, name: offerNow.fromName } : null,
+      journals: s.journals,
+      shared: sharedWithMe(actorId),
+      muted: s.muted
+    };
+  }
+
+  /*
+    The panel script. One property, two panels and the voice mute, because
+    they are all the same facts and three properties would be three updates
+    every time one friend logged in.
+  */
+  function panelScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || typeof v !== "object") { return; }',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    if (st.thornswoodSocialAt === v.at) { return; }',
+      '    st.thornswoodSocialAt = v.at;',
+      '    var body = JSON.stringify(v);',
+      '    var src = "(function(){try{" +',
+      '      "var d=" + body + ";" +',
+      '      "if(window.thornswoodParty&&window.thornswoodParty.setData){window.thornswoodParty.setData(d);}" +',
+      '      "if(window.thornswoodJournal&&window.thornswoodJournal.setData){window.thornswoodJournal.setData(d);}" +',
+      // The voice page holds the gain nodes. Handing it the mute list is the
+      // whole of muting; see toggleMute.
+      '      "if(window.thornswoodVoice&&window.thornswoodVoice.setMuted){window.thornswoodVoice.setMuted(d.muted||{});}" +',
+      '      "}catch(e){}})();";',
+      '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  var panelWas = {};
+
+  /** Push the panel view at one person, when it has actually changed. */
+  function push(actorId) {
+    var v;
+    try { v = view(actorId); } catch (e) { return; }
+    var sig = JSON.stringify(v);
+    if (panelWas[actorId] === sig) { return; }
+    panelWas[actorId] = sig;
+    v.at = Date.now();
+    try { mp.set(actorId, SOCIAL_PROPERTY + 'View', v); } catch (e) { }
+  }
+
+  // ------------------------------------------------------------ the tick --
+
+  function tick() {
+    try { nearTick(); } catch (e) { slog('near tick:', e); }
+    var all = online();
+    for (var i = 0; i < all.length; i++) {
+      try { push(all[i]); } catch (e) { }
+    }
+    // Offers that nobody answered.
+    var now = Date.now();
+    for (var pid in offers) {
+      if (!Object.prototype.hasOwnProperty.call(offers, pid)) { continue; }
+      if (now - offers[pid].at > SOCIAL.offerFor) { delete offers[pid]; }
+    }
+    // Anybody who logged out leaves their party.
+    var herePids = {};
+    for (var k = 0; k < all.length; k++) { herePids[profileOf(all[k])] = true; }
+    for (var member in inParty) {
+      if (!Object.prototype.hasOwnProperty.call(inParty, member)) { continue; }
+      if (!herePids[member]) { leaveParty(Number(member)); }
+    }
+  }
+
+  // ----------------------------------------------------------- properties --
+
+  try {
+    mp.makeProperty(NEAR_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: nearScript(), updateNeighbor: ''
+    });
+  } catch (e) { /* already made by a previous load */ }
+
+  try {
+    mp.makeProperty(SOCIAL_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) { }
+
+  try {
+    mp.makeProperty(SOCIAL_PROPERTY + 'View', {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: panelScript(), updateNeighbor: ''
+    });
+  } catch (e) { }
+
+  if (g.__thornswoodSocialTimer) { try { clearInterval(g.__thornswoodSocialTimer); } catch (e) { } }
+  g.__thornswoodSocialTimer = setInterval(guard('socialTick', tick), SOCIAL.nearEvery);
+
+  g.__thornswoodSocial = {
+    SOCIAL: SOCIAL,
+    stateOf: stateOf, read: read, write: write, fresh: fresh,
+    findPerson: findPerson, nameOfPerson: nameOfPerson, profileOf: profileOf,
+    actorForProfile: actorForProfile,
+    offer: offer, standingOffer: standingOffer, offers: offers,
+    addFriend: addFriend, dropFriend: dropFriend, isFriend: isFriend,
+    toggleMute: toggleMute,
+    partyOf: partyOf, joinParty: joinParty, leaveParty: leaveParty,
+    partyNear: partyNear, workBonus: workBonus, parties: parties, inParty: inParty,
+    newJournal: newJournal, writePage: writePage, dropJournal: dropJournal,
+    share: share, sharedWithMe: sharedWithMe, findJournal: findJournal,
+    view: view, push: push, tick: tick, nearTick: nearTick
+  };
+
+  slog('ready: friends and journals are kept, a party is a session,',
+       'nearby list every', SOCIAL.nearEvery + 'ms within', SOCIAL.nearReach + ' units');
+})();
+// ==== end thornswood social ====
+
+// ==== thornswood trade ====
+/*
+  ============================================================================
+  TRADING, BECAUSE THE MOD THAT USED TO DO IT IS NOT HERE.
+
+  Patrick, 22 September: "Currently the looking at people doesnt have the
+  trade menu and when it did you had to use youyr cursor and a bunch of other
+  bs I just want to press a key while looking at them."
+
+  The menu he remembers was TradeTogether, a Skyrim Together mod. The launcher
+  still carries six key bindings for it in Keys.cs, writing into
+  Data\SKSE\Plugins\TradeTogether.ini, and neither that file nor the DLL is
+  anywhere in this build; checked 23 September. So those rows have been
+  setting keys in a file nobody reads, which is why looking at somebody does
+  nothing, and the cursor he remembers was that mod's mouse menu.
+
+  WHAT A TRADE IS HERE. Two people, each with a pile they are offering, each
+  with a gold amount, and two confirmations. Nothing moves until both sides
+  have said yes to the pile in front of them, and CHANGING YOUR OFFER TAKES
+  BOTH CONFIRMATIONS BACK, which is the one rule that makes a trade safe: the
+  thing you agreed to is the thing you get.
+
+  THE SERVER OWNS THE PILES AND NEVER THE CLIENT. An offer is a list of base
+  ids and counts held here, checked against the real inventory at the moment
+  of the swap rather than at the moment of the offer, so somebody who drops
+  the sword they offered simply fails the check. The client draws what the
+  server says the piles are.
+
+  WHY NOT A CONTAINER. Skyrim's own barter and container menus are the
+  client's, and this server cannot drive them: the whole reason the chopping
+  block needed a plugin is that the engine's menus do not report to the
+  gamemode. A panel of our own is the same choice the K menu made.
+  ============================================================================
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  function tlog() {
+    var a = ['[thornswood trade]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  var TRADE_PROPERTY = 'thornswoodTrade';
+
+  var TRADE = {
+    // How far apart two people can be and still be trading. A trade that
+    // carries on across Skyrim is a post office.
+    reach: 700,
+    // How long a trade stands with nobody touching it.
+    idleFor: 180000,
+    // How often the open trades are checked over.
+    every: 2000,
+    // The most lines one side can offer, so a panel stays a panel.
+    mostLines: 24
+  };
+
+  /*
+    Every open trade, by the two actor ids in it. In memory: a trade is a
+    conversation, and one that survived a restart would be two people holding
+    piles neither of them remembers offering.
+  */
+  var open = {};      // actorId -> trade
+  var trades = [];    // the same objects, for the tick
+
+  function nameOf(actorId) {
+    var soc = g.__thornswoodSocial;
+    if (soc && soc.nameOfPerson) { return soc.nameOfPerson(actorId); }
+    return 'somebody';
+  }
+
+  function tradeOf(actorId) { return open[actorId] || null; }
+
+  function other(t, actorId) { return t.a === actorId ? t.b : t.a; }
+  function sideOf(t, actorId) { return t.a === actorId ? t.offerA : t.offerB; }
+  function okOf(t, actorId) { return t.a === actorId ? t.okA : t.okB; }
+
+  function setOk(t, actorId, v) {
+    if (t.a === actorId) { t.okA = v; } else { t.okB = v; }
+  }
+
+  /*
+    Any change to either pile takes BOTH confirmations back.
+
+    This is the whole safety of the thing. Without it, one side confirms, the
+    other quietly swaps a daedric sword for an iron one and confirms, and the
+    swap goes through on an agreement that no longer describes what is in the
+    piles.
+  */
+  function unconfirm(t) { t.okA = false; t.okB = false; t.at = Date.now(); }
+
+  function begin(aActor, bActor) {
+    if (open[aActor]) { return 'You are already trading.'; }
+    if (open[bActor]) { return 'They are already trading.'; }
+    if (!within(aActor, bActor)) { return 'You are too far apart.'; }
+    var t = {
+      a: aActor, b: bActor,
+      offerA: [], offerB: [], goldA: 0, goldB: 0,
+      okA: false, okB: false, at: Date.now()
+    };
+    open[aActor] = t; open[bActor] = t;
+    trades.push(t);
+    push(t);
+    try {
+      say(aActor, 'Trading with ' + nameOf(bActor) + '. /trade add <thing> [count], /trade gold <n>, /trade ok, /trade cancel.');
+      say(bActor, 'Trading with ' + nameOf(aActor) + '. /trade add <thing> [count], /trade gold <n>, /trade ok, /trade cancel.');
+    } catch (e) { }
+    return '';
+  }
+
+  function within(aActor, bActor) {
+    try {
+      var ca = String(mp.get(aActor, 'worldOrCellDesc') || '');
+      var cb = String(mp.get(bActor, 'worldOrCellDesc') || '');
+      if (!ca || ca !== cb) { return false; }
+      var pa = mp.get(aActor, 'pos'), pb = mp.get(bActor, 'pos');
+      if (!pa || !pb) { return false; }
+      var dx = pa[0] - pb[0], dy = pa[1] - pb[1], dz = pa[2] - pb[2];
+      return (dx * dx + dy * dy + dz * dz) <= (TRADE.reach * TRADE.reach);
+    } catch (e) { return false; }
+  }
+
+  function close(t, why) {
+    delete open[t.a]; delete open[t.b];
+    var at = trades.indexOf(t);
+    if (at !== -1) { trades.splice(at, 1); }
+    try { mp.set(t.a, TRADE_PROPERTY, { open: false, at: Date.now() }); } catch (e) { }
+    try { mp.set(t.b, TRADE_PROPERTY, { open: false, at: Date.now() }); } catch (e) { }
+    if (why) {
+      try { say(t.a, why); say(t.b, why); } catch (e) { }
+    }
+  }
+
+  /** How many of one base id somebody is actually holding. */
+  function holding(actorId, baseId) {
+    try {
+      var inv = mp.get(actorId, 'inventory');
+      var entries = (inv && inv.entries) || [];
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && entries[i].baseId === baseId) { n += (entries[i].count || 1); }
+      }
+      return n;
+    } catch (e) { return 0; }
+  }
+
+  /*
+    What somebody is carrying, as the panel needs it: one line per base, with
+    a name off the espm record.
+
+    NOT A CACHE. An inventory changes constantly and a stale list in a trade
+    panel is how somebody offers a thing they no longer have.
+  */
+  var nameCache = {};
+  function labelOf(baseId) {
+    if (Object.prototype.hasOwnProperty.call(nameCache, baseId)) { return nameCache[baseId]; }
+    var label = '';
+    try {
+      var res = mp.lookupEspmRecordById(baseId);
+      var rec = res && res.record;
+      if (rec) {
+        if (rec.editorId) { label = String(rec.editorId); }
+        var fields = rec.fields || [];
+        for (var i = 0; i < fields.length; i++) {
+          if (fields[i] && fields[i].type === 'FULL' && fields[i].data) {
+            label = String(fields[i].data);
+            break;
+          }
+        }
+      }
+    } catch (e) { }
+    if (!label) { label = '0x' + baseId.toString(16); }
+    nameCache[baseId] = label;
+    return label;
+  }
+
+  function carrying(actorId) {
+    var out = [];
+    try {
+      var inv = mp.get(actorId, 'inventory');
+      var entries = (inv && inv.entries) || [];
+      var byBase = {};
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (!e || !e.baseId) { continue; }
+        byBase[e.baseId] = (byBase[e.baseId] || 0) + (e.count || 1);
+      }
+      for (var b in byBase) {
+        if (!Object.prototype.hasOwnProperty.call(byBase, b)) { continue; }
+        out.push({ id: Number(b), n: labelOf(Number(b)), c: byBase[b] });
+      }
+      out.sort(function (x, y) { return x.n.toLowerCase() < y.n.toLowerCase() ? -1 : 1; });
+    } catch (e) { }
+    return out;
+  }
+
+  /** Put something on your side, by name or by hex base id. */
+  function add(actorId, what, count) {
+    var t = tradeOf(actorId);
+    if (!t) { return 'You are not trading.'; }
+    var want = String(what || '').trim().toLowerCase();
+    if (!want) { return 'Add what?'; }
+    var have = carrying(actorId);
+    var asId = parseInt(want, 16);
+    var hit = null;
+    for (var i = 0; i < have.length; i++) {
+      if ((isFinite(asId) && have[i].id === asId) ||
+          have[i].n.toLowerCase() === want) { hit = have[i]; break; }
+    }
+    if (!hit) {
+      for (var j = 0; j < have.length; j++) {
+        if (have[j].n.toLowerCase().indexOf(want) !== -1) { hit = have[j]; break; }
+      }
+    }
+    if (!hit) { return 'You are not carrying that.'; }
+
+    var n = Math.floor(Number(count) || 1);
+    if (!(n > 0)) { n = 1; }
+    if (n > hit.c) { n = hit.c; }
+
+    var side = sideOf(t, actorId);
+    for (var k = 0; k < side.length; k++) {
+      if (side[k].id === hit.id) {
+        var room = hit.c - side[k].c;
+        if (room <= 0) { return 'That is all of them already.'; }
+        side[k].c += Math.min(n, room);
+        unconfirm(t); push(t);
+        return '';
+      }
+    }
+    if (side.length >= TRADE.mostLines) { return 'That is as much as one side can offer.'; }
+    side.push({ id: hit.id, n: hit.n, c: n });
+    unconfirm(t); push(t);
+    return '';
+  }
+
+  function remove(actorId, what) {
+    var t = tradeOf(actorId);
+    if (!t) { return 'You are not trading.'; }
+    var want = String(what || '').trim().toLowerCase();
+    var side = sideOf(t, actorId);
+    for (var i = 0; i < side.length; i++) {
+      if (side[i].n.toLowerCase().indexOf(want) !== -1 ||
+          String(side[i].id) === want || side[i].id.toString(16) === want) {
+        side.splice(i, 1);
+        unconfirm(t); push(t);
+        return '';
+      }
+    }
+    return 'That is not on your side.';
+  }
+
+  function gold(actorId, n) {
+    var t = tradeOf(actorId);
+    if (!t) { return 'You are not trading.'; }
+    var want = Math.floor(Number(n) || 0);
+    if (!(want >= 0)) { want = 0; }
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    var have = holding(actorId, GOLD);
+    if (want > have) { return 'You only have ' + have + '.'; }
+    if (t.a === actorId) { t.goldA = want; } else { t.goldB = want; }
+    unconfirm(t); push(t);
+    return '';
+  }
+
+  function confirm(actorId) {
+    var t = tradeOf(actorId);
+    if (!t) { return 'You are not trading.'; }
+    if (okOf(t, actorId)) { return 'You have already agreed.'; }
+    setOk(t, actorId, true);
+    push(t);
+    var them = other(t, actorId);
+    if (!(t.okA && t.okB)) {
+      try { say(them, nameOf(actorId) + ' has agreed. /trade ok when you are ready.'); } catch (e) { }
+      return '';
+    }
+    return swap(t);
+  }
+
+  /*
+    The swap, and everything that can refuse it is asked HERE rather than when
+    the offer was made.
+
+    Somebody can drop, sell or break a thing between offering it and agreeing
+    to it, so the piles are checked against the real inventories at this
+    moment and a trade that no longer works is refused whole. Never half: a
+    half done trade is somebody's sword gone with nothing back for it.
+  */
+  function swap(t) {
+    if (!within(t.a, t.b)) {
+      unconfirm(t); push(t);
+      return 'You have moved too far apart.';
+    }
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+
+    var sides = [
+      { from: t.a, to: t.b, items: t.offerA, gold: t.goldA },
+      { from: t.b, to: t.a, items: t.offerB, gold: t.goldB }
+    ];
+    var i, j;
+    for (i = 0; i < sides.length; i++) {
+      var s = sides[i];
+      if (s.gold > holding(s.from, GOLD)) {
+        unconfirm(t); push(t);
+        return nameOf(s.from) + ' does not have that gold any more.';
+      }
+      for (j = 0; j < s.items.length; j++) {
+        if (s.items[j].c > holding(s.from, s.items[j].id)) {
+          unconfirm(t); push(t);
+          return nameOf(s.from) + ' does not have the ' + s.items[j].n + ' any more.';
+        }
+      }
+    }
+
+    /*
+      Both inventories are rewritten whole, in one write each, rather than
+      item by item. A write per item is a chance to be interrupted halfway
+      with one pile gone, and giveItems in the outer file already learned that
+      lesson for the starting kit.
+    */
+    var movedOk = true;
+    for (i = 0; i < sides.length && movedOk; i++) {
+      var side = sides[i];
+      var pairs = [];
+      for (j = 0; j < side.items.length; j++) {
+        pairs.push([side.items[j].id, side.items[j].c]);
+      }
+      if (side.gold > 0) { pairs.push([GOLD, side.gold]); }
+      if (!pairs.length) { continue; }
+      if (!moveById(side.from, side.to, pairs)) { movedOk = false; }
+    }
+    if (!movedOk) {
+      unconfirm(t); push(t);
+      return 'Something went wrong moving it. Nothing was taken.';
+    }
+
+    var whatA = describe(t.offerA, t.goldA);
+    var whatB = describe(t.offerB, t.goldB);
+    try {
+      say(t.a, 'Traded. You gave ' + whatA + ' and got ' + whatB + '.');
+      say(t.b, 'Traded. You gave ' + whatB + ' and got ' + whatA + '.');
+    } catch (e) { }
+    tlog(nameOf(t.a), 'and', nameOf(t.b), 'traded:', whatA, 'for', whatB);
+    close(t, '');
+    return '';
+  }
+
+  function describe(items, goldN) {
+    var bits = [];
+    for (var i = 0; i < items.length; i++) {
+      bits.push(items[i].c > 1 ? (items[i].c + ' ' + items[i].n) : items[i].n);
+    }
+    if (goldN > 0) { bits.push(goldN + ' gold'); }
+    return bits.length ? bits.join(', ') : 'nothing';
+  }
+
+  /** Move [baseId, count] pairs from one pack to another, or nothing at all. */
+  function moveById(fromActor, toActor, pairs) {
+    var fromInv, toInv;
+    try {
+      fromInv = mp.get(fromActor, 'inventory') || { entries: [] };
+      toInv = mp.get(toActor, 'inventory') || { entries: [] };
+    } catch (e) { return false; }
+    var out = (fromInv.entries || []).slice();
+    var into = (toInv.entries || []).slice();
+
+    var i, k;
+    for (i = 0; i < pairs.length; i++) {
+      var baseId = pairs[i][0], want = pairs[i][1];
+      var left = want;
+      for (k = 0; k < out.length && left > 0; k++) {
+        if (!out[k] || out[k].baseId !== baseId) { continue; }
+        var take = Math.min(left, out[k].count || 1);
+        out[k] = { baseId: baseId, count: (out[k].count || 1) - take };
+        left -= take;
+      }
+      if (left > 0) { return false; }
+      var landed = false;
+      for (k = 0; k < into.length; k++) {
+        if (into[k] && into[k].baseId === baseId && !into[k].worn) {
+          into[k] = { baseId: baseId, count: (into[k].count || 1) + want };
+          landed = true;
+          break;
+        }
+      }
+      if (!landed) { into.push({ baseId: baseId, count: want }); }
+    }
+    var keep = [];
+    for (i = 0; i < out.length; i++) {
+      if (out[i] && (out[i].count || 0) > 0) { keep.push(out[i]); }
+    }
+    try {
+      mp.set(fromActor, 'inventory', { entries: keep });
+      mp.set(toActor, 'inventory', { entries: into });
+    } catch (e2) { return false; }
+    return true;
+  }
+
+  function cancel(actorId) {
+    var t = tradeOf(actorId);
+    if (!t) { return 'You are not trading.'; }
+    close(t, nameOf(actorId) + ' called the trade off.');
+    return '';
+  }
+
+  // ------------------------------------------------------------ the panel --
+
+  function view(t, actorId) {
+    var meA = t.a === actorId;
+    return {
+      open: true,
+      them: nameOf(other(t, actorId)),
+      mine: meA ? t.offerA : t.offerB,
+      theirs: meA ? t.offerB : t.offerA,
+      myGold: meA ? t.goldA : t.goldB,
+      theirGold: meA ? t.goldB : t.goldA,
+      iAgreed: meA ? t.okA : t.okB,
+      theyAgreed: meA ? t.okB : t.okA,
+      pack: carrying(actorId),
+      at: Date.now()
+    };
+  }
+
+  function push(t) {
+    try { mp.set(t.a, TRADE_PROPERTY, view(t, t.a)); } catch (e) { }
+    try { mp.set(t.b, TRADE_PROPERTY, view(t, t.b)); } catch (e) { }
+  }
+
+  function panelScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || typeof v !== "object") { return; }',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    if (st.thornswoodTradeAt === v.at) { return; }',
+      '    st.thornswoodTradeAt = v.at;',
+      '    var body = JSON.stringify(v);',
+      '    var src = "(function(){try{" +',
+      '      "if(window.thornswoodTrade&&window.thornswoodTrade.setData){window.thornswoodTrade.setData(" + body + ");}" +',
+      '      "}catch(e){}})();";',
+      '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  function tick() {
+    var now = Date.now();
+    for (var i = trades.length - 1; i >= 0; i--) {
+      var t = trades[i];
+      if (now - t.at > TRADE.idleFor) { close(t, 'The trade timed out.'); continue; }
+      if (!within(t.a, t.b)) { close(t, 'You moved too far apart, so the trade is off.'); continue; }
+      var stillA = false, stillB = false;
+      try {
+        var all = mp.get(0, 'onlinePlayers') || [];
+        for (var k = 0; k < all.length; k++) {
+          if (all[k] === t.a) { stillA = true; }
+          if (all[k] === t.b) { stillB = true; }
+        }
+      } catch (e) { continue; }
+      if (!stillA || !stillB) { close(t, ''); }
+    }
+  }
+
+  try {
+    mp.makeProperty(TRADE_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: panelScript(), updateNeighbor: ''
+    });
+  } catch (e) { /* already made by a previous load */ }
+
+  if (g.__thornswoodTradeTimer) { try { clearInterval(g.__thornswoodTradeTimer); } catch (e) { } }
+  g.__thornswoodTradeTimer = setInterval(guard('tradeTick', tick), TRADE.every);
+
+  g.__thornswoodTrade = {
+    TRADE: TRADE,
+    begin: begin, add: add, remove: remove, gold: gold,
+    confirm: confirm, cancel: cancel, tradeOf: tradeOf,
+    carrying: carrying, labelOf: labelOf, within: within,
+    view: view, push: push, tick: tick, swap: swap, moveById: moveById,
+    open: open, trades: trades, describe: describe
+  };
+
+  tlog('ready: two piles, two confirmations, and any change takes both back');
+})();
+// ==== end thornswood trade ====

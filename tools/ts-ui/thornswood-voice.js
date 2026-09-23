@@ -118,6 +118,20 @@
    * second configure arriving mid-request cannot start a second one. */
   var micAsking = false;
   var lastWho = {};
+  /*
+    Who this person has muted, by profile id, handed over by the server.
+
+    Patrick, 22 September, wanted a mute key that works while you are looking
+    at somebody. Muting is THE SERVER'S TO REMEMBER and THIS PAGE'S TO DO: the
+    list lives on the character so it survives logging out, and the silencing
+    is a gain node that already exists here, one per peer, already being
+    written five times a second by the distance mixing below.
+
+    Deliberately not a mute on the microphone and not a mute the server
+    enforces. A server side mute would be a mute everybody got, which is a
+    moderation tool and a different thing entirely.
+  */
+  var muted = {};
   var conns = new Map();
   var waiting = null;
 
@@ -878,7 +892,9 @@
       var right = dx * cos - dy * sin;
       var forward = dx * sin + dy * cos;
 
-      rec.gain.gain.value = 1;
+      // Muted beats distance: somebody standing next to you and muted is
+      // silent, which is the whole point of the key.
+      rec.gain.gain.value = muted[rec.profileId] ? 0 : 1;
       setPos(rec.panner, right, dz, -forward);
       rec.dist = Math.sqrt(right * right + forward * forward + dz * dz);
     });
@@ -1044,6 +1060,18 @@
     },
 
     mode: function () { return myMode; },
+
+    /*
+      The mute list, from the server. Applied on the next placement pass,
+      which runs five times a second, so a key press is silent within a frame
+      or two and nothing here has to walk the connections itself.
+    */
+    setMuted: function (list) {
+      muted = (list && typeof list === 'object') ? list : {};
+      try { place(); } catch (e) { }
+      return true;
+    },
+    isMuted: function (profileId) { return !!muted[profileId]; },
     // There is no mute. Push to talk already means the microphone is shut
     // unless a key is held, so a second control for "shut" was answering a
     // question nobody asked.

@@ -81,7 +81,8 @@
 
   const UI_PATH = 'Data/Platform/UI/index.html';
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
-                    'thornswood-skills.js'];
+                    'thornswood-skills.js', 'thornswood-party.js',
+                    'thornswood-journal.js', 'thornswood-trade.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -192,6 +193,46 @@
     const m = ini.match(/^\s*VoiceUrl\s*=\s*(\S+)/m);
     return m ? String(m[1]).replace(/\/+$/, '') : '';
   })();
+  /*
+    The four social keys, and P and J are Patrick's own choices:
+    "P for the Party menu... J for Journal".
+
+    DirectInput scan codes, the same as ChatKey and SkillsKey above, because
+    that is what buttonEvent hands back. G, H and B do nothing in vanilla
+    Skyrim and are only armed while somebody is under the crosshair, so even a
+    mod that wanted one of them would keep it the rest of the time.
+  */
+  const PARTY_KEY   = iniNumber(ini, 'PartyKey', 25);      // P
+  const JOURNAL_KEY = iniNumber(ini, 'JournalKey', 36);    // J
+  const FRIEND_KEY  = iniNumber(ini, 'FriendKey', 34);     // G
+  const TRADE_KEY   = iniNumber(ini, 'TradeWithKey', 35);  // H
+  /*
+    MuteThemKey, NOT MuteKey. MuteKey is already in this same file and is the
+    microphone: "Mute the microphone... for when somebody walks into the
+    room", Keys.cs, default Y. Reusing the name would have made one launcher
+    row set two different things, and the first person to rebind their
+    microphone would have rebound this as well.
+
+    L rather than B or N or M: WheelKey is B, StopKey is N and MenuKey is M,
+    all of them in this file already.
+  */
+  const MUTE_KEY    = iniNumber(ini, 'MuteThemKey', 38);   // L
+  /* What the prompt calls them. Read off the scan code so a rebind in the ini
+     changes the letter on the screen as well as the key that works. */
+  function keyName(code) {
+    const letters = {
+      16: 'Q', 17: 'W', 18: 'E', 19: 'R', 20: 'T', 21: 'Y', 22: 'U', 23: 'I',
+      24: 'O', 25: 'P', 30: 'A', 31: 'S', 32: 'D', 33: 'F', 34: 'G', 35: 'H',
+      36: 'J', 37: 'K', 38: 'L', 44: 'Z', 45: 'X', 46: 'C', 47: 'V', 48: 'B',
+      49: 'N', 50: 'M'
+    };
+    return letters[code] || ('#' + code);
+  }
+  const PARTY_NAME = keyName(PARTY_KEY);
+  const FRIEND_NAME = keyName(FRIEND_KEY);
+  const TRADE_NAME = keyName(TRADE_KEY);
+  const MUTE_NAME = keyName(MUTE_KEY);
+
   const ESC = 1;
 
   const client = (function () {
@@ -2149,6 +2190,145 @@
     say('the fire is out');
   }));
 
+  /*
+    ------------------------------------------ who you are looking at
+
+    Patrick, 22 September: "when you look at someone, you are prompted to
+    press buttons: one for friend, one for trade, and one for mute. Currently
+    the looking at people doesnt have the trade menu and when it did you had
+    to use youyr cursor and a bunch of other bs I just want to press a key
+    while looking at them."
+
+    THE CROSSHAIR HAS ALWAYS BEEN AVAILABLE AND WAS NEVER USED. Skyrim
+    Platform exposes Game.getCurrentCrosshairRef and a crosshairRefChanged
+    event, and before today neither appeared anywhere in this repo. That is
+    the whole reason the old trade menu needed a mouse: nothing was asking the
+    game what was under the crosshair.
+
+    WHAT THE CLIENT CANNOT ANSWER. A crosshair reference is a form id. It does
+    not say whether that is a person, a bandit or a barrel, and it carries no
+    profile and no name that the server would recognise. So the server
+    publishes who is near you, form id to name, on the thornswoodNear
+    property, and this matches against it. Anything not in that list draws no
+    prompt at all, which is why looking at a chicken does nothing.
+
+    POLLED RATHER THAN EVENT DRIVEN, deliberately. crosshairRefChanged exists,
+    but the prompt also has to redraw when the SERVER's picture changes: a
+    friend request accepted while you are still looking at somebody should
+    turn "Add friend" into "Remove friend" without them stepping out of your
+    crosshair and back into it. One poll answers both and costs one native
+    call every third of a second.
+  */
+  const NEAR_EVERY = 320;
+  let nearAt = 0;
+  let lookingAt = '';      // the form id hex the prompt is currently drawn for
+  let lookingSig = '';     // what the prompt says, so it is not redrawn per poll
+
+  function nearList() {
+    try {
+      const w = globalThis.thornswoodNear;
+      return (w && typeof w === 'object') ? w : null;
+    } catch (e) { return null; }
+  }
+
+  /** Draw or clear the little panel that names them and the three keys. */
+  function drawPrompt(row) {
+    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y) : '';
+    if (sig === lookingSig) { return; }
+    lookingSig = sig;
+    if (!row) {
+      T.js('try{var d=document.getElementById("ts-look");if(d){d.style.display="none";}}catch(e){}');
+      return;
+    }
+    /*
+      Built here and handed over as one string, the same as the HUD. The page
+      is never asked to have a function for it, so an overlay from before this
+      existed still draws it.
+    */
+    const keyRow = function (key, what, on) {
+      return '<div style="margin-top:7px;white-space:nowrap">' +
+             '<span style="display:inline-block;min-width:34px;text-align:center;' +
+             'border:2px solid rgba(217,171,82,.75);border-radius:6px;padding:2px 7px;' +
+             'margin-right:12px;color:#d9ab52;font-family:Georgia,serif">' + key + '</span>' +
+             '<span style="color:' + (on ? '#8fb85e' : '#efe4cc') + '">' + what + '</span></div>';
+    };
+    const html =
+      '<div style="font-size:26px;color:#efe4cc;margin-bottom:4px">' + row.n +
+      (row.y ? '<span style="color:#8fb85e;font-size:18px"> &middot; your party</span>' : '') +
+      '</div>' +
+      keyRow(FRIEND_NAME, row.f ? 'Remove friend' : 'Add friend', !!row.f) +
+      keyRow(TRADE_NAME, 'Trade', false) +
+      keyRow(MUTE_NAME, row.m ? 'Unmute' : 'Mute', !!row.m) +
+      keyRow(PARTY_NAME, row.y ? 'Party menu' : 'Ask to party', !!row.y);
+
+    T.js('(function(){try{' +
+         'var d=document.getElementById("ts-look");' +
+         'if(!d){d=document.createElement("div");d.id="ts-look";' +
+         'd.style.cssText=' + JSON.stringify(LOOK_CSS) + ';' +
+         'document.body.appendChild(d);}' +
+         'd.innerHTML=' + JSON.stringify(html) + ';' +
+         'd.style.display="";' +
+         '}catch(e){}})();');
+  }
+
+  /*
+    Right of centre and a little below the crosshair, which is where Skyrim
+    puts its own activate prompt and is where an eye already is. Never over
+    the crosshair itself: a panel you cannot see past is worse than no panel.
+  */
+  const LOOK_CSS =
+    'position:fixed;left:54%;top:46%;z-index:2147483400;pointer-events:none;' +
+    'font-family:Georgia,serif;font-size:19px;letter-spacing:.03em;' +
+    'background:rgba(12,10,8,.62);border:2px solid rgba(0,0,0,.65);' +
+    'border-radius:9px;padding:11px 16px 14px;' +
+    'text-shadow:0 2px 4px rgba(0,0,0,.95)';
+
+  sp.on('update', guard('crosshair', () => {
+    const now = Date.now();
+    if (now - nearAt < NEAR_EVERY) { return; }
+    nearAt = now;
+
+    const near = nearList();
+    if (!near) { lookingAt = ''; drawPrompt(null); return; }
+
+    let ref = null;
+    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
+    if (!ref) { lookingAt = ''; drawPrompt(null); return; }
+
+    let hex = '';
+    try { hex = (ref.getFormID() >>> 0).toString(16); } catch (e) { hex = ''; }
+    if (!hex) { lookingAt = ''; drawPrompt(null); return; }
+
+    const row = Object.prototype.hasOwnProperty.call(near, hex) ? near[hex] : null;
+    if (!row) { lookingAt = ''; drawPrompt(null); return; }
+
+    if (hex !== lookingAt) {
+      lookingAt = hex;
+      say('looking at ' + row.n + ' (' + hex + ')');
+    }
+    drawPrompt(row);
+  }));
+
+  /*
+    The four keys, and they only mean anything while somebody is under the
+    crosshair.
+
+    That is what makes them safe to put on letters. G, H and B do nothing in
+    this game on their own, and even if a mod took one of them the prompt is
+    the only thing that arms these: with nobody in front of you the key falls
+    through to whatever else wants it.
+
+    P and J are Patrick's own choices and are the exception: those two open
+    their panels whether or not anybody is being looked at, because a party
+    menu you can only open by staring at a friend is not a menu.
+  */
+  function lookVerb(cmd) {
+    if (!lookingAt) { return false; }
+    tellServer('/' + cmd + ' ' + lookingAt);
+    say(cmd + ' on ' + lookingAt);
+    return true;
+  }
+
   let stuckKeys = 0;
   let stuckMoveKeys = 0;
   let stuckAt = 0;
@@ -3013,6 +3193,22 @@
       a browserMessage, and that is what moves the focus claim. The page can
       close itself on Escape, so it is the one that knows.
     */
+    /*
+      The social keys. The three verbs need somebody under the crosshair and
+      say nothing when there is not; P and J open their panels regardless.
+    */
+    if (e.code === FRIEND_KEY) { lookVerb('friend'); return; }
+    if (e.code === TRADE_KEY) { lookVerb('trade'); return; }
+    if (e.code === MUTE_KEY) { lookVerb('mute'); return; }
+    if (e.code === PARTY_KEY) {
+      T.js('try{window.thornswoodParty&&window.thornswoodParty.toggle();}catch(e){}');
+      return;
+    }
+    if (e.code === JOURNAL_KEY) {
+      T.js('try{window.thornswoodJournal&&window.thornswoodJournal.toggle();}catch(e){}');
+      return;
+    }
+
     if (e.code === SKILLS_KEY) {
       if (claims.chat) { return; }
       const busyNow = busyMenuOpen();
@@ -3302,6 +3498,8 @@
         log('the ' + who + ' claim has held the keyboard for two minutes, closing it and taking it back');
         if (who === 'skills') {
           T.js('try{window.thornswoodSkills&&window.thornswoodSkills.close();}catch(e){}');
+          T.js('try{window.thornswoodParty&&window.thornswoodParty.close();}catch(e){}');
+          T.js('try{window.thornswoodJournal&&window.thornswoodJournal.close();}catch(e){}');
         } else if (who === 'wheel') {
           T.js('try{window.thornswoodEmotes&&window.thornswoodEmotes.close();}catch(e){}');
         }
@@ -3636,6 +3834,23 @@
       that is a keyboard that never comes back, which is the failure
       claimFocus logs every single time for exactly this reason.
     */
+    /*
+      The three social panels say when they open and close, the same as the
+      skills panel and for the same reason: a panel can close itself on
+      Escape, and a focus claim left up after that is a keyboard that never
+      comes back.
+    */
+    if (what === 'party:opened') { T.claimFocus('party', true); return; }
+    if (what === 'party:closed') { T.claimFocus('party', false); return; }
+    if (what === 'journal:opened') { T.claimFocus('journal', true); return; }
+    if (what === 'journal:closed') { T.claimFocus('journal', false); return; }
+    if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
+    if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
+    if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready') {
+      log('the ' + what.split(':')[0] + ' panel is in');
+      return;
+    }
+
     if (what === 'skills:opened') { T.claimFocus('skills', true); return; }
     if (what === 'skills:closed') { T.claimFocus('skills', false); return; }
     if (what === 'skills:ready' || what === 'skills:refresh') {
