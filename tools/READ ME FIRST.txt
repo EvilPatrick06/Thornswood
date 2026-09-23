@@ -48,7 +48,7 @@ First time only:
   of us see over your head in game.
 - Save once before you connect.
 
-Then connect to the address shown in the launcher. Ask Gavin for the password.
+Then connect to the address shown in the launcher. Ask in the Discord for the password.
 
 
 While you play
@@ -63,7 +63,7 @@ If something goes wrong
 -----------------------
 The launcher shows five checks. Any red row is the problem. "Repair" puts the
 settings files back to the ones that shipped. Screenshot the launcher and send
-it to Gavin.
+it to the Discord.
 
 Do not run Steam's "Verify Integrity of Game Files" on Skyrim. It drags your
 Steam copy to the newest build. It cannot hurt our folder, but it is a bad

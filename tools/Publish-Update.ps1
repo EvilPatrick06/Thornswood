@@ -1234,7 +1234,7 @@ if ($noteLines.Count -eq 1) {
     }
 }
 
-# The note is whatever Gavin typed. These lines are what actually moved,
+# The note is whatever Patrick typed. These lines are what actually moved,
 # worked out from the diff, so nobody has to take the note's word for it and
 # nobody has to ask what a release contained.
 function Listed($names, [int]$cap) {
@@ -1248,7 +1248,7 @@ function LeafNames($paths, [string]$pattern) {
 
 $details = @()
 
-# What Gavin wrote comes first, because it is the only part that knows why.
+# What Patrick wrote comes first, because it is the only part that knows why.
 foreach ($bpt in $bullets) { $details += $bpt }
 
 if ($Launcher -and $launcherVersion) { $details += "Launcher $launcherVersion" }

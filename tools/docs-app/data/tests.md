@@ -188,7 +188,7 @@ Grab `thornswood-voice.log` and `launcher.log`.
 
 ## TEST 12. Restart warning
 
-1. Ask Gavin to send a test restart while you are playing.
+1. Ask Patrick to send a test restart while you are playing.
 2. Watch the chat.
 
 Pass if a message says what is happening and how long, then more as it counts down.

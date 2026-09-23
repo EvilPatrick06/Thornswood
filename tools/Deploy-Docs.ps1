@@ -4,7 +4,7 @@
   Puts the Thornswood docs site on the VPS and keeps it running.
 
   The site is a small node server holding six markdown documents and whatever
-  is in its files folder. Gavin and his friends edit the documents in the
+  is in its files folder. Patrick and the testers edit the documents in the
   browser, Claude edits the same files over ssh, and the installer is published
   into it by Publish-Installer.ps1.
 

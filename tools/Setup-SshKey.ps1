@@ -23,7 +23,7 @@
       .\Setup-SshKey.ps1            make the key and install it
       .\Setup-SshKey.ps1 -Test      only check whether it already works
       .\Setup-SshKey.ps1 -KeyOnly   make the key and point ssh at it, then print
-                                    the public line for Gavin to add on the VPS.
+                                    the public line for Patrick to add on the VPS.
                                     For a second developer who does not hold the
                                     VPS password.
 #>
@@ -140,7 +140,7 @@ Host $VpsHost
     } else {
         Say '  there is already an entry for this host, left alone' 'DarkGray'
     }
-    Head 'Send this line to Gavin'
+    Head 'Send this line to Patrick'
     Say '  It is the public half of the key. It is safe to paste anywhere; only this machine holds the private half.' 'DarkGray'
     Write-Host ''
     Write-Host $pub -ForegroundColor White
