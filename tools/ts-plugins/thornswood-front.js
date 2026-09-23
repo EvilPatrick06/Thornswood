@@ -1825,6 +1825,330 @@
     }
   }));
 
+  /*
+    ------------------------------------------- where you are standing
+
+    Patrick, 23 September, with five screenshots: the temperature meter read
+    "Fine 50" outside at night, beside a lit brazier in Whiterun, inside the
+    Bannered Mare, and standing in the middle of the Bannered Mare's fire pit.
+    "not any warmer when near or in fire or in a building also make so if you
+    are in a fire you catch on fire", and then "yeah forges and stuff like
+    that should be included too because they are hot".
+
+    THE METER WAS NEVER BROKEN. The needs block has moved temperature toward a
+    target since it was written, and /place is the command that sets the
+    target. Nothing ever sent it. n.place was '' on every character, the target
+    was always comfort, and the number sat on 50 for ever. A whole system that
+    worked perfectly and was never asked a question.
+
+    IT HAS TO BE THE CLIENT. Whether it is snowing on you, whether you are
+    swimming, whether you are under a roof and whether there is a fire in front
+    of you are facts about the machine drawing the world. The server holds a
+    position and a cell descriptor and cannot answer one of them. So this
+    measures them here and reports the answer the same way a fall of the axe is
+    reported, over the chat socket, and the server does the rest.
+
+    THE FIRE BASES ARE MEASURED, NOT TYPED. tools\fires.json is built by
+    tools\Build-FireTable.js out of Skyrim.esm: 44 base records whose model is
+    one of the fire effects or wood fires, plus the forge, skyforge, smelter
+    and cooking spit markers, with the unlit versions dropped by the rule
+    rather than by hand. Rebuild it with:
+
+        node tools\Build-FireTable.js
+
+    and tools\test-fires.js fails if this list and that file have drifted
+    apart, which is the only thing keeping a hand edit here honest.
+  */
+  const FIRE_BASES = [
+    0xd61b6, 0xd61be, 0xef77f, 0xf2ac6, 0x42521, 0x35f49, 0x35f47,
+    0xa9230, 0x90ca4, 0x10d820, 0xc2bf1, 0xdb682, 0xc6918, 0xfb9b0,
+    0xcbb23, 0xb6c08, 0x951d8, 0xe7c9a, 0xcbb2f, 0x101a51, 0xcae0b,
+    0xbbcf1, 0x48748, 0xbf9e1, 0x68adb, 0x9c6ce, 0x35f4a, 0x13b40,
+    0x13b42, 0x1094ab, 0xcd824, 0xcd823, 0xaa71c, 0x33da4, 0x106112,
+    0x1092e2, 0x33da9, 0x4318b, 0x51577, 0xf597f, 0xf6304, 0x10acc0,
+    0x4c5ce, 0x4c5cf
+  ];
+  // Standing at a fire, and standing IN one. A campfire is about a hundred
+  // units across, so 300 is warming your hands and 90 is in the coals.
+  const FIRE_REACH = 300;
+  const FIRE_INSIDE = 90;
+  /*
+    How often the world is asked. Four seconds while nothing is near, one
+    second once a fire is in reach, because the second number is what decides
+    whether somebody is burning and four seconds of that is four seconds of
+    standing in a fire taking nothing.
+  */
+  const PLACE_SLOW = 4000;
+  const PLACE_FAST = 1000;
+  // How far the water can be over your feet and still be wading. A character
+  // is about 128 units tall, so this is roughly waist deep.
+  const WADE_DEEP = 70;
+  // FireFXShader, 0001b212 in Skyrim.esm, read out of the EFSH records. This
+  // is the engine's own "this thing is burning", the one fire damage uses.
+  const FIRE_SHADER = 0x1b212;
+  // Per second in the coals. Survivable for a few seconds, fatal if somebody
+  // walks in and makes a cup of tea, which is the point.
+  const BURN_PER_SECOND = 7;
+
+  let placeAt = 0;
+  let placeSaid = '';
+  let placeFire = -1;
+
+  /** How far the nearest lit fire is, or -1 when there is none in reach. */
+  function fireDistance(px, py, pz) {
+    let best = -1;
+    for (let i = 0; i < FIRE_BASES.length; i++) {
+      try {
+        const base = sp.Form.from(sp.Game.getFormEx(FIRE_BASES[i]));
+        if (!base) { continue; }
+        const ref = sp.Game.findClosestReferenceOfType(base, px, py, pz, FIRE_REACH);
+        if (!ref) { continue; }
+        // A fire somebody has switched off is still a placed reference. The
+        // toggled ones (FXfireWithEmbers02Toggle and its heavy twin) are the
+        // reason this asks rather than trusting the base.
+        try { if (ref.isDisabled()) { continue; } } catch (e) { }
+        const dx = ref.getPositionX() - px;
+        const dy = ref.getPositionY() - py;
+        const dz = ref.getPositionZ() - pz;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (best < 0 || d < best) { best = d; }
+        if (best <= FIRE_INSIDE) { break; }
+      } catch (e) { /* one base that will not resolve is not the end of it */ }
+    }
+    return best;
+  }
+
+  sp.on('update', guard('place', () => {
+    const now = Date.now();
+    // Fast only when a fire is close enough to be about to burn somebody.
+    // Merely standing at one is 44 native calls a second for nothing.
+    const close = placeFire >= 0 && placeFire <= FIRE_INSIDE * 2;
+    if (now - placeAt < (close ? PLACE_FAST : PLACE_SLOW)) { return; }
+    placeAt = now;
+
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { return; }
+    if (!pc) { return; }
+    let px = 0, py = 0, pz = 0;
+    try { px = pc.getPositionX(); py = pc.getPositionY(); pz = pc.getPositionZ(); }
+    catch (e) { return; }
+
+    let swimming = false;
+    try { swimming = !!pc.isSwimming(); } catch (e) { }
+    let indoors = false;
+    let wading = false;
+    try {
+      const cell = pc.getParentCell();
+      if (cell) {
+        indoors = !!cell.isInterior();
+        /*
+          WADING IS NOT SWIMMING, and Patrick asked for the difference by
+          name: "different temperatures for different water types like ice,
+          galciers, fresh water, shallow, etc".
+
+          isSwimming only answers once somebody's feet have left the bottom.
+          Standing knee deep in a river in the Pale reads as dry land to it,
+          which is the wrong answer in the one situation people are actually
+          in most of the time. The cell's water level against where they are
+          standing is the rest of it: above their feet and below swimming is
+          wading.
+
+          A cell with no water answers a level far below anywhere anybody
+          stands, so the subtraction comes out negative and this is false
+          without needing to ask whether there is water at all.
+        */
+        const level = cell.getWaterLevel();
+        if (isFinite(level)) {
+          const deep = level - pz;
+          wading = deep > 0 && deep < WADE_DEEP;
+        }
+      }
+    } catch (e) { }
+    let sky = 0;
+    let skyId = 0;
+    try {
+      const w = sp.Weather.getCurrentWeather();
+      if (w) { sky = w.getClassification(); skyId = w.getFormID(); }
+    } catch (e) { }
+
+    /*
+      THE REST OF THE WEATHER, AND THE REST OF THE PLACE.
+
+      Patrick, 23 September: "the temp should also account for wind and all
+      other weather reelated and environment factors".
+
+      WIND IS NOT ON THE WEATHER OBJECT. Weather.pex has getWindDirection and
+      getWindDirectionRange and no speed at all, so the only way to know how
+      hard it is blowing is the WTHR record, which is on the server in
+      tools\weather.json. So the weather's form id goes over with everything
+      else and the server looks it up.
+
+      NIGHT is the game clock, which is twenty times real time, so it turns
+      over every seventy two real minutes and the small hours are genuinely
+      colder than the afternoon.
+
+      HEIGHT is the one environment factor that needs nothing but a number
+      already in hand. The tundra sits near zero, High Hrothgar is above
+      twelve thousand and the Throat of the World is past twenty five, and
+      being up there should feel like being up there.
+    */
+    let night = 0;
+    try {
+      const day = sp.Utility.getCurrentGameTime();
+      const hour = (day - Math.floor(day)) * 24;
+      night = (hour < 6 || hour >= 20) ? 1 : 0;
+    } catch (e) { }
+    // Asking is 44 native calls, and nobody in the water is at a fire.
+    const fire = swimming ? -1 : fireDistance(px, py, pz);
+    placeFire = fire;
+
+    /*
+      ONE WORD, IN ORDER OF WHAT WINS.
+
+      Water first, because being in it beats everything else about a place.
+      Then fire, which beats a roof: the point of the Bannered Mare is the fire
+      in the middle of it. Then the roof, then the weather, and outdoors last,
+      which is slightly cool rather than neutral so that walking into a
+      building is felt. Everything the server does not know a word for is
+      comfortable, so a client from before this says nothing and its owner
+      simply has no weather.
+    */
+    let kind = 'outdoors';
+    if (swimming) { kind = 'water'; }
+    else if (wading) { kind = 'shallow'; }
+    else if (indoors) { kind = 'indoors'; }
+    else if (sky === 3) { kind = 'snow'; }
+    else if (sky === 2) { kind = 'rain'; }
+
+    /*
+      ONE LINE, AND IT IS SENT WHEN ANY OF IT CHANGES.
+
+      kind, the weather's form id, night, whether there is a roof, the height,
+      and how far the nearest fire is. The server has a number for all of it;
+      a client that sends only the word still works, because everything after
+      the first is optional on that end.
+
+      THE FIRE IS A DISTANCE AND NOT A WORD, which is Patrick, 23 September:
+      "temperature should be relative too so like if I am further away or
+      closer to a fire it slowly rises and lowers as I walk away from the
+      fire". It used to be one of the words up there and it beat every other
+      one, so a campfire in a blizzard was worth the same as an inn hearth and
+      one pace back turned it off like a switch. Now it is added on top of
+      wherever you already are, tapering to nothing at reach.
+
+      EVERYTHING IS ROUNDED AND THE WHOLE LINE IS COMPARED AS A STRING, which
+      is what stops this sending a line every second. The height goes to the
+      nearest five hundred and the fire to the nearest twenty five, so walking
+      up to a hearth is about a dozen lines and standing at it is none.
+    */
+    const line = '/place ' + kind + ' ' + (skyId ? skyId.toString(16) : '-') +
+                 ' ' + night + ' ' + (indoors ? 1 : 0) +
+                 ' ' + Math.round(pz / 500) * 500 +
+                 ' ' + (fire >= 0 ? Math.round(fire / 25) * 25 : '-');
+    if (line !== placeSaid) {
+      placeSaid = line;
+      tellServer(line);
+      say('standing in ' + kind + (fire >= 0 ? ', fire ' + Math.round(fire) + ' away' : '') +
+          (night ? ', at night' : '') + (indoors ? ', under a roof' : ''));
+    }
+
+    /*
+      AND IF YOU ARE STANDING IN IT, YOU BURN.
+
+      Patrick: "make so if you are in a fire you catch on fire". Vanilla
+      Skyrim does not do this. The Bannered Mare's fire pit is set dressing and
+      you can stand in the coals all night, which is what the fifth screenshot
+      is: a character up to his knees in a fire, reading Fine 50.
+
+      Done here rather than on the server because the server cannot see the
+      fire and because damage belongs on the machine that is drawing it.
+      DamageActorValue is the engine's own call and goes through everything
+      health normally goes through.
+    */
+    if (fire >= 0 && fire <= FIRE_INSIDE) {
+      if (burnUntil < now) { try { sp.Debug.notification('You are standing in the fire.'); } catch (e) { } }
+      // Refreshed rather than set, so walking out of the coals lets it go
+      // within about a second instead of burning for the full catch.
+      burnUntil = Math.max(burnUntil, now + 1500);
+    }
+  }));
+
+  /*
+    ---------------------------------------------------- burning, and catching
+
+    Patrick, 23 September: "make so if you are in a fire you catch on fire",
+    and then "when people catch fire it should be able to spread to other
+    people if they ade close enough".
+
+    ONE CLOCK, TWO WAYS TO START IT. Standing in the coals refreshes it every
+    beat of the place tick. The server sets it through the thornswoodBurn
+    property when somebody alight is standing next to you, because the server
+    is the only end that knows where everybody is. Both write the same
+    burnUntil, so there is no argument about which of them gets to put it out.
+
+    AND IT REPORTS ITSELF, because the spreading is the server's half and it
+    cannot see a fire. One line when it starts and one when it stops, over the
+    chat socket, the same channel a fall of the axe goes down.
+  */
+  const BURN_TICK = 1000;
+  // The server lets go of somebody who stops reporting after three of its own
+  // beats, so this has to say so again while it is still alight. Every three
+  // seconds rather than every one, because it goes down the chat socket.
+  const BURN_REPORT = 3000;
+  let burnUntil = 0;
+  let burnTold = false;
+  let burnAt = 0;
+  let burnSaidAt = 0;
+
+  // The hook the gamemode's property script calls. On the global on purpose:
+  // an updateOwner script is evaluated in its own scope and this is the only
+  // thing the two of them share.
+  try {
+    globalThis.thornswoodCatchFire = function (ms) {
+      const add = Number(ms) || 5000;
+      burnUntil = Math.max(burnUntil, Date.now() + add);
+    };
+  } catch (e) { }
+
+  sp.on('update', guard('burning', () => {
+    const now = Date.now();
+    if (now - burnAt < BURN_TICK) { return; }
+    burnAt = now;
+
+    const alight = burnUntil > now;
+    if (alight === burnTold && !alight) { return; }
+
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { return; }
+    if (!pc) { return; }
+
+    if (alight) {
+      try { pc.damageActorValue('Health', BURN_PER_SECOND); } catch (e) { }
+      if (!burnTold) {
+        burnTold = true;
+        try {
+          const shader = sp.EffectShader.from(sp.Game.getFormEx(FIRE_SHADER));
+          if (shader) { shader.play(pc, 0); }
+        } catch (e) { }
+        say('burning');
+      }
+      if (now - burnSaidAt >= BURN_REPORT) {
+        burnSaidAt = now;
+        tellServer('/burn 1');
+      }
+      return;
+    }
+
+    burnTold = false;
+    burnSaidAt = 0;
+    try {
+      const shader = sp.EffectShader.from(sp.Game.getFormEx(FIRE_SHADER));
+      if (shader) { shader.stop(pc); }
+    } catch (e) { }
+    tellServer('/burn 0');
+    say('the fire is out');
+  }));
+
   let stuckKeys = 0;
   let stuckMoveKeys = 0;
   let stuckAt = 0;
