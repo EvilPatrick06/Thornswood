@@ -1260,6 +1260,44 @@ function getWithToken(url, token) {
 /* Refused at the door. It says which of the three reasons it was and what the
    person's own Discord id is, because "you are not allowed" with no reason is
    a support ticket and this is the answer to it. */
+/*
+  A PAGE RATHER THAN FOUR CHARACTERS.
+
+  A wrong address answered "not here" as plain text, which for the second
+  somebody reads it makes the whole site look unfinished or broken. The same
+  shape as the Not allowed in page below: the site's colours, a sentence, and a
+  way back, because a dead end with no way out of it is the actual fault.
+
+  BROWSERS ONLY. An API caller asking for JSON must not be handed HTML: it
+  cannot read it and the error it then reports is a parse failure rather than a
+  404, which is how a wrong address becomes an hour of somebody's evening. The
+  Accept header decides, and anything that does not say text/html keeps the
+  plain text it has always had.
+*/
+function wantsHtml(req) {
+  return String((req && req.headers && req.headers.accept) || '').indexOf('text/html') >= 0;
+}
+
+function plainPage(title, lines) {
+  const esc = (t) => String(t == null ? '' : t).replace(/[<>&]/g, '');
+  return '<!doctype html><meta charset=utf-8><title>' + esc(title) + ' | Thornswood</title>' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<body style="background:#12150F;color:#DDE3D5;font:15px/1.6 system-ui;' +
+    'display:grid;place-items:center;height:100vh;margin:0;text-align:center;padding:20px">' +
+    '<div style="max-width:32em">' +
+    '<h1 style="color:#C9A24B;font-weight:600">' + esc(title) + '</h1>' +
+    lines.map((t) => '<p>' + esc(t) + '</p>').join('') +
+    '<p><a style="color:#C9A24B" href="/">Back to Thornswood</a></p>' +
+    '</div>';
+}
+
+function notFoundPage() {
+  return plainPage('Not here', [
+    'That address does not exist on this site.',
+    'If a link brought you here, say so in the Discord and it will be fixed.'
+  ]);
+}
+
 function notAllowedPage(me, st) {
   const nm = String(me.username || '').replace(/[<>&]/g, '');
   const id = String(me.id).replace(/[^0-9]/g, '');
@@ -2555,6 +2593,9 @@ async function handle(req, res) {
     return sendJson(res, 404, { error: 'no such endpoint' });
   }
 
+  // The site's own look for a person, the same four characters for anything
+  // that did not ask for HTML. See notFoundPage above.
+  if (wantsHtml(req)) { return send(res, 404, notFoundPage(), TYPES['.html']); }
   send(res, 404, 'not here', 'text/plain');
 }
 
