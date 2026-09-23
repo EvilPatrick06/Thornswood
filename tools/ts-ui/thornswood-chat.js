@@ -262,6 +262,22 @@
       if (typeof fn === 'function') { listeners.push(fn); }
     },
 
+    /*
+      And how to stop wanting it.
+
+      There was no way off this bus, which is half of why the voice page could
+      not hand over to the launcher cleanly: it dropped its connections, set
+      its own flags and then carried on being handed every sdp and ice message
+      on the socket, answering them and building the peer connections back.
+      A handoff between two audio paths has to tear the old one down
+      verifiably, and a listener you cannot remove is not a teardown.
+    */
+    off: function (fn) {
+      for (var i = listeners.length - 1; i >= 0; i--) {
+        if (listeners[i] === fn) { listeners.splice(i, 1); }
+      }
+    },
+
     /** Raw send, for message kinds this file has no opinion about. */
     post: function (obj) {
       if (!ws || ws.readyState !== 1 || !joined) { return false; }

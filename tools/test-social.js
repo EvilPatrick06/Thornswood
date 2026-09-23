@@ -221,8 +221,15 @@ if (social && trade) {
     // The page is where the silence actually happens.
     const voice = fs.readFileSync(path.join(__dirname, 'ts-ui', 'thornswood-voice.js'), 'utf8');
     yes('the voice page takes a mute list', /setMuted: function/.test(voice));
+    /*
+      Matched on the mute and not on what the other branch happens to be. The
+      first version of this pinned the whole expression, `muted[...] ? 0 : 1`,
+      and broke the moment the distance work replaced the 1 with a level: the
+      mute was still correct and the check still failed. Pin the thing being
+      tested.
+    */
     yes('and applies it to the gain node it already had',
-        /muted\[rec\.profileId\] \? 0 : 1/.test(voice));
+        /setGain\(rec\.gain, muted\[rec\.profileId\] \? 0 :/.test(voice));
   }
 
   // --------------------------------------------------------------- parties
