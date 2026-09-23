@@ -6,6 +6,16 @@
 
       .\tools\Check-Manifest.ps1
       .\tools\Check-Manifest.ps1 -Full     print both lists in full
+      .\tools\Check-Manifest.ps1 -Dev      the dev server against the dev build
+
+  -Dev exists because until 22 September this could not be pointed at the dev
+  server at all. It finds the root by listing C:\ on the VPS and taking the
+  first folder that holds a server-settings.json, which is C:\Thornswood-Server,
+  and it compared against C:\Thornswood, the main build. So the one question
+  worth asking about the dev server, whether its load order is still the one
+  people are playing, had no way to be asked. On that day the answer was no: 60
+  plugins against the game's 57, parting company at position 7, and four things
+  for the launcher's scan to find before Play would come back.
 
   Why it matters: SkyMP's client compares the server's manifest against your
   plugin list position by position. One plugin out of place and the person is
@@ -17,10 +27,16 @@
 param(
   [string]$Vps  = '192.135.112.23',
   [string]$User = 'Administrator',
-  [string]$Client = 'C:\Thornswood',
+  [string]$Client = '',
+  [switch]$Dev,
   [switch]$Full,
   [switch]$NoPause
 )
+
+# The dev server is a second install beside the live one, and the dev build is
+# a second launcher beside the main one. Asking about one against the other is
+# what made this worth a switch rather than two paths typed by hand.
+if (-not $Client) { $Client = if ($Dev) { 'C:\Thornswood-DevBuild' } else { 'C:\Thornswood' } }
 
 $ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
@@ -107,8 +123,26 @@ if ("$found" -match 'NO SERVER FOUND') {
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
   exit 1
 }
-$root = (@($found) | Where-Object { $_ -match '^ROOT ' } | Select-Object -First 1) -replace '^ROOT ', ''
-$root = "$root".Trim()
+# Every root the box has, in the order it listed them. Taking the first was
+# right when there was one; with the dev instance beside it, the first is the
+# live server and the dev one was unreachable from here.
+$roots = @(@($found) | Where-Object { $_ -match '^ROOT ' } | ForEach-Object { ("$_" -replace '^ROOT ', '').Trim() })
+$devRoots  = @($roots | Where-Object { $_ -match '(?i)-dev$' })
+$liveRoots = @($roots | Where-Object { $_ -notmatch '(?i)-dev$' })
+
+if ($Dev) {
+  if (-not $devRoots.Count) {
+    Write-Host ''
+    Say '  No dev server on the box: nothing on C:\ ends in -Dev and holds a server-settings.json.' 'Red'
+    Say '  vps-dev-instance.ps1 is what makes it, and it runs on the VPS.' 'DarkGray'
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 1
+  }
+  $root = $devRoots[0]
+} else {
+  $root = if ($liveRoots.Count) { $liveRoots[0] } else { $roots[0] }
+}
+Say ("  reading {0} ({1}), against the build at {2}" -f $root, $(if ($Dev) { 'dev' } else { 'live' }), $Client) 'DarkGray'
 
 Head "Reading the manifests under $root"
 $out = Remote @"
@@ -232,11 +266,30 @@ if (-not (Test-Path -LiteralPath $plug)) {
     # comparison that was wrong. The server's order is the one to keep: the
     # world database keys every changed form on the position in that list, so
     # moving the server re-keys every saved chest, door and body after it.
-    Say '  This machine follows the server, not the other way round. Press Fix' 'Yellow'
-    Say '  in the launcher: it puts the server''s order into this build''s plugin' 'Yellow'
-    Say '  list and downloads nothing.' 'Yellow'
-    Say '  Do not redeploy the server to make this match. The world keys every' 'Yellow'
-    Say '  saved form on its position in that list, so moving it re-keys them.' 'Yellow'
+    if ($Dev) {
+      # The opposite answer, and it has to be said here or the habit from the
+      # live half does the damage. The dev world is made empty on purpose
+      # (vps-dev-instance.ps1: characters and the world are not copied), so
+      # there are no saved forms to re-key and nothing to protect by keeping a
+      # stale order. The dev server is the thing that falls behind, because
+      # until 22 September nothing could move a load order onto it. Pressing
+      # Fix here would write the dev server's old list into the dev build's
+      # plugins.txt, naming plugins that are no longer installed at all.
+      Say '  The DEV server follows the build, not the other way round. Its world' 'Yellow'
+      Say '  is empty by design, so there is nothing to re-key and nothing to keep.' 'Yellow'
+      Say ''
+      Say '  Do NOT press Fix in the dev launcher. It would write this old list' 'Red'
+      Say '  into the dev build and name plugins that are not installed any more.' 'Red'
+      Say ''
+      Say '  Bring the dev server up to the build instead (Patrick runs it):' 'Yellow'
+      Say '    .\tools\Deploy-DevGamemode.ps1 -LoadOrder' 'Yellow'
+    } else {
+      Say '  This machine follows the server, not the other way round. Press Fix' 'Yellow'
+      Say '  in the launcher: it puts the server''s order into this build''s plugin' 'Yellow'
+      Say '  list and downloads nothing.' 'Yellow'
+      Say '  Do not redeploy the server to make this match. The world keys every' 'Yellow'
+      Say '  saved form on its position in that list, so moving it re-keys them.' 'Yellow'
+    }
   }
 }
 

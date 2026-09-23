@@ -17,8 +17,46 @@
     .\Deploy-DevGamemode.ps1        syntax check, copy, point at 7789,
                                    restart, tail the log
 
-  A gamemode change that also changes the load order or the CHARGEN records
-  needs Deploy-Gamemode.ps1 -Vortex first. Code-only changes do not.
+    .\Deploy-DevGamemode.ps1 -LoadOrder
+                                   the same, and first bring the dev server's
+                                   load order and plugins up to what the built
+                                   server has
+
+  A gamemode change that also changes the CHARGEN records needs
+  Deploy-Gamemode.ps1 -Vortex first. Code-only changes do not.
+
+  THE LOAD ORDER, AND WHY -LoadOrder HAD TO EXIST.
+
+  Until 22 September nothing in this repo could move a load order onto the dev
+  server. Deploy-Server.ps1 is the live half and refuses this root on purpose.
+  This script sent gamemode.js alone. The only thing that ever wrote the dev
+  loadOrder was vps-dev-instance.ps1, which runs ON the VPS, copies from live,
+  and nothing in the normal dev flow calls it. So the dev server kept whatever
+  order it was built with while live moved on, and the client compares the two
+  position by position and refuses the session on any disagreement.
+
+  Measured on 22 September. Live was handing out 57 plugins and matched the
+  game exactly. The dev server was handing out 60: the order from 21 September,
+  still carrying Respawn - Death Overhaul.esp, SunHelmSurvival.esp,
+  SunHelmDiseases.esp, TavernGames.esp and Hothtrooper44_Armor_Ecksstra.esp,
+  and missing RaceCompatibility.esm and Playable Rieklings.esp. The lists part
+  company at position 7 and everything after it is out of place. Its
+  Thornswood-Content.esp was 151,288 bytes, which is the stale copy named in
+  Deploy-Server.ps1's own comment as the one that stopped going to live that
+  same day; the repo has been on 141,234 since. Four things for the launcher to
+  find, and Play refused before the game ever started.
+
+  -LoadOrder sends the plugins the built server's load order names and rewrites
+  the dev loadOrder to match, and nothing else about the dev settings is
+  touched: the port, the name and the voice port stay the dev ones, which is
+  the whole reason Deploy-Server.ps1 is refused here. The list goes up as a
+  file rather than inside the settings block, so the dev settings file is
+  edited in place the way everything else here edits it.
+
+  Our own plugin comes from the repo and not from a game folder, for the reason
+  written out at length in Deploy-Server.ps1: there have been four copies of
+  Thornswood-Content.esp on this machine at three different sizes, and the game
+  folder is not the one that is authoritative.
 #>
 [CmdletBinding()]
 param(
@@ -31,7 +69,17 @@ param(
   # voice service on 7778, pushes its positions over the live ones and
   # drains the live command and choice queues.
   [int]$VoicePort = 7789,
-  [string]$Gamemode
+  [string]$Gamemode,
+  # Bring the dev server's load order and plugins up to what the built server
+  # has. Off by default: a code-only gamemode change does not need it, and the
+  # plugin sizes are one extra call to the box.
+  [switch]$LoadOrder,
+  # Where Deploy-Gamemode.ps1 leaves the built server. Its server-settings.json
+  # is the one authority on what the load order is and in what order.
+  [string]$Dist = 'C:\Thornswood-Dev\skymp\build\dist\server',
+  # Where the other plugins live on this machine. Ours is taken from the repo
+  # instead; see the header.
+  [string]$Data = 'C:\Thornswood\Game\Data'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -90,6 +138,87 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
   Write-Host '  node is not on this machine, so the syntax check was skipped' -ForegroundColor Yellow
 }
 
+# --------------------------------------------------------- the load order ---
+#
+# Worked out before anything is stopped, so a missing plugin or an unreadable
+# build stops this while the dev server is still up and serving.
+$remotePlugins = ($Root -replace '\\', '/') + '/plugins'
+$farOrder      = ''
+$pluginNames   = @()
+$sendPlugins   = @()
+$changed       = @()
+$orderFile     = ''
+
+if ($LoadOrder) {
+  $settingsSrc = Join-Path $Dist 'server-settings.json'
+  if (-not (Test-Path -LiteralPath $settingsSrc)) {
+    throw "-LoadOrder needs the built server's settings at $settingsSrc. Run Deploy-Gamemode.ps1 -Vortex first."
+  }
+  $built = Get-Content -LiteralPath $settingsSrc -Raw | ConvertFrom-Json
+  if (-not $built.loadOrder) { throw "$settingsSrc has no loadOrder" }
+  $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
+  $ours = Join-Path $Here 'Thornswood-Content.esp'
+
+  # Name and size, the same question Deploy-Server.ps1 asks of the live box and
+  # for the same reason: a plugin already there by name may not be the same
+  # plugin any more. Size and not a hash, because a hash of 57 plugins is tens
+  # of megabytes of reading on a box that is also running two servers.
+  $thereRaw = @(Remote ("Get-ChildItem -LiteralPath '" + $remotePlugins.Replace('/','\') +
+                        "' -File | ForEach-Object { `$_.Name + '|' + `$_.Length }"))
+  $thereSize = @{}
+  foreach ($row in $thereRaw) {
+    $bits = "$row".Trim() -split '\|'
+    if ($bits.Count -eq 2 -and $bits[0] -match '\.es[pml]$') { $thereSize[$bits[0]] = [int64]$bits[1] }
+  }
+  # An unreadable folder and an empty one look the same from here, and the
+  # difference is 57 plugins going up over a slow link for no reason, or an scp
+  # into a path that does not exist. Neither should happen quietly.
+  if ($thereSize.Count -eq 0) {
+    Write-Host ''
+    Write-Host ("  Nothing readable at $remotePlugins on the dev box.") -ForegroundColor Red
+    foreach ($row in $thereRaw) { Write-Host ("    " + $row) -ForegroundColor DarkGray }
+    throw "could not read the dev server's plugin folder, so there is no way to tell what it already has"
+  }
+
+  foreach ($n in $pluginNames) {
+    $local = Join-Path $Data $n
+    if ($n -eq 'Thornswood-Content.esp' -and (Test-Path -LiteralPath $ours)) { $local = $ours }
+    if (-not $thereSize.ContainsKey($n)) {
+      if (Test-Path -LiteralPath $local) { $sendPlugins += $local }
+      else { throw "the load order names $n, the dev server does not have it, and it is not at $local either" }
+      continue
+    }
+    # There already. A plugin this machine does not have is left alone: the
+    # box's copy is then the only copy, and overwriting it with nothing is the
+    # one outcome worse than it being stale.
+    if (-not (Test-Path -LiteralPath $local)) { continue }
+    $localLen = (Get-Item -LiteralPath $local).Length
+    if ($localLen -ne $thereSize[$n]) {
+      $sendPlugins += $local
+      $changed += ('{0}  {1:N0} -> {2:N0} bytes' -f $n, $thereSize[$n], $localLen)
+    }
+  }
+
+  Write-Host ''
+  Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
+  if ($sendPlugins.Count) {
+    Write-Host ('  {0} plugin(s) will go up before the restart:' -f $sendPlugins.Count) -ForegroundColor Yellow
+    foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
+    foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
+  } else {
+    Write-Host '  every plugin the load order names is on the dev server at the same size' -ForegroundColor DarkGray
+  }
+
+  # The list goes up as a file of its own. Putting 57 paths inside the settings
+  # block below would add some 4,000 characters to something that is base64 of
+  # UTF-16 on a command line, which is the length problem Remote() exists to
+  # work around; and the dev settings file is edited in place here rather than
+  # written from a local build, which is the rule this script is built on.
+  $orderFile = Join-Path $env:TEMP 'thornswood-dev-loadorder.txt'
+  [IO.File]::WriteAllText($orderFile, (($pluginNames -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
+  $farOrder = 'C:/Windows/Temp/thornswood-dev-loadorder.txt'
+}
+
 # The port comes from the dev server's own settings on the box, so the process
 # stopped is the one on that port and nothing else. 7777 is the live server;
 # refusing it here is what makes this script safe to run without thinking.
@@ -121,6 +250,18 @@ Write-Host 'Copying...'
 & scp @ssh $Gamemode "$User@${Vps}:$Root/gamemode.js"
 if ($LASTEXITCODE -ne 0) { throw 'scp failed for gamemode.js' }
 Write-Host '  gamemode.js'
+
+if ($LoadOrder) {
+  foreach ($p in $sendPlugins) {
+    $n = Split-Path $p -Leaf
+    & scp @ssh $p "$User@${Vps}:$remotePlugins/$n"
+    if ($LASTEXITCODE -ne 0) { throw "scp failed for plugin $n" }
+    Write-Host "  plugins/$n"
+  }
+  & scp @ssh $orderFile "$User@${Vps}:$farOrder"
+  if ($LASTEXITCODE -ne 0) { throw 'scp failed for the load order list' }
+  Write-Host ('  the load order list, {0} plugins' -f $pluginNames.Count)
+}
 
 Write-Host ''
 Write-Host 'Pointing the dev server at the dev voice service...'
@@ -160,6 +301,29 @@ foreach (`$k in 'equipmentSlotCheckEnabled','equipmentSpellCheckEnabled','equipm
   if (`$s.PSObject.Properties.Name -notcontains `$k) { `$wantEquip = `$true }
   elseif (`$s.`$k -ne `$false) { `$wantEquip = `$true }
 }
+`$wantOrder = `$false
+`$newOrder = @()
+`$orderPath = '$farOrder'
+if (`$orderPath -and (Test-Path `$orderPath)) {
+  `$names = @(Get-Content `$orderPath | ForEach-Object { `$_.Trim() } | Where-Object { `$_ })
+  if (`$names.Count) {
+    `$newOrder = @(`$names | ForEach-Object { '$remotePlugins/' + `$_ })
+    `$oldOrder = @(`$s.loadOrder)
+    if ((`$oldOrder -join '|') -ne (`$newOrder -join '|')) {
+      `$wantOrder = `$true
+      'the load order moves from ' + `$oldOrder.Count + ' plugins to ' + `$newOrder.Count
+      `$n = [Math]::Max(`$oldOrder.Count, `$newOrder.Count)
+      for (`$i = 0; `$i -lt `$n; `$i++) {
+        `$a = ''; `$b = ''
+        if (`$i -lt `$oldOrder.Count) { `$a = Split-Path `$oldOrder[`$i] -Leaf }
+        if (`$i -lt `$newOrder.Count) { `$b = Split-Path `$newOrder[`$i] -Leaf }
+        if (`$a -ne `$b) { '  they first differ at position ' + `$i + ': had ' + `$a + ', now ' + `$b; break }
+      }
+    } else {
+      'the load order is already the ' + `$newOrder.Count + ' the build names'
+    }
+  }
+}
 # A byte order mark counts as needing a rewrite even when the number is
 # already right. The run on 18 September set the value AND wrote a mark, so
 # a second run that only compared the number would have said 'already 7789'
@@ -167,10 +331,11 @@ foreach (`$k in 'equipmentSlotCheckEnabled','equipmentSpellCheckEnabled','equipm
 `$bom = `$false
 try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
-if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip) {
-  'thornswoodVoicePort is already $VoicePort, and both equipment checks are already off'
+if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder) {
+  'thornswoodVoicePort is already $VoicePort, both equipment checks are already off, and the load order is already right'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
+  if (`$wantOrder) { `$s | Add-Member -NotePropertyName loadOrder -NotePropertyValue `$newOrder -Force }
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
@@ -204,7 +369,8 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip) {
     else { 'read back fine, thornswoodVoicePort is ' + `$back.thornswoodVoicePort +
             ', gear strip ' + `$back.equipmentSlotCheckEnabled +
             ', spell strip ' + `$back.equipmentSpellCheckEnabled +
-            ', unknown item vetoes ' + `$back.equipmentInventoryCheckEnabled }
+            ', unknown item vetoes ' + `$back.equipmentInventoryCheckEnabled +
+            ', load order ' + @(`$back.loadOrder).Count + ' plugins' }
   } catch {
     'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
   }
@@ -219,6 +385,20 @@ Start-Sleep -Seconds 10
 `$s = Get-Content '$rootWin\server-settings.json' -Raw | ConvertFrom-Json
 `$port = [int]`$s.port
 if (Get-NetUDPEndpoint -LocalPort `$port -EA SilentlyContinue) { 'dev server up on UDP ' + `$port } else { 'DEV SERVER IS NOT LISTENING on UDP ' + `$port }
+# The manifest is what the client actually compares its game against, and the
+# server writes it at startup out of the settings above. Saying the settings
+# were written is not the same as saying the server agreed to them.
+`$dataDir = 'data'
+if (`$s.dataDir) { `$dataDir = [string]`$s.dataDir }
+`$mf = Join-Path (Join-Path '$rootWin' `$dataDir) 'manifest.json'
+if (Test-Path `$mf) {
+  try {
+    `$m = Get-Content `$mf -Raw | ConvertFrom-Json
+    'manifest: ' + @(`$m.loadOrder).Count + ' plugins, written ' + (Get-Item `$mf).LastWriteTime
+  } catch { 'manifest: UNREADABLE, ' + `$_.Exception.Message }
+} else { 'manifest: not written yet' }
+`$tmpOrder = '$farOrder'
+if (`$tmpOrder -and (Test-Path `$tmpOrder)) { Remove-Item -LiteralPath `$tmpOrder -Force -EA SilentlyContinue }
 if (Test-Path '$rootWin\server.log') {
   '--- server.log, last 15 ---'
   Get-Content '$rootWin\server.log' -Tail 15
