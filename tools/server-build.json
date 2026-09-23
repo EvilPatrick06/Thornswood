@@ -7,9 +7,9 @@
   "source": {
     "repo": "https://github.com/EvilPatrick06/skymp.git",
     "branch": "thornswood/engine-changes",
-    "commit": "b375e5e39a97bd6ce9cad2592879436e3ed4808a",
+    "commit": "c8832519866e6848b9501039940dc2c6f0508668",
     "upstream": "https://github.com/skyrim-multiplayer/skymp.git",
-    "upstreamBase": ""
+    "upstreamBase": "f926944b18e3aed4bc3864ce668626c05ec2545f"
   },
-  "recorded": "2026-09-21"
+  "recorded": "2026-09-23"
 }
