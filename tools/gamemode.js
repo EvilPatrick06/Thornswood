@@ -17646,7 +17646,16 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       the page has to present.
     */
     if (word === '/restart' || word === '/shutdown') {
-      toProfile(profileId, 'Restarts are not run from chat. Use Request-Restart.ps1.');
+      /*
+        A SENTENCE, NOT A TOOL NAME. This used to answer "Use
+        Request-Restart.ps1", which is a file on one machine that almost
+        nobody typing /restart has, cannot run, and has never heard of. A
+        message to a person names what that person can do; the tool name
+        belongs in the log and in the comment above, where it is.
+      */
+      toProfile(profileId, 'Restarts are not run from chat. Ask whoever runs ' +
+                           'the server and they will count everybody down first.');
+      log('command:', word, 'from', profileId, 'refused: restarts come from the box');
       return;
     }
 
