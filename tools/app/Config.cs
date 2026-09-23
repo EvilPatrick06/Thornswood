@@ -446,6 +446,27 @@ namespace Thornswood
         }
     }
 
+    /// <summary>
+    /// Where to get the SkyMP client runtime, as one download.
+    ///
+    /// The six files in client-build.json are the only ones a person cannot
+    /// get from anywhere else: they are built from the fork, and the folder
+    /// build refuses to take them from the Steam copy. A pack carries only
+    /// what CHANGED and they change a few times a month, so before this
+    /// existed the launcher had to walk back through the update feed hoping to
+    /// find a release where they had moved. Published by Publish-Update when
+    /// the recorded build is not already on the feed, and named by fork
+    /// commit so an unchanged build is never uploaded twice.
+    /// </summary>
+    [DataContract]
+    public class ClientRuntimeRef
+    {
+        [DataMember] public string url = "";
+        [DataMember] public string sha256 = "";
+        [DataMember] public long bytes;
+        [DataMember] public string forkCommit = "";
+    }
+
     [DataContract]
     public class VersionDoc
     {
@@ -454,6 +475,10 @@ namespace Thornswood
         [DataMember] public string launcherSha256 = "";
         [DataMember] public string serverAddress = "";
         [DataMember] public string collectionUrl = "";
+
+        /// <summary>The client runtime download. Null on a feed written before
+        /// this existed, which is why every use of it is guarded.</summary>
+        [DataMember] public ClientRuntimeRef clientRuntime = null;
 
         /// <summary>
         /// Which revision of the collection the SERVER was built against.

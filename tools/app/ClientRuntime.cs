@@ -247,13 +247,40 @@ namespace Thornswood
             }
             if (want.Count == 0) { log("The client runtime is back to the recorded build."); return done; }
 
-            // TWO: the packs.
+            // TWO: the client runtime asset, which is the address rather than
+            // the search. One download, all six files, named by fork commit.
+            VersionDoc v = null;
+            try { v = Updater.Check(cfg); }
+            catch (Exception ex) { log("  could not ask the update feed: " + ex.Message); return done; }
+            if (v == null)
+            {
+                log("  the update feed could not be reached, so the rest could not be fetched.");
+                return done;
+            }
+
+            if (v.clientRuntime != null && !string.IsNullOrEmpty(v.clientRuntime.url))
+            {
+                string zip = null;
+                try
+                {
+                    log("  fetching the client runtime" +
+                        (string.IsNullOrEmpty(v.clientRuntime.forkCommit)
+                            ? "" : " " + v.clientRuntime.forkCommit) + "...");
+                    zip = Updater.Fetch(cfg, v.clientRuntime.url, v.clientRuntime.sha256, log);
+                    done += TakeFrom(zip, want, "the client runtime", log);
+                }
+                catch (Exception ex) { log("  the client runtime download failed: " + ex.Message); }
+                finally { if (zip != null) { try { File.Delete(zip); } catch { } } }
+            }
+            if (want.Count == 0) { log("The client runtime is back to the recorded build."); return done; }
+
+            // THREE: the packs, for a launcher newer than the feed, or a feed
+            // written before the asset above existed.
             try
             {
-                VersionDoc v = Updater.Check(cfg);
-                if (v == null || v.packs == null || v.packs.Length == 0)
+                if (v.packs == null || v.packs.Length == 0)
                 {
-                    log("  the update feed could not be reached, so the rest could not be fetched.");
+                    log("  nothing else on the feed carries them.");
                     return done;
                 }
                 /*
@@ -285,33 +312,7 @@ namespace Thornswood
                     {
                         log("  looking in " + p.Title + "...");
                         zip = Updater.Fetch(cfg, p.url, p.sha256, log);
-                        using (ZipArchive ar = ZipFile.OpenRead(zip))
-                        {
-                            for (int i = want.Count - 1; i >= 0; i--)
-                            {
-                                string rel = want[i];
-                                ZipArchiveEntry en = Find(ar, rel);
-                                if (en == null) continue;
-                                string dest = Full(rel);
-                                string dir = Path.GetDirectoryName(dest);
-                                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-                                // In a game folder made of hard links, writing
-                                // over a linked file rewrites Vortex's copy in
-                                // the Steam install with it. Updater.Install
-                                // breaks the link first for exactly this and so
-                                // does this.
-                                if (File.Exists(dest)) { try { OwnGame.Unshare(dest); } catch { } }
-                                en.ExtractToFile(dest, true);
-                                if (!Matches(rel, Sha256Of(dest)))
-                                {
-                                    log("  " + Path.GetFileName(rel) + " came out of that pack and is not the recorded build; leaving it.");
-                                    continue;
-                                }
-                                log("  " + Path.GetFileName(rel) + " restored from " + p.Title + ".");
-                                want.RemoveAt(i);
-                                done++;
-                            }
-                        }
+                        done += TakeFrom(zip, want, p.Title, log);
                     }
                     catch (Exception ex) { log("  " + p.Title + ": " + ex.Message); }
                     finally { if (zip != null) { try { File.Delete(zip); } catch { } } }
@@ -322,6 +323,57 @@ namespace Thornswood
             if (want.Count == 0) log("The client runtime is back to the recorded build.");
             else log("Could not put back " + want.Count + " of them. Say so in the Discord with this text.");
             return done;
+        }
+
+        /// <summary>
+        /// Take whatever of `want` this zip carries, verify each one, and
+        /// remove the ones that landed from the list.
+        ///
+        /// Shared by the client runtime asset and the pack walk, because the
+        /// two differ only in where the zip came from. Every file is hashed
+        /// AFTER it is written: a download whose checksum was right can still
+        /// hold the wrong build of a file, and a Client row that went green on
+        /// somebody else's build is worse than one that stayed red.
+        /// </summary>
+        static int TakeFrom(string zip, List<string> want, string where, Action<string> log)
+        {
+            int took = 0;
+            using (ZipArchive ar = ZipFile.OpenRead(zip))
+            {
+                for (int i = want.Count - 1; i >= 0; i--)
+                {
+                    string rel = want[i];
+                    ZipArchiveEntry en = Find(ar, rel);
+                    if (en == null) continue;
+                    string dest = Full(rel);
+                    try
+                    {
+                        string dir = Path.GetDirectoryName(dest);
+                        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                        // In a game folder made of hard links, writing over a
+                        // linked file rewrites Vortex's copy in the Steam
+                        // install with it. Updater.Install breaks the link
+                        // first for exactly this and so does this.
+                        if (File.Exists(dest)) { try { OwnGame.Unshare(dest); } catch { } }
+                        en.ExtractToFile(dest, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        log("  " + Path.GetFileName(rel) + " could not be written: " + ex.Message);
+                        continue;
+                    }
+                    if (!Matches(rel, Sha256Of(dest)))
+                    {
+                        log("  " + Path.GetFileName(rel) + " came out of " + where +
+                            " and is not the recorded build; leaving it.");
+                        continue;
+                    }
+                    log("  " + Path.GetFileName(rel) + " restored from " + where + ".");
+                    want.RemoveAt(i);
+                    took++;
+                }
+            }
+            return took;
         }
 
         static bool Matches(string rel, string sha)
