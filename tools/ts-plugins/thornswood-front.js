@@ -3244,6 +3244,40 @@
         The minute he waited was the game shutting down on its own terms after
         he gave up and closed it another way, not this call working slowly.
       */
+      /*
+        THE BROWSER IS PUT DOWN FIRST, AND THAT IS THE SLOW PART.
+
+        Patrick, after the first fix: "close game button in main menu takes too
+        long to actually close the game."
+
+        Asking the engine to quit is instant. What is not is the unwind:
+        SkyrimPlatform starts CEF with a multi threaded message loop, a
+        windowless renderer and a separate browser subprocess, and CefShutdown
+        is never called anywhere in the tree. So the UI, IO and renderer
+        threads and the child process are left for the operating system to
+        reap while the game is already coming apart, which is a well known way
+        to sit there for a long time.
+
+        And at the moment this button is pressed the page is doing its
+        heaviest work: the character chooser is playing a looping background
+        video and the theme track. An active video and audio pipeline inside a
+        windowless CEF at teardown is the worst case of an already bad case.
+
+        None of that can be fixed from here, since the shutdown is the
+        engine's. What CAN be done is arriving at it with less to unwind: stop
+        the media, drop focus, hide the browser, and only then ask to exit.
+      */
+      try {
+        T.js('try{' +
+             'var v=document.querySelector("#ts-select video");' +
+             'if(v){v.pause();v.removeAttribute("src");v.load();}' +
+             'var a=document.querySelectorAll("audio");' +
+             'for(var i=0;i<a.length;i++){a[i].pause();a[i].removeAttribute("src");}' +
+             '}catch(e){}');
+      } catch (e) { }
+      try { sp.browser.setFocused(false); } catch (e) { }
+      try { sp.browser.setVisible(false); } catch (e) { }
+
       let asked = false;
       try {
         if (sp.win32 && typeof sp.win32.exitProcess === 'function') {
