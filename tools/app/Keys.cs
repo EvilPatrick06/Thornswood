@@ -65,6 +65,35 @@ namespace Thornswood
             Add("`", 0xC0); Add("-", 0xBD); Add("=", 0xBB);
             Add("[", 0xDB); Add("]", 0xDD); Add("\\", 0xDC);
             Add(";", 0xBA); Add("'", 0xDE); Add(",", 0xBC); Add(".", 0xBE); Add("/", 0xBF);
+
+            // THE TWO THUMB BUTTONS, and they were the only thing missing.
+            //
+            // Grim Reefer, 21 September: "When in the launcher trying to change
+            // controls for voice to mouse 4 or 5 it doesn't work. It registers
+            // for other keys but not for mouse 4 or 5." Other keys worked,
+            // which was the useful half of the report: the binding machinery
+            // was fine and the CAPTURE never saw these.
+            //
+            // Nothing else had to change. BuildDik has bound Mouse 4 to 259 and
+            // Mouse 5 to 260 all along, the client's own DxScanCode enum calls
+            // those MouseButton3 and MouseButton4, and the Controls page
+            // already binds 265, the wheel, for another mod. The only gap was
+            // here: Set refuses a code Known does not hold, and these two were
+            // not in this table, so even a capture that saw them would have
+            // been turned away.
+            //
+            // THE NAMES MATCH THE DIK TABLE ON PURPOSE. Set translates by NAME
+            // rather than by number, because the two numberings disagree, so
+            // "Mouse 4" here and "Mouse 4" there are what make DikOf resolve.
+            //
+            // The left, right and middle buttons are deliberately absent. They
+            // are in the DIK table because a mod may already be bound to one,
+            // and DikName has to be able to say so; offering them on the
+            // Controls page is different, and binding push to talk to the
+            // attack button is not a thing to make one click away.
+            Add("Mouse 4", 0x05);   // VK_XBUTTON1
+            Add("Mouse 5", 0x06);   // VK_XBUTTON2
+
             BuildDik();
         }
 

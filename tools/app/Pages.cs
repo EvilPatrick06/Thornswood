@@ -445,14 +445,19 @@ namespace Thornswood
             capturing = b;
             capturingButton = button;
             button.Content = "Press a key";
-            Log("Press the key you want for " + b.Label.ToLowerInvariant() + ", or Escape to leave it alone.");
+            Log("Press the key you want for " + b.Label.ToLowerInvariant() +
+                ", or one of the two thumb buttons on your mouse, or Escape to leave it alone.");
             win.PreviewKeyDown += OnCaptureKey;
+            // The extra mouse buttons never arrive as key events, which is the
+            // whole of why they could not be bound. See OnCaptureMouse.
+            win.PreviewMouseDown += OnCaptureMouse;
         }
 
         static void CancelCapture()
         {
             if (capturing == null) return;
             win.PreviewKeyDown -= OnCaptureKey;
+            win.PreviewMouseDown -= OnCaptureMouse;
             if (capturingButton != null) capturingButton.Content = "Change";
             capturing = null;
             capturingButton = null;
@@ -468,8 +473,46 @@ namespace Thornswood
 
             Keys.Binding b = capturing;
             CancelCapture();
+            Bind(b, KeyInterop.VirtualKeyFromKey(key));
+        }
 
-            int vk = KeyInterop.VirtualKeyFromKey(key);
+        /// <summary>
+        /// The two thumb buttons on a mouse, which are not key presses.
+        ///
+        /// Grim Reefer, 21 September: "trying to change controls for voice to
+        /// mouse 4 or 5 it doesn't work. It registers for other keys but not
+        /// for mouse 4 or 5." Nothing was broken. A key press arrives as
+        /// PreviewKeyDown and the extra mouse buttons do not, they arrive here
+        /// as XButton1 and XButton2, and this window was only listening for the
+        /// first kind. Mouse 4 and 5 are where push to talk lives for a lot of
+        /// people precisely because the game does not use them.
+        ///
+        /// ONLY THE THUMB BUTTONS ARE TAKEN. Left, right and middle fall
+        /// through unhandled so the page carries on working normally while it
+        /// is waiting: the person still has to be able to press Change on
+        /// something else, or scroll, or give up and click away. Binding push
+        /// to talk to the attack button would also be a poor thing to make one
+        /// click away.
+        /// </summary>
+        static void OnCaptureMouse(object sender, MouseButtonEventArgs e)
+        {
+            if (capturing == null) return;
+
+            int vk;
+            if (e.ChangedButton == MouseButton.XButton1) vk = 0x05;
+            else if (e.ChangedButton == MouseButton.XButton2) vk = 0x06;
+            else return;
+
+            e.Handled = true;
+            Keys.Binding b = capturing;
+            CancelCapture();
+            Bind(b, vk);
+        }
+
+        /// <summary>Write the binding and say what happened. Shared, because a
+        /// thumb button and a key differ only in how they arrived.</summary>
+        static void Bind(Keys.Binding b, int vk)
+        {
             string why = Keys.Set(b, vk);
             if (why.Length > 0) { Log(why); return; }
 
