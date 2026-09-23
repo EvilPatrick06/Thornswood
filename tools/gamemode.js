@@ -16249,6 +16249,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
+               // Playtesters', like /tp, and gated the same way. Deliberately
+               // absent from PLAYER_WORDS: naming them in /help would be an
+               // invitation, and the gate answers everybody else anyway.
+               '/give', '/spawn',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -16411,6 +16415,319 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     }
     out.hall = { desc: HALL.desc, pos: HALL.pos, rot: HALL.rot, town: 'the creation hall' };
     return out;
+  }
+
+  /*
+    ============ EVERY NAMED PLACE IN THE LOAD ORDER, NOT JUST NINE TOWNS ====
+
+    Patrick, 22 September: "let's add it so we can tp to any city, town,
+    stronghold, anwyehre that is nnamed and not just the main holds."
+
+    THE NAMES ALREADY EXIST AND SO DO THE POSITIONS; nothing new is measured.
+    BUILDING_NAME is 852 named places read out of the load order, and
+    BUILDING_BY_DOOR is the 4,891 doors that lead into them. A door is a
+    placed reference, so at run time it HAS a position and a cell, which is
+    exactly what a teleport needs and is the one thing a cell descriptor on
+    its own cannot give: dropping somebody at an arbitrary point inside an
+    interior lands them in the geometry.
+
+    THE OUTSIDE DOOR IS PREFERRED, deliberately. A building's doors come in
+    pairs and either would work, but arriving at the street door means you can
+    see where you have been sent and walk away from it. Arriving inside a
+    locked room you have never seen is a worse answer even when it is the
+    literal one.
+
+    Built once and kept, because it walks 4,891 entries and reads a property
+    per door. The map is the same for the life of the process.
+  */
+  var namedDoors = null;
+
+  /*
+    GROUPED BY BUILDING, NOT BY NAME, AND SEVEN HALLS OF THE DEAD ARE WHY.
+
+    The first version keyed on the name alone, and the load order has SEVEN
+    separate buildings all called exactly "Hall of the Dead", one per hold.
+    They collapsed into a single entry whose door list was all seven mixed
+    together, so the name matched exactly and sent whoever asked to whichever
+    door happened to resolve first. Silently, and in a different hold.
+
+    Caught by the harness asking whether an ambiguous name asks rather than
+    guesses, which it did not. Worth saying plainly: the bug was not that the
+    match was fuzzy, it was that a duplicate name looked unique.
+
+    So a shared name is qualified by its hold, out of DATA.cellToHold and the
+    capitals table, and both spellings are offered: "hall of the dead" now
+    lists the seven, and "hall of the dead (whiterun)" goes straight there.
+  */
+  function buildNamedDoors() {
+    if (namedDoors) { return namedDoors; }
+    namedDoors = {};
+    try {
+      // One entry per BUILDING first, so two buildings with one name stay two.
+      var byBuilding = {};
+      for (var door in BUILDING_BY_DOOR) {
+        if (!Object.prototype.hasOwnProperty.call(BUILDING_BY_DOOR, door)) { continue; }
+        var building = BUILDING_BY_DOOR[door];
+        if (!BUILDING_NAME[building]) { continue; }
+        if (!byBuilding[building]) { byBuilding[building] = []; }
+        if (byBuilding[building].length < 6) { byBuilding[building].push(door); }
+      }
+
+      // How many buildings share each name.
+      var shared = {};
+      for (var b1 in byBuilding) {
+        if (!Object.prototype.hasOwnProperty.call(byBuilding, b1)) { continue; }
+        var n1 = String(BUILDING_NAME[b1]).toLowerCase();
+        shared[n1] = (shared[n1] || 0) + 1;
+      }
+
+      for (var b in byBuilding) {
+        if (!Object.prototype.hasOwnProperty.call(byBuilding, b)) { continue; }
+        var name = String(BUILDING_NAME[b]);
+        var base = name.toLowerCase();
+        var key = base;
+        var shown = name;
+        if (shared[base] > 1) {
+          var town = holdTownOf(b);
+          if (town) {
+            shown = name + ' (' + town + ')';
+            key = shown.toLowerCase();
+          } else {
+            /*
+              Nothing to tell them apart by, so they are numbered and NONE of
+              them keeps the plain name.
+
+              Starting at 2 and leaving the first one on the bare name is the
+              same bug in a smaller shape: the plain name would then resolve,
+              exactly, to one of several, and that is the silent wrong answer
+              this whole grouping exists to prevent. Numbered from one, the
+              bare name matches nothing exactly and falls through to the
+              listing, which asks.
+            */
+            var k = 1;
+            do { key = base + ' ' + k; shown = name + ' ' + k; k++; }
+            while (namedDoors[key]);
+          }
+        }
+        if (namedDoors[key]) { continue; }
+        namedDoors[key] = { name: shown, plain: base, doors: byBuilding[b] };
+      }
+    } catch (e) {
+      log('could not index the named places for /tp:', e);
+    }
+    return namedDoors;
+  }
+
+  /*
+    ============ EVERY ITEM AND EVERY CREATURE THIS SERVER ALREADY NAMES ====
+
+    For /give and /spawn. Built once, out of the tables that were generated
+    from the load order for other reasons, so there is no second list to keep
+    in step with anything: the ore a vein gives, the plants, the crops, the
+    fish, what a body carries, the recipe outputs, and the handful of items
+    named as constants.
+
+    An item this file has never named cannot be given. That is the honest
+    limit of doing it without a new generated table, and it is a large limit
+    in the right direction: several thousand things are named here.
+  */
+  var thingIndex = null;
+  var beastIndex = null;
+
+  function addThing(idx, name, desc) {
+    if (!name || !desc) { return; }
+    var key = String(name).toLowerCase();
+    if (!idx[key]) { idx[key] = { name: String(name), desc: desc }; }
+  }
+
+  function buildThings() {
+    if (thingIndex) { return thingIndex; }
+    var idx = {};
+    try {
+      // Ores, by what the vein hands over rather than by the vein.
+      for (var v in ORES_BY_BASE) {
+        if (!Object.prototype.hasOwnProperty.call(ORES_BY_BASE, v)) { continue; }
+        addThing(idx, ORES_BY_BASE[v].name, ORES_BY_BASE[v].ore);
+      }
+      // Plants, crops and water produce all hand over a named thing.
+      var tables = [HARVESTS_BY_BASE, CROPS_BY_BASE, FISH_BY_BASE];
+      for (var t = 0; t < tables.length; t++) {
+        for (var k in tables[t]) {
+          if (!Object.prototype.hasOwnProperty.call(tables[t], k)) { continue; }
+          var row = tables[t][k];
+          if (!row) { continue; }
+          if (row.gives) {
+            for (var gi = 0; gi < row.gives.length; gi++) {
+              addThing(idx, row.gives[gi].name, row.gives[gi].item);
+            }
+          }
+          /*
+            'produce' is the field, and guessing it was 'item' cost every
+            plant, crop and fish in the game.
+
+            All three of those tables are generated with the same shape:
+            { produce, name, rank }. The first version of this looked for
+            'item' and 'crop', found neither, and quietly indexed nothing from
+            any of them: /give nightshade answered "nothing called that" while
+            109 plants sat in the table. Caught by asking for nightshade by
+            name rather than by trusting the loop. 'item' is still read
+            because the hunt table does use it.
+          */
+          if (row.produce && row.name) { addThing(idx, row.name, row.produce); }
+          if (row.item && row.name) { addThing(idx, row.name, row.item); }
+        }
+      }
+      // What a body carries.
+      for (var h in HUNTS_BY_BASE) {
+        if (!Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, h)) { continue; }
+        var gives = HUNTS_BY_BASE[h].gives || [];
+        for (var q = 0; q < gives.length; q++) { addThing(idx, gives[q].name, gives[q].item); }
+      }
+      // And the several thousand things anybody can make.
+      for (var r in RECIPES_BY_ID) {
+        if (!Object.prototype.hasOwnProperty.call(RECIPES_BY_ID, r)) { continue; }
+        addThing(idx, RECIPES_BY_ID[r].name, RECIPES_BY_ID[r].out);
+      }
+      // The named constants, last, so a table's own name wins over a nickname.
+      for (var c in ITEMS) {
+        if (!Object.prototype.hasOwnProperty.call(ITEMS, c)) { continue; }
+        addThing(idx, c, ITEMS[c]);
+      }
+    } catch (e) {
+      log('could not index the items for /give:', e);
+    }
+    thingIndex = idx;
+    return thingIndex;
+  }
+
+  function buildBeasts() {
+    if (beastIndex) { return beastIndex; }
+    var idx = {};
+    try {
+      // The hunt table is keyed BY THE CREATURE's own base record, which is
+      // exactly what createActor wants.
+      for (var b in HUNTS_BY_BASE) {
+        if (!Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, b)) { continue; }
+        addThing(idx, HUNTS_BY_BASE[b].name, b);
+      }
+      for (var g in GAME_BY_BASE) {
+        if (!Object.prototype.hasOwnProperty.call(GAME_BY_BASE, g)) { continue; }
+        addThing(idx, GAME_BY_BASE[g].name, g);
+      }
+    } catch (e) {
+      log('could not index the creatures for /spawn:', e);
+    }
+    beastIndex = idx;
+    return beastIndex;
+  }
+
+  /*
+    One name out of an index, or a reason.
+
+    The same shape as findPlace and for the same reason: an exact name wins,
+    part of a name is enough when it picks out one thing, and several matches
+    are listed rather than chosen between. Handing somebody the wrong sword is
+    cheap; teaching them the command lies is not.
+  */
+  function findIn(idx, want, kind) {
+    if (Object.prototype.hasOwnProperty.call(idx, want)) { return idx[want]; }
+    var hits = [];
+    for (var key in idx) {
+      if (!Object.prototype.hasOwnProperty.call(idx, key)) { continue; }
+      if (key.indexOf(want) !== -1) { hits.push(key); }
+      if (hits.length > 14) { break; }
+    }
+    if (!hits.length) { return { why: 'Nothing called that. This server knows ' + kind + ' by the names in its own tables.' }; }
+    if (hits.length === 1) { return idx[hits[0]]; }
+    var names = [];
+    for (var i = 0; i < hits.length && i < 12; i++) { names.push(idx[hits[i]].name); }
+    return { why: 'Which one: ' + names.join(', ') + (hits.length > 12 ? ', and more' : '') + '.' };
+  }
+
+  function findThing(want) { return findIn(buildThings(), want, 'items'); }
+  function findBeast(want) { return findIn(buildBeasts(), want, 'creatures'); }
+
+  /** The town a building's hold is named after, or ''. */
+  function holdTownOf(buildingDesc) {
+    try {
+      var hold = DATA.cellToHold[buildingDesc];
+      if (!hold) { return ''; }
+      var cap = DATA.capitals[hold];
+      return (cap && cap.town) ? String(cap.town) : '';
+    } catch (e) { return ''; }
+  }
+
+  /*
+    Where a named place actually is, asked of the world rather than a table.
+
+    Every door is tried in turn and the first one that resolves to a real
+    position wins, with an OUTSIDE door preferred over an inside one. A door
+    in a plugin that is not in this load order simply answers 0 from idOf and
+    is skipped, which is how this stays correct when the collection changes
+    without anybody maintaining a second list.
+  */
+  function namedPlace(key) {
+    var entry = buildNamedDoors()[key];
+    if (!entry) { return null; }
+    var inside = null;
+    for (var i = 0; i < entry.doors.length; i++) {
+      var id = 0;
+      try { id = idOf(entry.doors[i]); } catch (e) { id = 0; }
+      if (!id) { continue; }
+      var pos = null, cell = '';
+      try {
+        pos = mp.get(id, 'pos');
+        cell = String(mp.get(id, 'worldOrCellDesc') || '');
+      } catch (e) { continue; }
+      if (!pos || !cell) { continue; }
+      var found = { desc: cell, pos: [pos[0], pos[1], pos[2]], rot: [0, 0, 0],
+                    town: entry.name };
+      // An interior cell is the building itself; anything else is the street.
+      if (!Object.prototype.hasOwnProperty.call(BUILDING_NAME, cell)) { return found; }
+      if (!inside) { inside = found; }
+    }
+    return inside;
+  }
+
+  /*
+    What somebody typed, against the towns first and then every named place.
+
+    Exact match wins outright. Otherwise anything containing the words, which
+    is how "bannered" finds The Bannered Mare without anybody having to know
+    the article. Several matches are listed rather than guessed between:
+    sending somebody to the wrong Hall of the Dead is worse than asking.
+  */
+  function findPlace(want) {
+    var table = places();
+    if (Object.prototype.hasOwnProperty.call(table, want)) {
+      return { where: table[want] };
+    }
+    var named = buildNamedDoors();
+    if (Object.prototype.hasOwnProperty.call(named, want)) {
+      var exact = namedPlace(want);
+      return exact ? { where: exact }
+                   : { why: named[want].name + ' is in the load order but the server ' +
+                            'cannot find a door into it, so there is nowhere to stand.' };
+    }
+    var hits = [];
+    for (var key in named) {
+      if (!Object.prototype.hasOwnProperty.call(named, key)) { continue; }
+      if (key.indexOf(want) !== -1) { hits.push(key); }
+      if (hits.length > 12) { break; }
+    }
+    if (!hits.length) {
+      return { why: 'No place called that. Try a town, or part of a building\'s name: ' +
+                    'bannered, jorrvaskr, understone.' };
+    }
+    if (hits.length === 1) {
+      var one = namedPlace(hits[0]);
+      return one ? { where: one }
+                 : { why: named[hits[0]].name + ' has no door the server can find.' };
+    }
+    var names = [];
+    for (var h = 0; h < hits.length && h < 10; h++) { names.push(named[hits[h]].name); }
+    return { why: 'Which one: ' + names.join(', ') +
+                  (hits.length > 10 ? ', and more' : '') + '.' };
   }
 
   function round1(v) { return Math.round(Number(v) * 10) / 10; }
@@ -16638,16 +16955,27 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         log('/tp refused profile ' + profileId + ' (roster: ' + src + ', written: ' + written + ')');
         return;
       }
+      /*
+        THE WHOLE REST OF THE LINE, because a place name has spaces in it.
+
+        arg is only the first word, which was enough while there were nine
+        towns and is not now: "The Bannered Mare" arrived as "the". Same shape
+        as /pick spell, which takes the rest of the line for the same reason.
+      */
+      var wanted = parts.slice(1).join(' ').trim().toLowerCase();
       var table = places();
-      if (!arg) {
-        toProfile(profileId, 'Where to: ' + Object.keys(table).sort().join(', '));
+      if (!wanted) {
+        toProfile(profileId, 'Where to: ' + Object.keys(table).sort().join(', ') +
+                  ', or the name of any inn, keep, shop or house in the world. ' +
+                  'Part of the name is enough.');
         return;
       }
-      var where = table[arg];
-      if (!where) {
-        toProfile(profileId, 'No such place. Try: ' + Object.keys(table).sort().join(', '));
+      var found = findPlace(wanted);
+      if (!found.where) {
+        toProfile(profileId, found.why);
         return;
       }
+      var where = found.where;
       // The listing above answers whether or not the sweep found anybody. The
       // move is the part that needs a character to move.
       if (!needCharacter()) { return; }
@@ -16660,7 +16988,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         return;
       }
       toProfile(profileId, 'Sent to ' + where.town + '.');
-      log('command: /tp', actorId.toString(16), '->', arg, where.desc);
+      log('command: /tp', actorId.toString(16), '->', wanted, '=', where.town, where.desc);
       return;
     }
 
@@ -16683,6 +17011,121 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     */
     if (word === '/restart' || word === '/shutdown') {
       toProfile(profileId, 'Restarts are not run from chat. Use Request-Restart.ps1.');
+      return;
+    }
+
+    /*
+      ------------------------------------------------- /give and /spawn ---
+
+      Patrick, 22 September: "we also need /give and /spwan commands so we can
+      give and spawn any item /give iron ore or /give iron ore 2 or /spawn
+      chicken /spawn cow 3".
+
+      PLAYTESTER ONLY, and for the same reason /tp is. The profile id a
+      command arrives under is a claim the page makes about itself, not
+      something the server checked, so anybody who opened a socket to the
+      voice port with somebody else's id could hand themselves anything in the
+      game. It stays behind that gate until a login hands out a token.
+
+      THE NAMES ARE NOT A NEW TABLE. Every name these two search was already
+      read out of the load order for something else: the ores a vein gives,
+      the plants, the crops, the fish, what a body carries, and the several
+      thousand outputs in the recipe table. An item nobody has ever named in
+      this file cannot be given, and that is the honest limit rather than a
+      gap, because a name this server does not know is a name it cannot check.
+    */
+    if (word === '/give' || word === '/spawn') {
+      if (!isPlaytester(profileId)) {
+        toProfile(profileId, word + ' is not yours to run. Ask Patrick to add profile ' + profileId + '.');
+        return;
+      }
+      if (!needCharacter()) { return; }
+
+      /*
+        THE COUNT IS THE LAST WORD, AND ONLY IF IT IS A NUMBER.
+
+        "/give iron ore 2" is two iron ore and "/give iron ore" is one, but
+        "/spawn cow 3" and "/spawn horse" have to work the same way, and a
+        name can end in a digit. So the last word is taken as a count only
+        when it parses as one AND there is something left in front of it.
+      */
+      var words = parts.slice(1);
+      var count = 1;
+      if (words.length > 1) {
+        var tail = Number(words[words.length - 1]);
+        if (isFinite(tail) && tail > 0 && String(Math.floor(tail)) === words[words.length - 1]) {
+          count = Math.floor(tail);
+          words = words.slice(0, words.length - 1);
+        }
+      }
+      var want = words.join(' ').trim().toLowerCase();
+      if (!want) {
+        toProfile(profileId, word === '/give'
+          ? 'Give what? /give iron ore, or /give iron ore 5.'
+          : 'Spawn what? /spawn chicken, or /spawn cow 3.');
+        return;
+      }
+      // Forty is plenty for a test and small enough that a typo is not an
+      // afternoon of cleaning up after it.
+      if (count > 40) { count = 40; }
+
+      var hit = (word === '/give') ? findThing(want) : findBeast(want);
+      if (!hit.desc) { toProfile(profileId, hit.why); return; }
+
+      if (word === '/give') {
+        if (!addItem(actorId, hit.desc, count)) {
+          toProfile(profileId, hit.name + ' is named in this server\'s tables but the ' +
+                    'plugin that owns it is not in the load order, so there is nothing to hand you.');
+          return;
+        }
+        toProfile(profileId, 'Given ' + count + ' ' + hit.name + '.');
+        log('command: /give', actorId.toString(16), '->', count, hit.name, hit.desc);
+        return;
+      }
+
+      // /spawn. Where they are standing, which is the only place that is
+      // certainly somewhere real.
+      var baseId = idOf(hit.desc);
+      if (!baseId) {
+        toProfile(profileId, hit.name + '\'s plugin is not in this load order.');
+        return;
+      }
+      var at = null, inCell = '';
+      try {
+        at = mp.get(actorId, 'pos');
+        inCell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      } catch (e) { at = null; }
+      if (!at || !inCell) {
+        toProfile(profileId, 'The server cannot tell where you are standing.');
+        return;
+      }
+      var cellId = idOf(inCell);
+      if (!cellId) {
+        toProfile(profileId, 'The server cannot place anything in this cell.');
+        return;
+      }
+      var made = 0;
+      for (var s = 0; s < count; s++) {
+        try {
+          // Spread them out a little, so three cows are three cows and not
+          // one cow with a stacking fault.
+          var ang = (s / Math.max(1, count)) * Math.PI * 2;
+          var away = count > 1 ? 120 : 0;
+          mp.createActor(baseId,
+            [at[0] + Math.cos(ang) * away, at[1] + Math.sin(ang) * away, at[2]],
+            0, cellId);
+          made++;
+        } catch (e) {
+          log('/spawn failed on', hit.name + ':', e);
+          break;
+        }
+      }
+      if (!made) {
+        toProfile(profileId, 'Nothing was spawned. The server log says why.');
+        return;
+      }
+      toProfile(profileId, 'Spawned ' + made + ' ' + hit.name + '.');
+      log('command: /spawn', actorId.toString(16), '->', made, hit.name, hit.desc);
       return;
     }
 
