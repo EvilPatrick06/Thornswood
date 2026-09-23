@@ -118,11 +118,89 @@
     if (fsm) { try { fsm.appendFileSync(LOG_FILE, line + '\n'); } catch (e) { fsm = null; } }
   }
 
+  /*
+    WHERE THE FRAME GOES, because nobody has ever been able to say.
+
+    Patrick, 21 September: "it's really laggy and I don't know why we need to
+    do some performance enhcanments", and on 23 September: it is on BOTH
+    servers. That second half is the useful one. The dev server simulates
+    interior NPCs only and the live one simulates every NPC in Skyrim, so if
+    both feel the same then the number of simulated NPCs is not the cost, and
+    the entry on the list says plainly that nothing should be optimised before
+    that answer is known.
+
+    What both servers share is this plugin. Nineteen handlers run on
+    sp.on('update'), which in skymp5-client is EVERY FRAME, and three of them
+    used to do real work every frame before they were given a heartbeat: the
+    swing, the skills panel and the door locks, the last of those only on
+    23 September.
+
+    So the frame is measured rather than guessed at. Every handler already
+    goes through guard(), so this is the one place that can time all of them
+    without touching nineteen bodies. Two Date.now() calls per handler per
+    frame is a rounding error against what the handlers themselves do, and the
+    report is one line every thirty seconds naming the five that cost the most.
+
+    READ IT AS: worst is the single slowest call, which is what a stutter
+    feels like, and total is where the time actually went. A handler that is
+    1ms every frame costs more than one that is 40ms once a minute.
+  */
+  const spent = {};
+  let frames = 0;
+  let spentAt = 0;
+  const SPENT_EVERY = 30000;
+
   function guard(name, fn) {
     return function () {
+      const began = Date.now();
       try { return fn.apply(null, arguments); }
       catch (e) { log(name, 'threw:', e && e.stack ? e.stack : e); return undefined; }
+      finally {
+        const took = Date.now() - began;
+        const row = spent[name] || (spent[name] = { ms: 0, runs: 0, worst: 0 });
+        row.ms += took;
+        row.runs++;
+        if (took > row.worst) { row.worst = took; }
+      }
     };
+  }
+
+  /*
+    Counted here rather than inside guard, because guard wraps every handler
+    and a frame is one pass through all of them. The 'pulse' handler is the
+    one that already runs on a five second beat and is always registered, so
+    it is the cheapest honest marker of a frame having happened.
+  */
+  function frameWent() {
+    frames++;
+    const now = Date.now();
+    if (!spentAt) { spentAt = now; return; }
+    if (now - spentAt < SPENT_EVERY) { return; }
+    const seconds = (now - spentAt) / 1000;
+    spentAt = now;
+
+    const rows = [];
+    for (const k in spent) {
+      if (Object.prototype.hasOwnProperty.call(spent, k)) {
+        rows.push({ name: k, ms: spent[k].ms, runs: spent[k].runs, worst: spent[k].worst });
+      }
+    }
+    rows.sort(function (a, b) { return b.ms - a.ms; });
+    const total = rows.reduce(function (t, r) { return t + r.ms; }, 0);
+
+    log('frame: ' + Math.round(frames / seconds) + ' updates a second, ' +
+        total + 'ms of plugin in ' + Math.round(seconds) + 's (' +
+        (total / Math.max(1, seconds) / 10).toFixed(1) + '% of one core), worst five: ' +
+        rows.slice(0, 5).map(function (r) {
+          return r.name + ' ' + r.ms + 'ms/' + r.runs + ' runs, worst ' + r.worst + 'ms';
+        }).join('; '));
+
+    for (const k in spent) {
+      if (Object.prototype.hasOwnProperty.call(spent, k)) {
+        spent[k].ms = 0; spent[k].runs = 0; spent[k].worst = 0;
+      }
+    }
+    frames = 0;
   }
 
   T.log = log;
@@ -3474,6 +3552,9 @@
   }));
 
   sp.on('update', guard('pulse', () => {
+    // One pass through the handlers is one frame. See frameWent above.
+    frameWent();
+
     const now = Date.now();
     if (!lastPulse) { lastPulse = now; return; }
     if (now - lastPulse < 5000) { return; }
