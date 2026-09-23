@@ -90,6 +90,32 @@ jobs:
           if ($bad) { exit 1 }
           Write-Host 'every harness passed'
 
+      - name: Run the bot harnesses
+        shell: pwsh
+        run: |
+          # The two Python ones import bot.py for real, so they need the
+          # library the bot runs on. They were written to be run by hand and,
+          # like every harness above before this file existed, had never run
+          # anywhere: nothing was checking the bot's startup on a pull request.
+          #
+          # An install that fails says so and stops the step rather than the
+          # build, because a pip outage is not a fault in the branch. A
+          # harness that fails is red, which is the point.
+          python -m pip install --quiet --disable-pip-version-check discord.py pillow certifi
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::warning::could not install discord.py, so the bot harnesses did not run'
+            exit 0
+          }
+          $env:DISCORD_TOKEN = 'not-a-real-token'
+          $bad = 0
+          foreach ($t in (Get-ChildItem tools\discord -Filter 'test-*.py' -File | Sort-Object Name)) {
+            Write-Host ("--- {0}" -f $t.Name)
+            & python $t.FullName
+            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          }
+          if ($bad) { exit 1 }
+          Write-Host 'every bot harness passed'
+
       - name: Build the launcher
         shell: pwsh
         run: |
