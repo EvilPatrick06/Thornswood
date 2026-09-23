@@ -306,6 +306,28 @@ if (-not $Now) {
       # leaves people in an empty world.
       & $ask -Minutes $Minutes -Mode $Mode -Why $Why -Vps $Vps -User $User `
              -Data "$Root/data" -RestartFollows
+
+      # AND READ WHETHER THE WARNING ACTUALLY WENT OUT.
+      #
+      # This called it and never looked. Request-Restart exits 1 when it
+      # cannot reach the server to announce anything, and the next thing this
+      # script does is stop the task, so a warning that failed meant everybody
+      # in the world was dropped with no notice at all while the log said the
+      # countdown had been given. That is the same shape as entry 118: a step
+      # printed that it had stopped and the caller carried on regardless.
+      #
+      # Nothing has gone up at this point and the task is still running, so
+      # stopping here leaves the server exactly as it was found. -Now is the
+      # way to take it down deliberately without warning anybody.
+      if ($LASTEXITCODE -ne 0) {
+        Write-Host ''
+        Write-Host "  THE WARNING DID NOT GO OUT. Request-Restart.ps1 exited with $LASTEXITCODE." -ForegroundColor Red
+        Write-Host "  $on people are in the world and the restart below would drop them with no" -ForegroundColor Red
+        Write-Host '  notice. Nothing has been sent and the server is still running exactly as' -ForegroundColor Red
+        Write-Host '  it was. Find out why it could not reach the server and run this again,' -ForegroundColor Red
+        Write-Host '  or pass -Now if you mean to take it down without telling anybody.' -ForegroundColor Red
+        exit 1
+      }
     } else {
       Write-Host '  Request-Restart.ps1 is missing, warning nobody' -ForegroundColor Yellow
     }
