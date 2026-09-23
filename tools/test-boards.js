@@ -166,13 +166,20 @@ if (block !== null) {
   /*
     S5: THE SITES AGAINST THE GAME'S OWN TABLE OF WHERE THE TOWNS ARE.
 
-    DATA.capitals is in gamemode.js and is not Djinn's. Eight of the nine sit a
-    short walk from their capital, which is what you get between a map marker
-    and a spot by a gate. SOLITUDE IS 51,950 UNITS AWAY and does not, so it is
-    named here rather than left for somebody to find by walking to Solitude and
-    seeing no board. This check does not fail on it: it is a measurement, it is
-    written down, and it is on the list to walk to. What it fails on is a NINTH
-    town quietly joining Solitude without anybody noticing.
+    DATA.capitals is in gamemode.js and is not Djinn's. Every site should sit a
+    short walk from its capital, which is what you get between a map marker and
+    a spot by a gate.
+
+    THIS USED TO ALLOW EXACTLY ONE EXCEPTION, Solitude, at 51,950 units. That
+    was a decimal point in the wrong column and nothing else: the X read
+    -6486.7 where the same person's own Solitude chopping block reads -64263,
+    with the Y and Z agreeing to within 1,596 and 28. Corrected on 23 September
+    and written out in full beside BOARD_SITES.
+
+    So the exception is gone and NOTHING is allowed to be more than 10,000
+    units out. That is the check worth having: it caught this one by making the
+    fault a named number, and it will catch the next table edit that drops a
+    digit the same way.
   */
   {
     const line = src.split('\n').find(function (l) { return l.indexOf('const DATA = ') === 0; });
@@ -191,9 +198,9 @@ if (block !== null) {
     }
     yes('S5 the capitals table was readable, or this check proves nothing',
         DATA !== null && !!DATA.capitals);
-    yes('S5 exactly one site is more than 10,000 units from its own capital, ' +
-        'and it is Solitude' + (far.length ? ' (' + far.join(', ') + ')' : ''),
-        far.length === 1 && far[0].indexOf('Solitude') === 0);
+    yes('S5 no site is more than 10,000 units from its own capital' +
+        (far.length ? ' (' + far.join(', ') + ')' : ''),
+        far.length === 0);
   }
 
   // S6: the file says out loud that these are unverified, so the next person
@@ -206,9 +213,18 @@ if (block !== null) {
       looking for was sitting right there in the file.
     */
     const flat = src.replace(/\s+/g, ' ');
-    yes('S6 the provenance and the Solitude gap are written next to the table',
-        flat.indexOf('Suggest allocation then verification and orientation') !== -1 &&
-        flat.indexOf('SOLITUDE IS 51,950 UNITS FROM ITS CAPITAL') !== -1);
+    yes('S6 the provenance is written next to the table',
+        flat.indexOf('Suggest allocation then verification and orientation') !== -1);
+    /*
+      And the correction is written down where the numbers are, because a
+      coordinate somebody changed with no reason beside it is a coordinate
+      nobody can check afterwards.
+    */
+    yes('S6 and so is why Solitude moved',
+        flat.indexOf("SOLITUDE'S X WAS MISSING A DIGIT") !== -1 &&
+        flat.indexOf('-64263') !== -1);
+    yes('S6 and the seeding number moved with it, or nothing in the world would change',
+        /var BOARD_SEED = 3;/.test(src));
     yes('S6 and a steward placing a board marks it so a deploy cannot undo it',
         /placed: Date\.now\(\)/.test(src));
   }

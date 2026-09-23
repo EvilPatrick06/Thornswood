@@ -14225,7 +14225,35 @@ log('gamemode loaded:',
   */
   var BOARD_CELL = '3c:Skyrim.esm';   // Tamriel
   var BOARD_SITES = {
-    solitude:   { pos: [-6486.7, 104407.2, -8405.9], facing: 9.9, where: 'Solitude' },
+    /*
+      SOLITUDE'S X WAS MISSING A DIGIT, corrected 23 September, and it is a
+      correction rather than a number somebody made up.
+
+      Djinn walked to all nine and wrote them down. Eight fall between 478 and
+      4,526 units of their own capital in DATA.capitals. Solitude was 51,950
+      away, which is most of a hold, and this entry has said since then that
+      correcting it would be inventing a number.
+
+      IT IS NOT AN INVENTION, because the same person wrote down a second
+      Solitude coordinate on a different day for a different reason. His
+      Solitude CHOPPING BLOCK, in entry 17, is -64263, 106003.5, -8377.8. Set
+      that beside what was here:
+
+        board          -6486.7   104407.2   -8405.9
+        chopping block -64263.0  106003.5   -8377.8
+
+      The Z agrees to 28 units and the Y to 1,596. Only the X disagrees, by
+      57,776. That is not two different places, it is one place with a decimal
+      point in the wrong column: -6486.7 is the digits 64867 read as a number a
+      tenth the size. Put the point where the other two axes say it belongs and
+      the board is 1,707 units from his own chopping block in the same city,
+      which is the same short walk the other eight are from their capitals.
+
+      Still worth standing at: -64867 is where those digits point, and only
+      somebody in the world can say whether it is a wall. /board move solitude
+      settles it for good and a deploy will never touch it again.
+    */
+    solitude:   { pos: [-64867, 104407.2, -8405.9], facing: 9.9, where: 'Solitude' },
     whiterun:   { pos: [23139.4, -7891.7, -3494.4], facing: 188.4, where: 'Whiterun' },
     riften:     { pos: [174559.5, -94337, 11130.2], facing: 38, where: 'Riften' },
     windhelm:   { pos: [134265.1, 35842.3, -12397.5], facing: 85.8, where: 'Windhelm' },
@@ -14254,7 +14282,7 @@ log('gamemode loaded:',
     it. The next time these coordinates change, this number goes up and the
     boards follow, except the ones people have moved on purpose.
   */
-  var BOARD_SEED = 2;
+  var BOARD_SEED = 3;   // 3: Solitude's X, 23 September. See BOARD_SITES above.
 
   var boards = seedBoards(loadPart('boards', null));
 
