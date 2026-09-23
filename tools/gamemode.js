@@ -4113,6 +4113,63 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
   }
 
   /*
+    AND THE WARRIOR'S WORK IS THE FIGHT.
+
+    THE CIRCLE. A Warrior holds bulwark or berserker. Neither owns a recipe,
+    because a warrior does not make things, and until now nothing anywhere
+    credited either of them: not the recipe gate, not a station, not a verb.
+    creditWork is the only road to addWork and addWork is the only road to
+    rankUp, so a Warrior could play for a month and stay a novice for ever
+    while a miner two feet away climbed. Audit-Systems calls it "OWNS NO
+    RECIPE AT ALL, so somebody can pick it and make nothing", which is the
+    symptom; the fault is that there was no way for them to climb at all.
+
+    THIS IS THE SAME SHAPE THE MAGE HAD and the same answer. The note over
+    treePointsPerRank says it: the server cannot see a spell being cast, so
+    casting cannot be counted, and a mage was stuck holding two novice spells
+    for good until two things the server DOES see were made to count. The
+    server does see a death, with its killer, and that is the warrior's.
+
+    THE RULES, and each one is there to stop something.
+      A PERSON KILLED BY A PERSON COUNTS FOR NOTHING. The dead actor is
+      checked for a profileId below and the credit is above that check on
+      purpose: only an NPC, an animal or a draugr pays. Paying for a kill
+      between people is a bounty on the people this server is for.
+      THE KILLER HAS TO BE A PERSON, for the same reason a bandit killing a
+      chicken is not work.
+      NOT YOURSELF. killerId equal to actorId is a fall or a fire, not a
+      fight.
+      ONLY A WARRIOR. Every other profession has a verb of its own and
+      crediting them here as well would make killing the fastest way to be a
+      tailor.
+
+    It goes through creditWork like every other verb, so the tiredness drain
+    and the party bonus apply and every ceiling in the rulebook still holds.
+  */
+  try {
+    var kid = Number(killerId) || 0;
+    if (kid && kid !== actorId) {
+      var deadIsPerson = 0;
+      try { deadIsPerson = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { deadIsPerson = 0; }
+      var killerIsPerson = 0;
+      try { killerIsPerson = Number(mp.get(kid, 'profileId')) || 0; } catch (e) { killerIsPerson = 0; }
+      if (!deadIsPerson && killerIsPerson) {
+        var ch = globalThis.__thornswoodCharacter;
+        var st = (ch && ch.stateOf) ? ch.stateOf(kid) : null;
+        if (st && st.prof === 'warrior' && st.half) {
+          var raised = creditWork(kid, st.half);
+          if (raised) {
+            notify(kid, raised);
+            say(kid, raised);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    log('could not count a kill for', (killerId || 0).toString(16) + ':', e);
+  }
+
+  /*
     People only.
 
     This fires for every MpActor the server owns, which is every bandit, wolf
