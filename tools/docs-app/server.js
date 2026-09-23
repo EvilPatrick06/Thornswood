@@ -1795,7 +1795,42 @@ async function handle(req, res) {
         fs.createReadStream(file, { start: start, end: end }).pipe(res);
         return;
       }
-      return send(res, 200, fs.readFileSync(file), type, { 'Accept-Ranges': 'bytes' });
+      /*
+        AND A CACHE HEADER, BECAUSE A LOGO IS NOT SOMEBODY'S PRIVATE DATA.
+
+        send() puts Cache-Control: no-store on everything, which is right for a
+        page that holds who somebody is and wrong for a picture. Every visit
+        was re-downloading the whole of public/: the favicon, the fonts, the
+        backdrop, the video. no-store also means a browser cannot even answer
+        with a 304, so a page reload is a full download of all of it.
+
+        An asset here is a file in public/ that a page asks for by name, and
+        the honest way to cache one that is NOT fingerprinted is a short
+        max-age plus an ETag: a browser reuses it for the hour and then asks,
+        and the answer to that question is 25 bytes rather than 1.8 MB.
+
+        The ETag is size and modified time, which is what a static file server
+        does. It changes the moment a deploy writes a new file, so a changed
+        picture is picked up on the next ask rather than after the hour.
+
+        The pages themselves are untouched: they go through send() and keep
+        no-store, which this branch never handles.
+      */
+      const st = fs.statSync(file);
+      const etag = '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"';
+      if (String(req.headers['if-none-match'] || '') === etag) {
+        res.writeHead(304, {
+          'etag': etag,
+          'cache-control': 'public, max-age=3600',
+          'x-content-type-options': 'nosniff'
+        });
+        return res.end();
+      }
+      return send(res, 200, fs.readFileSync(file), type, {
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'public, max-age=3600',
+        'ETag': etag
+      });
     }
   }
 
