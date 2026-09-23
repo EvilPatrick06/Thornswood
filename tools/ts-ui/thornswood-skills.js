@@ -512,6 +512,9 @@
   var elStatus = root.querySelector('.status');
   var elConfirm = root.querySelector('[data-act="confirm"]');
   var elClose = root.querySelector('[data-act="close"]');
+  // The word inside the Close button, so drawFoot can say "Not now" while
+  // creating without rebuilding the button or losing its key cap.
+  var elCloseLabel = elClose.querySelector('span');
   var elPanel = root.querySelector('.panel');
 
   /*
@@ -1657,10 +1660,23 @@
 
   /*
     The status line and the two buttons: three elements, set in place, never
-    rebuilt. While creating the one button is Begin, under Review only, and
-    there is no Close: Escape and K still shut the panel and the server's
-    reminder brings it back. In the world Confirm sits under every section
-    that sends, and Close is back.
+    rebuilt. In the world Confirm sits under every section that sends.
+
+    CLOSE IS THERE WHILE CREATING NOW, and it used to be hidden.
+
+    Djinn, 21 September: "There is no way to leave the character creation
+    screen except to make a character then log out. this needs a resolution."
+    The old note here said Escape and K shut the panel "and the server's
+    reminder brings it back", which is exactly the complaint written down as
+    though it were the design: you could shut it and it reopened thirty
+    seconds later, so you could not shut it.
+
+    Hiding the button did not stop anybody leaving either, since Escape
+    already worked. All it did was hide that leaving was possible, from the
+    people most likely to want it. The button is honest about what it does
+    now, and closing tells the server, which holds the reminder off for ten
+    minutes instead of thirty seconds. Nothing about the character is decided
+    by it.
   */
   function drawFoot() {
     var cr = creating();
@@ -1681,7 +1697,10 @@
     elConfirm.className = 'tsbtn primary' + (can ? '' : ' off');
     elConfirm.textContent = label;
     elConfirm.style.display = showConfirm ? '' : 'none';
-    elClose.style.display = cr ? 'none' : '';
+    elClose.style.display = '';
+    // "Not now" while creating, because Close beside Begin reads like
+    // cancelling the character rather than putting the panel down.
+    elCloseLabel.textContent = cr ? 'Not now' : 'Close';
   }
 
   function hint() {
@@ -1861,6 +1880,23 @@
   function leave() { closing = false; status = ''; statusKind = ''; later = {}; api.close(); }
 
   /*
+    Shut by hand: the Close button, or Escape.
+
+    While creating this also tells the server, which holds its reminder off
+    for ten minutes instead of pushing the panel back in thirty seconds. That
+    difference is the whole of Djinn's "there is no way to leave the character
+    creation screen": closing already worked, it just did not last.
+
+    Only from the two deliberate ways out. leave() above is creation ENDING
+    and must not send it, and the server ignores it once the stage is past
+    choosing anyway, so the two guards agree.
+  */
+  function closeByHand() {
+    if (creating()) { tell('pick', 'later'); }
+    api.close();
+  }
+
+  /*
     The server answered by rewriting the property. Each pick in flight is
     cleared by its own answer, the thing it asked for now set, and says so;
     a refusal clears the one its note is about (see refused). Confirm sends
@@ -1949,7 +1985,7 @@
   function onKey(e) {
     if (root.className === 'gone') return;
     var n = countRows();
-    if (e.key === 'Escape') { api.close(); e.preventDefault(); return; }
+    if (e.key === 'Escape') { closeByHand(); e.preventDefault(); return; }
     if (e.key === 'Enter') {
       if (section === 'tree') {
         var flat = [];
@@ -1986,7 +2022,7 @@
   }
   window.addEventListener('keydown', onKey, true);
   elConfirm.onclick = confirm;
-  elClose.onclick = function () { api.close(); };
+  elClose.onclick = function () { closeByHand(); };
 
   // ---------------------------------------------------------------- api --
   var api = {
@@ -2004,7 +2040,7 @@
       tell('closed');
     },
     toggle: function () {
-      if (root.className === 'gone') { api.open(); } else { api.close(); }
+      if (root.className === 'gone') { api.open(); } else { closeByHand(); }
     },
     isOpen: function () { return root.className !== 'gone'; },
     /*
