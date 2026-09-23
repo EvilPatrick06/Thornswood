@@ -183,10 +183,20 @@
   // are refused rather than rounded, because a roll nobody can predict the
   // shape of is worse than no roll.
   //
-  // Rolled here and sent as an ordinary line, so everybody sees the same words
-  // and the relay needs no idea that dice exist. Among five friends that is the
-  // right trade: making it uncheatable means changing the service and
-  // redeploying it, to stop people cheating at a game they play for fun.
+  // ROLLED ON THE SERVER, NOT HERE, AND THAT IS THE WHOLE POINT OF A DIE.
+  //
+  // This used to roll in the page and send the RESULT as an ordinary chat
+  // line: "/roll 20" went out as the words "rolls 20: 17". The comment that
+  // stood here said so and called it the right trade among five friends.
+  //
+  // It stopped being the right trade the moment a steward settled a dispute
+  // by asking somebody to roll for it. Anybody who can open a console can
+  // type "rolls 20: 20" themselves, and nobody reading the room can tell the
+  // two apart. A roll anybody can fake is worth less than no roll at all.
+  //
+  // So the spec goes to the server and the words come back from it. What is
+  // left here is the same parsing, used only to refuse nonsense before it
+  // travels: the answer is the server's and this cannot produce one.
   var ROLL = /^\/(roll|r)\b\s*(.*)$/i;
   var SPEC = /^(\d+)(?:\s*[x*]\s*(\d+))?$/;
 
@@ -210,19 +220,15 @@
     if (!isFinite(sides) || sides < 1 || sides > MAX_SIDES) return null;
     if (!isFinite(count) || count < 1 || count > MAX_DICE) return null;
 
-    var rolls = [];
-    var total = 0;
-    for (var i = 0; i < count; i++) {
-      var v = 1 + Math.floor(Math.random() * sides);
-      rolls.push(v);
-      total += v;
-    }
+    /*
+      The spec back in its plain form, never a result.
 
-    if (count === 1) return 'rolls ' + sides + ': ' + total;
-    // The breakdown, until there are so many that it is noise rather than
-    // working out.
-    if (count <= 12) return 'rolls ' + count + 'x' + sides + ': ' + rolls.join(' + ') + ' = ' + total;
-    return 'rolls ' + count + 'x' + sides + ': ' + total;
+      Rebuilt rather than passed through, so what goes to the server is always
+      "20" or "6x3" whatever somebody typed, including the d they typed on
+      reflex. The server parses it again and does not trust this: this is here
+      so a typo is answered in the same breath instead of a round trip later.
+    */
+    return count === 1 ? String(sides) : (count + 'x' + sides);
   }
 
   window.thornswoodNet = {
@@ -232,13 +238,14 @@
 
       var dice = ROLL.exec(text);
       if (dice) {
-        var line = rollOf(dice[2]);
-        if (!line) {
+        var spec = rollOf(dice[2]);
+        if (!spec) {
           note('The number is the sides: /roll 20, /roll 1000, or /roll 6x3 for three of them. ' +
                'Whole numbers, 1 to ' + MAX_SIDES + ', up to ' + MAX_DICE + ' dice.', C_WARN);
           return false;
         }
-        text = line;
+        // The command, not the answer. See the note over ROLL.
+        text = '/roll ' + spec;
       }
       if (ws && ws.readyState === 1 && joined) {
         try { ws.send(JSON.stringify({ t: 'chat', text: text })); return true; }
