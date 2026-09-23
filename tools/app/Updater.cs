@@ -407,6 +407,21 @@ namespace Thornswood
                 throw new Exception("The update feed pointed at " + u.Host + ", which is not where Thornswood updates come from. Refused.");
         }
 
+        /// <summary>
+        /// Download, for a caller that wants the zip and not the install.
+        ///
+        /// ClientRuntime.Heal takes the six recorded client files out of a pack
+        /// WITHOUT applying it, because applying a pack twice writes applied.txt
+        /// and a fresh file list in which every path reads as one that pack
+        /// wrote over, which puts its own files out of reach of its own Remove.
+        /// A repair must not move that bookkeeping. Every check Download makes
+        /// is still made: the url is checked and the checksum is mandatory.
+        /// </summary>
+        public static string Fetch(Config cfg, string url, string expectSha, Action<string> log)
+        {
+            return Download(cfg, url, expectSha, log);
+        }
+
         static string Download(Config cfg, string url, string expectSha, Action<string> log)
         {
             CheckUrl(url);

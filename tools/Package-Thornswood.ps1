@@ -257,6 +257,39 @@ if ($optionalPrefixes.Count) {
     Say ("  {0} optional path(s) will be left out and published separately" -f $optionalPrefixes.Count) 'Green'
 }
 
+# ---- the client runtime always ships, whatever anything else says ---------
+#
+# THE SIX FILES IN client-build.json ARE THE ONE THING A TESTER CANNOT GET ANY
+# OTHER WAY, and on 22 September one of them found that out.
+#
+# They are built from the fork and put into the game folder by Sync-Client.ps1,
+# which runs on Patrick's machine. OwnGame.WhyLeft refuses to take them from
+# the Steam copy, deliberately, because until 20 September the copies sitting
+# there were another launcher's builds. So for somebody who is not Patrick
+# there are exactly two routes: this installer, and a pack.
+#
+# Ship-Rules.ps1 has read this record for packs all along, and Test-ShipOtherServer
+# returns false for any path in it so a pack always carries all six. Nothing
+# here did the same, and a brand new install arrived with "skymp5-client.js is
+# missing" and a Play button that would not press. Same record, same rule, both
+# ends.
+#
+# This is a KEEP list, not a leave-out list: whatever the Vortex record or the
+# vanilla patterns below decide, a path in the record ships.
+$clientRecordPath = Join-Path $PSScriptRoot 'client-build.json'
+$shipClientFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+try {
+    if (Test-Path -LiteralPath $clientRecordPath) {
+        $rec = Get-Content -LiteralPath $clientRecordPath -Raw | ConvertFrom-Json
+        foreach ($p in $rec.files.PSObject.Properties.Name) { [void]$shipClientFiles.Add($p) }
+    }
+} catch { }
+if ($shipClientFiles.Count -gt 0) {
+    Say ("  {0} client runtime file(s) will ship whatever else leaves them out" -f $shipClientFiles.Count) 'Green'
+} else {
+    Say '  tools\client-build.json could not be read, so nothing protects the client runtime from the filters below' 'Yellow'
+}
+
 # ---- what the collection provides: also left out --------------------------
 # Vortex writes a record of every file it put in the game folder. That record,
 # not a guess at which folders count as "mods", is what decides this. A file is
@@ -317,8 +350,18 @@ $prefix = $GameDir.TrimEnd('\') + '\'
 
 $ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0
 $collectionBytes = 0; $collectionCount = 0
+$clientShipped = 0
 foreach ($f in $all) {
     $rel = $f.FullName.Substring($prefix.Length)
+    # Ours by record, before any filter is asked. See the note over
+    # $shipClientFiles: these six are the only files a tester cannot get from
+    # anywhere else, and a missing one is a Play button that will not press.
+    if ($shipClientFiles.Contains($rel)) {
+        $ship += [pscustomobject]@{ Rel = $rel; Full = $f.FullName; Len = $f.Length; Time = $f.LastWriteTimeUtc }
+        $shipBytes += $f.Length
+        $clientShipped++
+        continue
+    }
     if (Test-Vanilla $rel) { $skipBytes += $f.Length; continue }
     if (Test-Runtime $rel) { $skipBytes += $f.Length; continue }
     if (Test-ShipMachine $rel) { $skipBytes += $f.Length; $machineCount++; continue }
@@ -332,6 +375,31 @@ foreach ($f in $all) {
 }
 Say ("  {0:n0} files kept ({1:n1} GB), {2:n0} left out ({3:n1} GB of Bethesda files and debug symbols)" -f `
     $ship.Count, ($shipBytes / 1GB), ($all.Count - $ship.Count), ($skipBytes / 1GB)) 'Green'
+
+# AND IT STOPS IF THE CLIENT RUNTIME IS NOT ALL THERE.
+#
+# A warning is not enough for this one. An installer missing one of these six
+# builds cleanly, uploads cleanly, installs cleanly, and then every new tester
+# reaches a Play button that will not press and is told to reinstall. That is
+# what happened on 22 September, and nothing anywhere said a thing. Refusing
+# here is the only place it can be caught before somebody downloads it.
+if ($shipClientFiles.Count -gt 0) {
+    if ($clientShipped -eq $shipClientFiles.Count) {
+        Say ("  all {0} client runtime files are in" -f $clientShipped) 'Green'
+    } else {
+        $inShip = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+        foreach ($s in $ship) { [void]$inShip.Add($s.Rel) }
+        Write-Host ''
+        Say ("  STOP. {0} of the {1} client runtime files are not in this installer:" -f `
+            ($shipClientFiles.Count - $clientShipped), $shipClientFiles.Count) 'Red'
+        foreach ($c in $shipClientFiles) { if (-not $inShip.Contains($c)) { Say ("    " + $c) 'Red' } }
+        Say '  They are not in the game folder this is being built from. Run' 'Red'
+        Say '  tools\Sync-Client.ps1 to put the recorded build in place, then package again.' 'Red'
+        Say '  Shipping without them gives every new tester a Play button that will not press.' 'Red'
+        Write-Host ''
+        throw 'the client runtime is incomplete, so this installer was not built'
+    }
+}
 if ($machineCount) { Say ("  {0:n0} of this machine's own files, other servers' files and sign in tokens left out" -f $machineCount) 'DarkGray' }
 if ($collectionCount) {
     Say ("  {0:n0} of the left out ({1:n1} GB) are files the collection provides." -f `

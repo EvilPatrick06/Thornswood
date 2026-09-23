@@ -274,6 +274,25 @@ if (Test-Path -LiteralPath $iniTemplate) {
     Say '  tools\emotes\Thornswood.ini is missing; a machine with no Thornswood.ini will play on the plugins'' own defaults' 'Yellow'
 }
 
+# The record of which SkyMP client runtime belongs beside this launcher.
+#
+# IT TRAVELS IN THE EXE AND NOT AS A FILE, on purpose. The launcher, the game
+# files and the server go out as one release, so the launcher that is running
+# IS the statement of which client belongs with it, and there is no second copy
+# on disk to drift out of step or to be edited on somebody's machine.
+#
+# ClientRuntime reads it back out and checks the six files by hash. Without it
+# the launcher cannot tell which build of skymp5-client.js it has, which is
+# what the old text search for "THORNSWOOD PATCH" could never answer, and it
+# cannot put a missing one back either. A build without it still runs and says
+# so on the Play page rather than pretending the client is fine.
+$clientRecord = Join-Path $Here 'client-build.json'
+if (Test-Path -LiteralPath $clientRecord) {
+    $cscArgs += "/resource:$((Resolve-Path $clientRecord).Path),client-build.json"
+} else {
+    Say '  tools\client-build.json is missing; the launcher will not be able to check or repair the client runtime' 'Yellow'
+}
+
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 foreach ($f in $cs)   { $cscArgs += $f.FullName }
 if ($infoApp) { $cscArgs += $infoApp }
