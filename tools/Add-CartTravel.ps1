@@ -1,4 +1,4 @@
-<#
+﻿<#
   Add-CartTravel.ps1
 
   Carriages and ferries between the holds, so turning fast travel off leaves
@@ -20,7 +20,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root      = 'C:\SkyrimTogether',
+    [string]$Root      = 'C:\Thornswood',
     [string]$Downloads = "$env:USERPROFILE\Downloads",
     [string]$Notes = "Carriages and ferries between the holds`n- every hold has a carriage, and ferries run the rivers`n- the ride is a fade rather than a scripted journey, because a real one desyncs badly in co-op`n- patched for JK's Skyrim so the drivers do not end up standing inside the rebuilt city gates",
     [switch]$NoShip,

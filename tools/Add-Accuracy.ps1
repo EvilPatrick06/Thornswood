@@ -1,4 +1,4 @@
-<#
+﻿<#
   Add-Accuracy.ps1
 
   Localised combat damage. Where you hit somebody starts to matter, on top
@@ -22,7 +22,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root      = 'C:\SkyrimTogether',
+    [string]$Root      = 'C:\Thornswood',
     [string]$Downloads = "$env:USERPROFILE\Downloads",
     [string]$Notes = "Where you hit somebody now matters`n- localised damage per body part, layered on top of Precision`n- armour on that part of the body counts, so a helmet is worth wearing`n- the settings ship with the build, identical for everyone, because damage is worked out on the attacker's machine and mismatched numbers make health bars disagree",
     [switch]$NoShip,

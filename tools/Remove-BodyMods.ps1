@@ -1,4 +1,4 @@
-<#
+﻿<#
   Remove-BodyMods.ps1
 
   Pulls the male and female genitalia mods out of the Thornswood game folder.
@@ -17,7 +17,11 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$Data = 'C:\SkyrimTogether\Game\Data',
+    # Was C:\SkyrimTogether until 23 September. This one DELETES, so a default
+    # pointing at a folder that does not exist made it a no-op that looked like
+    # a clean run, and on any machine that did have that folder it would have
+    # deleted out of the wrong one.
+    [string]$Data = 'C:\Thornswood\Game\Data',
     [switch]$IncludePubeOverlays   # also disable MorphSync pubic-hair providers
 )
 

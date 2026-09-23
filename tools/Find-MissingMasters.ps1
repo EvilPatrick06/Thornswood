@@ -1,4 +1,4 @@
-<#
+﻿<#
   Find-MissingMasters.ps1
 
   Reads the TES4 header of every plugin in Data and reports any master that is
@@ -8,7 +8,34 @@
   Only the first 8 KB of each file is read. MAST fields always live in the TES4
   record, which is the first record in the file.
 #>
-param([string]$Data = 'C:\SkyrimTogether\Game\Data')
+param(
+    [string]$Data = 'C:\Thornswood\Game\Data',
+    [string]$Plugins = 'C:\Thornswood\Profile\Default\plugins.txt',
+    [switch]$NoPause
+)
+
+<#
+  A CHECK THAT FINDS NOTHING MUST NOT SAY EVERYTHING IS FINE.
+
+  Until 23 September this defaulted to C:\SkyrimTogether\Game\Data, a folder
+  from the Skyrim Together days that has not existed on either machine for
+  weeks. Run with no arguments it listed an empty folder, compared nothing
+  against nothing, and printed "no missing masters. every plugin's dependencies
+  are present." in green. Two errors scrolled past above it and the verdict
+  underneath was a lie.
+
+  That is the same fault as the launcher's old scan line and as the entry about
+  the tests that cannot run: a measurement of nothing reported as a pass. So the
+  folder is checked first and an empty one stops this rather than passing it.
+#>
+if (-not (Test-Path -LiteralPath $Data)) {
+    Write-Host ''
+    Write-Host "STOP. There is no Data folder at $Data" -ForegroundColor Red
+    Write-Host '  Nothing was read, so nothing can be said about any master.' -ForegroundColor Red
+    Write-Host '  Pass -Data with the game folder you mean.' -ForegroundColor Yellow
+    if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
+    exit 1
+}
 
 $present = @{}
 Get-ChildItem -LiteralPath $Data -File |
@@ -16,7 +43,7 @@ Get-ChildItem -LiteralPath $Data -File |
     ForEach-Object { $present[$_.Name.ToLower()] = $true }
 
 $enabled = @{}
-$pl = 'C:\SkyrimTogether\Profile\Default\plugins.txt'
+$pl = $Plugins
 if (Test-Path $pl) {
     Get-Content $pl | Where-Object { $_ -match '^\*' } |
         ForEach-Object { $enabled[$_.TrimStart('*').Trim().ToLower()] = $true }
@@ -55,8 +82,19 @@ foreach ($f in (Get-ChildItem -LiteralPath $Data -File |
 }
 
 Write-Host ''
+if ($present.Count -eq 0) {
+    # Belt and braces with the Test-Path above: a folder that exists and holds
+    # no plugins is the same nothing, and it must not read as a pass either.
+    Write-Host "STOP. $Data has no plugins in it, so nothing was compared." -ForegroundColor Red
+    if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
+    exit 1
+}
 if (-not $problems) {
-    Write-Host "no missing masters. every plugin's dependencies are present." -ForegroundColor Green
+    # THE COUNT IS THE POINT. The old line said everything was fine whether it
+    # had read ninety nine plugins or none, which is how it spent weeks
+    # reporting a pass from an empty folder.
+    Write-Host ("no missing masters: $($present.Count) plugin(s) in $Data, " +
+                "$($enabled.Count) of them enabled, every dependency present.") -ForegroundColor Green
 } else {
     $live = @($problems | Where-Object State -eq 'ENABLED')
     $problems | Sort-Object State, Plugin | Format-Table -AutoSize

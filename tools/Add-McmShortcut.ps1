@@ -1,4 +1,4 @@
-<#
+﻿<#
   Add-McmShortcut.ps1
 
   Installs MCM Shortcut NG, which is what lets Skyrim Unbound open its own
@@ -25,7 +25,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root      = 'C:\SkyrimTogether',
+    [string]$Root      = 'C:\Thornswood',
     [string]$Downloads = "$env:USERPROFILE\Downloads",
     [string]$Notes = 'Making a character now walks you through it. The starting location menu opens on its own after the face, and the class menu follows.',
     [switch]$NoShip,

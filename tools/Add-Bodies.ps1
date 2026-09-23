@@ -1,4 +1,4 @@
-<#
+﻿<#
   Add-Bodies.ps1
 
   Bodies, genitals and physics. Skeleton, female body, male body, and the
@@ -22,7 +22,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root      = 'C:\SkyrimTogether',
+    [string]$Root      = 'C:\Thornswood',
     [string]$Downloads = "$env:USERPROFILE\Downloads",
     [switch]$SkipRefits,
     [string]$Notes = "Bodies, and the physics to go with them`n- CBBE and 3BA for women, HIMBO and The New Gentleman for men, all nude by default`n- XPMSSE skeleton underneath, CBPC doing the physics`n- everyone gets identical meshes, because mismatched bodies is the one thing that actually breaks co-op",

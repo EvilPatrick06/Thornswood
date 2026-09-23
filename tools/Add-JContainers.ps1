@@ -1,4 +1,4 @@
-<#
+﻿<#
   Add-JContainers.ps1
 
   Installs JContainers SE and switches on the MCM recording that sets
@@ -23,7 +23,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root      = 'C:\SkyrimTogether',
+    [string]$Root      = 'C:\Thornswood',
     [string]$Downloads = "$env:USERPROFILE\Downloads",
     [string]$Notes = 'Hunger, thirst, exhaustion and cold now switch themselves on. The launcher configures SunHelm for you the first time you make a character, so nobody has to go hunting through menus.',
     [switch]$NoShip,

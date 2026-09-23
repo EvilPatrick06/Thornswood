@@ -1,4 +1,4 @@
-<#
+﻿<#
   Add-NoticeBoards.ps1
 
   Installs Missives into the isolated build, so the boards in and around
@@ -19,7 +19,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root      = 'C:\SkyrimTogether',
+    [string]$Root      = 'C:\Thornswood',
     [string]$Downloads = "$env:USERPROFILE\Downloads",
     [string]$Notes = 'The notice boards work now. Missives puts real contracts on the boards in and around every town, generated fresh, and each of you takes your own off the board rather than sharing one.',
     [switch]$NoShip,

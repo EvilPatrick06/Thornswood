@@ -1,4 +1,4 @@
-<#
+﻿<#
   Show-EslCascade.ps1
 
   Answers one question: if the server load order drops every ESL-flagged plugin,
@@ -13,8 +13,11 @@
   Reads only the TES4 header of each plugin. Changes nothing.
 #>
 param(
-    [string]$Data    = 'C:\SkyrimTogether\Game\Data',
-    [string]$Plugins = 'C:\SkyrimTogether\Profile\Default\plugins.txt'
+    # Was C:\SkyrimTogether until 23 September, which is a folder neither
+    # machine has had for weeks: this read an empty list and said so in a way
+    # that looked like an answer.
+    [string]$Data    = 'C:\Thornswood\Game\Data',
+    [string]$Plugins = 'C:\Thornswood\Profile\Default\plugins.txt'
 )
 
 function Read-Header([string]$path) {

@@ -1,4 +1,4 @@
-<#
+﻿<#
   Add-TempleRespawn.ps1
 
   Stops people respawning on the spot where they died. Respawn - Death
@@ -20,7 +20,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root      = 'C:\SkyrimTogether',
+    [string]$Root      = 'C:\Thornswood',
     [string]$Downloads = "$env:USERPROFILE\Downloads",
     [string]$Notes = 'Dying now sends you to the Temple of Kynareth or the nearest Hall of the Dead instead of dropping you next to your own corpse. Walk back for your things.',
     [switch]$NoShip,
