@@ -87,9 +87,35 @@ function Get-CollectionNewest {
     foreach ($f in (Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)) {
         try {
             $txt = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($f.FullName))
+
+            # SHAPE ONE, the transition Vortex writes the moment it notices a
+            # newer revision than the one installed:
+            #     "newestVersion","from":"3","to":"4"
             foreach ($m in [regex]::Matches($txt, '"newestVersion"\s*,\s*"from"\s*:\s*"(\d+)"\s*,\s*"to"\s*:\s*"(\d+)"')) {
                 $n = 0
                 if ([int]::TryParse($m.Groups[2].Value, [ref]$n) -and $n -gt $best) { $best = $n }
+            }
+
+            # SHAPE TWO, THE PLAIN CURRENT VALUE, and this is what is actually
+            # there once the machine is ON the newest revision, because there
+            # is no transition left to record. Only shape one was read until
+            # 22 September, so the moment revision 5 was installed the newest
+            # went back to 0 and the deploy gate stopped checking anything,
+            # which is the exact failure the gate was added for a day earlier.
+            #
+            # LevelDB writes the key, then ONE length byte, then that many
+            # bytes of JSON. Measured on this machine:
+            #
+            #   6E 65 77 65 73 74 56 65 72 73 69 6F 6E 03 22 35 22
+            #   n  e  w  e  s  t  V  e  r  s  i  o  n  len "  5  "
+            #
+            # A deleted key writes a length of 0 and no value, and is simply
+            # not matched. The length byte is any control character, so the
+            # class is bounded rather than a wildcard: a bare .{1,4} would
+            # happily match a quote and read somebody else's number.
+            foreach ($m in [regex]::Matches($txt, 'newestVersion[\x00-\x1F]{1,4}"(\d+)"')) {
+                $n = 0
+                if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -gt $best) { $best = $n }
             }
         } catch { }
     }
