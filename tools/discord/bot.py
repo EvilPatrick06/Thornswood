@@ -449,16 +449,45 @@ def said_yes(text):
     t = (text or '').strip().lower()
     if not t:
         return False
+
+    # A NUMBER BEATS A WORD, and this order is the whole fix.
+    #
+    # It used to check the yes words first, and "I'm 16" starts with "i'm ",
+    # which is in that list. So a sixteen year old answering in a sentence
+    # read as a yes and the thread was never flagged, which is the one answer
+    # this function exists to catch.
+    #
+    # An age is 1 to 120. Anything bigger is a year, a postcode or a number of
+    # hours, and treating "born in 2009" as an age of 2009 would be a yes for
+    # the same person. A text with no age-like number in it falls through to
+    # the words below exactly as before.
+    #
+    # ANY NUMBER UNDER EIGHTEEN IS A NO, even beside a bigger one. "my brother
+    # is 30, im 16" is not an answer anybody should be reading as a yes, and
+    # this function never rejects anybody by itself: a no here puts a line at
+    # the top of the thread for a person to read.
+    #
+    # It costs the occasional honest answer a flag: "34 and have been for 2
+    # years" reads as a no because of the 2. That is deliberate and is the
+    # cheap direction to be wrong in. A flag costs somebody five seconds of
+    # reading; a miss lets a minor through with nothing saying so.
+    ages = []
+    for n in re.findall(r'\d+', t):
+        try:
+            v = int(n)
+        except Exception:
+            continue
+        if 1 <= v <= 120:
+            ages.append(v)
+    if ages:
+        if min(ages) < 18:
+            return False
+        return True
+
     if t == 'n' or t.startswith(_NO):
         return False
     if t.startswith(_YES):
         return True
-    for n in re.findall(r'\d+', t):
-        try:
-            if int(n) >= 18:
-                return True
-        except Exception:
-            pass
     return False
 
 
