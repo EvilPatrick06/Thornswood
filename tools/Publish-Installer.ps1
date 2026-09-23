@@ -1,4 +1,4 @@
-<#
+﻿<#
   Publish-Installer.ps1
 
   Puts the current installer on the docs site so friends always have the newest
@@ -14,7 +14,7 @@
   itself. Can be run on its own if a push failed.
 
     .\Publish-Installer.ps1
-    .\Publish-Installer.ps1 -OutDir 'C:\Thornswood\_dist'
+    .\Publish-Installer.ps1 -OutDir 'C:\Thornswood-Dev\dist\Thornswood\_dist'
     .\Publish-Installer.ps1 -KeepOld     keep the previous pair as a rollback
 
   Only the current pair is kept by default. At a gigabyte each, three
@@ -23,7 +23,21 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$OutDir = 'C:\Thornswood\_dist',
+  <#
+    WHERE PACKAGE-THORNSWOOD ACTUALLY PUTS IT.
+
+    This defaulted to C:\Thornswood\_dist, which stopped existing when
+    releases were moved out of the folder Patrick plays from. Package builds
+    into C:\Thornswood-Dev\dist\Thornswood\_dist and has done
+    since; running this on its own, which is what Package's own recovery line
+    tells you to do when publishing fails, threw "not built" and named a folder
+    nobody has.
+
+    Found 23 September, and it is the same shape as the eleven scripts that
+    were still reading C:\SkyrimTogether: a default that points at a machine
+    nobody has any more, waiting for the one day somebody needs it.
+  #>
+  [string]$OutDir = 'C:\Thornswood-Dev\dist\Thornswood\_dist',
   [string]$Version,
   [string]$Note,
   [string]$Vps  = '192.135.112.23',
