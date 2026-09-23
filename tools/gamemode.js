@@ -18329,9 +18329,32 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     that has never seen this before draws it correctly the first time.
   */
   function hudScript() {
+    /*
+      BIGGER, SOLID, AND ON A BACKING, because the first version could not be
+      read.
+
+      Patrick, 23 September, looking at it in a night scene: "the indicators
+      are too small and hard to see with the color they are", "that's all
+      trasparent", "the water drop icon for water its like purple and not
+      blue".
+
+      Three separate mistakes, all mine. The text was 12px with 96px bars. The
+      healthy state was drawn at 0.38 opacity, which is almost nothing over a
+      dark scene and is where the washed out colours came from: a blue at a
+      third opacity over near black is not blue any more. And there was no
+      backing at all, so every colour was fighting whatever happened to be
+      behind it.
+
+      So: half again the size, a dark panel behind it, and opacity that never
+      goes below readable. Quiet is done with COLOUR now, not by fading the
+      whole row out, which was the thing that made it unreadable.
+    */
     var CSS = 'position:fixed;left:18px;bottom:16px;z-index:2147483500;' +
-              'pointer-events:none;font-family:Georgia,serif;font-size:12px;' +
-              'letter-spacing:.06em;color:#d8cbb0;text-shadow:0 1px 3px #000';
+              'pointer-events:none;font-family:Georgia,serif;font-size:15px;' +
+              'letter-spacing:.04em;color:#efe4cc;' +
+              'background:rgba(12,10,8,.62);border:1px solid rgba(0,0,0,.65);' +
+              'border-radius:7px;padding:9px 13px 11px;' +
+              'text-shadow:0 1px 3px rgba(0,0,0,.95)';
     return [
       '(function(){',
       '  try {',
@@ -18351,47 +18374,104 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
       '    if (st.thornswoodHud === sig) { return; }',
       '    st.thornswoodHud = sig;',
       '',
-      '    var ICON = {',
-      // A drumstick, a droplet, a crescent, a snowflake and a flame. Small,
-      // flat and readable at 14 pixels over any background.
-      '      food: "M4 13a4 4 0 0 1 4-4 3 3 0 1 1 3-3 4 4 0 0 1-4 4 4 4 0 0 1-3 3z M9.5 11.5 L15 17 M13 15l-1.5 3 3-1.5z",',
-      '      drink: "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z",',
-      '      rest: "M14.5 12.8A6 6 0 1 1 7.2 5.5a5 5 0 0 0 7.3 7.3z",',
-      '      cold: "M10 2v16 M3 6l14 8 M17 6L3 14 M10 5l-2-2 M10 5l2-2 M10 15l-2 2 M10 15l2 2",',
-      '      heat: "M10 18a5 5 0 0 0 5-5c0-4-5-11-5-11S5 9 5 13a5 5 0 0 0 5 5z"',
+      /*
+      FOUR SHAPES THAT CANNOT BE MISTAKEN FOR EACH OTHER, which the first set
+      could.
+
+      Patrick: "why is temp a water drop and the food icon seems weird too".
+      He was looking at a real bug. The old flame was
+      "M10 18a5 5 0 0 0 5-5c0-4-5-11-5-11S5 9 5 13a5 5 0 0 0 5 5z" and the old
+      droplet was "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z" —
+      the same teardrop, one of them upside down. At fourteen pixels they were
+      indistinguishable, so Temp genuinely did look like a second water drop.
+      The drumstick was three disconnected strokes and read as nothing at all.
+
+      An apple, a droplet, a crescent and a THERMOMETER now: four outlines
+      with different silhouettes, which is the only property that matters at
+      this size. The thermometer is also the right picture for a reading that
+      goes both ways, where a flame could only ever mean hot.
+    */
+    '    var ICON = {',
+      '      food: "M10 7c3.2 0 5.2 2.4 5.2 5.6 0 3.2-2.3 5.9-5.2 5.9s-5.2-2.7-5.2-5.9C4.8 9.4 6.8 7 10 7z M10 7V3.6 M10 4.6c1.6-1.4 3.2-1.4 4 -1.2 .2 1.4-.6 2.8-2.2 3.2",',
+      '      drink: "M10 2.4c0 0-5.6 6.6-5.6 10A5.6 5.6 0 0 0 15.6 12.4C15.6 9 10 2.4 10 2.4z",',
+      '      rest: "M15.2 12.9A6.4 6.4 0 1 1 7.4 5.1a5.3 5.3 0 0 0 7.8 7.8z",',
+      '      temp: "M8.2 11.8V4.6a1.8 1.8 0 0 1 3.6 0v7.2a3.4 3.4 0 1 1-3.6 0z M10 7.4v5.4"',
       '    };',
       '',
-      '    function row(kind, label, val, col) {',
-      '      var pct = Math.max(0, Math.min(100, Math.round(val)));',
-      // Quiet when it is fine. A HUD that shouts all the time is one nobody
-      // reads, so a healthy bar is nearly invisible and a bad one is not.
-      '      var dim = pct >= 50 ? 0.38 : (pct >= 25 ? 0.78 : 1);',
-      '      var svg = \'<svg width="14" height="14" viewBox="0 0 20 20" fill="none" \' +',
-      '        \'stroke="\' + col + \'" stroke-width="1.6" stroke-linecap="round" \' +',
-      '        \'stroke-linejoin="round" style="vertical-align:middle;margin-right:7px">\' +',
+      /*
+        One row. The readout is given rather than worked out, because Temp's
+        is a plain number and the other three are percentages.
+
+        Nothing is dimmed below 0.85. Quiet is done with colour: a healthy bar
+        is its own calm colour and a failing one turns red, which reads at a
+        glance without making the whole row disappear.
+      */
+      '    function row(kind, label, fill, col, readout) {',
+      '      var pct = Math.max(0, Math.min(100, Math.round(fill)));',
+      '      var svg = \'<svg width="19" height="19" viewBox="0 0 20 20" fill="none" \' +',
+      '        \'stroke="\' + col + \'" stroke-width="1.7" stroke-linecap="round" \' +',
+      '        \'stroke-linejoin="round" style="vertical-align:middle;margin-right:9px">\' +',
       '        \'<path d="\' + ICON[kind] + \'"/></svg>\';',
-      '      var track = \'<span style="display:inline-block;width:96px;height:8px;\' +',
-      '        \'background:rgba(0,0,0,.55);border:1px solid rgba(0,0,0,.85);\' +',
-      '        \'border-radius:2px;vertical-align:middle;overflow:hidden">\' +',
+      '      var track = \'<span style="display:inline-block;width:132px;height:11px;\' +',
+      '        \'background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.22);\' +',
+      '        \'border-radius:3px;vertical-align:middle;overflow:hidden">\' +',
       '        \'<span style="display:block;height:100%;width:\' + pct + \'%;\' +',
       '        \'background:\' + col + \'"></span></span>\';',
-      '      var num = \'<span style="display:inline-block;width:42px;text-align:right;\' +',
-      '        \'font-variant-numeric:tabular-nums">\' + pct + \'%</span>\';',
-      '      var name = \'<span style="display:inline-block;width:46px">\' + label + \'</span>\';',
-      '      return \'<div style="margin-top:6px;opacity:\' + dim + \'">\' +',
+      '      var num = \'<span style="display:inline-block;min-width:52px;text-align:right;\' +',
+      '        \'color:\' + col + \';font-variant-numeric:tabular-nums">\' + readout + \'</span>\';',
+      '      var name = \'<span style="display:inline-block;width:54px">\' + label + \'</span>\';',
+      '      return \'<div style="margin-top:7px;white-space:nowrap">\' +',
       '             svg + name + track + num + \'</div>\';',
       '    }',
       '',
-      // Temperature is drawn as distance from comfort, so the bar empties at
-      // BOTH ends: freezing and overheating both read as nearly gone, which
-      // is what they both are.
-      '    var cold = temp < 50;',
-      '    var tv = 100 - Math.min(100, Math.abs(temp - 50) * 2);',
-      '    var html = row("food", "Food", food, "#c9a227") +',
-      '               row("drink", "Water", drink, "#4f9fd0") +',
-      '               row("rest", "Rest", rest, "#8fb85e") +',
-      '               row(cold ? "cold" : "heat", cold ? "Cold" : "Heat", tv,',
-      '                   cold ? "#7fc7e8" : "#e08f42");',
+      /*
+        A meter's colour by how bad it is. Its own colour while it is fine,
+        amber once it matters, red once it is serious. This is what replaced
+        fading the row out.
+      */
+      '    function tone(v, good) {',
+      '      return v >= 50 ? good : (v >= 25 ? "#e0a040" : "#e0645a");',
+      '    }',
+      '',
+      /*
+        TEMPERATURE IS A NUMBER AND A COLOUR, NOT A PERCENTAGE.
+
+        Patrick: "heat shouldnt be a percentage to it should be a number plus
+        a color to reflect hot, cold, cmoftroable, anbd the ionbetweens", and
+        "instead of heat it should say Temp".
+
+        A percentage was the wrong shape twice over: it said 20% for freezing
+        AND 20% for overheating, which are opposite states, and a percentage
+        of what was never answerable. So the reading is the meter itself, 0 is
+        frozen and 100 is baking, the bar fills left to right across that
+        range, and the colour carries the meaning: blue cold, green
+        comfortable, orange warm, red hot, with a step either side of comfort
+        for the in betweens.
+      */
+      '    function tempTone(v) {',
+      '      if (v < 15) { return "#5ab4ff"; }',
+      '      if (v < 30) { return "#7fc7e8"; }',
+      '      if (v < 42) { return "#a9d6c2"; }',
+      '      if (v <= 58) { return "#8fb85e"; }',
+      '      if (v <= 70) { return "#d8c15e"; }',
+      '      if (v <= 85) { return "#e0a040"; }',
+      '      return "#e0645a";',
+      '    }',
+      '    function tempWord(v) {',
+      '      if (v < 15) { return "Freezing"; }',
+      '      if (v < 30) { return "Cold"; }',
+      '      if (v < 42) { return "Chilly"; }',
+      '      if (v <= 58) { return "Fine"; }',
+      '      if (v <= 70) { return "Warm"; }',
+      '      if (v <= 85) { return "Hot"; }',
+      '      return "Burning";',
+      '    }',
+      '',
+      '    var html = row("food", "Food", food, tone(food, "#d8b43a"), food + "%") +',
+      '               row("drink", "Water", drink, tone(drink, "#4fa8e0"), drink + "%") +',
+      '               row("rest", "Rest", rest, tone(rest, "#8fb85e"), rest + "%") +',
+      '               row("temp", "Temp", temp, tempTone(temp),',
+      '                   tempWord(temp) + " " + temp);',
       '',
       '    var src = "(function(){try{" +',
       '      "var d=document.getElementById(\'ts-hud\');" +',

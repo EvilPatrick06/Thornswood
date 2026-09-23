@@ -105,43 +105,78 @@ if (hud) {
         h.indexOf('<path d="') !== -1 && h.indexOf('src=') === -1);
     yes('S2 the percentage is written out', h.indexOf('62%') !== -1 &&
         h.indexOf('41%') !== -1 && h.indexOf('88%') !== -1);
-    yes('S2 hunger and thirst are both named',
-        h.indexOf('Food') !== -1 && h.indexOf('Water') !== -1);
-    yes('S2 and so are rest and temperature',
-        h.indexOf('Rest') !== -1 && (h.indexOf('Cold') !== -1 || h.indexOf('Heat') !== -1));
+    yes('S2 all four rows are named, and the fourth says Temp not Heat',
+        h.indexOf('>Food<') !== -1 && h.indexOf('>Water<') !== -1 &&
+        h.indexOf('>Rest<') !== -1 && h.indexOf('>Temp<') !== -1 &&
+        h.indexOf('>Heat<') === -1);
   }
 
-  // S3: temperature reads from both ends.
+  /*
+    S3: TEMPERATURE IS A WORD AND A NUMBER, NOT A PERCENTAGE.
+
+    Patrick, 23 September: "heat shouldnt be a percentage to it should be a
+    number plus a color to reflect hot, cold, cmoftroable, anbd the
+    ionbetweens", and "instead of heat it should say Temp".
+
+    A percentage said 20% for freezing AND 20% for overheating, which are
+    opposite states, and a percentage of what was never answerable.
+  */
   {
-    const cold = run(made, { food: 100, drink: 100, rest: 100, temp: 10 }, {});
-    const hot = run(made, { food: 100, drink: 100, rest: 100, temp: 90 }, {});
-    yes('S3 freezing says Cold', cold.made['ts-hud'].innerHTML.indexOf('Cold') !== -1);
-    yes('S3 overheating says Heat', hot.made['ts-hud'].innerHTML.indexOf('Heat') !== -1);
-    /*
-      Both extremes have to read as NEARLY EMPTY. The temperature bar is drawn
-      as distance from comfort, not as a level, so 10 and 90 are equally bad
-      and a bar that filled up as you overheated would say the opposite of
-      what it means.
-    */
-    /*
-      READ THE NUMBER OUT OF THE NUMBER SPAN, not the first percent sign in
-      the row. The first version of this took the first (\d+)% after the
-      label and always got 100, because the bar's own style says
-      height:100% before it ever says width:20%. It reported the temperature
-      bar broken when the bar was right, which is worse than not checking.
-    */
-    function shown(html, label) {
-      const seg = html.split('>' + label + '<')[1] || '';
-      const m = />(\d+)%<\/span>/.exec(seg);
-      return m ? Number(m[1]) : null;
+    function tempReadout(temp) {
+      const r = run(made, { food: 100, drink: 100, rest: 100, temp: temp }, {});
+      const seg = r.made['ts-hud'].innerHTML.split('>Temp<')[1] || '';
+      const m = />([A-Za-z]+) (\d+)<\/span>/.exec(seg);
+      return m ? { word: m[1], num: Number(m[2]), html: seg } : null;
     }
-    const cm = shown(cold.made['ts-hud'].innerHTML, 'Cold');
-    const hm = shown(hot.made['ts-hud'].innerHTML, 'Heat');
-    yes('S3 and both extremes read as nearly empty, not one full and one empty',
-        cm !== null && hm !== null && cm <= 25 && hm <= 25 && cm === hm);
-    const mild = run(made, { food: 100, drink: 100, rest: 100, temp: 50 }, {});
-    const mm = shown(mild.made['ts-hud'].innerHTML, 'Heat');
-    yes('S3 while comfortable reads as full', mm !== null && mm >= 95);
+    const cold = tempReadout(8);
+    const fine = tempReadout(50);
+    const hot = tempReadout(92);
+    /*
+      THE READOUT, NOT THE WHOLE ROW. The first version of this asked whether
+      the row contained a percent sign anywhere, and of course it does: the
+      bar's own style says height:100% and width:8%. It reported a correct
+      readout as wrong, which is the SECOND time in this file that reading CSS
+      as if it were content has produced a false failure. Match the readout
+      span and nothing else.
+
+      Matching at all is the check: a percentage readout renders as >8%</span>
+      and cannot match a word followed by a number.
+    */
+    yes('S3 it reads as a word and the number itself, with no percent sign',
+        !!cold && !!fine && !!hot &&
+        cold.num === 8 && fine.num === 50 && hot.num === 92);
+    yes('S3 the two ends say opposite things rather than the same thing',
+        cold.word !== hot.word);
+    yes('S3 cold reads cold, the middle comfortable, hot reads hot',
+        /freez|cold/i.test(cold.word) && /fine|comfort/i.test(fine.word) &&
+        /hot|burn/i.test(hot.word));
+    function colourAt(t) {
+      const seg = tempReadout(t).html;
+      const m = /color:(#[0-9a-f]{6})/i.exec(seg);
+      return m ? m[1].toLowerCase() : null;
+    }
+    const shades = [8, 25, 35, 50, 65, 80, 95].map(colourAt);
+    yes('S3 and every band has its own colour, including the in betweens',
+        shades.every(function (c) { return !!c; }) &&
+        new Set(shades).size === shades.length);
+  }
+
+  /*
+    S3b: readable, which the first one was not.
+
+    Patrick: "the indicators are too small and hard to see with the color they
+    are ... that's all trasparent". It drew at 0.38 opacity, 12px, with no
+    backing, over whatever happened to be behind it.
+  */
+  {
+    const r = run(made, { food: 100, drink: 100, rest: 100, temp: 50 }, {});
+    const el = r.made['ts-hud'];
+    yes('S3b a healthy HUD is not faded out of sight',
+        !/opacity:0\.[0-7]/.test(el.innerHTML));
+    yes('S3b it has a backing so it does not fight the scene',
+        /background:rgba\(/.test(el.style.cssText));
+    const size = /font-size:(\d+)px/.exec(el.style.cssText);
+    yes('S3b and the text is big enough to read', !!size && Number(size[1]) >= 14);
   }
 
   // S4: THE PER-FRAME GUARD. updateOwner runs every frame; this is what stops
