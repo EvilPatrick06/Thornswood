@@ -512,6 +512,64 @@ function Save-State {
     $o | ConvertTo-Json -Depth 3 -Compress | Set-Content $StateFile -Encoding UTF8
 }
 
+# ==== thornswood publish resume ====
+#
+# A RELEASE THAT DID NOT PUSH IS NOT PUBLISHED, and until 23 September this
+# file recorded it as published anyway: Save-State ran whatever happened to
+# the push, so the baseline moved, and the next Ship compared the build
+# against it, found nothing changed and stopped with "Nothing to do". The
+# assets were on GitHub, version.json was not, no launcher could see the
+# release, and the one command that would have fixed it refused to run.
+#
+# So the baseline only moves when the last step succeeded, and a failure is
+# written down beside it: the id, when, and what went wrong. The next run
+# reads that and FINISHES THAT RELEASE rather than minting a new id. Reusing
+# the id is the whole point. The assets for it are already uploaded, gh
+# release upload --clobber puts anything missing into the release that is
+# already there, and a new id would orphan a set of assets and grow the feed
+# by a release nobody can install.
+#
+# It lives beside the baseline, under LOCALAPPDATA, for the same reason: it
+# is a note about this machine, not part of any install, and the uninstaller
+# cannot reach it. The dev channel has its own baseline and so has its own
+# note.
+function Get-PendingFile([string]$stateFile) {
+    if (-not $stateFile) { return '' }
+    return ($stateFile -replace '\.json$', '') + '-pending.json'
+}
+
+function Read-Pending([string]$stateFile) {
+    $f = Get-PendingFile $stateFile
+    if (-not $f -or -not (Test-Path -LiteralPath $f)) { return $null }
+    try {
+        # A byte order mark is not JSON, and a note we cannot read is the same
+        # as no note: never a reason to stop a release.
+        $o = ((Get-Content -LiteralPath $f -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
+        if (-not $o -or -not $o.PSObject.Properties['id'] -or -not $o.id) { return $null }
+        return $o
+    } catch { return $null }
+}
+
+function Write-Pending([string]$stateFile, [string]$id, [string]$why) {
+    $f = Get-PendingFile $stateFile
+    if (-not $f) { return }
+    try {
+        [ordered]@{
+            id  = $id
+            why = $why
+            at  = (Get-Date).ToUniversalTime().ToString('s') + 'Z'
+        } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $f -Encoding UTF8
+    } catch { }
+}
+
+function Clear-Pending([string]$stateFile) {
+    $f = Get-PendingFile $stateFile
+    if ($f -and (Test-Path -LiteralPath $f)) {
+        try { Remove-Item -LiteralPath $f -Force } catch { }
+    }
+}
+# ==== end thornswood publish resume ====
+
 if ($Baseline) {
     Save-State
     Head 'Done'
@@ -627,7 +685,21 @@ if (-not $changed.Count -and -not $removed.Count -and -not $profileChanged.Count
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 2
 }
 
-if (-not $Id) { $Id = Get-Date -Format 'yyyyMMdd-HHmm'; if ($Dev) { $Id += '-dev' } }
+if (-not $Id) {
+    # An unfinished release is finished, not replaced. See the block beside
+    # Save-State for why the id matters more than the timestamp.
+    $resume = Read-Pending $StateFile
+    if ($resume) {
+        $Id = [string]$resume.id
+        Write-Host ''
+        Say ("Finishing release $Id, which did not get out: " +
+             $(if ($resume.PSObject.Properties['why']) { [string]$resume.why } else { 'the push failed' })) 'Yellow'
+        Say '  Its assets are already on GitHub, so this uploads into that release' 'DarkGray'
+        Say '  rather than making a second one.' 'DarkGray'
+    } else {
+        $Id = Get-Date -Format 'yyyyMMdd-HHmm'; if ($Dev) { $Id += '-dev' }
+    }
+}
 
 # ------------------------------------------------------------ pack
 # GitHub refuses a release asset over 2 GiB, and a body mod release goes well
@@ -1568,13 +1640,21 @@ if (-not $NoPush) {
     } finally { Pop-Location; $ErrorActionPreference = $old }
 }
 
-Save-State
+# THE BASELINE MOVES ONLY WHEN THE RELEASE IS REALLY OUT.
+if ($pushFailed) {
+    Write-Pending $StateFile $Id $pushFailed
+} else {
+    Save-State
+    Clear-Pending $StateFile
+}
 
 Head 'Done'
 if ($pushFailed) {
     Say "NOT SHIPPED. $pushFailed" 'Red'
     Say 'The assets are on GitHub but version.json is not, so no launcher will' 'Red'
     Say 'see this update. Fix the line above and push, then it is live.' 'Red'
+    Say "The baseline was NOT moved, so the next run finishes $Id rather than" 'Yellow'
+    Say 'starting a new one. Nothing here is lost by running it again.' 'Yellow'
 }
 else {
     Say "Everyone's launcher will offer update $Id on next start." 'Green'
