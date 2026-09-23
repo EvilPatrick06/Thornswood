@@ -551,6 +551,33 @@ if ($collectionRemovals) {
     $removed = @($removed | Where-Object { -not (Test-FromCollection $_) })
 }
 
+# ---- and the ones that are deleted whether they were here or not ----------
+#
+# Leaving a file out of a pack stops it reaching NEW machines and does nothing
+# for the ones that already have it, which are the machines the problem is on.
+#
+# 22 September, map.swf: excluded by Test-ShipOtherServer, released, and the
+# pack carried no delete.txt at all, so every tester who already had the game
+# kept the broken file and kept the SkyUI error box. It had only helped the
+# people who did not have the problem.
+#
+# The ordinary diff could not catch it. It left the game folder, which is
+# normally a removal, but the filter above reads the launcher's record of what
+# Vortex provides and that record lists map.swf even though Vortex's own
+# deployment manifest does not. So it was taken for a collection file and
+# dropped. THAT GUARD IS RIGHT AND STAYS; this is the deliberate override
+# beside it.
+#
+# Added AFTER the collection filter on purpose, so nothing here can be removed
+# by it. See $ShipDeleteAlways in Ship-Rules.ps1 for what may go on the list.
+$alwaysGone = @(Get-ShipDeleteAlways)
+foreach ($d in $alwaysGone) {
+    if ($removed -notcontains $d) { $removed += $d }
+}
+if ($alwaysGone.Count) {
+    Say ("  {0} path(s) are deleted from every install by rule, whether this machine had them or not" -f $alwaysGone.Count) 'DarkGray'
+}
+
 $changedBytes = 0
 foreach ($c in $changed) { $changedBytes += [int64](($now[$c] -split ':')[0]) }
 if ($profileChanged.Count) { Say '  the plugin list changed' 'Green' }
