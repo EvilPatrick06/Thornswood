@@ -942,7 +942,12 @@ if (-not $NoPublish) {
         } catch {
             Say "  could not publish: $_" 'Yellow'
             Say '  The installer is still built and fine. Run' 'DarkGray'
-            Say '  .\tools\Publish-Installer.ps1 when the VPS is reachable.' 'DarkGray'
+            # The folder is named, because this line used to send somebody to
+            # a bare command whose default pointed at a folder that no longer
+            # exists. It reads the same -OutDir this run used, so it is right
+            # even when somebody passed their own.
+            Say ('  .\tools\Publish-Installer.ps1 -OutDir "' + $OutDir + '"') 'DarkGray'
+            Say '  when the VPS is reachable.' 'DarkGray'
         }
     } else {
         Say '  Publish-Installer.ps1 is missing, nothing was published.' 'Yellow'
