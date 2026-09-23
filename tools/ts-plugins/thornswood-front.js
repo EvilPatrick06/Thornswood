@@ -228,6 +228,20 @@
    * A line in the corner of the screen, for the handful of things a person
    * needs to be told rather than a log needs to record.
    */
+  /*
+    ON SCREEN AND IN THE LOG, for the handful of things a person must see.
+
+    This existed, worked and had no callers at all: everything went through
+    say(), which is log only. That was right for a week of chasing a keystroke
+    and wrong the moment anybody who is not us plays, because a log somebody
+    has to go and find is not a message.
+
+    The bar for using it is deliberately high. A notification interrupts
+    somebody's game and sits over their screen next to their own mods' ones, so
+    it is for a thing that is happening TO them and that they can act on: they
+    are on fire, the fire is out, the console is not theirs. Everything else
+    stays in the log where it belongs.
+  */
   function note(text) {
     try { sp.Debug.notification('ThornsWood: ' + text); } catch (e) { }
     log(text);
@@ -1755,7 +1769,7 @@
     if (now - consoleToldAt > CONSOLE_SAY_EVERY) {
       consoleToldAt = now;
       try {
-        sp.Debug.notification('The console is switched off on Thornswood.');
+        note('the console is switched off here');
       } catch (e) { }
       /*
         And in the chat, where it stays on screen long enough to read and can
@@ -2457,7 +2471,7 @@
       health normally goes through.
     */
     if (fire >= 0 && fire <= FIRE_INSIDE) {
-      if (burnUntil < now) { try { sp.Debug.notification('You are standing in the fire.'); } catch (e) { } }
+      if (burnUntil < now) { note('you are standing in the fire'); }
       // Refreshed rather than set, so walking out of the coals lets it go
       // within about a second instead of burning for the full catch.
       burnUntil = Math.max(burnUntil, now + 1500);
@@ -2521,7 +2535,7 @@
           const shader = sp.EffectShader.from(sp.Game.getFormEx(FIRE_SHADER));
           if (shader) { shader.play(pc, 0); }
         } catch (e) { }
-        say('burning');
+        note('you have caught fire');
       }
       if (now - burnSaidAt >= BURN_REPORT) {
         burnSaidAt = now;
@@ -2537,7 +2551,7 @@
       if (shader) { shader.stop(pc); }
     } catch (e) { }
     tellServer('/burn 0');
-    say('the fire is out');
+    note('the fire is out');
   }));
 
   /*
