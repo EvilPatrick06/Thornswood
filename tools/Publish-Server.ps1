@@ -30,6 +30,11 @@
 param(
     [Parameter(Position = 0)][string]$Notes = '',
     [string]$RepoDir,
+    # The public releases clone, which is the feed every launcher reads.
+    # Same shape as Set-Server.ps1, and for the same reason: releases moved
+    # into their own repository and the version.json still sitting in this one
+    # stopped being the live feed that day. See the News section below.
+    [string]$ReleaseDir,
     <#
       Which server this goes to. 'main' is the one everybody plays on.
 
@@ -410,10 +415,20 @@ if ($up) {
 # go looking for an update button that is not going to light up.
 if (-not $NoNews -and $up) {
     if (-not $RepoDir) { $RepoDir = Split-Path -Parent $Here }
-    $VersionFile = Join-Path $RepoDir 'version.json'
+    # THE LIVE FEED, NOT THE COPY IN THIS REPO. Until 23 September this wrote
+    # into the repo's own version.json. That file is not dead, it is the
+    # shipped default read as a template, and nothing publishes it: every
+    # launcher reads the copy in the public releases clone. So a server change
+    # was written down in a file nobody reads, which is the same as not being
+    # announced at all, and the whole reason this News section exists.
+    if (-not $ReleaseDir) {
+        $guess = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
+        $ReleaseDir = if (Test-Path (Join-Path $guess '.git')) { $guess } else { $RepoDir }
+    }
+    $VersionFile = Join-Path $ReleaseDir 'version.json'
 
     if (-not (Test-Path -LiteralPath $VersionFile)) {
-        Say "no version.json in $RepoDir, so nothing was added to the News page" 'Yellow'
+        Say "no version.json in $ReleaseDir, so nothing was added to the News page" 'Yellow'
     } else {
         Head 'News'
         try {
@@ -511,16 +526,34 @@ if (-not $NoNews -and $up) {
                 Say ("  added: {0}" -f $entry.title) 'Green'
 
                 if (-not $NoPush) {
+                    # THE RELEASES CLONE, BY -C, AND NEVER THE SOURCE REPO.
+                    #
+                    # This used to Push-Location into the source repo and run a
+                    # bare git push there. Two things wrong with that, and the
+                    # second is the dangerous one. It pushed the file nobody
+                    # reads, so the news still did not reach anybody. And a
+                    # bare push takes whatever branch the source repo happens
+                    # to have checked out, which on the machine that ships is
+                    # usually main: a deploy script quietly pushing main is how
+                    # the rule that main is only ever what shipped gets broken
+                    # by accident.
+                    #
+                    # -C keeps it in the releases clone whatever this shell is
+                    # standing in, which is the shape Set-Server.ps1 uses for
+                    # the same file.
                     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-                    Push-Location $RepoDir
                     try {
                         # git writes progress to stderr, and Out-Host renders
                         # anything on stderr as a red error even on success.
                         function Relay { process { Write-Host ('  ' + $_.ToString()) -ForegroundColor DarkGray } }
-                        & git add version.json
-                        & git commit -m "Server: $($entry.title)" 2>&1 | Relay
-                        & git push 2>&1 | Relay
-                    } finally { Pop-Location; $ErrorActionPreference = $old }
+                        & git -C $ReleaseDir add version.json 2>&1 | Relay
+                        & git -C $ReleaseDir commit -m "Server: $($entry.title)" 2>&1 | Relay
+                        & git -C $ReleaseDir push 2>&1 | Relay
+                        if ($LASTEXITCODE -ne 0) {
+                            Say '  the feed did not push, so nobody has the News entry yet' 'Yellow'
+                            Say ("  git -C $ReleaseDir push   sends it") 'Yellow'
+                        }
+                    } finally { $ErrorActionPreference = $old }
                 }
             }
         } catch {
