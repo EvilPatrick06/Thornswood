@@ -16423,7 +16423,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // Friends, parties, mutes, trade and journals. See the
                // social block at the end of this file.
                '/friend', '/party', '/mute', '/trade', '/journal',
-               '/yes', '/no'];
+               '/yes', '/no',
+               // The dice. Rolled here now rather than on the roller's own
+               // machine; see the branch for why that matters.
+               '/roll', '/r'];
 
 /*
   The ones a person who is not a playtester is told about. /tp, /goto, /face,
@@ -16452,7 +16455,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // Everybody's, and they have to be findable: a key
                       // prompt nobody sees is a feature nobody has.
                       '/friend', '/party', '/mute', '/trade', '/journal',
-                      '/yes', '/no'];
+                      '/yes', '/no', '/roll'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
@@ -16510,6 +16513,18 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   // How far out of character talk carries. About the length of a longhouse,
   // which is roughly the group a scene has in it.
   var OOC_RANGE = 4000;
+
+  /*
+    The dice, and their limits.
+
+    A thousand sides because somebody will want a percentile and then a
+    thousand; a hundred dice because a handful is the point and a screenful is
+    not. Decimals are refused rather than rounded: a roll whose shape nobody
+    can predict is worse than no roll.
+  */
+  var ROLL_MAX_SIDES = 1000;
+  var ROLL_MAX_DICE = 100;
+  var ROLL_DEFAULT_SIDES = 20;
 
   function toProfile(profileId, text) {
     post('/say', { profileId: profileId, text: text });
@@ -17684,21 +17699,187 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       return;
     }
 
+    /*
+      ------------------------------------------------------------- the dice
+
+      THE WHOLE VALUE OF A DIE IS THAT NOBODY CHOSE THE NUMBER.
+
+      /roll used to be rolled in thornswood-chat.js, on the roller's own
+      machine, and sent as an ordinary chat line: the page turned "/roll 20"
+      into the words "rolls 20: 17" and posted them. The comment there said it
+      out loud and called it the right trade among five friends. It is not the
+      right trade on a server where a steward settles a dispute by asking for
+      a roll, because anybody who can open a console can type the sentence
+      themselves and nobody can tell the difference.
+
+      So the roll happens here. The page sends the SPEC and never a result,
+      this rolls it, and what everybody sees is written by the server. There
+      is no line a client can send that produces the same output, because the
+      page's own /roll is gone rather than merely discouraged.
+
+      THE SPEC IS THE SAME ONE PEOPLE ALREADY TYPE, deliberately: the number
+      is the number of sides, 6x3 is three of them, and a leading d is
+      dropped because somebody who has rolled dice before types it on reflex.
+      Nobody has to learn anything new.
+
+      HEARD BY THE SAME PEOPLE /ooc IS, and for the same reason: a roll is
+      part of a conversation and belongs in the room it happened in.
+    */
+    if (word === '/roll' || word === '/r') {
+      if (!needCharacter()) { return; }
+      var spec = parts.slice(1).join('').trim().toLowerCase();
+      spec = spec.replace(/\s+/g, '').replace(/(^|[x*])d/g, '$1');
+      if (!spec) { spec = String(ROLL_DEFAULT_SIDES); }
+
+      var rm = /^(\d+)(?:[x*](\d+))?$/.exec(spec);
+      var rsides = rm ? parseInt(rm[1], 10) : 0;
+      var rcount = (rm && rm[2]) ? parseInt(rm[2], 10) : 1;
+      if (!rm || !isFinite(rsides) || rsides < 1 || rsides > ROLL_MAX_SIDES ||
+          !isFinite(rcount) || rcount < 1 || rcount > ROLL_MAX_DICE) {
+        toProfile(profileId,
+          'The number is the sides: /roll 20, /roll 1000, or /roll 6x3 for three of them. ' +
+          'Whole numbers, 1 to ' + ROLL_MAX_SIDES + ', up to ' + ROLL_MAX_DICE + ' dice.');
+        return;
+      }
+
+      var rolls = [], total = 0;
+      for (var ri = 0; ri < rcount; ri++) {
+        var v = 1 + Math.floor(Math.random() * rsides);
+        rolls.push(v);
+        total += v;
+      }
+
+      var rwho = '';
+      try {
+        var rap = mp.get(actorId, 'appearance');
+        rwho = String((rap && rap.name) || '');
+      } catch (e) { }
+      if (!rwho) { rwho = 'Somebody'; }
+
+      var rline;
+      if (rcount === 1) { rline = rwho + ' rolls ' + rsides + ': ' + total; }
+      else if (rcount <= 12) {
+        rline = rwho + ' rolls ' + rcount + 'x' + rsides + ': ' + rolls.join(' + ') + ' = ' + total;
+      } else {
+        rline = rwho + ' rolls ' + rcount + 'x' + rsides + ': ' + total;
+      }
+
+      var rPos = [0, 0, 0], rCell = '';
+      try {
+        rPos = mp.get(actorId, 'pos') || [0, 0, 0];
+        rCell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      } catch (e) { }
+
+      var rNear = [];
+      try { rNear = mp.get(0, 'onlinePlayers') || []; } catch (e) { rNear = []; }
+      var rHeard = 0;
+      for (var rj = 0; rj < rNear.length; rj++) {
+        var rid = rNear[rj], rpid = 0;
+        try { rpid = Number(mp.get(rid, 'profileId')) || 0; } catch (e) { continue; }
+        if (!rpid) { continue; }
+        if (rid !== actorId) {
+          var rc = '', rp = [0, 0, 0];
+          try {
+            rc = String(mp.get(rid, 'worldOrCellDesc') || '');
+            rp = mp.get(rid, 'pos') || [0, 0, 0];
+          } catch (e) { continue; }
+          if (rc !== rCell) { continue; }
+          var rdx = rp[0] - rPos[0], rdy = rp[1] - rPos[1], rdz = rp[2] - rPos[2];
+          if ((rdx * rdx + rdy * rdy + rdz * rdz) > (OOC_RANGE * OOC_RANGE)) { continue; }
+        }
+        toProfile(rpid, rline);
+        rHeard++;
+      }
+      log('command: /roll', actorId.toString(16), spec, '=', total, 'heard by', rHeard);
+      return;
+    }
+
+    /*
+      ------------------------------------------------------------- /help
+
+      A SHORT MENU, NOT A COMMAND LIST. From the To Do List: "/help is a
+      developer's command list, and the unknown-command reply advertises a
+      command everybody is then refused... /help opens a short menu: controls,
+      how to talk, the rules, how to reach staff, what to do first."
+
+      What stood here was one paragraph of every verb in the property system,
+      in the order they happened to be written, with the keys people actually
+      press missing entirely. Somebody's first question is not "how do I take
+      the deed to a building", it is "how do I talk to anybody".
+
+      SO IT IS TOPICS. /help on its own says what there is; /help talking, or
+      /help land, or whichever, answers that one. Six short answers somebody
+      can read in the chat window instead of one wall they will scroll past.
+
+      AND IT IS FILTERED THE SAME WAY EVERY TIME. The playtester commands are
+      named only to a playtester here, which this always did correctly, and
+      the unknown-command reply below did not: it advertised /tp to
+      everybody and then refused them. Both read the same list now.
+    */
     if (word === '/help' || word === '/commands') {
+      var topic = String(parts[1] || '').toLowerCase();
+      var extra = isPlaytester(profileId)
+        ? ' You are ' + roleOf(profileId) + ': /tp <place> moves you and /tp on ' +
+          'its own lists the places, /give and /spawn make things.'
+        : '';
+
+      if (topic === 'talking' || topic === 'talk' || topic === 'chat') {
+        toProfile(profileId,
+          'Enter opens the chat box and Escape gives the keyboard back. Hold V ' +
+          'to talk out loud: voice carries as far as you are speaking, and a ' +
+          'whisper, a normal voice and a yell all reach different distances. ' +
+          '/ooc <what you meant> is out of character to whoever is near you. ' +
+          '/roll 20, or /roll 6x3 for three dice; the server rolls it, so ' +
+          'nobody can make a number up.');
+        return;
+      }
+      if (topic === 'people' || topic === 'friends' || topic === 'party') {
+        toProfile(profileId,
+          'Look at somebody and press G to ask them to be friends, H to offer a ' +
+          'trade, L to stop hearing them. P opens your friends and your party; ' +
+          'J opens your journals. Work done with your party in the same place ' +
+          'counts for more. /yes and /no answer whatever somebody has asked you.');
+        return;
+      }
+      if (topic === 'living' || topic === 'needs' || topic === 'food') {
+        toProfile(profileId,
+          'The four bars are food, water, rest and how warm you are. /eat and ' +
+          '/drink when you have something, /rest sit, /rest campfire, /rest inn ' +
+          'or /rest bed, and /rest up to get going again. Fires warm you and ' +
+          'standing in one burns you. What you are wearing matters: fur is the ' +
+          'warmest thing there is and metal is the worst.');
+        return;
+      }
+      if (topic === 'work' || topic === 'trade' || topic === 'class') {
+        toProfile(profileId,
+          'K opens your profession, your class and your skill tree. Work at what ' +
+          'you chose and the rank climbs on its own. /plot says what is in the ' +
+          'ground in front of you and whose farm it is, /plant sows it.');
+        return;
+      }
+      if (topic === 'land' || topic === 'home' || topic === 'deed') {
+        toProfile(profileId,
+          '/claim at a plot takes the farm around it; /claim at a door you have ' +
+          'just opened takes the building and hands you the deed. /deed lists ' +
+          'what you hold, /lock and /unlock turn the lock, /rent says what a ' +
+          'place costs. A smith says /mold at a door with the holder standing ' +
+          'there, and /key at a forge with the mold in hand.');
+        return;
+      }
+      if (topic === 'staff' || topic === 'rules' || topic === 'help') {
+        toProfile(profileId,
+          'The rules and the way to reach somebody are on thornswood.net and in ' +
+          'the Discord. Anything that needs a person is better raised there than ' +
+          'in the room: this chat reaches whoever is standing near you and ' +
+          'nobody else.');
+        return;
+      }
+
       toProfile(profileId,
-        '/ooc <what you meant> talks out of character to whoever is near you. ' +
-        '/where prints your cell, position and facing. ' +
-        '/plot says what is in the ground in front of you and whose farm it is, ' +
-        '/plant sows it, and /claim takes the farm around the plot in front of you. ' +
-        'At a door you have just opened, /claim takes the building instead and hands ' +
-        'you the deed; /deed lists what you hold; /lock and /unlock turn the lock on ' +
-        'a place of yours. A smith says /mold at a door with the holder standing ' +
-        'there, and /key at a forge with the mold in hand. ' +
-        '/roll is in the chat itself.' +
-        (isPlaytester(profileId)
-          ? ' /tp <place> moves you, and /tp on its own lists the places (' +
-            roleOf(profileId) + ').'
-          : ''));
+        'Ask for one of these: /help talking, /help people, /help living, ' +
+        '/help work, /help land, /help staff. Press K for your profession and ' +
+        'skills, P for friends and party, J for journals, Enter to talk and ' +
+        'hold V to speak.' + extra);
       return;
     }
 
@@ -17716,8 +17897,17 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     // Now it can. An echo in the room means the line never reached the game
     // server at all, which means the voice service in front of it is not
     // holding slash lines back, which means the copy running up there is old.
+    /*
+      AND IT DOES NOT ADVERTISE WHAT IT WILL THEN REFUSE.
+
+      This used to end "and /tp <place> for a playtester" to everybody,
+      including everybody who is not one, so the first thing a new person
+      learned about this server was a command that answers "no". /help two
+      lines up has always filtered correctly; this simply forgot to.
+    */
     toProfile(profileId, 'No command called ' + word + '. ' +
-              'There is ' + PLAYER_WORDS.join(', ') + ', and /tp <place> for a playtester.');
+              'Try /help. There is ' + PLAYER_WORDS.join(', ') +
+              (isPlaytester(profileId) ? ', and /tp <place>.' : '.'));
   }
 
   /*
