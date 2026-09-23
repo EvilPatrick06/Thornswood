@@ -312,6 +312,37 @@ if (Test-Path -LiteralPath $lo) {
         }
         Write-Host ("  collection revision {0}{1}" -f $cs.Have, $(if ($cs.Behind) { " (BEHIND $($cs.Newest), carrying on because -IgnoreRevision)" } else { ', which is the newest Vortex knows of' })) -ForegroundColor $(if ($cs.Behind) { 'Yellow' } else { 'Green' })
     }
+    elseif (-not $IgnoreRevision) {
+        #
+        # A CHECK THAT CANNOT READ ITS NUMBERS HAS NOT CHECKED ANYTHING, and
+        # until 22 September this branch did not exist: an unreadable revision
+        # fell straight through and the deploy carried on with nothing said.
+        #
+        # Behind is false when either number is unknown, deliberately, because
+        # a wrong number must never stop a deploy that is correct. That makes
+        # "up to date" and "could not tell" the same answer to any caller
+        # reading the bool, and on 22 September they were: Get-CollectionNewest
+        # could only read the transition shape, so the moment this machine was
+        # ON the newest revision the number went back to 0, Behind went false,
+        # and the gate added the day before to stop a stale collection reaching
+        # the server was off. It passed a deploy while blind, which is exactly
+        # what it exists to prevent.
+        #
+        # So an unreadable revision stops here now, the same way Deploy-Server
+        # refuses a binary it cannot hash. -IgnoreRevision is the way past it.
+        Write-Host ''
+        Write-Host '  STOP. The collection revision could not be read, so it was not checked.' -ForegroundColor Red
+        Write-Host ("  installed here: {0}    newest Vortex knows of: {1}" -f `
+            $(if ($cs.Have -gt 0) { $cs.Have } else { 'unreadable' }), `
+            $(if ($cs.Newest -gt 0) { $cs.Newest } else { 'unreadable' })) -ForegroundColor Red
+        Write-Host '  The server''s load order is derived from what Vortex has deployed here.' -ForegroundColor Red
+        Write-Host '  Deploying without knowing the revision is how the server was built against' -ForegroundColor Red
+        Write-Host '  a two revision old collection for days with nothing saying so.' -ForegroundColor Red
+        Write-Host ''
+        Write-Host '  Close Vortex and run this again: it holds its own state open while running.' -ForegroundColor Yellow
+        Write-Host '  -IgnoreRevision if you mean to deploy without the check.' -ForegroundColor DarkGray
+        throw 'the collection revision could not be read, so it was not checked'
+    }
 }
 
 $info = @{}; $missing = @()
