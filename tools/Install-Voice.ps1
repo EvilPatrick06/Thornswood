@@ -117,57 +117,19 @@ if ($LASTEXITCODE -ne 0) { Die "ssh exited with $LASTEXITCODE" }
 & scp (Join-Path $src 'voice-server.js') "${target}:$($Root -replace '\\','/')/voice-server.js"
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
 
-<#
-  The shared secret for the character register, read from server-secret.txt.
+# THE CHARACTER REGISTER IS GONE, 23 September, and so is the secret it used.
+#
+# The three routes it guarded, /whoami, /claim and /owners, refused every real
+# caller with 403, because each one required a password the launcher
+# deliberately never sent: Account.cs and CharSync.cs were written that way and
+# were themselves deleted on 20 September. They are out of voice-server.js now
+# along with owners.json, and tools\Characters.ps1, which existed only to read
+# them, went with them.
+#
+# Sending a secret that nothing reads is worse than sending nothing, so this
+# step is gone too. The service's own join tokens are signed with a key it
+# makes for itself in token-key.txt and have nothing to do with this.
 
-  Corrected on 18 September. This used to say the value was the game server's
-  own password, out of a private repo, so it was not public. Both halves of
-  that were wrong. It was published into version.json in the PUBLIC releases
-  repository on every release, and it is still in that repository's history
-  between 4ac2786 and 6dbc8e2, so anybody could read it. It was also only four
-  digits.
-
-  What is here now is a purpose made secret: 32 random bytes, held in
-  server-secret.txt on the shipping machine and in secret.txt on the VPS, in
-  neither case in git and never printed. Rotating it is a hand job, and the
-  register is down until this script has run.
-
-  What it buys is narrow and worth having. The register answers "which
-  characters belong to this Steam account", and a Steam id is close to public,
-  so without a second thing to know, anybody could ask the server for a
-  friend's profile ids and then connect as them. With it, reading the register
-  is exactly as hard as being allowed on the server at all. It is not
-  protection from the five people already here, and is not meant to be.
-
-  No file means the register switches itself off rather than answering openly.
-#>
-$secret = ''
-$secretFile = Join-Path (Split-Path -Parent $Here) 'server-secret.txt'
-try {
-    # Kept out of version.json on purpose: that file is published into a PUBLIC
-    # repository, so a secret written there is a secret handed to everybody.
-    # server-secret.txt is gitignored and never leaves this machine. The
-    # version.json fallback is only for a checkout made before that changed.
-    if (Test-Path -LiteralPath $secretFile) {
-        $secret = [string]([IO.File]::ReadAllText($secretFile)).Trim()
-    }
-    if (-not $secret) {
-        $vjson = Join-Path (Split-Path -Parent $Here) 'version.json'
-        if (Test-Path -LiteralPath $vjson) {
-            $secret = [string]((Get-Content -LiteralPath $vjson -Raw | ConvertFrom-Json).serverPassword)
-        }
-    }
-} catch { }
-
-if ($secret) {
-    $tmp = Join-Path $env:TEMP 'thornswood-voice-secret.txt'
-    [IO.File]::WriteAllText($tmp, $secret, (New-Object Text.UTF8Encoding($false)))
-    & scp $tmp "${target}:$($Root -replace '\\','/')/secret.txt"
-    Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue
-    Say 'character register secret sent' 'DarkGray'
-} else {
-    Say 'no server-secret.txt, so the character register stays off' 'Yellow'
-}
 & scp (Join-Path $src 'public\index.html') "${target}:$($Root -replace '\\','/')/public/index.html"
 & scp (Join-Path $src 'public\voice.js') "${target}:$($Root -replace '\\','/')/public/voice.js"
 Say 'copied' 'Green'
