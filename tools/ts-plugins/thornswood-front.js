@@ -525,9 +525,57 @@
       let inWorld = '?', uncaused = '?';
       try { inWorld = String(!!globalThis.__thornswoodInWorld); } catch (e) { }
       try { uncaused = String(Number(globalThis.__thornswoodUncausedLoad) || 0); } catch (e) { }
+
+      /*
+        AND WHAT IS IN THE SAVES FOLDER, which is the question this whole
+        entry now turns on and which nobody can answer without walking to the
+        stuck machine.
+
+        sp.loadGame builds a synthetic save and loads it, and it leaves the
+        file behind. On a machine where this works the folder holds exactly one
+        file, TESMODPLATFORM-<guid>.ess. So:
+
+          EMPTY means loadGame was never called at all, and the fault is above
+          it, in whatever decides to call it or in the message never arriving.
+
+          A TESMODPLATFORM FILE means loadGame ran and Skyrim refused the save,
+          which on a fresh install points at the mod files being incomplete.
+
+        Those two answers go to completely different places, which is exactly
+        why it is worth one line in a log rather than one trip to somebody's
+        house. The launcher redirects My Games into the Thornswood Profile
+        folder, so the path here is the redirected one and not the real
+        Documents.
+
+        Guarded to nothing: a client with no fs, or a folder that is not there
+        yet, says so instead of stopping the retry that is the point of this
+        function.
+      */
+      let saves = 'unknown';
+      try {
+        const fsm2 = require('fs');
+        /*
+          RELATIVE TO THE GAME FOLDER, which is where the process runs: the
+          crash logs record "Working Directory: C:\Thornswood\Game", and the
+          log file this function writes to is 'Data/Platform/...' for the same
+          reason. The Profile folder sits BESIDE Game, not inside it, so this
+          is one level up. Written relative rather than absolute so the dev
+          build, which lives in Thornswood-DevBuild, answers about its own
+          saves and not about the play install's.
+        */
+        const dir = '../Profile/MyGames/Saves';
+        const names = fsm2.readdirSync(dir);
+        const ess = names.filter(function (n) { return /\.ess$/i.test(n); });
+        const plat = ess.filter(function (n) { return /^TESMODPLATFORM/i.test(n); });
+        saves = ess.length + ' save(s), ' + plat.length + ' from loadGame' +
+                (plat.length ? ' (' + plat[0] + ')' : '');
+      } catch (e) {
+        saves = 'could not read the saves folder: ' + ((e && e.message) || e);
+      }
+
       log('menu: the client has not taken profile', menuChosenId, 'yet, saying it again',
           '(' + menuSaidTimes + ').',
-          'inWorld=' + inWorld, 'uncausedLoads=' + uncaused);
+          'inWorld=' + inWorld, 'uncausedLoads=' + uncaused, 'saves: ' + saves);
     }
     T.js('try{window.skyrimPlatform.sendMessage("thornswood","select",' +
          menuChosenId + ');}catch(e){}');
