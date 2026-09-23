@@ -1184,6 +1184,21 @@
       return true;
     },
     isMuted: function (profileId) { return !!muted[profileId]; },
+
+    /*
+      Where everybody is, for whoever else on this page needs it.
+
+      The position feed arrives here five times a second because voice needs
+      it, and it is the freshest picture of the world any page has. The party
+      strip in thornswood-party.js draws off it rather than off the server's
+      own party push, which is on a tick and a half: the same facts, fifteen
+      times more often, for nothing.
+
+      Handed back as it stands rather than copied. It is replaced whole on
+      every feed message, so a caller holding the old one is holding a
+      snapshot, which is what a drawing pass wants anyway.
+    */
+    who: function () { return lastWho; },
     // There is no mute. Push to talk already means the microphone is shut
     // unless a key is held, so a second control for "shut" was answering a
     // question nobody asked.

@@ -19897,6 +19897,7 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
 
   var SOCIAL_PROPERTY = 'thornswoodSocial';
   var NEAR_PROPERTY = 'thornswoodNear';
+  var PARTY_PROPERTY = 'thornswoodPartyAt';
 
   /*
     THE NUMBERS, in one table, the same way the needs block keeps its balance.
@@ -20114,6 +20115,106 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     for (var had in nearWas) {
       if (!Object.prototype.hasOwnProperty.call(nearWas, had)) { continue; }
       if (!here[had]) { delete nearWas[had]; }
+    }
+  }
+
+  /*
+    ---------------------------------------- WHERE YOUR PARTY IS, WHEREVER IT IS
+
+    Patrick, 22 September, asked the party menu to let people "see their name
+    tag colour, see them on the map and compass". Those three were the part of
+    that message that did not ship with the rest, because none of them can be
+    drawn by a browser overlay: a name tag is the client's own text, and the
+    compass and the map are the game's.
+
+    ALL THREE NEED THE SAME THING FROM HERE, and it is not what thornswoodNear
+    gives. Near is everybody within 2,600 units of you in the same cell, which
+    is the right answer for "who am I looking at" and the wrong one for "where
+    is my party": the whole point of a marker is that they are somewhere else.
+    So this is a second list with no distance and no cell test at all, sent
+    only to people who are actually in a party, and empty for everybody else.
+
+    THE FORM ID IS THE IMPORTANT FIELD. The client needs it to find the text
+    above their head, which skymp5-client stores by form id in
+    sp.storage.idTextNickname, and it is what ties this list to the one thing
+    the client can already see.
+
+    ROUNDED TO A HUNDRED UNITS FOR THE SIGNATURE, not for the value. Positions
+    move every frame and the signature is what stops this writing a property
+    sixty times a second; a hundred units is about a second and a half of
+    walking, which is this tick anyway. The coordinates themselves go over
+    exactly.
+  */
+  var partyWas = {};
+
+  function partyScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || typeof v !== "object") { return; }',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    if (st.thornswoodPartyAt === v.at) { return; }',
+      '    st.thornswoodPartyAt = v.at;',
+      // The plugin reads this. updateOwner bodies are compiled with new
+      // Function in the client's own global; see the note over nearScript.
+      '    try { globalThis.thornswoodPartyAt = v.m || []; } catch (e) { }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  function partyTick() {
+    var all = online();
+    if (!all.length) { return; }
+
+    // Read every position once, rather than once per member per member.
+    var at = {};
+    for (var i = 0; i < all.length; i++) {
+      var id = all[i];
+      try {
+        at[profileOf(id)] = {
+          a: id.toString(16),
+          n: nameOfPerson(id),
+          p: mp.get(id, 'pos') || [0, 0, 0],
+          c: String(mp.get(id, 'worldOrCellDesc') || '')
+        };
+      } catch (e) { }
+    }
+
+    for (var j = 0; j < all.length; j++) {
+      var who = all[j];
+      var mine = profileOf(who);
+      var p = partyOf(mine);
+      var list = [];
+      if (p && p.members.length > 1) {
+        for (var k = 0; k < p.members.length; k++) {
+          var pid = p.members[k];
+          if (pid === mine) { continue; }     // your own arrow is not a marker
+          var row = at[pid];
+          if (!row) { continue; }             // in the party and not online
+          list.push({ a: row.a, n: row.n, p: row.p, c: row.c,
+                      l: pid === p.leader ? 1 : 0 });
+        }
+      }
+
+      var sig = list.map(function (r) {
+        return r.a + ':' + r.c + ':' +
+               Math.round(r.p[0] / 100) + ',' +
+               Math.round(r.p[1] / 100) + ',' +
+               Math.round(r.p[2] / 100);
+      }).join('|');
+      if (partyWas[who] === sig) { continue; }
+      partyWas[who] = sig;
+      try { mp.set(who, PARTY_PROPERTY, { m: list, at: Date.now() }); } catch (e) { }
+    }
+
+    var here = {};
+    for (var q = 0; q < all.length; q++) { here[all[q]] = true; }
+    for (var had in partyWas) {
+      if (!Object.prototype.hasOwnProperty.call(partyWas, had)) { continue; }
+      if (!here[had]) { delete partyWas[had]; }
     }
   }
 
@@ -20497,6 +20598,7 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
 
   function tick() {
     try { nearTick(); } catch (e) { slog('near tick:', e); }
+    try { partyTick(); } catch (e) { slog('party tick:', e); }
     var all = online();
     for (var i = 0; i < all.length; i++) {
       try { push(all[i]); } catch (e) { }
@@ -20533,6 +20635,13 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   } catch (e) { }
 
   try {
+    mp.makeProperty(PARTY_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: partyScript(), updateNeighbor: ''
+    });
+  } catch (e) { /* already made by a previous load */ }
+
+  try {
     mp.makeProperty(SOCIAL_PROPERTY + 'View', {
       isVisibleByOwner: true, isVisibleByNeighbors: false,
       updateOwner: panelScript(), updateNeighbor: ''
@@ -20554,7 +20663,8 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     partyNear: partyNear, workBonus: workBonus, parties: parties, inParty: inParty,
     newJournal: newJournal, writePage: writePage, dropJournal: dropJournal,
     share: share, sharedWithMe: sharedWithMe, findJournal: findJournal,
-    view: view, push: push, tick: tick, nearTick: nearTick
+    view: view, push: push, tick: tick, nearTick: nearTick,
+    partyTick: partyTick, PARTY_PROPERTY: PARTY_PROPERTY
   };
 
   slog('ready: friends and journals are kept, a party is a session,',
