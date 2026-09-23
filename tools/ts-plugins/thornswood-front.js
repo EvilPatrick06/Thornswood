@@ -1582,11 +1582,52 @@
 
   const CONSOLE_MENUS = ['Console Native UI Menu', 'Console'];
   let consoleSince = 0;
+  /*
+    SAY IT ON THE SCREEN, NOT ONLY IN A LOG ON THE VPS.
+
+    From the To Do List: "Pressing tilde makes the console flash and vanish,
+    silently, forever, and nothing says why... Anti-cheat behaviour is
+    disclosed. Say it on the rules page and put a line on screen when it
+    triggers: the console is disabled on Thornswood. The explanation is
+    already written, it just goes to a file on the VPS."
+
+    Every message this block produced went through say(), which writes to
+    thornswood-front.log and nowhere else. From the chair it is a console that
+    opens for a fifth of a second and shuts, every time, with no explanation
+    anywhere, which reads as a broken game rather than as a rule.
+
+    Debug.notification is Skyrim's own corner message and needs no browser, so
+    it lands whether or not the overlay ever mounted.
+
+    ONCE, THEN EVERY FIVE MINUTES. Somebody who presses tilde out of habit
+    four times in a row does not need telling four times, and somebody who
+    comes back an hour later has forgotten.
+  */
+  const CONSOLE_SAY_EVERY = 300000;
+  let consoleToldAt = 0;
 
   function shutConsole(which) {
     // Printed before the close, so it is in the log even if closing throws.
     say('the ' + which + ' is open. Keys just before it, newest last: ' +
         recentKeysText());
+    const now = Date.now();
+    if (now - consoleToldAt > CONSOLE_SAY_EVERY) {
+      consoleToldAt = now;
+      try {
+        sp.Debug.notification('The console is switched off on Thornswood.');
+      } catch (e) { }
+      /*
+        And in the chat, where it stays on screen long enough to read and can
+        be scrolled back to. thornswoodChat.add is the widget's own way in,
+        the same one thornswood-chat.js note() uses; there is no note on the
+        object itself. Guarded, because the overlay may never have mounted and
+        the corner message above has to be enough on its own.
+      */
+      T.js('try{window.thornswoodChat&&window.thornswoodChat.add&&' +
+           'window.thornswoodChat.add([{text:"The console is switched off on ' +
+           'Thornswood. It is the same rule for everybody.",color:"#d9ab52"}],' +
+           '"plain");}catch(e){}');
+    }
     try {
       sp.TESModPlatform.closeMenu(which);
       say('the ' + which + ' opened on its own and has been shut');

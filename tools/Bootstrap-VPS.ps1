@@ -37,9 +37,33 @@ param(
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-# --- refuse to run on the gaming machine ------------------------------------
-if (Test-Path 'C:\SkyrimTogether\Game\SkyrimSE.exe') {
-    throw "SkyrimSE.exe is present, so this looks like the gaming PC, not the VPS. Nothing was changed."
+# --- refuse to run anywhere that is not the VPS -----------------------------
+#
+# THE GUARD USED TO TEST A FOLDER THAT NO LONGER EXISTS. It looked for
+# C:\SkyrimTogether\Game\SkyrimSE.exe, which was the install path before the
+# rename, so on either machine as they are today the guard cannot fire and this
+# script goes on to install Node and Python as though it were the VPS.
+#
+# A safety check has to test the thing it protects against, and it has to keep
+# testing it when that thing moves. So this asks Windows what it IS rather than
+# looking for one file: ProductType 1 is a workstation, 2 is a domain
+# controller and 3 is a server. The VPS is a server; both of the machines this
+# is meant to refuse are workstations.
+#
+# The Skyrim check stays underneath it as a second net, pointed at the paths
+# that exist now. Either one firing is enough.
+$productType = 1
+try { $productType = [int](Get-CimInstance Win32_OperatingSystem).ProductType } catch { }
+if ($productType -eq 1) {
+    throw "This is a workstation, not a server, so it is not the VPS. Nothing was changed."
+}
+
+foreach ($sign in @('C:\Thornswood\Game\SkyrimSE.exe',
+                    'C:\Thornswood-DevBuild\Game\SkyrimSE.exe',
+                    'C:\SkyrimTogether\Game\SkyrimSE.exe')) {
+    if (Test-Path -LiteralPath $sign) {
+        throw "$sign is present, so this looks like a gaming PC, not the VPS. Nothing was changed."
+    }
 }
 Write-Host "host: $env:COMPUTERNAME   user: $env:USERNAME" -ForegroundColor Cyan
 Write-Host "PowerShell currently: $($PSVersionTable.PSVersion)" -ForegroundColor Cyan

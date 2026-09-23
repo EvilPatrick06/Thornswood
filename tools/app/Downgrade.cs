@@ -36,8 +36,15 @@ namespace Thornswood
     static class Downgrade
     {
         const int AppId = 489830;
+
+        // How long nothing may happen before this stops waiting. Measured from
+        // the last time the download folder grew, not from the start, so a slow
+        // line is never cut off: any progress at all resets it. See the loop
+        // below for why a deadline is needed at all.
+        const int GiveUpMinutes = 25;
         // Depot id -> the manifest of that depot at 1.6.1170. Same three as
-        // Setup-Thornswood.ps1 and Build-Thornswood.ps1.
+        // Setup-Thornswood.ps1. (Build-Thornswood.ps1 was deleted on 23
+        // September: it could not produce a working build any more.)
         static readonly string[][] Depots = {
             new[] { "489831", "8442952117333549665" },
             new[] { "489832", "8042843504692938467" },
@@ -299,6 +306,37 @@ namespace Thornswood
                             break;
                         }
                         log("Steam never started this download, and " + folder + " is left over from an earlier attempt, so what is in it cannot be trusted. Delete that folder, then press the button again.");
+                        return false;
+                    }
+
+                    /*
+                      AND A DEADLINE, BECAUSE THIS USED TO BE while(true) WITH
+                      NO WAY OUT.
+
+                      Every exit above needs something to have happened: the
+                      log saying the download finished, or the folder being
+                      non-empty and still. Steam refusing outright satisfies
+                      neither. It writes its refusal to its own console, this
+                      folder never appears, size stays at zero, and the loop
+                      carries on at two seconds a turn for ever behind a
+                      progress line that will never move. There is nothing on
+                      screen that says so, and nothing a person watching it
+                      could do but guess.
+
+                      So: nothing has changed for GiveUpMinutes, stop and say
+                      which outside thing did not answer, and leave the manual
+                      path on screen. Measured against progress rather than
+                      against the clock from the start, so a genuinely slow
+                      download on a slow line is never cut off: the folder
+                      growing at all resets it.
+                    */
+                    if (quiet > GiveUpMinutes)
+                    {
+                        log("Steam has done nothing for " + GiveUpMinutes + " minutes and this part is still " + (size / 1048576).ToString("n0") + " MB, so it is being given up on rather than waited on for ever.");
+                        if (size == 0)
+                            log("Nothing was downloaded at all, which usually means Steam refused the command. Its console window says why: look for a line about a manifest, a licence or no connection.");
+                        log("To do it by hand: open Steam, press Ctrl+Shift+D or start it with -console, click the console's command line, and paste " + cmd);
+                        status("Steam did not answer. See the log for what to do by hand.");
                         return false;
                     }
                     Thread.Sleep(2000);

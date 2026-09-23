@@ -286,6 +286,20 @@ After that, a Moderator gets involved. After that, a Gamemaster.
 
 Rules 8 and 9 skip to the end.
 
+### The console is switched off
+
+Pressing the console key opens it for a moment and it closes again. That is us,
+it is the same for everybody including the people who run the server, and it is
+not your game going wrong.
+
+The console is how a single player game is edited. On a server where what you
+own, what you have made and what rank you hold are all real to other people, one
+person typing a command is everybody else's evening rewritten. So it is shut.
+
+Nothing else on your machine is touched or read. If you think you need the
+console for something, ask in the Discord: it is usually something the server
+should be doing for you anyway, and that is worth knowing about.
+
 ### Chat is written down
 
 Text chat is kept, with the name and the time. Nothing else is: **voice is not
