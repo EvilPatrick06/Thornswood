@@ -414,8 +414,11 @@ namespace Thornswood
             // not exist and putting two rows on the launcher's key page for a
             // mod nobody has. K is now the profession menu below.
             //
-            // Config.cs, Display.cs and Enforce.cs still carry minimap code.
-            // That is a separate tidy up and it is on the list.
+            // The rest of it went on 23 September: two saved settings in
+            // Config.cs that nothing read, a comment in Display.cs about a
+            // corner that is no longer worked out anywhere, and the nth
+            // occurrence machinery in Enforce.cs that only the minimap's
+            // position ever needed. Nothing writes to a minimap ini now.
 
             l.Add(Dx("search", "Inventory", "Search",
                      "Types into the search box at the top of any inventory, container or barter list.",

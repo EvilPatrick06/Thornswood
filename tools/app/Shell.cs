@@ -1355,7 +1355,7 @@ namespace Thornswood
 
                     try
                     {
-                        int rules = Enforce.Apply(cfg);
+                        int rules = Enforce.Apply();
                         if (rules > 0) did.Add(rules + " mod setting" + (rules == 1 ? "" : "s"));
                     }
                     catch { }
@@ -3786,7 +3786,7 @@ namespace Thornswood
                     Display.ScaleMenus();
                 }
 
-                int held = Enforce.Apply(cfg);
+                int held = Enforce.Apply();
                 if (held > 0) Log("Put back " + held + " setting" + (held == 1 ? "" : "s") + " the last session overwrote.");
                 foreach (string note in Enforce.Said) Log(note);
 
