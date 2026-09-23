@@ -12,11 +12,19 @@
     .\Publish-Discord.ps1 -Dev
     .\Publish-Discord.ps1 -DryRun
 
-  -DryRun prints what it would post and sends nothing. Running this script at
-  all is how a release that went out days ago gets announced a second time,
-  because it always posts whatever is newest in the feed and has no idea it
-  has posted it before. Anybody trying the script out, rather than shipping,
-  wants -DryRun.
+  -DryRun prints what it would post and sends nothing.
+
+  IT REMEMBERS WHAT IT POSTED. Until 23 September this script always posted
+  whatever was newest in the feed and had no idea it had posted it before, so
+  running it twice, or running it days after a release to see what it does,
+  announced that release again to everybody. It now writes the version and
+  the title it posted into discord\announced.json and refuses to say the same
+  thing twice. -Force is how a post that really does need repeating is made,
+  and it is the only way.
+
+  That file is one line per channel and it is NOT in git: the two builds
+  announce different versions and each shipping machine has its own history,
+  so a tracked copy would be a merge conflict on every release.
 
   Called by Ship.ps1 at the end of every release, so it is usually not run on
   its own. If tools\discord\news-webhook.txt is not there it does nothing and
@@ -50,6 +58,9 @@ param(
   [switch]$Dev,
   # Print the post and send nothing.
   [switch]$DryRun,
+  # Post it even though this exact release has been announced already. For a
+  # post that was deleted, or a channel that was cleared.
+  [switch]$Force,
   # Where the LIVE version.json is. Same reason Publish-News.ps1 has this:
   # releases moved into their own public repo, and the copy still sitting in
   # this repo stopped being updated the day that happened. Reading the stale
@@ -239,6 +250,38 @@ $title = Prop $n 'title'
 if ($Dev) { $title = 'Dev build: ' + $title }
 if ($title.Length -gt 250) { $title = $title.Substring(0, 247) + '...' }
 
+# ------------------------------------------------------------- said before?
+# Keyed by channel, because a dev release and a main release are different
+# announcements of different versions and the dev feed is shared between both
+# machines. The version alone is not enough on its own: a dev build can be
+# reshipped under the same number with a different note, and that note is
+# worth saying. The pair is what gets remembered.
+$stateFile = Join-Path $Here 'discord\announced.json'
+$stateKey = if ($Dev) { 'dev' } else { 'main' }
+$said = @{}
+if (Test-Path -LiteralPath $stateFile) {
+  # A file that will not parse is treated as no file at all. It is a note to
+  # ourselves about what was posted, and refusing to ship over a corrupted
+  # note would be the tail wagging the dog.
+  try {
+    $raw = ((Get-Content $stateFile -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
+    foreach ($p in $raw.PSObject.Properties) { $said[$p.Name] = $p.Value }
+  } catch {
+    if (-not $Quiet) { Write-Host '  announced.json will not parse, treating it as empty' -ForegroundColor DarkGray }
+  }
+}
+$stamp = (Prop $v 'launcherVersion') + '|' + $title
+if ($said.ContainsKey($stateKey) -and (Prop $said[$stateKey] 'stamp') -eq $stamp -and -not $Force) {
+  if (-not $Quiet) {
+    Write-Host ('  already announced ' + (Prop $v 'launcherVersion') + ' in ' +
+                $(if ($Dev) { 'the dev updates channel' } else { '#news' }) +
+                ', nothing posted') -ForegroundColor DarkGray
+    Write-Host '  -Force says it again anyway' -ForegroundColor DarkGray
+  }
+  $global:ThornswoodDiscordResult = 'already'
+  return
+}
+
 $last = @{
   description = $(if ($second) { $second } else { $first })
   # Gold for the release everybody gets, a colder blue for the dev build, so
@@ -294,6 +337,21 @@ try {
   Invoke-RestMethod -Uri $Webhook -Method Post -ContentType 'application/json' `
     -Body ([Text.Encoding]::UTF8.GetBytes($payload)) | Out-Null
   if (-not $Quiet) { Write-Host "  posted to Discord: $title" }
+  $global:ThornswoodDiscordResult = 'posted'
+  # AFTER the post returns and never before. A file written first turns a
+  # failed post into a release nobody is ever told about, because the next
+  # run would read it and refuse.
+  try {
+    $said[$stateKey] = @{ stamp = $stamp; version = (Prop $v 'launcherVersion')
+                          title = $title; at = (Get-Date).ToUniversalTime().ToString('s') + 'Z' }
+    ($said | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $stateFile -Encoding UTF8
+  } catch {
+    if (-not $Quiet) { Write-Host "  posted, but could not write announced.json: $_" -ForegroundColor Yellow }
+  }
 } catch {
-  if (-not $Quiet) { Write-Host "  could not post to Discord: $_" -ForegroundColor DarkGray }
+  # Said in colour and said again by Ship at the end. A release whose
+  # announcement failed is a release nobody knows about, and a grey line in
+  # the middle of a long log is a line nobody reads.
+  Write-Host "  COULD NOT POST TO DISCORD: $_" -ForegroundColor Red
+  $global:ThornswoodDiscordResult = 'failed'
 }

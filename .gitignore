@@ -28,6 +28,13 @@ _to_delete/
 __pycache__/
 *.pyc
 
+# What Publish-Discord.ps1 has already announced, one line per channel. Not a
+# credential, and not shared either: the two builds announce different
+# versions and each shipping machine has its own history, so a tracked copy
+# would be a conflict on every release. Ship commits nothing now, but it used
+# to commit the whole working tree, which is the other reason this stays out.
+tools/discord/announced.json
+
 # The dev build's own news webhook, for the dev updates channel. Same rule as
 # news-webhook.txt above: anyone holding the URL can post as the bot.
 tools/discord/dev-webhook.txt
