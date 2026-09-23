@@ -126,9 +126,13 @@
         return;
       }
 
+      // Anything that is not chat belongs to whoever else is on this socket.
       if (msg.t !== 'chat') { fanout(msg); return; }
 
-      if (msg.t === 'chat') {
+      // And from here down it is chat, which the line above already settled.
+      // There was a second `if (msg.t === 'chat')` wrapped round all of this,
+      // which could never be false.
+      {
         var who = String(msg.name || '').trim() || 'Someone';
         var mine = ME && Number(msg.profileId) === ME;
         var c = chat();

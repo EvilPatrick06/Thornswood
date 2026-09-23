@@ -18219,8 +18219,28 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   /*
     The drop box. Ship.ps1 writes it over ssh, we act on it and delete it, so a
     file left behind by a crash cannot fire a second time on the next boot.
+
+    RESOLVED AGAINST THE SERVER'S OWN DATA FOLDER, not against the working
+    directory. 'data/restart.json' is whatever data folder the process happens
+    to have been started from, which is the right one today and is a silent
+    failure the day anybody starts the server from somewhere else: the file
+    would be written where Ship puts it and looked for somewhere else, and a
+    restart request would simply never arrive with nothing saying why.
+
+    server-settings.json names the data folder and the voice feed already
+    reads it the same way a few hundred lines up. A settings file that cannot
+    be read falls back to the old relative path, which is what has always
+    worked.
   */
-  var REQUEST = 'data/restart.json';
+  var REQUEST = (function () {
+    try {
+      var rfs = require('fs');
+      var rpath = require('path');
+      var rcfg = JSON.parse(rfs.readFileSync('server-settings.json', 'utf8'));
+      if (rcfg && rcfg.dataDir) { return rpath.join(String(rcfg.dataDir), 'restart.json'); }
+    } catch (e) { }
+    return 'data/restart.json';
+  })();
 
   function checkRequest() {
     var fs;

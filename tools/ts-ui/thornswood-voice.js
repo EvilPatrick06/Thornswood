@@ -687,9 +687,28 @@
     if (wired) { return; }
     var n = net();
     if (!n) {
+      /*
+        AND IT GIVES UP EVENTUALLY.
+
+        This waits for thornswood-chat.js to load, because voice is a
+        passenger on that page's socket and there is nothing to join until it
+        exists. It normally takes a second. If that file never loads at all it
+        used to poll twice a second for the rest of the session with nothing
+        on screen saying so, which is the same silence the site outage taught
+        us to stop writing.
+
+        Two minutes is far longer than the page has ever taken and short
+        enough that somebody looking at a dead voice indicator gets an answer.
+      */
       if (!waiting) {
+        var waitedFrom = Date.now();
         waiting = setInterval(function () {
-          if (net()) { clearInterval(waiting); waiting = null; connect(); }
+          if (net()) { clearInterval(waiting); waiting = null; connect(); return; }
+          if (Date.now() - waitedFrom > 120000) {
+            clearInterval(waiting); waiting = null;
+            report('server', 'the chat page never loaded, so there is no socket to carry voice. ' +
+                             'Voice is off for this session.');
+          }
         }, 500);
         report('server', 'waiting for the chat socket');
       }
