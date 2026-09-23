@@ -399,6 +399,50 @@ function ensureProperties() {
       Visible to the owner and to nobody else. A neighbour sees the animation
       because Skyrim is playing it on a body they can see, not because they
       were sent anything.
+
+      ===== updateOwner RUNS EVERY FRAME, NOT ON CHANGE, AND THAT IS THE TRAP.
+
+      Patrick, 22 September: "you get stuck in the animation no way out even
+      when tping, a fresh game load, trying to walk away, trying to escape menu
+      anyuthing its trapped in that state", "it stops making the noise as its
+      supposed", "the mining animation doesnt always use your pick and tehre
+      are two".
+
+      All four of those are one defect. Read in the client this server ships,
+      skymp5-client/src/services/services/gamemodeUpdateService.ts: onUpdate is
+      bound with `this.controller.on("update", ...)`, controller.on IS sp.on,
+      and sp.on('update') is the PER FRAME event. onUpdate then walks every
+      updateOwner property and calls its function with the value that is there,
+      and there is no comparison against the value it used last time anywhere
+      in that file. updateNeighbor diffs; updateOwner does not.
+
+      So every comment in this file that says an updateOwner script runs "every
+      time the property changes" is wrong, including the one this paragraph
+      replaces. It runs sixty times a second for as long as the property holds
+      any value that is not undefined.
+
+      WHAT THAT DID TO MINING. One strike wrote the property, and from that
+      frame on the client sent IdlePickaxeEnter to the person every frame,
+      forever, and queued a 2.5 second exit every frame behind it. The idle
+      restarted before it ever reached the annotation that plays the strike, so
+      there was no noise and no pick in hand; Enter and the exits fought each
+      other, which is the second animation; and the person was held in it
+      because the next frame put them straight back. Walking away, a map
+      marker, the escape menu and a fresh load all did nothing, because
+      NOTHING EVER CLEARED THE PROPERTY: it is stored on the character, it is
+      sent to the owner again on the next login, and the loop started over.
+
+      TWO THINGS FIX IT AND BOTH ARE NEEDED. The script below is edge
+      triggered on v.at, which only moves when swing() is called, so a value
+      sitting unchanged costs one comparison a frame and plays nothing. And
+      swing() clears the property once the swing is over, so a character can
+      never carry one into the next session.
+
+      AND THE EXIT IS TWO EVENTS NOW. IdleChairExitStart is what those IDLE
+      records name, and it is a transition the behaviour graph only takes from
+      the state it belongs to. IdleForceDefaultState is the graph's
+      unconditional reset and is what actually gets somebody out from
+      anywhere, so it goes behind the named exit rather than in place of it.
     */
     mp.makeProperty(SWING_PROPERTY, {
       isVisibleByOwner: true,
@@ -1739,24 +1783,46 @@ function mineSalt(actorId, refrId) {
 
   const step = rankStep(actorId, 'miner');
 
+  /*
+    A press inside a swing this person is already taking, ignored in silence.
+    The twenty second cooldown below would refuse it anyway, but it would
+    refuse it with 'the seam needs 19 more seconds', and an early click is not
+    a person who came back too soon. See swinging().
+  */
+  if (swinging(actorId)) { return ''; }
+
   const wait = cooldownLeft(actorId, refrId);
   if (wait > 0) return 'The seam needs ' + wait + ' more seconds to be worth striking.';
 
-  const yielded = randInt(1, 2 + step);
-  if (!addItem(actorId, ITEMS.saltPile, yielded)) return 'The seam yields nothing you can carry.';
+  /*
+    The pick goes up on the press and the salt comes away when it lands, the
+    same ordering mineOre settled on and for the same reason Patrick gave:
+    "you dont get the ore as it hits the vein". The cooldown is stamped on the
+    press, with the seam rather than with the salt, so a click during the
+    swing cannot buy a second strike at it.
+  */
   stampCooldown(actorId, refrId);
-  let extra = '';
-  if (step >= 2 && Math.random() < 0.12 * (step - 1)) {
-    const rare = [ITEMS.fireSalts, ITEMS.frostSalts, ITEMS.voidSalts][randInt(0, 2)];
-    addItem(actorId, rare, 1);
-    extra = ' Something rarer came away with it.';
-  }
-  // The swing, because no Papyrus runs here to play it. See SWING_PROPERTY.
-  swing(actorId, SWING_MINE);
-  const rank = creditWork(actorId, 'mine');
-  const worn = wearTool(actorId, 'miner');
-  return 'You work ' + yielded + ' salt from the seam.' + extra +
-         (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
+  swing(actorId, SWING_MINE, function () {
+    const yielded = randInt(1, 2 + step);
+    if (!addItem(actorId, ITEMS.saltPile, yielded)) {
+      notify(actorId, 'The seam yields nothing you can carry.');
+      say(actorId, 'The seam yields nothing you can carry.');
+      return;
+    }
+    let extra = '';
+    if (step >= 2 && Math.random() < 0.12 * (step - 1)) {
+      const rare = [ITEMS.fireSalts, ITEMS.frostSalts, ITEMS.voidSalts][randInt(0, 2)];
+      addItem(actorId, rare, 1);
+      extra = ' Something rarer came away with it.';
+    }
+    const rank = creditWork(actorId, 'mine');
+    const worn = wearTool(actorId, 'miner');
+    const saying = 'You work ' + yielded + ' salt from the seam.' + extra +
+                   (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
+    notify(actorId, saying);
+    say(actorId, saying);
+  });
+  return '';
 }
 
 /**
@@ -1857,30 +1923,84 @@ const SWING_PROPERTY = 'thornswoodSwing';
 */
 const SWING_MS = 2500;
 
+/*
+  HOW FAR INTO A SWING THE PICK LANDS.
+
+  Patrick, 22 September: "you dont get the ore as it hits the vein". He is
+  right, and it was not a near miss: the ore was handed over the instant the
+  press arrived, before the animation had been asked for, so the pick coming
+  down had nothing to do with anything.
+
+  This is when the yield happens now. It is a number and not a measurement,
+  and saying so is the point: the strike inside IdlePickaxeEnter is an
+  annotation in the animation and the server cannot see annotations. The only
+  thing on either machine that can is the sendAnimationEvent hook in
+  thornswood-front.js, which is already watching the axe fall at a chopping
+  block for exactly this reason and writes down, once each, every event it did
+  not recognise. Pointing it at the pickaxe as well turns this constant into
+  the real event, and that is its own entry on the list.
+
+  Until then: early in the swing, because a pick comes down at the start of a
+  2.5 second idle and not at the end of it, and well inside SWING_MS so the
+  yield can never outlive the animation it belongs to.
+*/
+const SWING_LAND_MS = 900;
+
 /** The animation to play, by what is being worked. See SWING_PROPERTY. */
 const SWING_MINE = 'IdlePickaxeEnter';
+/*
+  Nothing sends this any more, and the name is kept rather than deleted. It
+  was read out of IDLE 6c1df under WoodChopRoot in Skyrim.esm and it is worth
+  more written down than worked out again; see chopWood for why the server
+  stopped sending it.
+*/
 const SWING_CHOP = 'IdleWoodChopStart';
 const SWING_STOP = 'IdleChairExitStart';
 
+/** The graph's unconditional reset. See the note on SWING_PROPERTY. */
+const SWING_FREE = 'IdleForceDefaultState';
+
 /*
-  Run on the person's own machine when SWING_PROPERTY changes. See the note on
-  the property. Written as one string for the same reason lockScript is: the
-  script cannot be changed once the property is made, so a change here needs a
-  server restart, which a deploy is.
+  Run on the person's own machine EVERY FRAME for as long as SWING_PROPERTY
+  holds a value. Not on change: see the note on the property, which is where
+  the reading of the client that settled that is written down. Everything
+  below the state guard runs once per swing because of the guard, and for no
+  other reason.
+
+  Written as one string for the same reason lockScript is: the script cannot be
+  changed once the property is made, so a change here needs a server restart,
+  which a deploy is.
 */
 function swingScript() {
   return [
     '(function(){',
     '  try {',
     '    var v = ctx.value;',
-    '    if (!v || !v.anim) { return; }',
+    '    if (!v || !v.anim || !v.at) { return; }',
+    /*
+      ctx.state is one object, made once when the client starts and handed to
+      every updateOwner script, so the key is namespaced. No state at all means
+      this cannot tell a swing from the frame after it, and a swing that does
+      not play is better than one that never stops: it fails shut.
+    */
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodSwingAt === v.at) { return; }',
+    '    st.thornswoodSwingAt = v.at;',
     '    var sp = ctx.sp;',
     '    var pc = sp.Game.getPlayer();',
     '    if (!pc) { return; }',
     '    sp.Debug.sendAnimationEvent(pc, v.anim);',
     // And let them go again. Utility.wait is a promise here, not a block.
     '    sp.Utility.wait((v.ms || 2500) / 1000).then(function () {',
-    '      try { sp.Debug.sendAnimationEvent(sp.Game.getPlayer(), v.stop); } catch (e) { }',
+    '      try {',
+    '        var me = sp.Game.getPlayer();',
+    '        if (!me) { return; }',
+    '        sp.Debug.sendAnimationEvent(me, v.stop);',
+    // The named exit is a transition out of one state. This one is out of any
+    // state, and it is the difference between an exit and a way out.
+    '        if (v.free) { sp.Debug.sendAnimationEvent(me, v.free); }',
+    '      } catch (e) { }',
     '    });',
     '  } catch (e) { }',
     '})();'
@@ -1888,25 +2008,72 @@ function swingScript() {
 }
 
 /*
-  Ask for a swing. The stamp is what makes it a change: the same animation
-  twice running is the same value, and a property that has not changed does not
-  run its script, so a second swing on the same seam would play nothing.
+  Ask for a swing, and take the ask back once it has been swung.
+
+  THE STAMP IS THE WHOLE EVENT. The script above plays a swing when at moves
+  and does nothing at all when it has not, so the stamp is what separates two
+  strikes at the same seam, and it is the only thing that does.
+
+  AND THE PROPERTY IS CLEARED AFTER. A swing is something that happened, not
+  something a character is. Left on the character it is stored, sent to the
+  owner again at the next login, and played again by a client that has never
+  seen that stamp before, which is the animation nobody could get out of by
+  loading a fresh game. Cleared, there is nothing to send. The clear is a
+  little past the end of the swing so it cannot race the client's own exit.
 */
-function swing(actorId, anim) {
+function swing(actorId, anim, lands) {
   try {
     mp.set(actorId, SWING_PROPERTY,
-           { anim: anim, stop: SWING_STOP, ms: SWING_MS, at: Date.now() });
+           { anim: anim, stop: SWING_STOP, free: SWING_FREE,
+             ms: SWING_MS, at: Date.now() });
   } catch (e) {
-    // A person whose property will not take is a person without an animation,
-    // and nothing else about their work changes. Once, so a broken client does
-    // not fill the log.
+    /*
+      A person whose property will not take is a person without an animation,
+      and NOTHING ELSE ABOUT THEIR WORK CHANGES. That sentence was here before
+      the yield moved onto the strike and it has to keep being true now that it
+      has: the seam has already been taken from by the time this is called, so
+      falling out here would leave somebody a piece of ore short because their
+      client could not be sent an idle. Everything below runs either way; only
+      the animation is lost. Logged once, so a broken client does not fill the
+      log.
+    */
     if (!SWING_QUIET[actorId]) {
       SWING_QUIET[actorId] = true;
       log('could not ask', actorId.toString(16), 'for a swing animation:', e);
     }
   }
+  SWING_IN_AIR[actorId] = true;
+  // One timer per person, not one per strike: a miner working a seam sets this
+  // again every swing, and the last one is the one that clears.
+  if (SWING_CLEAR[actorId]) { clearTimeout(SWING_CLEAR[actorId]); }
+  SWING_CLEAR[actorId] = setTimeout(function () {
+    delete SWING_CLEAR[actorId];
+    delete SWING_IN_AIR[actorId];
+    /*
+      A spent swing rather than null. The script above throws it away on
+      either, but this property has only ever held an object and a property
+      that refuses the value it is cleared with is a property that is never
+      cleared, which is the whole fault. An empty anim and a zero stamp are
+      what it checks for first.
+    */
+    try { mp.set(actorId, SWING_PROPERTY, { anim: '', at: 0 }); } catch (e) { }
+  }, SWING_MS + 1000);
+  if (lands) { setTimeout(guard('swingLands', lands), SWING_LAND_MS); }
 }
 const SWING_QUIET = {};
+const SWING_CLEAR = {};
+/* Who has a pick in the air right now. See swinging(). */
+const SWING_IN_AIR = {};
+
+/*
+  Is this person already mid swing?
+
+  Patrick, 22 September: "if you click duitig the animation you get the ore".
+  A press that lands inside a swing somebody is already taking is not a second
+  strike, it is the same strike clicked twice, and it used to be worth a second
+  piece of ore. This is what a branch asks so it can ignore it.
+*/
+function swinging(actorId) { return !!SWING_IN_AIR[actorId]; }
 
 const DEPOSIT_PROPERTY = 'thornswoodDeposit';
 /* Seams whose last write threw. See takeFromDeposit. */
@@ -2046,46 +2213,97 @@ function mineOre(actorId, refrId, baseDesc) {
     The clock is Patrick's: ten minutes for iron, gold, corundum and silver,
     thirty for everything else, with anything unnamed taking the longer one.
   */
+  /*
+    A PRESS THAT LANDS INSIDE A SWING IS NOT A SECOND STRIKE.
+
+    Patrick, 22 September: "if you click duitig the animation you get the ore".
+    Clicking four times while the pick was still up was four pieces of ore off
+    a seam that had only been struck once. Nothing is said: an early click is
+    not a mistake worth a sentence, and the strike they are already taking is
+    about to hand them what they came for.
+  */
+  if (swinging(actorId)) { return ''; }
+
   const backMs = depositBackMs(seam.name);
   const took = takeFromDeposit(refrId, backMs);
   if (!took) {
     return 'This seam is worked out. ' + depositBackIn(refrId, backMs);
   }
 
-  // One a swing, not the whole pile. The rank still decides WHICH seams are
-  // workable at all, which is what seam.yield's pair of zeroes says.
-  const yielded = 1;
-  // addItem answers false in one case only, which is idOf returning 0 because
-  // the plugin that owns this ore is not in the load order. The quarry says
-  // 'nothing you can carry' there, which would send somebody off to empty
-  // their pack over a fault in the build, so this says what is actually wrong
-  // and where to take it, in the shape the farming block already says it in
-  // for the same fault.
-  if (!addItem(actorId, seam.ore, yielded)) {
-    return 'The seam gives up ' + seam.name + ' and there is nothing in this load ' +
-           'order to put in your hands. Say so in the dev channel.';
-  }
-  // The swing, because no Papyrus runs here to play it. See SWING_PROPERTY.
-  swing(actorId, SWING_MINE);
-  const rank = creditWork(actorId, 'mine');
-  const worn = wearTool(actorId, 'miner');
   /*
-    NOTHING SAID FOR AN ORDINARY SWING. Patrick on the chopping block, and it
-    is the same complaint: "I dont want that spam everytime". A swing a second
-    with a line each is a wall of text over the thing you are trying to watch.
+    THE PICK GOES UP HERE AND THE ORE COMES OFF WHEN IT LANDS.
 
-    The three worth interrupting somebody for are kept: a rank going up, a tool
-    about to break, and the last one out of the seam, because that is the
-    moment it is worth walking away from.
+    Everything above this line is a refusal, and a refusal has to be immediate:
+    somebody who is not a miner, has no pickaxe, is not ranked for the seam or
+    is standing at a worked out one is told so on the press, the way they
+    always were. Everything below it is the yield, and the yield is what moves.
+
+    The seam is taken from on the press and not on the strike, deliberately.
+    Two miners at one vein must not both be handed the last of it because both
+    of them clicked before either pick came down; the pile is the shared thing
+    and the strike is the private one. The cost of that ordering is a single
+    piece of ore lost out of a seam if the server stops inside the 900ms, and
+    a seam refills on its own clock anyway.
   */
-  const last = (took === 1)
-    ? 'That is the last of this seam. ' + depositBackIn(refrId, backMs) : '';
-  const saying = [rank, worn, last].filter(function (x) { return !!x; }).join(' ');
-  if (saying) {
-    notify(actorId, saying);
-    say(actorId, saying);
-  }
-  return ALLOW;
+  swing(actorId, SWING_MINE, function () {
+    // One a swing, not the whole pile. The rank still decides WHICH seams are
+    // workable at all, which is what seam.yield's pair of zeroes says.
+    const yielded = 1;
+    // addItem answers false in one case only, which is idOf returning 0
+    // because the plugin that owns this ore is not in the load order. The
+    // quarry says 'nothing you can carry' there, which would send somebody off
+    // to empty their pack over a fault in the build, so this says what is
+    // actually wrong and where to take it, in the shape the farming block
+    // already says it in for the same fault.
+    if (!addItem(actorId, seam.ore, yielded)) {
+      const broken = 'The seam gives up ' + seam.name + ' and there is nothing in ' +
+                     'this load order to put in your hands. Say so in the dev channel.';
+      notify(actorId, broken);
+      say(actorId, broken);
+      return;
+    }
+    const rank = creditWork(actorId, 'mine');
+    const worn = wearTool(actorId, 'miner');
+    /*
+      NOTHING SAID FOR AN ORDINARY SWING. Patrick on the chopping block, and it
+      is the same complaint: "I dont want that spam everytime". A swing a second
+      with a line each is a wall of text over the thing you are trying to watch.
+
+      The three worth interrupting somebody for are kept: a rank going up, a tool
+      about to break, and the last one out of the seam, because that is the
+      moment it is worth walking away from.
+    */
+    const last = (took === 1)
+      ? 'That is the last of this seam. ' + depositBackIn(refrId, backMs) : '';
+    const saying = [rank, worn, last].filter(function (x) { return !!x; }).join(' ');
+    if (saying) {
+      notify(actorId, saying);
+      say(actorId, saying);
+    }
+  });
+  /*
+    ONE ANIMATION, AND THIS IS WHY IT IS NOT ALLOW ANY MORE.
+
+    Patrick, 22 September: "tehre are two". There were. ALLOW went on this
+    branch to stop `return false` throwing the mining animation away, and then
+    swing() was added above when that turned out not to have brought one back.
+    The note at SWING_PROPERTY says why it could not have: a vein's animation
+    is MineOreScript's and no Papyrus object script runs here, so for an ACTI
+    vein ALLOW hands the press to an engine that does nothing with it.
+
+    For a vein that is a FURN record it is not nothing. The table is built out
+    of the ACTI AND FURN records carrying MineOreScript, and furniture does not
+    need Papyrus: the press puts the person into Skyrim's own mining furniture,
+    which is the second animation, the one that holds a real pickaxe, and a
+    second way to be stuck standing at a seam. Two patches for one symptom,
+    both left in.
+
+    The swing above is the one that works at all 581 seams, ACTI and FURN
+    alike, so it is the one that is kept, and this goes back to blocking the
+    handover the way every other branch does. Empty rather than a sentence:
+    there is nothing to tell somebody about an ordinary strike.
+  */
+  return '';
 }
 
 /**
@@ -2255,14 +2473,21 @@ function chopWood(actorId, refrId, fromSwing) {
   }
   /*
     The press is what starts a session, and the block is a FURN so Skyrim's own
-    furniture plays the swing. The server only asks for an animation when the
-    report came from a swing rather than a press, because asking twice for the
-    same swing is what makes it stutter.
+    furniture plays the swing. THE SERVER ASKS FOR NO ANIMATION HERE AT ALL.
+
+    It used to ask for one on every reported swing, and that was the wrong way
+    round. The report only ever arrives DURING the furniture loop, because the
+    client counts the falls of an axe the engine is already swinging, so
+    IdleWoodChopStart landed in the middle of the animation it was meant to
+    start and restarted it. Patrick, 21 September: "the chopping block is still
+    not always doing the animation". That is what the stutter was, and with the
+    frame loop at SWING_PROPERTY on top of it the restart was every frame.
+
+    A seam is the other case and it is why swing() still exists: nothing in the
+    engine animates a press on a vein, so the server has to.
   */
   if (!fromSwing) {
     CHOP_AT[actorId] = { refrId: refrId, at: Date.now(), last: Date.now() };
-  } else {
-    swing(actorId, SWING_CHOP);
   }
   const rank = creditWork(actorId, 'woodwright');
   const worn = wearTool(actorId, 'woodworker');
@@ -14932,12 +15157,26 @@ log('gamemode loaded:',
   var lastDrawn = {};
 
   /*
-    The client side script. It runs inside skymp5-client every time the
-    property changes for its owner, with ctx.value the new value. While the
-    server says creating, it also opens the panel, which is how creation
-    lands on somebody's screen without them pressing anything. Everything
-    it does is guarded, because a page that has not mounted the panel yet is
-    the normal case for the first second of a session.
+    The client side script. It runs inside skymp5-client EVERY FRAME for as
+    long as the property holds a value, not once per change: the reading of
+    skymp5-client that settled that is written out in full at SWING_PROPERTY
+    in this file. ctx.value is whatever is on the character at that frame.
+    While the server says creating, it also opens the panel, which is how
+    creation lands on somebody's screen without them pressing anything.
+    Everything it does is guarded, because a page that has not mounted the
+    panel yet is the normal case for the first second of a session.
+
+    SO IT COMPARES BEFORE IT DRAWS. Without that, every frame built the whole
+    panel payload as a string and handed it to browser.executeJavaScript,
+    sixty times a second, for the entire session. drawn() and lastDrawn above
+    already hold back a WRITE that would not change the panel; this holds back
+    a DRAW of a value that has not changed since the last frame, which is a
+    different thing and, until now, the one nothing was holding back.
+
+    ctx.state is one object shared by every updateOwner script on the client,
+    so the key is namespaced. No state means draw, because a panel that is
+    redrawn too often is a cost and one that is never drawn is a character
+    sheet nobody can see.
   */
   function updateOwnerScript() {
     return [
@@ -14948,8 +15187,14 @@ log('gamemode loaded:',
       // No panel on the value means the write moved a counter and nothing
       // the panel draws, so the browser is not touched at all. See drawn().
       '    if (!v.panel) { return; }',
+      '    var body = JSON.stringify(v);',
+      '    var st = ctx.state;',
+      '    if (st) {',
+      '      if (st.thornswoodPanel === body) { return; }',
+      '      st.thornswoodPanel = body;',
+      '    }',
       '    var open = (v.panel && v.panel.creating) ? "window.thornswoodSkills.open();" : "";',
-      '    var src = "try{if(window.thornswoodSkills){window.thornswoodSkills.setData(null," + JSON.stringify(v) + ");" + open + "}}catch(e){}";',
+      '    var src = "try{if(window.thornswoodSkills){window.thornswoodSkills.setData(null," + body + ");" + open + "}}catch(e){}";',
       '    ctx.sp.browser.executeJavaScript(src);',
       '  } catch (e) { }',
       '})();'

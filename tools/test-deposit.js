@@ -131,9 +131,7 @@ if (block !== null) {
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/\/\/[^\n]*/g, ' ');
-  yes('mining answers ALLOW so the press is not blocked',
-      /return ALLOW;/.test(code));
-  yes('and the chain lets an ALLOW through without saying anything',
+  yes('the chain lets an ALLOW through without saying anything',
       /if \(message === ALLOW\) \{ return; \}/.test(code));
   yes('a swing takes one rather than the whole pair',
       /const yielded = 1;/.test(code));
@@ -142,6 +140,53 @@ if (block !== null) {
                               code.indexOf('function chopWood'));
   yes('and mining no longer refuses the press with a per-person cooldown',
       mineBody.indexOf('cooldownLeft(') === -1);
+
+  /*
+    ============================== ONE ANIMATION, AND A WAY OUT OF IT =========
+
+    Patrick, 22 September: "the mining animation doesnt always use your pick
+    and tehre are two ... it stops making the noise as its supposed you dont
+    get the ore as it hits the vein ... you get stuck in the animation no way
+    out even when tping, a fresh game load, trying to walk away, trying to
+    escape menu anyuthing its trapped in that state".
+
+    THIS HARNESS PASSED THROUGH ALL OF THAT, and the line it passed on is the
+    first one below as it used to read: 'mining answers ALLOW so the press is
+    not blocked', matched with /return ALLOW;/ against the whole file. mineOre
+    stopped answering ALLOW and the test went on passing, because chopWood
+    still does and the pattern was never anchored to mining. A check that
+    cannot fail is not a check. Every one below names the function it is about
+    and cuts the file down to it first.
+
+    WHAT WAS ACTUALLY WRONG is written out at SWING_PROPERTY in the gamemode:
+    updateOwner scripts run every frame in skymp5-client, not on change, so a
+    stored swing replayed sixty times a second forever and survived a fresh
+    game load because nothing cleared it.
+  */
+  yes('mining plays one animation, not the engine\'s as well',
+      mineBody.indexOf('return ALLOW') === -1);
+  yes('the swing script only fires when the stamp moves',
+      /st\.thornswoodSwingAt === v\.at/.test(code));
+  yes('and it gives up when there is no state to remember the stamp in',
+      /var st = ctx\.state;[\s\S]{0,40}if \(!st\) \{ return; \}/.test(code));
+  yes('a swing is taken off the character once it is swung',
+      /mp\.set\(actorId, SWING_PROPERTY, \{ anim: '', at: 0 \}\)/.test(code));
+  yes('the exit is the graph reset as well as the named one',
+      /IdleForceDefaultState/.test(code));
+  yes('the ore comes off the strike and not off the press',
+      /swing\(actorId, SWING_MINE, function \(\)/.test(code));
+  yes('and so does the salt',
+      code.slice(code.indexOf('function mineSalt'),
+                 code.indexOf('function rankWord'))
+          .indexOf('swing(actorId, SWING_MINE, function ()') !== -1);
+  yes('a press inside a swing is not a second strike',
+      /if \(swinging\(actorId\)\) \{ return ''; \}/.test(code));
+  yes('the chopping block is left to Skyrim\'s own furniture',
+      code.slice(code.indexOf('function chopWood'),
+                 code.indexOf('const KILN_ARMED'))
+          .indexOf('swing(') === -1);
+  yes('the skills panel is not pushed to the browser every frame',
+      /st\.thornswoodPanel === body/.test(code));
   yes('quicksilver is on the thirty minute clock rather than silver\'s ten',
       /DEPOSIT_SLOW/.test(code) &&
       code.indexOf('DEPOSIT_SLOW') < code.indexOf('DEPOSIT_QUICK[j]'));

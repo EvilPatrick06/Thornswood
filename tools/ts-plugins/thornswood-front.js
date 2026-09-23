@@ -1381,6 +1381,55 @@
   let chopSeen = 0;          // when an event last arrived
   const chopUnknown = {};    // event names seen and not counted, once each
 
+  /*
+    ---------------------------------------------- and every fall of the pick
+
+    THIS WATCHES AND REPORTS NOTHING, ON PURPOSE.
+
+    Patrick, 22 September: "you dont get the ore as it hits the vein". The ore
+    used to arrive on the press; the server now holds it back until the pick
+    lands, and "when the pick lands" is a constant in the gamemode,
+    SWING_LAND_MS, because nothing on the server can see inside an animation.
+    The strike is an annotation in IdlePickaxeEnter and this hook is the only
+    place on either machine that annotation passes through.
+
+    So this writes down, once each, every event a mining swing emits, exactly
+    the way the chopping watcher above it did before the axe was understood.
+    After one session at a seam the log names the real strike event, and
+    SWING_LAND_MS can be replaced by it instead of guessed at twice.
+
+    It never returns and never counts: IdleChairExitStart ends a mining swing
+    AND a chopping session, so a branch here that swallowed events would take
+    them off the axe. Everything below still sees every event it did.
+  */
+  const MINE_START = /pickaxe.*(enter|start)/i;
+  const MINE_END = /pickaxe.*(exit|stop)|idlechairexitstart|idleforcedefaultstate/i;
+  const MINE_IDLE_MS = 15000;
+  let mining = 0;
+  let mineSeen = 0;
+  const mineEvents = {};
+
+  function watchTheSwing(name, now) {
+    if (MINE_START.test(name)) {
+      mining = now; mineSeen = now;
+      say('mining: swing started on ' + name);
+      return;
+    }
+    if (!mining) { return; }
+    if (now - mineSeen > MINE_IDLE_MS) { mining = 0; return; }
+    mineSeen = now;
+    if (MINE_END.test(name)) {
+      // Read before mining is zeroed, or every swing is reported as 0ms long.
+      say('mining: swing ended on ' + name + ', ' + (now - mining) + 'ms in');
+      mining = 0;
+      return;
+    }
+    if (!mineEvents[name]) {
+      mineEvents[name] = true;
+      say('mining: ' + name + ' arrived ' + (now - mining) + 'ms into the swing');
+    }
+  }
+
   try {
     sp.hooks.sendAnimationEvent.add({
       enter: (ctx) => {
@@ -1388,6 +1437,8 @@
           const name = String(ctx.animEventName || '');
           if (!name) { return; }
           const now = Date.now();
+
+          watchTheSwing(name, now);
 
           if (CHOP_START.test(name)) {
             chopping = now; chopSeen = now;
