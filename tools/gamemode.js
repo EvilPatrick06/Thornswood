@@ -13443,12 +13443,54 @@ log('gamemode loaded:',
   */
   var LOCK_PROPERTY = 'thornswoodLocks';
 
+  /*
+    HOW OFTEN THE DOORS ARE RE-LOCKED, and why it is a heartbeat rather than
+    once.
+
+    updateOwner runs EVERY FRAME in skymp5-client, not on change; the reading
+    is written out in full over mp.makeProperty(SWING_PROPERTY). Three scripts
+    ride that channel. The swing and the skills panel were both given a state
+    guard on 22 September and this one was deliberately left alone, because it
+    looked load bearing and nobody had checked.
+
+    CHECKED, 23 September: IT IS. The comment inside the script says "a door in
+    a cell nobody has loaded does not resolve... the tick below comes back to
+    it", and there is no tick below. pushAll says so itself: "Done on a change
+    rather than on a tick: a lock is changed a handful of times a day and there
+    is nothing to poll for." So the ONLY thing that ever catches a door whose
+    cell streams in afterwards is this script being run again, and a plain edge
+    trigger would leave those doors unlocked with nothing anywhere to notice.
+
+    SO IT KEEPS RUNNING AGAIN, four seconds apart instead of sixty times a
+    second. That is the same behaviour a hundred and forty times cheaper: a
+    door that loads a moment later is locked within four seconds, a cell that
+    unloads and comes back is caught the same way, and a person standing in
+    Whiterun stops paying a resolve and a lock call per door per frame.
+
+    AND A CHANGE IS STILL INSTANT. The stamp is compared first, so locking a
+    door reaches everybody on the next frame rather than up to four seconds
+    later. The heartbeat is only for the doors that were not there yet.
+  */
+  var LOCK_EVERY_MS = 4000;
+
   function lockScript() {
     return [
       '(function(){',
       '  try {',
       '    var v = ctx.value;',
       '    if (!v || !v.shut) { return; }',
+      '    var st = ctx.state;',
+      '    if (st) {',
+      '      var now = Date.now();',
+      // The list changed: do it now. Otherwise only on the heartbeat.
+      '      if (st.thornswoodLockStamp === v.at &&',
+      '          (now - (st.thornswoodLockAt || 0)) < ' + LOCK_EVERY_MS + ') { return; }',
+      '      st.thornswoodLockStamp = v.at;',
+      '      st.thornswoodLockAt = now;',
+      '    }',
+      // No state at all is the old behaviour, every frame, which is correct
+      // and expensive. Failing that way round is the right one: a door that
+      // is not locked is a house anybody can walk into.
       '    var sp = ctx.sp;',
       '    for (var i = 0; i < v.shut.length; i++) {',
       '      try {',
@@ -13584,7 +13626,14 @@ log('gamemode loaded:',
   /** Tell one person which doors are shut to them. */
   function push(actorId, profileId) {
     try {
-      mp.set(actorId, LOCK_PROPERTY, shutFor(actorId, profileId));
+      /*
+        STAMPED, because the script on the other end now asks whether the list
+        has changed. Without it every push looks identical to the last one and
+        a door somebody just locked would wait for the heartbeat.
+      */
+      var v = shutFor(actorId, profileId);
+      v.at = Date.now();
+      mp.set(actorId, LOCK_PROPERTY, v);
     } catch (e) {
       plog('could not push the locks to', actorId.toString(16) + ':', e);
     }
