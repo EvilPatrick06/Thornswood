@@ -98,6 +98,9 @@ $ErrorActionPreference = 'Stop'
 # set. Non-zero means the installer rebuild failed, and the Done section says
 # so again at the end.
 $script:InstallerFailed = 0
+# What Publish-Discord.ps1 did, read back after it runs. It sets this in the
+# global scope; seeded here so strict mode has something to read either way.
+$global:ThornswoodDiscordResult = ''
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -808,7 +811,10 @@ if (-not $DryRun) {
             if ($Dev) { & $discordScript -Dev }
             else      { & $discordScript }
         }
-        catch { Say "  could not post to Discord: $_" 'DarkGray' }
+        catch {
+            Say "  could not post to Discord: $_" 'Red'
+            $global:ThornswoodDiscordResult = 'failed'
+        }
     } else {
         Say ('  Publish-Discord.ps1 is missing, ' +
              $(if ($Dev) { 'the dev updates channel' } else { '#news' }) +
@@ -909,6 +915,16 @@ if ($script:InstallerFailed) {
     Say ("The installer did NOT rebuild (exit $script:InstallerFailed). The release went out " +
          'without it.') 'Red'
     Say '  .\tools\Package-Thornswood.ps1' 'Yellow'
+    Write-Host ''
+}
+# The release is out either way, and the people who would have read the post
+# do not know it. Said here because this is the screen that gets looked at.
+if ($global:ThornswoodDiscordResult -eq 'failed') {
+    Say ('The release went out, but ' +
+         $(if ($Dev) { 'the dev updates channel' } else { '#news' }) +
+         ' was NOT told.') 'Yellow'
+    Say ('  .\tools\Publish-Discord.ps1' + $(if ($Dev) { ' -Dev' } else { '' }) +
+         '   posts it on its own') 'Yellow'
     Write-Host ''
 }
 if ($DryRun) { Say 'Dry run finished. Nothing left your machine.' 'Yellow' }
