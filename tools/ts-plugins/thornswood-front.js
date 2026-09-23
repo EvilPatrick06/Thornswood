@@ -1977,6 +1977,10 @@
   */
   const PLACE_SLOW = 4000;
   const PLACE_FAST = 1000;
+  // How often the tick writes a line even when its answer has not moved. See
+  // the heartbeat below: without it, a dead tick and a steady one read the
+  // same in the log.
+  const PLACE_BEAT = 30000;
   // How far the water can be over your feet and still be wading. A character
   // is about 128 units tall, so this is roughly waist deep.
   const WADE_DEEP = 70;
@@ -1991,15 +1995,45 @@
   let placeSaid = '';
   let placeFire = -1;
 
+  /*
+    WHAT THE FIRE PROBE ACTUALLY DID, because on 23 September it did nothing
+    and said nothing.
+
+    Patrick, in the world: "temp isnt working right or fgetting caught on fire
+    and taking damage base was 51 I gotta closer and closer to the fire until I
+    was standing in it and it stayed the same temp the whole time."
+
+    MEASURED from that session's plugin log. The place tick wrote ONE line, at
+    10:20:38, and not another in the ninety seconds after it, while the input
+    pulse next to it kept writing every five seconds. So the tick was alive and
+    the line it composes never changed, which means the fire distance stayed at
+    nothing while he walked into a fire.
+
+    AND NOTHING SAID WHY, because fireDistance swallows every error per base:
+    forty four bases that all throw and forty four bases that all resolve and
+    find nothing produce the same silent -1. That is the fault this block is
+    here to close. The numbers below are counted on every probe and written
+    into the heartbeat line, so one session answers which of the two it is and
+    what the error was if it is the first.
+  */
+  let fireBases = 0;      // how many of the 44 resolved to a form at all
+  let fireHits = 0;       // how many had a reference within reach
+  let fireThrew = 0;      // how many threw
+  let fireWhy = '';       // the first thing one of them threw
+  let placeBeat = 0;      // when the heartbeat last wrote
+
   /** How far the nearest lit fire is, or -1 when there is none in reach. */
   function fireDistance(px, py, pz) {
     let best = -1;
+    fireBases = 0; fireHits = 0; fireThrew = 0;
     for (let i = 0; i < FIRE_BASES.length; i++) {
       try {
         const base = sp.Form.from(sp.Game.getFormEx(FIRE_BASES[i]));
         if (!base) { continue; }
+        fireBases++;
         const ref = sp.Game.findClosestReferenceOfType(base, px, py, pz, FIRE_REACH);
         if (!ref) { continue; }
+        fireHits++;
         // A fire somebody has switched off is still a placed reference. The
         // toggled ones (FXfireWithEmbers02Toggle and its heavy twin) are the
         // reason this asks rather than trusting the base.
@@ -2010,7 +2044,13 @@
         const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
         if (best < 0 || d < best) { best = d; }
         if (best <= FIRE_INSIDE) { break; }
-      } catch (e) { /* one base that will not resolve is not the end of it */ }
+      } catch (e) {
+        // One base that will not resolve is not the end of it, but forty four
+        // of them is the whole feature, so it is counted and the first reason
+        // is kept for the heartbeat rather than thrown away.
+        fireThrew++;
+        if (!fireWhy) { fireWhy = String((e && e.message) || e); }
+      }
     }
     return best;
   }
@@ -2147,6 +2187,38 @@
       tellServer(line);
       say('standing in ' + kind + (fire >= 0 ? ', fire ' + Math.round(fire) + ' away' : '') +
           (night ? ', at night' : '') + (indoors ? ', under a roof' : ''));
+      placeBeat = now;
+    }
+    else if (now - placeBeat >= PLACE_BEAT) {
+      /*
+        A LINE EVEN WHEN NOTHING CHANGED, once every half minute.
+
+        Without this, a tick that has stopped and a tick whose answer never
+        changes look identical in the log, and on 23 September that cost a
+        whole session: one line at 10:20:38 and nothing after it, with no way
+        to tell which had happened.
+
+        It carries what the fire probe did, because that is the part that was
+        silent. 44 resolved, 0 hits means the bases are fine and there is
+        genuinely no fire of ours in reach, which points at the list. Anything
+        in threw means the probe itself is broken and the reason is printed.
+        And whatever the crosshair is on is named, so walking up to a fire and
+        looking at it says what that fire actually is, which is the one thing
+        nobody could find out from here.
+      */
+      placeBeat = now;
+      let looking = '';
+      try {
+        const at = sp.Game.getCurrentCrosshairRef();
+        if (at) {
+          const b = at.getBaseObject();
+          looking = ', looking at ' + (b ? ('base ' + b.getFormID().toString(16) +
+                    ' "' + (b.getName() || '') + '"') : 'something with no base');
+        }
+      } catch (e) { }
+      say('place: ' + line + '  [fire probe: ' + fireBases + ' bases, ' + fireHits +
+          ' in reach, ' + fireThrew + ' threw' + (fireWhy ? ' (' + fireWhy + ')' : '') + ']' +
+          looking);
     }
 
     /*
