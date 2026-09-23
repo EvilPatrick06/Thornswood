@@ -1113,6 +1113,20 @@
   const lastForced = {};
 
   /*
+    Whether the door rescue runs. It does not, and the long comment in the
+    type 29 branch below is the incident that switched it off on 16 September.
+
+    It has a name now because it was a bare return with thirty-one lines
+    behind it, which reads as a mistake rather than as a decision: anybody
+    tidying the file would have deleted the block, and the next person wanting
+    cage gates to work would have started from nothing. The flag says the code
+    is kept on purpose and says where to turn it on, and turning it on still
+    needs what the comment asks for, which is a signal only a real key press
+    produces.
+  */
+  const DOOR_RESCUE = false;
+
+  /*
     Bases the server answers for, so they are not activated twice.
 
     Every ACTI below is re-activated with default processing off, because some
@@ -1287,7 +1301,8 @@
         Cage gates stay unsolved for now. A rescue for them needs a signal
         that only a real key press produces, not the activate event.
       */
-      return;
+      if (!DOOR_RESCUE) { return; }
+
       const id = target;
       let openWas = -1;
       try { openWas = e.target.getOpenState(); } catch (err) { return; }
