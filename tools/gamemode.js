@@ -450,6 +450,37 @@ function ensureProperties() {
       updateOwner: swingScript(),
       updateNeighbor: '',
     });
+    /*
+      SOMETHING ON THE SCREEN, FOR THE THINGS PEOPLE MUST NOT MISS.
+
+      Patrick, 22 September: "I need it to do an onscreen warninjg and not just
+      in chat at one minute and at 30 seoconds before you get kciked from the
+      server incase people miss the message in chat."
+
+      He is right and the chat overlay is the wrong place for this. It is a
+      small panel somebody may have scrolled, moved, or not be looking at, and
+      the one message that must not be missed is the one that ends with being
+      thrown out mid sentence.
+
+      TWO PLACES AT ONCE, because neither is certain on its own. Debug
+      .notification is Skyrim's own corner message and needs no browser at all,
+      so it lands even if the overlay never mounted. The banner is a panel this
+      script builds ITSELF in the overlay document, with no dependency on any
+      page having exposed a function for it: a page from before this existed
+      still shows it.
+
+      EDGE TRIGGERED, like the swing above, and for the reason written out
+      there: updateOwner runs EVERY FRAME. Without the stamp guard this would
+      redraw a banner and fire a notification sixty times a second for as long
+      as the property held a value, which is the exact fault that trapped
+      people in the mining animation.
+    */
+    mp.makeProperty(ALERT_PROPERTY, {
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: alertScript(),
+      updateNeighbor: '',
+    });
   } catch (e) {
     // already made, or made by a previous load. harmless.
   }
@@ -1931,6 +1962,103 @@ const ALLOW = { thornswoodAllow: true };
 
 const DEPOSIT_SIZE = 20;
 const SWING_PROPERTY = 'thornswoodSwing';
+
+/*
+  THE ONE WAY TO PUT SOMETHING IN FRONT OF SOMEBODY'S EYES.
+
+  Patrick, 22 September, about the restart countdown: "I need it to do an
+  onscreen warninjg and not just in chat at one minute and at 30 seoconds
+  before you get kciked from the server incase people miss the message in
+  chat", and about the meters: "There is no indicator for the hunger food or
+  exhasution on screen".
+
+  Both are the same missing thing. Everything this server says lands in the
+  chat overlay, which is a small panel somebody may have scrolled away from or
+  simply not be looking at, and the two messages that must not be missed are
+  the one that ends in being thrown out and the one that says why you have
+  started missing your swings.
+
+  IT DRAWS ITSELF, WITH NO PAGE TO DEPEND ON. The script below builds its own
+  element in the overlay document. It does not call into thornswood-chat or
+  any other page, so it works on a client whose overlay is from before this
+  existed, and it needs no Ship: an updateOwner script travels with the
+  gamemode, so a deploy is enough to put a HUD on everybody's screen.
+
+  AND Debug.notification BESIDE IT, which is Skyrim's own corner message and
+  needs no browser at all. If the overlay never mounted, that one still lands.
+*/
+const ALERT_PROPERTY = 'thornswoodAlert';
+
+/*
+  How long a banner stays up before it fades, by how much it matters.
+  A countdown warning outlives the next one so the screen is never empty
+  between 60 and 30.
+*/
+const ALERT_MS = 9000;
+
+function alertScript() {
+  return [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || !v.text || !v.at) { return; }',
+    // updateOwner runs EVERY FRAME. See the note over SWING_PROPERTY.
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodAlertAt === v.at) { return; }',
+    '    st.thornswoodAlertAt = v.at;',
+    '    var sp = ctx.sp;',
+    // Skyrim's own corner message first, because it needs no browser.
+    '    try { sp.Debug.notification(String(v.text)); } catch (e) { }',
+    /*
+      And the banner. Built as one string here and handed to the overlay, so
+      the page is never asked to have a function for it. JSON.stringify does
+      the quoting, which is why nothing in the text has to be escaped by hand.
+    */
+    '    var body = JSON.stringify(String(v.text));',
+    '    var ms = Number(v.ms) || 9000;',
+    '    var tone = (v.tone === "bad") ? "#e0645a" : "#d9ab52";',
+    '    var src = "(function(){try{" +',
+    '      "var d=document.getElementById(\'ts-alert\');" +',
+    '      "if(!d){d=document.createElement(\'div\');d.id=\'ts-alert\';" +',
+    '      "d.style.cssText=\'position:fixed;left:0;right:0;top:11%;z-index:2147483600;" +',
+    '        "text-align:center;pointer-events:none;font-family:Georgia,serif\';" +',
+    '      "document.body.appendChild(d);}" +',
+    '      "d.innerHTML=\'<div style=\\\\\'display:inline-block;padding:16px 30px;" +',
+    '        "background:rgba(20,16,12,.92);border:2px solid " + tone + ";border-radius:10px;" +',
+    '        "color:#efe6d6;font-size:28px;letter-spacing:.03em;" +',
+    '        "box-shadow:0 10px 44px rgba(0,0,0,.65)\\\\\'>\' + " + body + " + \'</div>\';" +',
+    '      "d.style.display=\'\';" +',
+    '      "clearTimeout(window.__tsAlertT);" +',
+    '      "window.__tsAlertT=setTimeout(function(){try{d.style.display=\'none\';}catch(e){}}," + ms + ");" +',
+    '      "}catch(e){}})();";',
+    '    try { sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+}
+
+/*
+  Put a line in front of everybody, or one person.
+
+  The stamp is what makes it an event, the same as the swing: the same words
+  twice running are the same value, and a value that has not changed draws
+  nothing. tone is 'bad' for anything with a clock on it.
+*/
+function alertAll(text, tone, ms) {
+  let online = [];
+  try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+  for (let i = 0; i < online.length; i++) { alertOne(online[i], text, tone, ms); }
+}
+
+function alertOne(actorId, text, tone, ms) {
+  try {
+    mp.set(actorId, ALERT_PROPERTY, {
+      text: String(text || ''), tone: tone === 'bad' ? 'bad' : 'good',
+      ms: Number(ms) || ALERT_MS, at: Date.now()
+    });
+  } catch (e) { /* a person without a banner still has the chat line */ }
+}
 
 /*
   How long a swing is held before the person is let go of.
@@ -16134,7 +16262,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // Hunger, thirst and exhaustion. See the needs block at the end
                // of this file; the numbers there are invented and meant to be
                // argued with.
-               '/needs', '/rest', '/eat', '/drink', '/bard'];
+               '/needs', '/rest', '/eat', '/drink', '/bard',
+               // The client's weather report. Never typed; see the branch.
+               '/place'];
 
 /*
   The ones a person who is not a playtester is told about. /tp, /goto, /face,
@@ -16368,6 +16498,22 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       /eat     a meal; /drink water; /drink ale for the good and the bad of it
       /bard    say you are playing, which helps everyone resting near you
     */
+    /*
+      NOT A COMMAND ANYBODY TYPES. The client reports where somebody is
+      standing, as far as temperature cares: fire, indoors, rain, snow, water.
+      The server cannot know any of it, the same way it cannot see the axe
+      fall at a chopping block, so it is told. Registered in WORDS so the
+      dispatcher answers it, and kept out of PLAYER_WORDS so /help never
+      invites anybody to type it.
+    */
+    if (word === '/place') {
+      var pl = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
+      if (pl && pl.place && actorId) {
+        try { pl.place(actorId, String(parts[1] || '')); } catch (e) { }
+      }
+      return true;
+    }
+
     if (word === '/needs' || word === '/rest' || word === '/eat' ||
         word === '/drink' || word === '/bard') {
       var needs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
@@ -16904,6 +17050,28 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     return when + ' until the update. Finish up and get somewhere safe.';
   }
 
+  /*
+    The banner wording, which is not the chat wording.
+
+    Short, because it is read out of the corner of an eye while somebody is
+    doing something else, and it says what to DO rather than what is
+    happening. The chat line beside it carries the detail.
+
+    A notice does not throw anybody out, so it must not say it will: telling
+    people they are about to be kicked and then not kicking them is how a
+    warning stops being believed.
+  */
+  function onScreen(secs) {
+    var when = secs >= 60 ? '1 minute' : secs + ' seconds';
+    if (restart.mode === 'notice') {
+      return 'Server blips in ' + when + '. Nobody is kicked.';
+    }
+    if (restart.mode === 'restart') {
+      return 'Server goes down in ' + when + '. Get somewhere safe.';
+    }
+    return 'You are put back to the launcher in ' + when + '.';
+  }
+
   function parting() {
     if (restart.mode === 'notice') {
       return 'Going in now. Hold tight.';
@@ -16989,6 +17157,26 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           ? (m / 60) + (m === 60 ? ' minute' : ' minutes')
           : m + ' seconds';
         broadcast(reminder(when));
+        /*
+          AND ON THE SCREEN FOR THE LAST TWO.
+
+          Patrick: "I need it to do an onscreen warninjg and not just in chat
+          at one minute and at 30 seoconds before you get kciked from the
+          server incase people miss the message in chat."
+
+          Exactly those two marks and no others. The ten and five minute
+          warnings are information and belong in chat; a banner over the
+          middle of somebody's screen every few minutes is the thing that
+          teaches people to ignore banners. Sixty and thirty seconds are the
+          ones with a kick behind them.
+
+          Ten seconds is left alone deliberately: there is nothing anybody can
+          do with ten seconds that they could not do with thirty, and it would
+          land on top of the thirty second banner.
+        */
+        if (m === 60 || m === 30) {
+          alertAll(onScreen(m), 'bad', m === 30 ? 12000 : 9000);
+        }
         break;
       }
     }
@@ -17120,6 +17308,38 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     drain: { food: 100 / 6, drink: 100 / 3, rest: 100 / 20 },
 
     /*
+      TEMPERATURE, AND IT IS THE ONE METER THAT IS NOT A CLOCK.
+
+      Patrick, 22 September: "I forgot to say temp for cold/heat stuff for
+      like snow and rain and swimming and fire and stuff."
+
+      The other three only ever fall. This one moves BOTH WAYS toward whatever
+      the place you are standing in is worth, so a meter at 50 is comfortable,
+      0 is freezing and 100 is overheating. Standing by a fire in a blizzard
+      should settle somewhere reasonable rather than one of them winning, and
+      a target plus a rate is the shape that does that on its own.
+
+      warmth is how fast you move toward the target, per real hour. Fast
+      enough that walking indoors out of snow is felt within a few minutes,
+      slow enough that crossing a bridge in the rain is not a meter event.
+
+      THE PLACES ARE WORTH WHAT PATRICK NAMED. Snow and swimming pull down,
+      fire pulls up, rain is milder than snow, and indoors is simply
+      comfortable. Everything unnamed is comfortable too, because a world
+      where every unclassified cell is dangerous is a world that punishes
+      walking into a room nobody has thought about yet.
+    */
+    comfort: 50,
+    warmth: 60,
+    place: {
+      fire: 92,        // standing at a lit fire or a forge
+      indoors: 50,     // a roof, which is most of the game
+      rain: 34,        // wet and cold, but not dangerous on its own
+      snow: 16,        // the reach, the pale, Winterhold, a blizzard
+      water: 8         // swimming, which is the fastest way to get cold
+    },
+
+    /*
       Working your trade costs rest faster, and rank pays it back.
 
       Blade: "When doing your skilled profession, it drains your Exhaustion
@@ -17221,6 +17441,57 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     }
   };
 
+  /*
+    TEMPERATURE COSTS FROM BOTH ENDS, which is why it is not in COST above.
+
+    The other three are worse the lower they are, so one band table each is
+    enough. This one is worst at BOTH extremes and fine in the middle, so it
+    is read as a distance from comfort rather than as a level.
+
+    Cold takes your hands: stamina and speed, and at the far end health,
+    because that is what freezing does. Heat takes your wind and your magic:
+    stamina and magicka regeneration, and it never touches health, because
+    being too warm in Skyrim should be a nuisance and not a death.
+  */
+  var TEMP_COST = {
+    cold: {
+      fine:  {},
+      weary: { staminaRateMult: -20, speedMult: -2 },
+      bad:   { staminaRateMult: -40, speedMult: -6, stamina: -20 },
+      spent: { staminaRateMult: -60, speedMult: -12, stamina: -40, health: -25 }
+    },
+    hot: {
+      fine:  {},
+      weary: { staminaRateMult: -15 },
+      bad:   { staminaRateMult: -35, magickaRateMult: -20, stamina: -15 },
+      spent: { staminaRateMult: -55, magickaRateMult: -40, stamina: -35 }
+    }
+  };
+
+  /*
+    How far from comfort counts as what. A distance, in meter points.
+
+    Comfort is 50, so 'spent' at 40 away means 10 or 90 on the meter: you have
+    to be most of the way to an extreme before it is serious, and the middle
+    twenty points either side cost nothing at all.
+  */
+  var TEMP_BANDS = [
+    { at: 40, name: 'spent' },
+    { at: 30, name: 'bad' },
+    { at: 20, name: 'weary' },
+    { at: 0, name: 'fine' }
+  ];
+
+  /** Which way, and how badly, the temperature is wrong. */
+  function tempBand(v) {
+    var away = Math.abs(clamp(v) - NEEDS.comfort);
+    var name = 'fine';
+    for (var i = 0; i < TEMP_BANDS.length; i++) {
+      if (away >= TEMP_BANDS[i].at) { name = TEMP_BANDS[i].name; break; }
+    }
+    return { name: name, cold: clamp(v) < NEEDS.comfort };
+  }
+
   /* Below this, a person is too tired to make anything. Blade: low exhaustion
      hits "everything including your ability to craft". A gate rather than a
      number, because a half made sword is not a thing. */
@@ -17242,7 +17513,8 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   }
 
   function fresh() {
-    return { food: 100, drink: 100, rest: 100, at: Date.now(), resting: '', worked: 0 };
+    return { food: 100, drink: 100, rest: 100, temp: NEEDS.comfort,
+             at: Date.now(), resting: '', worked: 0, place: '' };
   }
 
   function read(actorId) {
@@ -17251,9 +17523,14 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     if (!v || typeof v !== 'object') { return null; }
     return {
       food: clamp(v.food), drink: clamp(v.drink), rest: clamp(v.rest),
+      // A character stored before temperature existed has no temp. Comfortable
+      // is the right answer for them: nobody should log in freezing because a
+      // meter was added while they were away.
+      temp: (typeof v.temp === 'number') ? clamp(v.temp) : NEEDS.comfort,
       at: Number(v.at) || Date.now(),
       resting: String(v.resting || ''),
-      worked: Number(v.worked) || 0
+      worked: Number(v.worked) || 0,
+      place: String(v.place || '')
     };
   }
 
@@ -17291,6 +17568,23 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     }
     var gain = restingGain(actorId, n);
     n.rest = clamp(n.rest + (gain - restRate) * hours);
+
+    /*
+      Temperature moves TOWARD where you are, rather than only falling.
+
+      An exponential approach rather than a straight line, so it is quick when
+      you are far from the target and settles rather than overshooting: step
+      the remaining distance by a fraction of an hour's worth of warmth. Walk
+      indoors out of a blizzard and most of the cold is gone in a few minutes;
+      stand in the snow and you keep sliding toward freezing without ever
+      quite arriving, which is the right shape for something you are supposed
+      to be able to endure for a while.
+    */
+    var target = NEEDS.place[n.place];
+    if (typeof target !== 'number') { target = NEEDS.comfort; }
+    var k = 1 - Math.pow(0.5, (NEEDS.warmth / 100) * hours * 2);
+    if (k > 1) { k = 1; }
+    if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
 
     n.at = now;
     write(actorId, n);
@@ -17365,25 +17659,59 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   function effects(actorId, n) {
     var out = {};
     if (!n) { return out; }
-    var meters = ['food', 'drink', 'rest'];
-    for (var i = 0; i < meters.length; i++) {
-      var cost = COST[meters[i]][bandOf(n[meters[i]])] || {};
+    function add(cost) {
       for (var av in cost) {
         if (!Object.prototype.hasOwnProperty.call(cost, av)) { continue; }
         out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + cost[av];
       }
     }
+    var meters = ['food', 'drink', 'rest'];
+    for (var i = 0; i < meters.length; i++) {
+      add(COST[meters[i]][bandOf(n[meters[i]])] || {});
+    }
+    // And temperature, which is read as a distance from comfort in either
+    // direction rather than as a level. See TEMP_COST.
+    var t = tempBand(typeof n.temp === 'number' ? n.temp : NEEDS.comfort);
+    add((t.cold ? TEMP_COST.cold : TEMP_COST.hot)[t.name] || {});
     return out;
   }
 
   /** What the panel draws. */
   function view(actorId) {
     var n = settle(actorId);
+    var t = tempBand(n.temp);
     return {
       food: Math.round(n.food), drink: Math.round(n.drink), rest: Math.round(n.rest),
+      temp: Math.round(n.temp),
       foodBand: bandOf(n.food), drinkBand: bandOf(n.drink), restBand: bandOf(n.rest),
-      resting: n.resting || ''
+      // Temperature says which way as well as how badly, because "cold" and
+      // "hot" are different words on a bar and 34 means nothing on its own.
+      tempBand: t.name, tempCold: !!t.cold,
+      resting: n.resting || '', place: n.place || ''
     };
+  }
+
+  /*
+    Where somebody is standing, as far as temperature cares.
+
+    The SERVER CANNOT KNOW THIS. Whether it is snowing on you, whether you are
+    in the water and whether there is a fire in front of you are all facts
+    about the machine drawing the world, so the client reports them the same
+    way it reports each fall of an axe. An unknown word is comfortable rather
+    than refused: a client from before this existed says nothing at all and its
+    owner simply has no weather.
+  */
+  function place(actorId, kind) {
+    kind = String(kind || '').toLowerCase();
+    if (kind && typeof NEEDS.place[kind] !== 'number') { return ''; }
+    var n = settle(actorId);
+    if (n.place === kind) { return ''; }
+    var wasBand = tempBand(n.temp);
+    n.place = kind;
+    write(actorId, n);
+    // Nothing said for the change itself. Walking indoors is not news; the
+    // band crossing that follows it is, and the tick says that.
+    return wasBand ? '' : '';
   }
 
   // ------------------------------------------------------------ the verbs --
@@ -17516,25 +17844,149 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     }
   }
 
+  /*
+    ===================== THE FOUR BARS ON SCREEN, AND WHY THEY ARE HERE =====
+
+    Patrick, 22 September: "There is no indicator for the hunger food or
+    exhasution on screen", and then "the temp stuff should also have a hud
+    element".
+
+    He is right and a meter nobody can see is only a punishment: you start
+    missing swings and nothing on the screen says why.
+
+    IT BUILDS ITSELF AND NEEDS NO SHIP. This is an updateOwner script, so it
+    travels with the gamemode: deploying the server puts the HUD on everybody
+    without a launcher release or a new overlay file. It creates its own
+    element in the overlay document and calls into no page, so a client whose
+    overlay predates this still draws it.
+
+    EDGE TRIGGERED ON A SIGNATURE, not on the raw value. updateOwner runs
+    EVERY FRAME (see the note over SWING_PROPERTY), and these numbers move
+    continuously, so a naive script would rebuild the HTML sixty times a
+    second forever. The signature is the ROUNDED numbers and the bands, so it
+    changes about once a minute and costs one string compare the rest of the
+    time.
+
+    QUIET WHEN THERE IS NOTHING TO SAY. A bar that is fine is dimmed almost to
+    nothing; the HUD only draws attention when something is actually wrong.
+    Four bars shouting all the time is four bars nobody reads.
+  */
+  /*
+    THE HTML IS BUILT HERE, NOT IN THE BROWSER, and that is the important
+    choice in this function.
+
+    An updateOwner script is JavaScript that runs on the client, so it can do
+    the work itself and hand the overlay one finished string. The first
+    version built the markup inside a string inside a string, four levels of
+    quoting deep, which is unreadable and is exactly where this kind of code
+    breaks silently. Now there is one level and JSON.stringify does all of it.
+
+    THE ICONS ARE INLINE SVG for the same reason the HUD builds its own
+    element: no file has to be shipped, no path has to resolve, and a client
+    that has never seen this before draws it correctly the first time.
+  */
+  function hudScript() {
+    var CSS = 'position:fixed;left:18px;bottom:16px;z-index:2147483500;' +
+              'pointer-events:none;font-family:Georgia,serif;font-size:12px;' +
+              'letter-spacing:.06em;color:#d8cbb0;text-shadow:0 1px 3px #000';
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || typeof v !== "object") { return; }',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      // Rounded, because the raw numbers move every frame and the screen does
+      // not. This is the whole of what stops a per-frame redraw.
+      '    var food = Math.round(Number(v.food));',
+      '    var drink = Math.round(Number(v.drink));',
+      '    var rest = Math.round(Number(v.rest));',
+      '    var temp = Math.round(Number(v.temp));',
+      '    if (!isFinite(food) || !isFinite(drink) || !isFinite(rest)) { return; }',
+      '    if (!isFinite(temp)) { temp = 50; }',
+      '    var sig = food + "|" + drink + "|" + rest + "|" + temp;',
+      '    if (st.thornswoodHud === sig) { return; }',
+      '    st.thornswoodHud = sig;',
+      '',
+      '    var ICON = {',
+      // A drumstick, a droplet, a crescent, a snowflake and a flame. Small,
+      // flat and readable at 14 pixels over any background.
+      '      food: "M4 13a4 4 0 0 1 4-4 3 3 0 1 1 3-3 4 4 0 0 1-4 4 4 4 0 0 1-3 3z M9.5 11.5 L15 17 M13 15l-1.5 3 3-1.5z",',
+      '      drink: "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z",',
+      '      rest: "M14.5 12.8A6 6 0 1 1 7.2 5.5a5 5 0 0 0 7.3 7.3z",',
+      '      cold: "M10 2v16 M3 6l14 8 M17 6L3 14 M10 5l-2-2 M10 5l2-2 M10 15l-2 2 M10 15l2 2",',
+      '      heat: "M10 18a5 5 0 0 0 5-5c0-4-5-11-5-11S5 9 5 13a5 5 0 0 0 5 5z"',
+      '    };',
+      '',
+      '    function row(kind, label, val, col) {',
+      '      var pct = Math.max(0, Math.min(100, Math.round(val)));',
+      // Quiet when it is fine. A HUD that shouts all the time is one nobody
+      // reads, so a healthy bar is nearly invisible and a bad one is not.
+      '      var dim = pct >= 50 ? 0.38 : (pct >= 25 ? 0.78 : 1);',
+      '      var svg = \'<svg width="14" height="14" viewBox="0 0 20 20" fill="none" \' +',
+      '        \'stroke="\' + col + \'" stroke-width="1.6" stroke-linecap="round" \' +',
+      '        \'stroke-linejoin="round" style="vertical-align:middle;margin-right:7px">\' +',
+      '        \'<path d="\' + ICON[kind] + \'"/></svg>\';',
+      '      var track = \'<span style="display:inline-block;width:96px;height:8px;\' +',
+      '        \'background:rgba(0,0,0,.55);border:1px solid rgba(0,0,0,.85);\' +',
+      '        \'border-radius:2px;vertical-align:middle;overflow:hidden">\' +',
+      '        \'<span style="display:block;height:100%;width:\' + pct + \'%;\' +',
+      '        \'background:\' + col + \'"></span></span>\';',
+      '      var num = \'<span style="display:inline-block;width:42px;text-align:right;\' +',
+      '        \'font-variant-numeric:tabular-nums">\' + pct + \'%</span>\';',
+      '      var name = \'<span style="display:inline-block;width:46px">\' + label + \'</span>\';',
+      '      return \'<div style="margin-top:6px;opacity:\' + dim + \'">\' +',
+      '             svg + name + track + num + \'</div>\';',
+      '    }',
+      '',
+      // Temperature is drawn as distance from comfort, so the bar empties at
+      // BOTH ends: freezing and overheating both read as nearly gone, which
+      // is what they both are.
+      '    var cold = temp < 50;',
+      '    var tv = 100 - Math.min(100, Math.abs(temp - 50) * 2);',
+      '    var html = row("food", "Food", food, "#c9a227") +',
+      '               row("drink", "Water", drink, "#4f9fd0") +',
+      '               row("rest", "Rest", rest, "#8fb85e") +',
+      '               row(cold ? "cold" : "heat", cold ? "Cold" : "Heat", tv,',
+      '                   cold ? "#7fc7e8" : "#e08f42");',
+      '',
+      '    var src = "(function(){try{" +',
+      '      "var d=document.getElementById(\'ts-hud\');" +',
+      '      "if(!d){d=document.createElement(\'div\');d.id=\'ts-hud\';" +',
+      '      "d.style.cssText=" + ' + JSON.stringify(JSON.stringify(CSS)) + ' + ";" +',
+      '      "document.body.appendChild(d);}" +',
+      '      "d.innerHTML=" + JSON.stringify(html) + ";" +',
+      '      "}catch(e){}})();";',
+      '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
   try {
     mp.makeProperty(NEEDS_PROPERTY, {
-      isVisibleByOwner: false,
+      // Visible to the owner now, because the HUD is drawn from this. Still
+      // nothing to a neighbour: how hungry somebody is is their business.
+      isVisibleByOwner: true,
       isVisibleByNeighbors: false,
-      updateOwner: '',
+      updateOwner: hudScript(),
       updateNeighbor: ''
     });
   } catch (e) {
     // Already made by a previous load, which is what a hot reload looks like.
+    // The script cannot be changed after the fact, so a changed HUD needs a
+    // server restart, which a deploy is.
   }
 
   if (g.__thornswoodNeedsTimer) { try { clearInterval(g.__thornswoodNeedsTimer); } catch (e) { } }
   g.__thornswoodNeedsTimer = setInterval(guard('needsTick', tick), TICK_MS);
 
   g.__thornswoodNeeds = {
-    NEEDS: NEEDS, COST: COST, CRAFT_REST: CRAFT_REST,
-    bandOf: bandOf, settle: settle, view: view, effects: effects,
+    NEEDS: NEEDS, COST: COST, TEMP_COST: TEMP_COST, CRAFT_REST: CRAFT_REST,
+    bandOf: bandOf, tempBand: tempBand,
+    settle: settle, view: view, effects: effects,
     ate: ate, resting: resting, worked: worked, bard: bard, arrived: arrived,
-    tooTiredToCraft: tooTiredToCraft,
+    place: place, tooTiredToCraft: tooTiredToCraft,
     fresh: fresh, clamp: clamp
   };
 

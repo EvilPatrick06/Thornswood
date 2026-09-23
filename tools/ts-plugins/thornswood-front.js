@@ -758,17 +758,60 @@
     if (up === want) { strayFocusSince = 0; return; }
 
     if (!want) {
+      /*
+        F6 IS A PERSON, NOT A STRAY, and treating it as one is what made a
+        panel unescapable.
+
+        skymp5-client binds F6 to toggling browser focus. Somebody looking at
+        a panel with no claim behind it presses F6, focus goes up, and this
+        function used to put it straight back down on the very next frame, for
+        ever. No cursor, and with focus down the browser is sent no keys and
+        no clicks either, so the panel's own Escape and Close are unreachable:
+        Task Manager was the only way out, which is exactly what Djinn
+        reported on 22 September.
+
+        So an unexplained focus is held rather than fought. It still cannot
+        last: manualFocusSince below caps it the same way every claim is
+        capped, so a focus nobody ever puts down still comes back on its own.
+        What is gone is the frame-by-frame fight that made F6 do nothing.
+
+        The race menu case below is unchanged and still comes first: that one
+        really is something else taking the keyboard.
+      */
       if (!strayFocusSince) { strayFocusSince = Date.now(); }
       const waited = Date.now() - strayFocusSince;
       if (raceMenuOpen() && waited < 1200) { return; }
       if (waited >= 1200) {
-        say('something took the keyboard and nothing here asked for it, taking it back');
+        if (!manualFocusSince) {
+          manualFocusSince = Date.now();
+          say('the keyboard was taken and nothing here asked for it. ' +
+              'Treating it as F6 and leaving it up; press F6 again to give it back.');
+        }
+        // Held, not taken back, until the cap below says otherwise.
+        if (Date.now() - manualFocusSince < MANUAL_FOCUS_MS) { return; }
+        say('F6 focus has been up for ' + Math.round(MANUAL_FOCUS_MS / 60000) +
+            ' minutes with nothing using it, taking it back');
+        manualFocusSince = 0;
       }
+    } else {
+      manualFocusSince = 0;
     }
 
     try { sp.browser.setFocused(want); } catch (e) { }
     strayFocusSince = 0;
   }
+
+  /*
+    When somebody's own F6 raised focus, and how long that is allowed to last.
+
+    Two minutes, the same number and the same reasoning as every other cap in
+    this file: far longer than anybody spends reading a panel, far shorter
+    than giving up on the game. Without it, a focus raised by F6 and never
+    lowered would be a keyboard that never comes back, which is the fault the
+    caps exist for.
+  */
+  let manualFocusSince = 0;
+  const MANUAL_FOCUS_MS = 120000;
 
   /*
     WHEN EACH CLAIM WENT UP, so the cap below can cover all of them.
@@ -2906,11 +2949,38 @@
       claim is released by name so the log says which one it was, which is the
       only evidence anybody will have next time.
     */
+    /*
+      AND IT CLOSES THE PANEL, RATHER THAN ONLY DROPPING THE CLAIM.
+
+      Djinn, 22 September: a panel was up, F6 gave no cursor, and the only way
+      out was Task Manager. This loop is how that happens.
+
+      Taking the claim back without telling the page leaves the panel DRAWN
+      with nobody claiming focus. applyFocus then forces focus to match the
+      claims every frame, so pressing F6 raises it and the very next frame
+      puts it straight back down: the cursor never appears. And with focus
+      down the browser is sent no key, no click and no mouse move at all, so
+      the panel's own Escape and its Close button are both unreachable. The
+      only way out left was the K key, and nothing on screen says so.
+
+      Two minutes is a real session at the skills panel, not an anomaly: the
+      plugin log for 22 September shows a single sitting of 67 seconds, so
+      this fires on people who are simply reading.
+
+      So the panel is asked to close first and the claim follows. Now the
+      rescue leaves somebody looking at the world with their keyboard back,
+      which is what it was always meant to do.
+    */
     for (const who in claimedAt) {
       if (who === 'chat') { continue; }
       if (!claims[who] || !claimedAt[who]) { continue; }
       if (now - claimedAt[who] > 120000) {
-        log('the ' + who + ' claim has held the keyboard for two minutes, taking it back');
+        log('the ' + who + ' claim has held the keyboard for two minutes, closing it and taking it back');
+        if (who === 'skills') {
+          T.js('try{window.thornswoodSkills&&window.thornswoodSkills.close();}catch(e){}');
+        } else if (who === 'wheel') {
+          T.js('try{window.thornswoodEmotes&&window.thornswoodEmotes.close();}catch(e){}');
+        }
         T.claimFocus(who, false);
       }
     }
@@ -3144,11 +3214,53 @@
     */
     if (what === 'select:quit') {
       log('menu: closing the game, asked from the character choice page');
+      /*
+        win32.exitProcess, NOT Debug.quitGame, and the difference is the whole
+        bug.
+
+        Patrick, 22 September: "close game button in main menu doesnt wokr
+        just says closing game forever", then "O it eventually closed it after
+        like a whole minuite or so".
+
+        Debug.quitGame is a PAPYRUS native. Every one of those needs a live VM
+        and stack, which SkyrimPlatform only has inside its update handler:
+        CallNativeApi throws "can't be called in this context" when the VM
+        pointer is null. A browserMessage does not arrive inside one. It comes
+        off a CEF thread and is handed over as a tick task, and tick tasks run
+        with no VM at all, so the call threw every single time and the catch
+        below ate it. thornswood-emotes.js has the same lesson written out at
+        length, and solves it by queueing to update.
+
+        QUEUEING WOULD NOT HAVE HELPED HERE. This button is only ever pressed
+        at the main menu, and there is no update event at the main menu: the
+        update loop is driven by a Papyrus native, so with no game loaded it
+        never fires. That is why the whole character choice block in this file
+        runs on tick rather than update.
+
+        win32.exitProcess is a plain function with no Papyrus anywhere near
+        it: it sets the engine's own quitGame flag, which is what
+        Debug.quitGame ends up doing anyway. It works from a tick.
+
+        The minute he waited was the game shutting down on its own terms after
+        he gave up and closed it another way, not this call working slowly.
+      */
+      let asked = false;
       try {
-        sp.Debug.quitGame();
+        if (sp.win32 && typeof sp.win32.exitProcess === 'function') {
+          sp.win32.exitProcess();
+          asked = true;
+        }
       } catch (e) {
-        log('menu: could not close the game:', e);
+        log('menu: win32.exitProcess threw:', e);
       }
+      if (!asked) {
+        // Older clients have no win32. Debug.quitGame will almost certainly
+        // throw here for the reason above, but a refusal that is logged is
+        // better than none, and the page's own timeout puts the button back.
+        try { sp.Debug.quitGame(); asked = true; }
+        catch (e) { log('menu: nothing could close the game:', e); }
+      }
+      if (asked) { log('menu: asked the engine to exit'); }
       return;
     }
     // The character choice page reports in plain lines: ready, alive, the

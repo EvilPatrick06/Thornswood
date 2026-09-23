@@ -222,6 +222,28 @@
         elQuit.textContent = 'Closing...';
         elQuit.className = 'btn2 quit';
         tell('quit');
+        /*
+          AND IT PUTS ITSELF BACK IF NOTHING HAPPENS.
+
+          Patrick: "close game button in main menu doesnt wokr just says
+          closing game forever". It said Closing for ever because the quit was
+          throwing on the other side and the page had committed to the word
+          with nothing to take it back.
+
+          A button that says Closing for ever is indistinguishable from a slow
+          quit, which is exactly how this was reported and why it took a
+          measurement rather than a glance to find. Six seconds is far longer
+          than a working exit needs and short enough that somebody has not yet
+          decided the launcher is broken.
+        */
+        setTimeout(function () {
+          try {
+            if (root.className === 'gone') { return; }
+            elQuit.textContent = 'Close the game';
+            elQuit.className = 'btn2 quit';
+            tell('quit did not take, the game is still here');
+          } catch (e) { }
+        }, 6000);
         return;
       }
       quitArmed = now;
