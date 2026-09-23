@@ -122,6 +122,13 @@ before code; a Claude does not settle it for them.
 - `git pull` before starting anything. If a pull conflicts, resolve it on
   your branch (`git fetch`, `git rebase origin/main`), never on main. If a
   push is rejected, pull, do not force.
+- Decided by Patrick on 23 Sep: **everything goes to the dev build first.**
+  His words: "start puttin these on the dev build and not the main build
+  launcher unless it's a security issue or can make the game untestable,
+  everything else even small changes go to the dev build launcher for
+  pretesting". Size is not a reason to skip it. A main Ship is for a
+  security fix or for something that leaves the game untestable, and he
+  says which.
 - The dev channel (`.\tools\Ship.ps1 -Channel dev "what changed"`) may be
   run from any branch, from either machine, to try work on the dev server.
   Say in #dev when you take it, because there is one dev feed and the last
@@ -146,7 +153,14 @@ run them.
 2. Then one command for each part the pull request touched:
    - The launcher (`tools\app`, `tools\ui.xaml`, the art and video that
      Build-Launcher.ps1 embeds), the game plugins (`tools\ts-plugins`), or
-     anything else that goes out in a pack: `.\tools\Ship.ps1 "what changed"`.
+     anything else that goes out in a pack:
+     `.\tools\Ship.ps1 -Channel dev "what changed"`. The dev build is where
+     it goes first, by the rule above. `.\tools\Ship.ps1 "what changed"`
+     with no channel is the live one, and that is for a security fix, for
+     something that leaves the game untestable, or for work Patrick has
+     said goes live.
+   - The gamemode behind that dev release: `.\tools\Deploy-DevGamemode.ps1`.
+     `Deploy-Gamemode.ps1` then `Deploy-Server.ps1` is the live pair.
    - The site's app or `tools\docs-app\public`: `.\tools\Deploy-Docs.ps1`.
      The public pages (`tools\docs-app\data\site\*.md`) need
      `.\tools\Deploy-Docs.ps1 -Site`.
