@@ -71,72 +71,6 @@ let nextPeer = 1;
 const peers = new Map();     // peerId -> {ws, profileId, name}
 
 /*
-  Who owns which characters.
-
-  A character under SkyMP is a change form the game server holds, keyed by a
-  profile id, and the id used to exist in exactly one place: a fifty byte
-  profiles.txt on the machine that made it. Reinstall, or move to another
-  computer, and that file is gone. The launcher rolls a fresh random id, the
-  server has never seen it, and creation runs from the top while the real
-  character sits up here forever with nothing left that knows its number.
-
-  Nothing about the character needs to move. It is already on the server. What
-  was missing is a way to prove who you are, so this is that: Steam account to
-  profile ids, written by the launcher every time somebody plays and read back
-  when their profiles.txt is missing.
-
-  Rebuilt by use rather than guarded. Every launch re-registers, so if this file
-  is ever lost each person restores their own entry the next time they play.
-
-  The shared secret is the game server's own password, out of version.json in
-  a private repo. So it is not public, but it is not a purpose made secret
-  either: everyone who plays here holds it, because holding it is what playing
-  here means.
-
-  That is the right bar for what this guards. A Steam id is close to public,
-  so without a second thing to know, anyone could ask the server which profile
-  ids belong to a friend and then connect as them. With it, reading the
-  register is exactly as hard as being allowed on the server at all, and no
-  harder. It is not protection from the people already here.
-*/
-const OWNERS_FILE = path.join(HERE, 'owners.json');
-let owners = {};
-try {
-  owners = JSON.parse(fs.readFileSync(OWNERS_FILE, 'utf8')) || {};
-} catch (e) {
-  owners = {};
-}
-
-/* The password, if the installer left one next to us. Without it every account
-   route is switched off rather than left open. */
-let SECRET = '';
-try {
-  SECRET = String(fs.readFileSync(path.join(HERE, 'secret.txt'), 'utf8')).trim();
-} catch (e) {
-  SECRET = '';
-}
-
-let ownersDirty = false;
-function saveOwners() {
-  if (!ownersDirty) return;
-  ownersDirty = false;
-  const tmp = OWNERS_FILE + '.tmp';
-  try {
-    // Written beside and renamed over, never truncated in place. A power cut
-    // halfway through a plain write leaves an empty file, and an empty file
-    // here means everybody is a stranger.
-    fs.writeFileSync(tmp, JSON.stringify(owners, null, 2));
-    fs.renameSync(tmp, OWNERS_FILE);
-  } catch (e) { }
-}
-setInterval(saveOwners, 4000);
-
-function steamOf(v) {
-  const s = String(v == null ? '' : v).trim();
-  return /^[0-9]{5,20}$/.test(s) ? s : '';
-}
-
-/*
   Ask the site whether this ticket owns this profile.
 
   Answers 'yes', 'no', or 'unchecked' when there is nobody to ask. Never throws
@@ -676,6 +610,26 @@ function iceServers() {
   return list;
 }
 
+/*
+  THE CHARACTER REGISTER IS GONE, 23 September.
+
+  It was three routes, /whoami, /claim and /owners, a file called owners.json
+  and a shared secret in secret.txt. All three refused every real caller with
+  403, because each required doc.password to equal that secret and the launcher
+  deliberately sent none: Account.cs and CharSync.cs were written that way and
+  were themselves deleted on 20 September. So owners.json was never written by
+  any launcher and never read by one, and CharSync.Sync returned null on every
+  launch, including the seven second wait it cost at Play.
+
+  The identity that actually flows is the site's linked.json, keyed by Discord
+  id. Two registers were never wanted and one of them never worked.
+
+  Taken out rather than left refusing, because a route that answers 403 to
+  every real caller is a thing somebody will one day try to fix instead of
+  delete. tools\Characters.ps1, which existed only to read /owners, went with
+  it; its own header already said the register had not been fed since
+  20 September.
+*/
 const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/positions') {
     // Loopback only. This is the gamemode talking to the service on the same
@@ -802,109 +756,6 @@ const server = http.createServer((req, res) => {
   }
 
   /*
-    Which characters belong to this Steam account.
-
-    Answered over the internet rather than loopback, because the launcher asks
-    it from somebody's house before the game has started.
-  */
-  if (req.method === 'POST' && route === '/whoami') {
-    readBody(req, res, 2000, (doc) => {
-      if (!SECRET || String(doc.password || '') !== SECRET) {
-        res.writeHead(403).end('no');
-        return;
-      }
-      const steam = steamOf(doc.steamId);
-      if (!steam) { res.writeHead(400).end('no steam id'); return; }
-      const rec = owners[steam];
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ steamId: steam, profiles: (rec && rec.profiles) || [] }));
-    });
-    return;
-  }
-
-  /*
-    This Steam account owns these profile ids.
-
-    Sent on every launch, so the record follows a character that was made
-    before any of this existed: nothing about the id changes, it just stops
-    being a secret held only by one hard drive.
-  */
-  if (req.method === 'POST' && route === '/claim') {
-    readBody(req, res, 4000, (doc) => {
-      if (!SECRET || String(doc.password || '') !== SECRET) {
-        res.writeHead(403).end('no');
-        return;
-      }
-      const steam = steamOf(doc.steamId);
-      if (!steam) { res.writeHead(400).end('no steam id'); return; }
-
-      const list = Array.isArray(doc.profiles) ? doc.profiles : [];
-      const clean = [];
-      for (const p of list.slice(0, 12)) {
-        const slot = Number(p.slot) || 0;
-        const profileId = Number(p.profileId) || 0;
-        if (slot <= 0 || profileId <= 0) continue;
-        clean.push({
-          slot: slot,
-          profileId: profileId,
-          name: String(p.name || '').slice(0, 40),
-          played: Number(p.played) || 0,
-          // The launcher's own notes about the character. The game server has
-          // none of this: it knows a change form, not that the person playing
-          // it calls themselves a bard from Winterhold with two hours in.
-          seconds: Number(p.seconds) || 0,
-          trade: String(p.trade || '').slice(0, 24),
-          town: String(p.town || '').slice(0, 24)
-        });
-      }
-      if (!clean.length) { res.writeHead(400).end('nothing to claim'); return; }
-
-      /*
-        Current list replaced, history only ever added to.
-
-        The list is what a fresh install gets handed back, so it has to be
-        whatever the machine in front of the person actually has. History is
-        the safety net under that: if somebody reinstalls, makes a character
-        before this has had a chance to hand theirs back, and then claims the
-        new id, the old one is still written down here rather than gone. A
-        character nobody can name is a character nobody can recover.
-      */
-      const was = owners[steam] || {};
-      const seen = Array.isArray(was.seen) ? was.seen.slice(0, 200) : [];
-      for (const p of clean) {
-        if (seen.indexOf(p.profileId) === -1) { seen.push(p.profileId); }
-      }
-
-      owners[steam] = { profiles: clean, seen: seen, at: Date.now() };
-      ownersDirty = true;
-      res.writeHead(204).end();
-    });
-    return;
-  }
-
-  /* The whole book, for the admin script. Same secret, and a POST so the
-     password never lands in a URL or a log line. */
-  if (req.method === 'POST' && route === '/owners') {
-    readBody(req, res, 2000, (doc) => {
-      if (!SECRET || String(doc.password || '') !== SECRET) {
-        res.writeHead(403).end('no');
-        return;
-      }
-      if (doc.forget) {
-        const steam = steamOf(doc.forget);
-        if (steam && owners[steam]) {
-          delete owners[steam];
-          ownersDirty = true;
-          saveOwners();
-        }
-      }
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ owners: owners }));
-    });
-    return;
-  }
-
-  /*
     The ICE list, for whichever page is about to build a peer connection.
 
     Answered to anyone who asks. It carries no secret: with the REST scheme the
@@ -953,9 +804,7 @@ const server = http.createServer((req, res) => {
                             bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             peers: peers.size, tracked: positions.size,
-                            queuedCommands: commands.length,
-                            accounts: Object.keys(owners).length,
-                            secret: SECRET ? 'set' : 'MISSING' }));
+                            queuedCommands: commands.length }));
     return;
   }
 
