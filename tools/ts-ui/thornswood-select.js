@@ -138,7 +138,11 @@
     // the foot
     '#ts-select .foot{padding:16px 44px 30px}',
     '#ts-select .status{font-size:15px;color:rgba(228,217,191,.7);min-height:1.5em;margin-bottom:12px;text-align:center}',
-    '#ts-select .hint{font-size:13px;color:rgba(228,217,191,.45);margin-top:4px;text-align:center;letter-spacing:.06em}'
+    '#ts-select .hint{font-size:13px;color:rgba(228,217,191,.45);margin-top:4px;text-align:center;letter-spacing:.06em}',
+    // Well below the hint and centred, so it is nowhere near the characters.
+    '#ts-select .quitrow{display:flex;justify-content:center;margin-top:18px}',
+    '#ts-select .quit{opacity:.72}',
+    '#ts-select .quit:hover{opacity:1}'
   ].join('');
   var style = document.createElement('style');
   style.id = 'ts-select-css';
@@ -154,7 +158,22 @@
       '<div class="count"></div></div>' +
       '<div class="list"></div>' +
       '<div class="foot"><div class="status"></div>' +
-      '<div class="hint">Click a character to play. Click an empty slot for a new character. Delete forgets the one that is lit.</div></div>' +
+      '<div class="hint">Click a character to play. Click an empty slot for a new character. Delete forgets the one that is lit.</div>' +
+      /*
+        A way out of this page that is not Task Manager.
+
+        Patrick, 22 September: "add a close game button in the main menu with
+        the chacrther selector". Until now the only way to leave was alt
+        tabbing and killing Skyrim, which is also what people do when the page
+        itself stops answering: Djinn's "Timed out" report ends "have to task
+        out exit". A quit that the page offers is one they can reach while it
+        is still drawing.
+
+        It asks a second time before it goes, the way Forget does, because
+        this is one click from Play and quitting by accident is a loading
+        screen and a walk back to where you were.
+      */
+      '<div class="quitrow"><div class="btn2 quit">Close the game</div></div></div>' +
     '</div>';
   document.body.appendChild(root);
   var elPanel = root.querySelector('.panel');
@@ -184,6 +203,38 @@
   }
   var elCount = root.querySelector('.count');
   var elStatus = root.querySelector('.status');
+
+  /*
+    Close the game. Asked twice, then sent to the front, which calls the
+    engine's own quit: nothing in a browser can shut Skyrim.
+
+    The second click is the confirm, on the same button, which is the lightest
+    thing that cannot be done by accident. It gives up after five seconds so a
+    stray first click does not leave a loaded gun sitting on the page.
+  */
+  var elQuit = root.querySelector('.quit');
+  var quitArmed = 0;
+  if (elQuit) {
+    elQuit.onclick = function () {
+      var now = Date.now();
+      if (quitArmed && now - quitArmed < 5000) {
+        quitArmed = 0;
+        elQuit.textContent = 'Closing...';
+        elQuit.className = 'btn2 quit';
+        tell('quit');
+        return;
+      }
+      quitArmed = now;
+      elQuit.textContent = 'Click again to close';
+      elQuit.className = 'btn2 quit danger';
+      setTimeout(function () {
+        if (!quitArmed) { return; }
+        quitArmed = 0;
+        elQuit.textContent = 'Close the game';
+        elQuit.className = 'btn2 quit';
+      }, 5000);
+    };
+  }
 
   function fit() {
     try { elPanel.style.transform = 'scale(' + scale().toFixed(3) + ')'; } catch (e) { }
