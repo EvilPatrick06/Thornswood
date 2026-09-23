@@ -176,6 +176,8 @@ function Test-ShipOtherServer([string]$rel) {
     # kept it out of the installer all along; nothing kept it out of a pack.
     if ($rel -match '^Data\\NirnLabUIPlatform($|\\)') { return $true }
     if ((Split-Path $rel -Leaf) -ieq 'NirnLabUIPlugin.dll') { return $true }
+    # See $ShipDeleteAlways below for why this one also has to be DELETED from
+    # machines that already have it, and not merely left out of new packs.
     # A loose map.swf. Somebody else left it in the Steam copy, it overrides
     # SkyUI's own copy inside SkyUI_SE.bsa because loose beats an archive, and
     # SkyUI answers with a full screen "ERROR CODE 5, Incompatible menu file
@@ -268,3 +270,41 @@ function Get-ShipLoadOrderDir([string]$Root, [string]$ProfileDir) {
     if (Test-Path -LiteralPath (Join-Path $own 'plugins.txt')) { return $own }
     return (Join-Path $ProfileDir 'Default')
 }
+
+# ---------------------------------------------------------------------------
+# FILES EVERY PACK DELETES, WHETHER THIS MACHINE HAS THEM OR NOT.
+#
+# Leaving a file out of a pack stops it reaching NEW machines. It does nothing
+# at all for the ones that already have it, and those are the machines the
+# problem is on.
+#
+# 22 September, map.swf. It was excluded from shipping by the rule above, the
+# release went out, and the pack carried no delete.txt: every tester who
+# already had the game kept the broken file and kept the SkyUI error box.
+# Excluding it had only helped people who did not have the problem.
+#
+# WHY IT WAS NOT CAUGHT BY THE ORDINARY REMOVAL DIFF. A file that leaves the
+# game folder is normally a removal, but removals are filtered through
+# Test-FromCollection first, and the launcher's own record of what Vortex
+# provides lists map.swf even though Vortex's deployment manifest does not. So
+# it was read as a collection file and dropped from the removal list. That
+# guard is RIGHT and stays: the first release after the move to the Steam copy
+# carried 28,833 removals and had to be pulled out of version.json by hand.
+#
+# So this is the deliberate override, and it is a list of paths somebody has
+# decided must not exist, not a diff. Deleting a file that is not there is a
+# no-op in Updater.Install, so carrying these in every pack costs nothing and
+# is what makes the fix reach the machines that need it.
+#
+# KEEP IT SHORT. Every entry here is deleted from everybody's game on every
+# update, for ever. Nothing belongs here that the collection might one day
+# legitimately provide.
+$ShipDeleteAlways = @(
+    # SkyUI refuses a map.swf it does not recognise and puts a full screen
+    # ERROR CODE 5 over the loading screen. Vortex deploys no map.swf, SkyUI
+    # ships its own inside SkyUI_SE.bsa, and A Quality World Map ships no
+    # Interface file at all, so nothing in the collection wants a loose one.
+    'Data\Interface\map.swf'
+)
+
+function Get-ShipDeleteAlways { return $ShipDeleteAlways }

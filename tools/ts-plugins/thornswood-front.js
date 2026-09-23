@@ -1700,6 +1700,88 @@
    * survive: forty key presses in five seconds is mashing, not the occasional
    * press of somebody sitting still watching the scenery.
    */
+  /*
+    ------------------------------------- three chopping blocks, taken away
+
+    Djinn, 22 September, "Removal from area - Woodworking chopping Blocks":
+    Solitude, Solitude Stables and Dragon Bridge, with a coordinate each.
+    Patrick: "I want them actually removed and not there visible anymore."
+
+    THE SERVER CANNOT DO THIS AND NEITHER CAN A GAMEMODE. Refusing the press
+    only makes a block that does nothing, which is what the first attempt did
+    and is not what was asked: the block is still standing there. Deleting a
+    placed reference means editing the plugin that placed it, which is a
+    rebuild, a pack, and a server that will not start if it goes wrong.
+
+    So it is done where it can be done. Skyrim Platform runs on the machine
+    that is drawing the block and ObjectReference.disable is the engine's own
+    "this is not here", the same call the game uses for every object a quest
+    takes out of the world. Every person running this plugin stops seeing them,
+    which is everybody.
+
+    BY BASE AND POSITION, because CHOPPING_BLOCKS is three BASE records shared
+    by every block in Skyrim: findClosestReferenceOfType is asked for one of
+    those bases within a short radius of one of Djinn's three points, so
+    nothing else can be caught. The radius is small for the same reason the
+    server's is.
+
+    ONCE PER SITE PER SESSION, and only when somebody is near enough for the
+    reference to be loaded at all. A disable on an unloaded cell finds
+    nothing, so this waits until they are close rather than firing at startup
+    and reporting three failures.
+  */
+  const BLOCK_BASES = [0x7022e, 0xa91bf, 0x10f575];
+  const BLOCKS_GONE = [
+    { where: 'Solitude', pos: [-64263, 106003.5, -8377.8] },
+    { where: 'Solitude Stables', pos: [-76193.3, 96600.6, -11435] },
+    { where: 'Dragon Bridge', pos: [-101780.7, 80484.5, -12522.7] }
+  ];
+  const BLOCK_FIND = 400;      // how close to the point the block has to be
+  const BLOCK_NEAR = 6000;     // how close YOU have to be for it to be loaded
+  const blockDone = {};
+  let blockAt = 0;
+
+  sp.on('update', guard('blocksgone', () => {
+    const now = Date.now();
+    if (now - blockAt < 4000) { return; }
+    blockAt = now;
+
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { return; }
+    if (!pc) { return; }
+    let px = 0, py = 0, pz = 0;
+    try { px = pc.getPositionX(); py = pc.getPositionY(); pz = pc.getPositionZ(); }
+    catch (e) { return; }
+
+    for (let i = 0; i < BLOCKS_GONE.length; i++) {
+      if (blockDone[i]) { continue; }
+      const site = BLOCKS_GONE[i];
+      const dx = px - site.pos[0], dy = py - site.pos[1], dz = pz - site.pos[2];
+      if (Math.sqrt(dx * dx + dy * dy + dz * dz) > BLOCK_NEAR) { continue; }
+
+      for (let b = 0; b < BLOCK_BASES.length; b++) {
+        try {
+          const base = sp.Form.from(sp.Game.getFormEx(BLOCK_BASES[b]));
+          if (!base) { continue; }
+          const ref = sp.Game.findClosestReferenceOfType(
+            base, site.pos[0], site.pos[1], site.pos[2], BLOCK_FIND);
+          if (!ref) { continue; }
+          // disable answers a promise. Nothing waits on it: the block either
+          // goes or it does not, and a failure is worth one line, not a stall.
+          const p = ref.disable(false);
+          if (p && typeof p.then === 'function') { p.then(function () { }, function () { }); }
+          blockDone[i] = true;
+          say('took the chopping block at ' + site.where + ' out of the world');
+          break;
+        } catch (e) {
+          say('could not take the ' + site.where + ' chopping block out: ' + e);
+          blockDone[i] = true;   // do not try it every four seconds forever
+          break;
+        }
+      }
+    }
+  }));
+
   let stuckKeys = 0;
   let stuckMoveKeys = 0;
   let stuckAt = 0;
