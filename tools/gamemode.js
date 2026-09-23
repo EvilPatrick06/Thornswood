@@ -13778,25 +13778,152 @@ log('gamemode loaded:',
     stand by the board, say /notice, and it goes up.
   */
   var BOARD_REACH = 400;
-  var boards = loadPart('boards', null) || seededBoards();
+
+  /*
+    ============================ THE NINE SITES, AND WHERE THEY CAME FROM =====
+
+    Djinn, 22 September, in "Borad location coords", nine towns with a facing
+    each, and his own next step written under them: "Suggest allocation then
+    verification and orientation". This is the allocation. The verification is
+    somebody standing on each one, and it is not done.
+
+    THEY ARE OUTSIDE NOW, WHICH IS THE POINT OF THEM. The boards were seeded
+    at each hold's INN, out of the chargen arrival table, because those were
+    the only positions this server had ever stood anybody on and a number
+    invented for the ground outside a keep would have put a board inside a
+    rock. That reasoning was right and it is what these replace: a coordinate
+    somebody walked to and read off beats one nobody has ever stood on, and
+    beats an inn, because a notice board belongs in the open where people pass
+    it.
+
+    WHAT WAS CHECKED HERE, because none of it was taken on trust. DATA.capitals
+    is this file's own table of the nine towns, and every one of Djinn's falls
+    a short walk from its capital: Winterhold 478 units, Dawnstar 760, Morthal
+    1031, Falkreath 1057, Windhelm 2898, Riften 3242, Markarth 3366, Whiterun
+    4526. That is the spread you get between a map marker and a spot by a gate,
+    and it puts all eight in the same worldspace the capitals are in, which is
+    Tamriel.
+
+    SOLITUDE IS 51,950 UNITS FROM ITS CAPITAL and is the one that does not fit.
+    The capitals table has Solitude at -58079.7, 110488.4; this coordinate is
+    at -6486.7, 104407.2, which is most of a hold away. So it is either a
+    different worldspace or a slip, and it is left in with the others
+    DELIBERATELY RATHER THAN DROPPED OR CORRECTED: correcting it would be me
+    inventing a number, which is the thing the inn seeding existed to avoid,
+    and dropping it would leave Solitude on its inn with nothing saying why.
+    It is on the To Do List to walk to. If it is wrong, /board move solitude
+    fixes it from the chair in one line.
+
+    THE Z AND THE FACING ARE THE SAME KIND OF UNVERIFIED. BOARD_REACH is 400,
+    so a height that is out by more than that leaves a board nobody can reach
+    while standing under it, and that is the first thing verification should
+    check. The facing is carried and nothing reads it: a board here is a PLACE,
+    a cell and a point, with no record and no placed reference, so there is
+    nothing yet to point in a direction. It is kept because it is the number
+    that will be needed the day there is, and because losing it means asking
+    Djinn for it twice.
+  */
+  var BOARD_CELL = '3c:Skyrim.esm';   // Tamriel
+  var BOARD_SITES = {
+    solitude:   { pos: [-6486.7, 104407.2, -8405.9], facing: 9.9, where: 'Solitude' },
+    whiterun:   { pos: [23139.4, -7891.7, -3494.4], facing: 188.4, where: 'Whiterun' },
+    riften:     { pos: [174559.5, -94337, 11130.2], facing: 38, where: 'Riften' },
+    windhelm:   { pos: [134265.1, 35842.3, -12397.5], facing: 85.8, where: 'Windhelm' },
+    markarth:   { pos: [-173494.7, 5049.1, -3447.6], facing: 72, where: 'Markarth' },
+    falkreath:  { pos: [-30342.2, -87022.7, -3119.1], facing: 56.6, where: 'Falkreath' },
+    morthal:    { pos: [-38766.1, 64411.9, -13920.9], facing: 251.2, where: 'Morthal' },
+    dawnstar:   { pos: [32216.4, 102314, -13263], facing: 110, where: 'Dawnstar' },
+    winterhold: { pos: [109969.6, 100594.4, -9033], facing: 241.4, where: 'Winterhold' }
+  };
+
+  /*
+    WHICH SEEDING A BOARD IS STANDING ON, AND WHY A NUMBER RATHER THAN A FLAG.
+
+    boards is SAVED, in the register beside the claims and the notices, and it
+    is written every time anything in that register is. So on any server that
+    has been played on, loadPart('boards') answers and seededBoards() is never
+    reached again: changing the table above would move the boards on a fresh
+    server and on no other, which is the failure where the fix reads perfectly
+    and nothing in the world changes.
+
+    So a seeded board carries the seed it came from and is replaced when that
+    number moves. 1 is the inn seeding and is what every board written before
+    today has, by not carrying the field at all. A board a STEWARD placed with
+    /board move carries no seed and is never touched again, because that is
+    somebody's decision about their own hold and a deploy must not walk over
+    it. The next time these coordinates change, this number goes up and the
+    boards follow, except the ones people have moved on purpose.
+  */
+  var BOARD_SEED = 2;
+
+  var boards = seedBoards(loadPart('boards', null));
+
+  /*
+    The saved boards, brought up to the current seeding. A null saved copy is a
+    server that has never written its register, which takes the whole table.
+  */
+  function seedBoards(saved) {
+    var out = {};
+    var hold;
+    if (saved && typeof saved === 'object') {
+      for (hold in saved) {
+        if (!Object.prototype.hasOwnProperty.call(saved, hold)) { continue; }
+        var b = saved[hold];
+        if (!b || typeof b !== 'object') { continue; }
+        // No seed field at all is a board a steward placed, OR one written by
+        // the inn seeding before this field existed. Those two are told apart
+        // by `placed`, which moveBoard writes and nothing else ever did.
+        if (b.placed) { out[hold] = b; continue; }
+        if (b.seed === BOARD_SEED) { out[hold] = b; continue; }
+        // Anything else is an older seeding and is replaced below.
+      }
+    }
+    var fresh = seededBoards();
+    var moved = 0;
+    for (hold in fresh) {
+      if (!Object.prototype.hasOwnProperty.call(fresh, hold)) { continue; }
+      if (out[hold]) { continue; }
+      out[hold] = fresh[hold];
+      moved++;
+    }
+    if (moved) {
+      plog('boards: seeding', moved, 'of', Object.keys(fresh).length,
+           'to sites ' + BOARD_SEED + '; the rest were placed by a steward');
+    }
+    return out;
+  }
 
   function seededBoards() {
     var out = {};
     /*
-      Straight out of PASSAGES, which is the chargen table and is top level in
-      this file. Each town's arrival carries the interior cell descriptor and
-      the exact point somebody is stood up at when they pick that home, so
-      these are positions the server has already put people on, over and over.
-      That is why they are not guesses.
+      Djinn's nine first, which are outdoor sites in Tamriel. Any town the
+      table above does not name falls back to that hold's INN, out of PASSAGES,
+      which is the chargen table and is top level in this file: each town's
+      arrival carries the interior cell descriptor and the exact point somebody
+      is stood up at when they pick that home. Those are positions the server
+      has already put people on, over and over, so a town with no site is on a
+      real spot rather than on nothing.
     */
     try {
       for (var desc in PASSAGES) {
         if (!Object.prototype.hasOwnProperty.call(PASSAGES, desc)) { continue; }
         var t = PASSAGES[desc];
-        if (t && t.key && t.arrival && t.arrival.desc && t.arrival.pos) {
+        if (!t || !t.key) { continue; }
+        var site = Object.prototype.hasOwnProperty.call(BOARD_SITES, t.key)
+          ? BOARD_SITES[t.key] : null;
+        if (site) {
+          out[t.key] = { cell: BOARD_CELL,
+                         pos: [site.pos[0], site.pos[1], site.pos[2]],
+                         facing: site.facing,
+                         where: site.where || t.town || t.key,
+                         seed: BOARD_SEED };
+          continue;
+        }
+        if (t.arrival && t.arrival.desc && t.arrival.pos) {
           out[t.key] = { cell: t.arrival.desc,
                          pos: [t.arrival.pos[0], t.arrival.pos[1], t.arrival.pos[2]],
-                         where: t.town || t.key };
+                         where: t.town || t.key,
+                         seed: BOARD_SEED };
         }
       }
     } catch (e) {
@@ -13834,9 +13961,19 @@ log('gamemode loaded:',
       toProfile(profileId, 'The server cannot tell where you are standing.');
       return true;
     }
-    boards[hold] = { cell: cell, pos: [pos[0], pos[1], pos[2]], where: hold };
+    /*
+      `placed` is what stops a later deploy moving this back. seedBoards reads
+      it: a board somebody walked to and put down is theirs, and a new seeding
+      replaces only boards that are still sitting where this file put them.
+      Keep the name the board already had rather than the hold key, so a board
+      moved twice does not lose 'Whiterun' and become 'whiterun'.
+    */
+    var was = boards[hold];
+    boards[hold] = { cell: cell, pos: [pos[0], pos[1], pos[2]],
+                     where: (was && was.where) || hold, placed: Date.now() };
     save();
-    plog('a steward put', hold + '\'s board where they stood');
+    plog('a steward put', hold + '\'s board where they stood, at',
+         cell, pos[0] + ',' + pos[1] + ',' + pos[2]);
     toProfile(profileId, hold + '\'s board is here now.');
     return true;
   }
