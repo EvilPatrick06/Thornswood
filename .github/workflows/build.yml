@@ -87,6 +87,16 @@ jobs:
             & pwsh -NoProfile -File $t.FullName
             if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
           }
+          # The five in tools\voice, which run nowhere else. They spawn the
+          # real service in a temp folder and drive it over HTTP, so they need
+          # node and nothing else, and node is already here. Added 23
+          # September: the harness step globbed tools with no -Recurse, so
+          # thirty ran and these five never had.
+          foreach ($t in (Get-ChildItem tools\voice -Filter 'test-*.js' -File | Sort-Object Name)) {
+            Write-Host ("--- voice/{0}" -f $t.Name)
+            & node $t.FullName
+            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          }
           if ($bad) { exit 1 }
           Write-Host 'every harness passed'
 

@@ -1,0 +1,31 @@
+# What this repository depends on, watched rather than remembered.
+#
+# ONE ECOSYSTEM, because one is what actually has a manifest here.
+#
+# github-actions: the build check pins actions by major version, and a pinned
+# action is a thing that goes stale quietly.
+#
+# NOT pip and NOT npm, and this is the honest reason rather than an oversight:
+# there is no requirements.txt and no package.json anywhere in this repository.
+# The bot's three libraries are named in the pip line inside Install-Bot.ps1 and
+# again in the build check; the site and the voice service are deliberately
+# written against node's own library and depend on nothing. Pointing dependabot
+# at a folder with no manifest gives an error on the Dependabot tab that reads
+# like a fault and watches nothing, which is worse than not configuring it.
+#
+# When the bot grows a requirements.txt, add a pip entry here pointing at
+# /tools/discord and it starts working the same day.
+#
+# The launcher is C# built with the .NET Framework csc and has no package
+# manager at all, by design, so there is nothing here for it.
+#
+# Weekly rather than daily: this is a two person project, and a pull request a
+# day from a robot is a pull request nobody reads.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
