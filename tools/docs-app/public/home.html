@@ -3,24 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- Google Ads conversion tag, AW-18458864483. This file is the whole public
-     front: server.js serves it for every route in PUBLIC_PAGES and swaps the
-     body in through /api/page, so the tag loads once here and covers the
-     download page, the join page and the rest. It is deliberately NOT in
-     index.html, which is the signed in half, because tracking people who have
-     already joined serves no advertising purpose and widens what leaves the
-     site. Two things this depends on and neither exists yet: a privacy page
-     saying that Google receives visitor data, which is entry 32, and a consent
-     gate for visitors in the EU and the UK, where Google Ads expects Consent
-     Mode rather than an unconditional load. -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=AW-18458864483"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+<!-- NO ANALYTICS AND NO ADVERTISING TAG, and that is a decision rather
+     than an oversight. A Google Ads conversion tag lived here until
+     23 September and Patrick took the decision to drop it: "we will
+     not be using Google Ads".
 
-  gtag('config', 'AW-18458864483');
-</script>
+     What went with it is worth knowing, because it is why two other
+     pieces of work are no longer owed. The tag loaded on every public
+     page, which meant Google received the address of every visitor
+     before they had agreed to anything, and that needed a privacy
+     page naming Google and a consent gate for visitors in the EU and
+     the UK, where an unconditional load is not what Google Ads
+     expects. No tracker reaches out from this page now, so neither is
+     needed for that reason.
+
+     WHAT STILL LEAVES, said plainly rather than left for somebody to
+     find: the fonts come from fonts.googleapis.com and the markdown
+     renderer from cdnjs, so a visitor's address reaches those two by
+     the fact of loading the page. That is not tracking and it is not
+     advertising, but a privacy page still has to say it.
+
+     If anything like it comes back, it comes back with the privacy
+     page and the consent gate in the same change, not after it. -->
 <title>Thornswood</title>
 <meta name="description" content="A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.">
 <!-- What a link to this site looks like when it is pasted into Discord. Without
