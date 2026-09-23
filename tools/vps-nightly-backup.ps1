@@ -1,4 +1,4 @@
-<#
+﻿<#
   vps-nightly-backup.ps1
 
   Runs on the VPS, once a night, as the scheduled task that Install-Backup.ps1
@@ -15,8 +15,7 @@
     server-settings.json  the port, the name, the load order
     gamemode.js           so a restore is a working server and not a puzzle
     the site's data       linked Discord accounts, the boards, the documents
-    the bot's config      bot.env.json, and the voice service's owners.json,
-                          choices.json and secret.txt
+    the bot's config      bot.env.json, and the voice service's choices.json
     the Caddyfile         whatever is answering on 443 for thornswood.net
 
   What it leaves: node_modules, the installer under the site's public folder,
@@ -117,14 +116,17 @@ Grab (Join-Path $SiteRoot 'config.json')          'site\config.json'
 # bot.env.json, not config.json. The first nightly run reported the bot config
 # missing because this asked for a name the bot has never used.
 Grab (Join-Path $BotRoot  'bot.env.json')         'bot\bot.env.json'
-# The shared secret the character register checks against. Without it the
-# register is switched off on a restored box until somebody rotates it.
-# token-key.txt is deliberately not here: it makes itself on first run and
-# losing it only expires join tokens that were good for five minutes anyway.
-Grab (Join-Path $VoiceRoot 'secret.txt')          'voice\secret.txt'
+# THE CHARACTER REGISTER IS GONE, 23 September, and so are the two files this
+# used to fetch for it: secret.txt, the shared secret it checked against, and
+# owners.json, the register itself. Nothing reads either any more, so backing
+# them up would be backing up a secret with no reader, which is worse than
+# having neither.
+#
+# token-key.txt is still deliberately not here, for its own reason: it makes
+# itself on first run and losing it only expires join tokens that were good
+# for an hour anyway.
 # Whatever is terminating TLS. RESTORING.md needs it on a fresh box.
 Grab (Join-Path $CaddyRoot 'Caddyfile')           'web\Caddyfile'
-Grab (Join-Path $VoiceRoot 'owners.json')         'voice\owners.json'
 Grab (Join-Path $VoiceRoot 'choices.json')        'voice\choices.json'
 
 # What was running and how, so a restore onto a fresh box is not archaeology.
