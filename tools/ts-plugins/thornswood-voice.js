@@ -334,6 +334,13 @@ let phase = 0;         // 0 waiting for the front, 1 configuring, 2 running
 let at = 0;
 let tries = 0;
 let micOpened = false; // whether the page has been told it may open a capture
+// How many times the front is told its settings before this gives up saying
+// it, and how many clear looks at the world are wanted before a capture
+// device is opened. Both are explained where they are used, below. Both were
+// cut once and put back, so neither moves again without somebody measuring
+// what takes the foreground during a launch.
+const CONFIGURE_TRIES = 12;
+const CLEAR_LOOKS = 8;
 let clear = 0;         // consecutive checks that said it is safe to
 
 sp.on('update', guard('tick', () => {
@@ -354,25 +361,31 @@ sp.on('update', guard('tick', () => {
   }
 
   /*
-   * Said more than once on purpose, but three times rather than twelve.
+   * Said more than once on purpose: CONFIGURE_TRIES times, 1200 ms apart.
    *
    * The page fetches its own script, so there is a window where the front is up
    * and window.thornswoodVoice is not there yet, and a configure call landing
    * in that window is silently lost. Repeating covers that. Always with the
    * microphone off, whatever the ini says.
    *
-   * Twelve of them, 1200 ms apart, was fourteen and a half seconds before the
-   * watcher below was even allowed to start looking. The line under it said
-   * there was no hurry. There was: that was most of the wait between loading in
-   * and being able to talk, and none of it was buying anything. The page is
-   * fetching a file off the same disk, and if one of these is still lost the
-   * configure sent when the microphone opens carries the whole thing again.
+   * THIS WAS CUT TO THREE AND PUT BACK. The reasoning for cutting it was that
+   * twelve of them is fourteen and a half seconds before the watcher below is
+   * allowed to start looking, which is most of the wait between loading in and
+   * being able to talk. The block under this one records what happened when
+   * that whole family of numbers came down: the keyboard lock came back, twice,
+   * and every number in this file went back to what it was. The comment stayed
+   * describing the cut for a day after the cut was undone, which is how this
+   * one got found.
+   *
+   * So the number is twelve, and it is written once, above, as a constant
+   * rather than as a literal down here, so the next person to move it moves
+   * this with it.
    */
   if (phase === 1 && now - at > 1200) {
     tries++;
     at = now;
     configure(false);
-    if (tries >= 12) { phase = 2; log('configured'); }
+    if (tries >= CONFIGURE_TRIES) { phase = 2; log('configured'); }
     return;
   }
 
@@ -432,26 +445,26 @@ sp.on('update', guard('tick', () => {
     clear++;
 
     /*
-     * Two clear checks, about two seconds.
+     * CLEAR_LOOKS clear checks, two seconds apart: sixteen seconds of the
+     * world being quietly up before a capture device is opened.
      *
-     * This was eight checks at two seconds each, sixteen seconds of standing
-     * in an inn before anybody could talk, and the reason given for it was
-     * that opening a capture device "puts its stall" into the arrival. That
-     * was true and the cause was somewhere else entirely.
+     * THIS WAS CUT TO TWO AND PUT BACK, the same night and for the same reason
+     * as the repeats above. The reasoning for cutting it was that the wait was
+     * only ever masking a keyboard loss, that the loss was really DirectInput
+     * never being re-acquired, and that with the hook re-acquiring the wait
+     * could go back to just "not in a menu". Half of that was right and the
+     * block above this one holds the measurement: at the short numbers the
+     * keyboard went away for fifteen seconds again, so every number in this
+     * file went back to what it was.
      *
-     * Opening the microphone takes the foreground for an instant. Windows
-     * hands back a foreground acquired DirectInput device when that happens,
-     * and SkyrimPlatform's hook never asked for it again, so the keyboard died
-     * and stayed dead. Waiting sixteen seconds did not fix that. It only moved
-     * it to a moment when somebody had stopped pressing keys long enough not
-     * to notice for a while.
-     *
-     * The hook re acquires now, so the stall it was hiding from is gone, and
-     * the wait goes back to what it is actually for: not opening a capture in
-     * the middle of a load screen or a menu. Two seconds of being genuinely in
-     * the world is enough to know that.
+     * Opening the microphone takes the foreground for an instant. What decides
+     * whether that costs nothing or costs a minute is how settled the
+     * foreground is when it lands, and early in a launch it is not settled at
+     * all. Sixteen seconds is distance from the noisiest part of a launch, not
+     * certainty, and it stays until something measures what takes the
+     * foreground.
      */
-    if (clear >= 8) {
+    if (clear >= CLEAR_LOOKS) {
       micOpened = true;
       configure(true);
       log('in the world and settled, opening the microphone');

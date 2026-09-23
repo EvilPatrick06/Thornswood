@@ -2890,7 +2890,13 @@ const CHARGEN_PROPERTY = 'thornswoodChargen';
  * is twelve seconds of pure tick overhead on top of every real wait.
  *
  * The work in a tick is a couple of property reads for at most five people, so
- * the rate was never about cost. One second.
+ * the rate was never about cost.
+ *
+ * IT IS HALF A SECOND, not the one second this comment asked for until 23
+ * September. It went to 500 and the sentence naming a number was left behind,
+ * which matters more here than it looks: the wait below is written in
+ * milliseconds and reasoned about in ticks, so a comment claiming a one second
+ * tick makes every one of those sums come out at twice the truth.
  */
 const CHARGEN_TICK_MS = 500;
 
@@ -2928,11 +2934,15 @@ const NUDGE_MS = 120000;   // two minutes; see the nudge below
  * tick, two seconds is still two separate confirmations that a person is on
  * their feet rather than nudging a camera.
  *
- * And down again to one. The check it gates is not "did the camera twitch", it
- * is "is this person's position or facing different from the last sample",
- * which a menu does not produce at all. A second confirmation was insurance
- * against a thing that was never happening, paid for by everybody standing in
- * an empty room. */
+ * And down again to one, which at CHARGEN_TICK_MS is 500 ms and one tick. The
+ * check it gates is not "did the camera twitch", it is "is this person's
+ * position or facing different from the last sample", which a menu does not
+ * produce at all. A second confirmation was insurance against a thing that was
+ * never happening, paid for by everybody standing in an empty room.
+ *
+ * The sentence above it said "at a one second tick" while the tick was half a
+ * second, so the two confirmations it describes were one second and not two.
+ * The number here never moved; the tick under it did. */
 const MOVED_ENOUGH_MS = 500;
 
 /* How far counts as having moved, between two consecutive samples.
