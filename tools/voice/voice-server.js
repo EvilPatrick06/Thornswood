@@ -913,8 +913,27 @@ const server = http.createServer((req, res) => {
     already serves.
   */
   if (route === '/ice') {
+    /*
+      AND A PAGE ON A file:// ORIGIN CAN READ IT.
+
+      The in-game page is loaded off disk, so its Origin is the literal string
+      null, and a fetch with no Access-Control-Allow-Origin on the answer is
+      refused by the browser before the page ever sees the body. It logged
+      "Access to fetch at .../voice-dev/ice from origin null has been blocked
+      by CORS policy" once a second, on live and on dev alike, and retried
+      forever.
+
+      This gives away nothing that was not already public. CORS is a rule about
+      what a PAGE may read, not about who may ask: anything that can make an
+      HTTP request to this service could already read this route, header or no
+      header. What the route hands out is the STUN list plus, when a relay is
+      configured, a credential that is derived and short lived under the REST
+      scheme. The static credential case is the one to keep an eye on, and it
+      is no more exposed by this line than it was by curl.
+    */
     res.writeHead(200, { 'content-type': 'application/json',
-                         'cache-control': 'no-store' });
+                         'cache-control': 'no-store',
+                         'access-control-allow-origin': '*' });
     res.end(JSON.stringify({ iceServers: iceServers() }));
     return;
   }

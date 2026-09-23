@@ -21,11 +21,18 @@ function run(env, then) {
       try { const r = await fetch('http://127.0.0.1:' + PORT + '/health'); if (r.ok) break; } catch (e) {}
       await new Promise(r => setTimeout(r, 150));
     }
-    const ice = await (await fetch('http://127.0.0.1:' + PORT + '/ice')).json();
+    // The headers come back too, because whether a page is ALLOWED to read
+    // this answer matters as much as what is in it. The in-game page is loaded
+    // off disk, so its Origin is the literal string null, and without the
+    // header the browser refuses the fetch before the page sees the body: it
+    // logged a CORS refusal once a second on live and dev alike.
+    const res = await fetch('http://127.0.0.1:' + PORT + '/ice', { headers: { Origin: 'null' } });
+    const cors = res.headers.get('access-control-allow-origin');
+    const ice = await res.json();
     const health = await (await fetch('http://127.0.0.1:' + PORT + '/health')).json();
     srv.kill();
     await new Promise(r => setTimeout(r, 200));
-    return { ice: ice.iceServers, turn: health.turn, log };
+    return { ice: ice.iceServers, turn: health.turn, cors: cors, log };
   })();
 }
 (async () => {
@@ -33,6 +40,7 @@ function run(env, then) {
   let r = await run({});
   check('only the STUN that was always there', r.ice, [{ urls: 'stun:stun.l.google.com:19302' }]);
   check('health says no relay', r.turn, 'none');
+  check('a page on a file:// origin may read the list', r.cors, '*');
 
   console.log('\na relay with the coturn REST secret:');
   const SECRET = 'a shared secret for the relay';
@@ -55,6 +63,11 @@ function run(env, then) {
   r = await run({ THORNSWOOD_TURN_URL: 'turn:x:3478', THORNSWOOD_TURN_USER: 'bob', THORNSWOOD_TURN_PASS: 'pw' });
   check('health says static', r.turn, 'static');
   check('it is passed through', [r.ice[1].username, r.ice[1].credential], ['bob', 'pw']);
+  // Named here because this is the case worth thinking about before widening
+  // who may read the route. It is no more exposed than it was: CORS says what
+  // a PAGE may read, and anything that can make an HTTP request could always
+  // read this.
+  check('and it is readable by a page in that case too, which is the one to watch', r.cors, '*');
 
   console.log('\na relay with no credentials at all, which would waste gathering time:');
   r = await run({ THORNSWOOD_TURN_URL: 'turn:x:3478' });
