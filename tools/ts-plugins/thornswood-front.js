@@ -2370,6 +2370,195 @@
     return true;
   }
 
+  /*
+    ------------------------------------- your party: the name, the map, the way
+
+    Patrick, 22 September, asked the party menu to let people "see their name
+    tag colour, see them on the map and compass". Those three did not ship with
+    the rest of the party work, because none of them is something a browser
+    overlay can draw: the name above somebody's head is the client's own text,
+    and the compass and the map belong to the game.
+
+    ALL THREE ARE HERE NOW, and each one is done where it can actually be done.
+
+    THE NAME, and this is the one that looked impossible and was not.
+    skymp5-client draws the tag itself, in formView.ts:
+
+        this.textNameId = createText(x, y, refr.getDisplayName(), [1, 1, 1, 0.8]);
+
+    A plugin cannot reach into that. But the client hands the id straight back
+    out: SweetTaffyNicknamesService writes every one of them into
+    sp.storage.idTextNickname, keyed BY FORM ID, and that is exactly the key
+    the server's party list carries. setTextColor takes the id. So the colour
+    is a table lookup and one call, with no change to the client at all.
+
+    THE MAP. MapMarker is STAT 0x00000010 in Skyrim.esm, read out of the file
+    rather than remembered. One marker is placed per party member, named after
+    them, added to the map with fast travel OFF, and moved to wherever the
+    server last said they were. It is taken out of the world the moment they
+    leave the party, because a marker nobody owns is worse than no marker.
+
+    THE COMPASS is NOT here and is not the game's compass. Skyrim's compass
+    draws quest targets and map markers and nothing a plugin can add to
+    directly; putting a party on it properly needs a quest with an alias per
+    member inside an esp, which is a Creation Kit change and a plugin rebuild.
+    What is drawn instead is a strip of our own, in thornswood-party.js, out of
+    positions the overlay already has five times a second. It says the same
+    thing the compass would say, in a place this server controls, and it
+    updates three times as often.
+  */
+  const MAP_MARKER_BASE = 0x00000010;    // STAT MapMarker, Skyrim.esm
+  const PARTY_EVERY = 1200;
+  // What a party member's name is written in. Green, the same green the HUD
+  // uses for a meter that is fine, so the two read as one game.
+  const PARTY_COLOUR = [0.56, 0.72, 0.37, 0.95];
+  const PLAIN_COLOUR = [1, 1, 1, 0.8];   // what the client itself uses
+
+  let partyAt = 0;
+  let partySaid = '';
+  const partyMarks = {};      // form id hex -> the marker reference
+  const partyTinted = {};     // form id hex -> true while its text is green
+
+  function partyList() {
+    try {
+      const m = globalThis.thornswoodPartyAt;
+      return Array.isArray(m) ? m : [];
+    } catch (e) { return []; }
+  }
+
+  /*
+    The client's own table of name tags, by form id.
+
+    Written by SweetTaffyNicknamesService every time one is created and
+    deleted, which is why this is read fresh each pass rather than kept: a tag
+    is destroyed and remade whenever somebody walks out of sight and back, and
+    a remembered id would then be coloured after it had been thrown away.
+  */
+  function nameTags() {
+    try {
+      const t = sp.storage['idTextNickname'];
+      return (t && typeof t === 'object') ? t : null;
+    } catch (e) { return null; }
+  }
+
+  function colourNames(want) {
+    const tags = nameTags();
+    if (!tags) { return; }
+    for (const hex in want) {
+      if (!Object.prototype.hasOwnProperty.call(want, hex)) { continue; }
+      const id = parseInt(hex, 16);
+      const textId = tags[id];
+      if (textId === undefined || textId === null) { continue; }
+      if (partyTinted[hex]) { continue; }
+      try { sp.setTextColor(textId, PARTY_COLOUR); partyTinted[hex] = true; }
+      catch (e) { }
+    }
+    /*
+      AND PUT IT BACK when somebody leaves. Not doing this leaves the last
+      party you were in written in green for the rest of the session, which is
+      worse than never colouring anything: the colour would stop meaning
+      anything at all.
+    */
+    for (const hex in partyTinted) {
+      if (!Object.prototype.hasOwnProperty.call(partyTinted, hex)) { continue; }
+      if (want[hex]) { continue; }
+      delete partyTinted[hex];
+      const id = parseInt(hex, 16);
+      const textId = tags[id];
+      if (textId === undefined || textId === null) { continue; }
+      try { sp.setTextColor(textId, PLAIN_COLOUR); } catch (e) { }
+    }
+  }
+
+  function markerFor(hex, name) {
+    if (partyMarks[hex]) { return partyMarks[hex]; }
+    let ref = null;
+    try {
+      const base = sp.Form.from(sp.Game.getFormEx(MAP_MARKER_BASE));
+      if (!base) { return null; }
+      const pc = sp.Game.getPlayer();
+      if (!pc) { return null; }
+      // Not persistent: a marker that outlived the session would be a
+      // permanent pin on everybody's map with nothing behind it.
+      ref = pc.placeAtMe(base, 1, false, false);
+      if (!ref) { return null; }
+      try { ref.setDisplayName(name, true); } catch (e) { }
+      // false: no fast travel. Somebody's position is a thing to walk to.
+      try { ref.addToMap(false); } catch (e) { }
+      partyMarks[hex] = ref;
+      say('put a map marker down for ' + name);
+    } catch (e) {
+      say('could not place a map marker for ' + name + ': ' + e);
+      return null;
+    }
+    return ref;
+  }
+
+  function dropMarker(hex) {
+    const ref = partyMarks[hex];
+    delete partyMarks[hex];
+    if (!ref) { return; }
+    try {
+      // disable first, so it stops drawing even if the delete is refused.
+      const off = ref.disable(false);
+      if (off && typeof off.then === 'function') { off.then(function () { }, function () { }); }
+      const gone = ref.delete();
+      if (gone && typeof gone.then === 'function') { gone.then(function () { }, function () { }); }
+    } catch (e) { }
+  }
+
+  sp.on('update', guard('party markers', () => {
+    const now = Date.now();
+    if (now - partyAt < PARTY_EVERY) { return; }
+    partyAt = now;
+
+    const list = partyList();
+    const want = {};
+    for (let i = 0; i < list.length; i++) {
+      const row = list[i];
+      if (!row || !row.a) { continue; }
+      want[String(row.a)] = row;
+    }
+
+    colourNames(want);
+
+    // A marker for everybody in the party, moved to where the server last
+    // said they were.
+    for (const hex in want) {
+      if (!Object.prototype.hasOwnProperty.call(want, hex)) { continue; }
+      const row = want[hex];
+      const ref = markerFor(hex, String(row.n || 'somebody'));
+      if (!ref) { continue; }
+      const pos = row.p || [0, 0, 0];
+      try {
+        const moved = ref.setPosition(Number(pos[0]) || 0, Number(pos[1]) || 0,
+                                      Number(pos[2]) || 0);
+        if (moved && typeof moved.then === 'function') { moved.then(function () { }, function () { }); }
+      } catch (e) { }
+    }
+
+    // And nothing left behind for somebody who has gone.
+    for (const hex in partyMarks) {
+      if (!Object.prototype.hasOwnProperty.call(partyMarks, hex)) { continue; }
+      if (want[hex]) { continue; }
+      say('taking the map marker back for ' + hex);
+      dropMarker(hex);
+    }
+
+    /*
+      The overlay draws the strip, so it needs the same list. Handed over
+      rather than fetched: the page has no way to read a plugin's variables,
+      and this is already the one place that knows when the list changed.
+    */
+    const sig = JSON.stringify(list);
+    if (sig !== partySaid) {
+      partySaid = sig;
+      T.js('try{window.thornswoodParty&&window.thornswoodParty.setWhere&&' +
+           'window.thornswoodParty.setWhere(' + JSON.stringify(list) + ');}catch(e){}');
+    }
+  }));
+
+
   let stuckKeys = 0;
   let stuckMoveKeys = 0;
   let stuckAt = 0;

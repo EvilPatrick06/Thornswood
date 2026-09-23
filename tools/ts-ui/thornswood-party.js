@@ -94,6 +94,155 @@
     '#' + ID + ' .tag.m{border-color:#e0645a;color:#e0645a}'
   ].join('\n');
 
+  /*
+    ------------------------------------------------------ THE PARTY STRIP
+
+    Patrick asked to "see them on the map and compass". The map is the
+    plugin's: one MapMarker per member, moved to wherever the server says they
+    are. The COMPASS is this, and it is deliberately not Skyrim's.
+
+    WHY NOT SKYRIM'S. That compass draws quest targets and map markers and
+    nothing a plugin can add an arrow to. Putting a party on it properly needs
+    a quest with one alias per member inside an esp, which is a Creation Kit
+    change, a plugin rebuild and a new master for everybody. This is a strip of
+    our own, under the game's compass, saying the same thing.
+
+    AND IT IS FRESHER THAN THE SERVER'S OWN PARTY PUSH. Voice already receives
+    everybody's position five times a second, because proximity voice needs it,
+    and thornswood-voice.js hands that table out through who(). The server's
+    party list is on a tick and a half. So membership comes from the server,
+    where it belongs, and the POSITIONS come from the voice feed, which is
+    fifteen times more often and costs nothing new.
+
+    THE MATHS IS THE SAME AS THE VOICE PANNER'S and is written out there at
+    length: Skyrim's facing is degrees clockwise from north, north is +Y, so
+    forward is (sin, cos) and right is (cos, -sin). Getting it wrong only
+    shows up once somebody turns away from north, which is why both places say
+    so.
+  */
+  var where = [];            // the server's party list: who, and their form id
+  var stripEl = null;
+  var stripTimer = null;
+
+  var STRIP_CSS =
+    'position:fixed;left:50%;top:76px;transform:translateX(-50%);' +
+    'z-index:2147483400;pointer-events:none;font-family:Georgia,serif;' +
+    'font-size:15px;letter-spacing:.03em;color:#e9e7e1;' +
+    'text-shadow:0 2px 4px rgba(0,0,0,.95);white-space:nowrap;display:none';
+
+  function esc2(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /*
+    One member, as an arrow and a distance.
+
+    The arrow is a character rather than a drawing: eight of them cover the
+    compass rose closely enough to point at somebody, they need no file and no
+    svg, and they are legible at this size on every machine.
+  */
+  var ARROWS = ['↑', '↗', '→', '↘',
+                '↓', '↙', '←', '↖'];
+
+  function arrowFor(bearing) {
+    var at = Math.round(((bearing % 360) + 360) % 360 / 45) % 8;
+    return ARROWS[at];
+  }
+
+  function drawStrip() {
+    if (!stripEl) { return; }
+    if (!where.length) { stripEl.style.display = 'none'; return; }
+
+    var who = null;
+    try {
+      if (window.thornswoodVoice && window.thornswoodVoice.who) {
+        who = window.thornswoodVoice.who();
+      }
+    } catch (e) { who = null; }
+
+    var mine = null;
+    var byProfile = who || {};
+    try {
+      if (data && data.me && byProfile[data.me]) { mine = byProfile[data.me]; }
+    } catch (e) { mine = null; }
+
+    var bits = [];
+    for (var i = 0; i < where.length; i++) {
+      var row = where[i];
+      var name = esc2(row.n || 'somebody');
+
+      /*
+        Match the server's row to the voice feed's by NAME, because the two
+        are keyed differently: the server's party list carries the form id the
+        plugin needs for the map marker, and the voice feed is keyed by
+        profile id. Names on this server are unique per character and the
+        alternative is a third table nobody needs.
+
+        Somebody the voice feed has not seen yet gets a name and no arrow,
+        which is honest: it says they are in your party and does not pretend
+        to know where.
+      */
+      var them = null;
+      for (var pid in byProfile) {
+        if (!Object.prototype.hasOwnProperty.call(byProfile, pid)) { continue; }
+        if (String(byProfile[pid].name || '') === String(row.n || '')) {
+          them = byProfile[pid];
+          break;
+        }
+      }
+
+      if (!them || !them.pos || !mine || !mine.pos) {
+        bits.push('<span style="margin:0 14px;color:#98a2ae">' + name + '</span>');
+        continue;
+      }
+
+      var dx = them.pos[0] - mine.pos[0];
+      var dy = them.pos[1] - mine.pos[1];
+      var dz = them.pos[2] - mine.pos[2];
+      var metres = Math.sqrt(dx * dx + dy * dy + dz * dz) / UNITS_PER_METRE;
+
+      // Their bearing from you, in degrees clockwise from north, minus the way
+      // you are facing. Skyrim's north is +Y.
+      var toThem = Math.atan2(dx, dy) * 180 / Math.PI;
+      var facing = Number(mine.angleZ) || 0;
+      var rel = toThem - facing;
+
+      var far = metres >= 1000;
+      var reads = far ? (Math.round(metres / 100) / 10) + ' km'
+                      : Math.round(metres) + ' m';
+      var sameRoom = String(them.cell) === String(mine.cell);
+
+      bits.push(
+        '<span style="margin:0 14px;color:' + (sameRoom ? '#8fb85e' : '#d9ab52') + '">' +
+        '<span style="font-size:18px">' + arrowFor(rel) + '</span> ' +
+        name + ' <span style="color:#98a2ae;font-size:13px">' + reads + '</span>' +
+        '</span>');
+    }
+
+    stripEl.innerHTML = bits.join('');
+    stripEl.style.display = '';
+  }
+
+  var UNITS_PER_METRE = 70;   // the same seventy the voice page uses
+
+  function ensureStrip() {
+    if (stripEl) { return; }
+    stripEl = document.createElement('div');
+    stripEl.id = 'ts-party-strip';
+    stripEl.style.cssText = STRIP_CSS;
+    document.body.appendChild(stripEl);
+    /*
+      Five a second, which is the rate the positions arrive at. Stopped
+      entirely when there is no party, so somebody playing alone pays nothing
+      at all for this.
+    */
+    stripTimer = setInterval(function () {
+      try { if (where.length) { drawStrip(); } } catch (e) { }
+    }, 200);
+  }
+
+
   function build() {
     if (root) { return root; }
     var style = document.createElement('style');
@@ -201,11 +350,20 @@
       rather than left out, because a missing feature nobody mentions reads as
       a broken one.
     */
-    html += '<div><h3>Not yet</h3><div class="note">' +
-            'Name tag colours, party markers on the map and on the compass. ' +
-            'Those are quest aliases and map marker references inside the game, ' +
-            'not something a page can draw, so they need their own piece of work ' +
-            'in the plugin. Everything else on this panel is live.' +
+    /*
+      THE NOTE THAT USED TO SAY THESE WERE MISSING. They are not any more, and
+      what is left of it is the one honest caveat: the strip is ours and not
+      Skyrim's compass, and it is worth saying so rather than letting somebody
+      wonder why the game's own compass never changed.
+    */
+    html += '<div><h3>Finding each other</h3><div class="note">' +
+            'Everybody in your party has their name in green above their head, ' +
+            'a marker on your map, and an arrow on the strip under your compass ' +
+            'with how far away they are. Green on the strip means the same room ' +
+            'as you, gold means somewhere else. ' +
+            'The strip is ours rather than Skyrim\'s own compass: that one only ' +
+            'draws quest targets and map markers, and putting people on it needs ' +
+            'a change inside the game files rather than on this server.' +
             '</div></div>';
 
     body.innerHTML = html;
@@ -251,7 +409,24 @@
     close: close,
     toggle: toggle,
     isOpen: function () { return shown; },
-    setData: function (d) { data = d || null; if (shown) { draw(); } }
+    setData: function (d) { data = d || null; if (shown) { draw(); } },
+
+    /*
+      Where your party is, handed over by thornswood-front.js.
+
+      It comes from the plugin rather than from the server's own push to this
+      page, because the plugin is already reading that property for the map
+      markers and a page cannot read a plugin's variables. One source, two
+      uses.
+    */
+    setWhere: function (list) {
+      where = Array.isArray(list) ? list : [];
+      ensureStrip();
+      drawStrip();
+      if (shown) { draw(); }
+    },
+    /* For anybody checking whether the strip is doing anything. */
+    strip: function () { return where.length; }
   };
 
   build();
