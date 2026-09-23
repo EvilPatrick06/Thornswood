@@ -412,8 +412,30 @@ Say ("  icon-$iconHash.ico") 'DarkGray'
 $isDevRoot = $Root.TrimEnd('\') -match '-DevBuild$'
 $lnkName   = if ($isDevRoot) { 'Thornswood Dev.lnk' } else { 'Thornswood.lnk' }
 
+# AND A SCRATCH BUILD TOUCHES THE DESKTOP AT ALL.
+#
+# The 22 September fix above told the dev build apart from the play install and
+# stopped there, and there is a third kind of root: a throwaway one. A compile
+# check, the build step in .github/workflows/build.yml which builds into
+# $RUNNER_TEMP, or a Claude proving that Keys.cs still compiles. None of those
+# match -DevBuild, so every one of them wrote Thornswood.lnk to the Desktop
+# pointing into a temporary folder, and then the folder was deleted.
+#
+# MEASURED 23 SEPTEMBER by doing exactly that for the fourth time: a compile
+# into %TEMP%\ts-keycheck repointed the real Desktop icon at
+# %TEMP%\ts-keycheck\Launcher\Thornswood.exe and restarted Explorer to be
+# sure the change took. It has happened often enough to have its own entry on
+# the To Do List.
+#
+# So a root that is neither of the two real installs gets its shortcut inside
+# its own folder and nowhere else. It still builds and it still gets an icon;
+# nothing outside that folder changes.
+$playRoot  = $Root.TrimEnd('\') -ieq 'C:\Thornswood'
+$isScratch = -not ($isDevRoot -or $playRoot)
+
 $ws = New-Object -ComObject WScript.Shell
-foreach ($dest in @([Environment]::GetFolderPath('Desktop'), $Root)) {
+$places = if ($isScratch) { @($Root) } else { @([Environment]::GetFolderPath('Desktop'), $Root) }
+foreach ($dest in $places) {
     # The old name, tidied away so nobody ends up with two shortcuts to the
     # same launcher after the rename.
     $was = Join-Path $dest 'Skyrim Together.lnk'
@@ -446,6 +468,7 @@ foreach ($dest in @([Environment]::GetFolderPath('Desktop'), $Root)) {
 }
 Say ("  $lnkName points at the exe now, no PowerShell in the chain") 'Green'
 if ($isDevRoot) { Say '  the play install''s own Thornswood.lnk is left alone' 'DarkGray' }
+if ($isScratch) { Say '  a throwaway build, so the Desktop is left alone entirely' 'DarkGray' }
 
 # Telling the shell an association changed is what actually makes Explorer
 # redraw, and unlike clearing the cache it costs nothing and interrupts
@@ -477,7 +500,12 @@ try {
 $stamp    = Join-Path $outDir '.iconstamp'
 $lastIcon = ''
 if (Test-Path $stamp) { $lastIcon = (Get-Content $stamp -Raw -ErrorAction SilentlyContinue).Trim() }
-if ($lastIcon -ne $iconHash) {
+# AND NOT ON A THROWAWAY BUILD EITHER. Killing and restarting Explorer is
+# already described below as too rude to do on every build; doing it because a
+# compile check ran is ruder still, and a scratch build's icon is not on
+# anybody's Desktop to be stale. A compile check on 23 September restarted
+# Explorer twice in as many minutes.
+if ($lastIcon -ne $iconHash -and -not $isScratch) {
     Say '  New artwork, clearing the cache properly' 'Yellow'
     try {
         taskkill /f /im explorer.exe 2>&1 | Out-Null

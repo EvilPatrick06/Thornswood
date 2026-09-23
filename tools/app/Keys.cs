@@ -37,9 +37,7 @@ namespace Thornswood
             public bool Hex { get { return How == Codes.VirtualKeyHex; } }
         }
 
-        static string TweaksIni { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\SkyrimTogetherTweaks.ini"); } }
         static string MenuIni   { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\SKSEMenuFramework.ini"); } }
-        static string TradeIni  { get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\TradeTogether.ini"); } }
         static string TdmIni    { get { return Path.Combine(Paths.Game, "Data\\MCM\\Config\\TrueDirectionalMovement\\settings.ini"); } }
         static string SkyUiIni  { get { return Path.Combine(Paths.Game, "Data\\MCM\\Config\\SkyUI_SE\\settings.ini"); } }
         static string BtpsIni   { get { return Path.Combine(Paths.Game, "Data\\MCM\\Config\\BetterThirdPersonSelection\\settings.ini"); } }
@@ -357,13 +355,21 @@ namespace Thornswood
         {
             var l = new List<Binding>();
 
-            l.Add(Vk("ui", "Multiplayer", "The party menu",
-                     "Everyone connected, teleporting to them, chat, and connecting by hand if the automatic one ever misses.",
-                     TweaksIni, "uUiKeyCode", 0x71));
+            /*
+              THE TWO SKYRIM TOGETHER ROWS THAT USED TO BE HERE ARE GONE.
 
-            l.Add(Vk("debug", "Multiplayer", "The connection readout",
-                     "Latency and sync while you play. Worth a look when movement goes choppy.",
-                     TweaksIni, "uDebugMenuKeyCode", 0x72));
+              "The party menu" and "The connection readout" wrote into
+              Data\SKSE\Plugins\SkyrimTogetherTweaks.ini, which is not in this
+              build and has not been for as long as anybody has looked. The
+              filter at the bottom of All() drops a binding whose file is
+              missing, so neither row has appeared on the page; what they were
+              costing was a reader's time and the belief that this server had
+              a party menu already.
+
+              It has one now, and it is Thornswood's own: see the party and
+              journal rows further down. Checked on 23 September, with the
+              trade rows below.
+            */
 
             // Not F1, which is what this shipped as. skymp5-client binds F1
             // to toggling the names above people's heads, and that binding is
@@ -382,24 +388,23 @@ namespace Thornswood
                 How = Codes.ByName, File = MenuIni, Key = "ToggleKey",
                 Value = string.IsNullOrEmpty(menu) ? "F4" : menu.Trim() });
 
-            l.Add(Dx("trade", "Trading", "Start a trade",
-                     "Offers a trade to whoever is under your crosshair. They have thirty seconds to take it.",
-                     TradeIni, "TradeKey", 20));
-            l.Add(Dx("tradeadd", "Trading", "Offer the selected item",
-                     "Inside a trade, moves the highlighted item into what you are offering.",
-                     TradeIni, "AddItemKey", 210));
-            l.Add(Dx("traderem", "Trading", "Take it back out",
-                     "Inside a trade, pulls the highlighted item back out of your offer.",
-                     TradeIni, "RemoveItemKey", 211));
-            l.Add(Dx("goldadd", "Trading", "Add gold",
-                     "Inside a trade, adds gold to your side of it.",
-                     TradeIni, "GoldAddKey", 78));
-            l.Add(Dx("goldrem", "Trading", "Remove gold",
-                     "Inside a trade, takes gold back off your side.",
-                     TradeIni, "GoldRemoveKey", 74));
-            l.Add(Dx("tradecancel", "Trading", "Cancel the trade",
-                     "Walks away from an open trade.",
-                     TradeIni, "CancelKey", 15));
+            /*
+              AND THE SIX TRADING ROWS, WHICH ARE WHY LOOKING AT SOMEBODY DID
+              NOTHING.
+
+              They were TradeTogether's, a Skyrim Together mod, writing into
+              Data\SKSE\Plugins\TradeTogether.ini. Neither the ini nor the DLL
+              is in this build; checked 23 September. Patrick, 22 September:
+              "Currently the looking at people doesnt have the trade menu and
+              when it did you had to use youyr cursor and a bunch of other bs
+              I just want to press a key while looking at them." The cursor he
+              remembers was that mod's mouse menu, and the reason the key did
+              nothing is that it was setting a value in a file nobody reads.
+
+              Thornswood has its own trading now, in the gamemode and in
+              thornswood-trade.js, and its key is in the ThornsWood group
+              below with the rest of ours.
+            */
 
             // The two minimap binds that used to sit here, L to show it and K
             // for its settings panel, are gone with the mod. Confirmed on 20
@@ -489,6 +494,32 @@ namespace Thornswood
             l.Add(Dx("skills", "ThornsWood", "Profession, class and skill tree",
                      "Your profession and which half of it you work, your class, and the fifteen sub-skills under Health, Magicka and Stamina. Opens over the world without pausing it. Escape closes it too.",
                      ThornIni, "SkillsKey", 37));
+
+            // ------------------------------------------------ the people keys
+            // Three of these only mean anything while somebody is under your
+            // crosshair, which is what makes them safe on plain letters: with
+            // nobody in front of you the key falls through to whatever else
+            // wants it. P and J open their panels either way.
+            //
+            // MuteThemKey is deliberately not MuteKey. MuteKey is the
+            // microphone, further down this file, and one row setting two
+            // different things is how somebody rebinds their microphone and
+            // silences a friend by accident.
+            l.Add(Dx("party", "ThornsWood", "Friends and party",
+                     "Who your friends are, who is online, your party, and the bonus for working together. Escape closes it.",
+                     ThornIni, "PartyKey", 25));
+            l.Add(Dx("journal", "ThornsWood", "Journals",
+                     "Your journals and their pages, and sharing a journal or one page with a friend.",
+                     ThornIni, "JournalKey", 36));
+            l.Add(Dx("friendkey", "ThornsWood", "Add or remove a friend",
+                     "While you are looking at somebody, asks them to be friends. Pressed on somebody already on your list, takes them off it.",
+                     ThornIni, "FriendKey", 34));
+            l.Add(Dx("tradewith", "ThornsWood", "Offer a trade",
+                     "While you are looking at somebody, offers to trade. They have forty five seconds to take it, and nothing moves until you have both agreed to what is on the table.",
+                     ThornIni, "TradeWithKey", 35));
+            l.Add(Dx("mutethem", "ThornsWood", "Mute somebody",
+                     "While you are looking at somebody, stops hearing them. Yours only: they are not told, and nobody else is affected. Press again to hear them.",
+                     ThornIni, "MuteThemKey", 38));
 
             l.Add(Dx("cyclehold", "Reaching things", "Cycle modifier",
                      "Held down, the two keys below step through everything you could reach instead of the game picking for you.",
