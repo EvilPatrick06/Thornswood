@@ -350,7 +350,24 @@ class Sock {
       if (mask) for (let i = 0; i < body.length; i++) body[i] ^= mask[i & 3];
       this.buf = this.buf.slice(off + len);
 
-      if (op === 0x8) { this.close(); return; }        // close
+      /*
+        A close is ANSWERED with a close, which RFC 6455 section 5.5.1 asks
+        for: "the endpoint MUST send a Close frame in response". This used to
+        drop the socket without one, so a well behaved client sat waiting for
+        the reply until its own timeout.
+
+        The body of a close frame is a two byte status code, big endian, and
+        1000 is a normal closure. Written before the teardown so a write that
+        throws cannot leave the socket open.
+      */
+      if (op === 0x8) {
+        try {
+          const bye = Buffer.from([0x88, 2, 0x03, 0xe8]);   // FIN+close, len 2, 1000
+          this.socket.write(bye);
+        } catch (e) { }
+        this.close();
+        return;
+      }
       if (op === 0x9) {                                 // ping -> pong
         try { this.socket.write(Buffer.concat([Buffer.from([0x8a, 0]), Buffer.alloc(0)])); } catch (e) { }
         continue;
@@ -454,9 +471,27 @@ function isLoopback(req) {
   return ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1';
 }
 
+/*
+  AN OVERSIZED BODY IS ANSWERED, NOT DROPPED.
+
+  This used to call req.destroy() the moment the body went over the limit,
+  which closes the connection with no status at all. From the other end that
+  is indistinguishable from the service being down, so a client with a body
+  one byte too big retries forever against a service that is working fine.
+  413 says what happened.
+*/
 function readBody(req, res, limit, then) {
   let body = '';
-  req.on('data', (d) => { body += d; if (body.length > limit) req.destroy(); });
+  let tooBig = false;
+  req.on('data', (d) => {
+    if (tooBig) { return; }
+    body += d;
+    if (body.length > limit) {
+      tooBig = true;
+      try { res.writeHead(413, { 'content-type': 'text/plain' }).end('too big'); } catch (e) { }
+      req.destroy();
+    }
+  });
   req.on('end', () => {
     let doc;
     try { doc = JSON.parse(body); }
@@ -651,7 +686,17 @@ const server = http.createServer((req, res) => {
       return;
     }
     let body = '';
-    req.on('data', (d) => { body += d; if (body.length > 200000) req.destroy(); });
+    let tooBig = false;
+    // Answered rather than dropped; see readBody for why.
+    req.on('data', (d) => {
+      if (tooBig) { return; }
+      body += d;
+      if (body.length > 200000) {
+        tooBig = true;
+        try { res.writeHead(413, { 'content-type': 'text/plain' }).end('too big'); } catch (e) { }
+        req.destroy();
+      }
+    });
     req.on('end', () => {
       try {
         const doc = JSON.parse(body);
@@ -875,8 +920,17 @@ const server = http.createServer((req, res) => {
   }
 
   if (route === '/health') {
+    /*
+      uptime is here so a watchdog can tell a RESTART from a HANG. Everything
+      else in this payload looks identical either way: a service that has just
+      come back up and a service that has been wedged for an hour both answer
+      with the same counts. A number that resets is the only thing that says
+      which.
+    */
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: true, build: BUILD, auth: AUTH,
+                            uptimeSeconds: Math.round(process.uptime()),
+                            startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
                             bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             peers: peers.size, tracked: positions.size,
