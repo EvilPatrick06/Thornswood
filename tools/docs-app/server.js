@@ -638,7 +638,43 @@ function slotsFor(st) {
  *
  * Newest first, capped, so it can never grow without limit on the VPS. */
 const ATTEMPTS = path.join(DATA, 'signins.json');
+
+// ==== thornswood signin ageing ====
+//
+// A COUNT IS NOT A RETENTION RULE. This was capped at 500 rows and nothing
+// else, so on a quiet closed playtest a row could sit here for a year: a
+// Discord id, a handle, a display name and the address it was reached from.
+// The reason the log exists is to answer "has anybody been poking at the
+// admin panel", and that question is about the last few weeks, not about
+// last spring.
+//
+// So it is aged by time as well as by count, and the ageing runs on the way
+// OUT as well as the way in. Ageing only on write means a month with no
+// sign-ins leaves everything sitting there, and the file that is meant to
+// have emptied itself has not.
+//
+// Thirty days, and the privacy page says so, which is the point: a promise
+// about what is kept is worth nothing if nothing enforces it.
+//
+// A row with no usable time is kept rather than dropped. It is a corrupt
+// row either way, and throwing away the record of somebody being refused at
+// the door because its timestamp would not parse is the wrong way to be
+// wrong.
 const ATTEMPTS_KEEP = 500;
+const ATTEMPTS_DAYS = 30;
+function freshSignIns(rows, now) {
+  const list = Array.isArray(rows) ? rows : [];
+  const cut = (Number(now) || Date.now()) - (ATTEMPTS_DAYS * 24 * 60 * 60 * 1000);
+  const kept = [];
+  for (const r of list) {
+    if (!r || typeof r !== 'object') continue;
+    const at = Number(r.at);
+    if (isFinite(at) && at > 0 && at < cut) continue;
+    kept.push(r);
+  }
+  return kept.slice(0, ATTEMPTS_KEEP);
+}
+// ==== end thornswood signin ageing ====
 
 function noteSignIn(req, me, st, back) {
   try {
@@ -663,7 +699,7 @@ function noteSignIn(req, me, st, back) {
       ip: String((req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
                  (req.socket && req.socket.remoteAddress) || '')
     });
-    putJson(ATTEMPTS, rows.slice(0, ATTEMPTS_KEEP));
+    putJson(ATTEMPTS, freshSignIns(rows, Date.now()));
   } catch (e) { }
 }
 
@@ -1577,9 +1613,13 @@ async function handle(req, res) {
 
   /* Who has tried to sign in. Admins only, because it is a list of people. */
   if (p === '/api/signins' && req.method === 'GET') {
+    // Aged here too, and written back when anything went, so a month with no
+    // sign-ins still empties the file rather than only the answer.
     if (!w.admin) return sendJson(res, 403, { error: 'admins only' });
     const rows = jsonFile(ATTEMPTS, []);
-    return sendJson(res, 200, { signins: Array.isArray(rows) ? rows : [] });
+    const live = freshSignIns(rows, Date.now());
+    if (Array.isArray(rows) && live.length !== rows.length) { putJson(ATTEMPTS, live); }
+    return sendJson(res, 200, { signins: live });
   }
 
   if (p === '/api/hello') {
