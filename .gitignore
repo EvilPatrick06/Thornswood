@@ -46,3 +46,16 @@ tools/signing.json.*
 # C:\Thornswood-Backup on the VPS, and it must be in both.
 tools/backup-key.txt
 thornswood-backup-key.txt
+
+# What the voice service makes beside itself the first time it runs. On the VPS
+# it lives in its own folder, so these only appear here when somebody runs it
+# out of a checkout to try something, which is exactly when nobody is watching
+# git status: token-key.txt signs the join tokens, secret.txt is the password
+# the account routes check, and owners.json is the register it keeps. Found on
+# 23 September by running the service locally to prove a header, which left a
+# signing key sitting untracked in tools\voice.
+tools/voice/token-key.txt
+tools/voice/secret.txt
+tools/voice/owners.json
+tools/voice/owners.json.tmp
+tools/voice/chat/
