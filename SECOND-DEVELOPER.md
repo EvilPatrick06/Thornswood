@@ -1,7 +1,7 @@
 # Thornswood for a second developer
 
 Read this first if you are working on Thornswood from a machine that is not
-Gavin's, or if you are the Claude working with somebody who is. It says what
+Patrick's, or if you are the Claude working with somebody who is. It says what
 Thornswood is, how the pieces fit, how a release goes out, and what has to be
 true on a machine before it can ship one. Nothing in here is a secret; the
 secrets are listed by name near the end with where each one lives.
@@ -9,7 +9,7 @@ secrets are listed by name near the end with where each one lives.
 ## What Thornswood is
 
 Thornswood is a modded co-op Skyrim roleplay server on SkyMP, the server
-authoritative multiplayer for Skyrim Special Edition. It is Gavin's, in a
+authoritative multiplayer for Skyrim Special Edition. It is Patrick's, in a
 closed playtest with friends and testers, becoming an RP server of its own,
 less strict than the big ones, with working NPCs, its own launcher, its own
 website and Discord, and a lore of its own (fifty years after the civil war,
@@ -40,7 +40,7 @@ a half.
 | Bot | `tools\discord`, on the VPS at `C:\Thornswood-Bot`, task `Thornswood Bot` | discord.py: tickets, join cards, staff tools |
 | Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour |
 
-The server's SkyMP fork and its build tree are Gavin's alone for now
+The server's SkyMP fork and its build tree are Patrick's alone for now
 (`C:\Thornswood-Dev\skymp`); server binaries are copied, not rebuilt, on a
 second machine.
 
@@ -78,7 +78,7 @@ Two people, two machines, one repo. The short rules are in `CLAUDE.md` at the
 repo root, which every Claude Code session reads on its own; this is the long
 form.
 
-- **main is what ships.** Only Gavin's machine ships main. `Ship.ps1`
+- **main is what ships.** Only Patrick's machine ships main. `Ship.ps1`
   refuses a main release that is not on the `main` branch or is behind
   `origin/main`, and when a main release is out it commits the source and
   pushes it, so the other machine can `git pull` exactly what shipped.
@@ -100,7 +100,7 @@ form.
   three launchers section: the own game folder is the decided direction),
   Keep and Hold for the shared Data\Platform, the patched client bundle,
   C# 5 only, one complete release at a time: changing any of these starts
-  as a few lines in #dev, agreed between Gavin and Djinn before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
+  as a few lines in #dev, agreed between Patrick and Djinn before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
   `Updater.cs` or `Publish-Update.ps1` gets a line in #dev too; both
   machines touch them.
 - **The publisher pulls the feed** before `version.json` is edited, so a
@@ -144,7 +144,7 @@ Then in `Thornswood-Repo`:
 ```
 
 which makes a key for the VPS, points ssh at it, and prints the public line.
-Send that line to Gavin; he runs `.\tools\Add-VpsKey.ps1 -PublicKey '<the line>'`
+Send that line to Patrick; he runs `.\tools\Add-VpsKey.ps1 -PublicKey '<the line>'`
 from his machine and the VPS knows you. `.\tools\Setup-SshKey.ps1 -Test`
 proves it. Until then the scripts that talk to the VPS (`Deploy-*`,
 `Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) cannot
@@ -162,7 +162,7 @@ so the baseline is the current release and the first real Ship carries only
 what you changed.
 
 `Publish-Discord.ps1` reads the #news webhook from `tools\discord\news-webhook.txt`,
-which is not in the repo. Gavin gives it to you if you will ship main releases
+which is not in the repo. Patrick gives it to you if you will ship main releases
 from your machine; without it Ship says so and carries on.
 
 ## Secrets, by name, none of them in the repo
@@ -286,4 +286,4 @@ it per session and ignores which profile Vortex has on.
 - `lore\`: history and the Accord. `tools\docs-app\data\site\*.md`: the public
   pages (world, rules, join, classes, credits, support), also live on the site.
 - The site's hub boards: Active Issues, Known Issues, Test These, Suggestions,
-  Archive, and the Gavin runbook.
+  Archive, and the Patrick runbook.

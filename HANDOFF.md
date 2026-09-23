@@ -6,16 +6,16 @@ from). SECOND-DEVELOPER.md is the long form of how the pieces fit.
 
 ## Where things stand
 
-- main is at 9b0c294, which is 1.1.45, shipped by Gavin from his machine on
+- main is at 9b0c294, which is 1.1.45, shipped by Patrick from his machine on
   17 Sep. Live launcher: 1.1.45. Live server (C:\Thornswood-Server on the
   VPS): the 1.1.45 gamemode, deployed 09:24 on the VPS clock (the VPS and
-  Gavin are UTC-06:00; server.log times are VPS local).
+  Patrick are UTC-06:00; server.log times are VPS local).
 - `git status` shows every .ps1 and .md as modified. That is line endings
   only: `git diff --ignore-cr-at-eol` is empty. The working copies are CRLF,
   the commits are LF. Do not "fix" it and do not commit it.
 - The dev server (C:\Thornswood-Server-Dev, port 7787, resources 7788, task
   'Thornswood Dev Server') still runs the 16 Sep gamemode. Nothing has gone
-  to the dev channel yet. C:\Thornswood-DevBuild may not exist on Gavin's
+  to the dev channel yet. C:\Thornswood-DevBuild may not exist on Patrick's
   machine; `Ship.ps1 -Channel dev` needs it (installed from the main
   launcher's Settings page) and the Thornswood-Releases clone beside the repo.
 - Live and confirmed with the actual bytes: the server publishes every
@@ -25,7 +25,7 @@ from). SECOND-DEVELOPER.md is the long form of how the pieces fit.
   server's copy. 10.bin answered 200 with all 3,157,818 bytes of
   JKs Skyrim.esp.
 
-## What Gavin asked for, in his words
+## What Patrick asked for, in his words
 
 "let's apply all of the fixes for the server and launcher + game to the dev
 launcher + server, for the website+discord stuff go ahead and apply them now"
@@ -228,7 +228,7 @@ fork and recorded in tools\client-build.json; `Sync-Client.ps1 -Check` says
 whether the six recorded files in the game folder are that build, and copies
 nothing. Ship runs that check and refuses a release that fails it.
 
-Dev launcher release (Gavin or Djinn runs it; says so in #dev; version becomes
+Dev launcher release (Patrick or Djinn runs it; says so in #dev; version becomes
 1.1.45.N; announces to the dev server's data folder, no source commit):
 
 ```powershell
@@ -264,7 +264,7 @@ cd $env:USERPROFILE\Downloads\Thornswood-Repo
 .\tools\Check-Site.ps1
 ```
 
-Main release, only ever from Gavin's machine, only when he says main:
+Main release, only ever from Patrick's machine, only when he says main:
 `.\tools\Deploy-Server.ps1 -Now` first when the gamemode changed, then
 `.\tools\Ship.ps1 "notes"`.
 
@@ -342,11 +342,11 @@ Main release, only ever from Gavin's machine, only when he says main:
   (bytes differed, names matched) and the dead reconnects (characters
   ff000011, ff000015). Mattythrill's fresh install hit the Start On Save
   crash and the profile 1 card. Djinn is the Downgrade test.
-- Gavin's machine is on 1.6.1170 with the collection; the launcher installs
+- Patrick's machine is on 1.6.1170 with the collection; the launcher installs
   into the Steam copy today (the own-game-folder branch is Djinn's, not on
   main). Test with fresh characters every time; never launch through Steam.
 
-## How Gavin wants the work done (beyond CLAUDE.md)
+## How Patrick wants the work done (beyond CLAUDE.md)
 
 - Full copy and paste command blocks, with no example value in any command
   block; a value he has to supply is described in prose or prompted for by
@@ -371,4 +371,4 @@ Main release, only ever from Gavin's machine, only when he says main:
   applying (a skyrim-platform.log from a kick-reconnect settles it).
 - The timing findings 4, 5, 6 and 10 in the audit each have a one-line
   repro in their text.
-- Whether C:\Thornswood-DevBuild is installed on Gavin's machine.
+- Whether C:\Thornswood-DevBuild is installed on Patrick's machine.

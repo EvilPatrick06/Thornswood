@@ -81,7 +81,7 @@ together.
 ## Something's wrong
 
 The launcher's Play page has five checks. Any red row is the actual problem.
-Screenshot it and send it to Gavin.
+Screenshot it and send it to Patrick.
 
 ---
 

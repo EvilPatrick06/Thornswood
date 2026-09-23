@@ -394,7 +394,7 @@ namespace Thornswood
             bool right = File.Exists(targetExe) && !Wrong(cfg, targetExe);
             if (!right)
             {
-                log("SkyrimSE.exe is still not the 1.6.1170 build after the copy (" + Describe(cfg, targetExe) + "). Send Gavin your launcher log.");
+                log("SkyrimSE.exe is still not the 1.6.1170 build after the copy (" + Describe(cfg, targetExe) + "). Send your launcher log to the Discord.");
                 return false;
             }
 

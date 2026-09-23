@@ -388,7 +388,7 @@ if (Test-Path $vanillaList) {
     }
 
     if ($off -contains 'SkyrimSE.exe') {
-        Die 'SkyrimSE.exe does not match a clean 1.6.1170 build even after the depot download. Send Gavin a screenshot of this.'
+        Die 'SkyrimSE.exe does not match a clean 1.6.1170 build even after the depot download. Send a screenshot of this to the Discord.'
     }
     if ($off.Count) {
         Say ("  " + ($off -join ', ') + " differ from the ones this package was built with.") 'Yellow'
