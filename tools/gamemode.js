@@ -2424,7 +2424,59 @@ function choppedSwing(actorId) {
   return chopWood(actorId, at.refrId, true);
 }
 
+/*
+  ============ THREE BLOCKS THAT ARE NOT OURS TO WORK, BY WHERE THEY STAND ===
+
+  Djinn, 22 September, in "Removal from area - Woodworking chopping Blocks":
+
+    Solitude:          -64263, 106003.5, -8377.8
+    Solitude Stables:  -76193.3, 96600.6, -11435
+    Dragon Bridge:     -101780.7, 80484.5, -12522.7
+
+  BY POSITION, BECAUSE THE BASE IS SHARED. CHOPPING_BLOCKS is three BASE
+  records and every block in Skyrim is one of them, so there is no way to name
+  one block without naming all of them. A placed reference cannot be deleted
+  from here either: that is a change to a plugin, which is a rebuild and a
+  pack and a server that will not start if it goes wrong. A place is something
+  this file can hold, the same way a notice board is a place, and it costs one
+  distance check on a press that was going to do work anyway.
+
+  THE RADIUS IS GENEROUS ON PURPOSE. 300 units is about two paces wider than a
+  block and its stump, and the nearest block Djinn did not name is a hold away
+  from any of these, so there is nothing for it to catch by accident.
+
+  WHAT A PRESS DOES NOW: nothing, and it says so once. The activate chain
+  blocks the handover, so Skyrim's own furniture does not start either and
+  nobody is left swinging at a block that pays nothing.
+*/
+const BLOCKS_OFF = [
+  { where: 'Solitude', pos: [-64263, 106003.5, -8377.8] },
+  { where: 'Solitude Stables', pos: [-76193.3, 96600.6, -11435] },
+  { where: 'Dragon Bridge', pos: [-101780.7, 80484.5, -12522.7] }
+];
+const BLOCK_OFF_REACH = 300;
+
+/** The named site a block is standing on, or null. See BLOCKS_OFF. */
+function blockIsOff(refrId) {
+  let pos = null;
+  try { pos = mp.get(refrId, 'pos'); } catch (e) { return null; }
+  if (!pos) { return null; }
+  for (let i = 0; i < BLOCKS_OFF.length; i++) {
+    const b = BLOCKS_OFF[i];
+    const dx = pos[0] - b.pos[0], dy = pos[1] - b.pos[1], dz = pos[2] - b.pos[2];
+    if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= BLOCK_OFF_REACH) { return b.where; }
+  }
+  return null;
+}
+
 function chopWood(actorId, refrId, fromSwing) {
+  // Before the class and the axe, because this block is not work for anybody
+  // and telling a woodworker they lack a tool at one would be a lie.
+  const off = blockIsOff(refrId);
+  if (off) {
+    return fromSwing ? '' : 'Nobody works this block. There are others in ' + off + '.';
+  }
+
   const half = halfGate(actorId, 'woodwright', 'novice',
     'A chopping block is a woodworker\'s. Only a woodworker who took Woodwright can ' +
     'work one, and a charburner gets the novice yield. Ask one.');

@@ -3043,6 +3043,32 @@
       }
       return;
     }
+    /*
+      Close the game, asked for from the character choice page.
+
+      Patrick, 22 September: "add a close game button in the main menu with
+      the chacrther selector". There was no way out of that page except
+      alt-tabbing and killing the process, which is also what somebody does
+      when the page itself is stuck, and Djinn's "Timed out" report ends with
+      exactly that: "have to task out exit".
+
+      Debug.quitGame is the engine's own exit and is what the main menu's Quit
+      does. It goes through the front rather than the page because nothing in
+      a browser can close Skyrim, and the page already talks to this plugin.
+
+      The page asks twice before sending this, so there is no confirm here: a
+      message that only arrives after somebody has said yes to leaving is not
+      one to second guess.
+    */
+    if (what === 'select:quit') {
+      log('menu: closing the game, asked from the character choice page');
+      try {
+        sp.Debug.quitGame();
+      } catch (e) {
+        log('menu: could not close the game:', e);
+      }
+      return;
+    }
     // The character choice page reports in plain lines: ready, alive, the
     // first mouse move, the music, the pick. Every one is a pulse for the
     // silence watch above; the alive beats are not written down, the rest are.
