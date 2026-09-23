@@ -120,7 +120,10 @@ if ($Vortex -or -not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
 }
 
 if (-not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
-    Die "No build at $GameDir, and no Steam copy of Skyrim either. Run Build-Thornswood.ps1, or install the collection in Vortex."
+    # Build-Thornswood.ps1 used to be named here. It is deleted: run today it
+    # produced a broken folder pointed at a server address that no longer
+    # exists, and there is one build path now.
+    Die "No build at $GameDir, and no Steam copy of Skyrim either. Deploy the collection in Vortex, then run .\tools\Ship.ps1, which builds the game folder."
 }
 
 $Here = $PSScriptRoot
