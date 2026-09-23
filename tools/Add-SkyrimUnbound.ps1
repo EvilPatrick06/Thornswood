@@ -1,4 +1,4 @@
-<#
+﻿<#
   Add-SkyrimUnbound.ps1
 
   Installs Skyrim Unbound Reborn and PapyrusUtil into the isolated build, so
@@ -19,7 +19,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root      = 'C:\SkyrimTogether',
+    [string]$Root      = 'C:\Thornswood',
     [string]$Downloads = "$env:USERPROFILE\Downloads",
     [string]$Password,
     [string]$Notes = 'Skyrim Unbound. No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded.',
