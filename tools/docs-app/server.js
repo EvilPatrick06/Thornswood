@@ -589,6 +589,25 @@ async function roleNames() {
 }
 
 const LINKED = path.join(DATA, 'linked.json');
+/*
+  Who is banned, by Discord id, beside the people who are linked.
+
+  THE ROLE WAS THE ONLY THING A BAN RESTED ON and the role did not exist: the
+  builder makes eighteen roles and Banned was not among them until 23
+  September, so every ban depended on somebody making it by hand and spelling
+  it the way cfg.access.banned spells it. A capital letter in the wrong place
+  was the difference between a ban and nothing at all, silently.
+
+  This is the other half. A file of ids is not spelled, cannot be renamed by
+  somebody tidying the Discord, and works when the bot is not in the guild,
+  when the guild lookup fails and when the bot has not been configured at all,
+  which is the branch that used to hand play to everybody.
+
+  Shape: {"<discord id>": {"at": <unix ms>, "by": "<id or name>", "why": "..."}}
+  Nothing here writes it yet. It is read on every standing() and a missing file
+  means nobody is banned, which is what an empty server looks like.
+*/
+const BANS = path.join(DATA, 'bans.json');
 // The game server's character roster, pushed here by the gamemode with the
 // door key (POST /api/roster) and handed back per person (POST /api/play/roster).
 // Keyed by profile id; live and dev both push into it, their ids never meet.
@@ -1135,6 +1154,23 @@ async function standing(discordId) {
   const out = { id: String(discordId), inGuild: false, banned: false,
                 admin: false, play: false, dev: false, roles: [], name: '' };
 
+  /*
+    THE FILE FIRST, AND BEFORE EVERY OTHER BRANCH.
+
+    A ban read off a role only works when the bot is in the guild, the guild
+    lookup succeeds and somebody spelled the role right. The branch below for
+    "no bot configured yet" hands play to everybody, which is correct for an
+    ordinary member and wrong for somebody who has been thrown out.
+
+    So the list is read here, where nothing can route around it, and it wins.
+  */
+  const bans = jsonFile(BANS, {});
+  if (bans && Object.prototype.hasOwnProperty.call(bans, String(discordId))) {
+    out.banned = true;
+    out.reason = String((bans[String(discordId)] || {}).why || '');
+    return out;
+  }
+
   /* The hand written admin list is an override, not a hint. It is the way back
      in when the bot is not in the server yet, has been kicked, or Discord is
      having a bad morning, so it cannot be gated behind a guild lookup that
@@ -1176,6 +1212,9 @@ async function standing(discordId) {
   const names = await roleNames();
   out.roles = (m.roles || []).map((id) => names[id]).filter(Boolean);
   const has = (list) => (list || []).some((n) => out.roles.indexOf(n) >= 0);
+  // The role as well as the file. Either one is a ban, because the role is
+  // what a moderator reaches for in Discord and the file is what survives
+  // somebody renaming it.
   out.banned = has(cfg.access.banned);
   if (out.banned) { out.admin = false; out.play = false; return out; }
   if (has(cfg.access.admin)) out.admin = true;

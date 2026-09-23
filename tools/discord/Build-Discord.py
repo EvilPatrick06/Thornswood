@@ -130,6 +130,21 @@ for _h in HOLDS:
 
 ROLES.append(('Member', 0x8D9682, False, PLAIN))   # everybody, on the way in
 
+# THE ONE A BAN DEPENDS ON, and it was never created.
+#
+# docs-app/server.js has keyed access off a role called Banned since it was
+# written: cfg.access.banned is ['Banned'] and standing() takes everything away
+# from anybody holding it. This builder makes eighteen roles and that was not
+# one of them, so the thing being enforced did not exist and a ban was a role
+# somebody had to remember to make by hand, spelled exactly right.
+#
+# Not hoisted and grey on purpose: a ban is not a badge, and a hoisted role
+# would put banned people in their own group at the top of the member list.
+# No permissions at all, because the site is what a ban acts on. The site also
+# reads a bans.json now, so a typo here stops being a security control rather
+# than being one.
+ROLES.append(('Banned', 0x4A4A4A, False, PLAIN))
+
 STAFF = ('Owner', 'Dev', 'Moderator', 'Gamemaster')
 
 # --------------------------------------------------------------- channels --
