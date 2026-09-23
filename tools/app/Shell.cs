@@ -393,6 +393,10 @@ namespace Thornswood
             try { RunScan(); }
             catch (Exception ex) { Log("Could not check the mod list on the way in: " + ex.Message); }
             if (DrawStatus()) Log("Ready."); else Log("Something needs attention before you can play.");
+            // Nobody should have to press anything to get a client file back.
+            // This does nothing at all when the six are the recorded build,
+            // which is every start but the one that needed it.
+            HealClientBackground();
             AutoDisplayOnce();
             StartPing();
             if (Updater.Enabled(cfg))
@@ -1049,6 +1053,9 @@ namespace Thornswood
             {
                 Log(DrawStatus() ? "Everything checks out." : "Something is still off, see the red rows.");
                 StartPing();
+                // Recheck is the button somebody presses when a row is red, so
+                // it is the button that has to do something about it.
+                HealClientBackground();
                 if (Updater.Enabled(cfg))
                 {
                     Log("Checking for updates...");
@@ -4169,6 +4176,55 @@ namespace Thornswood
 
             if (btnShowServer != null) btnShowServer.Content = serverShown ? "Hide" : "Show";
             if (btnSaveServer != null) btnSaveServer.IsEnabled = serverShown;
+        }
+
+        /// <summary>
+        /// Put the client runtime back, if it is not the recorded build.
+        ///
+        /// THE ROW PROMISED THIS AND NOTHING DID IT. 1.1.82 shipped the check
+        /// and the repair and never called the repair from anywhere, so the
+        /// Client row said "the launcher will fetch it" and the launcher did
+        /// not. Patrick, 22 September: "clicking scan and fix shows green and
+        /// than recheck does nothing". Recheck did exactly nothing, because
+        /// nothing was wired to it.
+        ///
+        /// Off the UI thread on purpose: this hashes six files, one of which
+        /// is 15 MB, and may download a pack. Every line it produces goes to
+        /// the log through the dispatcher, and the rows are redrawn at the end
+        /// only when something actually changed.
+        /// </summary>
+        static bool healing;
+        static void HealClientBackground()
+        {
+            if (healing) return;
+            if (ClientRuntime.Recorded().Count == 0) return;
+            if (ClientRuntime.Good()) return;
+            healing = true;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                int n = 0;
+                try
+                {
+                    n = ClientRuntime.Heal(cfg, delegate(string m)
+                    {
+                        string line = m;
+                        win.Dispatcher.BeginInvoke(new Action(delegate { Log(line); }));
+                    });
+                }
+                catch (Exception ex)
+                {
+                    string why = ex.Message;
+                    win.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        Log("Could not put the client runtime back: " + why);
+                    }));
+                }
+                finally
+                {
+                    healing = false;
+                    if (n > 0) win.Dispatcher.BeginInvoke(new Action(delegate { DrawStatus(); }));
+                }
+            });
         }
 
         static void CheckUpdatesBackground(bool loud)

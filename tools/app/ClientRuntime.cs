@@ -256,12 +256,30 @@ namespace Thornswood
                     log("  the update feed could not be reached, so the rest could not be fetched.");
                     return done;
                 }
-                // Newest last in the feed, so walk it backwards: the most
-                // recent pack holding a file is the one to take it from.
+                /*
+                  Newest last in the feed, so walk it backwards: the most
+                  recent pack holding a file is the one to take it from.
+
+                  AND NOT ALL THE WAY BACK. A pack only carries what CHANGED,
+                  and the feed listed 218 of them on 22 September going back to
+                  10 September. Walking the lot would download two hundred zips
+                  to look inside them, which is worse than saying plainly that
+                  it could not be found. The client runtime changes rarely, so
+                  if it is not in the last few dozen packs it is not coming
+                  from a pack at all and something else is wrong.
+                */
+                int looked = 0;
                 for (int pi = v.packs.Length - 1; pi >= 0 && want.Count > 0; pi--)
                 {
+                    if (looked >= 40)
+                    {
+                        log("  looked in the last 40 updates and did not find " + want.Count +
+                            " of them. Say so in the Discord with this text.");
+                        break;
+                    }
                     Pack p = v.packs[pi];
                     if (p == null || string.IsNullOrEmpty(p.url)) continue;
+                    looked++;
                     string zip = null;
                     try
                     {
