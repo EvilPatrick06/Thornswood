@@ -166,8 +166,10 @@ namespace Thornswood
         /// 2: Creation Club plugins the reference list does not name are left
         ///    out, and taken out of a folder that already has them. See
         ///    UnwantedCreation.
+        /// 3: Data\SkyrimTogetherReborn is another server's and is left out,
+        ///    all of it rather than the two subfolders Ship-Rules named.
         /// </summary>
-        const int Rules = 2;
+        const int Rules = 3;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -684,6 +686,11 @@ namespace Thornswood
             // program Windows Firewall stops the game to ask about.
             if (rel.StartsWith("Data\\NirnLabUIPlatform\\", StringComparison.OrdinalIgnoreCase)) return true;
             if (leaf.Equals("NirnLabUIPlugin.dll", StringComparison.OrdinalIgnoreCase)) return true;
+            // Skyrim Together Reborn's folder. Nothing here supports another
+            // server's install, so its files are not taken into ours either.
+            // Ship-Rules.ps1 carries the same rule; change the two together.
+            if (rel.StartsWith("Data\\SkyrimTogetherReborn\\", StringComparison.OrdinalIgnoreCase)) return true;
+            if (rel.Equals("Data\\SkyrimTogetherReborn", StringComparison.OrdinalIgnoreCase)) return true;
             // The client's per machine sign in data. It holds an access token.
             if (rel.StartsWith("Data\\Platform\\PluginsNoLoad\\", StringComparison.OrdinalIgnoreCase)) return true;
 
