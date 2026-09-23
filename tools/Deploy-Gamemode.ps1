@@ -43,6 +43,11 @@ param(
     [switch]$FullLoadOrder,      # list everything, indices be damned. for bisecting
     [switch]$Vortex,             # read the Steam game and the active Vortex profile
     [switch]$NewOrder,           # take the plugin list's order as it is, for a world being wiped
+    # The LIVE voice service, the one the 'Thornswood Voice' task runs on.
+    # Written into server-settings.json on every deploy rather than left to
+    # whatever is already in the file. See the block that writes it for why.
+    # The dev half of this is Deploy-DevGamemode.ps1 -VoicePort, which is 7789.
+    [int]$VoicePort = 7778,
     <#
       The NPCs, and how many of them the server simulates.
 
@@ -463,6 +468,44 @@ $s | Add-Member -NotePropertyName name        -NotePropertyValue $ServerName -Fo
 $s | Add-Member -NotePropertyName port        -NotePropertyValue $Port       -Force
 $s | Add-Member -NotePropertyName offlineMode -NotePropertyValue $true       -Force
 $s | Add-Member -NotePropertyName dataDir     -NotePropertyValue 'data'      -Force
+
+<#
+  WHICH VOICE SERVICE THIS SERVER TALKS TO, written every time rather than
+  inherited.
+
+  This file is READ BACK AND ADDED TO, not rewritten from nothing, so a key
+  nobody sets here survives for ever once anything puts it in. On 20 September
+  at 23:13 Deploy-DevGamemode.ps1 was run against C:\Thornswood-Server, the
+  LIVE folder, instead of the dev one. It set thornswoodVoicePort to 7789, the
+  dev voice service, and left its own server-settings.json.before-<stamp> in
+  the live folder as the only trace. The backup it made has no such key, which
+  is how that was proved rather than guessed.
+
+  FOR TWO DAYS THE LIVE SERVER THEN TALKED TO THE DEV VOICE SERVICE. Nothing
+  said so. The live voice service on 7778 took every slash command from every
+  person and queued it; the live game server drained 7789, which was empty and
+  always would be. The panel's picks ride that queue, so pressing Confirm at
+  the end of character creation said "Sent. The server is checking." and
+  nothing ever came back. Found 22 September with 38 commands piled up on
+  7778 and 0 on 7789, after Patrick could not finish a character.
+
+  The mirror of this is the case Deploy-DevGamemode.ps1 exists to prevent, and
+  its own comment describes it: a dev server with no port set talks to the LIVE
+  voice service and drains the live queues. Both directions are silent, and
+  both are one wrong -Root away.
+
+  So the live deploy asserts its own port the same way the dev deploy asserts
+  its. Setting it beats defaulting to it: gamemode.js falls back to 7778 when
+  the key is absent, but absent is not what goes wrong here, a wrong value is,
+  and a fallback cannot correct a value that is present and wrong.
+#>
+if ($s.PSObject.Properties.Name -contains 'thornswoodVoicePort' -and
+    [int]$s.thornswoodVoicePort -ne $VoicePort) {
+    Write-Host ("  thornswoodVoicePort was {0}, which is not this server's voice service. Setting it to {1}." -f `
+        [int]$s.thornswoodVoicePort, $VoicePort) -ForegroundColor Yellow
+    Write-Host '  A value that is not ours here means a dev deploy was pointed at this folder.' -ForegroundColor DarkGray
+}
+$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
 # Server-simulated NPCs. Off is SkyMP's default and it is the Skyrim Together
 # behaviour we are leaving behind: everyone gets their own private copy of every
 # bandit. On means one shared world. npcSettings stays empty, which is "no
