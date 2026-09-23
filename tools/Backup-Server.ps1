@@ -1,4 +1,4 @@
-<#
+﻿<#
   Backup-Server.ps1
 
   Pulls everything off the server that could not be rebuilt from the repo, and
@@ -217,16 +217,40 @@ foreach (`$c in @('C:\Caddy','C:\caddy','C:\Program Files\Caddy','C:\Thornswood-
 if (`$webNotes.Count -eq 0) { 'missing   nothing that looks like a web server is running' }
 
 # The scheduled tasks, whole. Importing these beats rebuilding them by hand.
+#
+# ASKED FOR RATHER THAN REMEMBERED, 23 September. This used to list four names
+# by hand and the box runs six: Setup-Domain registers Thornswood Web, which is
+# Caddy and therefore the only thing anybody outside can reach, and
+# Watch-Services registers Thornswood Watch, which is what restarts everything
+# else. A rebuild from this backup would have come up with no web server and
+# nothing watching, which is the pair you would least want to be missing at
+# 2am.
+#
+# So it enumerates and filters on the prefix. A task added later is in the
+# backup the night it is added, with nobody editing this file, and the count is
+# printed so a box that has lost one says so here rather than on the day it is
+# needed. The dev instances are named Thornswood Dev Server and Thornswood Dev
+# Voice and match the same prefix, which is right: they are part of the box.
 `$null = New-Item -ItemType Directory -Path (Join-Path `$stage 'tasks') -Force -EA SilentlyContinue
-foreach (`$t in @('Thornswood Docs','Thornswood Bot','Thornswood Voice','Thornswood Server')) {
+`$tasks = @()
+try {
+  `$tasks = @(Get-ScheduledTask -EA SilentlyContinue |
+              Where-Object { `$_.TaskName -like 'Thornswood*' } |
+              Select-Object -ExpandProperty TaskName | Sort-Object)
+} catch { `$tasks = @() }
+if (`$tasks.Count -eq 0) {
+  'missing   no scheduled task whose name begins Thornswood, which cannot be right'
+}
+foreach (`$t in `$tasks) {
   `$xml = & schtasks /query /tn `$t /xml 2>`$null
   if (`$LASTEXITCODE -eq 0 -and `$xml) {
     `$safe = `$t.Replace(' ','-')
     [IO.File]::WriteAllText((Join-Path `$stage ('tasks\' + `$safe + '.xml')), (`$xml -join [Environment]::NewLine))
     'took      tasks\' + `$safe + '.xml'
   }
-  else { 'no task   ' + `$t }
+  else { 'no task   ' + `$t + ' (it is registered but schtasks would not export it)' }
 }
+'tasks     ' + `$tasks.Count + ' scheduled task(s) whose name begins Thornswood'
 
 # What the box is, so the new one can be made to match.
 `$notes = @()
