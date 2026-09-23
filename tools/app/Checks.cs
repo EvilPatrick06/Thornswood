@@ -564,22 +564,47 @@ namespace Thornswood
         }
 
         /// <summary>What the Client row says, green or red.</summary>
+        /// <remarks>
+        /// IT NO LONGER TELLS ANYBODY TO REINSTALL, and that sentence was the
+        /// worst part of this row. The remedy used to be chosen from whether
+        /// Profile\Keep held a copy, and a fresh install never does, so a
+        /// brand new tester was always told to reinstall Thornswood. On
+        /// 22 September one of them did, got the same screen, and only got in
+        /// after purging Vortex twice, running another server's launcher
+        /// repair and logging in to a character there. The installer they
+        /// reinstalled from is a suspect in the same fault, so that advice
+        /// sent them round the loop it came from.
+        ///
+        /// The launcher puts it back itself now. See ClientRuntime.Heal, which
+        /// takes the recorded files out of the kept copies or out of a pack on
+        /// the feed. This row only has to say what is true while that happens.
+        /// </remarks>
         public static string ClientDetail()
         {
             try
             {
-                // Which remedy is named depends on whether there is anything
-                // to put back. Repair restores a Data\Platform file from the
-                // kept copy under Profile\Keep, and a kept copy only exists
-                // for a file one of this build's updates wrote. An install
-                // that came from the installer and has never taken a pack has
-                // none, so Repair would find nothing and say so, and the
-                // person would be stuck on a blocked button being told to
-                // press one that cannot help.
-                string how = Keep.HasKept(@"Data\Platform\Plugins\skymp5-client.js")
-                    ? "press Repair in Settings" : "reinstall Thornswood";
-                if (!File.Exists(ClientBundle)) return "skymp5-client.js is missing, " + how;
-                if (!ClientPatched()) return "skymp5-client.js is not this build's, " + how;
+                // The record is the check now, not a text search for our name.
+                // See ClientRuntime for why the old one could not tell you
+                // WHICH build you had.
+                if (ClientRuntime.Recorded().Count > 0)
+                {
+                    List<string> missing;
+                    List<string> wrong = ClientRuntime.Wrong(out missing);
+                    int bad = missing.Count + wrong.Count;
+                    if (bad == 0) return "client bundle";
+                    string what = (bad == 1)
+                        ? Path.GetFileName(missing.Count > 0 ? missing[0] : wrong[0])
+                        : bad + " client files";
+                    return (missing.Count > 0 && wrong.Count == 0)
+                        ? what + " is missing, the launcher will fetch it"
+                        : what + " is not this build's, the launcher will replace it";
+                }
+
+                // No record embedded. That is a build fault rather than
+                // anything wrong with this machine, so it says so plainly and
+                // falls back to asking whether the bundle is there at all.
+                if (!File.Exists(ClientBundle))
+                    return "skymp5-client.js is missing, and this launcher has no client record to fix it from";
             }
             catch { return "client bundle"; }
             return "client bundle";
@@ -598,7 +623,7 @@ namespace Thornswood
             // See ClientPatched: every row above this one asks whether a
             // file exists, and a bundle that is present but not ours is
             // what leaves somebody sitting on the backdrop.
-            l.Add(new Check("Client", ClientPatched(), ClientDetail()));
+            l.Add(new Check("Client", ClientRuntime.Good(), ClientDetail()));
             l.Add(new Check("Mods", plugins > 40, plugins + " plugins"));
 
             // The server does not police plugin lists, so this does. A list that
