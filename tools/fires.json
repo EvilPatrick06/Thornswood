@@ -1,0 +1,367 @@
+{
+  "builtFrom": [
+    "Skyrim.esm"
+  ],
+  "builtAt": "2026-09-23T06:24:27.301Z",
+  "reach": {
+    "flame": 300,
+    "craft": 260
+  },
+  "inside": 90,
+  "rule": "flame: the model is one of the fire effects or wood fires. craft: the editor id begins one of CraftingBlackSmithForge, CraftingSmelterMarker, CraftingBlacksmithForgeSTATIC, CraftingCookingFireSpit. Anything whose editor id or model ends Off or Out is dropped.",
+  "fires": [
+    {
+      "id": "0xd61b6",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "BFXFireVol01",
+      "modl": "Effects\\BFXFireVol01.nif",
+      "why": "model Effects\\BFXFireVol01.nif"
+    },
+    {
+      "id": "0xd61be",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "BFXFireVolCorner",
+      "modl": "Effects\\BFXFireVolCorner.nif",
+      "why": "model Effects\\BFXFireVolCorner.nif"
+    },
+    {
+      "id": "0xef77f",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "BFXFireVolCornerRound",
+      "modl": "Effects\\BFXFireVolCornerRound.nif",
+      "why": "model Effects\\BFXFireVolCornerRound.nif"
+    },
+    {
+      "id": "0xf2ac6",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "BFXFireVolCornerRoundNoFloor",
+      "modl": "Effects\\BFXFireVolCornerRoundNoFloor.nif",
+      "why": "model Effects\\BFXFireVolCornerRoundNoFloor.nif"
+    },
+    {
+      "id": "0x42521",
+      "type": "ACTI",
+      "kind": "flame",
+      "edid": "bwcStatuePuzzleFlame",
+      "modl": "Effects\\FXfireWithEmbers01.nif",
+      "why": "model Effects\\FXfireWithEmbers01.nif"
+    },
+    {
+      "id": "0x35f49",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01Burning",
+      "modl": "Clutter\\WoodFires\\Campfire01Burning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01Burning.nif"
+    },
+    {
+      "id": "0x35f47",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurning",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0xa9230",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurning_Heavy_SN",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0x90ca4",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurning_ReachDirt01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0x10d820",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningCaveBaseGround02",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0xc2bf1",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningCoastalBeach01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0xdb682",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningDirt01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0xc6918",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningFallForestDirt01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0xfb9b0",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningFieldGrass01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0xcbb23",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningFrozenMarshDirtSlope01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0xb6c08",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningPineForest01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0x951d8",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningReachDirt01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0xe7c9a",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningRiverBedEdge01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0xcbb2f",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningRocks01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0x101a51",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "Campfire01LandBurningTundra01",
+      "modl": "Clutter\\WoodFires\\Campfire01LandBurning.nif",
+      "why": "model Clutter\\WoodFires\\Campfire01LandBurning.nif"
+    },
+    {
+      "id": "0xcae0b",
+      "type": "FURN",
+      "kind": "craft",
+      "edid": "CraftingBlackSmithForge",
+      "modl": "Furniture\\BlacksmithForgeMarker.nif",
+      "why": "editor id begins CraftingBlackSmithForge"
+    },
+    {
+      "id": "0xbbcf1",
+      "type": "FURN",
+      "kind": "craft",
+      "edid": "CraftingBlackSmithForgeSkyforge",
+      "modl": "Furniture\\BlackSmithingSkyforgeMarker.nif",
+      "why": "editor id begins CraftingBlackSmithForge"
+    },
+    {
+      "id": "0x48748",
+      "type": "ACTI",
+      "kind": "craft",
+      "edid": "CraftingBlacksmithForgeSTATIC",
+      "modl": "Clutter\\Blacksmith\\BlacksmithForge01\\BlacksmithForge01.nif",
+      "why": "editor id begins CraftingBlackSmithForge"
+    },
+    {
+      "id": "0xbf9e1",
+      "type": "FURN",
+      "kind": "craft",
+      "edid": "CraftingBlackSmithForgeWR",
+      "modl": "Furniture\\BlacksmithForgeMarkerWR.nif",
+      "why": "editor id begins CraftingBlackSmithForge"
+    },
+    {
+      "id": "0x68adb",
+      "type": "FURN",
+      "kind": "craft",
+      "edid": "CraftingCookingFireSpit",
+      "modl": "Furniture\\FireSpitCooking.nif",
+      "why": "editor id begins CraftingCookingFireSpit"
+    },
+    {
+      "id": "0x9c6ce",
+      "type": "FURN",
+      "kind": "craft",
+      "edid": "CraftingSmelterMarker1",
+      "modl": "Furniture\\SmelterMarker.nif",
+      "why": "editor id begins CraftingSmelterMarker"
+    },
+    {
+      "id": "0x35f4a",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FireplaceWood01Burning",
+      "modl": "Clutter\\WoodFires\\FireplaceWood01Burning.nif",
+      "why": "model Clutter\\WoodFires\\FireplaceWood01Burning.nif"
+    },
+    {
+      "id": "0x13b40",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXFire01",
+      "modl": "Effects\\FXFire01New.nif",
+      "why": "model Effects\\FXFire01New.nif"
+    },
+    {
+      "id": "0x13b42",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXFire02",
+      "modl": "Effects\\FXFire02New.nif",
+      "why": "model Effects\\FXFire02New.nif"
+    },
+    {
+      "id": "0x1094ab",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXFireSovngarde",
+      "modl": "Effects\\FXFireSovngarde.nif",
+      "why": "model Effects\\FXFireSovngarde.nif"
+    },
+    {
+      "id": "0xcd824",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXfireWithEmbers01_Cheap",
+      "modl": "Effects\\FXfireWithEmbers01_Cheap.nif",
+      "why": "model Effects\\FXfireWithEmbers01_Cheap.nif"
+    },
+    {
+      "id": "0xcd823",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXfireWithEmbers01_lite",
+      "modl": "Effects\\FXfireWithEmbers01_lite.nif",
+      "why": "model Effects\\FXfireWithEmbers01_lite.nif"
+    },
+    {
+      "id": "0xaa71c",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXfireWithEmbers02Toggle",
+      "modl": "Effects\\FXfireWithEmbers02Toggle.nif",
+      "why": "model Effects\\FXfireWithEmbers02Toggle.nif"
+    },
+    {
+      "id": "0x33da4",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXfireWithEmbersHeavy",
+      "modl": "Effects\\FXfireWithEmbers01.nif",
+      "why": "model Effects\\FXfireWithEmbers01.nif"
+    },
+    {
+      "id": "0x106112",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXfireWithEmbersHeavySCALED",
+      "modl": "Effects\\FXfireWithEmbers01.nif",
+      "why": "model Effects\\FXfireWithEmbers01.nif"
+    },
+    {
+      "id": "0x1092e2",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXfireWithEmbersHeavyToggle",
+      "modl": "Effects\\FXfireWithEmbersHeavyToggle.nif",
+      "why": "model Effects\\FXfireWithEmbersHeavyToggle.nif"
+    },
+    {
+      "id": "0x33da9",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXfireWithEmbersLight",
+      "modl": "Effects\\FXfireWithEmbers02.nif",
+      "why": "model Effects\\FXfireWithEmbers02.nif"
+    },
+    {
+      "id": "0x4318b",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "FXfireWithEmbersLogs01",
+      "modl": "Effects\\FXfireWithEmbersLogs01.nif",
+      "why": "model Effects\\FXfireWithEmbersLogs01.nif"
+    },
+    {
+      "id": "0x51577",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "GiantCampfire01Burning",
+      "modl": "Clutter\\Giant\\GiantCampfire01Burning.nif",
+      "why": "model Clutter\\Giant\\GiantCampfire01Burning.nif"
+    },
+    {
+      "id": "0xf597f",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "GiantCampfire01BurningDirt01",
+      "modl": "Clutter\\Giant\\GiantCampfire01Burning.nif",
+      "why": "model Clutter\\Giant\\GiantCampfire01Burning.nif"
+    },
+    {
+      "id": "0xf6304",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "GiantCampfire01BurningDirt02Blank",
+      "modl": "Clutter\\Giant\\GiantCampfire01Burning.nif",
+      "why": "model Clutter\\Giant\\GiantCampfire01Burning.nif"
+    },
+    {
+      "id": "0x10acc0",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "GiantCampfire01BurningNoLand",
+      "modl": "Clutter\\Giant\\GiantCampfire01BurningNoLand.nif",
+      "why": "model Clutter\\Giant\\GiantCampfire01BurningNoLand.nif"
+    },
+    {
+      "id": "0x4c5ce",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "GiantCampfire01BurningSnow01",
+      "modl": "Clutter\\Giant\\GiantCampfire01Burning.nif",
+      "why": "model Clutter\\Giant\\GiantCampfire01Burning.nif"
+    },
+    {
+      "id": "0x4c5cf",
+      "type": "MSTT",
+      "kind": "flame",
+      "edid": "GiantCampfire01BurningSnow01B",
+      "modl": "Clutter\\Giant\\GiantCampfire01Burning.nif",
+      "why": "model Clutter\\Giant\\GiantCampfire01Burning.nif"
+    }
+  ],
+  "droppedForBeingOut": 1
+}

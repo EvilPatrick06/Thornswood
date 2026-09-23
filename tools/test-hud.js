@@ -179,6 +179,29 @@ if (hud) {
     yes('S3b and the text is big enough to read', !!size && Number(size[1]) >= 14);
   }
 
+  /*
+    S3c: the size Patrick actually asked for.
+
+    23 September, looking at the 15px version: "The indicator area is still to
+    small it all needs to be like 1.5x the current size". 15 x 1.5 is 22, the
+    132px bar becomes 198 and the 19px icon becomes 28. Numbers, not
+    adjectives, so nobody can shrink it back by accident and call it readable.
+  */
+  {
+    const r = run(made, { food: 100, drink: 100, rest: 100, temp: 50 }, {});
+    const el = r.made['ts-hud'];
+    const size = /font-size:(\d+)px/.exec(el.style.cssText);
+    yes('S3c the text is the asked for 1.5x, not the old 15px',
+        !!size && Number(size[1]) >= 22);
+    const bar = /width:(\d+)px;height:(\d+)px/.exec(el.innerHTML);
+    yes('S3c the bars grew with it', !!bar && Number(bar[1]) >= 198 && Number(bar[2]) >= 16);
+    const icon = /<svg width="(\d+)"/.exec(el.innerHTML);
+    yes('S3c and so did the icons', !!icon && Number(icon[1]) >= 28);
+    // The panel has to grow too, or bigger text inside the same box overflows.
+    const pad = /padding:(\d+)px/.exec(el.style.cssText);
+    yes('S3c the panel behind it grew as well', !!pad && Number(pad[1]) >= 13);
+  }
+
   // S4: THE PER-FRAME GUARD. updateOwner runs every frame; this is what stops
   // the HUD being rebuilt sixty times a second for ever.
   {
