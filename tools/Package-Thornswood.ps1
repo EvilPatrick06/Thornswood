@@ -1,4 +1,4 @@
-<#
+﻿<#
   Package-Thornswood.ps1
   Turns the built install at C:\Thornswood into the single file your friends run.
 
@@ -957,3 +957,13 @@ if (-not $NoPublish) {
 
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+
+# Said out loud rather than left to chance, the same as Build-Launcher.ps1.
+#
+# A PowerShell script that runs off the end does not reset $LASTEXITCODE: the
+# caller sees whatever the last native command left behind, and this script
+# runs 7z, winget and Publish-Installer. Ship.ps1 reads that code now to decide
+# whether a release may go out, so a stray value here would either hide a
+# failure or stop a good release for no reason. Every other way out of this
+# script already exits deliberately.
+exit 0

@@ -93,6 +93,12 @@ function Get-LauncherExe([string]$dir) {
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Declared here because Set-StrictMode is on: reading a variable that was never
+# set is an error, and the whole point of this one is that it is usually never
+# set. Non-zero means the installer rebuild failed, and the Done section says
+# so again at the end.
+$script:InstallerFailed = 0
+
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
@@ -739,6 +745,33 @@ if ($Dev) {
 elseif ($Package) {
     Head 'Rebuilding the installer'
     & (Join-Path $Here 'Package-Thornswood.ps1') -Root $Root -OutDir $DistDir -NoPause
+
+    # AND READ WHETHER IT WORKED, which is the same fault as the build step
+    # above and entry 118 on the list: Ship called a script and never looked at
+    # what it said. With -Package the installer is what a new person downloads,
+    # so a packager that stopped halfway left the release saying it had been
+    # rebuilt when it had not.
+    #
+    # IT DOES NOT STOP THE RELEASE, and that is deliberate rather than a
+    # half fix. This step runs long after 'Publishing': the pack is already on
+    # the feed by the time it starts. Dying here would leave a release that is
+    # out with the site never told, the Discord never posted to and the server
+    # never asked to restart, which is worse than an installer one release
+    # behind. So it says exactly what happened, in red, with the command to put
+    # it right. That the installer is rebuilt after the release goes out is its
+    # own question and it is on the list.
+    #
+    # Package-Thornswood.ps1 ends with an explicit exit 0 for this, because a
+    # script that runs off the end hands back whatever its last native command
+    # left behind and it runs 7z and winget.
+    if ($LASTEXITCODE -ne 0) {
+        $script:InstallerFailed = $LASTEXITCODE
+        Say "  THE INSTALLER DID NOT BUILD. Package-Thornswood.ps1 exited with $LASTEXITCODE." 'Red'
+        Say '  The release itself is already published and is fine. What is not' 'Red'
+        Say '  rebuilt is Thornswood-Setup.zip, so anybody installing from scratch' 'Red'
+        Say '  sits through this release on first launch.' 'Red'
+        Say '  .\tools\Package-Thornswood.ps1   to put that right' 'Yellow'
+    }
 }
 else {
     Show-Installer
@@ -870,6 +903,14 @@ if (-not $DryRun -and -not $Dev -and (Test-Path (Join-Path $RepoDir '.git'))) {
 }
 
 Head 'Done'
+# Repeated here on purpose. A red line in the middle of a release log is a line
+# nobody reads: the last screen is the one that gets looked at.
+if ($script:InstallerFailed) {
+    Say ("The installer did NOT rebuild (exit $script:InstallerFailed). The release went out " +
+         'without it.') 'Red'
+    Say '  .\tools\Package-Thornswood.ps1' 'Yellow'
+    Write-Host ''
+}
 if ($DryRun) { Say 'Dry run finished. Nothing left your machine.' 'Yellow' }
 elseif ($NoAnnounce) { Say 'Everyone gets it next time they open the launcher.' 'Green' }
 else {
