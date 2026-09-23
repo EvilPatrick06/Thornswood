@@ -781,11 +781,82 @@ Say "  repo: $Repo" 'DarkGray'
 $gh = Get-Command gh -EA SilentlyContinue
 $exeUrl = ''
 
+# ---- the client runtime, as an asset with an address ----------------------
+#
+# WHY IT IS NOT LEFT TO THE PACKS. A pack carries what CHANGED, and the six
+# files in client-build.json change a few times a month, so they are in a pack
+# only on the releases where they happened to move and absent from every other
+# one. On 22 September the launcher learned to repair a missing client file and
+# there was nothing on the feed to repair FROM: the four packs published after
+# the client was recorded that morning were 3 MB, 0, 0 and 0, and
+# SkyrimPlatformImpl.dll alone is 15.6 MB. It had to be forced by clearing six
+# entries out of the publish baseline by hand.
+#
+# That worked and it is not a mechanism. So the runtime gets its own asset and
+# its own line in version.json, and ClientRuntime.Heal asks for it by address
+# instead of walking forty updates hoping to trip over it.
+#
+# PUBLISHED ONLY WHEN IT CHANGES. The name carries the fork commit, so a build
+# that is already on the feed is already uploaded and this does nothing. 18 MB
+# on every release for six files that move a few times a month is exactly what
+# this is avoiding.
+$clientZip = ''
+$clientRel = $null
+try {
+    $cbPath = Join-Path $PSScriptRoot 'client-build.json'
+    if (Test-Path -LiteralPath $cbPath) {
+        $cb = Get-Content -LiteralPath $cbPath -Raw | ConvertFrom-Json
+        $cbCommit = [string]$cb.forkCommit
+        $have = $null
+        if ($doc.PSObject.Properties['clientRuntime']) { $have = $doc.clientRuntime }
+        $already = ($null -ne $have) -and ($have.PSObject.Properties['forkCommit']) -and
+                   ([string]$have.forkCommit -eq $cbCommit) -and
+                   ($have.PSObject.Properties['url']) -and ([string]$have.url).Length -gt 0
+        if ($already) {
+            Say "  client runtime $cbCommit is already on the feed" 'DarkGray'
+        } else {
+            $names = @($cb.files.PSObject.Properties.Name)
+            $stage = Join-Path $DistDir ("client-runtime-" + $cbCommit)
+            if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
+            $missingClient = @()
+            foreach ($n in $names) {
+                $src = Join-Path $GameDir $n
+                if (-not (Test-Path -LiteralPath $src)) { $missingClient += $n; continue }
+                $dst = Join-Path $stage $n
+                New-Item -ItemType Directory -Force -Path (Split-Path $dst -Parent) | Out-Null
+                Copy-Item -LiteralPath $src -Destination $dst -Force
+            }
+            if ($missingClient.Count) {
+                foreach ($m in $missingClient) { Say "  client runtime file missing from the build: $m" 'Red' }
+                Die 'The client runtime is incomplete in the game folder, so it was not published. Run tools\Sync-Client.ps1 and ship again.'
+            }
+            $clientZip = Join-Path $DistDir ("client-runtime-" + $cbCommit + ".zip")
+            if (Test-Path -LiteralPath $clientZip) { Remove-Item -LiteralPath $clientZip -Force }
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            [IO.Compression.ZipFile]::CreateFromDirectory($stage, $clientZip, [IO.Compression.CompressionLevel]::Optimal, $false)
+            Remove-Item -LiteralPath $stage -Recurse -Force
+            $clientRel = [pscustomobject]@{
+                name       = [IO.Path]::GetFileName($clientZip)
+                path       = $clientZip
+                sha256     = (Get-FileHash $clientZip -Algorithm SHA256).Hash.ToLower()
+                bytes      = (Get-Item -LiteralPath $clientZip).Length
+                forkCommit = $cbCommit
+                url        = ''
+            }
+            Say ("  client runtime {0} packed, {1:N1} MB" -f $cbCommit, ($clientRel.bytes / 1MB)) 'Green'
+        }
+    }
+} catch {
+    Say "  the client runtime could not be prepared: $_" 'Yellow'
+    $clientRel = $null
+}
+
 if (-not $NoUpload -and $gh) {
     Head 'Uploading'
     $assets = @()
     foreach ($c in $chunks) { $assets += $c.Path }
     if ($Launcher) { $assets += $exePath }
+    if ($clientRel) { $assets += $clientRel.path }
 
     $repoArg = @(); if ($Repo) { $repoArg = @('--repo', $Repo) }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -829,10 +900,22 @@ if (-not $NoUpload -and $gh) {
     foreach ($a in $relAssets) {
         $u = "https://api.github.com/repos/$Repo/releases/assets/$($a.id)"
         if ($a.name -eq 'Thornswood.exe' -or $a.name -eq 'SkyrimTogether.exe') { $exeUrl = $u; continue }
+        if ($clientRel -and $a.name -eq $clientRel.name) { $clientRel.url = $u; continue }
         foreach ($c in $chunks) {
             if ($a.name -eq ('pack-' + $c.Id + '.zip')) { $c.Url = $u }
         }
     }
+
+    # The same refusal the packs and the launcher get. A clientRuntime line
+    # with no url is a launcher that downloads nothing and falls back to
+    # walking the feed, which is the thing this asset exists to replace, and it
+    # would do it silently.
+    if ($clientRel -and -not $clientRel.url) {
+        Write-Host ''
+        Say "  $($clientRel.name) did not upload" 'Red'
+        Die 'version.json has not been touched. The client runtime asset never reached GitHub; run Ship again.'
+    }
+    if ($clientRel) { Say "  client runtime asset ready" 'Green' }
 
     $missing = @($chunks | Where-Object { -not $_.Url })
     if ($missing.Count) {
@@ -904,6 +987,17 @@ if ($chunks.Count) {
         Say "  pack $($c.Id) added" 'Green'
     }
     Set-Prop $doc 'packs' $packs
+}
+# The client runtime's address, so a launcher missing one of those six files
+# asks for it by name instead of searching the packs for it.
+if ($clientRel -and $clientRel.url) {
+    Set-Prop $doc 'clientRuntime' ([pscustomobject]@{
+        url        = $clientRel.url
+        sha256     = $clientRel.sha256
+        bytes      = $clientRel.bytes
+        forkCommit = $clientRel.forkCommit
+    })
+    Say "  client runtime $($clientRel.forkCommit) recorded" 'Green'
 }
 if ($Launcher -and (Test-Path $exePath)) {
     $wasVersion = Val $doc 'launcherVersion'
