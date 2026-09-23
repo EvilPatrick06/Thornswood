@@ -176,6 +176,14 @@ function Test-ShipOtherServer([string]$rel) {
     # kept it out of the installer all along; nothing kept it out of a pack.
     if ($rel -match '^Data\\NirnLabUIPlatform($|\\)') { return $true }
     if ((Split-Path $rel -Leaf) -ieq 'NirnLabUIPlugin.dll') { return $true }
+    # A loose map.swf. Somebody else left it in the Steam copy, it overrides
+    # SkyUI's own copy inside SkyUI_SE.bsa because loose beats an archive, and
+    # SkyUI answers with a full screen "ERROR CODE 5, Incompatible menu file
+    # (map.swf)" on the way in. Vortex's deployment record does not list it and
+    # A Quality World Map ships no Interface file at all, so nothing in the
+    # collection wants it and taking it out keeps the good map.
+    # OwnGame.Foreign carries the same rule; change the two together.
+    if ($rel -ieq 'Data\Interface\map.swf') { return $true }
     if (-not $rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $false }
     $leaf = Split-Path $rel -Leaf
     if ($rel.StartsWith('Data\Platform\PluginsNoLoad\', 'OrdinalIgnoreCase')) { return $true }

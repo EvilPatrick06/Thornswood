@@ -687,6 +687,40 @@ namespace Thornswood
             // The client's per machine sign in data. It holds an access token.
             if (rel.StartsWith("Data\\Platform\\PluginsNoLoad\\", StringComparison.OrdinalIgnoreCase)) return true;
 
+            /*
+              A LOOSE map.swf, WHICH IS SOMEBODY ELSE'S AND BREAKS SkyUI.
+
+              22 September: a full screen box on the way in, "SKYUI ERROR CODE
+              5. Incompatible menu file (map.swf)." SkyUI checks that file's
+              version and refuses one it does not recognise, so the box is
+              SkyUI saying something else's copy won.
+
+              MEASURED RATHER THAN GUESSED. The file is in the Steam copy, this
+              class hard linked it into Thornswood's folder, and the publish
+              baseline ships it. Vortex's own deployment record does NOT list
+              it: nothing in the collection put it there. SkyUI ships its
+              map.swf inside SkyUI_SE.bsa, and A Quality World Map, which is
+              the other mod anybody would suspect, ships 32 files and not one
+              of them is a .swf or anything under Interface at all. Its map is
+              Textures\terrain\*.dds, the ESP and two scripts.
+
+              So the loose file is an orphan another launcher left in the Steam
+              copy, it overrides SkyUI's copy because loose beats an archive,
+              and it is the only reason for the error.
+
+              TAKING IT OUT LOSES NOTHING AND KEEPS THE GOOD MAP. SkyUI's own
+              copy loads from its archive, and A Quality World Map's terrain
+              textures are untouched, so the map still looks the way Patrick
+              wants it to.
+
+              This is the same disease as the SkyMP client runtime above, in a
+              different folder: a file in the Steam copy that is not the
+              collection's, taken into our folder and then shipped to everybody
+              as though it were ours. Ship-Rules.ps1 carries the same rule;
+              change the two together.
+            */
+            if (rel.Equals("Data\\Interface\\map.swf", StringComparison.OrdinalIgnoreCase)) return true;
+
             if (!rel.StartsWith("Data\\Platform\\", StringComparison.OrdinalIgnoreCase)) return false;
             if (leaf.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)) return true;
             // The bundle is on ClientFiles and answered above in WhyLeft, so
