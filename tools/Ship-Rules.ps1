@@ -1,4 +1,4 @@
-<#
+﻿<#
   Ship-Rules.ps1
 
   The one list of what never leaves a machine inside a Thornswood pack or
@@ -304,7 +304,36 @@ $ShipDeleteAlways = @(
     # ERROR CODE 5 over the loading screen. Vortex deploys no map.swf, SkyUI
     # ships its own inside SkyUI_SE.bsa, and A Quality World Map ships no
     # Interface file at all, so nothing in the collection wants a loose one.
-    'Data\Interface\map.swf'
+    'Data\Interface\map.swf',
+
+    # ONE PERSON'S VOICE JOIN TOKEN, WHICH NINE PUBLISHED PACKS CARRIED.
+    #
+    # MEASURED 23 SEPTEMBER, which is what entry 81 asked for and what nobody
+    # had done. The token file first existed on 18 September (b2a9f9d) and the
+    # packing rule that excludes it landed on 20 September (15c472a). Thirteen
+    # packs were published inside that window. Nine of them carry
+    # game/Data/Platform/voice-token.txt: 20260918-1615, 20260918-2340,
+    # 20260919-1416, 20260919-1546, 20260919-1944, 20260919-2010,
+    # 20260919-2044, 20260920-1103 and 20260920-1124. Counted by listing the
+    # names inside each zip; no token was opened or printed, per that entry.
+    #
+    # WHAT IT IS AND IS NOT. The token is a signed join token that proves one
+    # profile id to the voice service and lives sixty minutes, so every one of
+    # these expired in September 2026 and opens nothing now. The fault was the
+    # rule, not the damage.
+    #
+    # LEAVING IT OUT OF NEW PACKS DOES NOTHING FOR THE MACHINES THAT HAVE ONE,
+    # which is the whole reason this list exists: map.swf taught that on 22
+    # September. So the next release deletes it from every install that took
+    # one of those nine. Harmless to a working machine, because the launcher
+    # writes a fresh token at Play and the update is applied before that.
+    #
+    # THE PUBLISHED PACKS ARE DELIBERATELY LEFT ALONE. Rewriting a release
+    # asset changes its sha256, and version.json records that hash for every
+    # pack: a launcher that took the old one would fail its checksum and stop.
+    # Breaking the feed to remove an expired token is a worse trade than
+    # leaving nine dead tokens in nine old zips.
+    'Data\Platform\voice-token.txt'
 )
 
 function Get-ShipDeleteAlways { return $ShipDeleteAlways }
