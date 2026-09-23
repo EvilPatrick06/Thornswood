@@ -199,11 +199,24 @@ if (block) {
     catch (e) { fires = null; }
     yes('the fire table has been built', !!fires && Array.isArray(fires.fires));
     if (fires) {
-      const listed = /const FIRE_BASES = \[([^\]]*)\]/.exec(FRONT);
+      const listed = /const FIRE_BASES = \[([\s\S]*?)\n  \];/.exec(FRONT);
       yes('the plugin carries a list of fire bases', !!listed);
       if (listed) {
-        const inPlugin = (listed[1].match(/0x[0-9a-f]+/g) || []).sort();
-        const inTable = fires.fires.map(function (f) { return f.id; }).sort();
+        /*
+          EACH ROW IS A FILE AND AN ID INSIDE IT, not a runtime id, and that is
+          the change of 23 September. A mod's form id is its place in the load
+          order and moves whenever anybody adds a mod, so the client resolves
+          anything outside Skyrim.esm with Game.getFormFromFile. The table is
+          the same pair, so they are compared as pairs.
+        */
+        const inPlugin = (listed[1].match(/\['([^']+)',\s*(0x[0-9a-f]+)\]/g) || [])
+          .map(function (t) {
+            const m = /\['([^']+)',\s*(0x[0-9a-f]+)\]/.exec(t);
+            return m[1].toLowerCase() + ':' + parseInt(m[2], 16);
+          }).sort();
+        const inTable = fires.fires.map(function (f) {
+          return f.file.toLowerCase() + ':' + parseInt(f.local, 16);
+        }).sort();
         /*
           THE ONE THING KEEPING A HAND EDIT HONEST. The list in the plugin is
           what the client actually scans with; fires.json is what the builder
@@ -213,10 +226,27 @@ if (block) {
         yes('and it is exactly what the builder measured (' + inTable.length + ')',
             inPlugin.length === inTable.length &&
             inPlugin.every(function (v, i) { return v === inTable[i]; }));
+        /*
+          AND THE MOD FIRES ARE IN IT, which is the whole reason this changed.
+          Patrick walked into a fire on 23 September and the temperature did
+          not move: this collection has Embers XD, a fire overhaul, and every
+          fire the client knew about came out of Skyrim.esm.
+        */
+        const mods = fires.fires.filter(function (f) {
+          return ['skyrim.esm', 'update.esm', 'dawnguard.esm', 'hearthfires.esm',
+                  'dragonborn.esm'].indexOf(f.file.toLowerCase()) === -1;
+        });
+        yes('fires a mod added are in it too (' + mods.length + ')', mods.length > 0);
+        yes('and the client resolves those through the file rather than an id',
+            /getFormFromFile/.test(FRONT));
       }
       // The unlit ones are the trap: a name match would have warmed people up
       // at a dead campfire.
-      const out = fires.fires.filter(function (f) { return /(off|out)\d*$/i.test(f.edid); });
+      const out = fires.fires.filter(function (f) {
+        // Embers names its unlit variants NoFire rather than Off, and one of
+        // them was in the first table read off the whole order.
+        return /((off|out)\d*$)|nofire|unlit/i.test(f.edid);
+      });
       yes('no unlit fire made it into the table', out.length === 0);
       const craft = fires.fires.filter(function (f) { return f.kind === 'craft'; });
       yes('forges and smelters are in it, which Patrick asked for by name',
