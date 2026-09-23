@@ -1355,7 +1355,7 @@ namespace Thornswood
 
                     try
                     {
-                        int rules = Enforce.Apply(cfg);
+                        int rules = Enforce.Apply();
                         if (rules > 0) did.Add(rules + " mod setting" + (rules == 1 ? "" : "s"));
                     }
                     catch { }
@@ -1973,6 +1973,58 @@ namespace Thornswood
                     ? " " + missing + " of them are mods that are not in the game folder at all, which Scan and Fix cannot change." +
                       (Paths.Collection ? " Vortex most likely has another profile deployed." : "")
                     : ""));
+
+            /*
+              AND WHICH ONES, because the count on its own is not a record of
+              anything.
+
+              FOUND 22 SEPTEMBER while working out why nobody could join the
+              dev server. The log said "Scan finished. 4 issues found" and
+              "Something needs attention before you can play", and that was the
+              entire record. It never said which four. Every one of those
+              issues already carries a written sentence naming the plugin and
+              what is wrong with it, because Verify.cs builds them that way for
+              the card on screen; this line threw all of it away and kept the
+              number.
+
+              Working out what those four were meant reading Verify.cs,
+              reimplementing its comparison by hand, fetching the server's
+              manifest and diffing it against the game folder. Twenty minutes
+              for somebody who knows the code and an impossibility for anybody
+              else.
+
+              IT MATTERS MOST FOR THE PEOPLE THE LOG IS COLLECTED FROM. Each
+              session's log goes up to the site, so a tester who cannot press
+              Play produced a line with a number in it, while the answer to
+              "why can't I play" was sitting in memory at that exact moment and
+              was deliberately not written down.
+
+              BLOCKING FIRST, because those are the ones that refuse Play, and
+              capped so a mod list that is 182 wrong does not bury the rest of
+              the log. The count above already says how many there were, so the
+              cap loses nothing that is not already recorded.
+            */
+            if (issues.Count > 0)
+            {
+                var named = new List<Issue>();
+                foreach (Issue i in issues) if (i.Blocking) named.Add(i);
+                foreach (Issue i in issues) if (!i.Blocking) named.Add(i);
+
+                const int LogAtMost = 25;
+                int shown = 0;
+                foreach (Issue i in named)
+                {
+                    if (shown >= LogAtMost) break;
+                    if (string.IsNullOrEmpty(i.Text)) continue;
+                    // One line each, flattened: a wrapped sentence in a log
+                    // file is a sentence somebody has to reassemble by eye.
+                    string one = i.Text.Replace("\r", " ").Replace("\n", " ").Trim();
+                    Log("  " + (i.Blocking ? "blocks Play: " : "worth knowing: ") + one);
+                    shown++;
+                }
+                if (named.Count > shown)
+                    Log("  and " + (named.Count - shown) + " more, not written out to keep the log readable.");
+            }
         }
 
         static void BuildModList()
@@ -3734,7 +3786,7 @@ namespace Thornswood
                     Display.ScaleMenus();
                 }
 
-                int held = Enforce.Apply(cfg);
+                int held = Enforce.Apply();
                 if (held > 0) Log("Put back " + held + " setting" + (held == 1 ? "" : "s") + " the last session overwrote.");
                 foreach (string note in Enforce.Said) Log(note);
 

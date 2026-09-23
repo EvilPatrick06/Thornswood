@@ -152,11 +152,10 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Writes every rule, plus wherever the launcher has been told to put
-        /// the minimap. Returns how many values it had to change, so a launch
-        /// that changed nothing can stay quiet.
+        /// Writes every rule. Returns how many values it had to change, so a
+        /// launch that changed nothing can stay quiet.
         /// </summary>
-        public static int Apply(Config cfg)
+        public static int Apply()
         {
             int changed = 0;
             Said.Clear();
@@ -168,8 +167,6 @@ namespace Thornswood
 
             return changed;
         }
-
-        static bool Set(string file, string key, string value) { return SetNth(file, key, value, 1); }
 
         /// <summary>
         /// Like Set, but for a key that may not be in the file yet. Replaces
@@ -184,7 +181,7 @@ namespace Thornswood
             {
                 if (File.Exists(file))
                 {
-                    if (SetNth(file, key, value, 1)) return true;
+                    if (Set(file, key, value)) return true;
                     // Nothing changed: either the key is already right, or it
                     // is not there at all. Tell those two apart.
                     var rx = new Regex("^\\s*" + Regex.Escape(key) + "\\s*=", RegexOptions.IgnoreCase);
@@ -223,12 +220,12 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Replaces the nth live occurrence of a key. These files repeat the
-        /// same key under several headings, so the minimap's own position is
-        /// the first uPositionX and the compass and meters own the rest.
+        /// Replaces the first live occurrence of a key, leaving any later one
+        /// alone: these files repeat the same key under several headings and a
+        /// rule owns the first of them. Commented out lines are not live.
         /// Returns true only when something actually changed.
         /// </summary>
-        static bool SetNth(string file, string key, string value, int which)
+        static bool Set(string file, string key, string value)
         {
             try
             {
@@ -237,7 +234,6 @@ namespace Thornswood
                 var lines = new List<string>(File.ReadAllLines(file));
                 var rx = new Regex("^(\\s*)" + Regex.Escape(key) + "\\s*=\\s*(.*?)\\s*$", RegexOptions.IgnoreCase);
 
-                int seen = 0;
                 for (int i = 0; i < lines.Count; i++)
                 {
                     string t = lines[i].TrimStart();
@@ -245,8 +241,6 @@ namespace Thornswood
                     Match m = rx.Match(lines[i]);
                     if (!m.Success) continue;
 
-                    seen++;
-                    if (seen != which) continue;
                     if (string.Equals(m.Groups[2].Value, value, StringComparison.OrdinalIgnoreCase)) return false;
 
                     lines[i] = key + " = " + value;

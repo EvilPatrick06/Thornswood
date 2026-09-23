@@ -177,15 +177,6 @@ namespace Thornswood
         // is exactly what false means.
         [DataMember] public bool DisplaySet = false;
 
-        // Where the minimap goes. Written into the mod's ini every launch,
-        // because the mod overwrites its own ini when Skyrim exits.
-        [DataMember] public string MiniMapSpot = "Top right";
-
-        // The minimap used to default to the bottom left corner, where it sat
-        // under the compass mods and the needs widget. Moved once, for
-        // everybody, rather than only for people installing fresh. Anyone who
-        // liked it where it was only has to put it back.
-        [DataMember] public bool MiniMapMoved = false;
         [DataMember] public bool KeepLauncherOpen = false;
 
         // Ticked, the launcher stops matching the game's resolution to the
@@ -292,7 +283,6 @@ namespace Thornswood
             if (string.IsNullOrEmpty(DiscordAppId)) DiscordAppId = "1549251507361292418";
             if (string.IsNullOrEmpty(SiteUrl)) SiteUrl = "https://thornswood.net";
             if (PresenceImage == null) PresenceImage = "https://thornswood.net/presence.png";
-            if (string.IsNullOrEmpty(MiniMapSpot)) MiniMapSpot = "Bottom left";
             if (VortexGame == null) VortexGame = "";
         }
 

@@ -345,17 +345,6 @@ namespace Thornswood
             catch { return null; }
         }
 
-        // ---- minimap corner ---------------------------------------------------
-        // The minimap's corner used to be worked out here from the screen
-        // shape. That was wrong twice over. The mod remaps X itself on a wide
-        // screen, so the shipped 1040 already is the top right corner at any
-        // aspect and a computed value pushed it off the edge. And Enforce
-        // writes the position from the person's own Settings choice on every
-        // launch, immediately after this ran, so whatever was computed here
-        // was overwritten a moment later anyway. Position belongs to Enforce.
-        // The open delay lives there too, as a rule, for the same reason: the
-        // mod rewrites this file when the game exits.
-
         static string PrefsPath { get { return Path.Combine(Paths.LiveMyGames, "SkyrimPrefs.ini"); } }
 
         /// <summary>
