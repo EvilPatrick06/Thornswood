@@ -31,7 +31,14 @@
 <meta property="og:type" content="website">
 <meta property="og:title" id="ogTitle" content="Thornswood">
 <meta property="og:description" id="ogDesc" content="A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.">
-<meta property="og:image" content="/presence.png">
+<!-- ABSOLUTE, because a relative og:image is not resolved by the thing
+     unfurling the link: Discord, Slack and every preview bot read the raw
+     tag and fetch it as given, so "/presence.png" is not an address and
+     every link shared anywhere unfurled as a grey box with no picture. -->
+<meta property="og:image" content="https://thornswood.net/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:image" content="https://thornswood.net/og.png">
 <meta name="theme-color" content="#0B0E0A">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.ico" sizes="any">
