@@ -45,9 +45,9 @@ Position and cell. Health, magicka and stamina. Death and respawn, including whe
 
 | Behaviour | Reason |
 |---|---|
-| Nothing in the creation hall is a choice | Your profession, half, class and town are chosen in the launcher before Play, and the hall holds nothing to pick up or read |
+| The creation hall is a bare stone room | Nothing in the room itself does anything. Every choice about a new character is on the panel behind K, which opens by itself once your face is made and keeps coming back until you have picked a town |
 | Start On Save is in the mod list but never loads a save | The launcher points it at a character that does not exist. A single player save cannot be loaded under Thornswood, and loading one crashed the game on a fresh install |
-| Your face is made in the hall, not in the launcher | The race menu opens once the game has loaded. Everything else about a new character is decided in the launcher |
+| You can leave the hall with no class or profession | Only the town you wake up in has to be chosen before you leave. Your class, your profession and the half of it can wait, and are picked later in the world from the same panel on K |
 
 ## The load order rule
 
