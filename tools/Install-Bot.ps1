@@ -172,7 +172,9 @@ $null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\a
 # say so. The id is not a secret and the file is tracked in git, unlike the two
 # webhook files sitting next to it, which are not sent by anything and must not
 # be added here.
-foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt') {
+#
+# requirements.txt too, because the full run installs the libraries from it.
+foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
   $src = Join-Path $Here "discord\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   & scp @ssh $src "${User}@${Vps}:$Root/$f" | Out-Null
@@ -262,8 +264,14 @@ Set-Location '$rootWin'
 # policy, so Python cannot verify discord.com and aiohttp fails the handshake
 # with "unable to get local issuer certificate". Carrying the roots in a file
 # sidesteps the whole thing.
-& python -m pip install --quiet --disable-pip-version-check discord.py pillow certifi 2>&1 | Out-Null
-if (`$LASTEXITCODE -eq 0) { 'discord.py, pillow and certifi ready' } else { 'PIP FAILED with ' + `$LASTEXITCODE }
+#
+# At the exact versions in requirements.txt, which went up with the code. By
+# name alone this took whatever PyPI had newest on the day, so the next fresh
+# box would have taken the next major of any of the three, untried. The
+# build check installs the same file before it runs the bot harnesses, so the
+# versions tested are the versions run. Bump them there, on purpose.
+& python -m pip install --quiet --disable-pip-version-check -r '$rootWin\requirements.txt' 2>&1 | Out-Null
+if (`$LASTEXITCODE -eq 0) { 'discord.py, pillow and certifi ready, at the versions in requirements.txt' } else { 'PIP FAILED with ' + `$LASTEXITCODE }
 `$ca = (& python -c "import certifi; print(certifi.where())" 2>&1 | Select-Object -Last 1)
 if (`$ca -and (Test-Path `$ca)) { 'root certificates at ' + `$ca } else { 'COULD NOT FIND certifi, TLS will fail' }
 "@ | ForEach-Object { Say "  $_" }
