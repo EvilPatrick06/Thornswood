@@ -10770,6 +10770,62 @@ log('gamemode loaded:',
   */
   var doorSaid = false;
 
+  /*
+    ONE PERSON WHO COULD NOT BE CHECKED IS NOT A REASON TO KEEP EVERYBODY STALE.
+
+    From the To Do List: "one rate-limited lookup throws the whole list
+    away". The site marked its whole answer failed when any single lookup
+    failed, and this kept the old list for everybody, so a ban, a new tester
+    or a removed role waited on the one person Discord would not answer for.
+
+    The site now names the profiles it could not check, in failedProfiles.
+    Each of those keeps exactly the standing it had in the file before: on
+    the list if it was, off it if it was not, and the same in devProfiles and
+    adminProfiles. A failed lookup can neither let somebody in nor turn
+    somebody away. Everybody else takes the fresh answer.
+
+    Only called when the site named who failed AND reached somebody; the
+    check in refresh() below still keeps the whole list when it did not.
+  */
+  function keepWhatFailed(doc, had) {
+    var failed = {};
+    for (var i = 0; i < doc.failedProfiles.length; i++) {
+      var f = Number(doc.failedProfiles[i]);
+      if (f) failed[f] = true;
+    }
+    function merged(fresh, old) {
+      var out = Array.isArray(fresh) ? fresh.slice() : [];
+      var seen = {};
+      for (var j = 0; j < out.length; j++) seen[Number(out[j])] = true;
+      if (Array.isArray(old)) {
+        for (var k = 0; k < old.length; k++) {
+          var n = Number(old[k]);
+          if (n && failed[n] && !seen[n]) { seen[n] = true; out.push(n); }
+        }
+      }
+      return out;
+    }
+    // The people rows are what Set-Door.ps1 prints, so a kept profile keeps
+    // the row that names whose it is.
+    var people = Array.isArray(doc.people) ? doc.people.slice() : [];
+    var named = {};
+    for (var p = 0; p < people.length; p++) if (people[p]) named[String(people[p].id)] = true;
+    var oldPeople = Array.isArray(had.people) ? had.people : [];
+    for (var q = 0; q < oldPeople.length; q++) {
+      var row = oldPeople[q];
+      if (!row || named[String(row.id)] || !Array.isArray(row.profiles)) continue;
+      for (var r = 0; r < row.profiles.length; r++) {
+        if (failed[Number(row.profiles[r])]) { named[String(row.id)] = true; people.push(row); break; }
+      }
+    }
+    return {
+      profiles: merged(doc.profiles, had.profiles),
+      devProfiles: merged(doc.devProfiles, had.devProfiles),
+      adminProfiles: merged(doc.adminProfiles, had.adminProfiles),
+      people: people
+    };
+  }
+
   function refresh() {
     var conf;
     try {
@@ -10819,8 +10875,13 @@ log('gamemode loaded:',
           }
           // Keeping the old list is the safe failure. Writing a short one built
           // while Discord was unreachable would turn away everybody missing
-          // from it.
-          if (doc.lookupFailed) {
+          // from it. A site that names who failed (failedProfiles) and reached
+          // Discord for somebody (a profile came back) gets the partial write
+          // below instead, which keeps just those as they were; a site older
+          // than that, or one that reached nobody, keeps the whole list.
+          if (doc.lookupFailed &&
+              !(Array.isArray(doc.failedProfiles) && doc.failedProfiles.length &&
+                Array.isArray(doc.profiles) && doc.profiles.length)) {
             /*
               AND WHY. This said only that the site could not reach Discord,
               and on 22 September that one line was the whole of what anybody
@@ -10856,10 +10917,22 @@ log('gamemode loaded:',
           }
 
           var enforce = false;
+          var had = {};
           try {
-            var had = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^\uFEFF/, ''));
+            had = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^\uFEFF/, '')) || {};
             enforce = had.enforce === true;
           } catch (e) { }
+
+          if (doc.lookupFailed) {
+            var kept = keepWhatFailed(doc, had);
+            doc.profiles = kept.profiles;
+            doc.devProfiles = kept.devProfiles;
+            doc.adminProfiles = kept.adminProfiles;
+            doc.people = kept.people;
+            note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
+                 'and keep the standing they had' +
+                 (doc.lookupFailedWhy ? ': ' + doc.lookupFailedWhy : ''));
+          }
 
           try {
             fs.writeFileSync(FILE, JSON.stringify({

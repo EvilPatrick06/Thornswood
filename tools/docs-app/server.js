@@ -2415,9 +2415,10 @@ async function handle(req, res) {
     the profile ids of everyone currently allowed in. Everyone who has ever
     checked in through the launcher is re-asked of Discord, so leaving the
     server or picking up the Banned role drops their numbers off the list
-    within a refresh. If any lookup failed the answer says so and the door
-    keeps the list it had, because a short list built while Discord was down
-    would turn away everybody missing from it.
+    within a refresh. If any lookup failed the answer says so and names the
+    profiles it could not check in failedProfiles, and the door keeps those
+    as they were, because a short list built while Discord was down would
+    turn away everybody missing from it.
 
     devProfiles rides along in the same answer: the subset of the same people
     who also hold the dev or admin role, whichever server they connect to.
@@ -2436,10 +2437,11 @@ async function handle(req, res) {
       return sendJson(res, 401, { error: 'no' });
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
+    const seenFailed = new Set();
     for (const d of Object.keys(linked)) {
       const row = linked[d] || {};
       const profiles = (Array.isArray(row.profiles) ? row.profiles : [])
@@ -2458,6 +2460,14 @@ async function handle(req, res) {
            enough; a list where every lookup fails fails for one reason. */
         out.lookupFailed = true;
         if (!out.lookupFailedWhy) { out.lookupFailedWhy = String(st.lookupFailed); }
+        /* AND WHOSE. lookupFailed alone makes one rate limited lookup throw
+           the whole list away, so the door kept a stale list for everybody
+           because one person could not be checked. Naming the profiles lets a
+           door that knows this field keep just those as they were and take
+           everybody else's fresh answer. lookupFailed and lookupFailedWhy stay
+           exactly as they were, so a door older than this still keeps the
+           whole list, which is what it did before. */
+        for (const n of profiles) if (!seenFailed.has(n)) { seenFailed.add(n); out.failedProfiles.push(n); }
         continue;
       }
       if (!st.play || st.banned) continue;
