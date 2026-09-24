@@ -123,6 +123,11 @@ if (Test-Path -LiteralPath $uiSrc) {
     Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
     Note $f.Name
   }
+  # The two pictures of the scroll in front of the character choice.
+  foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.webp) {
+    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    Note $f.Name
+  }
   # The painting behind the main menu's character choice: the site's own
   # banner, the loop and its first frame, copied under the page's names so
   # the one file in the repo is the site's. Ours, flat under UI, so it ships.
