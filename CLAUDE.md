@@ -90,23 +90,26 @@ before code; a Claude does not settle it for them.
   a main release that is not on main or is behind origin. A main Ship
   commits and pushes the source when the release is out, so the other
   machine can `git pull` exactly what shipped.
-- Decided by Patrick on 18 Sep: his own work goes straight to main. Small
-  commits, plain messages saying what changed, pushed to main. No branch and
-  no pull request for it. He owns the repo and ships it, and main requires an
-  approving review that he cannot give himself, so every one of his own pull
-  requests sat blocked until he overrode it with `--admin`. This makes the
-  real practice the written one.
+- Nobody pushes to main any more, Patrick included. Everything goes through a
+  pull request. This replaces the 18 Sep decision that his own work went
+  straight to main, which held while `enforce_admins` was off and stopped
+  holding the moment it went on.
 - What branch protection on main actually enforces, read off GitHub on
-  22 Sep and not off this file: one approving review, the `Launcher builds`
-  check, and a code owner review on the files in `.github/CODEOWNERS`. All
-  three bind Djinn's branches. Whether they bind Patrick is `enforce_admins`,
-  and until 22 Sep it had to stay off because `Ship.ps1` pushed its own
-  version commit straight to main and the setting refuses that push: the
-  release would have reached every launcher with the source never landing.
-  Ship writes nothing to the repository now (`Bump-Version.ps1` moves the
-  number first, as an ordinary commit), so the setting can be on. When it is,
-  the sentence above stops being true for Patrick as well and everything goes
-  through a pull request. Check which it is rather than assuming:
+  23 Sep and not off this file: `enforce_admins` is **on**, the one required
+  check is `Launcher builds`, required approving reviews is **0**, and the
+  code owner review is **off**. So a pull request from either of them merges
+  itself once the build goes green, and neither of them can push to main at
+  all. Force pushes are refused.
+  The three things that changed since 22 Sep: the review requirement was one
+  approving review, which Patrick could not give himself and had to override
+  with `--admin` on every one of his own pull requests, and it is now zero.
+  The code owner review on `.github/CODEOWNERS` is off. And `enforce_admins`,
+  which had to stay off while `Ship.ps1` pushed its own version commit
+  straight to main, is on, because Ship writes nothing to the repository now:
+  `Bump-Version.ps1` moves the number first, as an ordinary commit on a
+  branch, and Ship reads it.
+  Check which it is rather than assuming, because this paragraph was wrong
+  for a day before anybody looked:
   `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
 - Djinn's work still goes on a branch: `git checkout -b djinn/what-it-is`.
   Small commits, plain messages. Push the branch and open a pull request,
@@ -187,10 +190,20 @@ run them.
 
 Read anything. Run git status, diff, log, fetch, the read only scripts
 (Check-*.ps1, Setup-SshKey.ps1 -Test, Sync-Client.ps1 -Check), and compile checks.
-Edit source on a branch when asked. The person runs what leaves the machine:
-Ship.ps1, git push, gh pr create, and every script that talks to the VPS
-(Deploy-*, Request-Restart, Install-Bot, Rotate-ServerPassword, Publish-*).
-Show the command; let them run it. Never start the launcher or the game.
+Edit source on a branch when asked.
+
+Changed by Patrick on 23 Sep, during a night of playtesting: a Claude working
+with him runs the whole chain itself, commit, push, pull request, merge, Ship
+and the Deploy scripts. His words when it stopped to hand him commands: "why
+arent you pushiong and merging and publishing these changes to the dev server",
+and earlier, "you do those bro". Handing back a list of commands in the middle
+of a test session costs more than it protects. Say which ones leave the machine
+before running them, say what they did afterwards, and say in the reply what
+went out.
+
+That is Patrick. It is not a change for Djinn's sessions, and it is not
+permission to ship on a hunch: a main Ship still needs him to say so. Never
+start the launcher or the game.
 Measure before claiming a cause: read Profile\launcher.log, look at the file,
 check timestamps, say what you saw. When the doc and the machine disagree,
 say so and ask.
