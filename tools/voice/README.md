@@ -31,8 +31,11 @@ $env:THORNSWOOD_VOICE_PORT = '7900'; $env:THORNSWOOD_VOICE_BIND = '127.0.0.1'; n
 then open http://127.0.0.1:7900/health. It reads `THORNSWOOD_VOICE_PORT`
 (7778 when unset), `THORNSWOOD_VOICE_BIND` (every address when unset),
 `THORNSWOOD_VOICE_AUTH` (`log` when unset: a join that cannot prove itself is
-let in and written down; `on` refuses it) and `THORNSWOOD_SITE` (when unset,
-nobody is asked whether a join owns the profile it claims). `/health` reports
+let in and written down; `on` refuses it), `THORNSWOOD_CHAT_RANGE` (off when
+unset: every typed line goes to everybody; `on` keeps a line to the same cell
+and 4000 units, a number sets the units, and /me, /do, /w and /s work) and
+`THORNSWOOD_SITE` (when unset, nobody is asked whether a join owns the
+profile it claims). `/health` reports
 the `BUILD` string at the top of the file, which is the only way to tell from
 outside which copy is running, so change it whenever behaviour changes. The
 harnesses run the real file in a temporary folder on a spare port and need
