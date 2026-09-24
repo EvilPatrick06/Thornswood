@@ -11060,11 +11060,12 @@ log('gamemode loaded:',
     var https;
     try { https = require('https'); } catch (e) { return; }
 
-    var url = String(conf.site).replace(/\/+$/, '') +
-              '/api/allowed?key=' + encodeURIComponent(String(conf.key));
+    // The key goes in a header, never the address. An address is what a web
+    // server writes down, and this key is the door's whole secret. Entry 248.
+    var url = String(conf.site).replace(/\/+$/, '') + '/api/allowed';
     var req;
     try {
-      req = https.get(url, function (resp) {
+      req = https.get(url, { headers: { 'X-Thornswood-Key': String(conf.key) } }, function (resp) {
         var buf = '';
         resp.on('data', function (d) { buf += d; });
         resp.on('end', function () {

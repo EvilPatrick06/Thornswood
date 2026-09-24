@@ -772,12 +772,24 @@ const isMember = (req) =>
 
 /* The Discord cookie carries the id and a signature of it, and proves only who
    somebody is. What they may do is asked of Discord, so that removing a role
-   or removing a person takes effect here without anybody editing a list. */
+   or removing a person takes effect here without anybody editing a list.
+
+   It carries when it was made as well, inside the signature, and anything
+   older than ADMIN_DAYS reads as signed out. Max-Age is the browser promising
+   to throw the cookie away; nothing held the site to it, so a value copied out
+   of a browser was good forever, because all this checked was that the site
+   had signed it. Entry 248. A cookie made before that has three parts rather
+   than four and reads as signed out once. That only costs staff a sign in,
+   because only staff may use the hub; the launcher's ticket is not this. */
+const ADMIN_DAYS = 30;
 function identity(req) {
   const raw = cookies(req)[ADMIN] || '';
-  const [id, name, sig] = decodeURIComponent(raw).split('|');
-  if (!id || !sig) return null;
-  if (!sameSecret(sig, sign(id + '|' + (name || '')))) return null;
+  const [id, name, at, sig] = decodeURIComponent(raw).split('|');
+  if (!id || !at || !sig) return null;
+  if (!sameSecret(sig, sign(id + '|' + (name || '') + '|' + at))) return null;
+  // A minute of slack the other way, for a clock that stepped back.
+  const age = Date.now() - Number(at);
+  if (!(age > -60000 && age < ADMIN_DAYS * 86400000)) return null;
   return { id: String(id), name: name || '' };
 }
 
@@ -927,6 +939,38 @@ const secureHere = (req) =>
 const setCookie = (req, name, value, days) =>
   name + '=' + value + '; Path=/; Max-Age=' + (days * 86400) +
   '; HttpOnly; SameSite=Lax' + (secureHere(req) ? '; Secure' : '');
+
+/*
+  One Discord sign in attempt, tied to the browser that started it. Entry 248.
+
+  The OAuth state was the same string for every attempt that asked for the
+  same page: signed, and nothing else. Anybody holding one could hand it to
+  somebody else's browser, or use it again, and the callback took it. Now
+  every press of the button makes a random value that goes two ways, inside
+  the signed state out through Discord and back, and into a short cookie in
+  this browser only. The callback wants the two to match, once, inside ten
+  minutes, and refuses before Discord is asked anything.
+
+  The launcher's nonce is a different thing and rides alongside unchanged. It
+  proves the ticket landed on the port of the button that was pressed; this
+  proves the callback is finishing an attempt this browser began.
+
+  Named per attempt, so two tabs signing in at once do not overwrite each
+  other. The path keeps it off every other request. The launcher waits two
+  minutes for its ticket (Discord.cs), so ten is room to spare.
+*/
+const ATTEMPT = 'twst_';
+const ATTEMPT_MS = 10 * 60000;
+const attemptsSpent = new Map();
+const attemptCookie = (req, attempt, value, seconds) =>
+  ATTEMPT + attempt.slice(0, 8) + '=' + value + '; Path=/auth/discord; Max-Age=' + seconds +
+  '; HttpOnly; SameSite=Lax' + (secureHere(req) ? '; Secure' : '');
+
+/* Which doors have been answered with the key in the address, so site.log
+   says once, and without the key, that a game server still runs a gamemode
+   from before the key moved into a header. When neither door has said it
+   since both servers were redeployed, the address form can go. */
+const keyInAddress = new Set();
 
 // --------------------------------------------------------------- discord --
 function post(url, form) {
@@ -1816,8 +1860,11 @@ function notAllowedPage(me, st) {
 */
 function failed(req, res, e) {
   const bad = e instanceof URIError;
+  // The path and never the query. A caller that puts a key or a ticket in the
+  // address would have it copied into site.log, which Get-Logs brings down
+  // off the VPS. Entry 248.
   console.error('[thornswood-docs] ' + (bad ? 'malformed request ' : 'handler threw on ') +
-                JSON.stringify(String(req.url || '').slice(0, 200)) + ': ' +
+                JSON.stringify(String(req.url || '').split('?')[0].slice(0, 200)) + ': ' +
                 (e && e.stack ? e.stack : e));
   try {
     // Half an answer is already on the wire and cannot be taken back. Cutting
@@ -1942,28 +1989,52 @@ async function handle(req, res) {
     // knows the ticket it just caught belongs to the button its owner pressed
     // and not to a web page that guessed the port.
     const nonce = String(url.searchParams.get('nonce') || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 64);
-    const raw = Buffer.from(back + '\u0000' + askedPort + '\u0000' + nonce).toString('base64url');
+    // This attempt's own value and the time it began, after the three above,
+    // and the same value in a cookie for this browser. See ATTEMPT.
+    const attempt = crypto.randomBytes(16).toString('hex');
+    const raw = Buffer.from(back + '\u0000' + askedPort + '\u0000' + nonce + '\u0000' +
+                            attempt + '\u0000' + Date.now()).toString('base64url');
     const state = raw + '.' + sign(raw);
     const go = 'https://discord.com/api/oauth2/authorize' +
       '?client_id=' + encodeURIComponent(cfg.discord.clientId) +
       '&redirect_uri=' + encodeURIComponent(origin(req) + '/auth/discord/callback') +
       '&response_type=code&scope=identify' +
       '&state=' + encodeURIComponent(state);
-    return send(res, 302, '', 'text/plain', { Location: go });
+    return send(res, 302, '', 'text/plain', {
+      Location: go, 'Set-Cookie': attemptCookie(req, attempt, attempt, ATTEMPT_MS / 1000) });
   }
 
   if (p === '/auth/discord/callback' && req.method === 'GET') {
     const code = url.searchParams.get('code') || '';
     const state = (url.searchParams.get('state') || '').split('.');
-    let back = '/', port = '', nonce = '';
+    let back = '/', port = '', nonce = '', attempt = '', began = 0;
     if (state.length === 2 && sameSecret(state[1], sign(state[0]))) {
       try {
         const bits = Buffer.from(state[0], 'base64url').toString().split('\u0000');
         back = bits[0] || '/';
         port = (bits[1] || '').replace(/[^0-9]/g, '').slice(0, 5);
         nonce = (bits[2] || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 64);
+        attempt = (bits[3] || '').replace(/[^0-9a-f]/g, '').slice(0, 32);
+        began = Number(bits[4]) || 0;
       } catch (e) { }
     }
+    // Refused here, before Discord is asked anything: a state with no attempt
+    // in it, one this browser did not start, one already used, or one older
+    // than ten minutes. A signature alone used to be enough, and it is the
+    // same for everybody who asked for the same page.
+    const now = Date.now();
+    for (const [k, t] of attemptsSpent) { if (now - t > ATTEMPT_MS) attemptsSpent.delete(k); }
+    const age = now - began;
+    if (attempt.length !== 32 || attemptsSpent.has(attempt) ||
+        !(age > -60000 && age < ATTEMPT_MS) ||
+        !sameSecret(cookies(req)[ATTEMPT + attempt.slice(0, 8)] || '', attempt)) {
+      return send(res, 302, '', 'text/plain', { Location: '/?discord=expired' });
+    }
+    // Spent whatever happens next, and the cookie cleared on every answer
+    // below. The one that sets cookies of its own carries this in its list.
+    attemptsSpent.set(attempt, now);
+    const spent = attemptCookie(req, attempt, '', 0);
+    res.setHeader('Set-Cookie', spent);
     if (!/^\/[A-Za-z0-9/_-]*$/.test(back)) back = '/';
     if (!code) return send(res, 302, '', 'text/plain', { Location: '/?discord=cancelled' });
 
@@ -1995,7 +2066,11 @@ async function handle(req, res) {
       return send(res, 200, notAllowedPage(me, st), TYPES['.html']);
     }
     const name = String(st.name || me.global_name || me.username || '').replace(/[|;]/g, '');
-    const value = encodeURIComponent(me.id + '|' + name + '|' + sign(me.id + '|' + name));
+    // When it was made goes inside the signature, so identity() can refuse
+    // it once it is older than ADMIN_DAYS whatever the browser kept.
+    const at = String(Date.now());
+    const value = encodeURIComponent(me.id + '|' + name + '|' + at + '|' +
+                                     sign(me.id + '|' + name + '|' + at));
 
     // Remembered so there is a list of who has linked, when, and under what
     // name, which is what makes a ban traceable to a person later.
@@ -2009,8 +2084,8 @@ async function handle(req, res) {
     });
     putJson(LINKED, linked);
 
-    const cookies2 = [setCookie(req, ADMIN, value, 30),
-                      setCookie(req, COOKIE, memberToken(), 365)];
+    const cookies2 = [setCookie(req, ADMIN, value, ADMIN_DAYS),
+                      setCookie(req, COOKIE, memberToken(), 365), spent];
 
     // The launcher asked, so hand the ticket back to it on the loopback
     // address rather than leaving it in the browser.
@@ -2781,8 +2856,22 @@ async function handle(req, res) {
   const devDoor = (route === '/dev/api/allowed');
   if ((route === '/api/allowed' || devDoor) && req.method === 'GET') {
     if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
-    if (!sameSecret(String(url.searchParams.get('key') || ''), String(cfg.botKey))) {
+    // The key comes in the X-Thornswood-Key header. In the address it was
+    // written down by anything that logs a request line, this site's own
+    // failed() included. Entry 248. The address form stays for one release,
+    // for a game server still running a gamemode from before 24 September,
+    // and only when there is no header at all; keyInAddress says when a door
+    // still uses it.
+    const inHeader = req.headers['x-thornswood-key'];
+    const given = inHeader !== undefined ? inHeader : (url.searchParams.get('key') || '');
+    if (!sameSecret(String(given), String(cfg.botKey))) {
       return sendJson(res, 401, { error: 'no' });
+    }
+    if (inHeader === undefined && !keyInAddress.has(route)) {
+      keyInAddress.add(route);
+      console.log('[thornswood-docs] ' + route + ' answered a door that sent its key in ' +
+                  'the address, so that game server runs a gamemode from before 24 ' +
+                  'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
     const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
