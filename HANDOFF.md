@@ -218,7 +218,6 @@ cd $env:USERPROFILE\Downloads\Thornswood-Repo
 node --check .\tools\gamemode.js
 node --check .\tools\ts-plugins\thornswood-front.js
 node --check .\tools\ts-plugins\thornswood-emotes.js
-node --check .\tools\ts-plugins\thornswood-chargen.js
 node --check .\tools\ts-plugins\thornswood-mark.js
 node --check .\tools\ts-plugins\thornswood-voice.js
 ```

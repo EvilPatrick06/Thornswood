@@ -176,8 +176,21 @@ namespace Thornswood
             new HelpItem("In game", "Menus do not pause the world",
                 "Inventory, favourites, crafting and the map all keep the world running. Do not sort your bags mid fight."),
 
-            new HelpItem("In game", "Food, water, rest and warmth",
-                "Four bars: food, water, rest and how warm you are. /eat and /drink when you have something, /rest sit, /rest campfire, /rest inn or /rest bed, and /rest up to get going again. /needs says where each one stands and why. Fires warm you and standing in one burns you. What you are wearing matters: fur is the warmest thing there is and metal is the worst."),
+            // The needs run on the server now. This used to send people to the
+            // SunHelm MCM, which left the collection with SunHelm (To Do List
+            // entry 133), and to promise that a bedroll or a hot drink warms
+            // you, which nothing on the server counts. What it names instead
+            // is what is there: the four bars hudScript in gamemode.js draws
+            // bottom left, /needs, and the fire, roof and clothes the
+            // temperature is worked out from. tools\test-sunhelm-gone.js
+            // checks each of those against the gamemode.
+            // Entry 164's rebuild of this page had its own needs item, and
+            // the two were kept as one: this text, with the last sentence
+            // from that one, which says the commands the way /help living in
+            // the gamemode does. test-launcher-help.js holds every command it
+            // names to the gamemode's list for everybody.
+            new HelpItem("In game", "You will get hungry, thirsty and cold",
+                "Eat, drink, rest and stay warm. Cold bites hardest in the north, up high and at night. A fire warms you and standing in one burns you, a roof keeps the weather off, and what you wear counts: fur is the warmest thing there is and metal the worst. The four bars in the bottom left corner are Hunger, Thirst, Rest and Temp, and /needs gives the numbers and says where your warmth is heading. /eat and /drink when you have something, /rest sit, /rest campfire, /rest inn or /rest bed, and /rest up to get going again."),
 
             new HelpItem("In game", "When you die",
                 "You wake at the temple of the hold you died in. A hold with no temple of its own sends you to the nearest temple or Hall of the Dead, and anywhere on Solstheim sends you to Raven Rock."),

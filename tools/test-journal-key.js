@@ -205,6 +205,10 @@ function rig(opts) {
     'function rememberKey() { }\n' +
     'function wantTyping() { }\n' +
     'function lookVerb() { }\n' +
+    // The mold key's check runs first in the handler. With no door under the
+    // crosshair it passes every key on, which is what this stands in for.
+    'const MOLD_KEY = 22;\n' +
+    'function moldPress() { return false; }\n' +
     'const ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25,\n' +
     '      FRIEND_KEY = 34, TRADE_KEY = 35, MUTE_KEY = 38;\n';
   const make = new Function('sp', 'say', 'T', 'Date', 'guard', 'JOURNAL_KEY',
