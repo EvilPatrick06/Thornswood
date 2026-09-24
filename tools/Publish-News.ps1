@@ -10,6 +10,7 @@
   number go, into data/news.json.
 
     .\Publish-News.ps1
+    .\Publish-News.ps1 -OutFile news.json    writes the page here, sends nothing
 
   Called by Ship.ps1 at the end of every release, so it is usually not run on
   its own.
@@ -35,6 +36,10 @@ param(
   # Everything before this date is development history and stays off the site.
   # Read from tools\news-from.txt when not given, so it is one line to change.
   [string]$From,
+  # Writes the page to this file and sends nothing. The filters below are the
+  # whole point of this script, and until this there was no way to read what
+  # they leave without publishing it to the site.
+  [string]$OutFile,
   [switch]$Quiet
 )
 
@@ -107,7 +112,14 @@ $noise = @(
   '^\s*Launcher rebuilt\s*:',          # which .cs files changed
   '^\s*Launcher \d+\.\d+',            # the version, already shown
   'files? to download',                  # the size, which the launcher shows
-  '[\\/](SKSE|Data|tools)[\\/]'         # anything that is a path
+  '[\\/](SKSE|Data|tools)[\\/]',        # anything that is a path
+  # Entry 187: the public feed showed strangers "Load order: 60 plugins server
+  # side". Publish-Server wrote that and the line below into every server
+  # entry. It does not any more, and these take out the ones already written.
+  # Anchored at the start, so "The load order moved, so start a new character"
+  # still goes out, because that one is for the person reading it.
+  '^\s*Load order\s*:',
+  '^\s*The gamemode was rebuilt\b'
 )
 $dull = @('^server updated\.?$', '^no corner box\.?$', '^fixes?\.?$', '^wip\.?$')
 
@@ -178,10 +190,17 @@ foreach ($n in $all) {
     $details += $line
   }
 
+  # Publish-Server filled an empty body with "The server at" its address "was
+  # reinstalled and is answering", which is a note to whoever ran it and put
+  # the VPS address on the public page. It does not any more; this takes out
+  # the ones already in the feed.
+  $body = Prop $n 'body'
+  if ($body -match '^\s*The server at \S+ was reinstalled and is answering\.?\s*$') { $body = '' }
+
   $news += [ordered]@{
     date    = (Prop $n 'date')
     title   = $title
-    body    = (Prop $n 'body')
+    body    = $body
     details = @($details)
     # The file list never goes. It is a hundred lines of paths and it is the
     # single ugliest thing that could be on a public page.
@@ -257,6 +276,16 @@ $payload = [ordered]@{
   at         = (Get-Date).ToString('o')
   news       = $news
 } | ConvertTo-Json -Depth 8
+
+if ($OutFile) {
+  # Resolved against where PowerShell is standing. .NET has its own current
+  # folder, which is wherever the process started, and a relative name handed
+  # straight to WriteAllText lands there.
+  $OutFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
+  [IO.File]::WriteAllText($OutFile, $payload, (New-Object Text.UTF8Encoding $false))
+  if (-not $Quiet) { Write-Host ("  news written to {0}, {1} entries, nothing sent" -f $OutFile, @($news).Count) }
+  return
+}
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-news-' + [Guid]::NewGuid().ToString('N') + '.json')
 try {
