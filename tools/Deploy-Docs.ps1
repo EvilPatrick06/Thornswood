@@ -27,7 +27,8 @@
     .\Deploy-Docs.ps1 -RunAs 'LOCAL SERVICE'
                                runs the site as LOCAL SERVICE instead of
                                SYSTEM, with its own folder and nothing else
-                               to write in. -RunAs SYSTEM puts it back.
+                               to write in, and one privilege, the one for
+                               walking folders. -RunAs SYSTEM puts it back.
 
   The password crosses the wire in clear, because this is plain HTTP on an IP.
   Do not reuse one that matters. That improves the day a real domain and a
@@ -299,15 +300,34 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
 # so an account that does not resolve leaves the running site alone.
 #
 # SYSTEM is registered exactly as it always was, Highest and no grants, so a
-# deploy without -RunAs changes nothing. Anything else runs Limited and is
-# given what the site touches and no more: Modify on its own folder, where it
-# writes config.json, data, uploads and site.log, and Read on the five places
-# outside it that server.js reads, measured on 24 Sep: onlineFile, the main
-# and dev SERVER_LOGS, and the main and dev CHAT_DIRS. Granted on the folder
-# rather than the file, because server.log is deleted and made again at every
-# server start and a grant on the file would go with it. (NP) keeps each one
-# to the files directly in that folder and out of the world data below it. In
-# C:\Thornswood-Server that still includes server-settings.json.
+# deploy without -RunAs changes nothing.
+#
+# Anything else is cut down to one privilege. -RunLevel Limited alone takes
+# nothing away from a built-in service account, because it has no split
+# token to lower. Windows gives LOCAL SERVICE "Impersonate a client" and
+# "Replace a process level token" by default, and public tools turn either
+# of those into SYSTEM from inside whatever holds them. A task given no
+# privilege list is not kept from starting with them, so -RequiredPrivilege
+# names the one node needs, SeChangeNotifyPrivilege, which lets it reach a
+# file through folders it has no rights on. -ProcessTokenSidType
+# Unrestricted, in Microsoft's words, adds a SID made from the task name to
+# the process token and changes the token's default DACL "to allow only the
+# task SID and local system full control and the account SID read control",
+# which leaves every other service on the box that runs as LOCAL SERVICE
+# able to read the site's own objects and not change them. The account is
+# still the token's user, so the grants below still apply. Neither was tried
+# on a registered task here, and the read-back after registering says what
+# the box kept.
+#
+# It is also given what the site touches and no more: Modify on its own
+# folder, where it writes config.json, data, uploads and site.log, and Read
+# on the five places outside it that server.js reads, measured on 24 Sep:
+# onlineFile, the main and dev SERVER_LOGS, and the main and dev CHAT_DIRS.
+# Granted on the folder rather than the file, because server.log is deleted
+# and made again at every server start and a grant on the file would go with
+# it. (NP) keeps each one to the files directly in that folder and out of the
+# world data below it. In C:\Thornswood-Server that still includes
+# server-settings.json.
 `$runAs = '$RunAs'
 `$sid = 'S-1-5-18'
 if (`$runAs -eq 'SYSTEM') {
@@ -316,7 +336,8 @@ if (`$runAs -eq 'SYSTEM') {
   `$sid = ''
   try { `$sid = (New-Object Security.Principal.NTAccount('NT AUTHORITY', `$runAs)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
   if (-not `$sid) { 'NO SUCH ACCOUNT HERE: ' + `$runAs + '. Nothing was stopped or changed.'; return }
-  `$principal = New-ScheduledTaskPrincipal -UserId ('NT AUTHORITY\' + `$runAs) -LogonType ServiceAccount -RunLevel Limited
+  `$principal = New-ScheduledTaskPrincipal -UserId ('NT AUTHORITY\' + `$runAs) -LogonType ServiceAccount -RunLevel Limited ``
+    -RequiredPrivilege 'SeChangeNotifyPrivilege' -ProcessTokenSidType Unrestricted
   foreach (`$g in @(
       @('$rootWin', '(OI)(CI)M'),
       @('C:\Thornswood-Server\data', '(OI)(NP)R'),
@@ -393,6 +414,22 @@ if (`$who) {
   try { `$got = (New-Object Security.Principal.NTAccount(`$who.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
   if (`$got -eq `$sid) { 'task runs as ' + `$who.UserId + ', run level ' + `$who.RunLevel }
   else { 'THE TASK RUNS AS ' + `$who.UserId + ', NOT ' + `$runAs }
+  # The privilege cut too, because the account alone is not what makes it low
+  # privilege, and a box that dropped the list would otherwise pass as done.
+  if (`$runAs -ne 'SYSTEM') {
+    `$privs = (@(`$who.RequiredPrivilege) | Where-Object { `$_ }) -join ','
+    `$sidType = [string]`$who.ProcessTokenSidType
+    if (`$privs -eq 'SeChangeNotifyPrivilege' -and `$sidType -eq 'Unrestricted') {
+      'task privileges: ' + `$privs + ' only, token SID type ' + `$sidType
+    } else {
+      # No list at all is the worst case: the task starts with every
+      # privilege the account has, which is what this block is here to stop.
+      `$shown = `$privs
+      if (-not `$shown) { `$shown = 'every one ' + `$runAs + ' has' }
+      'THE TASK KEEPS MORE THAN IT SHOULD: privileges ' + `$shown + ', token SID type ' + `$sidType +
+      '. It should be SeChangeNotifyPrivilege only, Unrestricted.'
+    }
+  }
 }
 
 Start-ScheduledTask -TaskName '$Task'

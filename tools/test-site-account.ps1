@@ -24,12 +24,19 @@
     checks Register-ScheduledTask and Set-ScheduledTask both carry the
       principal, and that each call binds to a parameter set the real cmdlet
       has, so -Principal is never mixed with -User or -RunLevel
+    checks the principal for anything but SYSTEM is cut to one privilege,
+      SeChangeNotifyPrivilege, with -ProcessTokenSidType Unrestricted. The
+      entry asks for "a low privilege account", and on LOCAL SERVICE
+      -RunLevel Limited removes nothing, because a built-in service account
+      has no split token. Without the list the task can start with the
+      account's impersonation and token replacing rights, either of which
+      public tools turn into SYSTEM. Found in review on 24 Sep.
     runs the account block, between its markers, on this machine, with the
       folders it grants on swapped for scratch ones and the real icacls, and
-      reads what it did back with Get-Acl
+      reads what it did back with Get-Acl and off the principal it built
     runs it again with icacls standing in and refusing, to see it says so
     runs the read-back after the task is registered against a task that
-      stands in for Get-ScheduledTask
+      stands in for Get-ScheduledTask, for the account and for the cut
 
   Writes only under its own temp folder. Never connects to anything and never
   registers a task.
@@ -193,6 +200,48 @@ Yes 'LOCAL SERVICE: nothing else is granted, and nothing outside its folder more
     $grantLines.Count -eq $outside.Count + 1 -and
     @($grantLines | Where-Object { $_ -notlike 'C:\Thornswood-Docs|*' -and $_ -notlike '*|(OI)(NP)R' }).Count -eq 0)
 
+# ---- the privilege cut ---------------------------------------------------------------
+#
+# Read off the New-ScheduledTaskPrincipal calls in the script that goes up,
+# not off its text, because the comment above them names the privileges too.
+# The value after a parameter, or $null when the call does not name it.
+function ArgOf($cmd, [string]$name) {
+    $els = @($cmd.CommandElements)
+    for ($i = 0; $i -lt $els.Count; $i++) {
+        $e = $els[$i]
+        if ($e -is [System.Management.Automation.Language.CommandParameterAst] -and $e.ParameterName -eq $name) {
+            $v = $e.Argument
+            if (-not $v -and $i + 1 -lt $els.Count) { $v = $els[$i + 1] }
+            if (-not $v) { return $null }
+            try { return @($v.SafeGetValue()) } catch { return @($v.Extent.Text) }
+        }
+    }
+    return $null
+}
+$sentLs = [System.Management.Automation.Language.Parser]::ParseInput((Build 'LOCAL SERVICE' 'C:\Thornswood-Docs'), [ref]$null, [ref]$null)
+$made    = @(CallsOf $sentLs 'New-ScheduledTaskPrincipal')
+$sysMade = @($made | Where-Object { $_.Extent.Text -match "-UserId 'SYSTEM'" })
+$lsMade  = @($made | Where-Object { $_.Extent.Text -notmatch "-UserId 'SYSTEM'" })
+Yes 'there are two principals, one for SYSTEM and one for any other account' (
+    $made.Count -eq 2 -and $sysMade.Count -eq 1 -and $lsMade.Count -eq 1)
+if ($sysMade.Count -eq 1 -and $lsMade.Count -eq 1) {
+    $privs = ArgOf $lsMade[0] 'RequiredPrivilege'
+    Yes 'LOCAL SERVICE: the principal lists its privileges, so the task does not start with all of the account''s' ($null -ne $privs)
+    Yes 'LOCAL SERVICE: and the list is SeChangeNotifyPrivilege alone' ((@($privs) -join ',') -eq 'SeChangeNotifyPrivilege')
+    Yes 'LOCAL SERVICE: neither privilege that public tools turn into SYSTEM is listed' (
+        @($privs) -notcontains 'SeImpersonatePrivilege' -and @($privs) -notcontains 'SeAssignPrimaryTokenPrivilege')
+    Yes 'LOCAL SERVICE: the token SID type is Unrestricted' ((@(ArgOf $lsMade[0] 'ProcessTokenSidType') -join ',') -eq 'Unrestricted')
+    $sn = @(NamesOf $sysMade[0])
+    Yes 'SYSTEM: the principal it always had, with no privilege list and no token SID type' (
+        $sn -notcontains 'RequiredPrivilege' -and $sn -notcontains 'ProcessTokenSidType')
+    $pb = Binds $lsMade[0]
+    if ($null -eq $pb) {
+        Write-Host 'SKIP  New-ScheduledTaskPrincipal is not on this machine to bind against'
+    } else {
+        Yes 'LOCAL SERVICE: New-ScheduledTaskPrincipal binds to one of its real parameter sets' $pb
+    }
+}
+
 # ---- run the block ----------------------------------------------------------------
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-site-account-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 function Put([string]$path, [string]$text) {
@@ -267,6 +316,9 @@ try {
     Yes 'SYSTEM: at Highest, as it was registered from the start' ($r.principal -and "$($r.principal.RunLevel)" -eq 'Highest')
     Yes 'SYSTEM: as a service account, so no password is kept' ($r.principal -and "$($r.principal.LogonType)" -eq 'ServiceAccount')
     Yes 'SYSTEM: nothing is granted anywhere, so the box is left as it was' ($script:icaclsCalls -eq 0)
+    Yes 'SYSTEM: the principal it builds cuts no privileges and leaves the token SID type at Default' (
+        $r.principal -and @($r.principal.RequiredPrivilege | Where-Object { $_ }).Count -eq 0 -and
+        "$($r.principal.ProcessTokenSidType)" -eq 'Default')
     Yes 'SYSTEM: the SID it compares the read-back with is SYSTEM''s' ($r.sid -eq 'S-1-5-18')
 
     # -- LOCAL SERVICE, with the real icacls on the scratch folders -------------
@@ -278,7 +330,16 @@ try {
     $resolved = ''
     try { $resolved = (New-Object Security.Principal.NTAccount($r.principal.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
     Yes 'LOCAL SERVICE: the name it gives the task resolves, and to S-1-5-19' ($resolved -eq 'S-1-5-19')
-    Yes 'LOCAL SERVICE: at Limited, which is the point' ($r.principal -and "$($r.principal.RunLevel)" -eq 'Limited')
+    # Limited is kept, but on a built-in service account it takes nothing
+    # away. The privilege list is what makes this a low privilege account.
+    Yes 'LOCAL SERVICE: at Limited' ($r.principal -and "$($r.principal.RunLevel)" -eq 'Limited')
+    Yes 'LOCAL SERVICE: the principal it builds keeps SeChangeNotifyPrivilege and nothing else' (
+        $r.principal -and (@($r.principal.RequiredPrivilege) -join ',') -eq 'SeChangeNotifyPrivilege')
+    Yes 'LOCAL SERVICE: so SeImpersonatePrivilege and SeAssignPrimaryTokenPrivilege are not in it' (
+        $r.principal -and @($r.principal.RequiredPrivilege | Where-Object { $_ }).Count -gt 0 -and
+        @($r.principal.RequiredPrivilege) -notcontains 'SeImpersonatePrivilege' -and
+        @($r.principal.RequiredPrivilege) -notcontains 'SeAssignPrimaryTokenPrivilege')
+    Yes 'LOCAL SERVICE: with the token SID type Unrestricted' ($r.principal -and "$($r.principal.ProcessTokenSidType)" -eq 'Unrestricted')
     Yes 'LOCAL SERVICE: as a service account, so no password is kept' ($r.principal -and "$($r.principal.LogonType)" -eq 'ServiceAccount')
     Yes 'LOCAL SERVICE: it says what it granted' ($said -match [regex]::Escape("granted LOCAL SERVICE (OI)(CI)M on $docs"))
     Yes 'LOCAL SERVICE: a folder that is not there is said and skipped, not failed' (
@@ -350,21 +411,41 @@ try {
         $top[$at].Extent.StartOffset -gt @(CallsOf $sent 'Set-ScheduledTask')[0].Extent.StartOffset)
     if ($at -gt 0 -and $at + 1 -lt $top.Count) {
         $readBack = $top[$at].Extent.Text + "`n" + $top[$at + 1].Extent.Text
-        function ReadBack([string]$askedFor, [string]$sidAsked, [string]$taskSays) {
+        # The stand-in task carries a privilege list and token SID type as
+        # well as the account, as Get-ScheduledTask's principal does.
+        function ReadBack([string]$askedFor, [string]$sidAsked, [string]$taskSays, $privsSay, [string]$sidTypeSays) {
             $runAs = $askedFor
             $sid = $sidAsked
-            $script:taskUser = $taskSays
-            function Get-ScheduledTask { [pscustomobject]@{ Principal = [pscustomobject]@{ UserId = $script:taskUser; RunLevel = 'Limited' } } }
-            return (@(. ([ScriptBlock]::Create($readBack))) -join "`n")
+            $script:taskPrincipal = [pscustomobject]@{
+                UserId = $taskSays; RunLevel = 'Limited'
+                RequiredPrivilege = $privsSay; ProcessTokenSidType = $sidTypeSays
+            }
+            function Get-ScheduledTask { [pscustomobject]@{ Principal = $script:taskPrincipal } }
+            # The comma keeps a one-line answer an array, so [0] is the line
+            # and not its first letter.
+            return ,@(. ([ScriptBlock]::Create($readBack)))
         }
-        Yes 'read-back: the task running as LOCAL SERVICE says so' (
-            (ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'LOCAL SERVICE') -eq 'task runs as LOCAL SERVICE, run level Limited')
+        $cut = @('SeChangeNotifyPrivilege')
+        $said = ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'LOCAL SERVICE' $cut 'Unrestricted'
+        Yes 'read-back: the task running as LOCAL SERVICE says so' ($said[0] -eq 'task runs as LOCAL SERVICE, run level Limited')
+        Yes 'read-back: and says its privileges were cut' (
+            $said.Count -eq 2 -and $said[1] -eq 'task privileges: SeChangeNotifyPrivilege only, token SID type Unrestricted')
         Yes 'read-back: with NT AUTHORITY in front, the same account still matches' (
-            (ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'NT AUTHORITY\LOCAL SERVICE') -like 'task runs as *')
+            (ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'NT AUTHORITY\LOCAL SERVICE' $cut 'Unrestricted')[0] -like 'task runs as *')
         Yes 'read-back: a task still on SYSTEM after asking for LOCAL SERVICE is shouted' (
-            (ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'SYSTEM') -eq 'THE TASK RUNS AS SYSTEM, NOT LOCAL SERVICE')
-        Yes 'read-back: SYSTEM asked and SYSTEM there says so' (
-            (ReadBack 'SYSTEM' 'S-1-5-18' 'SYSTEM') -like 'task runs as SYSTEM*')
+            (ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'SYSTEM' $null 'Default')[0] -eq 'THE TASK RUNS AS SYSTEM, NOT LOCAL SERVICE')
+        $said = ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'LOCAL SERVICE' $null 'Default'
+        Yes 'read-back: a LOCAL SERVICE task that kept every privilege is shouted, not passed as done' (
+            $said.Count -eq 2 -and $said[1] -like 'THE TASK KEEPS MORE THAN IT SHOULD: privileges every one LOCAL SERVICE has, token SID type Default*')
+        $said = ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'LOCAL SERVICE' @('SeChangeNotifyPrivilege', 'SeImpersonatePrivilege') 'Unrestricted'
+        Yes 'read-back: and so is one that kept SeImpersonatePrivilege beside the one it needs' (
+            $said.Count -eq 2 -and $said[1] -like 'THE TASK KEEPS MORE THAN IT SHOULD: privileges SeChangeNotifyPrivilege,SeImpersonatePrivilege,*')
+        $said = ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'LOCAL SERVICE' $cut 'Default'
+        Yes 'read-back: and so is one whose token SID type did not take' (
+            $said.Count -eq 2 -and $said[1] -like 'THE TASK KEEPS MORE THAN IT SHOULD:*token SID type Default*')
+        $said = ReadBack 'SYSTEM' 'S-1-5-18' 'SYSTEM' $null 'Default'
+        Yes 'read-back: SYSTEM asked and SYSTEM there says so, and nothing about privileges' (
+            $said.Count -eq 1 -and $said[0] -like 'task runs as SYSTEM*')
     }
 }
 finally {
