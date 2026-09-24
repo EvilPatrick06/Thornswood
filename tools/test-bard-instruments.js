@@ -30,6 +30,7 @@ const read = (p) => fs.readFileSync(p, 'utf8').split(CR).join('');
 const TESTS = process.env.TESTS_MD || path.join(__dirname, 'docs-app', 'data', 'tests.md');
 const KNOWN = path.join(__dirname, 'docs-app', 'data', 'known.md');
 const EMOTES = path.join(__dirname, 'ts-plugins', 'thornswood-emotes.js');
+const INI = path.join(__dirname, 'emotes', 'Thornswood.ini');
 const GM = process.env.GM || path.join(__dirname, 'gamemode.js');
 const DATA = process.env.GAME_DATA || 'C:\\Thornswood\\Game\\Data';
 const PLUGIN = 'PlayFluteLuteDrum.esp';
@@ -53,8 +54,10 @@ yes('it says scripts are the cause, and that they never fire here',
     /scripts that never fire here/.test(note));
 yes('it says what the instruments do: look wrong and play nothing',
     /flute, lute or drum looks wrong when you equip it and plays nothing/.test(note));
-yes('it sends people to the wheel instead: B, then Revelry',
-    /press B, then pick Revelry/.test(note));
+// Which letter it names is checked below, against the key the wheel is
+// actually on.
+const wheelSaid = /open the emote wheel with ([A-Z])\b[^.]*then pick Revelry/.exec(note);
+yes('it sends people to the wheel instead: a key, then Revelry', !!wheelSaid);
 yes('the rest of the list is still there',
     note.indexOf('Typing in another window') >= 0 &&
     note.indexOf('Mod settings menus reset') >= 0 &&
@@ -75,13 +78,47 @@ yes('Known Issues still says mod scripts never fire',
     /Most mod scripts never fire \| All Papyrus events except OnUpdate are blocked/.test(known));
 
 /*
-  The wheel. B opens it and the instruments are in the Revelry category. The
-  launcher's help used to say Tab turns to a second ring; the wheel has had
-  categories since the 1.1.36 source, so the note says Revelry.
+  The wheel's key. The plugin reads WheelKey out of Thornswood.ini, and a
+  machine with no ini is given tools\emotes\Thornswood.ini by
+  ThornIni.Ensure, so the template's WheelKey is the key a tester has unless
+  they rebound it. The 48 in the plugin is only a fallback for a file with no
+  WheelKey line, and it is out of date: the wheel moved from B to G on 13 Sep,
+  and B is the voice range key now (TEST 11). The first version of this note
+  said B because it read that fallback, so this reads the template.
 */
 const emotes = read(EMOTES);
-yes('B is the key that opens the wheel', /const OPEN_KEY\s*=\s*key\('WheelKey', 48\);/.test(emotes) &&
-    /48: 'b'/.test(emotes));
+yes('the plugin takes the wheel key from WheelKey in the ini',
+    /const OPEN_KEY\s*=\s*key\('WheelKey', \d+\);/.test(emotes));
+
+let section = '', wheelCode = NaN;
+read(INI).split('\n').forEach(function (line) {
+  const t = line.trim();
+  const s = /^\[(.+)\]$/.exec(t);
+  if (s) { section = s[1]; return; }
+  const m = /^WheelKey\s*=\s*(\d+)$/.exec(t);
+  if (section === 'Emotes' && m) wheelCode = parseInt(m[1], 10);
+});
+yes('the ini template sets WheelKey', !isNaN(wheelCode));
+
+const letters = {};
+const lt = emotes.indexOf('const LETTERS = {');
+const ltEnd = lt < 0 ? -1 : emotes.indexOf('};', lt);
+if (lt >= 0 && ltEnd >= 0) {
+  const re = /(\d+): '([a-z])'/g;
+  let m;
+  while ((m = re.exec(emotes.slice(lt, ltEnd))) !== null) letters[m[1]] = m[2].toUpperCase();
+}
+const wheelLetter = letters[wheelCode] || '';
+yes('WheelKey ' + wheelCode + ' is a letter key (' + (wheelLetter || '?') + ')', wheelLetter !== '');
+yes('the note names that letter for the wheel, ' + (wheelLetter || '?') +
+    (wheelSaid ? ', and it says ' + wheelSaid[1] : ''),
+    !!wheelSaid && wheelLetter !== '' && wheelSaid[1] === wheelLetter);
+
+/*
+  The instruments are in the Revelry category. The launcher's help used to
+  say Tab turns to a second ring; the wheel has had categories since the
+  1.1.36 source, so the note says Revelry.
+*/
 const rv = emotes.indexOf("{ name: 'Revelry', items: [");
 const rvEnd = rv < 0 ? -1 : emotes.indexOf(']}', rv);
 const revelry = (rv >= 0 && rvEnd >= 0) ? emotes.slice(rv, rvEnd) : '';
