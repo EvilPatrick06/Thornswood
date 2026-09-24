@@ -9,6 +9,8 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 
 - `tools/app`: the launcher. C# 5 and WPF, compiled by
   `tools/Build-Launcher.ps1` with the .NET Framework 4 csc.
+- `tools/launcher`: not the launcher's code, only the voice page it opens in
+  a hidden window.
 - `tools/setup`: the small setup program people download.
 - `tools/ts-plugins`: the game plugins, in Skyrim Platform JavaScript.
 - `tools/ts-ui`: the overlays inside the game.
@@ -18,6 +20,10 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `tools/discord`: the Discord bot, in Python.
 - `tools/*.ps1`: the scripts that build, ship and deploy all of the above.
 - `lore/`: the world.
+
+`tools/discord`, `tools/docs-app`, `tools/launcher`, `tools/setup`,
+`tools/ts-plugins`, `tools/ts-ui` and `tools/voice` each have a README of
+their own, which says what the folder is and how to change it.
 
 ## Before changing anything
 

@@ -160,6 +160,16 @@ if (tracked) {
   });
   drive.forEach(function (d) { console.log('      ' + d); });
   yes('no tracked text file carries a Google Drive link', drive.length === 0);
+
+  // The folders under tools that explain themselves were given their READMEs
+  // after this one was written. The front page names each, so a folder that
+  // gains one later without a mention here shows up rather than going unread.
+  if (readme !== null) {
+    tracked.filter(function (f) { return /^tools\/[^\/]+\/README\.md$/.test(f); }).forEach(function (f) {
+      const dir = f.replace(/\/README\.md$/, '');
+      yes('README.md names ' + dir + ', which has a README of its own', readme.indexOf('`' + dir + '`') >= 0);
+    });
+  }
 }
 
 console.log('');
