@@ -4158,6 +4158,177 @@
     */
   }));
 
+  // ------------------------------------------------ J is our journal alone --
+  /*
+    J OPENS OUR JOURNAL AND NOTHING ELSE.
+
+    Patrick, 24 September: "also can you make it so when you press j to open
+    your journal it only opens our journal and not the vanilla skyrim jounral
+    in the background of our journal". J is Skyrim's own Journal key as well
+    as ours, so one press opened both: our panel, and the game's Journal Menu
+    at its Quests page behind it.
+
+    WHY IT IS SHUT RATHER THAN STOPPED. Nothing a plugin has on this build can
+    keep a key from the game. buttonEvent is not a gate: the fork's
+    EventHandler.cpp copies each key into an update task and returns
+    kContinue, so the game's own MenuControls has the same key untouched and
+    has already asked for its menu by the time this file hears J. The one
+    hotkey the fork does keep from the game, Ctrl and Print Screen, is kept by
+    wrapping a MenuControls handler inside the client (DisableCtrlPrtScnHotkey
+    in DevApi.cpp), and doing that for the journal is a client build, not
+    this.
+
+    And the game's journal cannot be switched off as a whole, because the
+    Journal Menu is also what Escape opens, at its System page, which is where
+    people save, change settings and quit. The journal flag on
+    DisablePlayerControls is documented as leaving only the System page of
+    the book, which takes the quest log mods still write to away from Escape
+    as well, and the controls watchdog above turns every control back on
+    after five seconds anyway.
+
+    So the book is shut the moment it opens, when J opened it, with the same
+    TESModPlatform.closeMenu that shuts the console.
+
+    J IS TOLD FROM ESCAPE BY THE GAME'S OWN NAME FOR THE KEY. Every key
+    arrives carrying the control it went down as: J is 'Journal' and Escape is
+    'Pause' (RE::UserEvents in CommonLibSSE). Only a press of our key that the
+    game also took as 'Journal' arms this. Any other key going down disarms
+    it, so an Escape pressed after J is Escape's. An Escape that went down in
+    the same breath just before J stops J arming at all, because the book
+    that opens next may be the System page. Either way the System page is
+    never the book that gets shut.
+
+    The name carries a rebind too. Somebody who moved the game's journal off
+    J keeps it on their own key, untouched, and somebody who moved ours off J
+    (the Journals row in the launcher's keys, JournalKey in Thornswood.ini)
+    gets the game's journal on J as before.
+
+    Only while our own panel is in. If thornswood-journal.js never mounted, J
+    opens the game's journal the way it always did rather than nothing.
+
+    The quest log is still there: Escape opens the same book, and its Quests
+    page is one of the tabs beside System.
+
+    tools\test-journal-key.js runs this block and the key handler below
+    against a pretend game kept in the fork's order of events.
+  */
+  const JOURNAL_MENU = 'Journal Menu';
+  // The book opens in the same frame as J or the next; the rest is room for
+  // a slow frame. Any key going down in between ends it sooner.
+  const JOURNAL_PRESS_MS = 1000;
+  // An Escape this close before J went down with it.
+  const JOURNAL_PAUSE_MS = 150;
+  // A book still up this long after it was shut is asked once more, and one
+  // still up after the second is given up on and said in the log.
+  const JOURNAL_AGAIN_MS = 1000;
+  const JOURNAL_WATCH_MS = 2000;
+  let journalPanelIn = false;
+  let journalPressAt = 0;
+  let journalPauseAt = 0;
+  let journalShutAt = 0;
+  let journalLag = 0;
+  let journalAsked = 0;
+  let journalGone = false;
+
+  // The key code is the fallback for an event that arrives without a name,
+  // the same as the jump and sprint probe.
+  function gameJournalPress(e) {
+    if (e.userEventName) { return e.userEventName === 'Journal'; }
+    try { return sp.Input.getMappedKey('Journal', 0) === e.code; } catch (err) { return false; }
+  }
+
+  // Every key that goes down, J included, from the key handler below.
+  function journalKeyDown(e) {
+    journalPressAt = 0;
+    journalShutAt = 0;
+    if (e.userEventName === 'Pause' || (!e.userEventName && e.code === ESC)) {
+      journalPauseAt = Date.now();
+    }
+  }
+
+  // Our J, after journalKeyDown: the game took this same press as its own
+  // journal, so the book that opens next is shut.
+  function journalKeyPressed(e) {
+    if (!journalPanelIn || !gameJournalPress(e)) { return; }
+    if (Date.now() - journalPauseAt < JOURNAL_PAUSE_MS) { return; }
+    journalPressAt = Date.now();
+  }
+
+  function shutJournal() {
+    journalAsked++;
+    try { sp.TESModPlatform.closeMenu(JOURNAL_MENU); return true; }
+    catch (err) { say('J: closeMenu threw on the game\'s journal: ' + err); return false; }
+  }
+
+  sp.on('browserMessage', guard('journal panel', (event) => {
+    const a = event && event.arguments;
+    if (!a || a[0] !== 'thornswood-front') { return; }
+    // The panel opening says it is in as well, for this file coming back
+    // after the page had already said ready.
+    if (a[1] === 'journal:ready' || a[1] === 'journal:opened') { journalPanelIn = true; }
+    // A page that reloads has lost the panel until it is put back.
+    if (a[1] === 'bridge is up') { journalPanelIn = false; }
+  }));
+
+  sp.on('menuOpen', guard('journal shut', (e) => {
+    if (!e || e.name !== JOURNAL_MENU || !journalPressAt) { return; }
+    journalLag = Date.now() - journalPressAt;
+    journalPressAt = 0;
+    if (journalLag > JOURNAL_PRESS_MS) { return; }
+    journalAsked = 0;
+    journalGone = false;
+    if (shutJournal()) { journalShutAt = Date.now(); }
+  }));
+
+  /*
+    AFTER THE SHUT: THE BOOK WENT, AND THE CURSOR STAYED WITH OURS.
+
+    Watched for two seconds after a shut and at no other time.
+
+    The book going is measured, not assumed: one line in the log says how
+    long after J it opened and how long after the shut it was gone, which is
+    the flash somebody might see. A book still up a second after the shut is
+    asked once more, because a book left open behind ours is the thing this
+    block is for, and one still up after two seconds is said in the log.
+
+    The cursor. browser.setFocused(true) only raises the game's Cursor Menu
+    when it is not up already (BrowserApiTilted.cpp in the fork), and the
+    game's book raises one of its own. So when our panel takes the keyboard
+    while the book is still on screen, the cursor showing is the book's, and
+    it goes when the book does: our panel holding the keyboard with no
+    cursor. Which of the two lands first is a race between the page answering
+    and the game closing the book. Focus held with no Cursor Menu up is
+    lowered and raised once, which is the call that raises the cursor and
+    marks it as ours to lower when the panel closes.
+  */
+  sp.on('update', guard('journal after', () => {
+    if (!journalShutAt) { return; }
+    const since = Date.now() - journalShutAt;
+    try {
+      if (sp.Ui.isMenuOpen(JOURNAL_MENU)) {
+        if (since > JOURNAL_WATCH_MS) {
+          journalShutAt = 0;
+          say('J: the game\'s journal is still open ' + since + 'ms after it was shut, asked ' +
+              journalAsked + ' times');
+        } else if (since > JOURNAL_AGAIN_MS && journalAsked < 2) {
+          shutJournal();
+        }
+        return;
+      }
+      if (!journalGone) {
+        journalGone = true;
+        say('J: the game\'s journal opened ' + journalLag + 'ms after the press and was gone ' +
+            since + 'ms after it was shut');
+      }
+      if (since > JOURNAL_WATCH_MS) { journalShutAt = 0; return; }
+      if (!sp.browser.isFocused() || sp.Ui.isMenuOpen('Cursor Menu')) { return; }
+      journalShutAt = 0;
+      sp.browser.setFocused(false);
+      sp.browser.setFocused(true);
+      say('J: the game\'s journal took the cursor with it, raised it again for ours');
+    } catch (err) { journalShutAt = 0; }
+  }));
+
   sp.on('buttonEvent', guard('keys', (e) => {
     keysSeen++;
     // Before the isDown guard, not after it.
@@ -4172,6 +4343,9 @@
     if (!e.isDown || e.isUp) return;
 
     rememberKey(e.code);
+    // Any key going down ends J's claim on the next Journal Menu, Escape
+    // above all. See JOURNAL_MENU above.
+    journalKeyDown(e);
     // 17 30 31 32 are W A S D. Somebody standing at a handle pressing E is not
     // stuck, they are using something, and that is what the one and only
     // firing of this detector actually caught.
@@ -4215,6 +4389,9 @@
     }
     if (e.code === JOURNAL_KEY) {
       T.js('try{window.thornswoodJournal&&window.thornswoodJournal.toggle();}catch(e){}');
+      // The game took this same press as its own journal: shut that one
+      // when it opens. See JOURNAL_MENU above.
+      journalKeyPressed(e);
       return;
     }
 
