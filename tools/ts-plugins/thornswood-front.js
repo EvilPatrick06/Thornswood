@@ -276,6 +276,20 @@
   const SKILLS_KEY = iniNumber(ini, 'SkillsKey', 37);   // K
   const VOICE_PORT = iniNumber(ini, 'VoicePort', 7778);
   /*
+    How long the chat stays up after its last line, and whether the needs bars
+    are drawn, from the launcher's Settings (ChatFade and NeedsBars in
+    Display.cs). Both go to the page in window.THORNSWOOD, which is where the
+    chat and the bars live. Not iniNumber, because 0 is a real answer here:
+    it is the chat staying up for good, and iniNumber turns 0 into its
+    fallback. Anything that is not one of the launcher's choices is ten.
+  */
+  const CHAT_FADE = (function () {
+    const m = ini.match(/^\s*ChatFade\s*=\s*(\d+)\s*$/im);
+    const v = m ? Number(m[1]) : 10;
+    return [0, 5, 10, 15, 20].indexOf(v) >= 0 ? v : 10;
+  })();
+  const NEEDS_BARS = !/^\s*NeedsBars\s*=\s*0\s*$/im.test(ini);
+  /*
     Where voice lives when it is not just a port on the server address.
     Written by the launcher at every Play, the same way VoicePort is.
     Empty is the normal case and means the raw port, which is how this
@@ -4571,7 +4585,8 @@
       lastToken = joinToken();
       T.js('window.THORNSWOOD=' + JSON.stringify({
         host: HOST, port: VOICE_PORT, profileId: PROFILE, name: sentName,
-        token: lastToken, base: VOICE_URL
+        token: lastToken, base: VOICE_URL,
+        chatFade: CHAT_FADE, needsBars: NEEDS_BARS
       }) + ';');
       OVERLAYS.forEach(inject);
       // The token itself is never logged. It is what somebody would need to
