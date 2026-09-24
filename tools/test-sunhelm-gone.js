@@ -15,14 +15,19 @@
 // On 24 September the launcher's Help page still said "The needs display is
 // configurable in the SunHelm MCM" and promised that "a bedroll or a hot
 // drink" warms you, which nothing on the server counts. The Controls page
-// said "SunHelm and the older mods live here". known.md listed all five mods
-// as "in the collection". Add-CartTravel.ps1 said fast travel was switched off
-// by SunHelm, when it is the SkyMP client that does it. Every one of those
-// sends somebody looking for a thing that is not there.
+// said "SunHelm and the older mods live here". Add-CartTravel.ps1 said fast
+// travel was switched off by SunHelm, when it is the SkyMP client that does
+// it. Every one of those sends somebody looking for a thing that is not there.
+// known.md listed all five mods as "in the collection" too; entry 280 fixed
+// that table first (tools/test-known-page.js owns it), and all this adds there
+// is the SunHelm row saying where the needs went.
 //
 // So this reads the text people read and checks it two ways: it names no mod
 // that has gone as though it were still here, and where it describes the
-// needs, everything it promises is something gamemode.js does. On a machine
+// needs, everything it promises is something gamemode.js does. It checks what
+// the text claims rather than the words it uses, so a rewrite of the Help
+// page (entry 164 has one in flight) passes as long as what it says is true.
+// On a machine
 // with the game built it also checks the entry's doneWhen: no SunHelm in the
 // reference plugin list, the game folder or the client's load order, and the
 // script free Immersive Armors in its place. On a runner with no game folder
@@ -126,23 +131,58 @@ helpStrings.forEach(function (s) {
 yes('the Help page names no mod that has left' + (helpGone.length ? ': ' + helpGone.join('; ') : ''),
     helpGone.length === 0);
 
-const TITLE = 'You will get hungry, thirsty and cold';
-const tAt = helpStrings.indexOf(TITLE);
-const body = tAt >= 0 ? (helpStrings[tAt + 1] || '') : '';
-yes('the needs item is on the Help page', body.length > 0);
+/*
+  The needs item, found by what it is about rather than by its title. The
+  title has been "You will get hungry, thirsty and cold" and entry 164's
+  rewrite of the page calls it "Food, water, rest and warmth", and a harness
+  that looked for one exact title would go red the day the other landed with
+  nothing wrong on the page. A HelpItem is (section, title, body), so the
+  title is the string after "In game" and the body is the one after that.
+*/
+const NEEDS_TITLE = /hungry|thirsty|warmth|food, water/i;
+const needsAt = [];
+for (let i = 1; i + 1 < helpStrings.length; i++) {
+  if (helpStrings[i - 1] === 'In game' && NEEDS_TITLE.test(helpStrings[i])) { needsAt.push(i); }
+}
+yes('the needs item is on the Help page, once' + (needsAt.length > 1 ? ' (found ' + needsAt.length + ')' : ''),
+    needsAt.length === 1);
+const body = needsAt.length ? (helpStrings[needsAt[0] + 1] || '') : '';
 yes('it sends nobody to an MCM, which went with SunHelm', !/\bMCM\b/.test(body));
 
 // Where the needs are shown, checked against the thing that draws them.
 yes('it names /needs', body.indexOf('/needs') >= 0);
 yes('and /needs is a command the gamemode answers', GM.indexOf("if (word === '/needs')") >= 0);
-yes('and one everybody is told about, not only a playtester', playerWords.indexOf("'/needs'") >= 0);
+const slashes = [];
+body.replace(/(^|\s)(\/[a-z]+)\b/g, function (all, pre, w) {
+  if (slashes.indexOf(w) < 0) { slashes.push(w); }
+  return all;
+});
+const untold = slashes.filter(function (w) { return playerWords.indexOf("'" + w + "'") < 0; });
+yes('every command it names (' + slashes.join(' ') + ') is one everybody is told about, not only a playtester' +
+    (untold.length ? ': not ' + untold.join(', ') : ''), slashes.length > 0 && untold.length === 0);
 
-yes('it says the bars are bottom left', /bottom left/i.test(body));
-yes('and the HUD is anchored bottom left',
-    /position:fixed;left:\d+px;bottom:\d+px/.test(hud));
-[['food', 'Hunger'], ['drink', 'Thirst'], ['rest', 'Rest'], ['temp', 'Temp']].forEach(function (k) {
-  yes('it names the ' + k[1] + ' bar, and the HUD draws one by that name',
-      body.indexOf(k[1]) >= 0 && hud.indexOf('row("' + k[0] + '", "' + k[1] + '"') >= 0);
+// Each claim about the bars is checked only if the item makes it, and has to
+// be true of hudScript when it does.
+const HUD_ROWS = [];
+hud.replace(/row\("(\w+)", "(\w+)"/g, function (all, key, label) { HUD_ROWS.push(label); return all; });
+yes('the HUD draws its bars by name, ' + HUD_ROWS.join(', '), HUD_ROWS.length >= 4);
+if (/bottom left/i.test(body)) {
+  yes('it says the bars are bottom left, and the HUD is anchored bottom left',
+      /position:fixed;left:\d+px;bottom:\d+px/.test(hud));
+}
+const COUNT = { two: 2, three: 3, four: 4, five: 5, six: 6 };
+const counted = /\b(two|three|four|five|six) bars\b/i.exec(body);
+if (counted) {
+  yes('it says there are ' + counted[1].toLowerCase() + ' bars, and the HUD draws ' + HUD_ROWS.length,
+      COUNT[counted[1].toLowerCase()] === HUD_ROWS.length);
+}
+['Hunger', 'Thirst', 'Rest', 'Temp', 'Warmth', 'Food', 'Water', 'Fatigue', 'Cold'].forEach(function (label) {
+  // Only a label it gives as a bar's name, capitalised mid sentence the way
+  // "are Hunger, Thirst, Rest and Temp" does. A sentence that starts with
+  // "Food" is not naming a bar.
+  if (new RegExp('[a-z,] ' + label + '\\b').test(body)) {
+    yes('it names a bar called ' + label + ', and the HUD draws one', HUD_ROWS.indexOf(label) >= 0);
+  }
 });
 
 /*
@@ -158,11 +198,14 @@ const lowNeeds = needs.toLowerCase();
       lowBody.indexOf(w) < 0 || lowNeeds.indexOf(w) >= 0);
 });
 yes('it says a fire warms you, and the needs block has a fire',
-    /fire warms you/i.test(body) && /\bfire:\s*\{\s*at:/.test(needs));
-yes('it says standing in one burns you, and the needs block has a burn',
-    /burns you/i.test(body) && /\bburn:\s*\{\s*spread:/.test(needs));
-yes('it says a roof keeps the weather off, and the needs block reads a roof',
-    /roof/i.test(body) && /\broof\b/.test(needs));
+    /fires? warms? you/i.test(body) && /\bfire:\s*\{\s*at:/.test(needs));
+if (/burns? you/i.test(body)) {
+  yes('it says standing in one burns you, and the needs block has a burn',
+      /\bburn:\s*\{\s*spread:/.test(needs));
+}
+if (/roof/i.test(body)) {
+  yes('it says a roof keeps the weather off, and the needs block reads a roof', /\broof\b/.test(needs));
+}
 
 const mat = /material:\s*\{([^}]*)\}/.exec(needs);
 const worth = {};
@@ -173,10 +216,13 @@ const kinds = Object.keys(worth).filter(function (k) { return k !== 'none'; });
 const best = kinds.slice().sort(function (a, b) { return worth[b] - worth[a]; })[0];
 const worst = kinds.slice().sort(function (a, b) { return worth[a] - worth[b]; })[0];
 yes('the needs block says what each material is worth, ' + kinds.length + ' of them', kinds.length >= 4);
-yes('it says fur is the warmest, and fur is the best material there (' + best + ')',
-    /fur is the warmest/i.test(body) && best === 'fur');
-yes('it says metal is the worst, and heavy armour is the worst material there (' + worst + ')',
-    /metal the worst|metal is the worst/i.test(body) && worst === 'heavy');
+if (/fur is the warmest/i.test(body)) {
+  yes('it says fur is the warmest, and fur is the best material there (' + best + ')', best === 'fur');
+}
+if (/metal the worst|metal is the worst/i.test(body)) {
+  yes('it says metal is the worst, and heavy armour is the worst material there (' + worst + ')',
+      worst === 'heavy');
+}
 
 // ------------------------------------------------------ the Controls page
 const pagesStrings = csStrings(read(['app', 'Pages.cs']));
@@ -203,26 +249,27 @@ yes('the row does not say the choices are kept in your save, when known.md says 
 
 // ------------------------------------------------------------- known.md
 /*
-  A section may name a mod that has gone only if its heading says it was
-  taken out. The old heading was "Mods that do not work as installed" and it
-  opened with "These are in the collection".
+  The table of what the collection took out belongs to entry 280 and to
+  tools/test-known-page.js, which checks every row is Out or In by its plugin
+  file and that no removed mod is named anywhere else on the page. The one
+  thing this entry adds is on the SunHelm Survival row: somebody reading that
+  SunHelm is out should learn where the needs went, not wonder whether they
+  went too. What it says is checked against the gamemode like the Help item.
 */
-const sections = KNOWN.split(/\n(?=## )/);
-const misplaced = [];
-let takenOut = '';
-sections.forEach(function (sec) {
-  const head = sec.split('\n')[0];
-  const names = goneIn(sec);
-  if (/Immersive Armors, standard/i.test(sec)) { names.push('Immersive Armors, standard version'); }
-  if (/taken out/i.test(head)) { takenOut = sec; return; }
-  names.forEach(function (nm) { misplaced.push(nm + ' under "' + head + '"'); });
-});
-yes('known.md names a mod that has gone only under a heading that says it was taken out' +
-    (misplaced.length ? ': ' + misplaced.join('; ') : ''), misplaced.length === 0);
-yes('known.md has that section', takenOut.length > 0);
-yes('and it does not say those mods are in the collection', !/are in the collection/i.test(takenOut));
-yes('and it says where the needs went: the server, the bars and /needs',
-    /on the server/i.test(takenOut) && /bottom left/i.test(takenOut) && takenOut.indexOf('/needs') >= 0);
+const shRow = KNOWN.split('\n').filter(function (l) { return /^\|\s*SunHelm Survival\s*\|/.test(l); })[0] || '';
+yes('known.md has a row for SunHelm Survival', shRow.length > 0);
+yes('it says the needs run on the server now', /on the server/i.test(shRow) && /hunger/i.test(shRow));
+yes('and points at /needs, which is a command everybody is told about',
+    shRow.indexOf('/needs') >= 0 && playerWords.indexOf("'/needs'") >= 0);
+if (/bottom left/i.test(shRow)) {
+  yes('it says the bars are bottom left, and the HUD is anchored bottom left',
+      /position:fixed;left:\d+px;bottom:\d+px/.test(hud));
+}
+const shCount = /\b(two|three|four|five|six) bars\b/i.exec(shRow);
+if (shCount) {
+  yes('it says there are ' + shCount[1].toLowerCase() + ' bars, and the HUD draws ' + HUD_ROWS.length,
+      COUNT[shCount[1].toLowerCase()] === HUD_ROWS.length);
+}
 
 // ------------------------------------------------------- Add-CartTravel.ps1
 const CART = read(['Add-CartTravel.ps1']);
