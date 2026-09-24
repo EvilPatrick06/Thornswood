@@ -113,6 +113,46 @@ if (block !== null) {
       (code.match(/spoilsBlock\.purse\(who\)/g) || []).length === 1);
 }
 
+// --------------------------------------------------- and somebody puts it on
+/*
+  THE SHIFT ARRIVED AND NOBODY EVER PUT IT ON.
+
+  Reported 21 September and again on the 23rd: "Still spawned in with no
+  clothes on". giveShift has always written the worn flag onto the INVENTORY
+  entry, which is the only field a gamemode can write; the client dresses
+  itself out of the EQUIPMENT record, whose property binding in the fork has a
+  Get and no Set. So the clothes sat in the pack.
+
+  That is also half of why clothes never moved the temperature: the equipment
+  update the client sends is what fills the server's record, and a client that
+  was never asked to wear anything sends nothing to record.
+
+  These hold the ask: that it exists, that the shift uses it, that arrival
+  uses it, and that it is taken back afterwards, because a property left on a
+  character is handed to the owner again at the next login and would re-dress
+  somebody in clothes they had deliberately taken off.
+*/
+{
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ');
+  yes('there is a way to ask somebody to put something on',
+      /function wearThese\(actorId, baseIds\)/.test(code) &&
+      /mp\.makeProperty\(WEAR_PROPERTY/.test(code));
+  yes('the ask is edge triggered like the swing, through ctx.state',
+      /st\.thornswoodWearAt === v\.at/.test(code));
+  yes('and it equips rather than granting anything',
+      /pc\.equipItem\(it, false, true\)/.test(code));
+  yes('the shift asks for itself to be worn', /wearThese\(actorId, toWear\)/.test(code));
+  yes('arriving puts back whatever the server believes is worn',
+      /function wearWhatIsWorn\(actorId\)/.test(code) &&
+      /wearWhatIsWorn\(actorId\)/.test(code.slice(code.indexOf('grantKnown(actorId)'))));
+  yes('nothing is invented: only worn things already in the pack',
+      /if \(e && e\.worn && e\.baseId\) \{ ids\.push\(e\.baseId\); \}/.test(code));
+  yes('and the ask is taken back, so it cannot fire again at the next login',
+      /mp\.set\(actorId, WEAR_PROPERTY, \{ ids: \[\], at: 0 \}\)/.test(code));
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
