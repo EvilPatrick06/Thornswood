@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 148 of them, with the one line that says
+Every `.ps1` in this folder, 154 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -108,6 +108,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Publish-Pack.ps1](Publish-Pack.ps1) | Builds the optional packs listed in optional-packs.txt, uploads them as release assets, and adds them to version.json so the Add-ons tab in every launcher offers them. |
 | [Publish-Server.ps1](Publish-Server.ps1) | Run this ON YOUR LAPTOP. It packs the server, sends it to the VPS, installs it there and checks it came up. |
 | [Publish-Update.ps1](Publish-Update.ps1) | Diffs the current build against the last published state, packs only what changed, uploads it as a release asset, and updates version.json so everyone's launcher picks it up. |
+| [Read-Load.ps1](Read-Load.ps1) | Says which service is using the box, from the record vps-load.ps1 keeps on it. |
 | [Remote.ps1](Remote.ps1) | Runs a bit of PowerShell on the VPS, properly. |
 | [Remove-BodyMods.ps1](Remove-BodyMods.ps1) | Pulls the male and female genitalia mods out of the Thornswood game folder. |
 | [Remove-DeadRecords.ps1](Remove-DeadRecords.ps1) | Deletes records from Thornswood-Content.esp that nothing uses any more, and refuses to delete one that anything still points at. |
@@ -153,6 +154,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-door-outage.ps1](test-door-outage.ps1) | The launcher's half of "Discord did not answer is not a no". |
 | [test-feed-notice.ps1](test-feed-notice.ps1) | What the update feed says to everybody, and when it may hold Play. |
 | [test-load-order.ps1](test-load-order.ps1) | The rule the pack's plugin list is put through before it ships, driven with stubs so it needs no game folder, no Data and no server. |
+| [test-log-upload.ps1](test-log-upload.ps1) | The launcher's half of the session logs: which files it picks, what it takes out of them, and whether the site can read what it sends. |
 | [test-master-flag.ps1](test-master-flag.ps1) | The master flag in the plugin header, which the game honours BEFORE the list order, and which Deploy-Gamemode.ps1 never read until 22 September. |
 | [test-max-online.ps1](test-max-online.ps1) | One number for how many a server seats, entry 281. |
 | [test-package-release-dir.ps1](test-package-release-dir.ps1) | The installer has to find the releases feed on whichever machine builds it, and has to stop rather than guess when the feed is not there. |
@@ -162,11 +164,15 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-release-prerelease.ps1](test-release-prerelease.ps1) | A dev build goes up to GitHub marked prerelease, on every path the upload can take, and a main build does not. |
 | [test-remote-length.ps1](test-remote-length.ps1) | No script sends the VPS more than a command line can hold. |
 | [test-script-index.ps1](test-script-index.ps1) | Ship.ps1 says every option it takes where Get-Help can read it, and tools\README.md lists every script in this folder exactly as New-ScriptIndex.ps1 writes it. |
+| [test-ship-gate.ps1](test-ship-gate.ps1) | A main release ships what is on GitHub, and nothing else. |
 | [test-ship-rules.ps1](test-ship-rules.ps1) | Two rules in Ship-Rules.ps1 that decide what leaves this machine in a pack or the installer. |
 | [test-steam-updates.ps1](test-steam-updates.ps1) | Steam's Updates setting for Skyrim, which nothing in the launcher read or set until 24 September (entry 271 on the To Do List, "Nothing stops Steam putting Skyrim back on the wrong build"). |
 | [test-voice-ticket.ps1](test-voice-ticket.ps1) | The Discord ticket only goes to the voice service over https. |
+| [test-watch-load.ps1](test-watch-load.ps1) | The load record the VPS keeps, and the note read out of it. |
 | [vps-dev-instance.ps1](vps-dev-instance.ps1) | Runs ON the VPS. Makes the dev game server and the dev voice server beside the live ones, from copies of the live installs, on their own ports, with their own scheduled tasks, firewall rules and watchdog entries. |
+| [vps-load.ps1](vps-load.ps1) | Runs ON the VPS, every five minutes, as the scheduled task that Watch-Load.ps1 -Install puts there. |
 | [vps-nightly-backup.ps1](vps-nightly-backup.ps1) | Runs on the VPS, once a night, as the scheduled task that Install-Backup.ps1 puts there. |
 | [Watch-Foreground.ps1](Watch-Foreground.ps1) | Which window Windows is giving the keyboard to, sampled from outside the game. |
+| [Watch-Load.ps1](Watch-Load.ps1) | The website, the game server, the voice service and the bot share one five core box, and nothing kept a number for any of them. |
 | [Watch-Services.ps1](Watch-Services.ps1) | Everything runs on one box now. The website, the game, the bot and the voice server are four things that can stop on their own, and nothing up there notices when one does. |
 | [Wipe-Saves.ps1](Wipe-Saves.ps1) | Starts the world over. Everybody begins again, nothing is claimed, nothing has been looted, and every container in the province is holding what Bethesda put in it. |
