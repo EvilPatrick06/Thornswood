@@ -413,29 +413,12 @@ $null = Stop-Game -Root $Root
 Head 'Thornswood - publish'
 
 # ------------------------------------------------------------ what is ours
-$vanillaDataFiles = @('Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm','_ResourcePack.esl','_ResourcePack.bsa')
-$vanillaDataPatterns = @('Skyrim - *.bsa','cc*.esm','cc*.esl','cc*.esp','cc*.bsa')
-$vanillaDataDirs = @('Video','Strings')
-$vanillaRootFiles = @('SkyrimSE.exe','SkyrimSELauncher.exe','steam_api64.dll','bink2w64.dll','Skyrim.ccc','installscript.vdf','Skyrim_Default.ini','High.ini','Low.ini','Medium.ini','Ultra.ini')
-$vanillaRootDirs = @('_DowngraderBackups','Creations','Mods','Skyrim','src')
-
-function Test-Vanilla([string]$rel) {
-    $parts = $rel -split '\\'
-    $top = $parts[0]
-    if ($vanillaRootDirs -contains $top) { return $true }
-    if ($parts.Count -eq 1) { return ($vanillaRootFiles -contains $top) }
-    if ($top -ne 'Data') { return $false }
-    if ($parts.Count -ge 3 -and ($vanillaDataDirs -contains $parts[1])) { return $true }
-    if ($parts.Count -eq 2) {
-        $leaf = $parts[1]
-        if ($vanillaDataFiles -contains $leaf) { return $true }
-        foreach ($p in $vanillaDataPatterns) { if ($leaf -like $p) { return $true } }
-    }
-    return $false
-}
-
-# The rules themselves are in Ship-Rules.ps1, dot-sourced above.
+# The rules themselves are in Ship-Rules.ps1, dot-sourced above. Bethesda's
+# files and other people's frameworks were the last list this file kept for
+# itself, a shorter copy of the installer's, and on 24 September packs were
+# carrying 90 files the installer left out. That list is in Ship-Rules too now.
 $runtimeDirs = $ShipRuntimeDirs
+function Test-Vanilla([string]$rel) { return ((Test-ShipVanilla $rel) -or (Test-ShipForeignFramework $rel)) }
 function Test-Runtime([string]$rel) { return (Test-ShipRuntime $rel) }
 function Test-OtherServer([string]$rel) { return (Test-ShipOtherServer $rel) }
 function Test-Machine([string]$rel) { return (Test-ShipMachine $rel) }

@@ -136,77 +136,6 @@ Head 'Packaging'
 # hashing them, which is how a package ends up half one version.
 $null = Stop-Game -Root $Root
 
-# ---- what never ships: Bethesda's own files ------------------------------
-$vanillaDataFiles = @(
-    'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm',
-    '_ResourcePack.esl', '_ResourcePack.bsa'
-)
-$vanillaDataPatterns = @('Skyrim - *.bsa', 'cc*.esm', 'cc*.esl', 'cc*.esp', 'cc*.bsa')
-$vanillaDataDirs     = @('Video', 'Strings')
-
-# ---- what never ships: other people's frameworks and modding tools --------
-#
-# Vortex's manifest answers "did Vortex put this here", which is not the same
-# question as "does Thornswood need this". These folders answered no to the
-# first and were shipped to everybody as though they were ours.
-#
-# NirnLabUIPlatform is another roleplay server's user interface framework and
-# on its own it is 356 MB. Nemesis, FNIS, BodySlide and xEdit are tools that
-# belong on the machine of somebody who builds mods, not in a folder handed to
-# somebody who plays. Source is Papyrus script sources, which the game never
-# reads. The rest is documentation, installer leftovers and a shader cache
-# that rebuilds itself on first launch.
-#
-# All of them stay where they are on this machine. This only decides what goes
-# into the installer.
-$foreignDataDirs = @(
-    'NirnLabUIPlatform',
-    'Nemesis_Engine', 'FNIS Behavior SE 7.6', 'CalienteTools', 'tools',
-    'Source', 'ModderResource', 'FOMod',
-    'Docs', 'Docs and Screenshots', 'readmes',
-    'ShaderCache'
-)
-
-$vanillaRootFiles = @(
-    'SkyrimSE.exe', 'SkyrimSELauncher.exe', 'steam_api64.dll', 'bink2w64.dll',
-    'Skyrim.ccc', 'installscript.vdf', 'Skyrim_Default.ini',
-    'High.ini', 'Low.ini', 'Medium.ini', 'Ultra.ini',
-
-    # Only ever seen when this is building out of the Steam copy rather than
-    # out of a game folder we built ourselves.
-    #
-    # The script extender is not ours to hand out and it is in the collection
-    # now, so shipping it again would be redistributing somebody's mod and
-    # doing it twice. VERSION and steam_appid.txt belong to Steam and the
-    # downgrader. imgui.ini and the d3dx9 log are written at runtime by
-    # whatever was last run against this install.
-    'skse64_loader.exe', 'skse64_1_6_1170.dll',
-    'skse64_readme.txt', 'skse64_whatsnew.txt',
-    'VERSION', 'steam_appid.txt', 'imgui.ini', 'd3dx9_42.log'
-)
-$vanillaRootDirs = @(
-    '_DowngraderBackups', 'Creations', 'Mods', 'Skyrim', 'src',
-
-    # Bethesda's launcher keeps its own folder. Not ours, not in an installer.
-    'BStarData'
-)
-
-function Test-Vanilla([string]$rel) {
-    $parts = $rel -split '\\'
-    $top   = $parts[0]
-    if ($vanillaRootDirs -contains $top) { return $true }
-    if ($parts.Count -eq 1) { return ($vanillaRootFiles -contains $top) }
-    if ($top -ne 'Data') { return $false }
-    if ($parts.Count -ge 3 -and ($vanillaDataDirs -contains $parts[1])) { return $true }
-    if ($parts.Count -ge 2 -and ($foreignDataDirs -contains $parts[1])) { return $true }
-    if ($parts.Count -eq 2) {
-        $leaf = $parts[1]
-        if ($vanillaDataFiles -contains $leaf) { return $true }
-        foreach ($p in $vanillaDataPatterns) { if ($leaf -like $p) { return $true } }
-    }
-    return $false
-}
-
 # ---- stage ----------------------------------------------------------------
 # The multiplayer client's menu is a Chromium window, and it keeps a browser
 # profile beside itself: caches, cookie databases, shader blobs, its own logs.
@@ -220,6 +149,11 @@ function Test-Vanilla([string]$rel) {
 # installer built on 16 Sep did carry.
 . (Join-Path $Here 'Ship-Rules.ps1')
 $runtimeDirs = $ShipRuntimeDirs
+# Bethesda's own files, and other people's frameworks and modding tools. The
+# lists were here, and a shorter copy of them in Publish-Update.ps1, until
+# 24 September, when packs were found carrying 90 files this left out. They
+# are one list in Ship-Rules.ps1 now.
+function Test-Vanilla([string]$rel) { return ((Test-ShipVanilla $rel) -or (Test-ShipForeignFramework $rel)) }
 function Test-Runtime([string]$rel) { return (Test-ShipRuntime $rel) }
 
 # ---- what ships separately: the optional packs ----------------------------
@@ -278,7 +212,7 @@ if ($optionalPrefixes.Count) {
 # ends.
 #
 # This is a KEEP list, not a leave-out list: whatever the Vortex record or the
-# vanilla patterns below decide, a path in the record ships.
+# vanilla patterns in Ship-Rules.ps1 decide, a path in the record ships.
 $clientRecordPath = Join-Path $PSScriptRoot 'client-build.json'
 $shipClientFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
 try {
