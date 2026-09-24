@@ -580,6 +580,67 @@ function send(res, code, payload, type, extra) {
 }
 const sendJson = (res, code, obj) => send(res, code, JSON.stringify(obj));
 
+/*
+  One byte range, when a client asks for one. Answers 206 or 416 and returns
+  true, or returns false when there is no range to honour and the caller sends
+  its own 200.
+
+  The static files had this and /file/ did not. /file/ is where the installer
+  gets its payload, and Bootstrap.cs asks for the rest of a half downloaded zip
+  with a Range header and appends whatever a 206 brings. The site answered
+  every such request 200 with the whole file and no Accept-Ranges, so a
+  connection that dropped at 300 MB started again from nothing, while the Join
+  page promises it carries on. The To Do List has it measured live: a Range
+  request for the payload came back 200 with the full length.
+
+  A 206 that starts anywhere but the byte asked for is written onto the end of
+  the partial file and corrupts it with nothing to notice, so the start is
+  exactly the number in the header and test-file-range.js holds it there.
+
+  headers are the ones this file is served with (content-type, and on /file/
+  the attachment name and its validators), lower case so none is sent twice.
+  When they carry an etag or last-modified, an If-Range that names neither is
+  a client resuming a file that has since changed, and it gets the whole new
+  file rather than the tail of it. head is a HEAD: headers only, and a HEAD
+  with a range on the installer does not read half a gigabyte to throw away.
+*/
+function rangeReply(req, res, file, size, headers, head) {
+  const range = req.headers.range;
+  const m = range && /^bytes=(\d*)-(\d*)$/.exec(String(range).trim());
+  if (!m) return false;
+  const ifRange = req.headers['if-range'];
+  if (ifRange && (headers.etag || headers['last-modified']) &&
+      ifRange !== headers.etag && ifRange !== headers['last-modified']) return false;
+  let start = m[1] === '' ? null : parseInt(m[1], 10);
+  let end = m[2] === '' ? null : parseInt(m[2], 10);
+  // bytes=-500 means the LAST 500, not "from 0 to 500".
+  if (start === null && end !== null) { start = Math.max(0, size - end); end = size - 1; }
+  if (start !== null && end === null) { end = size - 1; }
+  if (start === null || start > end || start >= size) {
+    res.writeHead(416, {
+      'content-range': 'bytes */' + size,
+      'accept-ranges': 'bytes',
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff'
+    });
+    res.end();
+    return true;
+  }
+  end = Math.min(end, size - 1);
+  // send() puts the last two on every other answer; a range must not be the
+  // one reply that quietly goes out without them.
+  res.writeHead(206, Object.assign({}, headers, {
+    'content-range': 'bytes ' + start + '-' + end + '/' + size,
+    'content-length': (end - start) + 1,
+    'accept-ranges': 'bytes',
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff'
+  }));
+  if (head) { res.end(); return true; }
+  fs.createReadStream(file, { start: start, end: end }).pipe(res);
+  return true;
+}
+
 function body(req, cap) {
   return new Promise((resolve) => {
     let out = '';
@@ -898,11 +959,18 @@ const SLOG_DAYS = 365;
 
 /* The names the launcher may send. Anything else is dropped rather than
    written: this is a path coming from outside, and a file name is the shortest
-   way into a folder nobody meant to write. */
+   way into a folder nobody meant to write.
+
+   In the order a set too big for SLOG_ALL keeps them. crash.log is the SKSE
+   crash log from that session, if it crashed, and it goes second because it
+   is the one that settles a crash with no message (entry 105).
+   skyrim-platform.log is the tail of Skyrim Platform's own log, and it goes
+   last because it is the biggest and the noisiest. */
 const SLOG_NAMES = [
-  'launcher.log', 'thornswood-front.log', 'thornswood-voice.log',
+  'launcher.log', 'crash.log', 'thornswood-front.log', 'thornswood-voice.log',
   'thornswood-emotes.log', 'thornswood-input.log', 'thornswood-dress.log',
-  'thornswood-loadorder.txt', 'thornswood-plugins-light.txt'
+  'thornswood-loadorder.txt', 'thornswood-plugins-light.txt',
+  'skyrim-platform.log'
 ];
 
 function slogFile(key) { return path.join(SLOGS, key + '.json'); }
@@ -1951,39 +2019,7 @@ async function handle(req, res) {
         Everything else is unaffected. No Range header means the old path, byte
         for byte, with Accept-Ranges added so a client knows it may ask.
       */
-      const range = req.headers.range;
-      const m = range && /^bytes=(\d*)-(\d*)$/.exec(String(range).trim());
-      if (m) {
-        const size = fs.statSync(file).size;
-        let start = m[1] === '' ? null : parseInt(m[1], 10);
-        let end = m[2] === '' ? null : parseInt(m[2], 10);
-        // bytes=-500 means the LAST 500, not "from 0 to 500".
-        if (start === null && end !== null) { start = Math.max(0, size - end); end = size - 1; }
-        if (start !== null && end === null) { end = size - 1; }
-        if (start === null || start > end || start >= size) {
-          res.writeHead(416, {
-            'content-range': 'bytes */' + size,
-            'accept-ranges': 'bytes',
-            'cache-control': 'no-store',
-            'x-content-type-options': 'nosniff'
-          });
-          res.end();
-          return;
-        }
-        end = Math.min(end, size - 1);
-        res.writeHead(206, {
-          'content-type': type,
-          'content-range': 'bytes ' + start + '-' + end + '/' + size,
-          'content-length': (end - start) + 1,
-          'accept-ranges': 'bytes',
-          // send() puts these on every other answer; a range must not be the
-          // one reply that quietly goes out without them.
-          'cache-control': 'no-store',
-          'x-content-type-options': 'nosniff'
-        });
-        fs.createReadStream(file, { start: start, end: end }).pipe(res);
-        return;
-      }
+      if (rangeReply(req, res, file, fs.statSync(file).size, { 'content-type': type }, head)) return;
       /*
         AND A CACHE HEADER, BECAUSE A LOGO IS NOT SOMEBODY'S PRIVATE DATA.
 
@@ -2033,11 +2069,23 @@ async function handle(req, res) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
-    res.writeHead(200, {
-      'Content-Type': 'application/octet-stream',
-      'Content-Length': st.size,
-      'Content-Disposition': 'attachment; filename="' + path.basename(file) + '"'
-    });
+    /* Resumable, because the payload is hundreds of megabytes and the Join
+       page says a dropped connection carries on. Accept-Ranges on the 200 so
+       a client knows before it starts. The ETag and Last-Modified are what a
+       browser needs before it will resume at all, and what If-Range is
+       checked against, so a one file installer taken in the browser resumes
+       too and never onto a different build. */
+    const kind = {
+      'content-type': 'application/octet-stream',
+      'content-disposition': 'attachment; filename="' + path.basename(file) + '"',
+      'etag': '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"',
+      'last-modified': new Date(st.mtimeMs).toUTCString()
+    };
+    if (rangeReply(req, res, file, st.size, kind, head)) return;
+    res.writeHead(200, Object.assign({}, kind, {
+      'content-length': st.size,
+      'accept-ranges': 'bytes'
+    }));
     if (head) return res.end();
     return fs.createReadStream(file).pipe(res);
   }
