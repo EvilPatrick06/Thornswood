@@ -72,9 +72,20 @@
   version number stays where it is.
 
 .PARAMETER DryRun
-  Builds and works out what would ship, but uploads nothing, pushes nothing
-  and tells nobody. The git checks are skipped, and the feed, the baseline and
-  the version number are put back afterwards.
+  Builds and works out what would ship, and uploads no pack, publishes no
+  feed and tells nobody: no news post, no warning from the server. The git
+  checks are skipped, and the feed, the baseline and the version number are
+  put back afterwards.
+
+  IT STILL CHANGES THIS MACHINE, so do not run it while the game is open here.
+  It closes any running Skyrim, SKSE loader or SkyMP client, matched by name
+  wherever it runs from, and it does that even with -ModsOnly, because
+  the publisher closes the game before it reads a single file. Without
+  -ModsOnly it also closes the launcher and puts the new Thornswood.exe in
+  <Root>\Launcher. It copies the plugins into the game folder. The pack it
+  makes stays in -DistRoot, and every pack-*.zip there older than the ten
+  newest is deleted. The first -Channel dev run on a machine makes the dev
+  branch of the releases repo and pushes it to GitHub, dry run or not.
 
 .PARAMETER Package
   Also rebuilds the two installer files for new people, after the release is
@@ -114,17 +125,22 @@
   main or dev, and main when it is left out.
 
   main is the build everybody plays on, and ships only what is already on
-  GitHub. It refuses a release that is not on main, that is behind or ahead
-  of origin/main, that has anything uncommitted, that has a file under tools
-  git does not know about (the build and Go.ps1 would take it anyway), or
-  that asks for a new number with -Version. dev builds and publishes the
-  second launcher: the dev branch of the releases repo, the dev server, and a
-  version like 1.1.35.3 that a main release always outranks. It may ship from
-  any branch, on either machine.
+  GitHub. It refuses a release that is not on main or on a hotfix/ branch,
+  that is behind or ahead of the same branch on origin, that has anything
+  uncommitted, that has a file under tools git does not know about (the
+  build and Go.ps1 would take it anyway), or that asks for a new number with
+  -Version. A hotfix/ branch is the live build plus one fix and its version
+  bump, cut from the commit the live release was built from. Ship refuses
+  one that is not on GitHub, and it is Patrick's call like any live release.
+
+  dev builds and publishes the second launcher: the dev branch of the
+  releases repo, the dev server, and a version like 1.1.35.3 that a main
+  release always outranks. It may ship from any branch, on either machine.
 
   THERE IS ONE DEV FEED AND THE LAST DEV SHIP WINS. Both machines publish to
   the same one, so a dev Ship replaces whatever the other machine put there.
-  Say in #dev before taking it. A main Ship resets dev to match main.
+  Say in #dev before taking it. A main Ship resets dev to match main. A
+  hotfix does not, because the work on dev was not in it.
 
   Everything goes to dev first, decided by Patrick on 23 September: "even
   small changes go to the dev build launcher for pretesting". A main Ship is
@@ -140,7 +156,10 @@
 .EXAMPLE
   .\tools\Ship.ps1 -DryRun "The map marker points at the right door now"
 
-  Builds and works out what would ship, and leaves nothing behind.
+  Builds and works out what would ship without publishing it. It closes a
+  running game and puts the new launcher in place on this machine, so run it
+  with the game closed. Get-Help .\tools\Ship.ps1 -Parameter DryRun lists
+  everything it still changes.
 
 .EXAMPLE
   .\tools\Ship.ps1 "The map marker points at the right door now"
