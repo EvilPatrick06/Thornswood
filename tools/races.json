@@ -1,203 +1,203 @@
 {
  "builtBy": "tools\\Build-RaceTable.js",
- "builtAt": "2026-09-24T03:10:32.605Z",
+ "builtAt": "2026-09-24T03:34:37.715Z",
  "source": "the RACE records of the plugins in load order",
  "note": "which recipes a race owns is in tools\\recipes.json; this only says what the races are",
  "count": 258,
  "items": {
   "109c7c:Skyrim.esm": {
    "e": "FoxRace",
-   "n": "\u0016\u001a\u0001",
+   "n": "FoxRace",
    "p": false
   },
   "108272:Skyrim.esm": {
    "e": "BretonRaceChildVampire",
-   "n": "®\u0017\u0001",
+   "n": "BretonRaceChildVampire",
    "p": false
   },
   "10760a:Skyrim.esm": {
    "e": "ManakinRace",
-   "n": "/\u0016\u0001",
+   "n": "ManakinRace",
    "p": false
   },
   "106c10:Skyrim.esm": {
    "e": "C06WolfSpiritRace",
-   "n": "ë\u0016\u0001",
+   "n": "C06WolfSpiritRace",
    "p": false
   },
   "1052a3:Skyrim.esm": {
    "e": "UndeadDragonRace",
-   "n": "B\u0014\u0001",
+   "n": "UndeadDragonRace",
    "p": false
   },
   "104f45:Skyrim.esm": {
    "e": "WhiteStagRace",
-   "n": "#\u0014\u0001",
+   "n": "WhiteStagRace",
    "p": false
   },
   "f905f:Skyrim.esm": {
    "e": "MG07DogRace",
-   "n": "Í\f\u0001",
+   "n": "MG07DogRace",
    "p": false
   },
   "f71dc:Skyrim.esm": {
    "e": "DraugrMagicRace",
-   "n": "k\u000b\u0001",
+   "n": "DraugrMagicRace",
    "p": false
   },
   "f3903:Skyrim.esm": {
    "e": "SprigganMatronRace",
-   "n": "\u001a\u0007\u0001",
+   "n": "SprigganMatronRace",
    "p": false
   },
   "ebe18:Skyrim.esm": {
    "e": "SkeletonNecroPriestRace",
-   "n": "\u0006\u0001",
+   "n": "SkeletonNecroPriestRace",
    "p": false
   },
   "eb872:Skyrim.esm": {
    "e": "SkeletonNecroRace",
-   "n": "\u000b\u0001",
+   "n": "SkeletonNecroRace",
    "p": false
   },
   "f1ac4:Skyrim.esm": {
    "e": "DogCompanionRace",
-   "n": "÷\t\u0001",
+   "n": "DogCompanionRace",
    "p": false
   },
   "f1182:Skyrim.esm": {
    "e": "WispShadeRace",
-   "n": "-\u0006\u0001",
+   "n": "WispShadeRace",
    "p": false
   },
   "de505:Skyrim.esm": {
    "e": "CartHorseRace",
-   "n": "Ä\u0000",
+   "n": "CartHorseRace",
    "p": false
   },
   "cd657:Skyrim.esm": {
    "e": "DA03BarbasDogRace",
-   "n": "oR\u0000",
+   "n": "DA03BarbasDogRace",
    "p": false
   },
   "b6f95:Skyrim.esm": {
    "e": "MagicAnomalyRace",
-   "n": "n\u0000",
+   "n": "MagicAnomalyRace",
    "p": false
   },
   "a919d:Skyrim.esm": {
    "e": "ChickenRace",
-   "n": "¨\u0012\u0000",
+   "n": "ChickenRace",
    "p": false
   },
   "97a3d:Skyrim.esm": {
    "e": "DA13AfflictedRace",
-   "n": "¤ß\u0000",
+   "n": "DA13AfflictedRace",
    "p": false
   },
   "7eaf3:Skyrim.esm": {
    "e": "NordRaceAstrid",
-   "n": "g!\u0000",
+   "n": "NordRaceAstrid",
    "p": false
   },
   "6dc99:Skyrim.esm": {
    "e": "HareRace",
-   "n": "fN\u0000",
+   "n": "HareRace",
    "p": false
   },
   "e7713:Skyrim.esm": {
    "e": "AlduinRace",
-   "n": "Æý\u0000",
+   "n": "AlduinRace",
    "p": false
   },
   "cf89b:Skyrim.esm": {
    "e": "DeerRace",
-   "n": "ï\u001d\u0000",
+   "n": "DeerRace",
    "p": false
   },
   "cdd84:Skyrim.esm": {
    "e": "WerewolfBeastRace",
-   "n": "Ð)\u0000",
+   "n": "WerewolfBeastRace",
    "p": false
   },
   "cae13:Skyrim.esm": {
    "e": "C00GiantOutsideWhiterunRace",
-   "n": "©Ç\u0000",
+   "n": "C00GiantOutsideWhiterunRace",
    "p": false
   },
   "c3edf:Skyrim.esm": {
    "e": "SkeeverWhiteRace",
-   "n": "Òo\u0000",
+   "n": "SkeeverWhiteRace",
    "p": false
   },
   "b9fd7:Skyrim.esm": {
    "e": "RigidSkeletonRace",
-   "n": "ü\u0000",
+   "n": "RigidSkeletonRace",
    "p": false
   },
   "a82ba:Skyrim.esm": {
    "e": "ElderRaceVampire",
-   "n": "*þ\u0000",
+   "n": "ElderRaceVampire",
    "p": false
   },
   "a82b9:Skyrim.esm": {
    "e": "OrcRaceVampire",
-   "n": "·\u0000",
+   "n": "OrcRaceVampire",
    "p": false
   },
   "88884:Skyrim.esm": {
    "e": "WoodElfRaceVampire",
-   "n": "äÖ\u0000",
+   "n": "WoodElfRaceVampire",
    "p": false
   },
   "88846:Skyrim.esm": {
    "e": "RedguardRaceVampire",
-   "n": "©\u0000",
+   "n": "RedguardRaceVampire",
    "p": false
   },
   "88845:Skyrim.esm": {
    "e": "KhajiitRaceVampire",
-   "n": "±ï\u0000",
+   "n": "KhajiitRaceVampire",
    "p": false
   },
   "88844:Skyrim.esm": {
    "e": "ImperialRaceVampire",
-   "n": "£O\u0000",
+   "n": "ImperialRaceVampire",
    "p": false
   },
   "88840:Skyrim.esm": {
    "e": "HighElfRaceVampire",
-   "n": "\u001a\u0000",
+   "n": "HighElfRaceVampire",
    "p": false
   },
   "8883d:Skyrim.esm": {
    "e": "DarkElfRaceVampire",
-   "n": "¥&\u0000",
+   "n": "DarkElfRaceVampire",
    "p": false
   },
   "8883c:Skyrim.esm": {
    "e": "BretonRaceVampire",
-   "n": "­Ä\u0000",
+   "n": "BretonRaceVampire",
    "p": false
   },
   "8883a:Skyrim.esm": {
    "e": "ArgonianRaceVampire",
-   "n": "Ýw\u0000",
+   "n": "ArgonianRaceVampire",
    "p": false
   },
   "88794:Skyrim.esm": {
    "e": "NordRaceVampire",
-   "n": "4¯\u0000",
+   "n": "NordRaceVampire",
    "p": false
   },
   "ba545:Skyrim.esm": {
    "e": "MudcrabRace",
-   "n": "î\u0000",
+   "n": "MudcrabRace",
    "p": false
   },
   "b7998:Skyrim.esm": {
    "e": "SkeletonRace",
-   "n": "F#\u0000",
+   "n": "SkeletonRace",
    "p": false
   },
   "b214b:Skyrim.esm": {
@@ -207,672 +207,672 @@
   },
   "a5601:Skyrim.esm": {
    "e": "ChaurusReaperRace",
-   "n": "ÉB\u0000",
+   "n": "ChaurusReaperRace",
    "p": false
   },
   "9aa44:Skyrim.esm": {
    "e": "SprigganSwarmRace",
-   "n": "ìp\u0000",
+   "n": "SprigganSwarmRace",
    "p": false
   },
   "9aa3c:Skyrim.esm": {
    "e": "SwarmRace",
-   "n": "F\u0000",
+   "n": "SwarmRace",
    "p": false
   },
   "71e6a:Skyrim.esm": {
    "e": "InvisibleRace",
-   "n": "\bI\u0000",
+   "n": "InvisibleRace",
    "p": false
   },
   "6fc4a:Skyrim.esm": {
    "e": "GoatDomesticsRace",
-   "n": "5ñ\u0000",
+   "n": "GoatDomesticsRace",
    "p": false
   },
   "67cd8:Skyrim.esm": {
    "e": "ElderRace",
-   "n": "[\u0000",
+   "n": "ElderRace",
    "p": false
   },
   "53477:Skyrim.esm": {
    "e": "FrostbiteSpiderRaceLarge",
-   "n": "C#\u0000",
+   "n": "FrostbiteSpiderRaceLarge",
    "p": false
   },
   "4e785:Skyrim.esm": {
    "e": "CowRace",
-   "n": "RH\u0000",
+   "n": "CowRace",
    "p": false
   },
   "4e507:Skyrim.esm": {
    "e": "FrostbiteSpiderRaceGiant",
-   "n": "GN\u0000",
+   "n": "FrostbiteSpiderRaceGiant",
    "p": false
   },
   "2c65c:Skyrim.esm": {
    "e": "BretonRaceChild",
-   "n": "ßv\u0000",
+   "n": "BretonRaceChild",
    "p": false
   },
   "2c65b:Skyrim.esm": {
    "e": "NordRaceChild",
-   "n": "ÅÝ\u0000",
+   "n": "NordRaceChild",
    "p": false
   },
   "2c65a:Skyrim.esm": {
    "e": "RedguardRaceChild",
-   "n": "\u0004H\u0000",
+   "n": "RedguardRaceChild",
    "p": false
   },
   "2c659:Skyrim.esm": {
    "e": "ImperialRaceChild",
-   "n": "ð\u0000",
+   "n": "ImperialRaceChild",
    "p": false
   },
   "13749:Skyrim.esm": {
    "e": "WoodElfRace",
-   "n": "D\u0000",
+   "n": "WoodElfRace",
    "p": true
   },
   "13748:Skyrim.esm": {
    "e": "RedguardRace",
-   "n": "\u000f\u0000",
+   "n": "RedguardRace",
    "p": true
   },
   "13747:Skyrim.esm": {
    "e": "OrcRace",
-   "n": "åò\u0000",
+   "n": "OrcRace",
    "p": true
   },
   "13746:Skyrim.esm": {
    "e": "NordRace",
-   "n": "Ù\u0000",
+   "n": "NordRace",
    "p": true
   },
   "13745:Skyrim.esm": {
    "e": "KhajiitRace",
-   "n": "K\u000f\u0000",
+   "n": "KhajiitRace",
    "p": true
   },
   "13744:Skyrim.esm": {
    "e": "ImperialRace",
-   "n": "»r\u0000",
+   "n": "ImperialRace",
    "p": true
   },
   "13743:Skyrim.esm": {
    "e": "HighElfRace",
-   "n": ":\u0000",
+   "n": "HighElfRace",
    "p": true
   },
   "13742:Skyrim.esm": {
    "e": "DarkElfRace",
-   "n": "d\u0013\u0000",
+   "n": "DarkElfRace",
    "p": true
   },
   "13741:Skyrim.esm": {
    "e": "BretonRace",
-   "n": "º\u0014\u0000",
+   "n": "BretonRace",
    "p": true
   },
   "13740:Skyrim.esm": {
    "e": "ArgonianRace",
-   "n": "\u0003È\u0000",
+   "n": "ArgonianRace",
    "p": true
   },
   "1320a:Skyrim.esm": {
    "e": "WolfRace",
-   "n": "k\u0000",
+   "n": "WolfRace",
    "p": false
   },
   "13209:Skyrim.esm": {
    "e": "WitchlightRace",
-   "n": "èÒ\u0000",
+   "n": "WitchlightRace",
    "p": false
   },
   "13208:Skyrim.esm": {
    "e": "WispRace",
-   "n": "È·\u0000",
+   "n": "WispRace",
    "p": false
   },
   "13206:Skyrim.esm": {
    "e": "TrollFrostRace",
-   "n": ")Æ\u0000",
+   "n": "TrollFrostRace",
    "p": false
   },
   "13205:Skyrim.esm": {
    "e": "TrollRace",
-   "n": "ª\u0000",
+   "n": "TrollRace",
    "p": false
   },
   "13204:Skyrim.esm": {
    "e": "SprigganRace",
-   "n": "õ;\u0000",
+   "n": "SprigganRace",
    "p": false
   },
   "13203:Skyrim.esm": {
    "e": "SlaughterfishRace",
-   "n": "öÚ\u0000",
+   "n": "SlaughterfishRace",
    "p": false
   },
   "13202:Skyrim.esm": {
    "e": "SabreCatSnowyRace",
-   "n": "!ß\u0000",
+   "n": "SabreCatSnowyRace",
    "p": false
   },
   "13201:Skyrim.esm": {
    "e": "SkeeverRace",
-   "n": "\u001f\b\u0000",
+   "n": "SkeeverRace",
    "p": false
   },
   "13200:Skyrim.esm": {
    "e": "SabreCatRace",
-   "n": "\u0000\u0001",
+   "n": "SabreCatRace",
    "p": false
   },
   "131ff:Skyrim.esm": {
    "e": "MammothRace",
-   "n": "p\u0000",
+   "n": "MammothRace",
    "p": false
   },
   "131fe:Skyrim.esm": {
    "e": "IceWraithRace",
-   "n": "A6\u0000",
+   "n": "IceWraithRace",
    "p": false
   },
   "131fd:Skyrim.esm": {
    "e": "HorseRace",
-   "n": "Õ\u0000",
+   "n": "HorseRace",
    "p": false
   },
   "131fc:Skyrim.esm": {
    "e": "HorkerRace",
-   "n": "\u0016?\u0000",
+   "n": "HorkerRace",
    "p": false
   },
   "131fb:Skyrim.esm": {
    "e": "HagravenRace",
-   "n": "Rt\u0000",
+   "n": "HagravenRace",
    "p": false
   },
   "131fa:Skyrim.esm": {
    "e": "GoatRace",
-   "n": "¡=\u0000",
+   "n": "GoatRace",
    "p": false
   },
   "131f9:Skyrim.esm": {
    "e": "GiantRace",
-   "n": "Õ\u0000",
+   "n": "GiantRace",
    "p": false
   },
   "131f8:Skyrim.esm": {
    "e": "FrostbiteSpiderRace",
-   "n": "¤é\u0000",
+   "n": "FrostbiteSpiderRace",
    "p": false
   },
   "131f7:Skyrim.esm": {
    "e": "AtronachStormRace",
-   "n": "\u000f\u0000",
+   "n": "AtronachStormRace",
    "p": false
   },
   "131f6:Skyrim.esm": {
    "e": "AtronachFrostRace",
-   "n": "\u0005ì\u0000",
+   "n": "AtronachFrostRace",
    "p": false
   },
   "131f5:Skyrim.esm": {
    "e": "AtronachFlameRace",
-   "n": "\fá\u0000",
+   "n": "AtronachFlameRace",
    "p": false
   },
   "131f4:Skyrim.esm": {
    "e": "FalmerRace",
-   "n": "\u0010\u0000",
+   "n": "FalmerRace",
    "p": false
   },
   "131f3:Skyrim.esm": {
    "e": "DwarvenSpiderRace",
-   "n": "æ\u0000",
+   "n": "DwarvenSpiderRace",
    "p": false
   },
   "131f2:Skyrim.esm": {
    "e": "DwarvenSphereRace",
-   "n": "\u0002\u0001\u0000",
+   "n": "DwarvenSphereRace",
    "p": false
   },
   "131f1:Skyrim.esm": {
    "e": "DwarvenCenturionRace",
-   "n": "=\u0000\u0000",
+   "n": "DwarvenCenturionRace",
    "p": false
   },
   "131f0:Skyrim.esm": {
    "e": "DremoraRace",
-   "n": "Ë°\u0000",
+   "n": "DremoraRace",
    "p": false
   },
   "131ef:Skyrim.esm": {
    "e": "DragonPriestRace",
-   "n": " ñ\u0000",
+   "n": "DragonPriestRace",
    "p": false
   },
   "131ee:Skyrim.esm": {
    "e": "DogRace",
-   "n": "\u0005x\u0000",
+   "n": "DogRace",
    "p": false
   },
   "131ed:Skyrim.esm": {
    "e": "ElkRace",
-   "n": "bw\u0000",
+   "n": "ElkRace",
    "p": false
   },
   "131eb:Skyrim.esm": {
    "e": "ChaurusRace",
-   "n": "áO\u0000",
+   "n": "ChaurusRace",
    "p": false
   },
   "131e9:Skyrim.esm": {
    "e": "BearSnowRace",
-   "n": "D©\u0000",
+   "n": "BearSnowRace",
    "p": false
   },
   "131e8:Skyrim.esm": {
    "e": "BearBlackRace",
-   "n": "u[\u0000",
+   "n": "BearBlackRace",
    "p": false
   },
   "131e7:Skyrim.esm": {
    "e": "BearBrownRace",
-   "n": "=\u0000",
+   "n": "BearBrownRace",
    "p": false
   },
   "12e82:Skyrim.esm": {
    "e": "DragonRace",
-   "n": "~=\u0000",
+   "n": "DragonRace",
    "p": false
   },
   "d53:Skyrim.esm": {
    "e": "DraugrRace",
-   "n": "¸\u0000",
+   "n": "DraugrRace",
    "p": false
   },
   "19:Skyrim.esm": {
    "e": "DefaultRace",
-   "n": "m±\u0000",
+   "n": "DefaultRace",
    "p": false
   },
   "10760a:Update.esm": {
    "e": "ManakinRace",
-   "n": "/\u0016\u0001",
+   "n": "ManakinRace",
    "p": false
   },
   "de505:Update.esm": {
    "e": "CartHorseRace",
-   "n": "Ä\u0000",
+   "n": "CartHorseRace",
    "p": false
   },
   "131fd:Update.esm": {
    "e": "HorseRace",
-   "n": "Õ\u0000",
+   "n": "HorseRace",
    "p": false
   },
   "2f93:Update.esm": {
    "e": "ccBGSSSE036_BoneWolfCompanionRace",
-   "n": "\u0000\u0000",
+   "n": "ccBGSSSE036_BoneWolfCompanionRace",
    "p": false
   },
   "2f74:Update.esm": {
    "e": "ccBGSSSE035_NixHoundCompanionRace",
-   "n": "\u0000\u0000",
+   "n": "ccBGSSSE035_NixHoundCompanionRace",
    "p": false
   },
   "1052a3:Update.esm": {
    "e": "UndeadDragonRace",
-   "n": "B\u0014\u0001",
+   "n": "UndeadDragonRace",
    "p": false
   },
   "12e82:Update.esm": {
    "e": "DragonRace",
-   "n": "~=\u0000",
+   "n": "DragonRace",
    "p": false
   },
   "13740:Update.esm": {
    "e": "ArgonianRace",
-   "n": "\u0003È\u0000",
+   "n": "ArgonianRace",
    "p": true
   },
   "8883a:Update.esm": {
    "e": "ArgonianRaceVampire",
-   "n": "Ýw\u0000",
+   "n": "ArgonianRaceVampire",
    "p": false
   },
   "13741:Update.esm": {
    "e": "BretonRace",
-   "n": "º\u0014\u0000",
+   "n": "BretonRace",
    "p": true
   },
   "8883c:Update.esm": {
    "e": "BretonRaceVampire",
-   "n": "­Ä\u0000",
+   "n": "BretonRaceVampire",
    "p": false
   },
   "13742:Update.esm": {
    "e": "DarkElfRace",
-   "n": "d\u0013\u0000",
+   "n": "DarkElfRace",
    "p": true
   },
   "8883d:Update.esm": {
    "e": "DarkElfRaceVampire",
-   "n": "¥&\u0000",
+   "n": "DarkElfRaceVampire",
    "p": false
   },
   "13743:Update.esm": {
    "e": "HighElfRace",
-   "n": ":\u0000",
+   "n": "HighElfRace",
    "p": true
   },
   "88840:Update.esm": {
    "e": "HighElfRaceVampire",
-   "n": "\u001a\u0000",
+   "n": "HighElfRaceVampire",
    "p": false
   },
   "13744:Update.esm": {
    "e": "ImperialRace",
-   "n": "»r\u0000",
+   "n": "ImperialRace",
    "p": true
   },
   "88844:Update.esm": {
    "e": "ImperialRaceVampire",
-   "n": "£O\u0000",
+   "n": "ImperialRaceVampire",
    "p": false
   },
   "13745:Update.esm": {
    "e": "KhajiitRace",
-   "n": "K\u000f\u0000",
+   "n": "KhajiitRace",
    "p": true
   },
   "88845:Update.esm": {
    "e": "KhajiitRaceVampire",
-   "n": "±ï\u0000",
+   "n": "KhajiitRaceVampire",
    "p": false
   },
   "13746:Update.esm": {
    "e": "NordRace",
-   "n": "Ù\u0000",
+   "n": "NordRace",
    "p": true
   },
   "88794:Update.esm": {
    "e": "NordRaceVampire",
-   "n": "4¯\u0000",
+   "n": "NordRaceVampire",
    "p": false
   },
   "13747:Update.esm": {
    "e": "OrcRace",
-   "n": "åò\u0000",
+   "n": "OrcRace",
    "p": true
   },
   "a82b9:Update.esm": {
    "e": "OrcRaceVampire",
-   "n": "·\u0000",
+   "n": "OrcRaceVampire",
    "p": false
   },
   "13748:Update.esm": {
    "e": "RedguardRace",
-   "n": "\u000f\u0000",
+   "n": "RedguardRace",
    "p": true
   },
   "88846:Update.esm": {
    "e": "RedguardRaceVampire",
-   "n": "©\u0000",
+   "n": "RedguardRaceVampire",
    "p": false
   },
   "13749:Update.esm": {
    "e": "WoodElfRace",
-   "n": "D\u0000",
+   "n": "WoodElfRace",
    "p": true
   },
   "88884:Update.esm": {
    "e": "WoodElfRaceVampire",
-   "n": "äÖ\u0000",
+   "n": "WoodElfRaceVampire",
    "p": false
   },
   "122b7:Dawnguard.esm": {
    "e": "DLC1HuskyBareCompanionRace",
-   "n": "D&\u0000",
+   "n": "DLC1HuskyBareCompanionRace",
    "p": false
   },
   "eb872:Dawnguard.esm": {
    "e": "SkeletonNecroRace",
-   "n": "\u000b\u0001",
+   "n": "SkeletonNecroRace",
    "p": false
   },
   "88845:Dawnguard.esm": {
    "e": "KhajiitRaceVampire",
-   "n": "±ï\u0000",
+   "n": "KhajiitRaceVampire",
    "p": false
   },
   "10d00:Dawnguard.esm": {
    "e": "DLC1GargoyleVariantBossRace",
-   "n": "&\u0000",
+   "n": "DLC1GargoyleVariantBossRace",
    "p": false
   },
   "e88a:Dawnguard.esm": {
    "e": "DLC1NordRace",
-   "n": "=%\u0000",
+   "n": "DLC1NordRace",
    "p": false
   },
   "3d02:Dawnguard.esm": {
    "e": "DLC1DeathHoundCompanionRace",
-   "n": "\u0000$\u0000",
+   "n": "DLC1DeathHoundCompanionRace",
    "p": false
   },
   "3d01:Dawnguard.esm": {
    "e": "DLC1HuskyArmoredCompanionRace",
-   "n": "z!\u0000",
+   "n": "DLC1HuskyArmoredCompanionRace",
    "p": false
   },
   "2ae0:Dawnguard.esm": {
    "e": "DLC1SoulCairnSoulWispRace",
-   "n": "=!\u0000",
+   "n": "DLC1SoulCairnSoulWispRace",
    "p": false
   },
   "1aacc:Dawnguard.esm": {
    "e": "FalmerFrozenVampRace",
-   "n": "\u001e\u0000",
+   "n": "FalmerFrozenVampRace",
    "p": false
   },
   "19fd3:Dawnguard.esm": {
    "e": "DLC1BlackSkeletonRace",
-   "n": "& \u0000",
+   "n": "DLC1BlackSkeletonRace",
    "p": false
   },
   "19d86:Dawnguard.esm": {
    "e": "DLC1GargoyleVariantGreenRace",
-   "n": "Ë\u001e\u0000",
+   "n": "DLC1GargoyleVariantGreenRace",
    "p": false
   },
   "cdd84:Dawnguard.esm": {
    "e": "WerewolfBeastRace",
-   "n": "Ð)\u0000",
+   "n": "WerewolfBeastRace",
    "p": false
   },
   "18b36:Dawnguard.esm": {
    "e": "DLC1HuskyBareRace",
-   "n": "º \u0000",
+   "n": "DLC1HuskyBareRace",
    "p": false
   },
   "18b33:Dawnguard.esm": {
    "e": "DLC1HuskyArmoredRace",
-   "n": "R \u0000",
+   "n": "DLC1HuskyArmoredRace",
    "p": false
   },
   "f3903:Dawnguard.esm": {
    "e": "SprigganMatronRace",
-   "n": "\u001a\u0007\u0001",
+   "n": "SprigganMatronRace",
    "p": false
   },
   "9aa44:Dawnguard.esm": {
    "e": "SprigganSwarmRace",
-   "n": "ìp\u0000",
+   "n": "SprigganSwarmRace",
    "p": false
   },
   "13204:Dawnguard.esm": {
    "e": "SprigganRace",
-   "n": "õ;\u0000",
+   "n": "SprigganRace",
    "p": false
   },
   "15c34:Dawnguard.esm": {
    "e": "DLC1LD_ForgemasterRace",
-   "n": "Å\u0015\u0000",
+   "n": "DLC1LD_ForgemasterRace",
    "p": false
   },
   "15136:Dawnguard.esm": {
    "e": "DLC1_BF_ChaurusRace",
-   "n": "w\u0016\u0000",
+   "n": "DLC1_BF_ChaurusRace",
    "p": false
   },
   "13b77:Dawnguard.esm": {
    "e": "SprigganEarthMotherRace",
-   "n": "Ý\u0019\u0000",
+   "n": "SprigganEarthMotherRace",
    "p": false
   },
   "117f5:Dawnguard.esm": {
    "e": "DLC1TrollRaceArmored",
-   "n": "\u0004\u0000",
+   "n": "DLC1TrollRaceArmored",
    "p": false
   },
   "117f4:Dawnguard.esm": {
    "e": "DLC1TrollFrostRaceArmored",
-   "n": "Ê\u000e\u0000",
+   "n": "DLC1TrollFrostRaceArmored",
    "p": false
   },
   "117de:Dawnguard.esm": {
    "e": "DLC1UndeadDragonRace",
-   "n": "°\u000b\u0000",
+   "n": "DLC1UndeadDragonRace",
    "p": false
   },
   "d0b6:Dawnguard.esm": {
    "e": "DLC1SabreCatGlowRace",
-   "n": "Ö\b\u0000",
+   "n": "DLC1SabreCatGlowRace",
    "p": false
   },
   "d0b2:Dawnguard.esm": {
    "e": "DLC1DeerGlowRace",
-   "n": "Q\u0011\u0000",
+   "n": "DLC1DeerGlowRace",
    "p": false
   },
   "c5f0:Dawnguard.esm": {
    "e": "DLC1DeathHoundRace",
-   "n": ",\t\u0000",
+   "n": "DLC1DeathHoundRace",
    "p": false
   },
   "a94b:Dawnguard.esm": {
    "e": "DLC01SoulCairnBonemanRace",
-   "n": "ú\u0007\u0000",
+   "n": "DLC01SoulCairnBonemanRace",
    "p": false
   },
   "a2c6:Dawnguard.esm": {
    "e": "DLC1GargoyleRace",
-   "n": "Ù\u0003\u0000",
+   "n": "DLC1GargoyleRace",
    "p": false
   },
   "894d:Dawnguard.esm": {
    "e": "DLC1SoulCairnSkeletonArmorRace",
-   "n": "O\n\u0000",
+   "n": "DLC1SoulCairnSkeletonArmorRace",
    "p": false
   },
   "7af3:Dawnguard.esm": {
    "e": "DLC1SoulCairnKeeperRace",
-   "n": "¦\n\u0000",
+   "n": "DLC1SoulCairnKeeperRace",
    "p": false
   },
   "a82b9:Dawnguard.esm": {
    "e": "OrcRaceVampire",
-   "n": "·\u0000",
+   "n": "OrcRaceVampire",
    "p": false
   },
   "88884:Dawnguard.esm": {
    "e": "WoodElfRaceVampire",
-   "n": "äÖ\u0000",
+   "n": "WoodElfRaceVampire",
    "p": false
   },
   "88846:Dawnguard.esm": {
    "e": "RedguardRaceVampire",
-   "n": "©\u0000",
+   "n": "RedguardRaceVampire",
    "p": false
   },
   "88844:Dawnguard.esm": {
    "e": "ImperialRaceVampire",
-   "n": "£O\u0000",
+   "n": "ImperialRaceVampire",
    "p": false
   },
   "88840:Dawnguard.esm": {
    "e": "HighElfRaceVampire",
-   "n": "\u001a\u0000",
+   "n": "HighElfRaceVampire",
    "p": false
   },
   "8883d:Dawnguard.esm": {
    "e": "DarkElfRaceVampire",
-   "n": "¥&\u0000",
+   "n": "DarkElfRaceVampire",
    "p": false
   },
   "8883c:Dawnguard.esm": {
    "e": "BretonRaceVampire",
-   "n": "­Ä\u0000",
+   "n": "BretonRaceVampire",
    "p": false
   },
   "88794:Dawnguard.esm": {
    "e": "NordRaceVampire",
-   "n": "4¯\u0000",
+   "n": "NordRaceVampire",
    "p": false
   },
   "6afa:Dawnguard.esm": {
    "e": "DLC1SoulCairnSkeletonNecroRace",
-   "n": "I\t\u0000",
+   "n": "DLC1SoulCairnSkeletonNecroRace",
    "p": false
   },
   "51fb:Dawnguard.esm": {
    "e": "DLC1ChaurusHunterRace",
-   "n": "]\n\u0000",
+   "n": "DLC1ChaurusHunterRace",
    "p": false
   },
   "4d31:Dawnguard.esm": {
    "e": "TestRace",
-   "n": "Ø\r\u0000",
+   "n": "TestRace",
    "p": false
   },
   "483b:Dawnguard.esm": {
    "e": "testDraugrRace",
-   "n": "Z\u0010\u0000",
+   "n": "testDraugrRace",
    "p": false
   },
   "377d:Dawnguard.esm": {
    "e": "SnowElfRace",
-   "n": "+\u0001\u0000",
+   "n": "SnowElfRace",
    "p": false
   },
   "131f4:Dawnguard.esm": {
    "e": "FalmerRace",
-   "n": "\u0010\u0000",
+   "n": "FalmerRace",
    "p": false
   },
   "283a:Dawnguard.esm": {
    "e": "DLC1VampireBeastRace",
-   "n": "\u0010\u0000\u0000",
+   "n": "DLC1VampireBeastRace",
    "p": false
   },
   "23e2:Dawnguard.esm": {
    "e": "SkeletonArmorRace",
-   "n": "\u000f\u0001\u0000",
+   "n": "SkeletonArmorRace",
    "p": false
   },
   "3cecb:Dragonborn.esm": {
    "e": "DLC2RigidSkeletonRace",
-   "n": "u.\u0000",
+   "n": "DLC2RigidSkeletonRace",
    "p": false
   },
   "3ca97:Dragonborn.esm": {
    "e": "DLC2MiraakRace",
-   "n": "p.\u0000",
+   "n": "DLC2MiraakRace",
    "p": false
   },
   "3c35f:Dragonborn.esm": {
@@ -882,57 +882,57 @@
   },
   "3911a:Dragonborn.esm": {
    "e": "DLC2AcolyteDragonPriestRace",
-   "n": "ñ*\u0000",
+   "n": "DLC2AcolyteDragonPriestRace",
    "p": false
   },
   "35538:Dragonborn.esm": {
    "e": "DLC2DremoraRace",
-   "n": "Ý&\u0000",
+   "n": "DLC2DremoraRace",
    "p": false
   },
   "2c88c:Dragonborn.esm": {
    "e": "DLC2DragonBlackRace",
-   "n": "!\u0000",
+   "n": "DLC2DragonBlackRace",
    "p": false
   },
   "2c88b:Dragonborn.esm": {
    "e": "DragonBlackRace",
-   "n": "v!\u0000",
+   "n": "DragonBlackRace",
    "p": false
   },
   "2b014:Dragonborn.esm": {
    "e": "DLC2DwarvenBallistaRace",
-   "n": "x\u001e\u0000",
+   "n": "DLC2DwarvenBallistaRace",
    "p": false
   },
   "2a6fd:Dragonborn.esm": {
    "e": "DLC2HulkingDraugrRace",
-   "n": "Ì\u001e\u0000",
+   "n": "DLC2HulkingDraugrRace",
    "p": false
   },
   "29efc:Dragonborn.esm": {
    "e": "DLC2dunInstrumentsRace",
-   "n": "§\u001c\u0000",
+   "n": "DLC2dunInstrumentsRace",
    "p": false
   },
   "29ee7:Dragonborn.esm": {
    "e": "DLC2dunKarstaagIceWraithRace",
-   "n": "À\u001b\u0000",
+   "n": "DLC2dunKarstaagIceWraithRace",
    "p": false
   },
   "28580:Dragonborn.esm": {
    "e": "DLC2NetchCalfRace",
-   "n": "\u001a\u001e\u0000",
+   "n": "DLC2NetchCalfRace",
    "p": false
   },
   "27bfc:Dragonborn.esm": {
    "e": "dlc2AshGuardianRace",
-   "n": "ê\u0017\u0000",
+   "n": "dlc2AshGuardianRace",
    "p": false
   },
   "27483:Dragonborn.esm": {
    "e": "DLC2ExpSpiderPackmuleRace",
-   "n": "Ë\u001c\u0000",
+   "n": "DLC2ExpSpiderPackmuleRace",
    "p": false
   },
   "24038:Dragonborn.esm": {
@@ -942,62 +942,62 @@
   },
   "1feb8:Dragonborn.esm": {
    "e": "DLC2NetchRace",
-   "n": "¤\r\u0000",
+   "n": "DLC2NetchRace",
    "p": false
   },
   "1f98f:Dragonborn.esm": {
    "e": "dlc2SpectralDragonRace",
-   "n": "\u000b\u0000",
+   "n": "dlc2SpectralDragonRace",
    "p": false
   },
   "1e17b:Dragonborn.esm": {
    "e": "DLC2WerebearBeastRace",
-   "n": "\t\t\u0000",
+   "n": "DLC2WerebearBeastRace",
    "p": false
   },
   "1dcb9:Dragonborn.esm": {
    "e": "DLC2SeekerRace",
-   "n": "ñ\u0006\u0000",
+   "n": "DLC2SeekerRace",
    "p": false
   },
   "1cad8:Dragonborn.esm": {
    "e": "DLC2GhostFrostGiantRace",
-   "n": "\b\u0000",
+   "n": "DLC2GhostFrostGiantRace",
    "p": false
   },
   "1052a3:Dragonborn.esm": {
    "e": "UndeadDragonRace",
-   "n": "B\u0014\u0001",
+   "n": "UndeadDragonRace",
    "p": false
   },
   "e7713:Dragonborn.esm": {
    "e": "AlduinRace",
-   "n": "Æý\u0000",
+   "n": "AlduinRace",
    "p": false
   },
   "1b658:Dragonborn.esm": {
    "e": "DLC2AshHopperRace",
-   "n": "\u0006\u0000",
+   "n": "DLC2AshHopperRace",
    "p": false
   },
   "1b647:Dragonborn.esm": {
    "e": "DLC2MudcrabSolstheimRace",
-   "n": "\u000b\u0006\u0000",
+   "n": "DLC2MudcrabSolstheimRace",
    "p": false
   },
   "1b644:Dragonborn.esm": {
    "e": "DLC2SprigganBurntRace",
-   "n": "o\u0006\u0000",
+   "n": "DLC2SprigganBurntRace",
    "p": false
   },
   "1b637:Dragonborn.esm": {
    "e": "DLC2AshSpawnRace",
-   "n": "ê\u0005\u0000",
+   "n": "DLC2AshSpawnRace",
    "p": false
   },
   "12e82:Dragonborn.esm": {
    "e": "DragonRace",
-   "n": "~=\u0000",
+   "n": "DragonRace",
    "p": false
   },
   "1a50a:Dragonborn.esm": {
@@ -1017,12 +1017,12 @@
   },
   "14495:Dragonborn.esm": {
    "e": "DLC2LurkerRace",
-   "n": "\u0017\u0000\u0000",
+   "n": "DLC2LurkerRace",
    "p": false
   },
   "14449:Dragonborn.esm": {
    "e": "DLC2ExpSpiderBaseRace",
-   "n": "p\u0000\u0000",
+   "n": "DLC2ExpSpiderBaseRace",
    "p": false
   },
   "145445:Odin - Skyrim Magic Overhaul.esp": {

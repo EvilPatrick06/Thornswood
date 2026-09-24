@@ -79,7 +79,24 @@ function loadOrder() {
 const PLAYABLE_AT = 32;
 const PLAYABLE_BIT = 1;
 
-function subrecords(rec) {
+/*
+  A LOCALISED PLUGIN DOES NOT HOLD ITS NAMES.
+
+  Skyrim.esm and the four other masters are localised: their FULL subrecord is
+  a four byte number pointing into a strings file, not the name. Reading it as
+  text put mojibake in races.json for every vanilla race, 'NordRace' coming
+  out beside a name of one stray character. Nothing broke, because the editor
+  id is what everything compares against and the name is only ever there so a
+  person can answer 'why did this count as a riekling', but that is the one
+  job the field has and it was not doing it.
+
+  The bit is 0x80 in the TES4 header flags. When it is set the name is left
+  empty rather than filled with the number, because an empty name reads as
+  missing and a number reads as a name.
+*/
+const LOCALISED = 0x80;
+
+function subrecords(rec, localised) {
   const got = { EDID: '', FULL: '', playable: false };
   let k = 0, over = 0;
   while (k + 6 <= rec.length) {
@@ -88,8 +105,11 @@ function subrecords(rec) {
     k += 6;
     if (over > 0) { sz = over; over = 0; }
     if (sub === 'XXXX') { over = rec.readUInt32LE(k); k += sz; continue; }
-    if ((sub === 'EDID' || sub === 'FULL') && sz > 1 && k + sz <= rec.length) {
-      got[sub] = rec.toString('latin1', k, k + sz - 1);
+    if (sub === 'EDID' && sz > 1 && k + sz <= rec.length) {
+      got.EDID = rec.toString('latin1', k, k + sz - 1);
+    }
+    if (sub === 'FULL' && sz > 1 && k + sz <= rec.length && !localised) {
+      got.FULL = rec.toString('latin1', k, k + sz - 1);
     }
     if (sub === 'DATA' && k + sz <= rec.length && sz >= PLAYABLE_AT + 4) {
       got.playable = !!(rec.readUInt32LE(k + PLAYABLE_AT) & PLAYABLE_BIT);
@@ -100,7 +120,7 @@ function subrecords(rec) {
 }
 
 const rows = {};
-const here = { file: '' };
+const here = { file: '', localised: false };
 let scanned = 0;
 
 function walk(b, start, end) {
@@ -124,7 +144,7 @@ function walk(b, start, end) {
         if (flags & 0x00040000) { rec = zlib.inflateSync(rec.slice(4)); }
       } catch (e) { rec = null; }
       if (rec) {
-        const s = subrecords(rec);
+        const s = subrecords(rec, here.localised);
         const desc = (formId & 0x00ffffff).toString(16) + ':' + here.file;
         rows[desc] = { e: s.EDID, n: s.FULL || s.EDID, p: s.playable };
       }
@@ -141,6 +161,13 @@ for (const file of order) {
   here.file = file;
   let buf = null;
   try { buf = fs.readFileSync(full); } catch (e) { continue; }
+  // See LOCALISED. Read off the plugin's own header, not off a list of names.
+  here.localised = false;
+  try {
+    if (buf.length > 12 && buf.toString('ascii', 0, 4) === 'TES4') {
+      here.localised = !!(buf.readUInt32LE(8) & LOCALISED);
+    }
+  } catch (e) { here.localised = false; }
   try { walk(buf, 0, buf.length); } catch (e) {
     console.error('FAIL  ' + file + ' would not parse: ' + e.message);
     process.exitCode = 1;
