@@ -431,7 +431,7 @@ function Unbump([string]$why) {
 # ------------------------------------------------------------ build
 if (-not $ModsOnly) {
     Head 'Building the launcher'
-    # Resolved twice on purpose. The build writes Thornswood.exe and removes a
+    # Resolved twice on purpose. The install writes Thornswood.exe and removes a
     # SkyrimTogether.exe left over from before the rename, so the path that
     # existed going in is not necessarily the path that exists coming out.
     # Holding on to the first answer makes a build that worked look like a
@@ -446,7 +446,13 @@ if (-not $ModsOnly) {
         }
     }
 
-    & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -NoPause
+    # The build and the install are two scripts since 24 September (To Do List
+    # entry 243). The build compiles into a folder of its own, so csc never
+    # meets the launcher still running from the install, and Install-Launcher
+    # then closes the game and the launcher, puts the exe in place and does
+    # the shortcut and the icon, which is everything the build used to do.
+    $buildOut = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
+    & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause
     $buildCode = $LASTEXITCODE
 
     <#
@@ -468,6 +474,14 @@ if (-not $ModsOnly) {
     if ($buildCode -ne 0) {
         Unbump 'the launcher build failed'
         Die ('The launcher build stopped with exit code ' + $buildCode +
+             '. Nothing was published. The errors are above.')
+    }
+
+    & (Join-Path $Here 'Install-Launcher.ps1') -Root $Root -From $buildOut -NoPause
+    $installCode = $LASTEXITCODE
+    if ($installCode -ne 0) {
+        Unbump 'the launcher could not be put in place'
+        Die ('Putting the new launcher into ' + $launchDir + ' stopped with exit code ' + $installCode +
              '. Nothing was published. The errors are above.')
     }
 

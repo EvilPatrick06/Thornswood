@@ -767,6 +767,17 @@ catch {
     Say '  Packaging carries on. The installer will skip that check.' 'DarkGray'
 }
 
+# ---- nothing that must never ship ------------------------------------------
+# Entry 236. This installer once carried the SkyMP client's saved sign in (see
+# Ship-Rules.ps1). The stage is exactly what gets zipped, so it is read here,
+# before -NoArchive hands the folder over and before the long compression: a
+# credential by name or by shape, or a file Ship-Rules says never ships, stops
+# the package. File, line and rule only, never the value. The stage of 23
+# September, 813 files with the launcher and config.json, passes.
+Head 'Checking for secrets'
+& (Join-Path $here 'Check-Secrets.ps1') -Dir $stage
+if ($LASTEXITCODE -ne 0) { Die 'Something that must never ship is in the staged installer. The lines above name each file and rule.' }
+
 # ---- archive ---------------------------------------------------------------
 if ($NoArchive) {
     Head 'Done'
