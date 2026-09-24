@@ -394,7 +394,7 @@ namespace Thornswood
                             txtOwnGameState.Text = text;
                         });
                     }
-                    catch { }
+                    catch { /* the window has closed, so there is nothing to draw into */ }
                 });
             }
             txtOwnGameState.Text = state + chosen;
@@ -436,7 +436,7 @@ namespace Thornswood
                     string start = OwnGame.DeploysInto(cfg);
                     if (start.Length > 0 && Directory.Exists(start)) dlg.SelectedPath = start;
                 }
-                catch { }
+                catch { /* only where the picker opens; it opens at its own default instead */ }
                 if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
                 chosen = dlg.SelectedPath;
             }

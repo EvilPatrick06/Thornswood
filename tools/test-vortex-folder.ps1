@@ -87,6 +87,12 @@ foreach ($r in $refs) {
 
 $real = @('Steam.cs', 'OwnGame.cs', 'Verify.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs') |
     ForEach-Object { Join-Path $AppPath $_ }
+# Config.Save reports a failed write through Swallow.Note since pull request
+# 311, and Swallow needs nothing but Paths. Taken only where it exists, so the
+# same harness still runs on a tree from before it, such as a hotfix branch
+# cut from a live release.
+$swallow = Join-Path $AppPath 'Swallow.cs'
+if (Test-Path -LiteralPath $swallow) { $real += $swallow }
 foreach ($f in $real) {
     Yes "tools\app\$([IO.Path]::GetFileName($f)) is there" (Test-Path -LiteralPath $f)
     if (-not (Test-Path -LiteralPath $f)) { Done }

@@ -150,14 +150,15 @@ namespace Thornswood
                 return s;
             }
             string steam = "";
-            try { steam = Steam.SkyrimPath(); } catch { }
+            try { steam = Steam.SkyrimPath(); } catch { /* no Steam copy: "" is the answer, and WhyNot says so */ }
             if (steam.Length > 0 && HasRecord(steam))
             {
                 Chosen(steam, "Vortex's record is in the Steam copy");
                 return steam;
             }
             string why = null, found = "";
-            try { found = Find(out why); } catch { }
+            try { found = Find(out why); }
+            catch (Exception ex) { Swallow.Note("OwnGame.DeploysInto, looking through Steam's libraries for Vortex's folder", ex); }
             if (found.Length > 0)
             {
                 Chosen(found, why);
@@ -210,7 +211,7 @@ namespace Thornswood
                     count++;
                     bool steam = Steam.IsSkyrimCopy(full);
                     long at = 0;
-                    try { at = File.GetLastWriteTimeUtc(Path.Combine(full, "Data\\vortex.deployment.json")).Ticks; } catch { }
+                    try { at = File.GetLastWriteTimeUtc(Path.Combine(full, "Data\\vortex.deployment.json")).Ticks; } catch { /* unreadable: counts as the oldest record */ }
                     if (best.Length == 0 || (steam && !bestSteam) || (steam == bestSteam && at > bestAt))
                     {
                         best = full;
@@ -242,7 +243,7 @@ namespace Thornswood
                 lastChosen = line;
             }
             try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + line + Environment.NewLine); }
-            catch { }
+            catch { /* the log is only a note of the choice; the choice stands without it */ }
         }
 
         static bool HasRecord(string dir)
@@ -339,7 +340,7 @@ namespace Thornswood
             // put Thornswood on a Skyrim the server does not run, so the Steam
             // copy is put right first and the folder follows it (Downgrade).
             long exeBytes = -1;
-            try { exeBytes = new FileInfo(Path.Combine(game, "SkyrimSE.exe")).Length; } catch { }
+            try { exeBytes = new FileInfo(Path.Combine(game, "SkyrimSE.exe")).Length; } catch { /* unreadable: -1, and the build check is skipped as it always was */ }
             if (exeBytes >= 0 && exeBytes != cfg.ExpectedExeBytes)
                 return "Skyrim in " + game + " is " + Downgrade.Describe(cfg, Path.Combine(game, "SkyrimSE.exe")) +
                        ", most likely because Steam updated it. Press Downgrade on the Play page first; the folder is brought up to date from it after that.";
@@ -1245,7 +1246,7 @@ namespace Thornswood
                         using (var fs = File.OpenRead(f))
                             doc = (VortexRecord)new DataContractJsonSerializer(typeof(VortexRecord)).ReadObject(fs);
                     }
-                    catch { }
+                    catch { /* doc stays null, and the record is refused just below with a line saying so */ }
                     if (doc == null || doc.files == null || string.IsNullOrEmpty(doc.stagingPath))
                     {
                         r.Refused.Add(f.Substring(src.TrimEnd('\\').Length).TrimStart('\\') + "  (Vortex's record could not be read, so nothing it lists was brought in)");

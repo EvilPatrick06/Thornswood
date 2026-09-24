@@ -102,11 +102,12 @@ namespace Thornswood
             if (Paths.Collection && !OwnGame.Active)
             {
                 string into = "";
-                try { into = OwnGame.DeploysElsewhere(cfg); } catch { }
+                try { into = OwnGame.DeploysElsewhere(cfg); }
+                catch (Exception ex) { Swallow.Note("Verify.Run, asking which folder Vortex deploys into", ex); }
                 if (into.Length > 0)
                 {
                     string game = "";
-                    try { game = OwnGame.Source(cfg); } catch { }
+                    try { game = OwnGame.Source(cfg); } catch { /* "" reads as apart, which only changes the sentence */ }
                     bool apart = !string.Equals(game, into, StringComparison.OrdinalIgnoreCase);
                     // "Vortex deploys into", not "Thornswood's mods": the record
                     // here says Vortex deployed something, not that it is the
@@ -693,7 +694,8 @@ namespace Thornswood
             if (cfg != null && Paths.Collection && !OwnGame.Active)
             {
                 string into = "";
-                try { into = OwnGame.DeploysElsewhere(cfg); } catch { }
+                try { into = OwnGame.DeploysElsewhere(cfg); }
+                catch (Exception ex) { Swallow.Note("Verify.Fix, asking which folder Vortex deploys into", ex); }
                 if (into.Length > 0)
                 {
                     bool ok;
