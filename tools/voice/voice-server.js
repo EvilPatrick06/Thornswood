@@ -318,8 +318,21 @@ setInterval(() => {
   the correct answer and is what unreliable transport means." So a socket that
   has said false is marked backed until it drains, and the position tick skips
   it (sendLossy): the next tick carries newer positions anyway. Everything else
-  stays on send, because the roster, welcome, chat, signalling and voice modes
-  each say something that is not said again.
+  stays on send, because welcome, chat, signalling and voice modes each say
+  something that is not said again.
+
+  The roster sits between the two (sendLatest). Every join and every leave
+  sends the whole room to everybody, so when a room fills at once, as it does
+  when the service restarts and every page reconnects, each socket is sent a
+  roster per arrival: about 1.3 MB for the first in at two hundred people.
+  Queued in full, that tripped the ceiling below for anybody slow to read,
+  and those closed sockets would reconnect into another burst. On
+  24 September test-cull.js, whose two hundred sockets join together, had 42
+  of them closed that way in one run on a busy machine.
+
+  Only the newest roster means anything, so a backed socket keeps just that
+  one and is sent it when it drains, or ahead of the next message it is sent,
+  so nothing arrives out of order.
 
   What is left to grow is that reliable traffic, for a socket that never
   reads. Past QUEUE_CEILING it is closed and left to reconnect, which all
@@ -334,6 +347,7 @@ setInterval(() => {
 */
 const QUEUE_CEILING = 1024 * 1024;
 let droppedPositions = 0;   // ticks not sent to a backed socket, for /health
+let skippedRosters = 0;     // rosters replaced by a newer one unsent, for /health
 let closedBacklogged = 0;   // sockets closed at the ceiling, for /health
 
 class Sock {
@@ -345,9 +359,11 @@ class Sock {
     this.closed = false;
     // True from a write that returned false until the socket drains.
     this.backed = false;
+    // The newest roster not yet written, while backed. See sendLatest.
+    this.latest = null;
     live.add(this);
 
-    socket.on('drain', () => { this.backed = false; });
+    socket.on('drain', () => { this.backed = false; this.flushLatest(); });
     socket.on('data', (d) => this.feed(d));
     socket.on('error', () => this.close());
     socket.on('close', () => {
@@ -378,6 +394,11 @@ class Sock {
 
   send(obj) {
     if (this.closed) return;
+    // A roster held back while this socket was backed goes out first, so
+    // every message still arrives after the roster that was current when it
+    // was sent, as it did before rosters were held back.
+    this.flushLatest();
+    if (this.closed) return;
     try { this.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
   }
 
@@ -385,6 +406,31 @@ class Sock {
   sendLossy(obj) {
     if (this.backed) { droppedPositions++; return; }
     this.send(obj);
+  }
+
+  /*
+    For the roster only. Each one is the whole room, so while this socket is
+    backed only the newest is worth keeping: it waits here, replacing any
+    older one, and goes out when the socket drains or ahead of the next
+    message sent to it, whichever comes first. Unlike a position it is never
+    dropped, because the next roster only comes when somebody joins or
+    leaves. See the note over QUEUE_CEILING.
+  */
+  sendLatest(obj) {
+    if (this.closed) return;
+    if (this.backed) {
+      if (this.latest) skippedRosters++;
+      this.latest = obj;
+      return;
+    }
+    this.send(obj);
+  }
+
+  flushLatest() {
+    if (!this.latest || this.closed) return;
+    const obj = this.latest;
+    this.latest = null;
+    try { this.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
   }
 
   close() {
@@ -489,7 +535,7 @@ function roster() {
 
 function announce() {
   const list = roster();
-  for (const [, p] of peers) p.ws.send({ t: 'peers', peers: list });
+  for (const [, p] of peers) p.ws.sendLatest({ t: 'peers', peers: list });
 }
 
 function onJoin(ws, msg) {
@@ -1089,6 +1135,7 @@ const server = http.createServer((req, res) => {
                             queuedCommands: commands.length,
                             backed: backed, largestQueueBytes: largestQueue,
                             droppedPositions: droppedPositions,
+                            skippedRosters: skippedRosters,
                             closedBacklogged: closedBacklogged }));
     return;
   }

@@ -22,6 +22,14 @@
 // fail. With the fix the queue sits at 0.14 MB, one position message, and
 // does not move.
 //
+// The roster checks came in when this met the culling work (entry 282). Its
+// test-cull.js joins two hundred sockets at once, every join sends the whole
+// roster to everybody, and the 1 MB ceiling closed up to 42 of them in one
+// run. Against main's code on 24 September (cull-1-command-ack-1) this
+// harness failed 15 of its 24 checks. With only the roster put back on the
+// reliable send, 4 fail: sixty joins and leaves put 0.35 MB more behind the
+// stuck socket, and 120 rosters reached it when it read again.
+//
 // This spawns the real service in a temp folder on a spare port, loopback
 // only, with a small probe preloaded into it. The probe wraps socket.write
 // from the inside and prints the largest queue and the memory in use four
@@ -37,6 +45,9 @@ const path = require('path');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
+// VOICE_SERVER points it at another copy, which is how it is shown to fail on
+// the code before a change.
+const SERVER = process.env.VOICE_SERVER || path.join(__dirname, 'voice-server.js');
 const PORT = 7907;
 const BASE = 'http://127.0.0.1:' + PORT;
 const ROWS = 1500;
@@ -53,7 +64,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MB = (n) => (n / 1048576).toFixed(2) + ' MB';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-backpressure-'));
-fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
+fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
 try { fs.mkdirSync(path.join(dir, 'public')); } catch (e) { }
 
 /*
@@ -246,16 +257,22 @@ async function until(what, cond, ms) {
 }
 
 /*
-  Dropping is right for positions and wrong for everything else. The roster,
-  welcome, chat, signalling and voice modes each say something that is not
-  said again, so the dropping send belongs on the 200 ms tick and nowhere
-  else. Read off the source, because the culling work (entry 282) rewrites
+  Dropping is right for positions and wrong for everything else. Welcome,
+  chat, signalling and voice modes each say something that is not said
+  again, and the roster is only sent again when somebody joins or leaves, so
+  the dropping send belongs on the 200 ms tick and nowhere else. Read off the source, because the culling work (entry 282) rewrites
   that same line and a merge could carry it somewhere it does not belong.
 */
-const SRC = fs.readFileSync(path.join(__dirname, 'voice-server.js'), 'utf8');
+const SRC = fs.readFileSync(SERVER, 'utf8');
 const TICK = /setInterval\(\(\) => \{\s*if \(peers\.size === 0\) return;[\s\S]*?\}, 200\);/.exec(SRC);
 yes('only the 200 ms position tick uses the dropping send',
     SRC.split('.sendLossy(').length - 1 === 1 && !!TICK && TICK[0].indexOf('.sendLossy(') !== -1);
+/* And only the roster keeps just its newest while backed: each one is the
+   whole room, which is not true of anything else sent. */
+const ANNOUNCE = /function announce\(\) \{[\s\S]*?\n\}/.exec(SRC);
+yes('only the roster is sent newest-only',
+    SRC.split('.sendLatest(').length - 1 === 1 && !!ANNOUNCE &&
+    /\.sendLatest\(\{ t: 'peers'/.test(ANNOUNCE[0]));
 
 (async () => {
   const h0 = await ready();
@@ -334,17 +351,64 @@ yes('only the 200 ms position tick uses the dropping send',
       gotDuring >= 20);
 
   /*
+    A room filling and emptying at once, which is what a restart looks like
+    when every page reconnects. Each join and each leave sends the whole
+    roster to everybody, so the stuck socket used to be queued one roster per
+    arrival and per departure: here about 0.35 MB for sixty people. It now
+    keeps only the newest, so its queue should hardly move. One of them stays,
+    so the roster it is holding differs from the last one it read, and only
+    arrives if what it held is really sent.
+  */
+  const BURST = 60;
+  const markR = probes.length;
+  const baseQueue = probes.length ? probes[probes.length - 1].queue : 0;
+  const crowd = await Promise.all(Array.from({ length: BURST }, () => open()));
+  crowd.forEach((c, i) => {
+    read(c, () => { });
+    send(c, { t: 'join', profileId: 200000 + i, name: ('Somebody passing through ' + i + ' ').padEnd(40, 'x') });
+  });
+  const full = await until('full', () => roster.length === BURST + 2, 5000);
+  const stays = crowd[0];
+  const staysName = ('Somebody passing through 0 ').padEnd(40, 'x');
+  for (const c of crowd) { if (c !== stays) { try { c.destroy(); } catch (e) { } } }
+  const empty = await until('emptied', () => roster.length === 3, 5000);
+  await sleep(600);
+  const peakR = Math.max.apply(null, probes.slice(markR).map((p) => p.queue));
+  const hR = await health();
+  console.log('      ' + BURST + ' joined and ' + (BURST - 1) + ' left: queue ' + MB(baseQueue) +
+              ' before, peak ' + MB(peakR) +
+              ', ' + hR.skippedRosters + ' rosters replaced unsent');
+  yes('the room filled and all but one left', full && empty);
+  yes('the stuck socket is not queued a roster for every join and leave',
+      peakR - baseQueue < 64 * 1024);
+  yes('health counts the rosters it replaced', hR.skippedRosters > 0);
+
+  /*
     Then it starts reading again, which is a slow link catching up. The drain
     listener is what clears the flag, so without it this socket would never be
-    sent a position again.
+    sent a position again, nor the roster it was holding.
   */
   const resumedAt = Date.now();
-  let fresh = 0;
-  read(S, (m) => { if (m.t === 'pos' && m.at >= resumedAt) fresh++; });
+  let fresh = 0, rosters = 0, lastRoster = null;
+  read(S, (m) => {
+    if (m.t === 'pos' && m.at >= resumedAt) fresh++;
+    if (m.t === 'peers') { rosters++; lastRoster = m.peers; }
+  });
   const caught = await until('fresh', () => fresh > 0, 5000);
   yes('once it reads again it is sent current positions again', caught);
   yes('and health no longer counts it as backed up',
       await until('none backed', async () => (await health()).backed === 0, 3000));
+  const current = await until('current roster', () => !!lastRoster && lastRoster.length === 3 &&
+      lastRoster.some((p) => p.name === 'keeps up') && lastRoster.some((p) => p.name === 'never reads') &&
+      lastRoster.some((p) => p.name === staysName), 3000);
+  console.log('      ' + rosters + ' rosters reached it after it read again, the last with ' +
+              (lastRoster ? lastRoster.length : 0) + ' people');
+  yes('and it is sent the roster as it is now, not lost', current);
+  yes('once, rather than every one it missed', rosters <= 5);
+
+  // The one who stayed leaves, so the room is the two of them again.
+  try { stays.destroy(); } catch (e) { }
+  yes('the last of them leaves', await until('two', () => roster.length === 2, 3000));
 
   /*
     The ceiling. Positions are dropped, but everything else is reliable: the
