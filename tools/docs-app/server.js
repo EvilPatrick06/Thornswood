@@ -441,8 +441,14 @@ function listFiles() {
     // server's address. Anything with a script extension is hidden whatever
     // files.json says about it.
     const script = /[.](ps1|psm1|cmd|bat|py|sh)$/i.test(name);
+    // The installer's SHA-256, which Publish-Installer writes, so the Downloads
+    // page can print it beside the size and date and link VirusTotal's report
+    // on it (To Do entry 176). Only a well formed hash goes out, in lower case
+    // because Get-FileHash writes upper and the page builds an address from it.
+    const sha256 = String(m.sha256 || '').toLowerCase();
     out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,
-      label: m.label || name, version: m.version || '', note: m.note || '' });
+      label: m.label || name, version: m.version || '', note: m.note || '',
+      sha256: /^[0-9a-f]{64}$/.test(sha256) ? sha256 : '' });
   }
   out.sort((a, b) => b.at - a.at);
   return out;
