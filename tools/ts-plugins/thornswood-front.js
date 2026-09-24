@@ -2221,21 +2221,41 @@
   let placeBeat = 0;      // when the heartbeat last wrote
 
   /*
-    THE FORMS, RESOLVED ONCE.
+    THE IDS, RESOLVED ONCE. NOT THE FORMS.
 
-    A fire from a mod cannot be reached by its runtime id, because that id is
-    the plugin's place in the order and moves whenever anybody adds a mod.
-    Game.getFormFromFile is the engine's own answer: the file and the id inside
-    it, which do not move. Skyrim.esm is index 00 always, so those go the
-    direct way and it is the same call underneath.
+    A fire from a mod cannot be reached by the id written in the plugin,
+    because a runtime id carries the plugin's place in the load order and
+    that moves whenever anybody adds a mod. Game.getFormFromFile is the
+    engine's own answer: the file and the id inside it, which do not move.
+    Skyrim.esm is index 00 always, so those go the direct way and it is the
+    same call underneath.
 
-    Done once and kept, because the answer cannot change inside a session and
-    doing it per tick is sixty three lookups a second for nothing.
+    A FORM DOES NOT SURVIVE THE FRAME IT WAS MADE IN, and the first version of
+    this kept the 62 Form objects for the session because "the answer cannot
+    change inside a session". The answer does not; the wrapper does.
+    SkyrimPlatform hands out native objects from a pool that it rolls over,
+    and one kept past its frame throws on the next use:
+
+      SP3NativeValueCasts::JsObjectToNativeObject - Invalid
+      _skyrimPlatform_indexInPool: 109, expected to be in [5201, 5212) range
+
+    Every one of the 62 threw that, on every probe, for the whole of
+    23 September. The heartbeat line read "62 bases, 0 in reach, 62 threw"
+    and that is the only reason it was found rather than guessed at again:
+    fireDistance swallows errors per base, so 62 that throw and 62 that find
+    nothing both come out as no fire. WHAT IT COST: no warmth from any fire,
+    so the temperature never moved whether you were across the room or
+    standing in the coals, and nobody ever caught fire either, because both
+    read the same distance.
+
+    So what is kept is the runtime id, which is a number and keeps perfectly,
+    and the form is asked for again in the frame it is used in. That is one
+    extra call per base per probe, and the probe already makes one.
   */
-  let fireForms = null;
+  let fireIds = null;
 
-  function fireFormList() {
-    if (fireForms) { return fireForms; }
+  function fireIdList() {
+    if (fireIds) { return fireIds; }
     const out = [];
     for (let i = 0; i < FIRE_BASES.length; i++) {
       const file = FIRE_BASES[i][0];
@@ -2245,7 +2265,12 @@
           ? sp.Game.getFormEx(local)
           : sp.Game.getFormFromFile(local, file);
         const base = sp.Form.from(raw);
-        if (base) { out.push(base); }
+        // Read here, in the frame the form was made in, which is the only
+        // place it can be read.
+        if (base) {
+          const id = base.getFormID();
+          if (id) { out.push(id); }
+        }
       } catch (e) {
         if (!fireWhy) { fireWhy = String((e && e.message) || e); }
       }
@@ -2253,20 +2278,22 @@
     // Nothing at all means the world is not up yet, so it is worth asking
     // again rather than remembering an empty answer for the session.
     if (!out.length) { return []; }
-    fireForms = out;
+    fireIds = out;
     log('fires: ' + out.length + ' of ' + FIRE_BASES.length +
         ' bases resolved, across ' + FIRE_FILES.length + ' plugin(s)');
-    return fireForms;
+    return fireIds;
   }
 
   /** How far the nearest lit fire is, or -1 when there is none in reach. */
   function fireDistance(px, py, pz) {
     let best = -1;
-    const forms = fireFormList();
-    fireBases = forms.length; fireHits = 0; fireThrew = 0;
-    for (let i = 0; i < forms.length; i++) {
+    const ids = fireIdList();
+    fireBases = ids.length; fireHits = 0; fireThrew = 0;
+    for (let i = 0; i < ids.length; i++) {
       try {
-        const base = forms[i];
+        // Asked for again here rather than kept: see the block above.
+        const base = sp.Form.from(sp.Game.getFormEx(ids[i]));
+        if (!base) { continue; }
         const ref = sp.Game.findClosestReferenceOfType(base, px, py, pz, FIRE_REACH);
         if (!ref) { continue; }
         fireHits++;

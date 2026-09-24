@@ -17488,6 +17488,28 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         toProfile(profileId, 'Food ' + v.food + ' (' + v.foodBand + '), drink ' + v.drink +
                   ' (' + v.drinkBand + '), rest ' + v.rest + ' (' + v.restBand + ')' +
                   (v.resting ? ', resting at a ' + v.resting + '.' : '.'));
+        /*
+          THE WARMTH, WITH ITS WORKING OUT.
+
+          Said as a second line rather than squeezed onto the first, because
+          this one is read when somebody is trying to find out whether the
+          temperature is broken, and that question needs the target, the
+          place the server believes they are in, whether it can see a fire,
+          and what it thinks they are wearing. Every one of those was
+          invisible on 23 September and every one of them was guessed at.
+        */
+        var where = v.place || 'nowhere the server knows about';
+        var fireBit = (v.fireAway >= 0)
+          ? ('a fire ' + v.fireAway + ' away, worth ' + v.fireWorth)
+          : 'no fire in reach';
+        var moving = (v.tempTarget > v.temp) ? 'warming toward '
+                   : (v.tempTarget < v.temp) ? 'cooling toward ' : 'settled at ';
+        toProfile(profileId,
+          'Warmth ' + v.temp + ' (' + v.tempBand + '), ' + moving + v.tempTarget + '. ' +
+          'You are ' + where + (v.roof ? ' under a roof' : ' with no roof') +
+          (v.night ? ', at night' : '') + ', ' + fireBit + '. ' +
+          'Weather and height are worth ' + v.exposure + '. ' +
+          'What you are wearing covers ' + v.cover + ' per cent of you.');
         return true;
       }
       if (word === '/bard') { toProfile(profileId, needs.bard(actorId)); return true; }
@@ -19426,7 +19448,30 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
       // Temperature says which way as well as how badly, because "cold" and
       // "hot" are different words on a bar and 34 means nothing on its own.
       tempBand: t.name, tempCold: !!t.cold,
-      resting: n.resting || '', place: n.place || ''
+      resting: n.resting || '', place: n.place || '',
+      /*
+        WHY THE NUMBER IS WHAT IT IS, added 23 September.
+
+        Patrick, in the world: "temp in general isn't working not just with
+        fire", after seeing 51 indoors and 53 to 54 outdoors and reading it
+        as backwards. The meter moves toward its target by half the distance
+        every three minutes, so almost every number anybody ever sees is
+        mid-journey, and a number mid-journey with no target beside it is
+        indistinguishable from a broken one. 51 indoors was on its way up to
+        58 and 53 outdoors was on its way down to 44, which is the system
+        working and looks exactly like the system failing.
+
+        So the target travels with the reading, along with the four things
+        that set it. Then the next report is a measurement rather than an
+        impression, and a real fault is told apart from a slow one in one
+        command.
+      */
+      tempTarget: Math.round(warmthTarget(actorId, n)),
+      roof: !!n.roof, night: !!n.night,
+      fireAway: (typeof n.fire === 'number' && n.fire >= 0) ? Math.round(n.fire) : -1,
+      fireWorth: Math.round(fireWarmth(n)),
+      exposure: Math.round(exposure(n)),
+      cover: Math.round(insulation(actorId) * 100)
     };
   }
 
