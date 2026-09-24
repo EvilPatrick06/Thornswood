@@ -123,7 +123,11 @@ const NOT_SECRET = {
   'config.txt': 'SkyUI\'s settings in the game folder',
   'config.shipped.txt': 'the launcher\'s copy of SkyUI\'s settings as they shipped',
   'door.txt': 'the launcher\'s last yes or no from the site and when, no key in it',
-  'discord-name.txt': 'the Discord display name the launcher shows'
+  'discord-name.txt': 'the Discord display name the launcher shows',
+  'check-secrets.allow.txt': 'the secret scan\'s list of known non-secrets, paths and rule names only',
+  'discord-webhook.txt': 'a made-up file test-check-secrets.ps1 writes in its own temp folder to prove the scan catches a webhook',
+  'github-token.txt': 'the same, for a GitHub token',
+  'test-turn-key.js': 'the voice service\'s harness for the relay key, named by test-voice-turn-url.ps1; it holds no key'
 };
 
 const sources = [];
