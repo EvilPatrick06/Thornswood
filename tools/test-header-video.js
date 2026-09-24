@@ -245,6 +245,16 @@ for (const f of shellFiles) {
       yes(where + ' is in Run, before the window is shown', inRun > 0 && shown > 0 && inRun < shown);
       yes('and the video cannot play before the window is shown, because it needs the page visible',
           /bool seen = page\.IsVisible\b/.test(decideSrc));
+    } else if (m[2].trim() === 'Checks.GameRunning()') {
+      // The same check in another way in, such as OpenForUninstall in
+      // ShellUninstall.cs (pull request 270): it has to come before that
+      // method shows the window with its own app.Run, for the same reason.
+      let runAt = -1;
+      for (let k = i + 1; k < lines.length; k++) {
+        if (/^\s*(public |private |internal )?static\s+\w[\w<>\[\]]*\s+\w+\s*\(/.test(lines[k])) break;
+        if (lines[k].indexOf('app.Run(win);') >= 0) { runAt = k; break; }
+      }
+      yes(where + ' comes before its own method shows the window', runAt > i);
     } else {
       yes(where + ' is an assignment this harness does not know: tell the video after it and add it here', false);
     }
