@@ -1735,6 +1735,37 @@ function offerTool(actorId, key) {
  * why nothing happened. That is the same ordering mineOre, harvest() and the
  * farming block already settled on.
  */
+/*
+  WHICH tool of the accepted ones is in this pack, as a form id.
+
+  holdsTool already walks this list to answer yes or no; the client needs the
+  id itself to put the thing in somebody's hands. Six pickaxes are accepted
+  and the one they own is the one that should be drawn, not a stand-in.
+  Nothing carried answers 0, which the client reads as no tool and leaves
+  their hands alone.
+*/
+function toolIdIn(actorId, key) {
+  const tool = toolFor(key);
+  if (!tool) { return 0; }
+  const wanted = [];
+  for (let i = 0; i < tool.accept.length; i++) {
+    const baseId = idOf(tool.accept[i]);
+    if (baseId) { wanted.push(baseId); }
+  }
+  if (!wanted.length) { return 0; }
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
+  const entries = (inv && inv.entries) || [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!e || !(e.count > 0)) { continue; }
+    for (let j = 0; j < wanted.length; j++) {
+      if (e.baseId === wanted[j]) { return e.baseId; }
+    }
+  }
+  return 0;
+}
+
 function toolGate(actorId, key) {
   const tool = toolFor(key);
   if (!tool) { return null; }
@@ -2181,7 +2212,19 @@ function swingScript() {
     '(function(){',
     '  try {',
     '    var v = ctx.value;',
-    '    if (!v || !v.anim || !v.at) { return; }',
+    /*
+      THE STAMP ALONE, because an end message carries no animation.
+
+      Patrick, 23 September, working a seam: "It's stopping the animation and
+      going back in that doesn't flow smoothly". Every strike was its own
+      animation with its own exit, so a spell of mining was enter, swing,
+      exit, enter, swing, exit. IdlePickaxeEnter is a state you stay in, so
+      now it is entered once, held for the whole spell, and left once at the
+      end. The end is a message with a stamp and no anim, which is why this
+      no longer asks for one. A cleared property is still at zero and still
+      falls out here.
+    */
+    '    if (!v || !v.at) { return; }',
     /*
       ctx.state is one object, made once when the client starts and handed to
       every updateOwner script, so the key is namespaced. No state at all means
@@ -2195,7 +2238,50 @@ function swingScript() {
     '    var sp = ctx.sp;',
     '    var pc = sp.Game.getPlayer();',
     '    if (!pc) { return; }',
+    /*
+      THE END OF A SPELL: put the tool away and leave the state.
+    */
+    '    if (v.end) {',
+    '      try { sp.Debug.sendAnimationEvent(pc, v.stop); } catch (e) { }',
+    '      try { if (v.free) { sp.Debug.sendAnimationEvent(pc, v.free); } } catch (e) { }',
+    '      try {',
+    '        if (v.tool) {',
+    '          var put = sp.Form.from(sp.Game.getFormEx(v.tool));',
+    '          if (put) { pc.unequipItem(put, false, true); }',
+    '        }',
+    '      } catch (e) { }',
+    '      return;',
+    '    }',
+    '    if (!v.anim) { return; }',
+    /*
+      AND THE PICK COMES OFF THE HIP FIRST.
+
+      Patrick, 23 September: "Still a pick on my hip when I am swinging", and
+      before that "it's not using the pickaxe on my hip so it looks weird".
+      He is right and it was never going to: in the game everybody knows, the
+      pickaxe is drawn by MineOreScript or by the mining furniture, and this
+      server plays the idle itself at all 581 seams precisely because neither
+      of those runs here. An idle mimes; it does not equip anything.
+
+      So the server names the tool it already had to find in the pack to let
+      the swing happen at all, and the client puts it in their hands before
+      the animation and back on the hip at the end. Silently, and without
+      preventing removal, so nothing here can trap a pickaxe on anybody.
+    */
+    '    if (v.tool) {',
+    '      try {',
+    '        var it = sp.Form.from(sp.Game.getFormEx(v.tool));',
+    '        if (it) { pc.equipItem(it, false, true); }',
+    '      } catch (e) { }',
+    '    }',
     '    sp.Debug.sendAnimationEvent(pc, v.anim);',
+    /*
+      A HELD SWING DOES NOT LET GO BY ITSELF. It is one strike of a spell that
+      is still going, and the exit comes as its own message when the spell
+      ends. Everything that is not a spell keeps the old shape exactly: play,
+      wait, exit.
+    */
+    '    if (v.hold) { return; }',
     // And let them go again. Utility.wait is a promise here, not a block.
     '    sp.Utility.wait((v.ms || 2500) / 1000).then(function () {',
     '      try {',
@@ -2205,6 +2291,10 @@ function swingScript() {
     // The named exit is a transition out of one state. This one is out of any
     // state, and it is the difference between an exit and a way out.
     '        if (v.free) { sp.Debug.sendAnimationEvent(me, v.free); }',
+    '        if (v.tool) {',
+    '          var off = sp.Form.from(sp.Game.getFormEx(v.tool));',
+    '          if (off) { me.unequipItem(off, false, true); }',
+    '        }',
     '      } catch (e) { }',
     '    });',
     '  } catch (e) { }',
@@ -2226,11 +2316,14 @@ function swingScript() {
   loading a fresh game. Cleared, there is nothing to send. The clear is a
   little past the end of the swing so it cannot race the client's own exit.
 */
-function swing(actorId, anim, lands) {
+function swing(actorId, anim, lands, opts) {
+  var o = opts || {};
   try {
     mp.set(actorId, SWING_PROPERTY,
            { anim: anim, stop: SWING_STOP, free: SWING_FREE,
-             ms: SWING_MS, at: Date.now() });
+             ms: SWING_MS, at: Date.now(),
+             // Held for a spell of work, and the tool to put in their hands.
+             hold: !!o.hold, tool: Number(o.tool) || 0 });
   } catch (e) {
     /*
       A person whose property will not take is a person without an animation,
@@ -2248,9 +2341,16 @@ function swing(actorId, anim, lands) {
     }
   }
   SWING_IN_AIR[actorId] = true;
+  // A held swing is cleared by whoever is holding it, through swingEnd. A
+  // timer that cleared it would put the pick away in the middle of the spell
+  // it was asked to hold.
+  if (SWING_CLEAR[actorId]) { clearTimeout(SWING_CLEAR[actorId]); delete SWING_CLEAR[actorId]; }
+  if (o.hold) {
+    if (lands) { setTimeout(guard('swingLands', lands), SWING_LAND_MS); }
+    return;
+  }
   // One timer per person, not one per strike: a miner working a seam sets this
   // again every swing, and the last one is the one that clears.
-  if (SWING_CLEAR[actorId]) { clearTimeout(SWING_CLEAR[actorId]); }
   SWING_CLEAR[actorId] = setTimeout(function () {
     delete SWING_CLEAR[actorId];
     delete SWING_IN_AIR[actorId];
@@ -2265,6 +2365,26 @@ function swing(actorId, anim, lands) {
   }, SWING_MS + 1000);
   if (lands) { setTimeout(guard('swingLands', lands), SWING_LAND_MS); }
 }
+/*
+  End a held swing: leave the state and put the tool away.
+
+  A stamp of its own, because the script edge triggers on the stamp and an
+  end that reused the last one would be read as the swing it is ending.
+*/
+function swingEnd(actorId, tool) {
+  if (SWING_CLEAR[actorId]) { clearTimeout(SWING_CLEAR[actorId]); delete SWING_CLEAR[actorId]; }
+  delete SWING_IN_AIR[actorId];
+  try {
+    mp.set(actorId, SWING_PROPERTY,
+           { anim: '', end: true, stop: SWING_STOP, free: SWING_FREE,
+             tool: Number(tool) || 0, at: Date.now() });
+  } catch (e) { }
+  // And cleared behind it, so nothing replays at the next login.
+  setTimeout(function () {
+    try { mp.set(actorId, SWING_PROPERTY, { anim: '', at: 0 }); } catch (e) { }
+  }, 1500);
+}
+
 const SWING_QUIET = {};
 const SWING_CLEAR = {};
 /* Who has a pick in the air right now. See swinging(). */
@@ -2310,6 +2430,7 @@ function swinging(actorId) { return !!SWING_IN_AIR[actorId]; }
   number, it is the thing that stops a bug from being infinite.
 */
 const MINE_SESSION = {};   // actorId -> the stamp of the spell they are on
+const MINE_TOOL = {};      // actorId -> the pickaxe that went into their hands
 const MINE_GAP_MS = 350;   // between the end of one swing and the next
 const MINE_MOST = 60;      // a hard stop, never reached by a real seam
 const MINE_AWAY = 400;     // how far from the seam is walking away
@@ -2334,8 +2455,20 @@ function miningGone(actorId) {
   } catch (e) { return false; }
 }
 
-/** Stop whatever spell of mining this person is on. The swing in the air finishes. */
-function stopMining(actorId) { delete MINE_SESSION[actorId]; }
+/*
+  Stop whatever spell of mining this person is on.
+
+  The held animation is left here and nowhere else, because it is held: there
+  is no timer under it that would end it on its own, which is the whole point
+  of holding it. Everything that stops a spell comes through this.
+*/
+function stopMining(actorId) {
+  if (!MINE_SESSION[actorId]) { return; }
+  delete MINE_SESSION[actorId];
+  const tool = MINE_TOOL[actorId] || 0;
+  delete MINE_TOOL[actorId];
+  swingEnd(actorId, tool);
+}
 
 /*
   Still at the seam?
@@ -2541,6 +2674,23 @@ function mineOre(actorId, refrId, baseDesc) {
   const spell = Date.now();
   MINE_SESSION[actorId] = spell;
   let swungThisSpell = 0;
+  /*
+    ONE ANIMATION FOR THE WHOLE SPELL, WITH THEIR OWN PICKAXE IN IT.
+
+    Patrick, 23 September: "It's stopping the animation and going back in
+    that doesn't flow smoothly", and "Still a pick on my hip when I am
+    swinging". Both are the same shape. A swing per strike meant enter,
+    swing, exit, enter, swing, exit, which is the stutter; and an idle mimes
+    rather than drawing anything, which is the pick staying on the hip.
+    Neither is fixed by a better number.
+
+    IdlePickaxeEnter is a state, so the spell enters it ONCE with the tool in
+    hand, strikes on a clock while it lasts, and leaves it once at the end.
+    The strikes after the first send no animation at all: the character is
+    already mining.
+  */
+  const pick = toolIdIn(actorId, 'miner');
+  MINE_TOOL[actorId] = pick;
 
   /*
     The next swing of the same spell, or the end of it.
@@ -2574,7 +2724,7 @@ function mineOre(actorId, refrId, baseDesc) {
   };
 
   const strike = function (took) {
-  swing(actorId, SWING_MINE, function () {
+  const lands = function () {
     // One a swing, not the whole pile. The rank still decides WHICH seams are
     // workable at all, which is what seam.yield's pair of zeroes says.
     const yielded = 1;
@@ -2611,13 +2761,28 @@ function mineOre(actorId, refrId, baseDesc) {
     }
     if (took === 1) { stopMining(actorId); return; }
     /*
-      The next swing, once this one has finished and let go of them. Measured
-      from the strike rather than from the press, so the gap is between the
-      pick coming up and going down again rather than a fixed rhythm the
-      animation has to keep up with.
+      The next strike, on the animation's own rhythm.
+
+      One swing's worth from this strike to the next, so the ore keeps coming
+      off the pick at the rate the pick is moving. Nothing is sent to the
+      client for it: the character is already in the animation and stays in
+      it, which is what stopped the stutter.
     */
-    setTimeout(guard('mineAgain', again), (SWING_MS - SWING_LAND_MS) + MINE_GAP_MS);
-  });
+    setTimeout(guard('mineAgain', again), SWING_MS);
+  };
+
+  /*
+    THE FIRST STRIKE ENTERS THE ANIMATION. EVERY ONE AFTER IT DOES NOT.
+
+    hold keeps the client in IdlePickaxeEnter with the pickaxe in hand until
+    stopMining sends the one exit, so a spell of mining is one animation with
+    many strikes in it rather than many animations.
+  */
+  if (swungThisSpell <= 1) {
+    swing(actorId, SWING_MINE, function () { lands(); }, { hold: true, tool: pick });
+  } else {
+    setTimeout(guard('mineLands', function () { lands(); }), SWING_LAND_MS);
+  }
   };
 
   swungThisSpell = 1;
@@ -17646,6 +17811,24 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           (v.night ? ', at night' : '') + ', ' + fireBit + '. ' +
           'Weather and height are worth ' + v.exposure + '. ' +
           'What you are wearing covers ' + v.cover + ' per cent of you.');
+        /*
+          A third line, and only when there is something to say. The server
+          holding no record of what somebody is wearing looks identical to
+          clothes not mattering, and it is the far more likely of the two:
+          anything handed out inside the client's own game is dropped from
+          the equipment update because the server never saw it arrive.
+        */
+        var wornBits = [];
+        for (var wi = 0; wi < v.worn.length && wi < 12; wi++) {
+          wornBits.push(v.worn[wi].name + ' ' +
+                        (v.worn[wi].known ? (v.worn[wi].worth + '%')
+                                          : 'not in the warmth table'));
+        }
+        toProfile(profileId, wornBits.length
+          ? ('Counted on you: ' + wornBits.join(', ') + '.')
+          : ('The server has no record of anything on you. Whatever you are ' +
+             'wearing was handed to your own game and never reached here, so ' +
+             'it cannot count toward warmth. Say so in the dev channel.'));
         return true;
       }
       if (word === '/bard') { toProfile(profileId, needs.bard(actorId)); return true; }
@@ -19486,6 +19669,73 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     return wearIndex[baseId] || null;
   }
 
+  /*
+    WHAT THE SERVER THINKS IS ON SOMEBODY, ITEM BY ITEM.
+
+    Patrick, 23 September: "temperature was not right it said the same with
+    clothes, without clothes, and with a mix". There are four things that
+    produce exactly that and nothing on screen tells them apart: the meter
+    being slow, the warmth table resolving nothing, the server holding no
+    record of the clothes because they were handed out inside the client's
+    own game, or the clothes being worth so little on a mild day that the
+    difference is under a degree.
+
+    The first is answered by /needs saying where the warmth is heading. This
+    answers the other three: every worn thing the server can see, whether the
+    table knows it, and what it is worth. A piece the server has no record of
+    cannot appear here at all, and that absence is the answer in the third
+    case: ActionListener::OnUpdateEquipment logs 'dropped N item(s) the
+    server has no record of' when the client equips something it was handed
+    inside its own game, and those are invisible to everything here.
+  */
+  /*
+    WHAT TO CALL A WORN THING.
+
+    The table that ships inside this file is the material and the coverage
+    and nothing else: the editor ids are in tools\warmth.json and are left
+    out of the installed copy, which is four thousand rows. So the descriptor
+    is the name, and it is the better one for this job anyway: 'ClothesFarm02
+    :Skyrim.esm' says which plugin a piece came from, and which plugin it came
+    from is exactly what is being asked when somebody's clothes are not
+    counting.
+  */
+  function wornName(baseId, row) {
+    if (row && row.e) { return String(row.e); }
+    try {
+      var d = mp.getDescFromId(baseId);
+      if (d) { return String(d); }
+    } catch (e) { }
+    return 'id ' + Number(baseId).toString(16);
+  }
+
+  function wornList(actorId) {
+    var out = [];
+    try {
+      var inv = mp.get(actorId, 'inventory');
+      var entries = (inv && inv.entries) || [];
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (!e || !e.worn) { continue; }
+        var row = wearRow(e.baseId);
+        if (!row) {
+          out.push({ name: wornName(e.baseId, null), worth: 0, known: false });
+          continue;
+        }
+        var mat = NEEDS.wear.material[row.m];
+        if (typeof mat !== 'number') { mat = NEEDS.wear.material.cloth; }
+        var worth = 0;
+        var parts = String(row.c || '').split(',');
+        for (var p = 0; p < parts.length; p++) {
+          var w = NEEDS.wear.perPart[parts[p]];
+          if (w) { worth += w * mat; }
+        }
+        out.push({ name: wornName(e.baseId, row),
+                   worth: Math.round(worth * 100), known: true });
+      }
+    } catch (e) { return out; }
+    return out;
+  }
+
   function insulation(actorId) {
     var total = 0;
     try {
@@ -19628,7 +19878,8 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
       fireAway: (typeof n.fire === 'number' && n.fire >= 0) ? Math.round(n.fire) : -1,
       fireWorth: Math.round(fireWarmth(n)),
       exposure: Math.round(exposure(n)),
-      cover: Math.round(insulation(actorId) * 100)
+      cover: Math.round(insulation(actorId) * 100),
+      worn: wornList(actorId)
     };
   }
 
