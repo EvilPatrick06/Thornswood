@@ -62,6 +62,9 @@ thornswood-backup-key.txt
 # 23 September by running the service locally to prove a header, which left a
 # signing key sitting untracked in tools\voice.
 tools/voice/token-key.txt
+# Not made by the service: the TURN relay's key, put beside it by hand. Ignored
+# here so a copy made to try the relay out of a checkout never reaches git.
+tools/voice/turn-key.txt
 tools/voice/secret.txt
 tools/voice/owners.json
 tools/voice/owners.json.tmp
