@@ -18466,9 +18466,26 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       return 'The server is going down in ' + when + ' for ' + restart.why +
              '. Get somewhere safe and log out before then.';
     }
-    return 'An update is out. Everyone has ' + when + ' to finish up, then you ' +
-           'will be put back to the launcher to install it. ' +
-           'Get somewhere safe.';
+    /*
+      AND IT ONLY HAPPENS TO PEOPLE WHO NEED IT, which this used to promise
+      everybody. Patrick, in the world on 23 September: "The server never
+      actually kicked me".
+
+      It did not, and it was right not to. The server does not kick for an
+      update at all, on purpose: see clearTheServer, where a kick with no
+      process restart behind it left thirteen reconnects dead on 17
+      September. The launcher closes the game instead, four and a half
+      minutes after IT sees the update. Patrick's launcher had already
+      installed that pack before he pressed Play, so it had nothing to
+      install and no reason to close anything, and the countdown promised
+      him something that was never going to happen.
+
+      So the wording says which half of the room it is talking to.
+    */
+    return 'An update is out. Everyone has ' + when + ' to finish up. Your ' +
+           'launcher closes the game when the countdown ends and installs it, ' +
+           'unless it already has this one, in which case nothing happens to ' +
+           'you. Get somewhere safe either way.';
   }
 
   function reminder(when) {
@@ -18478,7 +18495,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     if (restart.mode === 'restart') {
       return 'Server going down in ' + when + '. Log out somewhere safe.';
     }
-    return when + ' until the update. Finish up and get somewhere safe.';
+    return when + ' until the update. Your launcher closes the game if it ' +
+           'still needs it. Finish up and get somewhere safe.';
   }
 
   /*
@@ -18513,8 +18531,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       return 'The server goes down in ' + when + ' for ' + restart.why +
              '. Get somewhere safe and log out.';
     }
-    return 'Your game closes automatically in ' + when + ' for an update. ' +
-           'The launcher installs it and puts you back in.';
+    return 'Your game closes automatically in ' + when + ' for an update, ' +
+           'unless your launcher already has it. Then it installs and puts ' +
+           'you back in.';
   }
 
   function parting() {
@@ -18524,7 +18543,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     if (restart.mode === 'restart') {
       return 'Going down now. See you in a few minutes.';
     }
-    return 'Update time. Let the launcher patch, then come straight back.';
+    return 'Update time. If your launcher still needs it, it closes the game ' +
+           'now and patches, then you come straight back. If it already has ' +
+           'it, carry on.';
   }
 
   /*
