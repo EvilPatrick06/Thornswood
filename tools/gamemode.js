@@ -7176,7 +7176,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 */
   // ==== RECIPES_BY_ID ====
   /* Built by tools\Build-RecipeTable.ps1 out of the game's own records. Do not hand edit.
-     1886 crafting recipes, out of 4523 in tools\recipes.json.
+     1888 crafting recipes, out of 4525 in tools\recipes.json.
 
      Recipe desc -> what it makes, what kind of record that is, how many it
      makes, which profession and which half of it owns the recipe, and which
@@ -7203,7 +7203,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
      reached. Where part of the list is produced by nobody, that is a floor
      and what the output sells for can hold the row higher; where none of it
      is, the price ranks it inside its own half. On this build that is
-     1415 row(s) by what their inputs cost, 176 by price and 291 by how long
+     1417 row(s) by what their inputs cost, 176 by price and 291 by how long
      the shopping list is. That last rule is used for a whole half at a time
      and only where the first two leave a rung with nothing on it, which here
      is Cook/Confectioner, Enchanter/Bladebinder, Tailor/Liverywright. A rank there means how long the list is and
@@ -8513,14 +8513,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "9fd:MoreCraftableEquipment.esp": { "out": "d820:HearthFires.esm", "name": "Girl's Grey Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
     "9fe:MoreCraftableEquipment.esp": { "out": "d822:HearthFires.esm", "name": "Girl's Yellow Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
     "9ff:MoreCraftableEquipment.esp": { "out": "426c8:Skyrim.esm", "name": "Shiv", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Daggers", "open": false },
-    "15480:Thornswood-Content.esp": { "out": "15481:Thornswood-Content.esp", "name": "Poor Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "novice", "family": "Other goods", "open": true },
-    "15486:Thornswood-Content.esp": { "out": "15482:Thornswood-Content.esp", "name": "Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "15487:Thornswood-Content.esp": { "out": "15484:Thornswood-Content.esp", "name": "Charcoal Briquette", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "expert", "family": "Other goods", "open": true },
-    "15488:Thornswood-Content.esp": { "out": "15485:Thornswood-Content.esp", "name": "Coke", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "master", "family": "Other goods", "open": true },
-    "1548d:Thornswood-Content.esp": { "out": "e3c16:Skyrim.esm", "name": "Pickaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "War axes", "open": true },
-    "1548e:Thornswood-Content.esp": { "out": "2f2f4:Skyrim.esm", "name": "Woodcutter's Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other weapons", "open": true },
-    "15491:Thornswood-Content.esp": { "out": "15490:Thornswood-Content.esp", "name": "Tool Handle", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "novice", "family": "Other goods", "open": true },
-    "15492:Thornswood-Content.esp": { "out": "f5d05:Skyrim.esm", "name": "Shovel", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
     "37668:ZIA_Complete Pack.esp": { "out": "3764f:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
     "3766f:ZIA_Complete Pack.esp": { "out": "335a2:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
     "3766e:ZIA_Complete Pack.esp": { "out": "d2846:Skyrim.esm", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
@@ -9116,6 +9108,16 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "bff34:Playable Rieklings.esp": { "out": "bff30:Playable Rieklings.esp", "name": "Riekling Bandit Fur Kilt&Cloak", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Body armour", "open": true },
     "bff38:Playable Rieklings.esp": { "out": "bff36:Playable Rieklings.esp", "name": "Riekling Bandit Fur Shoes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Armoured boots", "open": true },
     "c0374:Playable Rieklings.esp": { "out": "c0372:Playable Rieklings.esp", "name": "Riekling Shrouded Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "15480:Thornswood-Content.esp": { "out": "15481:Thornswood-Content.esp", "name": "Poor Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "15486:Thornswood-Content.esp": { "out": "15482:Thornswood-Content.esp", "name": "Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
+    "15487:Thornswood-Content.esp": { "out": "15484:Thornswood-Content.esp", "name": "Charcoal Briquette", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "expert", "family": "Other goods", "open": true },
+    "15488:Thornswood-Content.esp": { "out": "15485:Thornswood-Content.esp", "name": "Coke", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "master", "family": "Other goods", "open": true },
+    "1548d:Thornswood-Content.esp": { "out": "e3c16:Skyrim.esm", "name": "Pickaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "War axes", "open": true },
+    "1548e:Thornswood-Content.esp": { "out": "2f2f4:Skyrim.esm", "name": "Woodcutter's Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other weapons", "open": true },
+    "15491:Thornswood-Content.esp": { "out": "15490:Thornswood-Content.esp", "name": "Tool Handle", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "15492:Thornswood-Content.esp": { "out": "f5d05:Skyrim.esm", "name": "Shovel", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "15496:Thornswood-Content.esp": { "out": "15495:Thornswood-Content.esp", "name": "Key Mold", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "15497:Thornswood-Content.esp": { "out": "15494:Thornswood-Content.esp", "name": "Key", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
     "306f:HearthFires.esm": { "out": "3012:HearthFires.esm", "name": "Lock", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "a lock, and locks are not made at a forge here. A door takes the key its holder cut from a mold." },
     "306e:HearthFires.esm": { "out": "3011:HearthFires.esm", "name": "Hinge", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "a hinge, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold." },
     "306d:HearthFires.esm": { "out": "300f:HearthFires.esm", "name": "Nails", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "a nail, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold." },
@@ -9805,6 +9807,18 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
   return;
 }
 
+/*
+  The recipe that makes a key, and how long to wait before naming what it made.
+
+  ThornswoodRecipeKey is added to Thornswood-Content.esp by
+  tools\Add-ContentRecords.py, one iron ingot at a forge. The delay is a tick
+  rather than a measurement: the output lands as soon as this handler returns
+  and nobody blocked, so anything above zero is enough and a quarter second is
+  well clear of a slow frame.
+*/
+const KEY_RECIPE = '15497:Thornswood-Content.esp';
+const KEY_NAME_DELAY = 250;
+
 mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId) {
   /*
     NO RECIPE AT ALL, which the fork now reports rather than dropping.
@@ -9850,6 +9864,49 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
   if (answer.note) {
     notify(actorId, answer.note);
     say(actorId, answer.note);
+  }
+
+  /*
+    A KEY COMES OUT NAMED FOR THE HOUSE ITS MOLD WAS STAMPED AT.
+
+    Patrick, 23 September, giving the whole shape at once: "you make a mold,
+    mold gets used on door to assign mold to the door, than key uses that mold
+    during crafting to make a key to specifically that house and it can be
+    reused". And, separately, "Each door in a property should take the same
+    key", which is already true and was checked rather than assumed: 4,891
+    doors map to 852 properties in BUILDING_BY_DOOR, 832 of them with more
+    than one door, and a key is named for the property rather than the door.
+
+    THE MOLD IS A CONDITION, NOT AN INPUT. It is not a CNTO on the recipe
+    because the engine takes an input away before the server is ever asked,
+    and he asked for the mold to be reusable. So the recipe costs an iron
+    ingot, this decides whether it may happen at all, and the mold stays.
+
+    NAMED AFTERWARDS, on a short timer, because the output is added after this
+    handler returns: OnFireSuccess is what removes the inputs and adds the
+    key, and it only runs when nobody blocked. Refusing here instead and
+    handing over a named key would leave the ingot in their pack.
+  */
+  if (desc === KEY_RECIPE) {
+    const prop = globalThis.__thornswoodProperty;
+    let stampedAt = null;
+    try {
+      stampedAt = (prop && prop.moldInHand) ? prop.moldInHand(actorId) : null;
+    } catch (e) { stampedAt = null; }
+    if (!stampedAt) {
+      const no = 'A key is cut from a mold, and you are carrying none that has been stamped. ' +
+                 'Forge a blank key mold, take it to the door with whoever holds the place, ' +
+                 'and say /mold there.';
+      notify(actorId, no);
+      say(actorId, no);
+      return false;
+    }
+    const named = stampedAt;
+    setTimeout(function () {
+      try { prop.nameFreshKey(actorId, named); } catch (e) {
+        log('the fresh key could not be named:', e);
+      }
+    }, KEY_NAME_DELAY);
   }
   /*
     THE HANDLE, AND EVERY OTHER HAFTED THING.
@@ -14594,6 +14651,30 @@ log('gamemode loaded:',
                            'in their hands. Cut the key from that.');
       return true;
     }
+    /*
+      THE BLANK IS SPENT HERE, AND IT IS WHAT MAKES THE CHAIN MAKE SENSE.
+
+      Patrick, 23 September: "Wait how tf does someone use a mold if you can't
+      make a key to own the building make this shit make sense make a fucking
+      mold item craftable dude this would solve alot", and then the whole
+      shape of it: "you make a mold, mold gets used on door to assign mold to
+      the door, than key uses that mold during crafting to make a key to
+      specifically that house and it can be reused".
+
+      Until now this conjured a mold out of nothing, which is why the chain
+      could never start: the only mold in the world came from the ceremony, so
+      the ceremony had to happen before the object existed.
+
+      A smith forges a blank at a forge now, out of one iron ingot, and this
+      is the stamping: the blank comes out of the smith's pack and a mold for
+      this door goes into the holder's. That is the same trade it always was,
+      with the smith supplying the metal, which is the part that was missing.
+    */
+    if (!takeBlankMold(actorId)) {
+      toProfile(profileId, 'You are carrying no blank key mold. Forge one at a forge, one iron ' +
+                           'ingot, then bring it back to this door.');
+      return true;
+    }
     if (!giveNamed(owner.actorId, MOLD, moldLabel(building))) {
       toProfile(profileId, 'The mold could not be handed over. Say so in the dev channel.');
       return true;
@@ -14697,6 +14778,66 @@ log('gamemode loaded:',
     toProfile(profileId, 'You cut a key to ' + nameOf(building) + '. It opens the door for ' +
                          'whoever is carrying it, so hand it over yourself.');
     return true;
+  }
+
+  /*
+    Take one BLANK mold out of this pack. A blank is a mold with no name on it:
+    a stamped one says which door it is for and is somebody's property, so this
+    steps over those and never spends one.
+
+    Answers whether it found one.
+  */
+  function takeBlankMold(actorId) {
+    var baseId = idOf(MOLD);
+    if (!baseId) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !(e.count > 0) || e.baseId !== baseId) { continue; }
+      if (e.name) { continue; }
+      if (e.count > 1) { e.count = e.count - 1; }
+      else { entries.splice(i, 1); }
+      try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return false; }
+      return true;
+    }
+    return false;
+  }
+
+  /*
+    Name a key that was just crafted, for the house whose mold is in the pack.
+
+    The crafting menu makes a plain Key, because a COBJ has one output record
+    and there is one key record for the whole game. Which house it opens is the
+    name on the entry, the same way a deed and a mold work, so this finds the
+    unnamed one that just arrived and names it.
+
+    THE MOLD IS NOT TOUCHED, because Patrick asked for it to be reusable: "it
+    can be reused". That is also why the mold is not an input on the recipe. An
+    input is taken by the engine before the server is ever asked.
+  */
+  function nameFreshKey(actorId, building) {
+    var baseId = idOf(KEY);
+    if (!baseId || !building) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !(e.count > 0) || e.baseId !== baseId) { continue; }
+      if (e.name) { continue; }
+      if (e.count > 1) {
+        e.count = e.count - 1;
+        entries.push({ baseId: baseId, count: 1, name: keyLabel(building) });
+      } else {
+        e.name = keyLabel(building);
+      }
+      try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return false; }
+      plog('a key to', nameOf(building), 'came off the mold at a forge');
+      return true;
+    }
+    return false;
   }
 
   /** The building whose mold is in this pack, or null. One at a time is enough. */
@@ -15707,6 +15848,7 @@ log('gamemode loaded:',
     holdsKey: holdsKey, holdsMold: holdsMold, holdsDeed: holdsDeed,
     giveNamed: giveNamed, doorsOf: doorsOf, shutFor: shutFor, push: push,
     pushAll: pushAll, touchedBench: touchedBench, moldInHand: moldInHand,
+    takeBlankMold: takeBlankMold, nameFreshKey: nameFreshKey,
     keyLabel: keyLabel, moldLabel: moldLabel, deedLabel: deedLabel,
     KEY: KEY, MOLD: MOLD, LOCK_PROPERTY: LOCK_PROPERTY,
     BENCH_PROPERTY: BENCH_PROPERTY, FORGE: FORGE,

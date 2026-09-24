@@ -1709,6 +1709,8 @@ $BENCH_UNOWNED_PREFIX = 'BYOHBuildingInteriorPart'
 # that the rules WOULD have settled is worth taking out again.
 $RECIPE_OWNER = [ordered]@{
     'ThornswoodRecipeToolShovel' = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'a shovel is a tool a smith forges, and it is here rather than derived because Shovel01 is a MISC: the forge settles ownership by the output being a WEAP, so the pickaxe and the axe are covered by that rule and the shovel is not. Patrick, 21 September: a broken tool is replaced by "a smith making them".' }
+    'ThornswoodRecipeKeyMold'    = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'a key mold is a smith''s work and it is here for the same reason the shovel is: the output is a MISC, so the forge rule, which settles ownership by the output being a WEAP, cannot see it. Patrick, 23 September: "make a fucking mold item craftable dude this would solve alot".' }
+    'ThornswoodRecipeKey'        = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'a key is cut by a smith off a stamped mold, and the mold is checked server side in mp.onCraft rather than as an input, because an input is taken by the engine and Patrick asked for the mold to be reusable: "it can be reused". Same MISC output as the mold, so the same reason it cannot be derived.' }
 }
 
 # FOUR NAMED RECIPES WHOSE RANK IS A DECISION RATHER THAN A READING.
