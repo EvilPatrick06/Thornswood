@@ -82,6 +82,9 @@ $ShipMachineFiles = @(
     # carry it. Sixty minute life, so a stale one opens nothing, but a token is
     # a token.
     'Data\Platform\voice-token.txt',
+    # Who this person has muted in voice, by profile id, written by the voice
+    # plugin for the launcher (entry 151). One person's list, so never in a pack.
+    'Data\Platform\voice-muted.txt',
     # The main menu character choice, 20 September: the launcher writes the
     # list before Play and the plugin writes the pick. Both are one machine's,
     # and the list is every profile id the install owns.
