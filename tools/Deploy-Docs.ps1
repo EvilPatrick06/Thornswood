@@ -28,7 +28,9 @@
                                runs the site as LOCAL SERVICE instead of
                                SYSTEM, with its own folder and nothing else
                                to write in, and one privilege, the one for
-                               walking folders. -RunAs SYSTEM puts it back.
+                               walking folders. It stays that way: a deploy
+                               without -RunAs keeps the account the task
+                               already has. -RunAs SYSTEM puts it back.
 
   The password crosses the wire in clear, because this is plain HTTP on an IP.
   Do not reuse one that matters. That improves the day a real domain and a
@@ -60,11 +62,16 @@ param(
   # The account the site's scheduled task runs as. Entry 219 on the To Do
   # List: the site has run as SYSTEM since it was first installed, which is
   # every right on the box for a node process that answers the internet.
-  # SYSTEM stays the default until Patrick has chosen the account and tried
-  # it, so a deploy without this changes nothing. LOCAL SERVICE is built in
-  # and needs no password kept anywhere, which a named local user would.
+  # LOCAL SERVICE is built in and needs no password kept anywhere, which a
+  # named local user would.
+  #
+  # No default on purpose. Left out, the task keeps the account it already
+  # runs as, and a task made for the first time is SYSTEM, as it always was.
+  # A default of SYSTEM put the site back on SYSTEM at the next plain deploy
+  # or -Site after the switch, which is what CLAUDE.md, Install-Bot and
+  # Set-Vps all tell people to run, and the read-back said nothing about it.
   [ValidateSet('SYSTEM', 'LOCAL SERVICE')]
-  [string]$RunAs = 'SYSTEM'
+  [string]$RunAs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -299,10 +306,15 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
 # Who the site runs as, from -RunAs. Worked out before anything is stopped,
 # so an account that does not resolve leaves the running site alone.
 #
-# SYSTEM is registered exactly as it always was, Highest and no grants, so a
-# deploy without -RunAs changes nothing.
+# Without -RunAs it is the account the task already runs as, read off the
+# task, so the switch survives every plain deploy and -Site after it. A box
+# with no task yet gets SYSTEM, as it always did. An account this script did
+# not make, set on the task by hand, is handed back to the task as it is and
+# granted nothing, because nothing here knows what it was set up to reach.
 #
-# Anything else is cut down to one privilege. -RunLevel Limited alone takes
+# SYSTEM is registered exactly as it always was, Highest and no grants.
+#
+# LOCAL SERVICE is cut down to one privilege. -RunLevel Limited alone takes
 # nothing away from a built-in service account, because it has no split
 # token to lower. Windows gives LOCAL SERVICE "Impersonate a client" and
 # "Replace a process level token" by default, and public tools turn either
@@ -327,10 +339,26 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
 # and made again at every server start and a grant on the file would go with
 # it. (NP) keeps each one to the files directly in that folder and out of the
 # world data below it. In C:\Thornswood-Server that still includes
-# server-settings.json.
+# server-settings.json. Given again at every deploy while the site is not
+# SYSTEM, which icacls adds to the rule already there rather than doubling,
+# so a dev folder made after the switch is reached at the next deploy.
 `$runAs = '$RunAs'
-`$sid = 'S-1-5-18'
-if (`$runAs -eq 'SYSTEM') {
+`$principal = `$null
+`$sid = ''
+if (-not `$runAs) {
+  `$runAs = 'SYSTEM'
+  `$was = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Principal
+  if (`$was) {
+    try { `$sid = (New-Object Security.Principal.NTAccount([string]`$was.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+    if (`$sid -eq 'S-1-5-19') { `$runAs = 'LOCAL SERVICE' }
+    elseif (`$sid -ne 'S-1-5-18') { `$runAs = [string]`$was.UserId; `$principal = `$was }
+  }
+  'no -RunAs, so the task keeps the account it has: ' + `$runAs
+}
+if (`$principal) {
+  'an account this script did not set up: left as it is, nothing granted'
+} elseif (`$runAs -eq 'SYSTEM') {
+  `$sid = 'S-1-5-18'
   `$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 } else {
   `$sid = ''
@@ -394,7 +422,8 @@ if (-not (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue)) {
   # it was first registered with, which is how the three restart cap survived
   # every deploy that was meant to change it. -Principal for the same reason:
   # without it -RunAs would never reach the task already on the box, and nor
-  # would going back to SYSTEM.
+  # would going back to SYSTEM. Without -RunAs the principal is the account
+  # the task already had, so this keeps it rather than resetting it.
   Set-ScheduledTask -TaskName '$Task' -Action `$a -Settings `$s -Principal `$principal | Out-Null
   'scheduled task updated'
 }

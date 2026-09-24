@@ -4,7 +4,8 @@
       pwsh -NoProfile -File .\tools\test-site-account.ps1
 
   Deploy-Docs.ps1 -RunAs chooses the account the site's scheduled task runs
-  as, and SYSTEM is the default.
+  as. Left out, the task keeps the account it already has, and a task made
+  for the first time is SYSTEM.
 
   WHY THIS EXISTS. Entry 219 on the To Do List: "A real service as a low
   privilege account". The log half of that entry is done. What was left is
@@ -12,8 +13,15 @@
   Highest -User 'SYSTEM', and for a task already on the box it called
   Set-ScheduledTask with only -Action and -Settings, so no other account could
   ever have reached it without deleting the task by hand. This is the
-  parameter. SYSTEM stays the default until Patrick has chosen the account and
-  tried it, so merging it changes nothing on the VPS.
+  parameter. Merging it changes nothing on the VPS, because the task there
+  is SYSTEM and a deploy without -RunAs keeps it SYSTEM.
+
+  It had a default of SYSTEM at first, and review found on 24 Sep that this
+  undid the switch: once -RunAs 'LOCAL SERVICE' had been run, the next plain
+  deploy or -Site, which is what CLAUDE.md, Install-Bot and Set-Vps tell
+  people to run, put the task back on SYSTEM at Highest and the read-back
+  said so as if nothing were wrong. So there is no default, and the account
+  block reads the account off the task when -RunAs is not given.
 
   HOW. Deploy-Docs.ps1 talks to the VPS and is never run here. Its parameter
   block is read off the syntax tree. The script it sends up to start the site
@@ -35,6 +43,10 @@
       folders it grants on swapped for scratch ones and the real icacls, and
       reads what it did back with Get-Acl and off the principal it built
     runs it again with icacls standing in and refusing, to see it says so
+    runs it with no -RunAs against a task that stands in for the one on the
+      box, on SYSTEM, on LOCAL SERVICE and on an account set by hand, to see
+      each one keeps its account, and with -RunAs against each to see that
+      what -RunAs says wins
     runs the read-back after the task is registered against a task that
       stands in for Get-ScheduledTask, for the account and for the cut
 
@@ -72,9 +84,16 @@ $params = @{}
 foreach ($p in $ast.ParamBlock.Parameters) { $params[$p.Name.VariablePath.UserPath] = $p }
 $runAsParam = $params['RunAs']
 Yes 'Deploy-Docs.ps1 takes -RunAs' ($null -ne $runAsParam)
-$default = $null
-if ($runAsParam -and $runAsParam.DefaultValue) { $default = $runAsParam.DefaultValue.SafeGetValue() }
-Yes '-RunAs defaults to SYSTEM, so a deploy without it changes nothing' ($default -eq 'SYSTEM')
+# Any default at all would be put on the task at every deploy that left
+# -RunAs out, which is how SYSTEM came back after the switch.
+Yes '-RunAs has no default, so a deploy without it keeps the account the task has' (
+    $runAsParam -and $null -eq $runAsParam.DefaultValue)
+# Kept for Build below, so a deploy that leaves -RunAs out is built with
+# whatever the script would really put there.
+$script:runAsDefault = ''
+if ($runAsParam -and $runAsParam.DefaultValue) {
+    try { $script:runAsDefault = [string]$runAsParam.DefaultValue.SafeGetValue() } catch { $script:runAsDefault = '' }
+}
 $set = @()
 if ($runAsParam) {
     foreach ($at in $runAsParam.Attributes) {
@@ -103,8 +122,10 @@ $strangers = @($used | Where-Object { $known -notcontains $_ })
 Yes ('the script is filled in from $Task, $Port, $rootWin and $RunAs and nothing else' +
      $(if ($strangers.Count) { ' (also ' + ($strangers -join ', ') + ')' } else { '' })) ($strangers.Count -eq 0)
 
-# The here-string, evaluated exactly as Deploy-Docs evaluates it.
+# The here-string, evaluated exactly as Deploy-Docs evaluates it. An empty
+# account is a deploy with no -RunAs, which gets the parameter's default.
 function Build([string]$account, [string]$docsRoot) {
+    if (-not $account) { $account = $script:runAsDefault }
     $RunAs = $account
     $rootWin = $docsRoot
     $Task = 'Thornswood Docs'
@@ -142,37 +163,42 @@ function Binds($cmd) {
     return $false
 }
 
-foreach ($account in @('SYSTEM', 'LOCAL SERVICE')) {
+# '' is a deploy with no -RunAs, which is every routine one.
+foreach ($account in @('', 'SYSTEM', 'LOCAL SERVICE')) {
+    $label = $account
+    if (-not $label) { $label = 'no -RunAs' }
     $text = Build $account 'C:\Thornswood-Docs'
     $perrs = $null
     $sent = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$null, [ref]$perrs)
-    Yes "$account`: the script that goes up parses" ($perrs.Count -eq 0)
-    Yes "$account`: it is told the account" ($text.Contains("`$runAs = '$account'"))
+    Yes "$label`: the script that goes up parses" ($perrs.Count -eq 0)
+    Yes "$label`: it is told the account, or told none" ($text.Contains("`$runAs = '$account'"))
 
     $block = BlockOf $text
-    Yes "$account`: it carries the account block between its markers" ($null -ne $block)
+    Yes "$label`: it carries the account block between its markers" ($null -ne $block)
     $firstStop = $text.IndexOf('Stop-Process')
-    Yes "$account`: the account is worked out before anything is stopped" (
+    Yes "$label`: the account is worked out before anything is stopped" (
         $null -ne $block -and $firstStop -gt 0 -and $text.IndexOf($open) -lt $firstStop)
 
     $reg = @(CallsOf $sent 'Register-ScheduledTask')
     $upd = @(CallsOf $sent 'Set-ScheduledTask')
-    Yes "$account`: one Register-ScheduledTask and one Set-ScheduledTask" ($reg.Count -eq 1 -and $upd.Count -eq 1)
+    Yes "$label`: one Register-ScheduledTask and one Set-ScheduledTask" ($reg.Count -eq 1 -and $upd.Count -eq 1)
     if ($reg.Count -eq 1 -and $upd.Count -eq 1) {
         $rn = @(NamesOf $reg[0])
         $un = @(NamesOf $upd[0])
-        Yes "$account`: a new task is registered with the principal" ($rn -contains 'Principal')
-        Yes "$account`: and not with -User 'SYSTEM' or -RunLevel written into the call" (
+        Yes "$label`: a new task is registered with the principal" ($rn -contains 'Principal')
+        Yes "$label`: and not with -User 'SYSTEM' or -RunLevel written into the call" (
             $rn -notcontains 'User' -and $rn -notcontains 'RunLevel')
-        Yes "$account`: a task already there is given the principal too, so -RunAs reaches it" ($un -contains 'Principal')
-        Yes "$account`: and still its action and settings" ($un -contains 'Action' -and $un -contains 'Settings')
+        # Which principal that is, with and without -RunAs, is run below
+        # against a task standing in for the one on the box.
+        Yes "$label`: a task already there is given the principal too, so -RunAs reaches it" ($un -contains 'Principal')
+        Yes "$label`: and still its action and settings" ($un -contains 'Action' -and $un -contains 'Settings')
         $rb = Binds $reg[0]
         $ub = Binds $upd[0]
         if ($null -eq $rb -or $null -eq $ub) {
-            Write-Host "SKIP  $account`: the ScheduledTasks cmdlets are not on this machine to bind against"
+            Write-Host "SKIP  $label`: the ScheduledTasks cmdlets are not on this machine to bind against"
         } else {
-            Yes "$account`: Register-ScheduledTask binds to one of its real parameter sets" $rb
-            Yes "$account`: Set-ScheduledTask binds to one of its real parameter sets" $ub
+            Yes "$label`: Register-ScheduledTask binds to one of its real parameter sets" $rb
+            Yes "$label`: Set-ScheduledTask binds to one of its real parameter sets" $ub
         }
     }
 }
@@ -373,6 +399,17 @@ try {
         (RulesFor (Join-Path $server 'world\changeForms.json') $ls).Count -eq 0 -and
         (RulesFor (Join-Path $server 'world') $ls).Count -eq 0)
 
+    # The grants are given again at every deploy while the site is not SYSTEM,
+    # so a second run has to leave the same rules, not a second copy of each.
+    $before = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
+    $r = Run $block
+    $after = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
+    Yes ('a second run grants again without doubling a rule (' + ($before -join ',') + ' then ' + ($after -join ',') + ')') (
+        ($before -join ',') -eq ($after -join ',') -and @($after | Where-Object { $_ -ne 1 }).Count -eq 0)
+    Yes 'and the second run still says what it granted, with nothing refused' (
+        ($r.said -join "`n") -match [regex]::Escape("granted LOCAL SERVICE (OI)(CI)M on $docs") -and
+        ($r.said -join "`n") -notmatch 'COULD NOT GRANT')
+
     # -- icacls refusing: said, and the rest still tried ------------------------
     $code = 'function icacls { ''Access is denied.''; $global:LASTEXITCODE = 5 }' + "`n" + $block
     $threw = $false
@@ -396,6 +433,72 @@ try {
     Yes 'and it returns from the block before the old site is stopped' (
         $whole.IndexOf('Nothing was stopped or changed.''; return') -gt 0 -and
         $whole.IndexOf('Nothing was stopped or changed.''; return') -lt $whole.IndexOf('Stop-Process'))
+
+    # -- no -RunAs keeps the account the task already has -----------------------
+    #
+    # The finding of 24 Sep: with a default of SYSTEM, the next plain deploy or
+    # -Site after -RunAs 'LOCAL SERVICE' put the task back on SYSTEM. Every
+    # routine deploy leaves -RunAs out, so the block is run with none, against
+    # a stand-in for the task on the box, and with -RunAs, to see it wins.
+    $script:taskWas = $null
+    $script:taskAsked = 0
+    $standins = 'function icacls { $script:icaclsCalls++; $global:LASTEXITCODE = 0 }' + "`n" +
+                'function Get-ScheduledTask { $script:taskAsked++; if ($script:taskWas) { [pscustomobject]@{ Principal = $script:taskWas } } }' + "`n"
+    function Against([string]$given, [string]$taskRunsAs) {
+        $script:icaclsCalls = 0
+        $script:taskAsked = 0
+        $script:taskWas = $null
+        if ($taskRunsAs) { $script:taskWas = [pscustomobject]@{ UserId = $taskRunsAs; RunLevel = 'Limited' } }
+        return Run ($standins + (Scratch (BlockOf (Build $given $docs)) $map))
+    }
+    # Folders the scratch box has, so the grants the block should give.
+    $there = @($map.Values | Where-Object { Test-Path -LiteralPath $_ }).Count + 1
+
+    $r = Against '' $null
+    Yes 'no -RunAs and no task yet: a new task is SYSTEM, as it always was' (
+        $r.principal -and $r.principal.UserId -eq 'SYSTEM' -and "$($r.principal.RunLevel)" -eq 'Highest' -and $r.sid -eq 'S-1-5-18')
+    Yes 'and nothing is granted' ($script:icaclsCalls -eq 0)
+    Yes 'and it says which account it kept' (($r.said -join "`n") -match 'no -RunAs, so the task keeps the account it has: SYSTEM')
+
+    $r = Against '' 'SYSTEM'
+    Yes 'no -RunAs, task on SYSTEM: it stays SYSTEM at Highest, nothing granted' (
+        $r.principal -and $r.principal.UserId -eq 'SYSTEM' -and "$($r.principal.RunLevel)" -eq 'Highest' -and
+        $r.sid -eq 'S-1-5-18' -and $script:icaclsCalls -eq 0)
+
+    foreach ($name in @('LOCAL SERVICE', 'NT AUTHORITY\LOCAL SERVICE')) {
+        $r = Against '' $name
+        Yes "no -RunAs, task on $name`: it stays LOCAL SERVICE, not back to SYSTEM" (
+            $r.principal -and $r.principal.UserId -match 'LOCAL SERVICE$' -and $r.sid -eq 'S-1-5-19')
+        Yes "no -RunAs, task on $name`: with the privilege cut and token SID type it had" (
+            $r.principal -and (@($r.principal.RequiredPrivilege) -join ',') -eq 'SeChangeNotifyPrivilege' -and
+            "$($r.principal.ProcessTokenSidType)" -eq 'Unrestricted' -and "$($r.principal.RunLevel)" -eq 'Limited')
+        Yes "no -RunAs, task on $name`: its folders are granted again ($there of them)" ($script:icaclsCalls -eq $there)
+        Yes "no -RunAs, task on $name`: and it says it kept LOCAL SERVICE" (
+            ($r.said -join "`n") -match 'no -RunAs, so the task keeps the account it has: LOCAL SERVICE')
+    }
+
+    # An account set on the task by hand, which the entry's own steps suggest
+    # making: handed back to the task as it is, and nothing granted to it.
+    $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    foreach ($name in @($me, 'NO SUCH USER 219')) {
+        $r = Against '' $name
+        Yes "no -RunAs, task on an account set by hand ($name): the task's own principal goes back unchanged" (
+            $null -ne $r.principal -and [object]::ReferenceEquals($r.principal, $script:taskWas))
+        Yes "no -RunAs, task on an account set by hand ($name): nothing is granted" ($script:icaclsCalls -eq 0)
+        Yes "no -RunAs, task on an account set by hand ($name): it says it left it alone" (
+            ($r.said -join "`n") -match 'left as it is, nothing granted')
+    }
+
+    # -RunAs wins over the task, and does not even ask it.
+    $r = Against 'SYSTEM' 'LOCAL SERVICE'
+    Yes '-RunAs SYSTEM on a LOCAL SERVICE task puts it back on SYSTEM' (
+        $r.principal -and $r.principal.UserId -eq 'SYSTEM' -and "$($r.principal.RunLevel)" -eq 'Highest' -and $r.sid -eq 'S-1-5-18')
+    Yes 'and it did not read the task to decide' ($script:taskAsked -eq 0)
+    $r = Against 'LOCAL SERVICE' 'SYSTEM'
+    Yes '-RunAs LOCAL SERVICE on a SYSTEM task moves it, with the cut' (
+        $r.principal -and $r.principal.UserId -match 'LOCAL SERVICE$' -and
+        (@($r.principal.RequiredPrivilege) -join ',') -eq 'SeChangeNotifyPrivilege' -and $script:icaclsCalls -eq $there)
+    Yes 'and it did not read the task to decide either' ($script:taskAsked -eq 0)
 
     # ---- the read-back, after the task is registered --------------------------
     $sent = [System.Management.Automation.Language.Parser]::ParseInput((Build 'LOCAL SERVICE' 'C:\Thornswood-Docs'), [ref]$null, [ref]$null)
