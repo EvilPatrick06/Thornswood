@@ -3999,6 +3999,26 @@ function arriveAt(actorId, townKey) {
   setChargen(actorId, state);
   closeRaceMenu(actorId);
   log('chargen', actorId.toString(16), 'home =', entry.key, '(' + arrival.cell + ') -> done');
+  /*
+    ONE LINE AT THE DOOR OF THE INN, beside the log line and never instead of it.
+
+    The To Do List's entry on narrating creation lists what a stranger meets in
+    the first minutes: "a stone room with nobody in it, a race menu, silence,
+    an unexplained teleport". This is the teleport. Until now the server
+    wrote "home = whiterun" to its own log and the person got a load screen
+    and a room they had never seen, with no word from anybody.
+
+    Only this one. Patrick, 21 September, on the panel line: "that is chat
+    spam and is unnescery". That line described what was already on the
+    screen. This one is said once, after the one pick that ends creation, and
+    it says where the server has just moved them, which nothing else does.
+    Lines for the other steps of creation are his to decide, and none are
+    added here.
+
+    say() and not notify(), whose own comment says it may well do nothing
+    from here.
+  */
+  say(actorId, 'Welcome to ' + entry.town + '. You start at the inn.');
   return true;
 }
 

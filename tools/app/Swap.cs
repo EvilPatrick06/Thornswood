@@ -15,7 +15,7 @@ namespace Thornswood
         static void DropLink(string p)
         {
             // Removes the link, never the folder it points at.
-            try { Directory.Delete(p); } catch { }
+            try { Directory.Delete(p); } catch (Exception ex) { Swallow.Note("Swap.DropLink, " + p, ex); }
         }
 
         static bool IsEmpty(string p)
@@ -54,15 +54,18 @@ namespace Thornswood
                 // Only when it is empty, because anything inside it is theirs.
                 if (Directory.Exists(win) && !IsLink(win) && Directory.Exists(bak) && IsEmpty(win))
                 {
-                    try { Directory.Delete(win); } catch { }
+                    try { Directory.Delete(win); } catch (Exception ex) { Swallow.Note("Swap.Restore, clearing " + win, ex); }
                 }
 
+                // A failure here leaves the person's own settings and saves
+                // in the backup folder, so it is written down even though
+                // Restore carries on as it always has.
                 if (Directory.Exists(bak) && !Directory.Exists(win))
                 {
-                    try { Directory.Move(bak, win); did = true; } catch { }
+                    try { Directory.Move(bak, win); did = true; } catch (Exception ex) { Swallow.Note("Swap.Restore, moving " + bak + " back", ex); }
                 }
             }
-            try { if (had) File.Delete(Paths.StateFile); } catch { }
+            try { if (had) File.Delete(Paths.StateFile); } catch (Exception ex) { Swallow.Note("Swap.Restore, the state file", ex); }
             return did || had;
         }
 

@@ -11,8 +11,7 @@ the page from `tools\ts-ui` once, mounts the overlays into it and does most of
 the client's own work. `thornswood-emotes.js` is the game side of the emote
 wheel, `thornswood-voice.js` the game side of proximity voice (who you are,
 where to call, push to talk), and `thornswood-mark.js` writes down the spot
-you stand on for `Mark-Spot.ps1`. `thornswood-chargen.js` is retired and does
-nothing; it stays until the scripts that name it change. Every one of them
+you stand on for `Mark-Spot.ps1`. Every one of them
 idles unless the client settings point at our server and the launcher has left
 a fresh session note, `Data\Platform\thornswood-session.txt`.
 

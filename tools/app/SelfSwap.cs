@@ -218,7 +218,15 @@ namespace Thornswood
             if (File.Exists(bad))
             {
                 string v = null;
-                try { v = FileVersionInfo.GetVersionInfo(bad).ProductVersion; } catch { }
+                // These two cannot go to Swallow.Note: test-self-update.ps1
+                // compiles this class on its own, so it reaches nothing else in
+                // the launcher.
+                try { v = FileVersionInfo.GetVersionInfo(bad).ProductVersion; }
+                catch
+                {
+                    // No version to name: the line says "The last launcher
+                    // update" instead, which is still true.
+                }
                 string what = String.IsNullOrEmpty(v) ? "The last launcher update" : "Launcher " + v;
                 string line = what + " did not start on this machine, so the launcher you had before was put back. " +
                               "The update is offered again. If it fails the same way, tell Patrick.";
@@ -227,7 +235,12 @@ namespace Thornswood
                     File.SetAttributes(bad, FileAttributes.Normal);
                     File.Delete(bad);
                 }
-                catch { }
+                catch
+                {
+                    // A .bad that stays means the same line is said at the next
+                    // start and the delete is tried again then. The script
+                    // clears an old .bad itself before it moves another aside.
+                }
                 said = said == null ? line : line + "  " + said;
             }
             return said;

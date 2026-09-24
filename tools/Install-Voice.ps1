@@ -20,6 +20,9 @@
       .\Install-Voice.ps1 -Remove      take it off again
       .\Install-Voice.ps1 -Auth on     require a join to prove itself
       .\Install-Voice.ps1 -ChatRange on   typed chat reaches only the people near
+      .\Install-Voice.ps1 -TurnUrl turn:host:3478
+                                       offer a relay; its key is turn-key.txt
+                                       in -Root on the VPS, put there by hand
 #>
 [CmdletBinding()]
 param(
@@ -51,6 +54,15 @@ param(
     # a number is the range in units. See CHAT_RANGE in voice\voice-server.js.
     [ValidatePattern('^(off|on|\d+)$')]
     [string]$ChatRange = 'off',
+    # A relay for the pairs that cannot reach each other directly:
+    # turn:host:3478, or several joined by commas. It becomes
+    # THORNSWOOD_TURN_URL on the service's command line. The relay's key never
+    # goes on a command line: it sits in turn-key.txt in -Root on the VPS, put
+    # there by hand, and the service reads it from there. Left off, whatever
+    # is running is kept, the same as -Bind, -Auth and -ChatRange; -TurnUrl ''
+    # takes it away. With no relay at all, the command line is the one it
+    # always was.
+    [string]$TurnUrl  = '',
     [string]$TaskName = 'Thornswood Voice',
     [switch]$Restart,
     [switch]$Remove,
@@ -101,9 +113,21 @@ if ($Restart) {
 $bindExplicit = $PSBoundParameters.ContainsKey('Bind')
 $authExplicit = $PSBoundParameters.ContainsKey('Auth')
 $chatExplicit = $PSBoundParameters.ContainsKey('ChatRange')
-if (-not $bindExplicit -or -not $authExplicit -or -not $chatExplicit) {
+$turnExplicit = $PSBoundParameters.ContainsKey('TurnUrl')
+# What a relay address may look like, whether it came from -TurnUrl or from
+# what is running. It goes onto a cmd.exe line below, where an & or a quote
+# would start a second command.
+$turnShape = '^turns?:[A-Za-z0-9.-]+(:\d{1,5})?(\?transport=(udp|tcp))?(,turns?:[A-Za-z0-9.-]+(:\d{1,5})?(\?transport=(udp|tcp))?)*$'
+if ($TurnUrl -and $TurnUrl -notmatch $turnShape) { Die "-TurnUrl takes turn:host:port, or several joined by commas, and nothing else." }
+if (-not $bindExplicit -or -not $authExplicit -or -not $chatExplicit -or -not $turnExplicit) {
+    # The relay is read off /ice, the list every page is handed, because that
+    # is what is actually being served; a relay with no key serves nothing and
+    # so is not kept, and /health's turn field is read too so that is said
+    # rather than done quietly. On its own try, so a service that cannot
+    # answer /ice still has its bind, auth and chat range kept. The relay
+    # comes last in the answer because its address is read to the end.
     $probe = @"
-try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; 'bind=' + `$h.bind + ';auth=' + `$h.auth + ';chat=' + `$h.chatRange } catch { 'none' }
+try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t = ''; try { `$t = @((Invoke-RestMethod 'http://127.0.0.1:$Port/ice' -TimeoutSec 5).iceServers | ForEach-Object { `$_.urls } | Where-Object { "`$_" -match '^turns?:' }) -join ',' } catch { }; 'bind=' + `$h.bind + ';auth=' + `$h.auth + ';chat=' + `$h.chatRange + ';relay=' + `$h.turn + ';turn=' + `$t } catch { 'none' }
 "@
     $current = & (Join-Path $Here 'Remote.ps1') $probe -VpsHost $VpsHost -VpsUser $VpsUser 2>$null | Select-Object -Last 1
     if ("$current" -match 'bind=([\d.]+);auth=(on|log|off)') {
@@ -114,6 +138,16 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; 'bi
     # off, which is already the default, so only a live range is kept.
     if (-not $chatExplicit -and "$current" -match ';chat=([1-9]\d*)') {
         Say "  keeping the current chat range, $($Matches[1]), since -ChatRange was not passed" 'DarkGray'; $ChatRange = $Matches[1]
+    }
+    if (-not $turnExplicit -and "$current" -match ';turn=(\S+)') {
+        $was = $Matches[1]
+        if ($was -match $turnShape) { Say "  keeping the current relay, $was, since -TurnUrl was not passed" 'DarkGray'; $TurnUrl = $was }
+    }
+    # A relay address given before its key was put in place. Dropping it is
+    # right, since it serves nothing, but a relay that quietly vanishes on the
+    # next install is the same pair of people still not hearing each other.
+    if (-not $turnExplicit -and "$current" -match ';relay=MISCONFIGURED;') {
+        Say "  the running service has a relay address and no key for it, so it serves no relay and this install drops the address. Put turn-key.txt in $Root and pass -TurnUrl again." 'Yellow'
     }
 }
 
@@ -167,6 +201,10 @@ try {
 
 # ---------------------------------------------------------------- install ---
 Head 'Installing'
+# The relay, when there is one. With none this is empty and the service's
+# command line below is exactly the one every install sent before it existed.
+$turnSet = ''
+if ($TurnUrl) { $turnSet = "set THORNSWOOD_TURN_URL=$TurnUrl&& " }
 $remote = @"
 `$ErrorActionPreference = 'Stop'
 # Progress records come back as a wall of CLIXML when stdout is not a console.
@@ -202,10 +240,12 @@ if (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
 #
 # roll-log.ps1 runs in front of node, because cmd holds voice.log open for as
 # long as node runs and nothing can move it until then. & rather than &&, so
-# a roll that fails still starts voice.
+# a roll that fails still starts voice. The relay line, when there is one,
+# sits with the other settings ahead of the roll, so it is set in this cmd
+# before node starts whatever the roll does.
 `$roll = Join-Path '$Root' 'roll-log.ps1'
 `$psExe = Join-Path `$env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=$Auth&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& "{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log, `$psExe, `$roll)
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=$Auth&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log, `$psExe, `$roll)
 
 <#
   Stop the old service, and mean it.

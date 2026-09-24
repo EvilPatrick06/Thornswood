@@ -1,0 +1,45 @@
+{
+  "password": "thornswood",
+  "discord": {
+    "clientId": "",
+    "clientSecret": "",
+    "botToken": "",
+    "guildId": "",
+    "invite": ""
+  },
+  "patreon": "",
+  "gamePort": 7777,
+  "gameCheckPort": 3000,
+  "onlineFile": "C:/Thornswood-Server/data/online.json",
+  "access": {
+    "admin": [
+      "Owner",
+      "Dev"
+    ],
+    "play": [
+      "Owner",
+      "Dev",
+      "Moderator",
+      "Gamemaster",
+      "Loremaster",
+      "Content Creator",
+      "Playtester"
+    ],
+    "banned": [
+      "Banned"
+    ],
+    "dev": [
+      "Owner",
+      "Dev"
+    ],
+    "slots3": [
+      "Thalmor Boot-Licker",
+      "Talos Worshiper",
+      "Milk Drinker",
+      "Gamemaster"
+    ]
+  },
+  "botKey": "",
+  "admins": [],
+  "secret": ""
+}

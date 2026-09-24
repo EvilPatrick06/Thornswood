@@ -5,9 +5,11 @@ the server up once and exits.
 What it does:
 
   Joins    draws a card and puts it in #welcome
-  Tickets  a panel in #tickets, one private thread per ticket, and a copy
-           pushed to the site so the inbox has it whether or not anybody was
-           looking at Discord
+  Tickets  a panel in #tickets-and-applications, one private thread per
+           ticket, and a copy pushed to the site so the inbox has it whether
+           or not anybody was looking at Discord. #tickets is the staff only
+           channel closed tickets are written down in, and where a ticket
+           goes when its thread will not open
   Watch    asks the site every five minutes over its public name, and says so
            in #dev when it stops answering and when it comes back
   Reports  says each thing sent in on the site's public report page in the
@@ -22,7 +24,9 @@ Everything it needs is in env:
   THORNSWOOD_KEY   shared secret the site checks on /api/ticket
   JOIN_CHANNEL     name of the channel join cards go in, default general
   TICKET_CHANNEL   public channel the panel lives in, comma separated, first wins
-  TICKET_LOG       staff only channel closed tickets are recorded in
+  TICKET_LOG       staff only channel closed tickets are recorded in, and where
+                   a ticket goes when its thread will not open. Checked by its
+                   permissions, never trusted by its name
   STAFF_ROLES      comma separated, who gets pulled into every ticket thread
   CREATOR_ROLES    comma separated, added to Apply: Content Creator only
   TICKET_COOLDOWN  seconds between one person's tickets, default 300
@@ -90,7 +94,9 @@ TICKETS_SAID = ' or #'.join(TICKETS)
 # Everybody who can apply can read that one, so a closed application posted
 # there is somebody else's answers sitting in front of the next person
 # queueing up, and it buries the panel besides. Staff only, and made if it is
-# not there.
+# not there. A ticket whose private thread will not open goes here too, so a
+# report about somebody is never posted where that somebody can read it.
+# log_channel checks that by the channel's permissions, not by these names.
 TICKET_LOG = [n.strip().lower() for n in
               os.environ.get('TICKET_LOG', 'tickets,ticket-log').split(',')
               if n.strip()]
@@ -292,25 +298,102 @@ def by_name(guild, names, kind='text'):
     return None
 
 
+def private_channel_ok(guild, ch):
+    """
+    True when nobody outside staff can read this channel, by its permissions
+    and not by its name.
+
+    @everyone must be denied it, and so must every role that is not staff.
+    Content Creator counts as outside, for the reason log_channel gives. Two
+    kinds of role are skipped because no channel could ever keep them out: a
+    role with Administrator reads every channel whatever its overwrites say,
+    and a bot's own role is software somebody added to the server, this bot
+    included. Counting either would make no channel private at all.
+
+    A person given the channel by name, in a member overwrite, counts too,
+    unless they hold a staff role or are a bot.
+
+    Anything it cannot read is a no. The cost of a wrong no is a ticket that
+    reaches the site inbox and not Discord; the cost of a wrong yes is a report
+    about somebody in front of the person it is about.
+    """
+    try:
+        staff = set(STAFF)
+        if ch.permissions_for(guild.default_role).view_channel:
+            return False
+        roles = list(guild.roles)
+        for r in roles:
+            if r == guild.default_role or r.name.lower() in staff:
+                continue
+            if getattr(r.permissions, 'administrator', False):
+                continue
+            if getattr(r, 'is_bot_managed', lambda: False)():
+                continue
+            if ch.permissions_for(r).view_channel:
+                return False
+        for who, ow in (getattr(ch, 'overwrites', None) or {}).items():
+            if who in roles or getattr(who, 'bot', False):
+                continue
+            held = set(x.name.lower() for x in (getattr(who, 'roles', None) or []))
+            if ow.view_channel and not (held & staff):
+                return False
+        return True
+    except Exception:
+        log('could not read the permissions on #%s, so it is treated as '
+            'public:\n' % getattr(ch, 'name', '?') + traceback.format_exc())
+        return False
+
+
 async def log_channel(guild, make=True):
     """
-    The staff only channel closed tickets are recorded in.
+    The staff only channel closed tickets are recorded in, and where a ticket
+    goes when its private thread will not open.
 
     Made rather than asked for, because the alternative is a feature that
     silently does nothing until somebody thinks to read a log. Deny first:
     @everyone cannot see it and only the staff roles are added back. Content
     Creator is left out on purpose, the same reason it is left out of every
     ticket that is not an application to join it.
+
+    CHECKED, NOT TRUSTED BY NAME. TICKET_LOG's first name is tickets. Until
+    24 September Build-Discord.py's PLAN made a #tickets in Help with
+    mode='open', which everybody in the server could read. The PLAN now makes
+    #tickets staff only, in Applications beside the panel, and that is the
+    channel this is meant to find. But the PLAN's modes only apply to a
+    channel it makes, never to one already there, so a #tickets left over
+    from the old PLAN, or made by hand, keeps whatever permissions it had.
+    This used to take the first channel with a TICKET_LOG name, so a public
+    one would have become the log, and every closed application and every
+    report that missed its thread would have gone into it. Now a channel with
+    the right name and the wrong permissions is passed over and said so, and
+    the next free name is made instead.
     """
-    ch = by_name(guild, TICKET_LOG)
-    if ch is not None or not make:
-        return ch
+    taken = set()
+    for want in TICKET_LOG:
+        for ch in guild.text_channels:
+            if ch.name.lower() != want:
+                continue
+            taken.add(want)
+            if private_channel_ok(guild, ch):
+                return ch
+            log('#%s is named in TICKET_LOG, but people outside staff can read '
+                'it, so nothing from a ticket goes there.' % ch.name)
+    if not make:
+        return None
+
+    free = [n for n in TICKET_LOG if n not in taken]
+    if not free:
+        log('every TICKET_LOG name (#%s) is a channel people outside staff can '
+            'read, so there is nowhere private in Discord to put a ticket. '
+            'Make one of them staff only, or add another name to TICKET_LOG '
+            'in bot.env.json on the VPS.' % ', #'.join(TICKET_LOG))
+        return None
 
     if not guild.me.guild_permissions.manage_channels:
         log('there is no #%s to record closed tickets in, and the bot cannot '
             'make one because it does not have Manage Channels. Either give '
             'it that, or make the channel by hand with staff the only ones '
-            'who can see it.' % TICKET_LOG[0])
+            'who can see it.' % free[0])
         return None
 
     try:
@@ -325,14 +408,15 @@ async def log_channel(guild, make=True):
                                                       send_messages=True)
         where = by_name(guild, TICKETS)
         ch = await guild.create_text_channel(
-            TICKET_LOG[0],
+            free[0],
             overwrites=over,
             category=(where.category if where is not None else None),
-            topic='Every ticket that gets closed, with a link back to it. Staff only.')
+            topic='Every ticket that gets closed, with a link back to it, and '
+                  'any ticket whose private thread would not open. Staff only.')
         log('made #%s for closed tickets, staff only' % ch.name)
         return ch
     except Exception:
-        log('could not make #%s:\n' % TICKET_LOG[0] + traceback.format_exc())
+        log('could not make #%s:\n' % free[0] + traceback.format_exc())
         return None
 
 
@@ -696,27 +780,48 @@ class TicketModal(discord.ui.Modal):
                 log('writing the ticket into the thread failed:\n'
                     + traceback.format_exc())
 
-        # A ticket nobody can see is the same as no ticket. If the thread could
-        # not be made, or could not be written in, the whole application goes
-        # into the tickets channel as an ordinary message instead. That channel
-        # is already the one the panel lives in, so it is no more public than
-        # the thread would have been, and it means an application is never lost
-        # to one permission somebody forgot to tick. The reason rides along
-        # with it, so whoever reads it can fix the cause without going to the
-        # VPS for a log.
+        # A ticket nobody can see is the same as no ticket, and a ticket
+        # everybody can see is worse. If the thread could not be made, or could
+        # not be written in, the whole ticket goes to the staff only log
+        # channel instead, with the reason riding along so whoever reads it can
+        # fix the cause without going to the VPS for a log.
+        #
+        # IT USED TO GO INTO THE PANEL CHANNEL, on the argument that the panel
+        # channel was no more public than the thread. It was far more public. A
+        # private thread is readable by the person who opened it and the staff
+        # added to it; the panel channel is readable by everybody who can open
+        # a ticket, which is the whole server. A report about somebody would go
+        # up in front of the person it was about. From the To Do List: "A
+        # reported member reading the report in the channel is a safety
+        # problem, not a formatting one."
+        #
+        # log_channel checks the channel really is staff only before handing it
+        # back. When there is no such channel, nothing goes into Discord at
+        # all: the site inbox still gets the ticket below, and the person is
+        # told by DM.
         fell_back = False
-        if not posted and ch is not None:
-            note = ''
-            if why:
-                note = '\n_No private thread for this one: %s._' % why
+        if not posted:
             try:
-                await ch.send(('**%s**\n%s%s' % (title, head, note))[:1900])
-                for chunk in _chunks(detail, 1900):
-                    await ch.send(chunk)
-                fell_back = True
+                book = await log_channel(guild)
             except Exception:
-                log('the ticket could not be posted in #%s either:\n'
-                    % ch.name + traceback.format_exc())
+                log('could not look for the staff only log channel:\n'
+                    + traceback.format_exc())
+                book = None
+            if book is None:
+                log('no staff only channel to put this ticket in, so Discord '
+                    'has no copy of it. It goes to the site inbox only.')
+            else:
+                note = ''
+                if why:
+                    note = '\n_No private thread for this one: %s._' % why
+                try:
+                    await book.send(('**%s**\n%s%s' % (title, head, note))[:1900])
+                    for chunk in _chunks(detail, 1900):
+                        await book.send(chunk)
+                    fell_back = True
+                except Exception:
+                    log('the ticket could not be posted in #%s either:\n'
+                        % book.name + traceback.format_exc())
 
         # And whatever happened in Discord, the person gets told something
         # true. The old wording promised a message that nothing ever sent.
@@ -738,8 +843,9 @@ class TicketModal(discord.ui.Modal):
                 ephemeral=True)
         elif fell_back:
             await interaction.followup.send(
-                'Sent. A private thread would not open, so it has gone to staff '
-                'in the channel instead. Somebody will answer you.',
+                'Sent. A private thread would not open, so it has gone straight '
+                'to staff instead, somewhere only staff can read it. Somebody '
+                'will answer you by message.',
                 ephemeral=True)
         else:
             await interaction.followup.send(
@@ -1050,6 +1156,11 @@ def panel_is_current(msg):
     return getattr(msg, 'content', None) == PANEL and _panel_options(msg) == _panel_wanted()
 
 
+# Which servers staff have been told cannot open ticket threads, and why, so
+# a reconnect does not tell them again.
+_told_blocked = set()
+
+
 async def ensure_panel(guild):
     ch = by_name(guild, TICKETS)
     if ch is None:
@@ -1087,10 +1198,31 @@ async def ensure_panel(guild):
 
     why = thread_block(guild, ch)
     if why:
-        log('tickets in "%s" will NOT get a private thread: %s. Tick it in '
-            'that channel\'s permissions, or on the bot\'s role server wide. '
-            'Until then every ticket goes into #%s as a plain message.'
-            % (guild.name, why, ch.name))
+        if book is not None:
+            where = '#%s, which only staff can read' % book.name
+        else:
+            where = ('the site inbox and nowhere in Discord, because there is '
+                     'no staff only channel to put it in')
+        fix = ('%s. Tick it in that channel\'s permissions, or on the bot\'s '
+               'role server wide. Until then every ticket goes to %s.'
+               % (why, where))
+        log('tickets in "%s" will NOT get a private thread: %s' % (guild.name, fix))
+
+        # Said in the staff channel too, because the log is on the VPS and
+        # nobody reads it until something is already wrong. Once per process:
+        # this runs on every reconnect, and a flaky evening would say it ten
+        # times.
+        #
+        # THE PANEL STAYS UP. The To Do List asked for the bot to refuse to
+        # start here, "so the permission gets fixed before a stranger finds
+        # out". With the fallback staff only there is nothing left for a
+        # stranger to find. Refusing would not take the panel down either: the
+        # posted one keeps answering through the view setup_hook registers.
+        # All it would do is take away the one way to report somebody, on the
+        # night that way is broken.
+        if (guild.id, why) not in _told_blocked:
+            _told_blocked.add((guild.id, why))
+            await trouble_say('**Tickets cannot open a private thread:** ' + fix)
     else:
         log('ticket threads look fine in #%s' % ch.name)
 
