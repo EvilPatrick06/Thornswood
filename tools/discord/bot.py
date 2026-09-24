@@ -447,6 +447,100 @@ def thread_block(guild, ch):
 
 
 # ----------------------------------------------------------------- joins --
+# Which arrival each person was, on disk beside the code.
+#
+# Patrick, 24 September, with a screenshot of #welcome-travelers: "#28 twice".
+# Daggerio came up the road at 19:41 and VENUS at 22:45, and both cards said
+# "The 28th to walk in". The number was guild.member_count, the server's size
+# at that moment, and the size falls whenever anybody leaves or is removed, so
+# one departure between two joins handed the second arrival the first one's
+# number, and it could go on doing that for ever.
+#
+# So the numbers are written down: the last one given out on each server, and
+# the one each person got. A new arrival gets the next one, and somebody who
+# leaves and comes back keeps theirs. It never goes below member_count, since
+# anybody who joined while the bot was down was never counted here. And it
+# never goes below JOIN_FLOOR, the highest number known to be on a card
+# already: 28, off that screenshot, which is the one number the first join
+# after this goes up has to get past, with no record yet and a member count
+# that may by then be under it. Set JOIN_NUMBER_FLOOR in bot.env.json on the
+# VPS if a later card went higher before this was installed.
+#
+# Install-Bot.ps1 sends a fixed list of files and deletes nothing in this
+# folder, so neither the full run nor -CodeOnly can overwrite or remove it,
+# and .gitignore keeps it out of the repo, like open-tickets.json.
+JOINS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'joins.json')
+JOIN_FLOOR = _int_env('JOIN_NUMBER_FLOOR', 28)
+
+
+def _joins_read():
+    """
+    The record, or {} when there is none yet. Raises when there is one and it
+    cannot be read, so a file that is there and unreadable is never taken for
+    an empty one and written over, which would start the numbers again.
+    """
+    if not os.path.exists(JOINS):
+        return {}
+    with open(JOINS, encoding='utf-8') as f:
+        d = json.load(f)
+    if not isinstance(d, dict):
+        raise ValueError(JOINS + ' is not a JSON object')
+    return d
+
+
+def _joins_write(d):
+    """Written to a file beside it and swapped in, so a write that fails half
+       way leaves the old record whole rather than half of a new one."""
+    tmp = JOINS + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(d, f)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, JOINS)
+
+
+def arrival_number(guild, member):
+    """
+    Which arrival this member is on this server: the number they were given
+    before, or the next one. When the record cannot be read or written this
+    says so in the log and answers member_count, which is what every card
+    said before, because a greeting never waits on a file.
+
+    Called on the event loop and not in an executor, so two joins a moment
+    apart cannot both read the same last number.
+    """
+    count = guild.member_count
+    try:
+        rec = _joins_read()
+        g = rec.get(str(guild.id))
+        if not isinstance(g, dict):
+            g = {}
+        ids = g.get('members')
+        if not isinstance(ids, dict):
+            ids = {}
+        had = ids.get(str(member.id))
+        if type(had) is int and had > 0:
+            n, said = had, 'came back and keeps number %d' % had
+        else:
+            last = g.get('last')
+            if type(last) is not int:
+                last = 0
+            n = max(last + 1, JOIN_FLOOR + 1, count or 0)
+            ids[str(member.id)] = n
+            g['members'] = ids
+            g['last'] = n
+            rec[str(guild.id)] = g
+            _joins_write(rec)
+            said = 'is number %d, with %s members' % (n, count)
+    except Exception:
+        log('join numbers: could not read or write %s, so this card says the '
+            'member count, %s, which can repeat a number:\n%s'
+            % (JOINS, count, traceback.format_exc()))
+        return count
+    log('join: %s %s' % (member, said))
+    return n
+
+
 @client.event
 async def on_member_join(member):
     # First line in, before anything can go wrong, so the log can tell a join
@@ -458,7 +552,7 @@ async def on_member_join(member):
         log('no text channel called #%s to greet in' % WELCOME)
         return
 
-    number = member.guild.member_count
+    number = arrival_number(member.guild, member)
     name = member.display_name or member.name
 
     png = None
