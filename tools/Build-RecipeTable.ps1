@@ -1254,6 +1254,23 @@ $WOODWRIGHT_TAKES_BOWS_AND_ARROWS = $true
 $WOODWRIGHT_TAKES_INSTRUMENTS = $true
 $INSTRUMENT_WORDS = @('Flute', 'Lute', 'Drum')
 
+# WHO OWNS A SPEAR, AND A FISHING ROD.
+#
+# Patrick, 23 September, playing it: "Spears should also be woodworkers", in
+# the same breath as instruments, bows and arrows. He is right and the reason
+# is the same one classes.md gives for a bow: the length of it is a shaft of
+# wood and the smith's part is the head on the end. A spear is a pole with a
+# point, which is a Woodwright's work with an Edgewright's tip, and the server
+# has to give it to one of them.
+#
+# BY NAME, LIKE THE INSTRUMENTS, AND FOR THE SAME REASON: a spear is a WEAP
+# with the animation type of a two handed weapon, which is exactly what a
+# greatsword is, so nothing on the record separates them. Matched as a whole
+# word against the output's editor id and its name, so Spear matches and
+# Spearmint does not, and the count is printed every run.
+$WOODWRIGHT_TAKES_SPEARS = $true
+$SPEAR_WORDS = @('Spear', 'Pike', 'Halberd', 'FishingRod', 'Fishing Rod', 'FishingPole', 'Fishing Pole')
+
 # WHICH FOOD IS A DESSERT. This was expected to be a judgement and it is not,
 # on this build, which is worth writing down because the next person will
 # expect it to be a judgement too.
@@ -2854,6 +2871,12 @@ foreach ($desc in $recipes.Keys) {
             $ownerName = 'Woodworker'; $half = 'Woodwright'
             $reason = 'the output is an instrument, and classes.md gives the Woodwright bows, arrows and instruments in one sentence'
             $instrumentRows.Add(("{0} -> {1} ({2}), animation type {3}, {4} keyword(s)" -f $r.Edid, $o.Name, $o.Edid, $o.WeapAnim, $names.Count))
+        } elseif ($WOODWRIGHT_TAKES_SPEARS -and ((MatchesWord $o.Edid $SPEAR_WORDS) -or (MatchesWord $o.Name $SPEAR_WORDS))) {
+            # Before the animation rule, like the instruments above: a spear
+            # carries a two handed animation and so does a greatsword, so the
+            # record cannot tell them apart and the name has to.
+            $ownerName = 'Woodworker'; $half = 'Woodwright'
+            $reason = 'the output is a spear or a pole, which is a shaft of wood with a head on it'
         } elseif ($o.WeapAnim -eq $WEAP_ANIM_STAFF) {
             $ownerName = 'Enchanter'; $half = 'Bladebinder'
             $reason = 'the output is a WEAP whose animation type is a staff, and a staff is an enchantment on a stick'
