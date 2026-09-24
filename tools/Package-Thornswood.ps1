@@ -44,7 +44,14 @@ param(
     # Bootstrap.cs has always been able to read. This was dropped when the
     # payload was 14 GB, because Windows would not load an executable that big.
     # It is under a gigabyte now that the mods come from the collection.
-    [switch]$OneFile
+    [switch]$OneFile,
+    # The public releases clone. Its version.json is how this build knows which
+    # packs it already has (applied.txt, further down). Left empty it is the
+    # Thornswood-Releases folder beside this repo, where Ship, Publish-Update
+    # and Check-ShipReady already look. It was a path into one home folder, so
+    # only one machine could build an installer that knew its own packs.
+    # Last in the list so no existing positional argument moves.
+    [string]$ReleaseDir = ''
 )
 
 
@@ -128,6 +135,29 @@ if (-not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+
+# ==== thornswood release feed ====
+# Found and checked before anything is staged or any game is closed, because
+# without it the build cannot write applied.txt and there is no point spending
+# twenty minutes on an installer that is wrong.
+#
+# It used to fall back to this repo's own version.json when the home folder
+# path was missing. MEASURED 24 SEPTEMBER: the feed lists 227 packs and the
+# repo's copy lists 164, so on any machine but Patrick's the installer marked
+# 63 packs as missing from a build that had them, and a fresh install fetched
+# them all again. With neither file there it shipped no applied.txt at all:
+# every one of the 227 packs pending on first launch, and 164 of them point at
+# the private repository. So it stops and says where it looked.
+if (-not $ReleaseDir) { $ReleaseDir = Join-Path (Split-Path -Parent (Split-Path -Parent $Here)) 'Thornswood-Releases' }
+$vLive = Join-Path $ReleaseDir 'version.json'
+if (-not (Test-Path -LiteralPath $vLive)) {
+    Die ("No version.json in $ReleaseDir, so this installer cannot say which packs it already has, " +
+         "and everybody who installs from it would be offered every pack ever published. " +
+         "Clone the feed there (git clone https://github.com/EvilPatrick06/Thornswood-Releases.git $ReleaseDir) " +
+         "or pass -ReleaseDir with the folder it is in.")
+}
+# ==== end thornswood release feed ====
+
 . (Join-Path $Here 'Close-Launcher.ps1')
 
 Head 'Packaging'
@@ -415,6 +445,24 @@ if ($collectionCount) {
     Say '  The launcher has to send them to the collection before this goes on the site.' 'Yellow'
     Write-Host ''
 }
+# Loose textures and meshes that are neither ours nor the collection's, named a
+# folder at a time. The installer on the site carried them on 23 September,
+# 539 MB by this machine's record the day after, and no build ever said so.
+# See Get-ShipLooseArt in Ship-Rules.ps1; it reports and stops nothing.
+$loose = Get-ShipLooseArt $ship
+if ($loose.Count) {
+    $looseFiles = 0; $looseBytes = [long]0
+    foreach ($l in $loose) { $looseFiles += $l.Files; $looseBytes += $l.Bytes }
+    Say ("  LOOSE ART THAT IS NOT OURS: {0:n0} file(s), {1:n1} MB, in {2} folder(s)." -f `
+        $looseFiles, ($looseBytes / 1MB), $loose.Count) 'Yellow'
+    Say '  Under Data\textures and Data\meshes, not from the collection, and in this' 'Yellow'
+    Say '  installer for everybody. Take it out of the game folder, or put its mod in' 'Yellow'
+    Say '  the collection, or, if it is ours, in the Thornswood Content mod.' 'Yellow'
+    foreach ($l in $loose) {
+        Say ("    {0,8:n1} MB {1,6:n0} file(s)  {2}" -f ($l.Bytes / 1MB), $l.Files, $l.Folder) 'DarkGray'
+    }
+    Write-Host ''
+}
 if ($optionalCount) {
     Say ("  {0:n0} more ({1:n1} GB) are in optional packs and published separately." -f `
         $optionalCount, ($optionalBytes / 1GB)) 'DarkGray'
@@ -666,8 +714,7 @@ if ($collectionCount -gt 0) {
 }
 
 $appliedOut = Join-Path $stage 'applied.txt'
-$vLive = Join-Path 'C:\Users\evilp\Downloads\Thornswood-Releases' 'version.json'
-if (-not (Test-Path -LiteralPath $vLive)) { $vLive = Join-Path (Split-Path -Parent $here) 'version.json' }
+# $vLive is the releases feed, found and checked before anything was staged.
 if (Test-Path -LiteralPath $vLive) {
     try {
         $vd = ((Get-Content $vLive -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
