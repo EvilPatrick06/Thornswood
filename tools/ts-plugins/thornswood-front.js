@@ -309,6 +309,19 @@
     all of them in this file already.
   */
   const MUTE_KEY    = iniNumber(ini, 'MuteThemKey', 38);   // L
+  /*
+    The key mold, pressed into the lock of the door under the crosshair.
+    Patrick, 24 September: "actually can we make it a different key that is
+    unused in tis scenario and include a prompt when loooking at a door to
+    press that key to set a mold". Not E, because E opens the door. U, scan
+    code 22, because vanilla Skyrim binds nothing to it and neither does
+    anything of ours: not a default in this file or in the emote, voice and
+    mark plugins, not a value in Thornswood.ini and not a row on the
+    launcher's Controls page, checked on 24 September and held there by
+    test-mold-key.js. Like G, H and L it only means anything while its
+    prompt is up.
+  */
+  const MOLD_KEY    = iniNumber(ini, 'MoldKey', 22);       // U
   /* What the prompt calls them. Read off the scan code so a rebind in the ini
      changes the letter on the screen as well as the key that works. */
   function keyName(code) {
@@ -324,6 +337,7 @@
   const FRIEND_NAME = keyName(FRIEND_KEY);
   const TRADE_NAME = keyName(TRADE_KEY);
   const MUTE_NAME = keyName(MUTE_KEY);
+  const MOLD_NAME = keyName(MOLD_KEY);
 
   const ESC = 1;
 
@@ -2939,6 +2953,197 @@
   }
 
   /*
+    ------------------------------------------ a key mold, into a door's lock
+
+    Patrick, 24 September, in order: "you should press e on a un molded door
+    to fill the mold", then "not type" /mold, then "actually can we make it a
+    different key that is unused in tis scenario and include a prompt when
+    loooking at a door to press that key to set a mold".
+
+    So while somebody carrying a Key Mold looks at a door, one line under the
+    crosshair names the key, and the key sends /moldhere with that door's form
+    id. The server decides everything else: that it is a door of a building,
+    that they are standing at it, and every rule /mold keeps. The id is a
+    hint and nothing more. The server's own distance check is what makes it
+    safe, so nothing here is the gate.
+
+    ONLY WITH THE PLUGIN THAT HAS BLANKS. The blank key mold's recipe is
+    0x15496 in Thornswood-Content.esp. The live build has that file from the
+    Nexus collection, which does not carry the record yet; a dev release has
+    carried our own copy since #251. A build without the record has no blank
+    to press, so on it nothing is drawn and nothing is sent. It is
+    asked once, when the world is up, and remembered, because a plugin does
+    not gain a record while the game runs. What is kept is the Key Mold's
+    runtime id and not the form, for the reason under THE IDS, RESOLVED ONCE.
+
+    A STAMPED MOLD LOOKS LIKE A BLANK FROM HERE. Which door a mold is for is
+    the name on the server's copy of the pack, and getItemCount counts the
+    record. So the line shows for anybody carrying a Key Mold, and somebody
+    whose only mold is already stamped is told so by the server on the press.
+
+    ON THE CROSSHAIR POLL'S BEAT, a third of a second, never every frame. On a
+    build without the recipe that is one comparison and no call into the game.
+    With it, one call for the crosshair and two to ask whether it is a door;
+    only for a door are the menus and the pack asked.
+
+    NEVER OVER A MENU, and never while the chat or a panel holds the
+    keyboard. The key reaches this file even while somebody is typing, and a
+    u typed into the chat has to stay a letter. The menus are asked fresh
+    rather than out of busyMenuOpen's quarter second memory, because a
+    remembered "no menu" from just before the inventory opened would put the
+    line back over it; that walk only happens while a door is under the
+    crosshair. And a menu opening takes the line down at once, below, rather
+    than on the next look.
+  */
+  const MOLD_EVERY = 320;
+  const MOLD_FILE = 'Thornswood-Content.esp';
+  const MOLD_RECIPE = 0x15496;   // COBJ ThornswoodRecipeKeyMold, the blank's recipe
+  const MOLD_ITEM = 0x15495;     // MISC, the Key Mold itself
+  const DOOR_TYPE = 29;          // a DOOR base, the same test the activate handler makes
+  let moldAt = 0;
+  let moldBase = -1;       // -1 not asked yet, 0 not in this build, else the Key Mold's runtime id
+  let moldDoor = '';       // the door the line is up for, its form id in hex
+  let moldShown = false;
+  let moldSentFor = '';
+  let moldSentAt = 0;
+
+  /** Whether this build has blank molds, found out once the world is up. */
+  function moldReady() {
+    if (moldBase >= 0) { return moldBase > 0; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return false; }
+    try {
+      const recipe = sp.Game.getFormFromFile(MOLD_RECIPE, MOLD_FILE);
+      const item = recipe ? sp.Game.getFormFromFile(MOLD_ITEM, MOLD_FILE) : null;
+      moldBase = item ? (item.getFormID() || 0) : 0;
+    } catch (e) {
+      // Not remembered. A throw is not an answer, so it is asked again.
+      return false;
+    }
+    log(moldBase ? 'key molds: this build has blanks, so ' + MOLD_NAME + ' presses one into a door'
+                 : 'key molds: no blank key mold recipe in ' + MOLD_FILE + ', so no prompt and no key');
+    return moldBase > 0;
+  }
+
+  /** The door under the crosshair, in hex, while a Key Mold could go into it. '' otherwise. */
+  function moldDoorNow() {
+    if (!moldReady()) { return ''; }
+    if (anyClaim()) { return ''; }
+    let ref = null;
+    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
+    if (!ref) { return ''; }
+    let door = false;
+    try {
+      const b = ref.getBaseObject();
+      door = !!b && b.getType() === DOOR_TYPE;
+    } catch (e) { door = false; }
+    if (!door) { return ''; }
+    if (busyMenuOpenNow()) { return ''; }
+    let carried = 0;
+    try {
+      const pc = sp.Game.getPlayer();
+      const mold = sp.Game.getFormEx(moldBase);
+      carried = (pc && mold) ? pc.getItemCount(mold) : 0;
+    } catch (e) { carried = 0; }
+    if (!(carried > 0)) { return ''; }
+    let hex = '';
+    try { hex = (ref.getFormID() >>> 0).toString(16); } catch (e) { hex = ''; }
+    return hex;
+  }
+
+  /*
+    Under the crosshair and centred, in the K panel's colours. Not right of
+    centre where the look prompt sits: for a door that is where Skyrim draws
+    its own "Open", and a line over it would hide the one the person needs.
+    Beneath our panels, which stand at 2147483000, so one opened while the
+    line is up covers it for the moment before the next look takes it down.
+  */
+  const MOLD_CSS =
+    'position:fixed;left:50%;top:62%;transform:translateX(-50%);z-index:2147482900;' +
+    'pointer-events:none;white-space:nowrap;' +
+    'font-family:"Palatino Linotype",Palatino,Georgia,serif;font-size:19px;letter-spacing:.03em;' +
+    'color:#d9cfb4;background:rgba(11,10,8,.72);border:1px solid rgba(198,170,109,.42);' +
+    'padding:8px 16px 9px;text-shadow:0 2px 4px rgba(0,0,0,.95)';
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawMold(on) {
+    if (on === moldShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-mold");if(d){d.style.display="none";}}catch(e){}')) {
+        moldShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + MOLD_NAME + '</span>' +
+      'Press your key mold into this lock';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-mold");' +
+             'if(!d){d=document.createElement("div");d.id="ts-mold";' +
+             'd.style.cssText=' + JSON.stringify(MOLD_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      moldShown = true;
+    }
+  }
+
+  /*
+    One look: the line up for a door a mold could go into, down for anything
+    else. While the page is not ready there is nothing to draw on, and a page
+    that reloaded has lost the line with everything else, so it is forgotten
+    and drawn again once the page is back.
+  */
+  function moldLook() {
+    if (!T.ready) { moldShown = false; moldDoor = ''; return; }
+    const hex = moldDoorNow();
+    if (hex && hex !== moldDoor) { say('a key mold could go into door ' + hex); }
+    moldDoor = hex;
+    drawMold(!!hex);
+  }
+
+  /*
+    The key. Asked again at the moment it goes down rather than read off the
+    last look, so the id sent is the door under the crosshair at the press.
+    Answers whether it was used, so the key falls through when it was not.
+    One line per door per second and a half, so pressing twice in a breath
+    is not two refusals in the chat.
+  */
+  function moldPress() {
+    if (!T.ready) { return false; }
+    const hex = moldDoorNow();
+    moldDoor = hex;
+    drawMold(!!hex);
+    if (!hex) { return false; }
+    const now = Date.now();
+    if (hex === moldSentFor && now - moldSentAt < 1500) { return true; }
+    moldSentFor = hex;
+    moldSentAt = now;
+    tellServer('/moldhere ' + hex);
+    say('pressed a key mold into door ' + hex);
+    return true;
+  }
+
+  sp.on('update', guard('mold', () => {
+    const now = Date.now();
+    if (now - moldAt < MOLD_EVERY) { return; }
+    moldAt = now;
+    moldLook();
+  }));
+
+  // A menu that takes the keyboard takes the line down the moment it opens.
+  sp.on('menuOpen', guard('mold menu', (e) => {
+    if (!moldShown) { return; }
+    if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
+    moldDoor = '';
+    drawMold(false);
+  }));
+
+  /*
     ------------------------------------- your party: the name, the map, the way
 
     Patrick, 22 September, asked the party menu to let people "see their name
@@ -3998,6 +4203,9 @@
       The social keys. The three verbs need somebody under the crosshair and
       say nothing when there is not; P and J open their panels regardless.
     */
+    // The mold key, and only while a door is under the crosshair and a Key
+    // Mold is in the pack. Otherwise it is not used and goes on down the list.
+    if (e.code === MOLD_KEY && moldPress()) { return; }
     if (e.code === FRIEND_KEY) { lookVerb('friend'); return; }
     if (e.code === TRADE_KEY) { lookVerb('trade'); return; }
     if (e.code === MUTE_KEY) { lookVerb('mute'); return; }
