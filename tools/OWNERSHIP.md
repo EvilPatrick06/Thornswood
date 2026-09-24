@@ -1,0 +1,101 @@
+# Who holds what
+
+Written 24 September 2026 for the To Do List entry "Five things exist only on
+your laptop or in your head". For everything Thornswood cannot run without,
+this says where it lives, who holds it, who the second holder is, and how to
+get it back. Secrets are named by location only. No value appears here and
+none ever should.
+
+It was written from the scripts and from what could be read on Patrick's
+machine on 24 September. Nothing on the VPS was opened for it; those rows say
+what the scripts that write the files say. Patrick corrects any row that is
+wrong. "Nobody yet" means nothing written down, and nothing that could be
+measured, names a second person.
+
+## The five things
+
+1. **The SkyMP fork's build tree.** The fork's source is on GitHub and
+   survives any one machine. The configured build and its toolchain are on
+   Patrick's machine only, and the configure settings are written down
+   nowhere but the build folder itself.
+2. **The publish baseline.** A record of what the last release carried, on the
+   machine that shipped it. Losing it costs one oversized pack, never a wrong
+   one.
+3. **The #news webhook.** One file on Patrick's machine. Anybody with the bot
+   token can fetch it again.
+4. **The update token in config.json.** Nobody holds one any more. It was
+   empty in both launcher configs on 24 September, and the releases
+   repository is public, so nothing needs it.
+5. **The collection.** The Nexus collection every install gets its mods from,
+   curated from Patrick's Nexus account in his Vortex. The decision is
+   `tools\COLLECTION-METHOD.md`.
+
+## The table
+
+| Asset | Where it lives | Who holds it | Second holder | How to reissue |
+| --- | --- | --- | --- | --- |
+| SkyMP fork source | github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`, cloned at `C:\Thornswood-Dev\skymp` on Patrick's machine | Patrick, whose account owns the repository | GitHub holds the source itself. Nobody yet holds admin on the repository | `git clone https://github.com/EvilPatrick06/skymp.git`, then `git checkout thornswood/engine-changes`. The commit to build is `forkCommit` in `tools\client-build.json` and `source.commit` in `tools\server-build.json` |
+| SkyMP build tree and toolchain | `C:\Thornswood-Dev\skymp\build` on Patrick's machine: Visual Studio 17 2022 for x64, the fork's own vcpkg submodule with triplet `x64-windows-sp`, and node for `npx webpack` in `skymp5-client`. The configure settings are in `build\CMakeCache.txt` and nowhere else | Patrick | Nobody yet. A second machine copies the server binaries rather than building them | Not from anything written down yet: `tools\Build-Server.ps1` compiles a tree that is already configured and refuses to configure one. By hand: clone as above, `git submodule update --init`, configure with the settings in that CMakeCache (generator, toolchain file, triplet, `OFFLINE_MODE`, `BUILD_CLIENT`, `BUILD_SKYRIM_PLATFORM`, `SKYRIM_DIR`), then `.\tools\Build-Server.ps1` for the server, the client targets and `npx webpack` in `skymp5-client` for the client, and `.\tools\New-ClientBuildRecord.ps1`. A new build means new records, because Deploy-Server and Sync-Client refuse any file whose hash is not the recorded one |
+| Publish baseline | `%LOCALAPPDATA%\Thornswood\published.json` and `published-dev.json` on each machine that ships, with `published-pending.json` or `published-dev-pending.json` beside them while a release has not finished pushing | Patrick's machine | Per machine by design, so there is no copy to share. Djinn's machine has its own once he has run `-Baseline` there | `.\tools\Publish-Update.ps1 -Baseline`, straight after the launcher has brought the game up to date |
+| #news webhook | `tools\discord\news-webhook.txt` on Patrick's machine, ignored by git. The webhook itself is the one named Thornswood in #news | Patrick | Nobody yet. Only Patrick's machine ships main, so only it needs the file | `.\tools\Setup-Discord.ps1` asks for the bot token and writes the existing webhook's address back into the file. If it leaked, delete that webhook in #news (Edit Channel, Integrations, Webhooks) first and the same run makes a new one |
+| Update token | `UpdateToken` in the launcher's `config.json` (`C:\Thornswood\config.json`, `C:\Thornswood-DevBuild\config.json`), encrypted to the Windows account when set | Nobody. Empty in both on 24 September | Not needed: the releases repository is public and `Updater.Enabled` asks for no token | Only if the releases repository ever went private: a fine-grained, read-only token for that one repository, put in with `.\tools\Set-UpdateToken.ps1`. Every install would then need it, which is why it went (`tools\app\Config.cs`, the comment on `UpdateToken`) |
+| The collection | Nexus collection `ombo2a` (`Collection` in `tools\app\Config.cs`), curated in Vortex on Patrick's machine | Patrick's Nexus account | Nobody yet | A new revision is published from Vortex by the account that curates it. If that account were lost, a new collection is made from any machine with the Thornswood profile installed, and `.\tools\Set-Collection.ps1` sends its address to every launcher |
+| Dev updates webhook | `tools\discord\dev-webhook.txt` on Patrick's machine, ignored by git. `tools\discord\dev-channel.txt` names the channel it has to point at | Patrick | Nobody yet. Without it a dev Ship carries on and posts nothing | In Discord: the dev updates channel, Edit Channel, Integrations, Webhooks, New Webhook, Copy Webhook URL. Then `.\tools\Set-DevNews.ps1`, which asks for it at a prompt. Delete the old webhook there if it leaked |
+| Code signing | `tools\signing.json` (ignored by git) and `C:\tools\metadata.json` on Patrick's machine, and the Azure Artifact Signing account they name | Patrick | Nobody yet | Switched off on purpose and not finished. Patrick, 22 September: "the code signing stuff isnt finnished thats why its switched off". Neither file carries a key or a password (`tools\Sign-Artifact.ps1`). The account is Patrick's to finish |
+| Backup passphrase | VPS `C:\Thornswood-Backup\key.txt`, and the copy `Install-Backup.ps1` brings down to `%USERPROFILE%\Documents\thornswood-backup-key.txt` on Patrick's machine. `Restore-Backup.ps1` also looks for `tools\backup-key.txt`, which git ignores | Patrick, both copies | Nobody yet. Losing both copies makes every backup unreadable | It cannot be reissued for backups already taken, so keep the old one as long as any backup made with it. A new one: remove `key.txt` on the VPS, move the local copy aside, and run `.\tools\Install-Backup.ps1`, which makes one and copies it down |
+| Discord client secret and bot token | The Discord application `1549251507361292418` (`DiscordAppId` in `tools\app\Config.cs`). The secret and the token sit in VPS `C:\Thornswood-Docs\config.json` (`discord.clientSecret`, `discord.botToken`), and the token again in VPS `C:\Thornswood-Bot\bot.env.json` | Patrick, as the application's owner in the Discord developer portal | Nobody yet. The nightly backup carries encrypted copies of both files | Reset them in the developer portal, then `.\tools\Set-DiscordLogin.ps1` for the site and `.\tools\Install-Bot.ps1` for the bot. Both ask at a prompt |
+| The bot's shared key | `botKey` in VPS `C:\Thornswood-Docs\config.json`, `THORNSWOOD_KEY` in VPS `C:\Thornswood-Bot\bot.env.json`, and `key` in `private\door.json` under `C:\Thornswood-Server` and `C:\Thornswood-Server-Dev` | The VPS | Not needed by hand. Every copy is on the VPS and in the nightly backup, and a new one can be made at any time | `.\tools\Install-Bot.ps1 -RotateKey` gives the bot and the site a new one, and `.\tools\Deploy-Docs.ps1` restarts the site onto it. Then `.\tools\Set-Door.ps1 -Connect`, and `.\tools\Set-Door.ps1 -Connect -Root C:\Thornswood-Server-Dev` for the dev server |
+| The site's own keys | `secret` (signs the site's cookies) and `password` (the member password, refused whenever Discord sign in is set up) in VPS `C:\Thornswood-Docs\config.json` | The VPS | Not needed. The site makes a new `secret` itself when it is missing | Remove `secret` and restart the site: everybody is signed out once. Never use `Deploy-Docs.ps1 -Password`: it writes a config.json holding only the password over the whole file, and every key in this row and the two above goes with it |
+| Server password | `serverPassword` in VPS `C:\Thornswood-Docs\config.json`, written by `Rotate-ServerPassword.ps1`, and the `serverPassword` field on the version feed in `tools\app\Config.cs`, which Publish-Update takes out of every version.json | Nobody: it is not enforced. SkyMP has no join password (`tools\Rotate-ServerPassword.ps1`, READ THIS FIRST), and `tools\docs-app\server.js` did not read the key on 24 September | Not needed | Nothing to reissue while nothing checks it. The To Do List entry about the secrets table saying the game server has a password owns the rewrite of that row in SECOND-DEVELOPER.md |
+| Voice token key | VPS `C:\Thornswood-Voice\token-key.txt` and `C:\Thornswood-Voice-Dev\token-key.txt` | The voice service, which makes it on first run | Not needed. Losing it only ends join tokens that last an hour, which is why the nightly backup leaves it out | Delete it and run `.\tools\Install-Voice.ps1 -Restart`; the service makes a new one |
+| Retired secrets | `server-secret.txt` at the root of the repo folder on Patrick's machine (ignored by git), and `secret.txt` and `owners.json` in the voice folders | Nobody needs them. The character register they guarded was removed on 23 September (`tools\Install-Voice.ps1`, `tools\vps-nightly-backup.ps1`) | Not needed | Nothing reads them. They are listed so nobody takes one for a live secret |
+| VPS access | 192.135.112.23, user Administrator, by SSH key in `administrators_authorized_keys`. Patrick's key is `%USERPROFILE%\.ssh\thornswood_ed25519` | Patrick | Djinn, if the public line he sent was added with `Add-VpsKey.ps1`. `.\tools\Setup-SshKey.ps1 -Test` on his machine says | `.\tools\Setup-SshKey.ps1 -KeyOnly` on the machine that needs a key, then `.\tools\Add-VpsKey.ps1 -PublicKey '<the line>'` from a machine the VPS already knows |
+| Hosting account | BisectHosting and its VirtFusion panel for the box (`tools\MOVING-THE-SERVER.md`). The panel is the only way in when ssh does not answer (`IT-IS-DOWN.md`) | Patrick | Nobody yet | Through BisectHosting, by the account holder |
+| Domain | `thornswood.net`, an A record for `@` and `www` pointing at the VPS (`tools\Setup-Domain.ps1`). Caddy renews the certificate itself | Not written down in the repo. Patrick to fill in | Nobody yet | Where the domain was bought is not written down anywhere in the repo, which is the gap in this row |
+| GitHub | `EvilPatrick06/Thornswood` (the source, private), `EvilPatrick06/Thornswood-Releases` (the feed, public) and `EvilPatrick06/skymp` (the fork). Publishing uses the `gh` sign in on the shipping machine | Patrick, as the personal account that owns all three | Nobody yet as owner: a repository under a personal account has one. Djinn is a collaborator on the source repository, and his commits are in its history | Owner access cannot be reissued by anybody else. Each person's own access is their own `gh auth login` |
+| Discord server | The Thornswood Discord, whose #news, dev updates channel and roles the scripts above point at | Patrick, as server owner | Nobody yet. Discord allows one owner, so the fallback is a second person with an Administrator role, and whether anybody else holds one is not written down | Ownership is transferred by the owner in Server Settings |
+| Each person's own sign in | The launcher's Discord ticket, `Profile\discord.txt` (encrypted to the Windows account); the voice join token, `Data\Platform\voice-token.txt`, good for an hour and renewed while the game runs; the SkyMP client's saved sign in, `Data\Platform\PluginsNoLoad\auth-data-no-load.js` | Each person, on their own machine | Not needed, and a second copy would be a leak. `tools\Ship-Rules.ps1` keeps the two in the game folder out of every pack and installer | Signing in again |
+
+## What was measured, 24 September
+
+- The fork: `C:\Thornswood-Dev\skymp` is on `thornswood/engine-changes`, and
+  the local branch and `origin/thornswood/engine-changes` both point at
+  c8832519, read off the clone's own refs. That is the commit both build
+  records name. The triage pass the same day found no uncommitted change in
+  it. So the source is not on one disk; the configured build and its
+  toolchain are.
+- The build tree: `build\CMakeCache.txt` names Visual Studio 17 2022, x64,
+  the toolchain file `vcpkg\scripts\buildsystems\vcpkg.cmake` inside the fork,
+  triplet `x64-windows-sp`, `OFFLINE_MODE` on, `BUILD_CLIENT` and
+  `BUILD_SKYRIM_PLATFORM` on, and `SKYRIM_DIR` at the Steam copy.
+- The update token: `UpdateToken` is empty in `C:\Thornswood\config.json` and
+  in `C:\Thornswood-DevBuild\config.json`. Checked by length, never printed.
+- Present on Patrick's machine, checked by existence and never opened:
+  `tools\discord\news-webhook.txt`, `tools\discord\dev-webhook.txt`,
+  `tools\signing.json`, `C:\tools\metadata.json`, `server-secret.txt`,
+  `Documents\thornswood-backup-key.txt`, and both baselines.
+- The door's key file is `private\door.json`, not `data\door.json`:
+  `tools\Set-Door.ps1` writes it there and `tools\gamemode.js` reads it from
+  there. The secrets table in SECOND-DEVELOPER.md says `data`.
+
+## Keeping it complete
+
+`tools\test-ownership.js` reads every file name in `tools\*.ps1` and
+`tools\app\*.cs` that looks like it holds a credential, and fails when one is
+not in the table above. It also fails on a row with no second holder. A new
+secret file gets a row here in the same pull request that adds it. The names
+it ignores, and why, are listed in the test.
+
+## What would close it
+
+The entry's answer is a build toolchain in a repository with a documented
+build, and credentials in a shared vault with two people on each. Choosing the
+vault is Patrick's and Djinn's decision. The To Do List entry "If your machine
+dies, the source survives and the release process does not" is where moving
+the credentials is planned, so it is not planned twice here. The build half
+starts with the configure settings above going into `tools\Build-Server.ps1`
+or the fork's own README. The GitHub, hosting, domain, Discord and Nexus
+accounts each need their owner to add a second person.
+
+The secrets table in `SECOND-DEVELOPER.md` says what each credential is for.
+This page says who holds it.
