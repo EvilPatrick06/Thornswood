@@ -165,10 +165,20 @@ ROLES.append(('Banned', 0x4A4A4A, False, PLAIN))
 STAFF = ('Owner', 'Dev', 'Moderator', 'Gamemaster')
 
 # --------------------------------------------------------------- channels --
-# mode:  open      anybody talks
-#        read      staff post, everybody reads
-#        staff     staff only, invisible to everybody else
-#        pathfind  testers and staff only
+# mode:  public       anybody talks, including somebody not yet approved
+#        read         staff post, everybody reads, including the unapproved
+#        open         Members talk, invisible to anybody without Member
+#        membersread  staff post, Members read
+#        hold         one hold's Citizen and Jarl, and hold staff
+#        staff        staff only, invisible to everybody else
+#        pathfind     testers and staff only
+#
+# THE GATE, set up by hand on 23 and 24 September. Somebody who joins sees
+# #welcome, #rules, #start-here, #say-hello and the Applications category and
+# nothing else until staff give them Member. A hold's channel opens to its own
+# Citizen and Jarl roles, picked in #choose-your-hold. These modes only apply
+# to a channel this makes, never to one already there, so they are what keeps
+# a channel made by a later run behind that gate instead of in front of it.
 #
 # key is what the words in content.py point at, so a channel can be renamed
 # without every mention of it going stale.
@@ -181,22 +191,27 @@ PLAN = [
    dict(kind='text',  name='start-here',  key='START',    mode='read',
         topic="How to actually get in and play.",
         post=C.START),
+   dict(kind='text',  name='say-hello',   key='HELLO',    mode='public',
+        topic='New here? Say hi and tell us a little about yourself. Slowmode is on.'),
+ ]),
+ # Where somebody applies, before they have Member. The ticket panel lives in
+ # #tickets-and-applications, which is what <#TICKETS> in content.py points
+ # at. #tickets is staff only, where the bot writes closed tickets.
+ ('Applications', [
+   dict(kind='text',  name='tickets-and-applications', key='TICKETS', mode='read'),
+   dict(kind='text',  name='tickets',     mode='staff'),
  ]),
  ('Information', [
-   dict(kind='announce', name='news',     key='NEWS',     mode='read',
+   dict(kind='announce', name='news',     key='NEWS',     mode='membersread',
         topic='What changed, every time it changes.',
         post=C.NEWS_FIRST),
-   dict(kind='text',  name='updates',     key='UPDATES',  mode='read',
+   dict(kind='text',  name='updates',     key='UPDATES',  mode='membersread',
         topic="Restarts and outages. Check here before asking why you can't connect."),
-   dict(kind='text',  name='faq',         key='FAQ',      mode='read',
+   dict(kind='text',  name='faq',         key='FAQ',      mode='membersread',
         topic='Read this before you ask.', post=C.FAQ),
  ]),
  ('Help', [
-   dict(kind='text',  name='tickets',     key='TICKETS',  mode='open',
-        topic="Open a ticket. Nobody sees it but staff."),
    dict(kind='voice', name='Support',      mode='open'),
-   dict(kind='text',  name='applications',key='APPLY',    mode='open',
-        topic='Want to help run the place? Say which job and why you.'),
    dict(kind='forum', name='bugs',        key='BUGS',     mode='open',
         topic=C.BUGS_TOPIC),
    dict(kind='forum', name='suggestions', key='SUGGESTIONS', mode='open',
@@ -211,10 +226,10 @@ PLAN = [
         topic='Screenshots and clips. Talk about one in a thread under it.'),
  ]),
  ('In Character', [
-   dict(kind='text',  name='game-rules',  key='GAMERULES', mode='read',
+   dict(kind='text',  name='game-rules',  key='GAMERULES', mode='membersread',
         topic='How roleplay works here. Ten rules, and what we let slide.',
         post=C.GAME_RULES),
-   dict(kind='text',  name='lore',        key='LORE',     mode='read',
+   dict(kind='text',  name='lore',        key='LORE',     mode='membersread',
         topic='4E 252. What happened and who you can be.',
         post=C.LORE),
    dict(kind='text',  name='character-introductions', key='CHARS', mode='open',
@@ -230,9 +245,12 @@ PLAN = [
  # One channel per hold, because a hold with nowhere to talk is a line on a
  # map. These are in character: what is said here is said in the hold.
  ('The Holds', [
-   dict(kind='text', name=_h.lower(), key='HOLD_' + _h.upper(), mode='open',
-        topic=C.HOLD_TOPICS[_h.lower()])
+   dict(kind='text', name=_h.lower(), key='HOLD_' + _h.upper(), mode='hold',
+        hold=_h, topic=C.HOLD_TOPICS[_h.lower()])
    for _h in HOLDS
+ ] + [
+   # Where a Member picks their hold. The bot posts the buttons.
+   dict(kind='text', name='choose-your-hold', key='CHOOSE', mode='membersread'),
  ]),
  # Three, plus somewhere to be idle. Proximity voice is in the launcher, so
  # these are for before, after, and whoever is not in the world.
@@ -283,7 +301,18 @@ def say(mark, what):
     print('  %-9s %s' % (mark, what))
 
 
-def overwrites(guild, mode, roles):
+# Who can see every hold. Wider than STAFF: the gamemaster ranks and the
+# Loremaster run things in the holds too. Looked up by name, because only some
+# of these are in ROLES.
+HOLD_STAFF = ('Owner', 'Dev', 'Lead Gamemaster', 'Moderator',
+              'Trial Gamemaster', 'Gamemaster', 'Loremaster')
+
+
+def _named(guild, roles, name):
+    return roles.get(name) or discord.utils.get(guild.roles, name=name)
+
+
+def overwrites(guild, mode, roles, hold=None):
     ev = guild.default_role
     deny_all  = discord.PermissionOverwrite(view_channel=False)
     read_only = discord.PermissionOverwrite(send_messages=False,
@@ -293,8 +322,28 @@ def overwrites(guild, mode, roles):
     talk      = discord.PermissionOverwrite(view_channel=True,
                                             send_messages=True,
                                             read_message_history=True)
-    if mode == 'open':
+    if mode == 'public':
         return {}
+    if mode in ('open', 'membersread'):
+        out = {ev: deny_all}
+        member = _named(guild, roles, 'Member')
+        if member is not None:
+            out[member] = talk if mode == 'open' else discord.PermissionOverwrite(
+                view_channel=True, read_message_history=True, send_messages=False)
+        for r in STAFF:
+            if roles.get(r):
+                out[roles[r]] = talk
+        return out
+    if mode == 'hold':
+        out = {ev: deny_all}
+        names = list(HOLD_STAFF)
+        if hold:
+            names += ['Jarl of ' + hold, 'Citizen of ' + hold]
+        for n in names:
+            r = _named(guild, roles, n)
+            if r is not None:
+                out[r] = talk
+        return out
     if mode == 'read':
         out = {ev: read_only}
         for r in STAFF:
@@ -361,7 +410,7 @@ async def ensure_channel(guild, cat, spec, roles, found):
         if ch.name == want and getattr(ch, 'category', None) == cat:
             existing = ch
             break
-    ow = overwrites(guild, spec.get('mode', 'open'), roles)
+    ow = overwrites(guild, spec.get('mode', 'open'), roles, spec.get('hold'))
 
     if existing is None and CHECK:
         say('would make', ('voice ' if kind == 'voice' else '#') + want)
@@ -517,8 +566,9 @@ async def on_ready():
             if catname:
                 cat = discord.utils.get(guild.categories, name=catname)
                 if cat is None:
-                    mode = 'staff' if catname in ('Staff',) else (
-                           'pathfind' if catname == 'Testing' else 'open')
+                    mode = {'Staff': 'staff', 'Testing': 'pathfind',
+                            'The Holds': 'hold',
+                            'Applications': 'public'}.get(catname, 'open')
                     cat = await guild.create_category(
                         catname, overwrites=overwrites(guild, mode, roles),
                         reason='Thornswood setup')
@@ -609,7 +659,10 @@ async def on_ready():
                 join_notification_replies=False,
                 premium_subscriptions=True,
                 guild_reminder_notifications=False)
-            if wel is not None:
+            # Only when the server has none yet. It was set by hand to
+            # #welcome-travelers, where the join cards go, and a re-run moving
+            # it back to #welcome would undo that.
+            if wel is not None and guild.system_channel is None:
                 if CHECK:
                     say('would change', 'a server or channel setting')
                 else:
