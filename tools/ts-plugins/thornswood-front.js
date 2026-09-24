@@ -2000,9 +2000,9 @@
     which is everybody.
 
     BY BASE AND POSITION, because CHOPPING_BLOCKS is three BASE records shared
-    by every block in Skyrim: findClosestReferenceOfType is asked for one of
-    those bases within a short radius of one of Djinn's three points, so
-    nothing else can be caught. The radius is small for the same reason the
+    by every block in Skyrim: the cell is walked for those bases and only a
+    reference within a short radius of one of Djinn's three points is touched,
+    so nothing else can be caught. The radius is small for the same reason the
     server's is.
 
     ONCE PER SITE PER SESSION, and only when somebody is near enough for the
@@ -2010,6 +2010,65 @@
     nothing, so this waits until they are close rather than firing at startup
     and reporting three failures.
   */
+  /*
+    ======================= WALKING A CELL FOR A BASE =======================
+
+    Game.findClosestReferenceOfType FINDS PERSISTENT REFERENCES, and almost
+    nothing anybody stands next to is one. Two features in this file asked it
+    for things and quietly got nothing, for the whole of their lives:
+
+      the fire probe, which read "62 bases, 0 in reach, 0 threw" standing in
+      the Bannered Mare's fire pit, in its cooking fire, and in the brazier
+      outside it, on 23 September
+
+      the chopping blocks at Solitude, the stables and Dragon Bridge, which
+      have never once written their own "took the chopping block out of the
+      world" line in any log on this machine
+
+    Neither was a table problem or a radius problem. Cell.getNumRefs and
+    getNthRef see everything in the cell, temporary references included, so
+    that is what both use now.
+
+    THE FORM TYPES ARE THE FILTER AND THEY MATTER: walking every reference in
+    an exterior cell is thousands of native calls. Activator 24, static 34,
+    movable static 36 and furniture 42 are the four the fire table is built
+    from, and the chopping blocks are furniture.
+  */
+  const CELL_TYPES = [24, 34, 36, 42];
+
+  /**
+   * Every reference in this cell whose base is one of `want`, as
+   * {ref, x, y, z}. Walked once by the caller and kept: nothing in here
+   * moves. `onWalked` is told how many references were looked at, for the
+   * probe line.
+   */
+  function refsInCell(cell, want, onWalked, onThrew) {
+    const out = [];
+    let walked = 0;
+    if (!cell) { return out; }
+    for (let t = 0; t < CELL_TYPES.length; t++) {
+      let n = 0;
+      try { n = cell.getNumRefs(CELL_TYPES[t]); } catch (e) {
+        if (onThrew) { onThrew(e); }
+        continue;
+      }
+      for (let i = 0; i < n; i++) {
+        walked++;
+        try {
+          const r = cell.getNthRef(i, CELL_TYPES[t]);
+          if (!r) { continue; }
+          const b = r.getBaseObject();
+          if (!b || !want[b.getFormID()]) { continue; }
+          out.push({ ref: r, x: r.getPositionX(), y: r.getPositionY(), z: r.getPositionZ() });
+        } catch (e) {
+          if (onThrew) { onThrew(e); }
+        }
+      }
+    }
+    if (onWalked) { onWalked(walked); }
+    return out;
+  }
+
   const BLOCK_BASES = [0x7022e, 0xa91bf, 0x10f575];
   const BLOCKS_GONE = [
     { where: 'Solitude', pos: [-64263, 106003.5, -8377.8] },
@@ -2039,23 +2098,41 @@
       const dx = px - site.pos[0], dy = py - site.pos[1], dz = pz - site.pos[2];
       if (Math.sqrt(dx * dx + dy * dy + dz * dz) > BLOCK_NEAR) { continue; }
 
-      for (let b = 0; b < BLOCK_BASES.length; b++) {
-        try {
-          const base = sp.Form.from(sp.Game.getFormEx(BLOCK_BASES[b]));
-          if (!base) { continue; }
-          const ref = sp.Game.findClosestReferenceOfType(
-            base, site.pos[0], site.pos[1], site.pos[2], BLOCK_FIND);
-          if (!ref) { continue; }
-          // disable answers a promise. Nothing waits on it: the block either
-          // goes or it does not, and a failure is worth one line, not a stall.
-          const p = ref.disable(false);
-          if (p && typeof p.then === 'function') { p.then(function () { }, function () { }); }
-          blockDone[i] = true;
-          say('took the chopping block at ' + site.where + ' out of the world');
-          break;
-        } catch (e) {
-          say('could not take the ' + site.where + ' chopping block out: ' + e);
-          blockDone[i] = true;   // do not try it every four seconds forever
+      /*
+        WALKED, NOT ASKED FOR. This used findClosestReferenceOfType and never
+        removed a single block: not one "took the chopping block out of the
+        world" line exists in any log on this machine. See the note over
+        refsInCell. The position test is kept exactly as it was, because
+        these three bases are shared by every chopping block in Skyrim and
+        only the ones at Djinn's three points are ours to remove.
+      */
+      {
+        const want = {};
+        for (let b = 0; b < BLOCK_BASES.length; b++) {
+          try {
+            const base = sp.Form.from(sp.Game.getFormEx(BLOCK_BASES[b]));
+            if (base) { want[base.getFormID()] = true; }
+          } catch (e) { }
+        }
+        let cell = null;
+        try { cell = pc.getParentCell(); } catch (e) { cell = null; }
+        const found = refsInCell(cell, want, null, null);
+        for (let k = 0; k < found.length; k++) {
+          const dx2 = found[k].x - site.pos[0];
+          const dy2 = found[k].y - site.pos[1];
+          const dz2 = found[k].z - site.pos[2];
+          if (Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2) > BLOCK_FIND) { continue; }
+          try {
+            // disable answers a promise. Nothing waits on it: the block either
+            // goes or it does not, and a failure is worth one line, not a stall.
+            const p = found[k].ref.disable(false);
+            if (p && typeof p.then === 'function') { p.then(function () { }, function () { }); }
+            blockDone[i] = true;
+            say('took the chopping block at ' + site.where + ' out of the world');
+          } catch (e) {
+            say('could not take the ' + site.where + ' chopping block out: ' + e);
+            blockDone[i] = true;   // do not try it every four seconds forever
+          }
           break;
         }
       }
@@ -2215,9 +2292,12 @@
     what the error was if it is the first.
   */
   let fireBases = 0;      // how many of them resolved to a form at all
-  let fireHits = 0;       // how many had a reference within reach
+  let fireHits = 0;       // how many fires of ours are in this cell
   let fireThrew = 0;      // how many threw
   let fireWhy = '';       // the first thing one of them threw
+  let fireWalked = 0;     // how many things in the cell were looked at
+  let fireCell = -1;      // the cell the list below was made for
+  let fireHere = null;    // where the fires in it are
   let placeBeat = 0;      // when the heartbeat last wrote
 
   /*
@@ -2284,36 +2364,79 @@
     return fireIds;
   }
 
-  /** How far the nearest lit fire is, or -1 when there is none in reach. */
-  function fireDistance(px, py, pz) {
-    let best = -1;
+  /*
+    THE FIRES IN THIS CELL, WALKED ONCE.
+
+    THE ENGINE CALL THIS REPLACES FINDS PERSISTENT REFERENCES ONLY, and a
+    fire is almost never one. Game.findClosestReferenceOfType answered null
+    for all 62 bases everywhere: standing in the Bannered Mare's own fire
+    pit, standing in its cooking fire, standing in the brazier outside it,
+    standing in a fire bowl on a farm. The probe read "62 bases, 0 in reach,
+    0 threw" through all of it, which is the call working exactly as
+    documented and being the wrong call: the FX fire placed in an inn is a
+    temporary reference in that cell, and those functions do not see one.
+    That is why nothing ever warmed anybody, and no amount of fixing the
+    table would have changed it.
+
+    Cell.getNumRefs and getNthRef see everything in the cell, temporary
+    included, so the cell is walked once and the fires in it are kept with
+    their positions. A fire does not move, so the list is good until the cell
+    changes, and every probe after that is a handful of subtractions instead
+    of sixty two native calls.
+
+    FOUR FORM TYPES, WHICH ARE THE FOUR THE TABLE IS BUILT FROM: activator
+    24, static 34, movable static 36 and furniture 42. Filtering costs
+    nothing and walking every reference in an exterior cell costs a great
+    deal.
+  */
+  function fireSpotsHere(pc) {
+    let cellId = 0;
+    let cell = null;
+    try {
+      cell = pc.getParentCell();
+      cellId = cell ? cell.getFormID() : 0;
+    } catch (e) { cellId = 0; }
+    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; }
+    if (fireHere) { return fireHere; }
+    if (!cell) { return []; }
+
     const ids = fireIdList();
-    fireBases = ids.length; fireHits = 0; fireThrew = 0;
-    for (let i = 0; i < ids.length; i++) {
-      try {
-        // Asked for again here rather than kept: see the block above.
-        const base = sp.Form.from(sp.Game.getFormEx(ids[i]));
-        if (!base) { continue; }
-        const ref = sp.Game.findClosestReferenceOfType(base, px, py, pz, FIRE_REACH);
-        if (!ref) { continue; }
-        fireHits++;
-        // A fire somebody has switched off is still a placed reference. The
-        // toggled ones (FXfireWithEmbers02Toggle and its heavy twin) are the
-        // reason this asks rather than trusting the base.
-        try { if (ref.isDisabled()) { continue; } } catch (e) { }
-        const dx = ref.getPositionX() - px;
-        const dy = ref.getPositionY() - py;
-        const dz = ref.getPositionZ() - pz;
-        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (best < 0 || d < best) { best = d; }
-        if (best <= FIRE_INSIDE) { break; }
-      } catch (e) {
-        // One base that will not answer is not the end of it, but all of them
-        // is the whole feature, so it is counted and the first reason is kept
-        // for the heartbeat rather than thrown away.
+    fireBases = ids.length;
+    const want = {};
+    for (let i = 0; i < ids.length; i++) { want[ids[i]] = true; }
+
+    const found = refsInCell(cell, want,
+      function (n) { fireWalked = n; },
+      function (e) {
         fireThrew++;
         if (!fireWhy) { fireWhy = String((e && e.message) || e); }
-      }
+      });
+    const out = [];
+    for (let k = 0; k < found.length; k++) {
+      // A fire somebody has switched off is still a placed reference. The
+      // toggled ones are the reason this asks rather than trusting the base.
+      try { if (found[k].ref.isDisabled()) { continue; } } catch (e) { }
+      out.push([found[k].x, found[k].y, found[k].z]);
+    }
+    fireHere = out;
+    fireHits = out.length;
+    log('fires: ' + out.length + ' of ours in this cell, out of ' + walked +
+        ' thing(s) looked at');
+    return fireHere;
+  }
+
+  /** How far the nearest lit fire is, or -1 when there is none in reach. */
+  function fireDistance(px, py, pz, pc) {
+    let best = -1;
+    const spots = fireSpotsHere(pc);
+    for (let i = 0; i < spots.length; i++) {
+      const dx = spots[i][0] - px;
+      const dy = spots[i][1] - py;
+      const dz = spots[i][2] - pz;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d > FIRE_REACH) { continue; }
+      if (best < 0 || d < best) { best = d; }
+      if (best <= FIRE_INSIDE) { break; }
     }
     return best;
   }
@@ -2399,7 +2522,7 @@
       night = (hour < 6 || hour >= 20) ? 1 : 0;
     } catch (e) { }
     // Asking is 44 native calls, and nobody in the water is at a fire.
-    const fire = swimming ? -1 : fireDistance(px, py, pz);
+    const fire = swimming ? -1 : fireDistance(px, py, pz, pc);
     placeFire = fire;
 
     /*
@@ -2480,8 +2603,8 @@
         }
       } catch (e) { }
       say('place: ' + line + '  [fire probe: ' + fireBases + ' bases, ' + fireHits +
-          ' in reach, ' + fireThrew + ' threw' + (fireWhy ? ' (' + fireWhy + ')' : '') + ']' +
-          looking);
+          ' in this cell of ' + fireWalked + ' looked at, ' + fireThrew + ' threw' +
+          (fireWhy ? ' (' + fireWhy + ')' : '') + ']' + looking);
     }
 
     /*

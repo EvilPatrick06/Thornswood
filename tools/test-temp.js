@@ -251,6 +251,32 @@ if (block) {
         yes('fires a mod added are in it too (' + mods.length + ')', mods.length > 0);
         yes('and the client resolves those through the file rather than an id',
             /getFormFromFile/.test(FRONT));
+        /*
+          AND IT WALKS THE CELL RATHER THAN ASKING FOR THE CLOSEST REFERENCE.
+
+          Game.findClosestReferenceOfType finds PERSISTENT references, and a
+          fire placed in an inn is not one. It answered null for all 62 bases
+          everywhere on 23 September: in the Bannered Mare fire pit, in its
+          cooking fire, in the brazier outside it. Cell.getNumRefs sees
+          temporary references too, which is the whole of the fix, so this
+          holds the shape: no closest-reference call, a walk of the cell, and
+          the four form types the table is built from.
+        */
+        /*
+          The CALL, not the word: the note explaining why that call was wrong
+          names it four times, and a check that cannot tell prose from code
+          would have to be deleted the day somebody writes the reason down.
+        */
+        yes('the client walks the cell instead of asking for the closest reference',
+            /getNumRefs\(/.test(FRONT) && /getNthRef\(/.test(FRONT) &&
+            FRONT.indexOf('sp.Game.findClosestReferenceOfType(') === -1);
+        yes('and it asks for the four form types the table is built from',
+            /const CELL_TYPES = \[24, 34, 36, 42\];/.test(FRONT));
+        yes('a fire somebody switched off is still skipped',
+            /found\[k\]\.ref\.isDisabled\(\)/.test(FRONT));
+        yes('and the walk happens once a cell rather than once a probe',
+            /if \(cellId !== fireCell\)/.test(FRONT) &&
+            /if \(fireHere\) \{ return fireHere; \}/.test(FRONT));
       }
       // The unlit ones are the trap: a name match would have warmed people up
       // at a dead campfire.
