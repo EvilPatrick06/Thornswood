@@ -117,6 +117,14 @@ if (-not $single) {
     throw "not built: $zip  (run Package-Thornswood.ps1 first, or pass -OutDir)"
   }
   $zipItem = Get-Item -LiteralPath $zip
+  # The setup program downloads this and runs the Setup.bat inside it, and
+  # until now it checked nothing but the length. The hash goes into files.json
+  # beside the name, /api/payload hands it over, and Bootstrap.cs deletes a
+  # download that does not match instead of unpacking it (To Do entry 173).
+  # Lower case, the same shape Publish-Update writes for every pack and for
+  # launcherSha256. Measured here, beside the exe's, so the $meta block below
+  # only names what was measured.
+  $zipSha = (Get-FileHash -LiteralPath $zipItem.FullName -Algorithm SHA256).Hash.ToLower()
 }
 
 if (-not $Version) {
@@ -166,13 +174,7 @@ if ($single) {
   # The payload is published but hidden. The setup program asks the site for
   # it and fetches it, so it is on here for that and not for a person to pick.
   # Two buttons was the old way and it was one of them being the wrong one.
-  #
-  # The setup program downloads this and runs the Setup.bat inside it, and
-  # until now it checked nothing but the length. The hash goes into files.json
-  # beside the name, /api/payload hands it over, and Bootstrap.cs deletes a
-  # download that does not match instead of unpacking it. Lower case, the same
-  # shape Publish-Update writes for every pack and for launcherSha256.
-  $zipSha = (Get-FileHash -LiteralPath $zipItem.FullName -Algorithm SHA256).Hash.ToLower()
+  # sha256 is what the setup program checks the download against.
   $meta = @{
     $exeOut = @{
       label   = 'Thornswood installer'

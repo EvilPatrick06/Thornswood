@@ -82,10 +82,23 @@ try {
 
     # ---- 1. Publish-Installer writes the hash into files.json -----------------
     #
-    # The block that builds $meta, from "if ($single) {" to the line that
-    # encodes it for the trip to the VPS. The rest of the script copies files
-    # to the VPS and cannot run here.
+    # Two pieces of it. The line that measures the zip, which sits where the
+    # zip is found, beside the one that measures the exe. And the block that
+    # builds $meta, from "if ($single) {" to the line that encodes it for the
+    # trip to the VPS. The rest of the script copies files to the VPS and
+    # cannot run here.
     $pub = Get-Content -LiteralPath $InstallerPath -Raw
+    $hm = [regex]::Match($pub, '(?m)^[ \t]*\$zipSha = \(Get-FileHash -LiteralPath \$zipItem\.FullName -Algorithm SHA256\)\.Hash[^\r\n]*')
+    Yes 'Publish-Installer measures the zip it publishes' ($hm.Success)
+    $hashLine = ''
+    if ($hm.Success) { $hashLine = $hm.Value.Trim() }
+    # A one file build carries the payload inside the exe and has no zip to
+    # measure, so the measuring has to sit inside the branch that found one.
+    $z0 = $pub.IndexOf('if (-not $single) {')
+    $z1 = -1
+    if ($z0 -ge 0) { $z1 = $pub.IndexOf("`n}", $z0) }
+    Yes 'and only when there is a zip to measure' ($hm.Success -and $z0 -ge 0 -and $hm.Index -gt $z0 -and $hm.Index -lt $z1)
+
     $a = $pub.IndexOf('if ($single) {')
     $b = $pub.IndexOf('$b64 = [Convert]::ToBase64String(')
     Yes 'the block that builds files.json is in Publish-Installer.ps1' ($a -ge 0 -and $b -gt $a)
@@ -96,6 +109,8 @@ try {
     $single = $false
     $Version = 'launcher 1.2.3'
     $zipItem = Get-Item -LiteralPath $zipPath
+    $zipSha = $null
+    if ($hashLine) { Invoke-Expression $hashLine }
     if ($metaBlock) { Invoke-Expression $metaBlock }
     $zipMeta = $null
     if ($meta) { $zipMeta = $meta[$zipOut] }
@@ -107,11 +122,11 @@ try {
     Yes 'written lower case, the shape launcherSha256 already has' ($wrote -cmatch '^[0-9a-f]{64}$')
     Yes 'the entry is still hidden, so nobody is offered the payload as a button' ($zipMeta -and $zipMeta['hidden'] -eq $true)
 
-    # A one file build carries the payload inside the exe and has no zip to
-    # measure, so it must not try.
+    # And the $meta block of a one file build names no zip and no zip hash.
     $meta = $null
     $single = $true
     $zipItem = $null
+    $zipSha = $null
     $oneFileOk = $true
     try { if ($metaBlock) { Invoke-Expression $metaBlock } } catch { $oneFileOk = $false }
     Yes 'a one file build still builds its entry without a zip to measure' ($oneFileOk -and $meta -and $meta.Count -eq 1)
@@ -120,6 +135,8 @@ try {
     # remote half of Publish-Installer does, byte order mark left off.
     $single = $false
     $zipItem = Get-Item -LiteralPath $zipPath
+    $zipSha = $null
+    if ($hashLine) { Invoke-Expression $hashLine }
     $meta = $null
     if ($metaBlock) { Invoke-Expression $metaBlock }
     $all = @{}
