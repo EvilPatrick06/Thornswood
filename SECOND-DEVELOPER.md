@@ -48,18 +48,30 @@ second machine.
 
 ```
 cd C:\Users\<you>\Downloads\Thornswood-Repo
+git checkout main
+git pull
 .\tools\Bump-Version.ps1
-# then the branch and pull request it prints; once that is merged:
+```
+
+The version moves first and on its own. `Bump-Version.ps1` changes `Version`
+in `tools\app\Updater.cs` (1.1.35 to 1.1.36), commits that one file, and
+prints the rest. main refuses a push from everybody, so it prints the
+commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
+push it and open the pull request, which is merged once `Launcher builds` is
+green (see Two machines shipping). Then, back on main:
+
+```
 git checkout main
 git pull
 .\tools\Ship.ps1 "what changed, in plain words"
 ```
 
-`Bump-Version.ps1` moves `Version` in `tools\app\Updater.cs` (1.1.35 to
-1.1.36), commits that one file, and prints the branch and pull request
-commands for it, because main refuses a push from everybody. Ship runs once
-that pull request is merged and pulled; it writes nothing to this repository.
-It builds the launcher, checks the client is the recorded build, then runs
+Ship writes nothing to this repository. It refuses a main release with
+anything uncommitted, with a file under `tools` that git does not know, with
+a `-Version` other than the number already on main, or with main here behind
+or ahead of `origin/main`, so what ships is what is on GitHub. It builds the
+launcher, checks that the game folder holds the recorded client build
+(`Sync-Client.ps1 -Check`), then runs
 `tools\Publish-Update.ps1`, which
 scans the game folder for loose files that are not Vortex's, not vanilla, not
 runtime and not per machine, diffs them against this machine's baseline
@@ -93,11 +105,25 @@ form.
   `tools` that git does not know. It commits and pushes nothing, so what
   shipped is already on GitHub and the other machine can `git pull` exactly
   that.
-- **Work happens on a branch.** `git checkout -b djinn/what-it-is` (or
-  `gavin/...`), small commits with plain messages, `git push -u origin
-  <branch>`, then `gh pr create --fill`. The other person reads the pull
-  request and it is merged on GitHub. Nothing is pushed over main from a
-  second machine, and nothing is force pushed.
+- **Every change goes through a pull request, Patrick's included.** Nobody
+  pushes to main from either machine; GitHub refuses it. `git checkout -b
+  djinn/what-it-is` (Patrick's start `patrick/`, older ones `gavin/`), small
+  commits with plain messages, `git push -u origin <branch>`, then
+  `gh pr create --fill` standing on the branch. Nothing is force pushed.
+- **What GitHub enforces on main, and what it does not.** Read off GitHub on
+  23 Sep, and the same on 24 Sep: `enforce_admins` is on, so the rules bind
+  the owner too; the one required check is `Launcher builds`, the one job in
+  `.github/workflows/build.yml`; required approving reviews is 0; the code
+  owner review is off. So a pull request can be merged by its own author as
+  soon as `Launcher builds` is green, and a red one cannot be merged by
+  anybody. Nothing merges by itself: auto-merge is off on the repository, so
+  somebody presses merge or runs `gh pr merge --squash`. Patrick merges his
+  own. He reads Djinn's before they are merged, and that read is a habit,
+  not a setting. `.github/CODEOWNERS` asks the other person for a review when
+  a pull request touches one of the shared files, and blocks nothing while
+  the code owner review is off. The settings change without a commit, so
+  read them rather than this paragraph:
+  `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
 - **One fix per pull request.** A branch that changes eight things is eight
   reviews at once; split it.
 - **`git pull` before anything.** A conflicting pull is resolved on your

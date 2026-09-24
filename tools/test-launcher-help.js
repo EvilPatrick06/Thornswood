@@ -306,11 +306,13 @@ function freshKey(name) {
 [
   ['SkillsKey', 'Character', 'K is your character', function (k) { return k + ' opens your profession'; }],
   ['ChatKey', 'Chat and commands', 'The chat box', function (k) { return k + ' opens it'; }],
-  ['PartyKey', 'Chat and commands', 'Friends, parties and trading', function (k) { return k + ' opens your friends and your party'; }],
+  // The party wording is test-help-parties.js's, from main (entry 336), and
+  // that harness holds the rest of the two party items to the code.
+  ['PartyKey', 'Chat and commands', 'Parties', function (k) { return k + ', unless you have moved it on the Controls page, opens your friends and your party'; }],
   ['JournalKey', 'Chat and commands', 'Journals', function (k) { return k + ' opens your journals'; }],
-  ['FriendKey', 'Chat and commands', 'Friends, parties and trading', function (k) { return 'press ' + k + ' to ask them to be friends'; }],
-  ['TradeWithKey', 'Chat and commands', 'Friends, parties and trading', function (k) { return k + ' to offer a trade'; }],
-  ['MuteThemKey', 'Chat and commands', 'Friends, parties and trading', function (k) { return k + ' to stop hearing them'; }],
+  ['FriendKey', 'Chat and commands', 'Friends and trading', function (k) { return 'press ' + k + ' to ask them to be friends'; }],
+  ['TradeWithKey', 'Chat and commands', 'Friends and trading', function (k) { return k + ' to offer a trade'; }],
+  ['MuteThemKey', 'Chat and commands', 'Friends and trading', function (k) { return k + ' to stop hearing them'; }],
   ['StopKey', 'Emotes', 'Getting out of one', function (k) { return k + ' stands you up'; }],
   ['PushToTalk', 'Chat and commands', 'Voice', function (k) { return 'Hold ' + k + ' to talk'; }]
 ].forEach(function (row) {

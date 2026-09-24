@@ -109,8 +109,21 @@ namespace Thornswood
             new HelpItem("Chat and commands", "Voice",
                 "Hold V to talk. Voice runs in the launcher rather than in the game, so leave the launcher open while you play; it minimises by itself. B steps your voice between a whisper, which carries about 7 metres, your normal voice, about 30 metres, and a yell, about 85 metres. The further away somebody is standing, the quieter you are to them."),
 
-            new HelpItem("Chat and commands", "Friends, parties and trading",
-                "Look at somebody and press G to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. P opens your friends and your party: Ask to party is beside every friend who is online, or type /party and their name, and /party leave to go. Everybody in your party has their name in green, a marker on your map and an arrow on the strip under your compass. Work done with your party in the same place counts for more. /yes and /no answer whatever somebody has asked you. Friends are kept; a party lasts until the server restarts."),
+            new HelpItem("Chat and commands", "Friends and trading",
+                "Look at somebody and press G to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. /yes and /no answer whatever somebody has asked you. Your friends are on the P panel, and friends are kept."),
+
+            // The two party items came from main (entry 336, #281), which put
+            // them in place of the old item that said there were no parties.
+            // tools\test-help-parties.js finds them by what they are about
+            // rather than by section, and holds every number, key and command
+            // in them to the gamemode, the plugin and the P panel. The friends
+            // item above says nothing about parties, so that harness does not
+            // read its "look at somebody and press" as a party key promise.
+            new HelpItem("Chat and commands", "Parties",
+                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, press Enter and type /party and their name, or press Ask to party beside a friend who is online. They have forty five seconds to say /yes or /no, or to press Yes or No on their own P panel. A party holds up to six. /party on its own says who is in yours, and /party leave takes you out. Logging out takes you out too, and every party ends when the server restarts."),
+
+            new HelpItem("Chat and commands", "Finding your party",
+                "Everybody in your party has their name in green above their head, a marker on your map, and an arrow on a strip under your compass with how far away they are. Green on the strip means the same place as you, gold means somewhere else. The strip is ours rather than Skyrim's own compass, and the marker is for walking to: you cannot fast travel to it. Work done with somebody from your party in the same place counts 15 per cent more. Meet up by walking, or by picking the same town when you make your characters."),
 
             new HelpItem("Chat and commands", "Journals",
                 "J opens your journals and their pages. You can share a whole journal, or one page of it, with a friend."),
