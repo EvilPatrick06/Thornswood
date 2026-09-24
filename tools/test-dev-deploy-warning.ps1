@@ -28,6 +28,15 @@
   The rest of the deploy is read, not run: where the warning sits against the
   stop is checked on the parsed script.
 
+  AND A SERVER THAT IS NOT RUNNING. A review on 24 September found the read
+  trusted online.json with nothing on the port: {"now":1} left by a killed
+  process read as one on, the warning went out to nobody, and restart.json
+  sat in the data folder until the next boot counted down on its own. The
+  read now runs here with a real UDP socket on loopback standing in for the
+  server, and with none. The stop block is taken out of the deploy and run
+  here too, against a temp folder, with everything in it that stops a task or
+  a process replaced by a stand-in.
+
   Never connects to anything.
 #>
 [CmdletBinding()]
@@ -230,8 +239,10 @@ function Said([string]$pattern) {
     return $false
 }
 
-$dev    = 'PORT 7787'
+$dev    = 'PORT 7787|UP yes'
+$down   = 'PORT 7787|UP no'
 $devDat = 'DATA C:/Thornswood-Server-Dev/data'
+$udp    = $null
 
 try {
     # ---- the read, run the way the box would run it -------------------------------
@@ -244,13 +255,24 @@ try {
     $script:local = $true
     $wantData = [IO.Path]::Combine($box, 'data').Replace('\', '/')
 
-    [IO.File]::WriteAllText($settings, '{"port":7787,"name":"Thornswood Dev","dataDir":"data"}')
+    # The server, as far as the read can tell: something on the game port. A
+    # UDP socket on loopback, so no firewall is asked about it. A second one
+    # is opened and closed for a port with nothing on it.
+    $loop = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Loopback, 0)
+    $udp = New-Object System.Net.Sockets.UdpClient($loop)
+    $upPort = $udp.Client.LocalEndPoint.Port
+    $gone = New-Object System.Net.Sockets.UdpClient($loop)
+    $downPort = $gone.Client.LocalEndPoint.Port
+    $gone.Close()
+
+    [IO.File]::WriteAllText($settings, ('{"port":' + $upPort + ',"name":"Thornswood Dev","dataDir":"data"}'))
     [IO.File]::WriteAllText($online, '{"now":3,"at":1790000000000,"restarting":false}')
     $script:reads = 0
     $r = Get-DevRoom
-    Yes "the box's own settings give the port (got $($r.Port))" ($r.Port -eq 7787)
+    Yes "the box's own settings give the port (got $($r.Port))" ($r.Port -eq $upPort)
     Yes "and the data folder the gamemode writes online.json to (got $($r.Data))" ($r.Data -eq $wantData)
     Yes "and online.json gives the head count (got $($r.Online))" ($r.Online -eq 3)
+    Yes 'and it sees the server on its port' ($r['Up'] -eq $true)
 
     Remove-Item -LiteralPath $online -Force
     $r = Get-DevRoom
@@ -274,11 +296,53 @@ try {
     $elsewhere = Join-Path $work 'elsewhere'
     New-Item -ItemType Directory -Path $elsewhere -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $elsewhere 'online.json'), '{"now":5}')
-    $json = (@{ port = 7787; dataDir = $elsewhere } | ConvertTo-Json -Compress)
+    $json = (@{ port = $upPort; dataDir = $elsewhere } | ConvertTo-Json -Compress)
     [IO.File]::WriteAllText($settings, $json)
     $r = Get-DevRoom
     Yes 'a dataDir written as a full path is read where it points' (
         $r.Data -eq $elsewhere.Replace('\', '/') -and $r.Online -eq 5)
+
+    # What the review measured: a count left behind by a process that is gone.
+    [IO.File]::WriteAllText($settings, ('{"port":' + $downPort + ',"dataDir":"data"}'))
+    [IO.File]::WriteAllText($online, '{"now":1,"at":1790000000000,"restarting":false}')
+    $r = Get-DevRoom
+    Yes "nothing on the port is read as nothing there (port $downPort)" ($r['Up'] -eq $false)
+    Yes 'so a count left in online.json by a server that is gone is nobody on' ($r.Online -eq 0)
+    Yes 'and the count it left is kept to say so' ($r['Stale'] -eq 1)
+
+    # And the stop, run here. The things that would stop a task or a process
+    # are functions in front of the cmdlets, which PowerShell prefers, so
+    # nothing on this machine is touched whatever is on that port.
+    $stopAst = @($ast.EndBlock.Statements | Where-Object {
+        $_ -is [System.Management.Automation.Language.PipelineAst] -and
+        $_.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst] -and
+        $_.PipelineElements[0].GetCommandName() -eq 'Remote' -and
+        $_.Extent.Text -match 'Stop-ScheduledTask' })
+    Yes 'the deploy has one stop block to run' ($stopAst.Count -eq 1)
+    if ($stopAst.Count -eq 1) {
+        $Task = 'thornswood-test-no-such-task'
+        $stopText = Invoke-Expression $stopAst[0].PipelineElements[0].CommandElements[1].Extent.Text
+        $standIns = @'
+function Stop-ScheduledTask { }
+function Stop-Process { 'stand-in asked to stop ' + ($args -join ' ') }
+function Get-NetUDPEndpoint { }
+function Get-NetTCPConnection { }
+function Start-Sleep { }
+
+'@
+        $request = Join-Path $boxData 'restart.json'
+        [IO.File]::WriteAllText($request, '{"seconds":60,"mode":"notice","why":"a gamemode update"}')
+        $said = @(RunHere ($standIns + $stopText))
+        Yes 'the stop removes a restart.json the old process never read' (-not (Test-Path -LiteralPath $request))
+        Yes 'and says it did' (@($said | Where-Object { $_ -match 'removed a restart.json' }).Count -eq 1)
+        Yes 'and leaves the rest of the data folder alone' (Test-Path -LiteralPath $online)
+        Yes 'and still gets to the end' ($said -contains 'stopped')
+        Yes 'with nothing on this machine stopped' (@($said | Where-Object { $_ -match 'stand-in asked' }).Count -eq 0)
+
+        $said = @(RunHere ($standIns + $stopText))
+        Yes 'with no restart.json there it says nothing about one' (
+            @($said | Where-Object { $_ -match 'restart.json' }).Count -eq 0 -and $said -contains 'stopped')
+    }
 
     Remove-Item -LiteralPath $settings -Force
     $r = Get-DevRoom
@@ -296,6 +360,29 @@ try {
     Yes 'and there is no wait' ($script:slept -eq 0)
     Yes 'and it says so' (Said 'nobody is on the dev server')
     Yes 'and carries on to the stop' ($script:threw -eq '')
+
+    # ---- a server that is not running ------------------------------------------------
+    # What the review measured: online.json still saying one, nothing on the port.
+    # Before this the deploy asked for a warning nobody could hear, waited the
+    # full 80 seconds saying '1 still on', and left restart.json behind.
+    Drive "$down|$devDat|ONLINE 1"
+    Yes 'not running: no warning is asked for, whatever online.json says' (@(Asked).Count -eq 0)
+    Yes 'and there is no wait' ($script:slept -eq 0)
+    Yes 'and it says the server is not running' (Said 'not running')
+    Yes 'and what online.json still says' (Said 'still says 1')
+    Yes 'and carries on to the stop' ($script:threw -eq '')
+
+    Drive "$down|$devDat|ONLINE unreadable"
+    Yes 'not running with an unreadable count is still nobody, with no second look' (
+        $script:threw -eq '' -and $script:reads -eq 1 -and @(Asked).Count -eq 0)
+
+    Drive "PORT 7787|$devDat|ONLINE 2"
+    Yes 'a box that could not list its ports keeps the count, and warns' (
+        $script:threw -eq '' -and @(Asked).Count -eq 1)
+
+    Drive "$dev|$devDat|ONLINE 2", "$down|$devDat|ONLINE 2"
+    Yes "a server that goes down during the wait ends the wait (waited $($script:slept))" (
+        $script:threw -eq '' -and $script:slept -eq 15)
 
     # ---- three on, the default notice -----------------------------------------------
     Drive "$dev|$devDat|ONLINE 3"
@@ -376,6 +463,7 @@ try {
     $Now = $false
 }
 finally {
+    if ($udp) { $udp.Close() }
     Remove-Item Env:\THORNSWOOD_TEST_ASK_EXIT -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }

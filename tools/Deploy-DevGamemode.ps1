@@ -61,6 +61,13 @@
   there and the dev server is left running exactly as it was. -Now is how to
   take it down anyway, for a fix that cannot wait a minute.
 
+  A server that is not running has nobody on it, whatever online.json says.
+  The gamemode writes that file only when the count moves, so a killed or
+  crashed process leaves its last count behind. The same read asks whether
+  anything is on the dev game port, and nothing there means nobody on. And
+  the stop removes any restart.json the old process never read, so the next
+  one does not find it and count down on its own.
+
   THE LOAD ORDER, AND WHY -LoadOrder HAD TO EXIST.
 
   Until 22 September nothing in this repo could move a load order onto the dev
@@ -274,13 +281,23 @@ if ($LoadOrder) {
 function Read-DevRoom($lines) {
   # What the box answered, as the port, the data folder and a head count.
   # Online -1 means it could not tell, which is not the same thing as nobody.
-  $room = @{ Port = 0; Data = ''; Online = -1; Said = @($lines) }
+  $room = @{ Port = 0; Data = ''; Online = -1; Up = $null; Stale = -1; Said = @($lines) }
   foreach ($line in @($lines)) {
     $t = "$line".Trim()
     if ($t -match '^PORT (\d+)$') { $room.Port = [int]$Matches[1] }
     elseif ($t -match '^DATA (.+)$') { $room.Data = $Matches[1].Trim() }
     elseif ($t -match '^ONLINE (\d+)$') { $room.Online = [int]$Matches[1] }
+    elseif ($t -match '^UP (yes|no)$') { $room.Up = ($Matches[1] -eq 'yes') }
   }
+  # Nothing on the game port is no server, and no server has nobody on it,
+  # whatever online.json says. The gamemode writes that file only when the
+  # count moves, so a process that was killed or crashed leaves its last count
+  # behind. Measured in review on 24 September: online.json {"now":1} with
+  # nothing on the port read as one on, and this warned a room that was not
+  # there, waited 80 seconds, and left restart.json for the next boot. When
+  # the box could not list its ports there is no UP line, and the count is
+  # kept, which errs toward a warning.
+  if ($room.Up -eq $false) { $room.Stale = $room.Online; $room.Online = 0 }
   return $room
 }
 
@@ -292,13 +309,23 @@ function Get-DevRoom {
   # file with no count in it is unknown: node empties it before it writes, and
   # Windows PowerShell reads an empty file as nothing at all rather than an
   # error, which came out as nobody on until the test for this caught it.
+  # UP says whether anything is on the game port. Every endpoint is listed and
+  # filtered here, because -LocalPort with nothing on it is an error, and an
+  # error has to stay distinct from nothing there.
   Read-DevRoom (Remote @"
 `$s = Get-Content '$rootWin\server-settings.json' -Raw | ConvertFrom-Json
-'PORT ' + [int]`$s.port
+`$port = [int]`$s.port
+'PORT ' + `$port
 `$d = 'data'
 if (`$s.dataDir) { `$d = [string]`$s.dataDir }
 `$d = [IO.Path]::Combine('$rootWin', `$d)
 'DATA ' + `$d.Replace('\', '/')
+if (`$port -gt 0) {
+  try {
+    `$u = @(Get-NetUDPEndpoint -EA Stop | Where-Object { `$_.LocalPort -eq `$port })
+    if (`$u.Count) { 'UP yes' } else { 'UP no' }
+  } catch { }
+}
 `$o = Join-Path `$d 'online.json'
 if (-not (Test-Path `$o)) { 'ONLINE 0' }
 else {
@@ -345,6 +372,13 @@ function Warn-DevRoom {
   }
 
   if ($room.Online -eq 0) {
+    if ($room.Up -eq $false) {
+      Write-Host ('  the dev server is not running, nothing is on UDP {0}, so nobody is on it' -f $room.Port)
+      if ($room.Stale -gt 0) {
+        Write-Host ('  online.json still says {0}, left over from before it stopped' -f $room.Stale) -ForegroundColor DarkGray
+      }
+      return
+    }
     Write-Host '  nobody is on the dev server, going straight down'
     return
   }
@@ -408,6 +442,15 @@ Warn-DevRoom
 # The port comes from the dev server's own settings on the box, so the process
 # stopped is the one on that port and nothing else. 7777 is the live server;
 # refusing it here is what makes this script safe to run without thinking.
+#
+# Once the process is gone, so is any restart.json it never read. The gamemode
+# deletes that file when it reads it, and a process that is down, or whose
+# gamemode failed at load, never does. The next one to start then finds it
+# within a tick and a half and counts down on its own: under -Mode notice a
+# "Pushing a server update in 1 minute" with nothing behind it, to people who
+# have just come back to the fixed server, and under -Mode restart a kick a
+# minute after boot with no restart behind it, which is the empty world with
+# no NPCs that Request-Restart's -RestartFollows guard exists to prevent.
 Write-Host ''
 Write-Host 'Stopping the dev server...'
 Remote @"
@@ -426,6 +469,13 @@ Start-Sleep -Seconds 2
 if (Test-Path '$rootWin\gamemode.js') {
   Copy-Item '$rootWin\gamemode.js' ('$rootWin\gamemode.js.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
   'kept the old gamemode beside it as gamemode.js.before-<stamp>'
+}
+`$d = 'data'
+if (`$s.dataDir) { `$d = [string]`$s.dataDir }
+`$rq = Join-Path ([IO.Path]::Combine('$rootWin', `$d)) 'restart.json'
+if (Test-Path -LiteralPath `$rq) {
+  try { Remove-Item -LiteralPath `$rq -Force -EA Stop; 'removed a restart.json the old process never read' }
+  catch { 'COULD NOT REMOVE ' + `$rq + ', so the new process will count down on its own: ' + `$_.Exception.Message }
 }
 'stopped'
 "@ | ForEach-Object { "  $_" }
