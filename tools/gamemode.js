@@ -20236,13 +20236,19 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
 
     onActivate    Pressing E on anything. mp.onActivate refuses on named paths
                   only: a bench that is not theirs, a locked door whose client
-                  lock did not run, the spoils rule, and the stations, crops,
-                  plants, fish, game, veins and bodies this server hands out
-                  itself. Every other door, chest and item falls off the end,
-                  and Skyrim does what it always did.
+                  lock did not run (never a door that is a way out, WAY_OUT),
+                  the spoils rule, and the stations, crops, plants, fish,
+                  game, veins and bodies this server hands out itself. Every
+                  other door, chest and item falls off the end, and Skyrim
+                  does what it always did.
     onCraft       A finished craft. mp.onCraft refuses a recipe nobody makes
                   here, or one the person's trade, rank or race does not
-                  allow, and a refusal keeps their materials.
+                  allow; a key with no stamped mold; a hafted thing with no
+                  handle in the pack; a brew or an enchantment by somebody
+                  whose trade is not that bench's; and a craft that matched no
+                  recipe but makes an item a recipe here owns, asked the same
+                  race, profession and rank question (tempering still comes
+                  through). A refusal keeps their materials.
     onPutItem     Putting into a container. mp.onPutItem refuses anything but
                   coin into a hold's box, and says nothing about any other
                   container.
