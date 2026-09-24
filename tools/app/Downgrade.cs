@@ -489,16 +489,17 @@ namespace Thornswood
             // seconds, and the console is asked for again halfway.
             bool front = false;
             bool reopened = false;
+            IntPtr h = IntPtr.Zero;
             DateTime start = DateTime.Now;
             while (!front && (DateTime.Now - start).TotalSeconds < 20)
             {
                 Thread.Sleep(500);
-                IntPtr h = MainWindow();
+                h = MainWindow();
                 if (h == IntPtr.Zero) continue;
                 SayWindow(h, log);
                 BringToFront(h);
                 Thread.Sleep(400);
-                front = ForegroundIsSteam();
+                front = SteamInFront(h);
                 if (!front && !reopened && (DateTime.Now - start).TotalSeconds > 8)
                 {
                     reopened = true;
@@ -509,7 +510,7 @@ namespace Thornswood
 
             // A moment for the console page to finish drawing.
             Thread.Sleep(1200);
-            if (!ForegroundIsSteam()) return false;
+            if (!SteamInFront(h)) return false;
 
             // Then a click on the command line. Opening the console puts the
             // keyboard there when the page is new, and not when the tab was
@@ -519,9 +520,9 @@ namespace Thornswood
             // not to its input. The command line sits along the bottom of the
             // console page, above the status bar, and that is where this
             // clicks, scaled for the monitor Steam is on.
-            ClickCommandLine(MainWindow());
+            ClickCommandLine(h);
             Thread.Sleep(150);
-            if (!ForegroundIsSteam()) return false;
+            if (!SteamInFront(h)) return false;
 
             // Whatever is on the command line goes first. The retry used to
             // type the command a second time onto the first one, and Steam ran
@@ -559,7 +560,10 @@ namespace Thornswood
         {
             try
             {
-                ShowWindow(h, SW_RESTORE);
+                // Restored only when it is minimised. Restoring a maximised
+                // window un-maximises it, which every attempt did to Steam once
+                // its real window was the one found (review, 24 September).
+                if (IsIconic(h)) ShowWindow(h, SW_RESTORE);
                 uint pid;
                 uint steamThread = GetWindowThreadProcessId(h, out pid);
                 uint me = GetCurrentThreadId();
@@ -573,7 +577,7 @@ namespace Thornswood
                 {
                     if (attached) AttachThreadInput(me, steamThread, false);
                 }
-                if (ForegroundIsSteam()) return;
+                if (SteamInFront(h)) return;
                 Key(VK_MENU);
                 Thread.Sleep(50);
                 SetForegroundWindow(h);
@@ -598,7 +602,7 @@ namespace Thornswood
             if (h == IntPtr.Zero) return;
             BringToFront(h);
             Thread.Sleep(300);
-            if (ForegroundIsSteam()) ClickCommandLine(h);
+            if (SteamInFront(h)) ClickCommandLine(h);
         }
 
         /// <summary>
@@ -644,6 +648,25 @@ namespace Thornswood
                 GetWindowThreadProcessId(fg, out pid);
                 if (pid == 0) return false;
                 return IsSteam(Process.GetProcessById((int)pid).ProcessName);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Steam is in front, and it is the window this brought forward or a
+        /// window inside it. Any Steam window was not enough once windows drawn
+        /// by steamwebhelper counted as Steam's: the Friends list, a chat window
+        /// or the sign-in box can be the one in front, and a download_depot line
+        /// and two Enters typed into a chat would go to a friend as a message.
+        /// Found in review, 24 September.
+        /// </summary>
+        static bool SteamInFront(IntPtr h)
+        {
+            if (h == IntPtr.Zero || !ForegroundIsSteam()) return false;
+            try
+            {
+                IntPtr fg = GetForegroundWindow();
+                return fg == h || GetAncestor(fg, GA_ROOT) == h;
             }
             catch { return false; }
         }
@@ -904,6 +927,7 @@ namespace Thornswood
         // ------------------------------------------------------------ win32
 
         const int SW_RESTORE = 9;
+        const uint GA_ROOT = 2;
         const ushort VK_RETURN = 0x0D;
         const ushort VK_MENU = 0x12;
         const ushort VK_CONTROL = 0x11;
@@ -942,6 +966,8 @@ namespace Thornswood
         [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
         [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
         [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
+        [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);

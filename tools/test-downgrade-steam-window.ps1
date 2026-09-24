@@ -106,6 +106,7 @@ function Get-Member([string]$all, [string]$signature) {
 
 $wanted = [ordered]@{
     'ForegroundIsSteam' = 'static bool ForegroundIsSteam()'
+    'SteamInFront'      = 'static bool SteamInFront(IntPtr h)'
     'MainWindow'        = 'static IntPtr MainWindow()'
     'IsSteam'           = 'static bool IsSteam(string processName)'
     'SteamNames'        = 'static readonly string[] SteamNames ='
@@ -162,7 +163,7 @@ namespace Probe
 
     public class Win
     {
-        public IntPtr Handle; public uint Pid; public bool Visible; public int Width, Height; public string Title;
+        public IntPtr Handle; public uint Pid; public bool Visible; public int Width, Height; public string Title; public IntPtr Root;
     }
 
     public static class Downgrade
@@ -185,6 +186,8 @@ namespace Probe
             Desktop.Add(w);
         }
         public static void SetForeground(long h) { Foreground = new IntPtr(h); }
+        // A window inside another: GetAncestor(GA_ROOT) answers the outer one.
+        public static void SetRoot(long h, long root) { Win w = Find(new IntPtr(h)); if (w != null) w.Root = new IntPtr(root); }
 
         static Win Find(IntPtr h) { foreach (Win w in Desktop) if (w.Handle == h) return w; return null; }
 
@@ -199,6 +202,8 @@ namespace Probe
             r.Left = 40; r.Top = 30; r.Right = 40 + w.Width; r.Bottom = 30 + w.Height; return true;
         }
         static IntPtr GetForegroundWindow() { return Foreground; }
+        const uint GA_ROOT = 2;
+        static IntPtr GetAncestor(IntPtr h, uint flags) { Win w = Find(h); return (w != null && w.Root != IntPtr.Zero) ? w.Root : h; }
         static int GetWindowText(IntPtr h, StringBuilder text, int max) { Win w = Find(h); if (w == null || w.Title == null) return 0; text.Append(w.Title); return w.Title.Length; }
         static void TryClipboard(string text) { Clipboard.Add(text); }
         static void FlashLauncher() { Flashes++; }
@@ -320,6 +325,25 @@ try {
         Call 'SetForeground' @([long]0xB1) | Out-Null
         Yes ("a window of a process named {0} does not count as Steam's" -f $name) (-not [bool](Call 'ForegroundIsSteam' @()))
         Measured
+    }
+    # Review, 24 September: any steamwebhelper window counting as Steam's let a
+    # Friends list, chat or sign-in window in front take the keys, and a chat
+    # would have sent the download_depot line to a friend.
+    if (Has 'SteamInFront') {
+        Call 'Reset' @() | Out-Null
+        Call 'AddProcess' @(700, 'steamwebhelper') | Out-Null
+        Call 'AddWindow' @([long]0x71, 700, $true, 2308, 927, 'Steam') | Out-Null
+        Call 'AddWindow' @([long]0x72, 700, $true, 300, 600, 'Friends List') | Out-Null
+        Call 'AddWindow' @([long]0x73, 700, $true, 400, 30, '') | Out-Null
+        Call 'SetRoot' @([long]0x73, [long]0x71) | Out-Null
+        Call 'SetForeground' @([long]0x71) | Out-Null
+        Yes "Steam's own window in front is Steam in front" ([bool](Call 'SteamInFront' @([IntPtr]0x71)))
+        Call 'SetForeground' @([long]0x73) | Out-Null
+        Yes 'and so is a window inside it' ([bool](Call 'SteamInFront' @([IntPtr]0x71)))
+        Call 'SetForeground' @([long]0x72) | Out-Null
+        Yes 'but the Friends list or a chat in front is not, though steamwebhelper draws it too' (-not [bool](Call 'SteamInFront' @([IntPtr]0x71)))
+        Call 'SetForeground' @([long]0x71) | Out-Null
+        Yes 'and no window at all is never in front' (-not [bool](Call 'SteamInFront' @([IntPtr]::Zero)))
     }
     if (Has 'IsSteam') {
         Yes 'IsSteam takes steam and steamwebhelper in any case, and nothing else' (
@@ -447,11 +471,12 @@ if ($type) {
     # The trap in the entry: never type or click unless Steam's window is
     # really in front, exactly as before. Three checks, and the click and the
     # keys each come after one.
-    Yes 'Steam being in front is still checked three times' (([regex]::Matches($type, 'ForegroundIsSteam\(\)')).Count -eq 3)
+    Yes 'Steam being in front is still checked three times, each time for the window brought forward' (([regex]::Matches($type, 'SteamInFront\(h\)')).Count -eq 3)
+    Yes 'and the click goes to that same window' ($type -match 'ClickCommandLine\(h\);')
     # Right after one: nothing but comments and Thread.Sleep between the check
     # and the click, and between the next check and the keys.
     function Guarded([string]$in, [string]$act) {
-        $check = 'if (!ForegroundIsSteam()) return false;'
+        $check = 'if (!SteamInFront(h)) return false;'
         $iAct = $in.IndexOf($act)
         if ($iAct -lt 0) { return $false }
         $iChk = $in.LastIndexOf($check, $iAct)
@@ -463,7 +488,7 @@ if ($type) {
     }
     Yes 'the click comes straight after a check that Steam is in front' (Guarded $type 'ClickCommandLine(')
     Yes 'and the keys come straight after another' (Guarded $type 'Chord(')
-    Yes 'and the two checks are not the same one' ($type.LastIndexOf('if (!ForegroundIsSteam()) return false;', $type.IndexOf('Chord(')) -gt $type.IndexOf('ClickCommandLine('))
+    Yes 'and the two checks are not the same one' ($type.LastIndexOf('if (!SteamInFront(h)) return false;', $type.IndexOf('Chord(')) -gt $type.IndexOf('ClickCommandLine('))
 }
 $flash = Get-Member $text 'static void FlashLauncher()'
 Yes 'FlashLauncher is found' ($null -ne $flash)
