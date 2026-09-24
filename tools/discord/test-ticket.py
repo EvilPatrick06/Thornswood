@@ -125,6 +125,9 @@ class Thread(object):
 
 
 class Channel(object):
+    """The panel's channel, which everybody in the server can read."""
+    said = 'written in the panel channel'
+
     def __init__(self, name, events, refuse_thread=False):
         self.name = name
         self.events = events
@@ -146,7 +149,29 @@ class Channel(object):
     async def send(self, text):
         await asyncio.sleep(0)
         self.sent.append(text)
-        self.events.append('written in the channel')
+        self.events.append(self.said)
+
+
+class Seen(object):
+    def __init__(self, view_channel):
+        self.view_channel = view_channel
+
+
+class StaffChannel(Channel):
+    """
+    The staff only log channel a ticket goes to when its thread will not open.
+    Only the bot can see it among the things log_channel asks about, because
+    the one role here is staff and staff are not asked.
+    """
+    said = 'written in the staff channel'
+
+    def permissions_for(self, who):
+        return Seen(bool(getattr(who, 'bot', False)))
+
+
+class NoManage(object):
+    """The bot cannot make channels, so a missing log channel stays missing."""
+    manage_channels = False
 
 
 class Guild(object):
@@ -154,8 +179,10 @@ class Guild(object):
         self.id = 7
         self.text_channels = channels
         self.voice_channels = []
-        self.roles = roles
+        self.default_role = Role('@everyone', [])
+        self.roles = [self.default_role] + roles
         self.me = Member(1, 'thornswood', is_bot=True)
+        self.me.guild_permissions = NoManage()
 
     def get_thread(self, tid):
         for ch in self.text_channels:
@@ -236,8 +263,9 @@ def submit(where, refuse_reply=False, real_push=False):
     One ticket, from Submit to the site copy landing.
 
     where is 'thread' (the thread opens), 'channel' (the thread is refused, so
-    it falls back to the channel) or 'nowhere' (no tickets channel at all, so
-    the person is sent a message). Returns everything that was recorded.
+    it falls back to the staff only log channel) or 'nowhere' (no tickets
+    channel and no staff channel at all, so the person is sent a message).
+    Returns everything that was recorded.
     """
     out = {'events': [], 'calls': [], 'seen': [], 'lines': [],
            'raised': None, 'in_flight': None, 'left': None, 'stored': None}
@@ -256,10 +284,12 @@ def submit(where, refuse_reply=False, real_push=False):
         if where != 'nowhere':
             channels.append(Channel(bot.TICKETS[0], events,
                                     refuse_thread=(where == 'channel')))
+            channels.append(StaffChannel(bot.TICKET_LOG[0], events))
         guild = Guild(channels, [Role('Moderator', [staff])])
         inter = Interaction(guild, who, events, refuse_reply)
         out['who'] = who
         out['channel'] = channels[0] if channels else None
+        out['staff'] = channels[1] if channels else None
         out['followup'] = inter.followup
 
         keep = (bot.push, bot.log, bot.KEY, urllib.request.urlopen)
@@ -341,21 +371,26 @@ yes('T1 nothing raised', r['raised'] is None)
 yes('T1 the thread is written down as their one open ticket',
     r['stored'] == {'7:42': 900})
 
-# T2: the thread is refused, so the ticket goes into the channel instead. Same
+# T2: the thread is refused, so the ticket goes to the staff only log channel
+#     instead (test-ticket-fallback.py is where that fallback is tested). Same
 #     answer: told as soon as it is there, not when the site has had its say.
 r = submit('channel')
 ev = r['events']
-yes('T2 the ticket is in the channel before anybody is told it exists',
-    before(ev, 'written in the channel', 'acknowledged'))
+yes('T2 the ticket is in the staff channel before anybody is told it exists',
+    before(ev, 'written in the staff channel', 'acknowledged'))
+yes('T2 and none of it went into the panel channel, which everybody can read',
+    r['channel'].sent == [])
 yes('T2 THE REPLY GOES OUT BEFORE THE SITE HAS ANSWERED',
     before(ev, 'acknowledged', 'site push finished'))
-yes('T2 the reply says it went to the channel',
+yes('T2 the reply says it went to staff, somewhere only staff can read it',
     r['followup'].said
-    and r['followup'].said[0][0].startswith('Sent. A private thread would not open'))
+    and r['followup'].said[0][0].startswith('Sent. A private thread would not open')
+    and 'only staff can read' in r['followup'].said[0][0])
 yes('T2 the site copy still goes, once', pushed_once(r))
 yes('T2 nothing raised', r['raised'] is None)
 
-# T3: no tickets channel at all. The person gets a message, then the reply.
+# T3: no tickets channel and no staff channel at all. The person gets a
+#     message, then the reply.
 r = submit('nowhere')
 ev = r['events']
 yes('T3 the direct message goes before the reply',
@@ -398,6 +433,12 @@ yes('every case was let through by the ticket limit, none by its failing',
             for line in ALL_LINES))
 yes('and no open ticket failed to be written down',
     not any(line.startswith('could not write down which ticket')
+            for line in ALL_LINES))
+# The same for the staff channel: found or not found by log_channel's own
+# checks, never missed because a fake could not answer what it asked.
+yes('and the staff channel was looked for without anything falling over',
+    not any(line.startswith('could not look for the staff only log channel')
+            or line.startswith('could not read the permissions on')
             for line in ALL_LINES))
 
 shutil.rmtree(TMP, ignore_errors=True)
