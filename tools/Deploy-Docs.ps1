@@ -169,9 +169,15 @@ if ($SeedDocs -or $Boards -or $docNames.Count) {
   # away an evening of edits before now: -SeedDocs flattens the lot, -Boards
   # flattens board.json, and a board is the thing most likely to have been
   # typed into five minutes ago.
+  #
+  # The \* matters. -Include filters only what a wildcard or -Recurse has
+  # already gathered, so on the bare folder it matched nothing and this said
+  # "backed up 0 document(s)" on every run: no -Docs, -Boards or -SeedDocs
+  # ever left the .bak the messages below promise. Measured 24 September on
+  # Windows PowerShell 5.1: 0 files without it, every .md and .json with it.
   Remote @"
 `$n = 0
-foreach (`$f in Get-ChildItem '$rootWin\data' -File -Include *.md,*.json -EA SilentlyContinue) {
+foreach (`$f in Get-ChildItem '$rootWin\data\*' -File -Include *.md,*.json -EA SilentlyContinue) {
   Copy-Item `$f.FullName (`$f.FullName + '.bak') -Force -EA SilentlyContinue
   `$n++
 }
