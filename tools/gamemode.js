@@ -453,6 +453,14 @@ function ensureProperties() {
       updateOwner: swingScript(),
       updateNeighbor: '',
     });
+    // The clothes somebody has been handed, which nothing else can put on
+    // them. See the note over WEAR_PROPERTY.
+    mp.makeProperty(WEAR_PROPERTY, {
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: wearScript(),
+      updateNeighbor: '',
+    });
     /*
       SOMETHING ON THE SCREEN, FOR THE THINGS PEOPLE MUST NOT MISS.
 
@@ -2041,6 +2049,78 @@ const DEPOSIT_SIZE = 20;
 const SWING_PROPERTY = 'thornswoodSwing';
 
 /*
+  ===================== PUT YOUR CLOTHES ON =================================
+
+  Patrick, 23 September, and it has been reported since the 21st: "Still
+  spawned in with no clothes on".
+
+  THE SERVER CANNOT DRESS ANYBODY, and that is the whole of it. giveShift
+  puts a Roughspun Tunic and Footwraps in the pack with worn set on the
+  INVENTORY entry, which is the only thing a gamemode can write: the
+  equipment record is a separate field and its property binding has a Get
+  and no Set. So the items arrive and nothing on the client ever equips
+  them. The client dresses itself from the EQUIPMENT record, which for a
+  new character is empty, so the character stands there in their skin with
+  a tunic in the pack.
+
+  That is one half of why clothes never changed the temperature either: the
+  equipment update the client sends is what fills the server's record, and a
+  client that was never asked to wear anything sends nothing to record.
+
+  So the server asks, the same way it asks for a swing: an updateOwner
+  script, edge triggered on a stamp through ctx.state, that equips the base
+  ids it is given. Silently and without preventing removal, so nothing here
+  can trap anything on anybody, and they can take it off the moment they
+  find something better.
+*/
+const WEAR_PROPERTY = 'thornswoodWear';
+
+function wearScript() {
+  return [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || !v.at || !v.ids || !v.ids.length) { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodWearAt === v.at) { return; }',
+    '    st.thornswoodWearAt = v.at;',
+    '    var sp = ctx.sp;',
+    '    var pc = sp.Game.getPlayer();',
+    '    if (!pc) { return; }',
+    '    for (var i = 0; i < v.ids.length; i++) {',
+    '      try {',
+    '        var it = sp.Form.from(sp.Game.getFormEx(v.ids[i]));',
+    '        if (it) { pc.equipItem(it, false, true); }',
+    '      } catch (e) { }',
+    '    }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+}
+
+/*
+  Ask somebody to put something on, and take the ask back afterwards.
+
+  Cleared for the same reason the swing is: a property left on a character is
+  stored, handed to the owner again at the next login, and played again by a
+  client that has never seen it. A stale one would re-dress somebody in
+  clothes they had deliberately taken off.
+*/
+function wearThese(actorId, baseIds) {
+  const ids = [];
+  for (let i = 0; i < (baseIds || []).length; i++) {
+    const id = Number(baseIds[i]) || 0;
+    if (id) { ids.push(id); }
+  }
+  if (!ids.length) { return; }
+  try { mp.set(actorId, WEAR_PROPERTY, { ids: ids, at: Date.now() }); } catch (e) { return; }
+  setTimeout(function () {
+    try { mp.set(actorId, WEAR_PROPERTY, { ids: [], at: 0 }); } catch (e) { }
+  }, 4000);
+}
+
+/*
   THE ONE WAY TO PUT SOMETHING IN FRONT OF SOMEBODY'S EYES.
 
   Patrick, 22 September, about the restart countdown: "I need it to do an
@@ -3365,6 +3445,24 @@ function giveShift(actorId) {
     added++;
   }
   if (added) { mp.set(actorId, 'inventory', { entries: entries }); }
+
+  /*
+    AND PUT IT ON, which nothing has ever done.
+
+    The worn flag above is on the inventory entry, and the client dresses
+    itself out of the equipment record, which is a different field the
+    gamemode cannot write. So the shift arrived in the pack and stayed there,
+    which is "I came in with no clothes on" as reported on 21 and 23
+    September. Asked for whether anything was added or not: somebody who
+    already had the shift in their pack and was not wearing it is the same
+    person with the same problem.
+  */
+  const toWear = [];
+  for (const pair of SHIFT) {
+    const baseId = idOf(pair[0]);
+    if (baseId) { toWear.push(baseId); }
+  }
+  wearThese(actorId, toWear);
 
   /*
     SAID OUT LOUD, because "people are not loading in with their clothes on"

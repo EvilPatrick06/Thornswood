@@ -222,6 +222,37 @@ function frame(payload) {
   return Buffer.concat([head, data]);
 }
 
+/*
+  EVERY OPEN SOCKET, SO A QUIET ONE CAN BE KEPT ALIVE.
+
+  Patrick, 23 September, with it on his screen: "Chat lost the server. Trying
+  again." over and over while the service was up the whole time and the game
+  never noticed anything.
+
+  This service answered pings and never sent one. A websocket that says
+  nothing for long enough is closed by whatever is between the two ends, and
+  between these two ends is Caddy: the chat page reaches the service through
+  wss://thornswood.net/voice/, which is a reverse proxy, and a proxy that
+  sees no traffic eventually drops the connection. Voice traffic kept a
+  speaking socket busy and the position feed kept a PEER busy, so the ones
+  that died were the quiet ones: somebody standing about with the chat window
+  open and nobody near them.
+
+  A ping every twenty five seconds is under every default idle timeout worth
+  naming, costs two bytes, and is the thing the protocol has for exactly
+  this. It also gives a dead socket somewhere to fail, which is better than
+  discovering it on the next thing somebody types.
+*/
+const live = new Set();
+// Settable so a harness can watch one arrive without waiting half a minute.
+const PING_EVERY = Number(process.env.THORNSWOOD_VOICE_PING_MS) || 25000;
+
+setInterval(() => {
+  for (const s of live) {
+    try { s.ping(); } catch (e) { }
+  }
+}, PING_EVERY);
+
 class Sock {
   constructor(socket) {
     this.socket = socket;
@@ -229,14 +260,22 @@ class Sock {
     this.onmessage = null;
     this.onclose = null;
     this.closed = false;
+    live.add(this);
 
     socket.on('data', (d) => this.feed(d));
     socket.on('error', () => this.close());
     socket.on('close', () => {
+      live.delete(this);
       if (this.closed) return;
       this.closed = true;
       if (this.onclose) this.onclose();
     });
+  }
+
+  /* A ping frame: FIN, opcode 9, no body. See the note over `live`. */
+  ping() {
+    if (this.closed) return;
+    try { this.socket.write(Buffer.from([0x89, 0])); } catch (e) { this.close(); }
   }
 
   send(obj) {
@@ -245,6 +284,7 @@ class Sock {
   }
 
   close() {
+    live.delete(this);
     if (this.closed) return;
     this.closed = true;
     try { this.socket.destroy(); } catch (e) { }
@@ -306,6 +346,9 @@ class Sock {
         try { this.socket.write(Buffer.concat([Buffer.from([0x8a, 0]), Buffer.alloc(0)])); } catch (e) { }
         continue;
       }
+      // A pong is the answer to OUR ping. Nothing to do with it: it has
+      // already done its job by crossing the proxy in both directions.
+      if (op === 0xa) { continue; }
       if (op !== 0x1) continue;                         // only text is used
 
       let msg = null;
