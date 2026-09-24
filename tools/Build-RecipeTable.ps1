@@ -1268,6 +1268,139 @@ $INSTRUMENT_WORDS = @('Flute', 'Lute', 'Drum')
 # greatsword is, so nothing on the record separates them. Matched as a whole
 # word against the output's editor id and its name, so Spear matches and
 # Spearmint does not, and the count is printed every run.
+# WHOSE RACE MADE THIS.
+#
+# Patrick, 23 September: "Riekling stuff should only be able to be made by a
+# riekling", and then "We already agreed on the race gate for race based items
+# so if there is anything by another race aswell it should be race locked".
+#
+# ONLY A RACE SOMEBODY CAN ACTUALLY BE. Patrick, 23 September, reading a first
+# list that had Falmer, Dremora and Draugr in it: "they are not playable races
+# so they can be by anuone only playable races should be race locked". He is
+# right: locking a recipe to a race nobody can choose is deleting the recipe
+# by a longer road.
+#
+# So the list comes out of tools/races.json, which reads the playable bit off
+# the RACE record itself, at an offset measured against ten races everybody
+# knows are playable rather than looked up. Twelve races are playable on this
+# build: the ten vanilla ones, and two from Playable Rieklings.esp, which is
+# the whole reason riekling gear can be locked to rieklings at all.
+#
+# AND THE TEN VANILLA NAMES ARE STYLES, NOT PEOPLES, WHICH IS WHY THEY ARE
+# TAKEN BACK OUT. Nordic weapons, Orcish armour, Imperial armour and Elven
+# everything are MATERIALS any smith with the perk hammers out, and always
+# have been. Leaving Nord in this list would lock Nord Mail and Nordic Carved
+# to Nords, which is not what anybody asked for and would gut the smithing
+# tree. What is left on this build is riekling, which is the case he named.
+$RACE_LOCKED = $true
+$RACE_STYLE_NOT_PEOPLE = @('Nord', 'Breton', 'Imperial', 'Redguard', 'Orc',
+                           'HighElf', 'WoodElf', 'DarkElf', 'Argonian', 'Khajiit',
+                           'Elf', 'Elven')
+
+# BUT A PEOPLE'S OWN DRESS IS NOT A MATERIAL, AND THAT DOES LOCK.
+#
+# Patrick, 23 September: "somtimes things are called bosmer, orsimer, altmer,
+# dunmer", then "That's the exact reason I said it because of Bosmer armour",
+# then "Which we should have in our mods", then "Also I believe we have Nordic
+# armour somewhere".
+#
+# All of it is in the order and all of it was measured rather than guessed.
+# Immersive Armors (Hothtrooper44_ArmorCompilation.esp) ships 41 Bosmer, 7
+# Dunmer, 2 Orsimer and 16 Nord Mail recipes, and 4 Nord spectacle helmets.
+# Every one of them was unlocked before this, and nothing above could ever
+# have caught them: a RACE record spells that people WoodElfRace and the
+# armour spells them Bosmer.
+#
+# THE LINE, WHICH PATRICK DREW ON 23 SEPTEMBER WHEN ASKED WHAT NORD GEAR DOES.
+# A set named for a people is that people's dress and locks. A MATERIAL is a
+# tier of metal any smith with the perk hammers out, and the name on it is the
+# recipe rather than the maker, so it stays open. He chose the cultural sets
+# alone. In the same build that means Nord Mail locks and Nordic Carved does
+# not, though both say Nord: Nordic Carved is the quicksilver tier between
+# Elven and Glass, and taking a whole tier off everybody who is not a Nord is
+# not what any of this was for. Ancient Nord and Nord Hero stay open for the
+# same reason. Bosmer armour locks, Elven armour does not.
+#
+# THE PHRASE IS WHAT THE THING IS CALLED AND THE VALUE IS WHAT THE RACE RECORD
+# CALLS THE PEOPLE. 'Bosmer Boots' is recorded as woodelf, because the
+# gamemode has nothing to compare against but WoodElfRace. The words of a
+# phrase have to sit next to each other, so 'Nord Mail' catches Nord Mail
+# Hauberk and never Nord Hero or Nordic.
+#
+# 'Spectacle Helmet' is here without a Nord in front of it because both of
+# them are called Nord Heavy and Nord Light Spectacle Helmet, so the words are
+# not adjacent. Measured: every spectacle helmet in this order is a Nord one.
+# The run prints what each set caught, so the day a mod adds somebody else's
+# spectacles the count says so.
+#
+# WHERE THE REST OF THE LIST CAME FROM. Patrick, 23 September: "look for
+# anymoire culture sets". So every recipe name in the order was swept for the
+# name of a people, a homeland or a great house, and what came back is below
+# with the count it answered for.
+#
+# TWO THAT CAME BACK AND ARE DELIBERATELY NOT HERE. Thalmor, 5, is a political
+# faction and it takes Bosmer as readily as Altmer, so robes named for it
+# belong to no one people. Forsworn, 22, is a tribe at war with the Reach
+# rather than a people, and its gear is fur and antler anybody can tie on.
+# Neither is a race, and this gate is for races.
+#
+# Einherjar, Barbarian, Warchief, Stormlord and Viking came back too and are
+# not here either: they are Immersive Armors flavour names, and none of them
+# is a people anybody in Tamriel is born into.
+$RACE_OWN_SETS = [ordered]@{
+    'Bosmer'           = 'WoodElf'    # 41, Immersive Armors
+    'Orsimer'          = 'Orc'        # 2, Immersive Weapons
+    'Altmer'           = 'HighElf'    # none on this build, and it costs nothing to be ready
+    'Dunmer'           = 'DarkElf'    # 7, MoreCraftableEquipment
+    'Telvanni'         = 'DarkElf'    # 3, a Dunmer great house
+    'Nord Mail'        = 'Nord'       # 16, Immersive Armors
+    'Spectacle Helmet' = 'Nord'       # 4, Nord Heavy and Nord Light
+    'Skaal'            = 'Nord'       # 8, the Nords of Solstheim
+    'Redguard'         = 'Redguard'   # 19, mostly the Redguard Knight set
+    'Alik''r'          = 'Redguard'   # 17, and the apostrophe splits it into two words, which is why it reads as one
+    'Yokudan'          = 'Redguard'   # 5, Yokuda is where the Redguards came from
+    'Colovian'         = 'Imperial'   # 4, a Cyrodiil province, unlike Imperial itself which is legion issue
+    'Khajiit'          = 'Khajiit'    # 2, Ornate Khajiit Bow
+}
+
+# Word to look for in an item name -> the race word the lock is recorded as.
+$RACE_LOCK_WORDS = [ordered]@{}
+$RACE_WORDS = @()
+$racesJson = Join-Path $PSScriptRoot 'races.json'
+if ($RACE_LOCKED -and (Test-Path -LiteralPath $racesJson)) {
+    try {
+        $raceDoc = Get-Content -LiteralPath $racesJson -Raw | ConvertFrom-Json
+        $words = New-Object 'System.Collections.Generic.HashSet[string]'
+        $playableWords = New-Object 'System.Collections.Generic.HashSet[string]'
+        foreach ($prop in $raceDoc.items.PSObject.Properties) {
+            $row = $prop.Value
+            if (-not $row.p) { continue }
+            # RieklingBlueRace, 1RieklingPurpleRace and DLC2RieklingRace are
+            # all one people. Strip the decoration and keep what is left.
+            $w = [string]$row.e
+            $w = $w -replace '^(DLC\d*|\d+|Npc)+', ''
+            $w = $w -replace '(Race|Vampire|Child|Blue|Purple|Npc)+$', ''
+            $w = $w -replace '(Blue|Purple)', ''
+            if ($w.Length -lt 3) { continue }
+            [void]$playableWords.Add($w)
+            if ($RACE_STYLE_NOT_PEOPLE -contains $w) { continue }
+            [void]$words.Add($w)
+        }
+        $RACE_WORDS = @($words)
+        foreach ($w in $RACE_WORDS) { $RACE_LOCK_WORDS[$w] = $w.ToLower() }
+        # And the cultural sets, but only for a race somebody can actually be
+        # on this build. If WoodElfRace is not playable here then Bosmer armour
+        # has nobody to belong to, and locking it would delete it.
+        foreach ($set in $RACE_OWN_SETS.Keys) {
+            $canon = [string]$RACE_OWN_SETS[$set]
+            if (-not $playableWords.Contains($canon)) { continue }
+            $RACE_LOCK_WORDS[$set] = $canon.ToLower()
+        }
+    } catch {
+        Write-Host ('  could not read races.json, so nothing is race locked: ' + $_.Exception.Message) -ForegroundColor Yellow
+    }
+}
+
 $WOODWRIGHT_TAKES_SPEARS = $true
 $SPEAR_WORDS = @('Spear', 'Pike', 'Halberd', 'FishingRod', 'Fishing Rod', 'FishingPole', 'Fishing Pole')
 
@@ -2988,10 +3121,24 @@ foreach ($desc in $recipes.Keys) {
     # and a family is about what the thing is.
     $famRead = FamilyOf $o $names
 
+    # Whose race made it. See $RACE_LOCK_WORDS: the word looked for is the one
+    # the item is named with, Riekling or Bosmer, and the word recorded is the
+    # one the RACE record uses, riekling or woodelf, because that is what the
+    # gamemode has to compare the person against.
+    $raceWord = ''
+    if ($RACE_LOCKED) {
+        foreach ($w in $RACE_LOCK_WORDS.Keys) {
+            if ((MatchesWord $o.Edid @($w)) -or (MatchesWord $o.Name @($w))) {
+                $raceWord = [string]$RACE_LOCK_WORDS[$w]
+                break
+            }
+        }
+    }
+
     $owned[$desc] = [pscustomobject]@{
         Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type
         BenchDesc = $r.BenchDesc; BenchName = $benchName
-        Owner = $ownerName; Half = $half; Reason = $reason
+        Owner = $ownerName; Half = $half; Reason = $reason; Race = $raceWord
         Family = $famRead[0]; FamilyFrom = $famRead[1]; FamilyRead = $famRead[2]
         Count = $r.Count; Inputs = $r.Inputs; InputList = $r.InputList; Fires = $fires
         Plugin = $r.Plugin; SeenIn = $r.SeenIn; Local = $r.Local
@@ -4669,6 +4816,7 @@ foreach ($desc in $owned.Keys) {
              ', "inputs": ' + $r.Inputs + ', "inputItems": ' + (InputsJson $r) + ', "worth": ' + $r.Value +
              ', "bench": ' + (JsonStr $r.BenchDesc) + ', "benchName": ' + (JsonStr $r.BenchName) +
              ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
+             ', "race": ' + (JsonStr $r.Race) +
              ', "rank": ' + (JsonStr $r.Rank) +
              ', "family": ' + (JsonStr $r.Family) + ', "familyFrom": ' + (JsonStr $r.FamilyFrom) +
              ', "fires": ' + $firesTxt + ', "canBeMadeOnDayOne": ' + $dayOneTxt +
@@ -4726,6 +4874,7 @@ foreach ($desc in $owned.Keys) {
     $blockRows.Add('    ' + (JsonStr $desc) + ': { "out": ' + (JsonStr $r.OutDesc) + ', "name": ' + (JsonStr $r.OutName) +
                    ', "type": ' + (JsonStr $r.OutType) + ', "makes": ' + $r.Count +
                    ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
+                   ', "race": ' + (JsonStr $r.Race) +
                    ', "rank": ' + (JsonStr $r.Rank) + ', "family": ' + (JsonStr $r.Family) +
                    ', "open": ' + $dayOneTxt + ' },')
 }
