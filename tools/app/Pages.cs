@@ -288,7 +288,14 @@ namespace Thornswood
         // key and what it does.
         static readonly string[][] ControlTable = new string[][] {
             new string[] { "Bound inside the game", "", "" },
-            new string[] { "", "Esc,  Mod Configuration", "The classic SkyUI settings pages. SunHelm and the older mods live here, and this is where their keys get rebound. Those choices are kept in your save rather than in a file, so nothing out here can move them." },
+            // SunHelm was the example here until it left the collection (To Do
+            // List entry 133). QuickLoot is one that is still in the build,
+            // with its own page, QuickLootIEMCM.pex. The line that said these
+            // choices are kept in your save went with it, because it is not
+            // true of what is left: five of the pages are MCM Helper ones,
+            // which write Data\MCM\Settings\*.ini (checked 24 September), and
+            // known.md says the script kind resets every session.
+            new string[] { "", "Esc,  Mod Configuration", "The classic SkyUI settings pages. QuickLoot and the older mods live here, and this is where their keys get rebound. Nothing out here can move those choices." },
             new string[] { "", "E   /   R  at a container", "Loot without opening anything. Your Activate key takes the highlighted item, R takes the lot. Rebindable on the QuickLoot page of the mod settings menu." },
             new string[] { "", "Your Activate key", "Picks up, talks, opens. Rebindable in Skyrim's own controls, under Settings, Controls." },
 

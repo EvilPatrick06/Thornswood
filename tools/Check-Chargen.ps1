@@ -179,13 +179,6 @@ if (-not (Test-Path -LiteralPath $esp)) {
 
 Write-Host ''
 Write-Host 'gamemode' -ForegroundColor Cyan
-$cgPlugin = Join-Path $Data 'Platform\Plugins\thornswood-chargen.js'
-if (Test-Path -LiteralPath $cgPlugin) {
-    Ok 'the creation menu plugin is installed on this machine'
-} else {
-    Note 'the creation menu plugin is not installed here, so choices fall back to reading the books'
-}
-
 $gm = Join-Path $Dist 'gamemode.js'
 if (-not (Test-Path -LiteralPath $gm)) {
     Bad "not found: $gm"

@@ -136,6 +136,82 @@ function writeChannel(name, text) {
   return wrote;
 }
 
+/*
+  The launcher's two files, read off the game's thread.
+
+  Every sp.on('update') handler runs on the game's thread between frames, and
+  the two further down used to read with readFileSync there: the status every
+  400 ms and the port every 3 seconds, up to two files each. Small files, but
+  a synchronous open waits on whatever else has the disk, antivirus included,
+  and the frame waits with it. To Do List entry 270: "Get the disk off the
+  render thread".
+
+  So the handlers take the last thing a background read brought back, and
+  start the next one. fs.readFile works on Node's thread pool and answers
+  through the libuv loop, which SkyrimPlatform runs once per update (uv_run
+  with UV_RUN_NOWAIT in the fork's NodeInstance::Tick), so an answer lands a
+  few frames after the ask.
+
+  Nothing else in these plugins has used an asynchronous call, so this does
+  not take it on trust. If no background read has ever come back and one has
+  been out for ASYNC_GIVE_UP_MS, the loop is not being run here, and from then
+  on the files are read the way they always were. The worst case is the old
+  behaviour, never an indicator that goes blank.
+*/
+const ASYNC_GIVE_UP_MS = 5000;
+let readAsync = true;       // until a read that never comes back says otherwise
+let asyncAnswered = false;  // whether any background read has come back yet
+const channelCache = {};    // file name -> { text, busy, since, ticket }
+
+function readChannelAsync(name, done) {
+  let i = 0;
+  const next = function () {
+    if (i >= CHANNEL_DIRS.length || !fsm) { done(''); return; }
+    const d = CHANNEL_DIRS[i++];
+    try {
+      fsm.readFile(d + name, 'utf8', function (err, raw) {
+        const text = err ? '' : String(raw).trim();
+        if (text) { done(text); } else { next(); }
+      });
+    } catch (e) { next(); }
+  };
+  next();
+}
+
+/* Start the next read of a channel file, in the background when it can be. */
+function refreshChannel(name, now) {
+  const c = channelCache[name] ||
+            (channelCache[name] = { text: '', busy: false, since: 0, ticket: 0 });
+  if (readAsync && !asyncAnswered && c.busy && now - c.since > ASYNC_GIVE_UP_MS) {
+    readAsync = false;
+    log('a background read of ' + name + ' never came back, so the launcher\'s ' +
+        'files are read on the game\'s thread again, as before');
+  }
+  if (!readAsync || !fsm || typeof fsm.readFile !== 'function') {
+    c.text = readChannel(name);
+    c.busy = false;
+    return;
+  }
+  // One read at a time per file. One that has been out for longer than the
+  // give up time is let go, so a read that hangs cannot freeze the cache.
+  if (c.busy && now - c.since <= ASYNC_GIVE_UP_MS) { return; }
+  const ticket = ++c.ticket;
+  c.busy = true;
+  c.since = now;
+  readChannelAsync(name, function (text) {
+    asyncAnswered = true;
+    if (ticket !== c.ticket) { return; }
+    c.text = text;
+    c.busy = false;
+  });
+}
+
+/* The last thing read from a channel file, empty until a read has come back. */
+function channelText(name) {
+  const c = channelCache[name];
+  return c ? c.text : '';
+}
+
 let fsm = null;
 try { fsm = require('fs'); fsm.writeFileSync(LOG_FILE, ''); } catch (e) { fsm = null; }
 
@@ -536,13 +612,18 @@ let lastStatusSeen = '';
 let statusCheckedAt = 0;
 
 function readStatusFile() {
-  return readChannel(STATUS_FILE);
+  return channelText(STATUS_FILE);
 }
 
 sp.on('update', guard('status', () => {
   const now = Date.now();
-  if (now - statusCheckedAt < 400) { return; }
-  statusCheckedAt = now;
+  // The file is asked for every 400 ms, as before. What came back is looked
+  // at every frame, which is one string compared with another, so a new line
+  // reaches the page as soon as it is in rather than a poll later.
+  if (now - statusCheckedAt >= 400) {
+    statusCheckedAt = now;
+    refreshChannel(STATUS_FILE, now);
+  }
 
   const line = readStatusFile();
   if (!line || line === lastStatusSeen) { return; }
@@ -565,17 +646,23 @@ sp.on('update', guard('status', () => {
 }));
 
 function readLauncherPort() {
-  const n = Number(readChannel(PORT_FILE).replace(/[^0-9]/g, ''));
+  const n = Number(channelText(PORT_FILE).replace(/[^0-9]/g, ''));
   return (n > 0 && n < 65536) ? n : 0;
 }
 
 sp.on('update', guard('launcher', () => {
   const now = Date.now();
-  if (now - portCheckedAt < 3000) { return; }
-  portCheckedAt = now;
+  const due = now - portCheckedAt >= 3000;
+  if (due) {
+    portCheckedAt = now;
+    refreshChannel(PORT_FILE, now);
+  }
 
   const p = readLauncherPort();
   if (!p) { return; }
+  // Said again every three seconds, as before, and at once when a read brings
+  // back a port the page has not been given yet.
+  if (!due && p === launcherPort) { return; }
 
   js('try{window.thornswoodVoice&&window.thornswoodVoice.setLauncherPort(' + p + ');}catch(e){}');
 
