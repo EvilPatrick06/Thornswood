@@ -75,6 +75,11 @@ for them is at the bottom of this page.
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes
 with SkyMP.
 
+**This site** is set in Cinzel, by the Cinzel Project Authors, and Spectral,
+by the Spectral Project Authors, both under the SIL Open Font License. It
+draws its written pages with marked, by Christopher Jeffrey, under the MIT
+licence. All three are served from here.
+
 ## Microsoft WebView2 SDK licence
 
 ```

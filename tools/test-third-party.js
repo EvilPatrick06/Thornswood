@@ -201,6 +201,52 @@ const WV2_LICENCE = [
 yes('THIRD-PARTY.md carries the WebView2 licence word for word', flat(N).indexOf(flat(WV2_LICENCE)) >= 0);
 yes('the credits page carries the WebView2 licence word for word', flat(C).indexOf(flat(WV2_LICENCE)) >= 0);
 
+// ---------------------------------------------------------------- the site
+//
+// Entry 247 (#271) moved the site's fonts and marked off Google Fonts and
+// cdnjs into tools\docs-app\public, so since then the site hands them to every
+// visitor itself. Anything there that is somebody else's by its kind, a font
+// file or a minified script, has to be in THIRD-PARTY.md by name and sha256,
+// so a newer marked or another font dropped in without a word fails here.
+// Text is hashed with its CRs taken out: git stores it with LF, a Windows
+// checkout adds them, and the hash in the notices is of what git stores.
+const PUB = path.join(TOOLS, 'docs-app', 'public');
+function vendoredKind(n) { return /\.(woff2?|ttf|otf)$/i.test(n) || /\.min\.js$/i.test(n); }
+let pubNames = [];
+try { pubNames = fs.readdirSync(PUB); } catch (e) { pubNames = []; }
+const siteFiles = pubNames.filter(vendoredKind);
+console.log('      the site serves ' + siteFiles.length + ' font or minified script files');
+siteFiles.forEach(function (n) {
+  let buf = fs.readFileSync(path.join(PUB, n));
+  if (/\.js$/i.test(n)) { buf = Buffer.from(buf.toString('latin1').split(CR).join(''), 'latin1'); }
+  const sha = crypto.createHash('sha256').update(buf).digest('hex');
+  yes(n + ' (the site) is named in THIRD-PARTY.md', N.indexOf('`' + n + '`') >= 0);
+  yes(n + ' is in THIRD-PARTY.md by its sha256, ' + sha.slice(0, 16), N.toLowerCase().indexOf(sha) >= 0);
+});
+// And the other way: a row for a file the site no longer serves is a notice
+// for something nobody is handed any more.
+const siteSection = (/\n## On the site\n([\s\S]*?)\n## /.exec(N) || [])[1] || '';
+yes('THIRD-PARTY.md has a section for the site', siteSection.length > 0);
+siteSection.split('\n').forEach(function (l) {
+  const m = /^\| `([^`]+)`/.exec(l);
+  if (!m || !vendoredKind(m[1])) { return; }
+  yes(m[1] + ', listed under the site, is still in tools\\docs-app\\public', pubNames.indexOf(m[1]) >= 0);
+});
+const markedFile = siteFiles.filter(function (n) { return /^marked-.*\.min\.js$/i.test(n); })[0];
+if (markedFile) {
+  const head = (read(path.join(PUB, markedFile)) || '').slice(0, 300);
+  yes(markedFile + ' still carries its own MIT notice at the top', /\(MIT Licensed\)/.test(head));
+  const row = siteSection.split('\n').filter(function (l) { return l.indexOf('`' + markedFile + '`') >= 0; })[0] || '';
+  yes('THIRD-PARTY.md gives ' + markedFile + ' as MIT', /\bMIT\b/.test(row));
+}
+siteFiles.filter(function (n) { return /\.woff2?$/i.test(n); }).forEach(function (n) {
+  const row = siteSection.split('\n').filter(function (l) { return l.indexOf('`' + n + '`') >= 0; })[0] || '';
+  yes('THIRD-PARTY.md gives ' + n + ' as OFL-1.1', row.indexOf('OFL-1.1') >= 0);
+});
+['Cinzel', 'Spectral', 'marked'].forEach(function (what) {
+  yes('the credits page names ' + what + ', which the site serves', C.indexOf(what) >= 0);
+});
+
 // ---------------------------------------------------------------- the client
 //
 // Which subproject of the fork each recorded file is built from, and the build

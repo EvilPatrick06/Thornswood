@@ -12,9 +12,10 @@ of its own, and choosing one is Patrick's decision.
 
 `tools\test-third-party.js` checks this file against the build. It covers every
 resource Build-Launcher.ps1 compiles into the launcher, every file under
-`tools\lib`, the six client files and the commits in `tools\client-build.json`
-and `tools\server-build.json`, and the source paragraph on the public credits
-page. When a rebuild records a new commit, this file and
+`tools\lib`, every font and minified script the site serves from
+`tools\docs-app\public`, the six client files and the commits in
+`tools\client-build.json` and `tools\server-build.json`, and the source
+paragraph on the public credits page. When a rebuild records a new commit, this file and
 `tools\docs-app\data\site\credits.md` have to change in the same pull request,
 or the build check goes red.
 
@@ -29,6 +30,9 @@ or the build check goes red.
   the collection did not provide and Ship-Rules.ps1 does not hold back.
 - **The game server** runs on the VPS. Nobody receives a copy, but the AGPL
   still asks for its source to be offered to everybody who connects.
+- **The site**, thornswood.net, hands every visitor's browser the files in
+  `tools\docs-app\public`, among them the fonts and the markdown renderer
+  listed under "On the site".
 
 Everything else Build-Launcher.ps1 compiles into the launcher is Thornswood's
 own: `ui.xaml`, `logo.png`, `launcher-header.jpg`, `launcher-header.mp4`,
@@ -181,6 +185,37 @@ built on 23 September carries every one of them.
   Patrick's word of 22 September (commit ec8d113). The terms are between
   Patrick and the artist and are not written down here.
 
+## On the site
+
+Since entry 247 (#271) the site serves its fonts and its markdown renderer
+itself, from `tools\docs-app\public`, instead of sending every visitor to
+Google Fonts and cdnjs.cloudflare.com. So each browser that opens a page gets
+these from Thornswood, and server.js runs marked to draw the written pages
+before it sends them.
+
+| File | What it is | Licence | sha256 |
+|---|---|---|---|
+| `marked-12.0.2.min.js` | marked 12.0.2, the markdown renderer, by Christopher Jeffrey, https://github.com/markedjs/marked | MIT, by the notice at the top of the file | `15fabce5b65898b32b03f5ed25e9f891a729ad4c0d6d877110a7744aa847a894` |
+| `cinzel.woff2` | Cinzel, one variable file for weights 400 to 700 | OFL-1.1 | `09941fb1c169c38fd414536b37690057fc01b3117a5c63dd6571186540c8f370` |
+| `spectral-300.woff2` | Spectral Light | OFL-1.1 | `3ff652c63672dac64699f04465d7e679045d8cdddfb2a2a1a8762d28866e2891` |
+| `spectral-300-italic.woff2` | Spectral Light Italic | OFL-1.1 | `b1dc3c4e4bebc0768c8bc9b4662ea2ad7f9fb2b19f98b3b023cf2fbb6e8e362e` |
+| `spectral-400.woff2` | Spectral | OFL-1.1 | `cf8daee3b83c1e662196c6e34e444bc41344d54bfeb4fb5351e197de6ce94539` |
+| `spectral-400-italic.woff2` | Spectral Italic | OFL-1.1 | `db397149a9f73fd6a41dd2fdf3314cf8a9daf0485134465cc268cac578766b71` |
+| `spectral-600.woff2` | Spectral SemiBold | OFL-1.1 | `33faca8b5795a0de1af77cbc43a050a3655c4b1e03e04847fdef4d19d2e361d2` |
+
+The hash for marked is of the file as git stores it, with LF line endings. A
+Windows checkout adds a CR to each of its six lines, which changes the hash
+but not the file. When #271 added it, it was the same file cdnjs served and
+npm publishes for 12.0.2.
+
+The fonts are the latin set Google Fonts served on 24 September. Each file's
+own name table gives its copyright, "Copyright 2020 The Cinzel Project Authors
+(https://github.com/NDISCOVER/Cinzel)" or "Copyright 2017 The Spectral Project
+Authors (https://github.com/productiontype/Spectral)", and the licence's
+address: https://scripts.sil.org/OFL in Cinzel and https://openfontlicense.org
+in the five Spectral files. The name tables give no version. `fonts.css`, beside
+them, names the SIL Open Font License, Version 1.1.
+
 ## Not shipped by Thornswood
 
 - The collection. Each person installs every mod from Nexus Mods through
@@ -236,6 +271,9 @@ the installer. `tools\test-source-offer.ps1` holds both to the records.
   public credits page only. The launcher's updates and the release pages on
   GitHub say nothing about source.
 - The vcpkg licence texts do not travel with the client runtime.
+- The MIT and OFL texts are not on the site beside marked and the fonts. The
+  files keep their copyright lines and name their licences, as the copies
+  from npm and Google Fonts did.
 - build.js has no recorded source commit.
 - The Futura PT, DIN Pro and Bankir-Retro fonts, and the files under "Shipped
   today with no licence this file can name", ship with no licence found.
