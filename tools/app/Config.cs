@@ -332,7 +332,10 @@ namespace Thornswood
                 }
                 Secrets.LockDown(path);
             }
-            catch { }
+            // Still no throw, so every caller behaves as it did, but a Save
+            // that failed now says so in launcher.log. It used to be the
+            // tester saying the Save button did nothing, and nothing else.
+            catch (Exception ex) { Swallow.Note("Config.Save, writing " + path, ex); }
             finally
             {
                 UpdateToken = tk;

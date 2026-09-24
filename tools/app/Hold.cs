@@ -113,14 +113,17 @@ namespace Thornswood
                     watcher = null;
                 }
             }
-            catch { }
+            // Every failure in Release is logged and none is thrown. It runs
+            // as the launcher closes, and a file it could not let go of stays
+            // unwritable to everything else with nothing in the log to say why.
+            catch (Exception ex) { Swallow.Note("Hold.Release, the watcher", ex); }
             lock (gate)
             {
-                foreach (FileStream fs in open) { try { fs.Dispose(); } catch { } }
+                foreach (FileStream fs in open) { try { fs.Dispose(); } catch (Exception ex) { Swallow.Note("Hold.Release, letting go of a held file", ex); } }
                 open.Clear();
                 foreach (string s in stubs)
                 {
-                    try { if (File.Exists(s) && new FileInfo(s).Length == 0) File.Delete(s); } catch { }
+                    try { if (File.Exists(s) && new FileInfo(s).Length == 0) File.Delete(s); } catch (Exception ex) { Swallow.Note("Hold.Release, removing the stand-in " + s, ex); }
                 }
                 stubs.Clear();
             }

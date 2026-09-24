@@ -1,0 +1,72 @@
+# Silent catches in the launcher, per file. Read by tools\Check-Swallow.ps1,
+# which fails when any file in tools\app has more than its line here allows.
+# A file that is not listed is allowed none.
+#
+# THE RULE. A catch counts when the body between its braces is empty or holds
+# nothing but whitespace, whether the braces sit on one line or on lines of
+# their own. A catch naming an exception, catch (IOException), counts the same
+# as a bare one. A body holding only a comment does NOT count: a comment inside
+# the braces is somebody saying on purpose why nothing is done, which is the
+# deliberate swallow entry 239 says to leave alone. A comment beside the
+# braces, after the closing one, is outside the body, so that catch still
+# counts. On 24 Sep that choice was worth one catch, where Chars.cs writes the
+# character menu's script: 386 by this rule, 387 counting it.
+#
+# The numbers are catch clauses, not lines. The Select-String line in entry
+# 239 counts lines, so it shows Shell.cs at 78 where this shows 80: two of its
+# lines hold two empty catches each. .\tools\Check-Swallow.ps1 -List prints
+# the numbers below in this same format.
+#
+# The count reads the text, so a comment or a string that spells out an empty
+# catch is counted as one. Nothing in tools\app does that today.
+#
+# A number here only goes down. When a file's count drops, lower its line in
+# the same pull request. To make a catch stop counting, log it with
+# Swallow.Note (tools\app\Swallow.cs). Raising a number is a decision for
+# Patrick, not a fix.
+#
+# Measured 24 Sep: 386 silent catches of 618 before this list existed. The
+# places entry 239 named, Config.Save, Swap.Restore with the DropLink it
+# starts with, Hold.Release and Keep.Unpark, log instead now, which is the ten
+# fewer below: 376.
+Art.cs 1
+Chars.cs 18
+Checks.cs 21
+ClientRuntime.cs 3
+Config.cs 1
+DevBuild.cs 4
+Diag.cs 9
+Discord.cs 14
+Display.cs 3
+Door.cs 2
+Downgrade.cs 18
+Enforce.cs 3
+Files.cs 5
+Firewall.cs 2
+Hold.cs 8
+Icons.cs 21
+Junction.cs 1
+Keep.cs 12
+Keys.cs 4
+Leaks.cs 2
+Mics.cs 6
+Online.cs 1
+OwnGame.cs 20
+Pages.cs 8
+Paths.cs 1
+Presence.cs 5
+Register.cs 4
+Secrets.cs 1
+Shell.cs 80
+ShellOwnGame.cs 6
+SkyMp.cs 7
+Stall.cs 1
+Stats.cs 2
+Steam.cs 6
+Swap.cs 6
+ThornIni.cs 1
+Uninstall.cs 16
+Updater.cs 20
+Verify.cs 9
+Voice.cs 22
+Waiting.cs 2
