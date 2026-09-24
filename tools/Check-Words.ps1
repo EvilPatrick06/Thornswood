@@ -11,15 +11,18 @@
   SETUP.md:46. The word at README.md:3, tools/app/Help.cs:207, the rules page
   at 295, and the Known Issues and Help pages (known.md:49, help.md:121),
   which the site serves to anybody without a sign in. The old owner name had
-  none.
+  none. Since then main deleted SETUP.md (#265) and rewrote README.md for
+  the people who work on the repository, so SETUP.md is off the list below
+  and SECURITY.md, the page GitHub shows anybody reporting a hole, is on it.
 
   What it reads is the files that are text for people from end to end: the
-  READMEs, the launcher's help and window, the bot's channel posts, the public
-  site pages, and the two data pages the site serves in public (PUBLIC_DOCS
-  in tools/docs-app/server.js). Not lore\, where in-world writing is not
-  operational text. Not the code files either (the gamemode, the overlays,
-  the rest of the launcher): a word check there fires on identifiers and
-  engine names like player.moveto, and those are not text for people.
+  README and the security page, the launcher's help and window, the bot's
+  channel posts, the public site pages, and the two data pages the site
+  serves in public (PUBLIC_DOCS in tools/docs-app/server.js). Not lore\,
+  where in-world writing is not operational text. Not the code files either
+  (the gamemode, the overlays, the rest of the launcher): a word check there
+  fires on identifiers and engine names like player.moveto, and those are
+  not text for people.
 
   The em dash is built from its code point, [char]0x2014, plus its HTML
   entities, and never pasted in, so this file's own encoding cannot decide
@@ -45,7 +48,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $Root) { $Root = Split-Path -Parent $Here }
 
 $Paths = @(
-    'README.md', 'SETUP.md', 'tools/app/Help.cs', 'tools/ui.xaml', 'tools/discord/content.py',
+    'README.md', 'SECURITY.md', 'tools/app/Help.cs', 'tools/ui.xaml', 'tools/discord/content.py',
     'tools/docs-app/data/site/*.md', 'tools/docs-app/data/known.md', 'tools/docs-app/data/help.md',
     'tools/docs-app/public/home.html'
 )

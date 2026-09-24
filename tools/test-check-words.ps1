@@ -103,7 +103,7 @@ try {
         ('Pages 1' + $en + '5 and a well-known name, both fine.'),
         'Ask gavin about it.'
     )
-    Put 'SETUP.md' @('Fine.', 'An entity &mdash; here.', 'A number &#8212; here.', 'A hex one &#x2014; here.', 'Fine again.')
+    Put 'SECURITY.md' @('Fine.', 'An entity &mdash; here.', 'A number &#8212; here.', 'A hex one &#x2014; here.', 'Fine again.')
     Put 'tools/app/Help.cs' @('new HelpItem("x", "fine"),', 'new HelpItem("y", "a single-player game"),')
     # With a byte order mark, which the check has to read through.
     Put 'tools/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>', ('<TextBlock Text="one' + $em + 'two"/>')) $utf8bom
@@ -116,7 +116,7 @@ try {
 
     $want = @(
         'README.md:2', 'README.md:3', 'README.md:4', 'README.md:7',
-        'SETUP.md:2', 'SETUP.md:3', 'SETUP.md:4',
+        'SECURITY.md:2', 'SECURITY.md:3', 'SECURITY.md:4',
         'tools/app/Help.cs:2',
         'tools/ui.xaml:2',
         'tools/docs-app/data/site/a.md:2',
@@ -159,7 +159,7 @@ try {
 
     # Clean the seeded breaks away and the same files pass.
     Put 'README.md' @('# Seeded', 'A multiplayer engine, a playtest, getPlayer() and PlayerCharacter.')
-    Put 'SETUP.md' @('Fine.')
+    Put 'SECURITY.md' @('Fine.')
     Put 'tools/app/Help.cs' @('new HelpItem("x", "fine"),')
     Put 'tools/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>') $utf8bom
     Put 'tools/docs-app/data/site/a.md' @('Fine.')
@@ -169,9 +169,9 @@ try {
     Yes ('clean files exit 0 with no hits (exit ' + $c2.Code + ', ' + $c2.Hits.Count + ' hit(s))') ($c2.Code -eq 0 -and $c2.Hits.Count -eq 0)
 
     # A listed file that is gone is said out loud, not silently dropped.
-    Remove-Item -LiteralPath (Join-Path $tmp 'SETUP.md') -Force
+    Remove-Item -LiteralPath (Join-Path $tmp 'SECURITY.md') -Force
     $g = Invoke-Check $self $tmp
-    $warned = @($g.Out | Where-Object { $_ -like '::warning::SETUP.md is not there*' }).Count -gt 0
+    $warned = @($g.Out | Where-Object { $_ -like '::warning::SECURITY.md is not there*' }).Count -gt 0
     Yes ('a listed file that is missing is a warning and not a failure (exit ' + $g.Code + ')') ($warned -and $g.Code -eq 0)
 }
 finally {
