@@ -654,13 +654,20 @@
                     </Border>
                   </StackPanel>
 
+                  <!-- This card told a new person to name the character after
+                       themselves and to save before connecting, both left over
+                       from Skyrim Together. The name is what everybody sees over
+                       your head in a roleplay world, so a person who followed the
+                       card walked into Whiterun under their own name. And there is
+                       no saving: the server holds the character. Help.cs gives the
+                       same name rule in its Joining items, and
+                       tools/test-first-run-words.js keeps the two saying the same
+                       thing. -->
                   <StackPanel x:Name="FirstRunCard">
                     <TextBlock Text="First time" Style="{StaticResource Eyebrow}"/>
                     <Border Style="{StaticResource Slab}">
                       <StackPanel>
-                        <TextBlock Style="{StaticResource Body}" Text="Create a character and name it after yourself. That name is what other people see above your head, and it cannot be changed later without a new character."/>
-                        <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,13,0,13"/>
-                        <TextBlock Style="{StaticResource Body}" Text="Save once before connecting. Joining from an unsaved game drops you back to the menu."/>
+                        <TextBlock Style="{StaticResource Body}" Text="Give your character a name that belongs in Skyrim: a first name and a family name or a byname, and not your own. That name is what other people see above your head, and it cannot be changed later without a new character."/>
                       </StackPanel>
                     </Border>
                   </StackPanel>
