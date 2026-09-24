@@ -280,7 +280,8 @@ it per session and ignores which profile Vortex has on.
 ## Where things are written down
 
 - `README.md`, `SETUP.md`: the repo and a fresh install.
-- `tools\app\HOOKUP.md`: how the launcher classes hang together.
+- `tools\app\ARCHITECTURE.md`: how the launcher starts, what each class owns
+  on disk, and every step between pressing Play and the game starting.
 - `tools\MOVING-THE-SERVER.md`, `tools\COLLECTION-METHOD.md`: the VPS and the
   mod collection.
 - `lore\`: history and the Accord. `tools\docs-app\data\site\*.md`: the public
