@@ -247,6 +247,11 @@ Say ("payload {0:N1} MB" -f ((Get-Item -LiteralPath $Zip).Length / 1MB)) 'Green'
 # never runs a version of the installer older than the payload it is unpacking.
 $installer = Join-Path $Here 'Install-ThornswoodServer.ps1'
 if (-not (Test-Path -LiteralPath $installer)) { Die "not found: $installer" }
+# Beside the installer, which puts it in the server's folder for the task to
+# run in front of the server. See Roll-Log.ps1 for why a log can only be
+# rolled at start.
+$rollLog = Join-Path $Here 'Roll-Log.ps1'
+if (-not (Test-Path -LiteralPath $rollLog)) { Die "not found: $rollLog" }
 
 Head 'Stopping the server up there'
 # Not fatal: on a first install there is no task to stop.
@@ -291,6 +296,8 @@ Say 'this is the slow part, a few minutes on a first run' 'DarkGray'
 & scp $Zip "${target}:C:/thornswood-server.zip"
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
 & scp $installer "${target}:C:/Install-ThornswoodServer.ps1"
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+& scp $rollLog "${target}:C:/Roll-Log.ps1"
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
 Say 'copied' 'Green'
 

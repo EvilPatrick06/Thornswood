@@ -178,6 +178,12 @@ foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt') {
   & scp @ssh $src "${User}@${Vps}:$Root/$f" | Out-Null
   Say "  $f" 'Green'
 }
+# The roller run.ps1 calls before each start of the bot. See Roll-Log.ps1 for
+# why a log cmd holds open can only be rolled then.
+$roll = Join-Path $Here 'Roll-Log.ps1'
+if (-not (Test-Path $roll)) { Die "missing: $roll" }
+& scp @ssh $roll "${User}@${Vps}:$Root/roll-log.ps1" | Out-Null
+Say '  roll-log.ps1' 'Green'
 
 # staff-channel.txt the same way, when there is one. It holds the id of the
 # channel a session that went wrong is announced in. Unlike the file above it
@@ -231,12 +237,15 @@ Start-Sleep -Seconds 12
 if (`$p) { 'bot up, pid ' + (`$p | Select-Object -First 1).ProcessId } else { 'BOT DID NOT START' }
 
 # Only what this start wrote. The file is held open by the bot, so it is read
-# with FileShare ReadWrite or not at all.
+# with FileShare ReadWrite or not at all. Shorter than before means run.ps1
+# rolled it on the way up, so all of it is this start.
 `$fs = `$null
 try {
   `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
-  if (`$fs.Length -gt `$before) {
-    [void]`$fs.Seek(`$before, 'Begin')
+  `$from = `$before
+  if (`$fs.Length -lt `$from) { `$from = 0 }
+  if (`$fs.Length -gt `$from) {
+    [void]`$fs.Seek(`$from, 'Begin')
     `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
     (`$sr.ReadToEnd()) -split "\r?\n" | Where-Object { `$_ } | Select-Object -Last 12
     `$sr.Close()
@@ -413,6 +422,10 @@ if (-not `$env:DISCORD_TOKEN) {
 if (-not `$env:PYTHONIOENCODING) { `$env:PYTHONIOENCODING = 'utf-8' }
 
 while (`$true) {
+  # Rolled here, between runs, because this is the one moment nothing holds
+  # bot.log: cmd opens it for the >> below and keeps it until python exits.
+  # At 4 MB, five kept, and it never stops the bot starting. Roll-Log.ps1.
+  try { & '$rootWin\roll-log.ps1' -Path '$rootWin\bot.log' | Out-Null } catch { }
   # Python writes the log itself, through cmd's redirection, the same way the
   # game server and the voice server are run. Piping every line through
   # PowerShell and Out-File, which this did until 2026-09-16, re-encoded the
@@ -460,14 +473,17 @@ Start-Sleep -Seconds 5
 if (`$p) { 'bot up, pid ' + `$p.ProcessId } else { 'BOT DID NOT START' }
 
 # Opened with FileShare ReadWrite, because the bot has it open for writing and
-# anything less strict than that is denied while it does.
+# anything less strict than that is denied while it does. Shorter than before
+# means run.ps1 rolled it on the way up, so all of it is this start.
 function Fresh {
   `$out = @()
   `$fs = `$null
   try {
     `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
-    if (`$fs.Length -gt `$before) {
-      [void]`$fs.Seek(`$before, 'Begin')
+    `$from = `$before
+    if (`$fs.Length -lt `$from) { `$from = 0 }
+    if (`$fs.Length -gt `$from) {
+      [void]`$fs.Seek(`$from, 'Begin')
       `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
       `$out = @((`$sr.ReadToEnd()) -split "\r?\n")
       `$sr.Close()

@@ -59,9 +59,67 @@ const WORLDSPACES = new Set(DATA.worldspaces);
 
   Opened lazily and given up on for good the first time a write fails, because
   a log that throws once a tick is worse than no log.
+
+  ROLLED AT 4 MB, FIVE KEPT, entry 220, the same rule as the site's site.log.
+  Nothing rolled this file, so it grew until reading last night's crash meant
+  opening a file nothing could open. appendFileSync opens, writes and closes
+  on every line, so between lines this process holds nothing and a rename
+  works. server.log is different: cmd holds it open for as long as the server
+  runs, so roll-log.ps1 rolls that one before the server starts. The size is
+  read once per load and counted after that, so a busy tick does not ask the
+  disk about the file for every line.
 */
 let logFile = null;
 let logBroken = false;
+const LOG_MAX_BYTES = 4 * 1024 * 1024;
+const LOG_KEEP = 5;
+let logBytes = -1;
+let logStateSaid = false;
+
+// Oldest first, so nothing is overwritten on the way: .5 goes, .4 becomes .5,
+// and the live file becomes .1. Rolled, never deleted: deleting a log is how
+// the evidence for the last crash disappeared in the first place.
+function rollLog(where) {
+  const fs = require('fs');
+  try {
+    const oldest = where + '.' + LOG_KEEP;
+    if (fs.existsSync(oldest)) { fs.unlinkSync(oldest); }
+    for (let i = LOG_KEEP - 1; i >= 1; i--) {
+      if (fs.existsSync(where + '.' + i)) { fs.renameSync(where + '.' + i, where + '.' + (i + 1)); }
+    }
+    if (fs.existsSync(where)) { fs.renameSync(where, where + '.1'); }
+    return true;
+  } catch (e) { return false; }
+}
+
+/*
+  WHETHER THIS LOG IS WORKING, where it can be read from outside.
+
+  The give-up below used to be one line on the console, which lands in
+  server.log among four fifths engine noise, and nothing else, so a server
+  that had stopped writing thornswood.log looked exactly like a quiet one. The
+  entry asks for the give-up to "set a state the health or manifest route
+  reports, so a server logging nothing is visible from outside".
+
+  So it goes in thornswood-log.json in the data folder, which the resources
+  server hands out over plain HTTP: /thornswood-log.json on 3000 for live and
+  7788 for dev, readable with no ssh. It says whether the log works and, when
+  it does not, why, and nothing about anybody. Written when the first line of
+  a load lands, so a restart that fixed it says so, and once when it breaks.
+*/
+function sayLogState(state) {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    let dataDir = 'data';
+    try {
+      const cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+    } catch (e) { }
+    state.at = Date.now();
+    fs.writeFileSync(path.join(dataDir, 'thornswood-log.json'), JSON.stringify(state));
+  } catch (e) { }
+}
 
 function logPath() {
   if (logFile !== null || logBroken) { return logFile; }
@@ -86,12 +144,28 @@ function log() {
   const where = logPath();
   if (!where) { return; }
   try {
-    require('fs').appendFileSync(where, stamp() + ' ' + line + '\n');
+    const fs = require('fs');
+    const text = stamp() + ' ' + line + '\n';
+    if (logBytes < 0) {
+      try { logBytes = fs.statSync(where).size; } catch (e) { logBytes = 0; }
+    }
+    if (logBytes >= LOG_MAX_BYTES) {
+      // A roll refused because something is reading the file right then is
+      // tried again a little later, not on every line until it lets go.
+      logBytes = rollLog(where) ? 0 : LOG_MAX_BYTES - 256 * 1024;
+    }
+    fs.appendFileSync(where, text);
+    logBytes += Buffer.byteLength(text);
+    if (!logStateSaid) {
+      logStateSaid = true;
+      sayLogState({ ok: true });
+    }
   } catch (e) {
     // Once. A log that throws every tick is worse than no log.
     logBroken = true;
     console.log('[thornswood] could not write thornswood.log, carrying on ' +
-                'with the console only: ' + e);
+                'with the console only, and saying so at /thornswood-log.json: ' + e);
+    sayLogState({ ok: false, why: String((e && (e.code || e.message)) || e) });
   }
 }
 

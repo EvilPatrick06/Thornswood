@@ -146,3 +146,27 @@ one month at the old price and saves a week of people asking why nothing works.
 
 `.\tools\Check-Load.ps1` against the old address shows whether anyone is still
 landing there. When that is zero for a few days, cancel it.
+
+## The logs on the box, and how big they get
+
+Each service writes its log in its own folder, and each one is rolled: at
+4 MB `x.log` becomes `x.log.1`, what was `.1` becomes `.2`, and five are kept.
+The oldest past five is the only thing that is ever removed.
+
+- `server.log` (game server, live and dev), `voice.log` (live and dev) and
+  `bot.log` are written by cmd's `>>` from the scheduled task, and Windows
+  will not move a file held that way while the service runs. So
+  `roll-log.ps1`, beside each service, rolls it just before the service
+  starts. A service that runs for days grows one file until its next restart.
+  An install of the game server or of voice rolls its log whatever the size,
+  so the run it starts has a file of its own and the one before is `.1`.
+- `thornswood.log` (the gamemode) and `site.log` (the website) roll
+  themselves.
+- `C:\Thornswood-Watch\watch.log` is not rolled. Past 2,000 lines the watcher
+  keeps the last 1,000 and the rest is gone.
+- `.\tools\Get-Logs.ps1` reads only the current file. After a restart, last
+  night's crash may be in `.1` beside it.
+- Whether the gamemode can write its log at all is at
+  `http://192.135.112.23:3000/thornswood-log.json`, and on 7788 for dev.
+  `"ok": false` means thornswood.log has stopped, and `why` says what the
+  write was refused with.
