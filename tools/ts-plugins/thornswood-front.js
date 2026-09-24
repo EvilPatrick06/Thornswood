@@ -4428,6 +4428,33 @@
   /* How long a "restarting" seen in online.json keeps the probe patient.
      Longer than any restart so far, and it only ever delays a quit. */
   const RESTART_GRACE_MS = 600000;
+  /*
+    How long one probe may go unanswered before it counts as a strike.
+
+    The flag that says a probe is out used to be cleared only by that probe's
+    own answer, so one request that never came back switched this watchdog
+    off for the rest of the session. And a request can take a long time to
+    come back: the fork's HttpClient.cpp gives its httplib client no timeouts,
+    and cpp-httplib 0.40.0 defaults both the connect and the read timeout to
+    300 seconds. A server that accepts the connection and then says nothing
+    held each probe for five minutes, so twelve strikes took an hour. And a
+    request that throws on its worker thread never calls back at all: the
+    pool keeps the error in a future HttpClient.cpp never reads, so the flag
+    stayed set for good.
+
+    So a probe that has not answered in fifteen seconds is a probe that did
+    not answer: it counts as a strike and the next one goes out. Twelve of
+    those is three minutes, against two for a server that refuses outright.
+    Only clearing the flag was not enough, because the stuck requests would
+    still take five minutes each to fail. An answer that arrives after its
+    deadline still resets the count when it says the server is up, so a slow
+    reply is not an outage.
+
+    Never shorter than PROBE_MS. Every request waits on one pool of three
+    threads shared with every other plugin, and a shorter deadline stacks
+    more of them behind a server that has stopped answering.
+  */
+  const PROBE_DEADLINE_MS = 15000;
 
   let probe = null;
   try { probe = HOST ? new sp.HttpClient('http://' + HOST + ':3000') : null; } catch (e) { probe = null; }
@@ -4457,6 +4484,9 @@
   let strikes = 0;
   let probing = false;
   let lastProbe = 0;
+  /* When the probe now out was sent, and which one it is. See PROBE_DEADLINE_MS. */
+  let probeStartedAt = 0;
+  let probeSeq = 0;
   let leaving = 0;
   /* The last whole second the way-out countdown put on screen, 0 before the
      first. See the quit in the tick above, the only place that can draw it. */
@@ -4465,13 +4495,26 @@
   let toldRestarting = 0;
 
   function checkServer(now) {
-    if (!probe || probing || leaving) return;
+    if (!probe || leaving) return;
+    if (probing && now - probeStartedAt > PROBE_DEADLINE_MS) {
+      probing = false;
+      log('the server has not answered in', PROBE_DEADLINE_MS / 1000, 'seconds');
+      strikes++;
+      onStrike();
+    }
+    if (probing || leaving) return;
     if (now - lastProbe < PROBE_MS) return;
     lastProbe = now;
+    probeStartedAt = now;
     probing = true;
+    const seq = ++probeSeq;
     try {
       probe.get('/online.json', undefined, guard('probe', (res) => {
-        probing = false;
+        // An answer to a probe the deadline already counted. If it says the
+        // server is up that still counts; if not, the strike is already in,
+        // and the flag belongs to the probe that went out after it.
+        const late = seq !== probeSeq || !probing;
+        if (!late) { probing = false; }
         const ok = res && res.status >= 200 && res.status < 500;
         if (ok) {
           // The server said it is going down on purpose. Remember that, so
@@ -4491,6 +4534,7 @@
           strikes = 0;
           return;
         }
+        if (late) { return; }
         strikes++;
         onStrike();
       }));
@@ -4525,6 +4569,11 @@
       swallows that throw, so a note here would only ever reach the log again,
       which is the bug entry 159 was about. The quit in the update tick above
       draws the message and the countdown, where game calls work.
+
+      The other way in is a probe that passed PROBE_DEADLINE_MS, which
+      checkServer counts from the update tick, where a note would work. It is
+      left to the same place anyway, so there is one message and one
+      countdown however the outage was noticed.
     */
     say('the server has gone down, going back to the menu');
     log('server unreachable', PROBE_STRIKES, 'times running, quitting to the main menu');
