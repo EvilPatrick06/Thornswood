@@ -334,7 +334,10 @@ Copy-Item C:\Thornswood\Profile\launcher.log "$out\"
 **M8, the installer's checksum.** Prints the SHA-256 of the newest installer in
 the Downloads folder, in lower case the way the Downloads page prints it, then
 the file it read. An installer published before the page printed a checksum has
-none there, and then row 15 says so.
+none there, and then row 15 says so. A checksum is not a key: the page prints it
+for anybody, so both go into row 15 whole, and
+`tools\test-clean-install-run.js` lets a SHA-256 through on a line that says
+SHA-256.
 
 ```powershell
 Get-ChildItem "$env:USERPROFILE\Downloads\Thornswood-Setup*.exe" | Sort-Object LastWriteTime | Select-Object -Last 1 | Get-FileHash -Algorithm SHA256 | ForEach-Object { $_.Hash.ToLower() + '  ' + $_.Path }

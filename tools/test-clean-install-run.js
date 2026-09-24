@@ -34,7 +34,17 @@
   time, or "not reached", and something under Seen.
 
   And the house rules for text people read: no em dash, never "player", no To
-  Do entry by number (the numbers move), nothing shaped like a secret.
+  Do entry by number (the numbers move), nothing shaped like a secret. A
+  SHA-256 is shaped like one and is not: row 15 asks for the installer's, word
+  for word, and the Downloads page prints it for anybody. So 64 hex characters
+  on a line that says SHA-256 are let through, and nothing else that long is.
+
+  FIVE, the list accepts its own record. The list once asked for the SHA-256
+  at row 15 while the key check here refused it, so the pull request carrying a
+  faithful run could not have merged, and the proof made on a filled-in copy
+  was older than the row. So this fills every row of the list in memory the
+  way a run would, hashes included, and every check on the rows and the words
+  must pass on that copy too.
 
   Read only. Pass another path as the first argument to check a copy.
 */
@@ -67,9 +77,9 @@ function norm(s) { return String(s).replace(/\s+/g, ' ').trim(); }
 function repoFile(p) { return path.join(ROOT, p.split('\\').join(path.sep)); }
 function readRepo(p) { try { return fs.readFileSync(repoFile(p), 'utf8'); } catch (e) { return null; } }
 
-/* The document, cut at its ## headings. */
-function section(name) {
-  const parts = doc.split(/^## /m);
+/* The document, or a copy of it, cut at its ## headings. */
+function section(name, text) {
+  const parts = (text === undefined ? doc : text).split(/^## /m);
   for (let i = 1; i < parts.length; i++) {
     const nl = parts[i].indexOf('\n');
     const head = (nl < 0 ? parts[i] : parts[i].slice(0, nl)).trim();
@@ -86,26 +96,31 @@ function cells(line) {
 function unquote(c) { return /^`[^`]*`$/.test(c) ? c.slice(1, -1) : null; }
 
 // ---- the status line -------------------------------------------------------
-const status = /\*\*Last run: ([^*]+?)\.?\*\*/.exec(doc);
+const LAST_RUN = /\*\*Last run: ([^*]+?)\.?\*\*/;
+const status = LAST_RUN.exec(doc);
 yes('there is a Last run line, the way tools\\RESTORING.md has one', !!status);
 const runAt = doc.indexOf('## The run');
 yes('the Last run line comes before the run, where the reader meets it first', !!status && runAt > 0 && status.index < runAt);
 const neverRun = !!status && /^never$/i.test(status[1].trim());
 
 // ---- the run table ---------------------------------------------------------
+const HEADER = ['#', 'Step', 'Clock', 'Seen, word for word', 'A stranger would instead'];
+function runTable(text) {
+  const t = { rows: [], headers: 0, headersOk: true, widthOk: true };
+  (text || '').split('\n').forEach(function (line) {
+    if (!line.trim().startsWith('|')) return;
+    const c = cells(line);
+    if (c[0] === '#') { t.headers++; if (JSON.stringify(c) !== JSON.stringify(HEADER)) t.headersOk = false; return; }
+    if (c.every(function (x) { return /^-+$/.test(x); })) return;
+    if (c.length !== HEADER.length) t.widthOk = false;
+    t.rows.push({ n: Number(c[0]), step: c[1] || '', clock: c[2] || '', seen: c[3] || '', other: c[4] || '' });
+  });
+  return t;
+}
 const run = section('The run');
 yes('there is a section called The run', run !== null);
-const HEADER = ['#', 'Step', 'Clock', 'Seen, word for word', 'A stranger would instead'];
-const rows = [];
-let headersOk = true, widthOk = true, headers = 0;
-(run || '').split('\n').forEach(function (line) {
-  if (!line.trim().startsWith('|')) return;
-  const c = cells(line);
-  if (c[0] === '#') { headers++; if (JSON.stringify(c) !== JSON.stringify(HEADER)) headersOk = false; return; }
-  if (c.every(function (x) { return /^-+$/.test(x); })) return;
-  if (c.length !== HEADER.length) widthOk = false;
-  rows.push({ n: Number(c[0]), step: c[1] || '', clock: c[2] || '', seen: c[3] || '', other: c[4] || '' });
-});
+const table = runTable(run);
+const rows = table.rows, headers = table.headers, headersOk = table.headersOk, widthOk = table.widthOk;
 yes('every table in the run has the three columns the entry asked for: Clock, Seen, A stranger would instead', headers > 0 && headersOk);
 yes('every row has exactly one cell per column, so no step has swallowed a pipe', widthOk);
 yes('the run is long enough to be the whole path, ' + rows.length + ' rows', rows.length >= 40);
@@ -125,14 +140,16 @@ yes('Steam, then Nexus and Vortex, then the installer, then the own folder, then
 yes('the two read-only checks are the last thing in the run', order[5] === heads.length - 1);
 
 // ---- filled in, or not yet --------------------------------------------------
+function noClockRows(rs) { return rs.filter(function (r) { return !/^(([01]?\d|2[0-3]):[0-5]\d|not reached)$/i.test(r.clock); }); }
+function noSeenRows(rs) { return rs.filter(function (r) { return !r.seen; }); }
 if (neverRun) {
   const filled = rows.filter(function (r) { return r.clock || r.seen || r.other; });
   yes('never run, so no row carries a time or an observation yet' +
       (filled.length ? ' (filled: ' + filled.map(function (r) { return r.n; }).join(', ') + ')' : ''),
       filled.length === 0);
 } else {
-  const noClock = rows.filter(function (r) { return !/^(([01]?\d|2[0-3]):[0-5]\d|not reached)$/i.test(r.clock); });
-  const noSeen = rows.filter(function (r) { return !r.seen; });
+  const noClock = noClockRows(rows);
+  const noSeen = noSeenRows(rows);
   yes('run on ' + (status ? status[1] : '?') + ', so every row carries a clock time or "not reached"' +
       (noClock.length ? ' (missing: ' + noClock.map(function (r) { return r.n; }).join(', ') + ')' : ''),
       noClock.length === 0);
@@ -213,10 +230,85 @@ yes('every tools\\ file the list names is in the repository (' + Object.keys(men
     Object.keys(mentioned).length > 5 && missingFiles.length === 0);
 
 // ---- the words --------------------------------------------------------------
-yes('no em dash or en dash anywhere', !/[\u2014\u2013]/.test(doc));
-yes('never "player"', !/\bplayers?\b/i.test(doc));
-yes('To Do entries are named by title, never by number, because the numbers move', !/\bentr(y|ies)\s+#?\d/i.test(doc));
-yes('nothing written down as a password, token, secret or webhook', !/\b(password|passwd|token|secret|webhook)s?\s*[:=]\s*\S/i.test(doc));
-yes('no long run of letters and digits that could be a key', !/[A-Za-z0-9+_\-]{40,}/.test(doc));
+// Each rule answers with the line numbers it objects to and never the text, so
+// a key somebody pasted into a row is not printed a second time by the check
+// that caught it.
+function lineHits(text, re) {
+  const g = new RegExp(re.source, re.flags.indexOf('g') < 0 ? re.flags + 'g' : re.flags);
+  const out = [];
+  let m;
+  while ((m = g.exec(text)) !== null) {
+    const n = text.slice(0, m.index).split('\n').length;
+    if (out.indexOf(n) < 0) out.push(n);
+    if (!m[0].length) g.lastIndex++;
+  }
+  return out;
+}
+// The installer's SHA-256 is 64 hex characters, which is key shaped, and it is
+// public: the Downloads page prints it and row 15 asks for it word for word,
+// from the page and from M8. So on a line that says SHA-256, a run of exactly
+// 64 hex characters standing on its own is set aside first. A longer run, a
+// shorter one, or a hash on a line that does not say what it is still fails.
+const SHA256_RUN = /(^|[^A-Za-z0-9+_\-])[0-9A-Fa-f]{64}(?![A-Za-z0-9+_\-])/g;
+function keyLines(text) {
+  const out = [];
+  text.split('\n').forEach(function (line, i) {
+    const l = /SHA-256/i.test(line) ? line.replace(SHA256_RUN, '$1') : line;
+    if (/[A-Za-z0-9+_\-]{40,}/.test(l)) out.push(i + 1);
+  });
+  return out;
+}
+const WORDS = [
+  { what: 'no em dash or en dash anywhere', lines: function (t) { return lineHits(t, /[\u2014\u2013]/); } },
+  { what: 'never "player"', lines: function (t) { return lineHits(t, /\bplayers?\b/i); } },
+  { what: 'To Do entries are named by title, never by number, because the numbers move', lines: function (t) { return lineHits(t, /\bentr(y|ies)\s+#?\d/i); } },
+  { what: 'nothing written down as a password, token, secret or webhook', lines: function (t) { return lineHits(t, /\b(password|passwd|token|secret|webhook)s?\s*[:=]\s*\S/i); } },
+  { what: 'no long run of letters and digits that could be a key, bar a SHA-256 on a line that says so', lines: keyLines }
+];
+function wordChecks(text, prefix) {
+  WORDS.forEach(function (w) {
+    const bad = w.lines(text);
+    yes(prefix + w.what + (bad.length ? ' (line ' + bad.join(', ') + ')' : ''), bad.length === 0);
+  });
+}
+wordChecks(doc, '');
+
+// ---- the list accepts its own record ----------------------------------------
+// Every row of the run filled in the way How to fill in a row asks, in memory:
+// a clock time, and Seen. Wherever a row asks for a SHA-256 it gets the
+// installer's hash whole, once as the page prints it and once as M8 prints it,
+// with the path beside it. A check that fails on this copy would fail on the
+// pull request carrying the real run, so it fails here first.
+const SAMPLE_HASH = '0123456789abcdef'.repeat(4);
+function filledIn(text) {
+  const start = text.search(/^## The run$/m);
+  if (start < 0) return null;
+  const next = text.slice(start + 1).search(/^## /m);
+  const end = next < 0 ? text.length : start + 1 + next;
+  const body = text.slice(start, end).split('\n').map(function (line) {
+    if (!line.trim().startsWith('|')) return line;
+    const c = cells(line);
+    if (c.length !== HEADER.length || !/^\d+$/.test(c[0])) return line;
+    const seen = /SHA-256/.test(c[1])
+      ? 'Thornswood-Setup.exe, 14.2 MB, no browser warning. Page: SHA-256 ' + SAMPLE_HASH +
+        ' M8: ' + SAMPLE_HASH + '  C:\\Users\\tester\\Downloads\\Thornswood-Setup.exe They match.'
+      : 'nothing';
+    return '| ' + c[0] + ' | ' + c[1] + ' | 14:05 | ' + seen + ' | |';
+  }).join('\n');
+  return (text.slice(0, start) + body + text.slice(end))
+    .replace(LAST_RUN, '**Last run: 25 Sep, the tester, from the clean checkpoint.**');
+}
+const copy = filledIn(doc);
+yes('a copy with every row filled in can be made from the list', copy !== null);
+if (copy !== null) {
+  const copyStatus = LAST_RUN.exec(copy);
+  const copyRows = runTable(section('The run', copy)).rows;
+  yes('filled in: the Last run line carries a date', !!copyStatus && !/^never$/i.test(copyStatus[1].trim()));
+  yes('filled in: every row carries a clock time and something under Seen, ' + copyRows.length + ' rows',
+      copyRows.length === rows.length && noClockRows(copyRows).length === 0 && noSeenRows(copyRows).length === 0);
+  yes('filled in: a row asks for the installer\'s SHA-256, and the copy carries it there whole',
+      copyRows.some(function (r) { return r.seen.indexOf(SAMPLE_HASH) >= 0; }));
+  wordChecks(copy, 'filled in: ');
+}
 
 done();
