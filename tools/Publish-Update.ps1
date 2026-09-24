@@ -950,6 +950,28 @@ try {
     $clientRel = $null
 }
 
+# ---- nothing that must never ship, read off what was built ----------------
+#
+# Entry 236. Ship-Rules decides what goes into a pack, and twice a secret got
+# past it because nobody had listed the file yet: the SkyMP sign in in the
+# installer, and voice-token.txt in nine main packs from 18 to 20 September.
+# Check-Secrets reads what was actually built, every pack, the launcher and the
+# client runtime, and stops the release here, before anything is uploaded, on a
+# credential by name or by shape or on a file Ship-Rules says never ships.
+# It prints the file, the line and the rule, never the value. Measured on 24
+# September over the 54 packs and 2 client runtimes on Patrick's machine: the
+# two dev packs that carried a token and the 16 September one that carried
+# five files the rules keep out now fail, and the other 53 pass.
+$scanZips = @($chunks | ForEach-Object { $_.Path })
+if ($clientRel) { $scanZips += $clientRel.path }
+$scanExes = @()
+if ($Launcher -and (Test-Path -LiteralPath $exePath)) { $scanExes += $exePath }
+if ($scanZips.Count -or $scanExes.Count) {
+    Head 'Checking for secrets'
+    & (Join-Path $Here 'Check-Secrets.ps1') -Zip $scanZips -Binary $scanExes
+    if ($LASTEXITCODE -ne 0) { Die 'Something that must never ship is in what was just built. The lines above name each file and rule. Nothing was uploaded.' }
+}
+
 if (-not $NoUpload -and $gh) {
     Head 'Uploading'
     $assets = @()
