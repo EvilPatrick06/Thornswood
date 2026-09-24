@@ -51,7 +51,13 @@ else     { '[state] the bot is NOT running' }
 
 # Read as UTF-8 rather than whatever the console codepage happens to be, or
 # every accented character in here comes back as a question mark.
-Get-Content `$log -Encoding UTF8 -Tail 3000 -EA SilentlyContinue |
+#
+# bot.log.1 first, when there is one. Entry 220 has run.ps1 roll bot.log to
+# bot.log.1 through roll-log.ps1 before a start once it passes 4 MB, so right
+# after a roll the lines that say why the bot restarted are in bot.log.1 and
+# the current file has only the new start. With no bot.log.1 this reads
+# bot.log alone, as it always did. tools\test-show-botlog.ps1 runs it.
+Get-Content -LiteralPath (`$log + '.1'), `$log -Encoding UTF8 -Tail 3000 -EA SilentlyContinue |
   Where-Object { `$_ -match '$filter' } |
   Select-Object -Last $Lines
 "@
