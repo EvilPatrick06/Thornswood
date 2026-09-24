@@ -412,20 +412,42 @@ if (-not `$node) { 'NODE NOT FOUND ON THIS MACHINE'; return }
 `$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ``
       -DontStopIfGoingOnBatteries -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 1) ``
       -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable
-if (-not (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue)) {
+`$have = Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
+if (-not `$have) {
   `$t = New-ScheduledTaskTrigger -AtStartup
   Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$t -Settings `$s ``
     -Principal `$principal | Out-Null
   'scheduled task created'
 } else {
-  # -Settings as well as -Action. Without it an existing task keeps whatever
-  # it was first registered with, which is how the three restart cap survived
-  # every deploy that was meant to change it. -Principal for the same reason:
-  # without it -RunAs would never reach the task already on the box, and nor
-  # would going back to SYSTEM. Without -RunAs the principal is the account
-  # the task already had, so this keeps it rather than resetting it.
-  Set-ScheduledTask -TaskName '$Task' -Action `$a -Settings `$s -Principal `$principal | Out-Null
-  'scheduled task updated'
+  # The settings as well as the action. Without them an existing task keeps
+  # whatever it was first registered with, which is how the three restart cap
+  # survived every deploy that was meant to change it. The principal for the
+  # same reason: without it -RunAs would never reach the task already on the
+  # box, and nor would going back to SYSTEM. Without -RunAs the principal is
+  # the account the task already had, so this keeps it rather than resetting
+  # it.
+  #
+  # On the task object and handed back whole, not as Set-ScheduledTask
+  # -Principal. That parameter merges the new principal into the old one and
+  # keeps the old privilege list, and a SYSTEM principal carrying one is not
+  # a valid task. So -RunAs SYSTEM on a task that had been LOCAL SERVICE
+  # failed with "The task XML contains an unexpected node ...
+  # Privilege:SeChangeNotifyPrivilege" (0x80041316), the task stayed LOCAL
+  # SERVICE, and this deploy's action and settings were lost with it. Found in
+  # review on 24 Sep and measured the same day on a scratch task under Windows
+  # PowerShell 5.1 and pwsh 7: the object replaces the principal outright, in
+  # both directions, and leaves the trigger alone.
+  `$have.Actions = `$a
+  `$have.Settings = `$s
+  `$have.Principal = `$principal
+  # Said in capitals when it fails. This script runs with Continue, so the
+  # line after a failed update used to say "scheduled task updated" anyway.
+  try {
+    `$have | Set-ScheduledTask -ErrorAction Stop | Out-Null
+    'scheduled task updated'
+  } catch {
+    'COULD NOT UPDATE THE SCHEDULED TASK, it keeps what it had: ' + `$_.Exception.Message
+  }
 }
 
 # Read back rather than assumed. Set-ScheduledTask is quiet about settings

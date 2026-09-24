@@ -23,15 +23,25 @@
   said so as if nothing were wrong. So there is no default, and the account
   block reads the account off the task when -RunAs is not given.
 
+  Review found a second thing on 24 Sep that only a real task shows.
+  Set-ScheduledTask -Principal merges the new principal into the old one and
+  keeps its privilege list, so -RunAs SYSTEM on a task that had been LOCAL
+  SERVICE failed with "The task XML contains an unexpected node", the task
+  stayed LOCAL SERVICE, and the way back the script promised did not work.
+  Every check here passed, because none of them ever applied a principal to
+  a task. So an elevated run now does, on a scratch task.
+
   HOW. Deploy-Docs.ps1 talks to the VPS and is never run here. Its parameter
   block is read off the syntax tree. The script it sends up to start the site
   is one here-string, and this builds it the way the deploy does, from that
   same here-string with the same variables set, then:
 
     parses it, as the far end will
-    checks Register-ScheduledTask and Set-ScheduledTask both carry the
-      principal, and that each call binds to a parameter set the real cmdlet
-      has, so -Principal is never mixed with -User or -RunLevel
+    checks Register-ScheduledTask carries the principal, and that a task
+      already there is handed back whole with the principal set on it rather
+      than through Set-ScheduledTask -Principal, and that each call binds to
+      a parameter set the real cmdlet has, so -Principal is never mixed with
+      -User or -RunLevel
     checks the principal for anything but SYSTEM is cut to one privilege,
       SeChangeNotifyPrivilege, with -ProcessTokenSidType Unrestricted. The
       entry asks for "a low privilege account", and on LOCAL SERVICE
@@ -49,9 +59,15 @@
       what -RunAs says wins
     runs the read-back after the task is registered against a task that
       stands in for Get-ScheduledTask, for the account and for the cut
+    when it is elevated, which the build check on GitHub is, runs the account
+      block, the code that registers or updates the task and the read-back,
+      all cut from the script that goes up, against one real scratch task,
+      through every change of account a deploy makes, and reads the task back
+      after each. Not elevated, that part says SKIP.
 
-  Writes only under its own temp folder. Never connects to anything and never
-  registers a task.
+  Writes only under its own temp folder and, when elevated, one scheduled
+  task whose action is cmd.exe /c exit. That task is never started and is
+  removed before this ends. Never connects to anything.
 #>
 [CmdletBinding()]
 param([string]$ToolsPath)
@@ -124,11 +140,12 @@ Yes ('the script is filled in from $Task, $Port, $rootWin and $RunAs and nothing
 
 # The here-string, evaluated exactly as Deploy-Docs evaluates it. An empty
 # account is a deploy with no -RunAs, which gets the parameter's default.
-function Build([string]$account, [string]$docsRoot) {
+# The task name is the real one unless a scratch task is being driven.
+function Build([string]$account, [string]$docsRoot, [string]$taskName = 'Thornswood Docs') {
     if (-not $account) { $account = $script:runAsDefault }
     $RunAs = $account
     $rootWin = $docsRoot
-    $Task = 'Thornswood Docs'
+    $Task = $taskName
     $Port = 3001
     return (& ([ScriptBlock]::Create($script:remote.Extent.Text)))
 }
@@ -189,9 +206,35 @@ foreach ($account in @('', 'SYSTEM', 'LOCAL SERVICE')) {
         Yes "$label`: and not with -User 'SYSTEM' or -RunLevel written into the call" (
             $rn -notcontains 'User' -and $rn -notcontains 'RunLevel')
         # Which principal that is, with and without -RunAs, is run below
-        # against a task standing in for the one on the box.
-        Yes "$label`: a task already there is given the principal too, so -RunAs reaches it" ($un -contains 'Principal')
-        Yes "$label`: and still its action and settings" ($un -contains 'Action' -and $un -contains 'Settings')
+        # against a task standing in for the one on the box, and, elevated,
+        # against a real one.
+        #
+        # A task already there is handed back whole, as the object
+        # Set-ScheduledTask takes from the pipeline, with the principal, the
+        # action and the settings set on it first. Set-ScheduledTask
+        # -Principal merges into the old principal and keeps its privilege
+        # list, which is how -RunAs SYSTEM after LOCAL SERVICE failed.
+        $fed = ''
+        $pipe = $upd[0].Parent
+        if ($pipe -is [System.Management.Automation.Language.PipelineAst] -and
+            $pipe.PipelineElements.Count -ge 2 -and $pipe.PipelineElements[1] -eq $upd[0] -and
+            $pipe.PipelineElements[0] -is [System.Management.Automation.Language.CommandExpressionAst] -and
+            $pipe.PipelineElements[0].Expression -is [System.Management.Automation.Language.VariableExpressionAst]) {
+            $fed = $pipe.PipelineElements[0].Expression.Extent.Text
+        }
+        $setOn = @()
+        if ($fed) {
+            $setOn = @($sent.FindAll({ param($n)
+                $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                $n.Left -is [System.Management.Automation.Language.MemberExpressionAst] -and
+                $n.Left.Expression.Extent.Text -eq $fed -and
+                $n.Extent.EndOffset -lt $upd[0].Extent.StartOffset
+            }, $true) | ForEach-Object { $_.Left.Member.Extent.Text })
+        }
+        Yes "$label`: a task already there is handed to Set-ScheduledTask whole, with the principal set on it, so -RunAs reaches it" (
+            $fed -and $setOn -contains 'Principal')
+        Yes "$label`: and still its action and settings" ($setOn -contains 'Actions' -and $setOn -contains 'Settings')
+        Yes "$label`: and not through Set-ScheduledTask -Principal, which keeps the old privilege list" ($un -notcontains 'Principal')
         $rb = Binds $reg[0]
         $ub = Binds $upd[0]
         if ($null -eq $rb -or $null -eq $ub) {
@@ -549,6 +592,130 @@ try {
         $said = ReadBack 'SYSTEM' 'S-1-5-18' 'SYSTEM' $null 'Default'
         Yes 'read-back: SYSTEM asked and SYSTEM there says so, and nothing about privileges' (
             $said.Count -eq 1 -and $said[0] -like 'task runs as SYSTEM*')
+    }
+
+    # ---- on a real task, when this is elevated ------------------------------------
+    #
+    # Everything above builds principals and reads stand-ins back. None of it
+    # ever applied a principal to a task, and the fault review found on 24 Sep
+    # shows only when one is: Set-ScheduledTask -Principal merged SYSTEM into a
+    # LOCAL SERVICE principal, kept its privilege list and failed, so -RunAs
+    # SYSTEM did not put the site back. So, elevated, the account block and
+    # everything from the settings to the read-back of the account are cut
+    # from the script that goes up and run against one scratch task, through
+    # every change of account a deploy makes, and the task is read back after
+    # each. Its action is cmd.exe /c exit. Nothing here starts it, and it is
+    # removed before this ends.
+    $elevated = $false
+    try {
+        $elevated = (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch { $elevated = $false }
+    if (-not $elevated) {
+        Write-Host 'SKIP  not elevated, so the account changes were not applied to a real task'
+    } else {
+        $scratchTask = 'Thornswood test-site-account ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+        # From the settings set to the read-back of the account, and not the
+        # Start-ScheduledTask after it. The account does not change this part
+        # of the script, only the task name does.
+        $realTop = @([System.Management.Automation.Language.Parser]::ParseInput(
+            (Build 'SYSTEM' $docs $scratchTask), [ref]$null, [ref]$null).EndBlock.Statements)
+        $from = -1
+        $to = -1
+        for ($i = 0; $i -lt $realTop.Count; $i++) {
+            $st = $realTop[$i]
+            if (-not ($st -is [System.Management.Automation.Language.AssignmentStatementAst])) { continue }
+            if ($from -lt 0 -and $st.Left.Extent.Text -eq '$s' -and $st.Right.Extent.Text -match 'New-ScheduledTaskSettingsSet') { $from = $i }
+            if ($st.Left.Extent.Text -eq '$who' -and $i + 1 -lt $realTop.Count) { $to = $i + 1 }
+        }
+        $makeOrUpdate = ''
+        if ($from -ge 0 -and $to -gt $from) {
+            $makeOrUpdate = (@($realTop[$from..$to] | ForEach-Object { $_.Extent.Text }) -join "`n")
+        }
+        Yes 'real task: the code that registers or updates the task and reads it back is found, and nothing that starts or stops anything' (
+            $makeOrUpdate -match 'Register-ScheduledTask' -and $makeOrUpdate -match 'Set-ScheduledTask' -and
+            $makeOrUpdate -match [regex]::Escape($scratchTask) -and
+            $makeOrUpdate -notmatch 'Start-ScheduledTask' -and $makeOrUpdate -notmatch 'Stop-Process')
+
+        # One deploy against the scratch task: the account block with the
+        # scratch folders and icacls standing in, an action that does nothing,
+        # then the real register-or-update and read-back, with Continue as the
+        # far end has it. Hands back what it said and the task as it is after.
+        function OnTask([string]$given, [int]$n) {
+            $code = '$ErrorActionPreference = ''Continue''' + "`n" +
+                    'function icacls { $script:icaclsCalls++; $global:LASTEXITCODE = 0 }' + "`n" +
+                    (Scratch (BlockOf (Build $given $docs $scratchTask)) $map) + "`n" +
+                    ('$a = New-ScheduledTaskAction -Execute ''cmd.exe'' -Argument ''/c exit {0}''' -f $n) + "`n" +
+                    $makeOrUpdate
+            $script:icaclsCalls = 0
+            # A cmdlet that fails in there can still end this script, because
+            # a module's cmdlet does not always see the Continue set above.
+            # Kept as what it said, so the checks below fail by name instead.
+            try { $ran = Run $code }
+            catch { $ran = @{ said = @('THREW: ' + $_.Exception.Message) } }
+            $task = Get-ScheduledTask -TaskName $scratchTask -ErrorAction SilentlyContinue
+            $p = $null
+            if ($task) { $p = $task.Principal }
+            return @{ said = ($ran.said -join "`n"); task = $task; p = $p }
+        }
+        function PrivsOf($p) { return ((@($p.RequiredPrivilege) | Where-Object { $_ }) -join ',') }
+        function ArgsOf($task) { if (-not $task) { return '' }; return [string](@($task.Actions)[0].Arguments) }
+        # The start-up trigger it was registered with, and the ten restarts.
+        function Kept($task) {
+            return [bool]($task -and @($task.Triggers | Where-Object { $_ }).Count -eq 1 -and $task.Settings.RestartCount -eq 10)
+        }
+        function IsSystem($p) {
+            return [bool]($p -and $p.UserId -eq 'SYSTEM' -and "$($p.RunLevel)" -eq 'Highest' -and
+                -not (PrivsOf $p) -and "$($p.ProcessTokenSidType)" -eq 'Default')
+        }
+        function IsCut($p) {
+            return [bool]($p -and $p.UserId -match 'LOCAL SERVICE$' -and "$($p.RunLevel)" -eq 'Limited' -and
+                (PrivsOf $p) -eq 'SeChangeNotifyPrivilege' -and "$($p.ProcessTokenSidType)" -eq 'Unrestricted')
+        }
+
+        if ($makeOrUpdate) {
+            try {
+                $r = OnTask '' 1
+                Yes 'real task: no -RunAs and no task yet registers one' ($r.said -match 'scheduled task created' -and $null -ne $r.task)
+                Yes 'real task: on SYSTEM at Highest, with no privilege list and token SID type Default' (IsSystem $r.p)
+                Yes 'real task: with its start-up trigger, ten restarts and the action it was given' (
+                    (Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 1')
+                Yes 'real task: and the read-back says SYSTEM' ($r.said -match 'task runs as SYSTEM, run level Highest')
+
+                $r = OnTask 'LOCAL SERVICE' 2
+                Yes 'real task: -RunAs LOCAL SERVICE updates it without an error' (
+                    $r.said -match 'scheduled task updated' -and $r.said -notmatch 'COULD NOT UPDATE')
+                Yes 'real task: it is now LOCAL SERVICE at Limited, SeChangeNotifyPrivilege only, token SID type Unrestricted' (IsCut $r.p)
+                Yes 'real task: the trigger and settings kept, and this deploy''s action on it' (
+                    (Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 2')
+                Yes 'real task: and the read-back says LOCAL SERVICE with the cut' (
+                    $r.said -match 'task runs as LOCAL SERVICE, run level Limited' -and
+                    $r.said -match 'task privileges: SeChangeNotifyPrivilege only, token SID type Unrestricted')
+
+                $r = OnTask '' 3
+                Yes 'real task: a deploy without -RunAs after that reads LOCAL SERVICE off the task and keeps it, cut' (
+                    $r.said -match 'keeps the account it has: LOCAL SERVICE' -and (IsCut $r.p) -and (ArgsOf $r.task) -eq '/c exit 3')
+
+                # The finding. Before the fix this said "scheduled task
+                # updated" and left the task on LOCAL SERVICE with the last
+                # deploy's action.
+                $r = OnTask 'SYSTEM' 4
+                Yes 'real task: -RunAs SYSTEM on the LOCAL SERVICE task updates it without an error' (
+                    $r.said -match 'scheduled task updated' -and $r.said -notmatch 'COULD NOT UPDATE' -and $r.said -notmatch 'unexpected node')
+                Yes 'real task: -RunAs SYSTEM puts it back on SYSTEM at Highest, with no privilege list left over' (IsSystem $r.p)
+                Yes 'real task: with this deploy''s action on it, not the last one''s' ((Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 4')
+                Yes 'real task: and the read-back says SYSTEM' (
+                    $r.said -match 'task runs as SYSTEM, run level Highest' -and $r.said -notmatch 'THE TASK RUNS AS')
+
+                $r = OnTask '' 5
+                Yes 'real task: and a deploy without -RunAs after that keeps SYSTEM' (
+                    $r.said -match 'keeps the account it has: SYSTEM' -and (IsSystem $r.p) -and (ArgsOf $r.task) -eq '/c exit 5')
+            }
+            finally {
+                Unregister-ScheduledTask -TaskName $scratchTask -Confirm:$false -ErrorAction SilentlyContinue
+            }
+        }
+        Yes 'real task: the scratch task is gone again' ($null -eq (Get-ScheduledTask -TaskName $scratchTask -ErrorAction SilentlyContinue))
     }
 }
 finally {
