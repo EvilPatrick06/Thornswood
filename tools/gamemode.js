@@ -14670,10 +14670,30 @@ log('gamemode loaded:',
       this door goes into the holder's. That is the same trade it always was,
       with the smith supplying the metal, which is the part that was missing.
     */
-    if (!takeBlankMold(actorId)) {
-      toProfile(profileId, 'You are carrying no blank key mold. Forge one at a forge, one iron ' +
-                           'ingot, then bring it back to this door.');
-      return true;
+    /*
+      UNTIL THE PLUGIN REACHES EVERYBODY, THE DOOR STILL MAKES THE MOLD.
+
+      The blank is a record in Thornswood-Content.esp, and that file reaches
+      clients only through the Nexus collection: it is listed in
+      Profile\OwnGame\files.txt, so Publish-Update never puts it in a pack.
+      And the launcher compares every plugin's name and size with the server's
+      and refuses Play on any difference, so the new plugin cannot go on a
+      server before it is on the collection without locking out everybody who
+      has the old one.
+
+      So there is a stretch, of unknown length, where this gamemode is running
+      against a plugin with no blank mold in it. Demanding a blank there would
+      refuse every /mold in the world, because nobody could make one. While the
+      record is absent the door conjures the mold exactly as it did before; the
+      day the plugin carries it, the blank is spent. Nothing has to be switched
+      over by hand, which is the point: the switch is the plugin.
+    */
+    if (blankMoldsExist()) {
+      if (!takeBlankMold(actorId)) {
+        toProfile(profileId, 'You are carrying no blank key mold. Forge one at a forge, one iron ' +
+                             'ingot, then bring it back to this door.');
+        return true;
+      }
     }
     if (!giveNamed(owner.actorId, MOLD, moldLabel(building))) {
       toProfile(profileId, 'The mold could not be handed over. Say so in the dev channel.');
@@ -14778,6 +14798,31 @@ log('gamemode loaded:',
     toProfile(profileId, 'You cut a key to ' + nameOf(building) + '. It opens the door for ' +
                          'whoever is carrying it, so hand it over yourself.');
     return true;
+  }
+
+  /*
+    Is the blank key mold's recipe in the plugins this server loaded.
+
+    Asked of the engine rather than assumed from the gamemode, because the
+    gamemode and the plugin ship by different roads: this file goes up with
+    Deploy-DevGamemode, the plugin only with -LoadOrder and only once the Nexus
+    collection carries it. mp.getIdFromDesc is arithmetic on the load order and
+    answers a number for a record that is not there, so the lookup is what
+    says whether it exists.
+
+    Remembered once it is true. A plugin does not lose a record while the
+    server is running, and asking the engine on every /mold is not free.
+  */
+  var BLANK_MOLD_RECIPE = '15496:Thornswood-Content.esp';
+  var blankMoldsKnown = false;
+  function blankMoldsExist() {
+    if (blankMoldsKnown) { return true; }
+    var id = idOf(BLANK_MOLD_RECIPE);
+    if (!id) { return false; }
+    var found = null;
+    try { found = mp.lookupEspmRecordById(id); } catch (e) { found = null; }
+    if (found && found.record) { blankMoldsKnown = true; }
+    return blankMoldsKnown;
   }
 
   /*
@@ -15848,7 +15893,7 @@ log('gamemode loaded:',
     holdsKey: holdsKey, holdsMold: holdsMold, holdsDeed: holdsDeed,
     giveNamed: giveNamed, doorsOf: doorsOf, shutFor: shutFor, push: push,
     pushAll: pushAll, touchedBench: touchedBench, moldInHand: moldInHand,
-    takeBlankMold: takeBlankMold, nameFreshKey: nameFreshKey,
+    takeBlankMold: takeBlankMold, nameFreshKey: nameFreshKey, blankMoldsExist: blankMoldsExist,
     keyLabel: keyLabel, moldLabel: moldLabel, deedLabel: deedLabel,
     KEY: KEY, MOLD: MOLD, LOCK_PROPERTY: LOCK_PROPERTY,
     BENCH_PROPERTY: BENCH_PROPERTY, FORGE: FORGE,
