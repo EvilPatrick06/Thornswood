@@ -555,6 +555,7 @@
               <RowDefinition Height="*"/>
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
@@ -653,13 +654,20 @@
                     </Border>
                   </StackPanel>
 
+                  <!-- This card told a new person to name the character after
+                       themselves and to save before connecting, both left over
+                       from Skyrim Together. The name is what everybody sees over
+                       your head in a roleplay world, so a person who followed the
+                       card walked into Whiterun under their own name. And there is
+                       no saving: the server holds the character. Help.cs gives the
+                       same name rule in its Joining items, and
+                       tools/test-first-run-words.js keeps the two saying the same
+                       thing. -->
                   <StackPanel x:Name="FirstRunCard">
                     <TextBlock Text="First time" Style="{StaticResource Eyebrow}"/>
                     <Border Style="{StaticResource Slab}">
                       <StackPanel>
-                        <TextBlock Style="{StaticResource Body}" Text="Create a character and name it after yourself. That name is what other people see above your head, and it cannot be changed later without a new character."/>
-                        <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,13,0,13"/>
-                        <TextBlock Style="{StaticResource Body}" Text="Save once before connecting. Joining from an unsaved game drops you back to the menu."/>
+                        <TextBlock Style="{StaticResource Body}" Text="Give your character a name that belongs in Skyrim: a first name and a family name or a byname, and not your own. That name is what other people see above your head, and it cannot be changed later without a new character."/>
                       </StackPanel>
                     </Border>
                   </StackPanel>
@@ -705,7 +713,22 @@
               </Grid>
             </Border>
 
-            <Grid Grid.Row="3" Margin="36,4,36,28">
+            <!-- What the update feed says to everybody (To Do List entry 262): its
+                 message, and the reason when it holds Play for maintenance or for
+                 a launcher too old to play. A row of its own, so it can stand
+                 under an update card without covering it; UpdateBar and
+                 DowngradeBar share row 2 because DrawStatus keeps the downgrade
+                 card down while an update card is up.
+                 Filled in by ShowNotice in Shell.cs. -->
+            <Border x:Name="NoticeBar" Grid.Row="3" Background="{DynamicResource Card}" BorderBrush="{DynamicResource Accent}"
+                    BorderThickness="1" CornerRadius="2" Padding="20,16" Margin="36,0,36,16" Visibility="Collapsed">
+              <StackPanel>
+                <TextBlock x:Name="TxtNoticeTitle" Style="{StaticResource H2}"/>
+                <TextBlock x:Name="TxtNoticeNote" Style="{StaticResource Small}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+
+            <Grid Grid.Row="4" Margin="36,4,36,28">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1.9*" MinWidth="330"/>
                 <ColumnDefinition Width="30"/>
