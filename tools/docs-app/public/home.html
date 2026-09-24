@@ -375,7 +375,6 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
     <a class="mark" href="/"><img src="/logo.png" alt="">Thornswood</a>
     <button class="burger" id="burger" aria-label="Menu" aria-expanded="false">&#9776;</button>
     <nav class="top" id="nav">
-      <a href="/downloads">Download</a>
       <a href="/rules">Rules</a>
       <a href="/classes">Professions</a>
       <a href="/roadmap">Roadmap</a>
@@ -383,7 +382,11 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
       <a href="https://www.patreon.com/thornswood" id="navPatreon"
          target="_blank" rel="noopener">Patreon</a>
       <a href="DISCORD_URL" target="_blank" rel="noopener">Discord</a>
-      <a class="enter" href="/hub">Admin login</a>
+      <!-- The one gold button in the bar is Download, because that is what a
+           stranger came for. It was Admin login, a door only staff can use;
+           that link is in the footer now. It stays last, where the narrow
+           screen rule for .enter sets it apart from the list. -->
+      <a class="enter" href="/downloads">Download</a>
     </nav>
   </div>
 </header>
