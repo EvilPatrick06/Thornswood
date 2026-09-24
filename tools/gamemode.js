@@ -20087,14 +20087,22 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   Read out of the fork (C:\Thornswood-Dev\skymp, thornswood/engine-changes)
   rather than remembered. PacketParser.cpp is every message a client can
   send, and server_guest_lib\gamemode_events is every event that reaches a
-  function on mp. tools\test-audit-handlers.js checks the event list below
-  against the fork whenever the fork is on the machine it runs on.
+  function on mp. tools\test-audit-handlers.js checks the events and the
+  Papyrus names below against the fork whenever the fork is on the machine it
+  runs on.
 
-  THE ELEVEN EVENTS A HANDLER HERE CAN ANSWER. The engine calls mp.<name> when
-  it is a function, and ScampServerListener::OnMpApiEvent reads what comes
-  back: undefined and true let it through, false refuses it, and a throw is
-  logged and lets it through. So a handler with no opinion returns nothing at
-  all.
+  EVERY EVENT A HANDLER HERE CAN ANSWER. The engine calls mp[name] when it is
+  a function, and ScampServerListener::OnMpApiEvent reads what comes back:
+  undefined and true let it through, false refuses it (except in the Papyrus
+  family, where it refuses nothing), and a throw is logged and lets it
+  through. So a handler with no opinion returns nothing at all.
+  Eleven events have a fixed name, and they come first. Two families build
+  their name when they fire: the Papyrus family, onPapyrusEvent:<Name>, which
+  is the one that hears hits and spells and has its own heading below, and
+  custom events, whose name is whatever the client sent (CUSTOM EVENTS AND
+  PACKETS).
+
+  THE ELEVEN WITH A FIXED NAME.
 
     onActivate    Pressing E on anything. mp.onActivate refuses on named paths
                   only: a bench that is not theirs, a locked door whose client
@@ -20117,7 +20125,9 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   the event is raised for Gold001.
     onDeath       Anything dying. mp.onDeath never refuses. It logs a person's
                   death with the killer's id, and that line is the only record
-                  a kill leaves, because a hit raises no event (see below).
+                  of a fight this file keeps. The hits before it do raise an
+                  event, onPapyrusEvent:OnHit, but nothing here listens to it
+                  yet (THE PAPYRUS FAMILY, below).
     onRespawn     Logged by mp.onRespawn, never refused.
     onEatItem     Eating or drinking something in the pack. No handler: the
                   engine applies a potion's effects. The needs block hears
@@ -20136,13 +20146,74 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   equipmentSpellCheckEnabled and equipmentSlotCheckEnabled in
                   server-settings.json.
 
-  WHAT THE ENGINE ANSWERS AND THIS FILE NEVER SEES. Movement, animation,
-  animation variables, health, magicka and stamina, hits, spell casts, bow
-  shots (one arrow is taken), hosting an NPC nobody connected owns, and the
-  reply to a script the server asked the client to run. None of them raises
-  an event, so no handler here can refuse a hit or a spell. The engine refuses
-  a hit sent for an attacker the sender is not hosting. An UpdateProperty
-  message is parsed and dropped.
+  THE PAPYRUS FAMILY, mp['onPapyrusEvent:<Name>']. Every Papyrus event the
+  engine sends goes through MpForm::SendPapyrusEvent, which wraps it in a
+  PapyrusEventEvent and fires it the way the eleven above are fired, under
+  the name "onPapyrusEvent:" followed by the Papyrus name. A handler is called
+  with the id of the form the event is sent on, then the Papyrus arguments
+  (PapyrusUtils::GetJsValueFromPapyrusValue): a form as { type: 'form', desc },
+  a record as { type: 'espm', desc }, None as null, and numbers and flags as
+  themselves. These are the names the fork sends:
+
+    OnHit         A hit from a client: (target, aggressor, weapon or spell,
+                  null, power, sneak, bash, blocked). ActionListener::OnHit
+                  raises it once it has checked that the aggressor is the
+                  sender or an actor the sender hosts, that the target is in
+                  the same cell or world and, unless it is a bow or crossbow
+                  shot, within 4096 units, that the aggressor is alive, and
+                  that the weapon or spell is one it has equipped, or a bare
+                  fist. It fires before the attack speed and splash checks and
+                  before the damage, so a hit those checks then throw away was
+                  still raised. The blocked flag is the one the client sent,
+                  because the engine works out a block after the event.
+    OnSpellCast   A cast of a spell the caster has equipped, by the sender or
+                  an actor it hosts: (caster, spell). Raised after the cast has
+                  already gone out to everybody nearby, and not for the second
+                  message that interrupts a cast.
+    OnObjectEquipped
+                  A client's equip message for a weapon, armour, ammunition,
+                  a torch, a scroll, a potion, an ingredient or a book the
+                  actor holds, or a spell it has learned (MpActor::OnEquip):
+                  (actor, item, null).
+    OnItemAdded   One kind of item added to a pack or a container by
+                  MpObjectReference::AddItem: (the pack or container, item,
+                  count, null, null). AddItems, which adds several kinds at
+                  once, raises nothing.
+    OnActivate    An activation mp.onActivate did not refuse: (the thing, who
+                  pressed it).
+    SkympOnActivateClose
+                  The second press that closes a container the presser had
+                  open: (the container, who pressed it).
+    OnTriggerEnter, OnTriggerLeave, OnTrigger
+                  Something moving into, out of, or about inside a trigger
+                  box: (the box, what moved). OnTrigger is raised on every
+                  position update while it stays inside.
+    OnInit, OnCellLoad, OnLoad
+                  A reference the first time a person comes near it: (the
+                  reference).
+    OnUpdate      A form's registered update coming due: (the form).
+
+  A FALSE HERE REFUSES NOTHING. MpForm::SendPapyrusEvent does not read what
+  Fire returns, and PapyrusEventEvent::OnFireSuccess only hands the event to
+  the world's Papyrus scripts. So on a false the hit still lands, the spell
+  was already cast and the item was already added, and all that is stopped is
+  the event reaching a lever's or a quest's own script. That is why nothing
+  here may ever return false to this family. Nothing here listens to any of
+  it yet, and the engine does not build the arguments for a name mp has no
+  function for, so the family costs this file nothing today.
+
+  WHAT THE ENGINE ANSWERS WITH NO EVENT AT ALL. Movement, animation, animation
+  variables, health, magicka and stamina, bow shots (one arrow is taken),
+  hosting an NPC nobody connected owns, and the reply to a script the server
+  asked the client to run. None of them raises anything a handler here could
+  hear. An UpdateProperty message is parsed and dropped.
+
+  HITS AND SPELLS are answered by the engine too, and they do raise an event,
+  onPapyrusEvent:OnHit and onPapyrusEvent:OnSpellCast, but only once the
+  engine has already let them through and, for a cast, sent it on. So a
+  handler here can hear one person hit another and cannot refuse a hit or a
+  spell. The engine itself refuses a hit or a cast sent for an actor the
+  sender is not hosting.
 
   CONSOLE COMMANDS, WHICH IS WHERE ITEM CREATION WOULD COME IN. The client
   forwards exactly five (consoleCommandsService.ts): additem, equipitem,
@@ -20176,6 +20247,12 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   body, is a decision Patrick has not made. A handler that answers false too
   eagerly shuts every chest in Skyrim for everybody at once, so until he makes
   it the two handlers below watch and refuse nothing.
+
+  Hits are a different case: nothing here can refuse one, only hear it,
+  through onPapyrusEvent:OnHit. Nothing listens to it yet. It is raised for
+  every blow the engine takes, a hosted bandit's as much as a person's, so
+  which blows are worth a line, one person hitting another being the obvious
+  one, belongs to the same decision.
 */
 
 /*

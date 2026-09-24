@@ -21,6 +21,16 @@
 // machine it also checks the list against the fork itself; on a machine
 // without it those checks say SKIP.
 //
+// THE FORK CHECK READS EVERY NAME, NOT ONLY THE EASY ONES. The first version
+// collected event names with one pattern for `return "onX";` and passed while
+// the fork raised a whole family it could not see: PapyrusEventEvent builds its
+// name when it fires, onPapyrusEvent:<Name>, and that family is the one that
+// hears hits and spells. So now every GetName in gamemode_events is read, a
+// literal is an event, the two families built at runtime are named and checked
+// one by one, and any other GetName is a failure rather than a silence. The
+// same goes for every call that sends a Papyrus event: each name it can send is
+// read, and a call whose name cannot be read fails.
+//
 // Read only.
 const fs = require('fs');
 const path = require('path');
@@ -53,11 +63,18 @@ function liftThrough(from, anchor, to) {
   return c < 0 ? null : src.slice(a, c + to.length);
 }
 
-// Every event the fork raises, read out of
+// The eleven events with a fixed name, read out of
 // skymp5-server/cpp/server_guest_lib/gamemode_events on 24 September.
 const EVENTS = ['onActivate', 'onCraft', 'onDeath', 'onDropItem', 'onEatItem',
                 'onPutItem', 'onReadBook', 'onRespawn', 'onTakeItem',
                 'onUpdateAppearanceAttempt', 'onUpdateEquipmentAttempt'];
+// The Papyrus family: the engine calls mp['onPapyrusEvent:' + name] for each
+// of these. Read out of every SendPapyrusEvent call in the fork.
+const PAPYRUS_PREFIX = 'onPapyrusEvent:';
+const PAPYRUS = ['OnActivate', 'OnCellLoad', 'OnHit', 'OnInit', 'OnItemAdded',
+                 'OnLoad', 'OnObjectEquipped', 'OnSpellCast', 'OnTrigger',
+                 'OnTriggerEnter', 'OnTriggerLeave', 'OnUpdate',
+                 'SkympOnActivateClose'];
 // The console commands the client forwards, consoleCommandsService.ts.
 const CONSOLE = ['additem', 'equipitem', 'placeatme', 'disable', 'mp'];
 
@@ -65,6 +82,9 @@ const guardSrc = lift('function guard(name, fn) {', '\n}\n');
 const auditSrc = liftThrough('function auditProfile(refrId) {', 'mp.onDropItem = guard(', '\n});');
 const handlersSrc = liftThrough('mp.onTakeItem = guard(', 'mp.onDropItem = guard(', '\n});');
 const listSrc = lift('  WHAT A CLIENT CAN ASK THIS SERVER, AND WHAT IT IS TOLD.', '*/');
+// The list with its line breaks and indents folded, so a phrase that wraps
+// in the comment can be looked for as one phrase.
+const listFlat = listSrc === null ? null : listSrc.replace(/\s+/g, ' ');
 
 yes('guard() is in the gamemode', guardSrc !== null);
 yes('the take and drop watchers are in the gamemode', auditSrc !== null && handlersSrc !== null);
@@ -72,12 +92,34 @@ yes('and so is the list of what a client can ask', listSrc !== null);
 
 // ------------------------------------------------------------ the handlers --
 
-// Every handler this file registers, by the line that registers it.
+// Every handler this file registers, by the line that registers it: mp.onX,
+// mp._x (a custom event), and mp['...'] (the only way to write a Papyrus
+// family name, which has a colon in it).
 const registered = [];
-src.split('\n').forEach(function (line) {
-  const m = /^mp\.(on[A-Za-z]+)\s*=\s*(.*)$/.exec(line);
-  if (m) { registered.push({ name: m[1], rest: m[2] }); }
+src.split('\n').forEach(function (line, i) {
+  let m = /^mp\.((?:on|_)[\w$]*)\s*=(?!=)\s*(.*)$/.exec(line);
+  if (!m) {
+    const b = /^mp\[(['"])([^'"]+)\1\]\s*=(?!=)\s*(.*)$/.exec(line);
+    if (b) { m = [b[0], b[2], b[3]]; }
+  }
+  if (m) { registered.push({ name: m[1], rest: m[2], line: i }); }
 });
+
+function isFamilyName(name) {
+  return name.indexOf(PAPYRUS_PREFIX) === 0 &&
+         PAPYRUS.indexOf(name.slice(PAPYRUS_PREFIX.length)) !== -1;
+}
+
+// A handler's body, from its line to the first line that closes it.
+function bodyOf(h) {
+  const lines = src.split('\n');
+  const out = [];
+  for (let i = h.line; i < lines.length; i++) {
+    out.push(lines[i]);
+    if (i > h.line && /^\}\);/.test(lines[i])) { break; }
+  }
+  return out.join('\n');
+}
 
 yes('more than the four handlers the entry counted, ' + registered.length + ' of them',
     registered.length > 4);
@@ -86,13 +128,28 @@ yes('every one of them is built with guard() under its own name',
       return h.rest.indexOf("guard('" + h.name + "', function") === 0;
     }));
 yes('every one is an event the fork actually raises, so none of them is a handler that never fires',
-    registered.every(function (h) { return EVENTS.indexOf(h.name) !== -1; }));
+    registered.every(function (h) {
+      return EVENTS.indexOf(h.name) !== -1 || isFamilyName(h.name);
+    }));
+yes('no mp._ function, which is what the list says answers every custom event',
+    registered.every(function (h) { return h.name.charAt(0) !== '_'; }));
 yes('onTakeItem is registered', registered.some(function (h) { return h.name === 'onTakeItem'; }));
 yes('onDropItem is registered', registered.some(function (h) { return h.name === 'onDropItem'; }));
 yes('and each event is registered once, so a later line cannot quietly replace an earlier one',
     registered.every(function (h, i) {
       return registered.findIndex(function (o) { return o.name === h.name; }) === i;
     }));
+
+// The list says nothing may ever return false to the Papyrus family or to the
+// two attempt events. None is registered today; this is here so the first one
+// that is gets read.
+const neverFalse = registered.filter(function (h) {
+  return h.name.indexOf(PAPYRUS_PREFIX) === 0 ||
+         h.name === 'onUpdateAppearanceAttempt' || h.name === 'onUpdateEquipmentAttempt';
+});
+yes('no handler on the Papyrus family or an attempt event returns false (' +
+    (neverFalse.length ? neverFalse.map(function (h) { return h.name; }).join(', ') : 'none registered') + ')',
+    neverFalse.every(function (h) { return !/\breturn\s+false\b/.test(bodyOf(h)); }));
 
 if (handlersSrc !== null) {
   // Not a single return in either watcher. A return with nothing after it
@@ -103,39 +160,248 @@ if (handlersSrc !== null) {
 // ---------------------------------------------------------------- the list --
 
 if (listSrc !== null) {
-  yes('the list names all eleven events',
+  yes('the list names all eleven events with a fixed name',
       EVENTS.every(function (e) { return listSrc.indexOf(e) !== -1; }));
+  yes('the list names the Papyrus family by the name the engine looks up',
+      listSrc.indexOf("mp['" + PAPYRUS_PREFIX + "<Name>']") !== -1);
+  yes('the list names every Papyrus event the fork sends',
+      PAPYRUS.every(function (p) { return new RegExp('\\b' + p + '\\b').test(listSrc); }));
+  yes('the list gives OnHit its arguments in the order the engine passes them',
+      listFlat.indexOf('(target, aggressor, weapon or spell, null, power, sneak, bash, blocked)') !== -1);
+  yes('the list gives OnSpellCast its arguments', listFlat.indexOf('OnSpellCast A cast') !== -1 &&
+      listFlat.indexOf('(caster, spell)') !== -1);
+  yes('the list says a false on the Papyrus family refuses nothing',
+      /A FALSE HERE REFUSES NOTHING/.test(listSrc) &&
+      listFlat.indexOf('nothing here may ever return false to this family') !== -1);
+  yes('the list no longer says a hit raises no event',
+      !/hits?\s+raises?\s+no\s+event/i.test(listFlat) &&
+      listFlat.indexOf('hits, spell casts') === -1);
+  yes('the list still says a hit or a spell cannot be refused here',
+      listFlat.indexOf('cannot refuse a hit or a spell') !== -1);
   yes('the list names all five console commands',
       CONSOLE.every(function (c) { return new RegExp('\\b' + c + '\\b').test(listSrc); }));
   yes('the list says where item creation is refused', /EnsureAdmin/.test(listSrc));
   yes('the list says which decision is still Patrick\'s', /decision Patrick has not made/.test(listSrc));
 }
 
+// Two older comments said the same wrong thing about casts, and one counted
+// four hooks. Nothing anywhere in the file says either any more.
+yes('no comment in the gamemode says the server cannot see a spell being cast',
+    !/cannot\s+see\s+a\s+spell/i.test(src));
+yes('and none counts four event hooks', !/four\s+event\s+hooks/i.test(src));
+
 // ------------------------------------------------------------- the fork --
 
 function readFork(rel) {
-  try { return fs.readFileSync(path.join(FORK, rel), 'utf8'); } catch (e) { return null; }
+  try { return fs.readFileSync(path.join(FORK, rel), 'utf8').split(CR).join(''); } catch (e) { return null; }
 }
 
-const eventsDir = path.join(FORK, 'skymp5-server', 'cpp', 'server_guest_lib', 'gamemode_events');
-let forkEvents = null;
-try {
-  forkEvents = [];
-  fs.readdirSync(eventsDir).forEach(function (f) {
-    if (!/\.cpp$/.test(f)) { return; }
-    const body = fs.readFileSync(path.join(eventsDir, f), 'utf8');
-    const m = /return\s+"(on[A-Za-z]+)"\s*;/.exec(body);
-    if (m) { forkEvents.push(m[1]); }
-  });
-  forkEvents.sort();
-} catch (e) {
-  forkEvents = null;
+// C++ with its comments taken out, so a commented-out call is not counted and
+// a name in a comment is not read as code. Strings are kept whole.
+function stripComments(text) {
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i], n = text[i + 1];
+    if (c === '/' && n === '/') {
+      while (i < text.length && text[i] !== '\n') { i++; }
+    } else if (c === '/' && n === '*') {
+      i += 2;
+      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) { i++; }
+      i += 2;
+    } else if (c === '"' || (c === '\'' && !/[0-9A-Za-z_]/.test(text[i - 1] || ''))) {
+      // A quote straight after a digit or a letter is a digit separator
+      // (1'000) or the end of a prefix, not the start of a character.
+      const q = c;
+      out += c; i++;
+      while (i < text.length && text[i] !== q) {
+        if (text[i] === '\\') { out += text[i]; i++; }
+        out += text[i]; i++;
+      }
+      out += q; i++;
+    } else {
+      out += c; i++;
+    }
+  }
+  return out;
 }
-if (forkEvents === null) {
+
+// From an opening brace to the brace that closes it.
+function braceBody(text, open) {
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === '{') { depth++; }
+    else if (text[i] === '}') { depth--; if (depth === 0) { return text.slice(open + 1, i); } }
+  }
+  return null;
+}
+
+// The first argument of a call, from just after its opening parenthesis to
+// the first comma or closing parenthesis at the same depth.
+function firstArg(text, start) {
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      i++;
+      while (i < text.length && text[i] !== '"') { if (text[i] === '\\') { i++; } i++; }
+    } else if (c === '(') { depth++; }
+    else if (c === ')') { if (depth === 0) { return text.slice(start, i).trim(); } depth--; }
+    else if (c === ',' && depth === 0) { return text.slice(start, i).trim(); }
+  }
+  return null;
+}
+
+function walk(dir, out) {
+  fs.readdirSync(dir, { withFileTypes: true }).forEach(function (d) {
+    const p = path.join(dir, d.name);
+    if (d.isDirectory()) { walk(p, out); }
+    else if (/\.(cpp|h)$/.test(d.name)) { out.push(p); }
+  });
+  return out;
+}
+
+// Every GetName in gamemode_events, read.
+const eventsDir = path.join(FORK, 'skymp5-server', 'cpp', 'server_guest_lib', 'gamemode_events');
+let getNames = null;
+try {
+  getNames = [];
+  fs.readdirSync(eventsDir).forEach(function (f) {
+    if (!/\.(cpp|h)$/.test(f)) { return; }
+    const body = stripComments(fs.readFileSync(path.join(eventsDir, f), 'utf8'));
+    const re = /GetName\(\)\s*const(?:\s+override)?\s*\{/g;
+    let m;
+    while ((m = re.exec(body)) !== null) {
+      const inner = braceBody(body, m.index + m[0].length - 1);
+      const r = inner === null ? null : /return\s+([^;]+);/.exec(inner);
+      getNames.push({ file: f, expr: r ? r[1].trim() : null });
+    }
+  });
+} catch (e) {
+  getNames = null;
+}
+
+if (getNames === null) {
   skip('the fork is not on this machine, so the event list is not checked against it');
 } else {
-  yes('the eleven events are exactly the ones the fork raises (' + forkEvents.join(', ') + ')',
-      JSON.stringify(forkEvents) === JSON.stringify(EVENTS.slice().sort()));
+  const literal = [], runtime = [];
+  getNames.forEach(function (g) {
+    const lit = g.expr === null ? null : /^"(on[A-Za-z]+)"$/.exec(g.expr);
+    if (lit) { literal.push(lit[1]); } else { runtime.push(g); }
+  });
+  literal.sort();
+  yes('the eleven fixed names are exactly the ones the fork raises (' + literal.join(', ') + ')',
+      JSON.stringify(literal) === JSON.stringify(EVENTS.slice().sort()));
+
+  // The two families whose name is built when they fire, each checked by what
+  // its own source says the name is.
+  const papyrusCpp = readFork('skymp5-server/cpp/server_guest_lib/gamemode_events/PapyrusEventEvent.cpp');
+  const listenerCpp = readFork('skymp5-server/cpp/server_guest_lib/ActionListener.cpp');
+  const KNOWN = {
+    'PapyrusEventEvent.cpp': function (g) {
+      return g.expr === 'eventNameFull.data()' && papyrusCpp !== null &&
+             papyrusCpp.indexOf('eventNameFull += "' + PAPYRUS_PREFIX + '";') !== -1;
+    },
+    'CustomEvent.cpp': function (g) {
+      return g.expr === 'eventName.c_str()' && listenerCpp !== null &&
+             /msg\.eventName\[0\]\s*!=\s*'_'/.test(listenerCpp);
+    }
+  };
+  const unread = runtime.filter(function (g) { return !(KNOWN[g.file] && KNOWN[g.file](g)); });
+  yes('every other GetName is one of the two families the list names, none the check cannot read' +
+      (unread.length ? ' (cannot read: ' + unread.map(function (g) { return g.file + ' ' + g.expr; }).join('; ') + ')' : ''),
+      unread.length === 0);
+  yes('and both families are there: the Papyrus family as ' + PAPYRUS_PREFIX + '<Name>, custom events under an underscore',
+      runtime.some(function (g) { return g.file === 'PapyrusEventEvent.cpp'; }) &&
+      runtime.some(function (g) { return g.file === 'CustomEvent.cpp'; }));
+}
+
+// Every name a Papyrus event can be sent under, read off every call in the
+// server's C++. A call written X::SendPapyrusEvent( is a definition or a
+// forward and carries no name of its own; BeforeSendPapyrusEvent is a hook.
+// The one call allowed a name it does not spell out is the hand-off to the
+// Papyrus scripts in PapyrusEventEvent.cpp, WorldState::SendPapyrusEvent,
+// which takes the form first and the name second.
+const cppDir = path.join(FORK, 'skymp5-server', 'cpp');
+let sends = null;
+try {
+  sends = { names: [], unread: [] };
+  walk(cppDir, []).forEach(function (file) {
+    if (!/\.cpp$/.test(file)) { return; }
+    const body = stripComments(fs.readFileSync(file, 'utf8'));
+    const re = /(^|[^\w:])SendPapyrusEvent\s*\(/g;
+    let m;
+    while ((m = re.exec(body)) !== null) {
+      const arg = firstArg(body, m.index + m[0].length);
+      const names = (arg || '').match(/"([A-Za-z]+)"/g) || [];
+      if (names.length) {
+        names.forEach(function (s) { sends.names.push(s.replace(/"/g, '')); });
+      } else if (!(path.basename(file) === 'PapyrusEventEvent.cpp' && arg === 'form')) {
+        sends.unread.push(path.basename(file) + ' ' + arg);
+      }
+    }
+  });
+  sends.names = sends.names.filter(function (n, i, a) { return a.indexOf(n) === i; }).sort();
+} catch (e) {
+  sends = null;
+}
+
+if (sends === null) {
+  skip('the fork is not on this machine, so the Papyrus names are not checked against it');
+} else {
+  yes('the Papyrus names are exactly the ones the fork sends (' + sends.names.join(', ') + ')',
+      JSON.stringify(sends.names) === JSON.stringify(PAPYRUS.slice().sort()));
+  yes('and no call sends a Papyrus event under a name the check cannot read' +
+      (sends.unread.length ? ' (' + sends.unread.join('; ') + ')' : ''),
+      sends.unread.length === 0);
+}
+
+// What the list says about the Papyrus family, checked in the source it was
+// read out of.
+const mpForm = readFork('skymp5-server/cpp/server_guest_lib/MpForm.cpp');
+const papyrusEv = readFork('skymp5-server/cpp/server_guest_lib/gamemode_events/PapyrusEventEvent.cpp');
+const actionListener = readFork('skymp5-server/cpp/server_guest_lib/ActionListener.cpp');
+if (mpForm === null || papyrusEv === null || actionListener === null) {
+  skip('the fork is not on this machine, so what a false does to the Papyrus family is not checked against it');
+} else {
+  yes('MpForm::SendPapyrusEvent throws away what Fire returns, so a false there refuses nothing',
+      /^\s*papyrusEventEvent\.Fire\(parent\);/m.test(mpForm));
+  yes('and PapyrusEventEvent has no OnFireBlocked of its own, so a false does nothing but skip the scripts',
+      !/OnFireBlocked/.test(papyrusEv) && /OnFireSuccess[\s\S]*worldState->SendPapyrusEvent\(form,/.test(papyrusEv));
+
+  const onHitSend = (function () {
+    const a = actionListener.indexOf('void ActionListener::SendPapyrusOnHitEvent(');
+    if (a < 0) { return null; }
+    const b = actionListener.indexOf('\n}', a);
+    return b < 0 ? null : actionListener.slice(a, b);
+  })();
+  yes('OnHit carries aggressor, weapon or spell, projectile, power, sneak, bash and blocked, in that order',
+      onHitSend !== null &&
+      /args\[0\][\s\S]*?akAggressor[\s\S]*?args\[1\][\s\S]*?akSource[\s\S]*?args\[2\][\s\S]*?akProjectile[\s\S]*?args\[3\][\s\S]*?abPowerAttack[\s\S]*?args\[4\][\s\S]*?abSneakAttack[\s\S]*?args\[5\][\s\S]*?abBashAttack[\s\S]*?args\[6\][\s\S]*?abHitBlocked/.test(onHitSend) &&
+      /args\[2\]\s*=\s*VarValue::None\(\)/.test(onHitSend));
+
+  const weaponHit = (function () {
+    const a = actionListener.indexOf('void ActionListener::OnWeaponHit(');
+    if (a < 0) { return null; }
+    const b = actionListener.indexOf('\n}', a);
+    return b < 0 ? null : actionListener.slice(a, b);
+  })();
+  yes('a weapon hit raises OnHit before the attack speed check, the block and the damage',
+      weaponHit !== null && weaponHit.indexOf('SendPapyrusOnHitEvent(') !== -1 &&
+      weaponHit.indexOf('SendPapyrusOnHitEvent(') < weaponHit.indexOf('CanHit(') &&
+      weaponHit.indexOf('SendPapyrusOnHitEvent(') < weaponHit.indexOf('isHitBlocked = true') &&
+      weaponHit.indexOf('SendPapyrusOnHitEvent(') < weaponHit.indexOf('CalculateDamage('));
+
+  const spellCast = (function () {
+    const a = actionListener.indexOf('void ActionListener::OnSpellCast(');
+    if (a < 0) { return null; }
+    const b = actionListener.indexOf('\n}', a);
+    return b < 0 ? null : actionListener.slice(a, b);
+  })();
+  yes('a cast raises OnSpellCast only after it has gone out to everybody nearby, and not for an interrupt',
+      spellCast !== null &&
+      spellCast.indexOf('SendToNeighbours(') < spellCast.indexOf('"OnSpellCast"') &&
+      spellCast.indexOf('interruptCast') < spellCast.indexOf('"OnSpellCast"'));
 }
 
 const cmds = readFork('skymp5-client/src/services/services/consoleCommandsService.ts');
