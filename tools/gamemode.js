@@ -2117,6 +2117,85 @@ function wearScript() {
   invented: an item the server has no record of cannot be worn by this, the
   same way it cannot be counted for warmth.
 */
+/*
+  ================== AND IT FIXES ITSELF WHERE YOU STAND =================
+
+  Patrick, 23 September, on being told to relog to see the clothes come
+  back: "this a shitty solutiuon it shopuld do it automatically". He is
+  right. Dressing somebody at the door only helps the person who walks
+  through it afterwards, and anybody already standing in the world in their
+  skin stays that way until they quit the game, which is a workaround
+  wearing a fix's clothes.
+
+  So the server watches instead. It can READ the equipment record even
+  though it cannot write one, so it can see the difference between what
+  somebody is wearing and what their pack says they are wearing, and that
+  difference is the whole bug.
+
+  ONLY WHEN THEY ARE WEARING NOTHING AT ALL, which is the line between
+  fixing this and fighting the person. Taking your boots off is a decision.
+  Standing in an inn with a full pack and no clothes on is not a decision
+  anybody made, and it is the only state this acts on: an empty equipment
+  record beside a pack that says something is worn.
+
+  NOTHING IS ASKED OF THE PERSON. There is no prompt and nothing appears on
+  screen: the server tells the client to equip what the pack already says is
+  worn, silently, and it is on. If you left your clothes on, your clothes
+  are on.
+
+  AND IT GIVES UP. Three goes, a quarter of a minute apart, and then it
+  stops for the session and says so once. A client that will not equip what
+  it is handed is a different fault, and a server that keeps at it forever
+  is a server nobody can read the log of.
+*/
+const DRESS_EVERY = 15000;    // how often somebody undressed is looked at
+const DRESS_TRIES = 3;        // then it stops, for the session
+const dressAt = {};           // actorId -> when they were last asked
+const dressTried = {};        // actorId -> how many times
+
+/** What the client actually has on, by base id, or null when it cannot be read. */
+function wornNow(actorId) {
+  let eq = null;
+  try { eq = mp.get(actorId, 'equipment'); } catch (e) { return null; }
+  if (!eq) { return null; }
+  const entries = (eq.inv && eq.inv.entries) || eq.entries || [];
+  const out = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (e && e.worn && e.baseId) { out.push(e.baseId); }
+  }
+  return out;
+}
+
+/*
+  Somebody standing there with nothing on and clothes in the pack, put right.
+  Answers what it did, for the log.
+*/
+function dressIfBare(actorId) {
+  const now = Date.now();
+  if (dressAt[actorId] && now - dressAt[actorId] < DRESS_EVERY) { return ''; }
+  if ((dressTried[actorId] || 0) >= DRESS_TRIES) { return ''; }
+
+  const on = wornNow(actorId);
+  // Unreadable is not empty. A record that cannot be read is left alone.
+  if (on === null) { return ''; }
+  if (on.length) {
+    // Dressed. Whatever went wrong earlier is over, so the counter goes back.
+    delete dressTried[actorId];
+    return '';
+  }
+
+  dressAt[actorId] = now;
+  const put = wearWhatIsWorn(actorId);
+  if (!put) { return ''; }
+  dressTried[actorId] = (dressTried[actorId] || 0) + 1;
+  if (dressTried[actorId] >= DRESS_TRIES) {
+    return 'put ' + put + ' thing(s) back on for the last time this session; ' +
+           'the client is not taking them';
+  }
+  return 'wearing nothing with ' + put + ' worn thing(s) in the pack, put back on';
+}
+
 function wearWhatIsWorn(actorId) {
   let inv = null;
   try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
@@ -3980,14 +4059,35 @@ function chargenTick() {
         Said in the log with a count, because "nobody is wearing anything"
         and "the server thinks nobody is wearing anything" are different
         faults and this is the line that tells them apart.
+
+        This is the ask at the door. The watch that notices somebody already
+        standing there undressed is dressIfBare, below, on the same tick.
       */
       try {
         const put = wearWhatIsWorn(actorId);
-        log('login', actorId.toString(16), 'asked to put back on', put, 'worn thing(s)');
+        log('login', actorId.toString(16), 'put', put, 'worn thing(s) back on');
       } catch (e) {
-        log('login', actorId.toString(16), 'could not ask for the clothes back:', e);
+        log('login', actorId.toString(16), 'could not put the clothes back on:', e);
       }
     }
+    /*
+      NOBODY STANDS ABOUT UNDRESSED WAITING FOR A DOOR.
+
+      The block above puts somebody's clothes back on as they arrive. This
+      one is for anybody already in the world with nothing on, who would
+      otherwise stay that way until they quit the game. Nothing is asked of
+      the person and nothing appears on their screen: the server tells their
+      client to equip what their own pack says they are wearing, and it
+      happens.
+
+      dressIfBare does nothing at all unless somebody is wearing NOTHING,
+      and gives up after three goes. See the note over it.
+    */
+    try {
+      const said = dressIfBare(actorId);
+      if (said) { log('dress', actorId.toString(16), said); }
+    } catch (e) { }
+
     if (now - firstSeen.get(actorId) < SETTLE_MS) {
       continue;
     }
