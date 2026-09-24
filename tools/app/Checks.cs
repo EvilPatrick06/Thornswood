@@ -100,6 +100,22 @@ namespace Thornswood
             catch { return ""; }
         }
 
+        /// <summary>
+        /// At or below this many enabled plugins the collection counts as not
+        /// installed. Two things on screen ask it: the Mods row on the checks
+        /// list and the "not installed yet" card above Play, which is
+        /// Shell.CollectionProblem answering "none". Until 24 September each
+        /// had its own 40 written into it, so moving one and not the other
+        /// would have put a green Mods row under a card saying the mods are
+        /// not installed.
+        ///
+        /// Nothing recorded says where 40 came from; it has been the number
+        /// since the first launcher. It sits well under the 94 plugins the
+        /// shipped reference list enables, counted on 24 September, so a full
+        /// install clears it easily and an empty list does not come near it.
+        /// </summary>
+        public const int MostPluginsWithoutCollection = 40;
+
         public static int EnabledPlugins()
         {
             try
@@ -624,7 +640,7 @@ namespace Thornswood
             // file exists, and a bundle that is present but not ours is
             // what leaves somebody sitting on the backdrop.
             l.Add(new Check("Client", ClientRuntime.Good(), ClientDetail()));
-            l.Add(new Check("Mods", plugins > 40, plugins + " plugins"));
+            l.Add(new Check("Mods", plugins > MostPluginsWithoutCollection, plugins + " plugins"));
 
             // The server does not police plugin lists, so this does. A list that
             // does not match the one this build shipped with desyncs everyone,

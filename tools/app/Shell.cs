@@ -4555,39 +4555,33 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// No mods, and a collection to point at.
-        ///
-        /// Everything downstream reads differently when this is true. An update
-        /// cannot succeed against a build with no mods in it, so the bar above
-        /// Play said "Update failed" over the top of the one message somebody
-        /// in that state actually needs, and blamed Thornswood for the thing it
-        /// was trying to send them off to fix.
-        /// </summary>
-        /// <summary>
         /// Whether the card above Play should be the collection card, and if
-        /// so which of the two things is wrong.
+        /// so which thing is wrong.
         ///
-        /// A plugin count alone only catches somebody who has never installed
-        /// the collection. It does not catch somebody sitting on an older
-        /// revision, because an old revision still deploys 96 plugins and
-        /// looks perfect by that measure.
+        /// Returns "none" for never installed, which is no more than
+        /// Checks.MostPluginsWithoutCollection plugins enabled; "stale" when
+        /// the revision Vortex installed is behind the one the server was
+        /// built against; "ahead" when it is in front of it. Otherwise "",
+        /// which includes having no collection address and either revision
+        /// reading as 0.
         ///
-        /// That mattered the moment a revision added a mod with no plugin of
-        /// its own. Start On Save arrived in revision 3 and ships no esp, so
-        /// an out of date install counts 96, passes this, shows no card, and
-        /// the person is left with a greyed out Play button and one red row
-        /// naming a file they have never heard of. The one click that fixes it
-        /// is updating the collection, and nothing on screen said so.
+        /// Two tests because a plugin count alone only catches somebody who
+        /// has never installed the collection. An older revision still
+        /// deploys a full list of plugins and looks perfect by that measure,
+        /// so behind and ahead come from the revision numbers.
         ///
-        /// Returns "" when nothing is wrong, "none" for never installed,
-        /// "stale" for installed but behind.
+        /// ModsMissing is this answering anything but "", and while it does
+        /// the mod updates wait. An update cannot succeed against a build
+        /// with no mods in it, and the bar above Play used to say "Update
+        /// failed" over the top of the one message somebody in that state
+        /// actually needs.
         /// </summary>
         static string CollectionProblem()
         {
             if (string.IsNullOrEmpty(cfg.CollectionUrl)) return "";
             try
             {
-                if (Checks.EnabledPlugins() <= 40) return "none";
+                if (Checks.EnabledPlugins() <= Checks.MostPluginsWithoutCollection) return "none";
 
                 // THE REVISION, NOT A NAMED FILE.
                 //
