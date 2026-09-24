@@ -304,16 +304,34 @@ if (block) {
     api.minutes(3);
     const after = api.view(1).temp;
     /*
-      THE HALF LIFE, AND THE OLD NUMBER WAS NOT ONE.
+      THE HALF LIFE, AND IT HAS BEEN WRONG TWICE.
 
-      It read warmth: 60 "per real hour" and fed it to a power of a half, which
-      worked out at about half a point a minute: an hour of standing in a fire
-      to read as warm. Three minutes is halfway to the target by definition, so
-      a fresh character at 50 in a fire whose target is 92 should be near 71.
+      First it read warmth: 60 "per real hour" and fed it to a power of a half,
+      which worked out at about half a point a minute: an hour of standing in a
+      fire to read as warm.
+
+      Then it was three minutes for everything, which is what Patrick was
+      standing in the Bannered Mare's fire pit measuring on 23 September when
+      he said "Fire is still not changing temp but I do catch on fire now and
+      take damage". The client was reporting the fire and the server was
+      warming him: from 51 toward 84 it reached 52.2 in ten seconds and 54.6 in
+      thirty, and nobody stands in a fire for three minutes to find out whether
+      a number works.
+
+      Warming is half a minute now and cooling is a minute and a half, because
+      a fire warms you in seconds and a cold night takes you slowly. Half a
+      minute in a fire whose target is 92 takes a fresh 50 to about 71.
     */
     yes('standing in a fire actually warms you up', after > before + 10);
-    yes('and it is halfway there in the half life, not in an hour',
-        Math.abs(after - (50 + (92 - 50) / 2)) < 4);
+    const quick = rig();
+    quick.view(4);
+    quick.place(4, 'fire');
+    quick.minutes(0.5);
+    yes('and half a minute in it is halfway there, because heat is fast',
+        Math.abs(quick.view(4).temp - (50 + (92 - 50) / 2)) < 4);
+    quick.minutes(0.5);
+    yes('and a minute in is most of the way',
+        quick.view(4).temp > 50 + (92 - 50) * 0.7);
 
     api.place(1, 'snow');
     api.minutes(9);
@@ -361,8 +379,16 @@ if (block) {
     api.place(7, 'indoors');
     api.minutes(1);
     const oneMinuteIn = api.view(7).temp;
-    yes('a minute indoors from fresh is barely off 50, which is what he saw',
-        oneMinuteIn > 50 && oneMinuteIn < 53);
+    /*
+      THIS CHECK USED TO HOLD THE SYMPTOM DOWN. It read "a minute indoors from
+      fresh is barely off 50, which is what he saw", and it was right about
+      what he saw: 51. That was the meter being too slow to read rather than
+      the meter being wrong, and the answer was to make warming fast rather
+      than to keep explaining the 51. A minute indoors now gets most of the way
+      to 58, which is a number somebody can watch move.
+    */
+    yes('a minute indoors from fresh is most of the way to warm',
+        oneMinuteIn > 55 && oneMinuteIn <= 58);
     api.minutes(29);
     const settledIn = api.view(7).temp;
     yes('and half an hour indoors is genuinely warm', settledIn > 55);
