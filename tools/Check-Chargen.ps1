@@ -14,11 +14,29 @@
     - the start point in server-settings.json is the creation room, computed
       from this load order rather than written down
 
-  Read only. It changes nothing.
+      .\tools\Check-Chargen.ps1              the build on this machine
+      .\tools\Check-Chargen.ps1 -From dev    the dev server's own settings
+      .\tools\Check-Chargen.ps1 -From live   the live server's own settings
+
+  ASK THE BOX, NOT ONLY THE BUILD. Until 23 September this read the built
+  server on this machine and nothing else, and the file that went wrong was
+  the one on the dev box: it keeps its own server-settings.json, which is
+  the whole reason Deploy-DevGamemode exists, and its start point was left
+  naming file index 58 after the load order under it moved. Skyrim Unbound
+  is at 54 there, in a list of 57, so every new character died at login with
+  'FromFormId failed due to invalid file index 58' and the client showed a
+  box saying only that there were technical difficulties. This check would
+  have found it in ten seconds and could not be pointed at the file.
+
+  Read only, here and there. It changes nothing on either machine.
 #>
 param(
     [string]$Dist = 'C:\Thornswood-Dev\skymp\build\dist\server',
-    [string]$Data = 'C:\Thornswood\Game\Data'
+    [string]$Data = 'C:\Thornswood\Game\Data',
+    # Whose settings to read: the build on this machine, or a server's own.
+    [ValidateSet('build', 'live', 'dev')][string]$From = 'build',
+    [string]$Vps  = '192.135.112.23',
+    [string]$User = 'Administrator'
 )
 
 $fail = 0
@@ -26,9 +44,31 @@ function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
 function Bad ($m) { Write-Host "  FAIL  $m" -ForegroundColor Red; $script:fail++ }
 function Note($m) { Write-Host "        $m" -ForegroundColor DarkGray }
 
-$settingsPath = Join-Path $Dist 'server-settings.json'
-if (-not (Test-Path -LiteralPath $settingsPath)) { throw "not found: $settingsPath" }
-$s = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+if ($From -eq 'build') {
+    $settingsPath = Join-Path $Dist 'server-settings.json'
+    if (-not (Test-Path -LiteralPath $settingsPath)) { throw "not found: $settingsPath" }
+    $s = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+    Write-Host ''
+    Write-Host "reading the build at $settingsPath" -ForegroundColor DarkGray
+} else {
+    # The file is read where it lives and only the text comes back. Nothing
+    # is written on either machine.
+    $root = if ($From -eq 'dev') { 'C:\Thornswood-Server-Dev' } else { 'C:\Thornswood-Server' }
+    $settingsPath = "$root\server-settings.json"
+    $remote = "`$ProgressPreference='SilentlyContinue'; Get-Content -LiteralPath '$settingsPath' -Raw"
+    $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
+    $text = & ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1
+    $json = (@($text) -join "`n")
+    # The warning ssh prints about key exchange arrives on the same stream as
+    # the answer, so the JSON is taken from its first brace rather than from
+    # the first line.
+    $at = $json.IndexOf('{')
+    if ($at -lt 0) { throw "could not read $settingsPath from $Vps : $json" }
+    $s = $json.Substring($at) | ConvertFrom-Json
+    Write-Host ''
+    Write-Host "reading the $From server at $Vps, $settingsPath" -ForegroundColor DarkGray
+    Write-Host '  the plugin and gamemode checks below still read this machine' -ForegroundColor DarkGray
+}
 $order = @($s.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
 
 Write-Host ''
@@ -174,7 +214,15 @@ if (-not $sp) {
         Ok ("start point is the creation room (0x{0:X8})" -f $want)
     } else {
         Bad ("start point is 0x{0:X8}, the creation room is 0x{1:X8}" -f $got, $want)
-        Note 'run Deploy-Gamemode.ps1 again; it computes this from the load order'
+        Note ("it names file index {0}; Skyrim Unbound.esp is at {1} in this load order" -f
+              [int]($got -shr 24), $idxUnbound)
+        Note 'a new character cannot spawn at all: the server throws FromFormId failed'
+        Note 'and the client shows a box saying only that there are technical difficulties'
+        if ($From -eq 'build') {
+            Note 'run Deploy-Gamemode.ps1 again; it computes this from the load order'
+        } else {
+            Note 'run Deploy-DevGamemode.ps1; it recomputes this on the box every run'
+        }
     }
 } else {
     Note ("start point is {0}, which is the fallback" -f $sp.worldOrCell)
