@@ -92,7 +92,11 @@ function Remote($script) {
     # The path goes across as it is. Windows PowerShell takes forward
     # slashes, and converting them was how this shipped with the slashes
     # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'" 2>&1
+    # And bare, with no quotes round it. sshd hands this line to cmd.exe,
+    # which passes single quotes on to Windows PowerShell as part of the
+    # path, and -File refuses it: "The given path's format is not supported".
+    # Measured 24 September. The path above is ours and has no spaces.
+    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
     & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
   }
   finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }

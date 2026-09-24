@@ -363,8 +363,12 @@ else {
         if ($LASTEXITCODE -ne 0) { Die "could not send the install script to $VpsHost" }
         # The path goes across as it is: Windows PowerShell takes forward
         # slashes, and converting them is how a sister script once shipped
-        # with the slashes stripped out entirely.
-        & ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'"
+        # with the slashes stripped out entirely. And bare, with no quotes
+        # round it: sshd hands this line to cmd.exe, which passes single
+        # quotes on to Windows PowerShell as part of the path, and -File
+        # refuses it: "The given path's format is not supported". Measured
+        # 24 September. The path above is ours and has no spaces.
+        & ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far"
         $rc = $LASTEXITCODE
         & ssh $target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" | Out-Null
         $global:LASTEXITCODE = $rc

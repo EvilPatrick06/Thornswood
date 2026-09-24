@@ -97,6 +97,13 @@ $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
 # other's script. Written with a byte order mark so Windows PowerShell on the
 # box reads it as UTF-8 whichever PowerShell sent it. The exit code is the
 # script's, kept across the tidy up.
+#
+# The path goes bare, with no quotes round it. cmd.exe passes single quotes on
+# to Windows PowerShell as part of the path, and -File refuses it with "The
+# given path's format is not supported". Measured 24 September, after the
+# first version of this sent -File '<path>' and a review caught it. Bare also
+# reaches ssh the same from Windows PowerShell and from pwsh, which quote an
+# embedded double quote differently. The path is ours and has no spaces.
 $cmd = "powershell -NoProfile -EncodedCommand $encoded"
 if ($cmd.Length -gt 6000) {
     $far = 'C:/Windows/Temp/thornswood-remote-' + [Guid]::NewGuid().ToString('N') + '.ps1'
@@ -106,7 +113,7 @@ if ($cmd.Length -gt 6000) {
         [IO.File]::WriteAllText($tmp, $full, (New-Object Text.UTF8Encoding($true)))
         & scp -o BatchMode=yes -o StrictHostKeyChecking=no $tmp "${VpsUser}@${VpsHost}:$far" 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "Could not copy the script to $VpsHost. Nothing was run." }
-        & ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$VpsUser@$VpsHost" "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'" 2>&1
+        & ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$VpsUser@$VpsHost" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
         $rc = $LASTEXITCODE
         & ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$VpsUser@$VpsHost" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
     }
