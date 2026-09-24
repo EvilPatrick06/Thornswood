@@ -253,12 +253,16 @@ namespace Thornswood
             BuildStatRow();
             BuildPathRows();
             BuildHelp();
+
+            // Windows Settings sends people here with -uninstall. The window
+            // and the Settings page above are what the uninstall is made of;
+            // everything below is a launcher starting up to play, and none of
+            // it belongs on the way out. ShellUninstall.cs says what still runs.
+            if (askedToUninstall) { OpenForUninstall(); return; }
+
             BuildModList();
             RefreshDiscord();
-            // Windows Settings sends people here with -uninstall, so land on
-            // the page that does it rather than on Play with no clue why the
-            // launcher opened.
-            ShowPage(askedToUninstall ? PageSettings : PagePlay);
+            ShowPage(PagePlay);
 
             // And put Thornswood in Installed apps, or bring the entry up to
             // date. Done here rather than in the installer so that every
@@ -430,6 +434,22 @@ namespace Thornswood
             win.Dispatcher.BeginInvoke(
                 new Action(delegate { Voice.Start(delegate (string m) { Log(m); }, cfg); }),
                 System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            // The self update's way back. A launcher that got as far as drawing
+            // its window started cleanly, so the copy of the one before it can
+            // go, and not before: the update script watches for that copy to
+            // disappear and puts it back if this one closes first. SelfSwap.cs.
+            win.ContentRendered += delegate
+            {
+                string self = Assembly.GetExecutingAssembly().Location;
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    string said = null;
+                    try { said = SelfSwap.Settle(self); } catch { }
+                    if (string.IsNullOrEmpty(said)) return;
+                    try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); }); } catch { }
+                });
+            };
 
             CentreOnMainScreen();
 
@@ -883,7 +903,10 @@ namespace Thornswood
         static MediaPlayer music;
         static void StartMenuMusic()
         {
-            if (cfg == null) return;
+            // Not for somebody who opened this from Windows Settings to
+            // uninstall. The theme playing is the loudest way to say the
+            // launcher has started up to play when that is not why it opened.
+            if (cfg == null || askedToUninstall) return;
             string src = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-theme.mp3");
             if (!File.Exists(src)) return;
 
@@ -997,7 +1020,9 @@ namespace Thornswood
             // Unticking it left the person at a main menu with no way in and
             // nothing on screen saying why.
             if (!cfg.AutoJoin) { cfg.AutoJoin = true; cfg.Save(Paths.CfgFile); }
-            DrawVoiceState();
+            // A request to the voice service. Somebody who came to uninstall
+            // is not waiting on its answer, and the Server page asks again.
+            if (!askedToUninstall) DrawVoiceState();
 
             // The emblem travels inside the exe rather than beside it, so the
             // update that replaces the launcher carries its artwork with it and
@@ -1699,7 +1724,9 @@ namespace Thornswood
             bool all = true;
             foreach (Check c in Checks.All(cfg))
             {
-                if (!c.Ok) all = false;
+                // An advisory row that fails is drawn amber and leaves Play
+                // alone. See Check.Advisory.
+                if (c.Blocks) all = false;
                 var row = new Grid();
                 row.Margin = new Thickness(0, 0, 0, 1);
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1717,7 +1744,7 @@ namespace Thornswood
                 dot.Width = 7; dot.Height = 7;
                 dot.Margin = new Thickness(0, 0, 12, 0);
                 dot.VerticalAlignment = VerticalAlignment.Center;
-                dot.Fill = Res(c.Ok ? "Ok" : "Bad");
+                dot.Fill = Res(c.Ok ? "Ok" : c.Advisory ? "Warn" : "Bad");
                 Grid.SetColumn(dot, 0); row.Children.Add(dot);
 
                 var t1 = new TextBlock();
@@ -1728,7 +1755,7 @@ namespace Thornswood
                 var t2 = new TextBlock();
                 t2.Text = c.Detail; t2.FontSize = 11.5;
                 t2.VerticalAlignment = VerticalAlignment.Center;
-                t2.Foreground = Res(c.Ok ? "Muted" : "Bad");
+                t2.Foreground = Res(c.Ok ? "Muted" : c.Advisory ? "Warn" : "Bad");
                 Grid.SetColumn(t2, 2); row.Children.Add(t2);
 
                 back.Child = row;

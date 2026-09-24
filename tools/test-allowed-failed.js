@@ -67,13 +67,16 @@ yes('the /api/allowed route is in server.js', route.indexOf('return sendJson(res
 */
 async function ask(linked, standings, devDoor) {
   let sent = null;
+  // The key comes in the X-Thornswood-Key header since entry 248, the way the
+  // door sends it. keyInAddress is the route's note of doors that still put
+  // it in the address; test-site-auth.js checks that side.
   const run = new Function(
     'route', 'devDoor', 'req', 'res', 'cfg', 'url', 'sameSecret', 'sendJson',
-    'jsonFile', 'LINKED', 'standingCached',
+    'jsonFile', 'LINKED', 'standingCached', 'keyInAddress',
     'return (async function () {\n' + route + '\n})();');
   await run(
     devDoor ? '/dev/api/allowed' : '/api/allowed', !!devDoor,
-    { method: 'GET' }, {}, { botKey: 'k' },
+    { method: 'GET', headers: { 'x-thornswood-key': 'k' } }, {}, { botKey: 'k' },
     { searchParams: { get: function () { return 'k'; } } },
     function (a, b) { return a === b; },
     function (res, code, body) { sent = { code: code, body: JSON.parse(JSON.stringify(body)) }; },
@@ -82,7 +85,7 @@ async function ask(linked, standings, devDoor) {
       const s = standings[id];
       if (s instanceof Error) throw s;
       return s;
-    });
+    }, new Set());
   return sent;
 }
 
@@ -91,7 +94,8 @@ const doorAt = game.indexOf('  var doorSaid = false;');
 const refreshAt = doorAt < 0 ? -1 : game.indexOf('  function refresh() {', doorAt);
 const refreshEnd = refreshAt < 0 ? -1 : toClose(game, refreshAt);
 const door = (doorAt >= 0 && refreshEnd > refreshAt) ? game.slice(doorAt, refreshEnd) : '';
-yes('the door refresh is in gamemode.js', door.indexOf('/api/allowed?key=') >= 0);
+yes('the door refresh is in gamemode.js',
+    door.indexOf("'/api/allowed'") >= 0 && door.indexOf("'X-Thornswood-Key'") >= 0);
 
 const PRIV = 'private';
 const FILE = path.join(PRIV, 'allowed.json');
@@ -115,7 +119,9 @@ function refreshWith(before, answer, status) {
     writeFileSync: function (p, s) { disk[p] = String(s); }
   };
   const fakeHttps = {
-    get: function (url, cb) {
+    // (url, options, callback), since the key rides in the options' headers.
+    get: function (url, opts, cb) {
+      if (typeof opts === 'function') cb = opts;
       const on = {};
       cb({ statusCode: status || 200, on: function (ev, fn) { on[ev] = fn; } });
       on.data(JSON.stringify(answer));

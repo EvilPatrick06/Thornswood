@@ -28,8 +28,9 @@ then open http://127.0.0.1:3101. Left unset it listens on every address on
 the member password is the one written there, and Discord sign in and the role
 checks are off, since there is no client id or bot token. The game status and
 the chat under each session read files that only exist on the VPS
-(`C:\Thornswood-Server\data\online.json`, `C:\Thornswood-Voice\chat`), so
-locally the game shows as down.
+(`C:\Thornswood-Server\data\online.json`, `C:\Thornswood-Voice\chat`, and
+`C:\Thornswood-Voice-Dev\chat` for a dev session), so locally the game shows
+as down.
 
 ## Where it runs
 
