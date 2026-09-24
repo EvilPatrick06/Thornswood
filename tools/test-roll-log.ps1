@@ -237,8 +237,10 @@ try {
         Put (Join-Path $vr 'voice-server.js') ("console.log('stand-in voice up on ' + process.env.THORNSWOOD_VOICE_PORT + ' auth ' + process.env.THORNSWOOD_VOICE_AUTH);`n")
         Copy-Item -LiteralPath $roller -Destination (Join-Path $vr 'roll-log.ps1')
         $vlog = Join-Path $vr 'voice.log'
-        # What the outer here-string fills in at install time.
-        $fmt = $m.Groups[1].Value.Replace('$Site', 'https://site.invalid').Replace('$Port', '7999').Replace('$Bind', '127.0.0.1').Replace('$Auth', 'log')
+        # What the outer here-string fills in at install time. $turnSet is the
+        # relay line, empty with no relay, which is every box today;
+        # tools\test-voice-turn-url.ps1 runs this line with one.
+        $fmt = $m.Groups[1].Value.Replace('$Site', 'https://site.invalid').Replace('$Port', '7999').Replace('$Bind', '127.0.0.1').Replace('$Auth', 'log').Replace('$ChatRange', 'off').Replace('$turnSet', '')
         $line = FillLine $fmt $m.Groups[2].Value @{
             '$node.Source' = $node; '$log' = $vlog; '$psExe' = $winps; '$roll' = (Join-Path $vr 'roll-log.ps1')
         }
