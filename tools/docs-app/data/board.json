@@ -283,7 +283,7 @@
     ]
   },
   "known": {
-    "intro": "Permanent limits of how this server works. None are bugs, none are changing. Not worth reporting.",
+    "intro": "Limits of how this server works, each with the reason. Not all of them are permanent: what NPCs do is on the roadmap, and the rest of the first table is being looked at. The public copy at /known is data/known.md.",
     "sections": [
       {
         "id": "s34",
