@@ -9,11 +9,15 @@
 // out over HTTP so it can be read from outside.
 //
 // The log block is lifted out of gamemode.js by text, from `let logFile` to
-// the voice port, and evaluated fresh for every "load", the way a restart or
-// a hot reload would. It reads server-settings.json and writes relative to
-// the working directory, which on the VPS is the server's own folder, so the
-// test changes into a temp folder first. Nothing outside that folder is
-// touched.
+// the comment that opens the "Which gamemode.js this is" block, and evaluated
+// fresh for every "load", the way a restart or a hot reload would. It stops
+// there because that block (entry 254) writes a line of its own the moment it
+// loads, outside anything here that counts what was said, so a log just under
+// 4 MB would be pushed over before the test wrote to it, and the carrying-on
+// message would be said before the test started listening. It reads
+// server-settings.json and writes relative to the working directory, which on
+// the VPS is the server's own folder, so the test changes into a temp folder
+// first. Nothing outside that folder is touched.
 
 const fs = require('fs');
 const path = require('path');
@@ -22,7 +26,8 @@ const os = require('os');
 const SRC = path.join(__dirname, 'gamemode.js');
 const text = fs.readFileSync(SRC, 'utf8');
 const a = text.indexOf('let logFile = null;');
-const b = text.indexOf('let voicePortCached');
+const idAt = text.indexOf('Which gamemode.js this is.');
+const b = idAt < 0 ? -1 : text.lastIndexOf('/*', idAt);
 if (a < 0 || b < 0 || b < a) {
   console.error('the log block is not in gamemode.js the way this expects');
   process.exit(1);
@@ -166,6 +171,24 @@ clear();
 g = load();
 quietly(function () { g.log('working again'); });
 yes('the next start that can write puts ok back', !!state() && state().ok === true);
+
+// ---- the line that names the gamemode.js, through the same log ------------
+// Evaluated with the id block this time, which is how the server loads it:
+// its line is the first of every load, so it is what rolls a log left over
+// 4 MB and what writes thornswood-log.json, before any person does anything.
+clear();
+fs.writeFileSync(LOG, Buffer.alloc(FOUR + 10, 0x78));
+const c = text.indexOf('let voicePortCached');
+yes('the id block is between the log block and the voice port', c > b);
+const withId = c > b ? text.slice(a, c) : '';
+const atLoad = quietly(function () {
+  // eslint-disable-next-line no-eval
+  eval(withId);
+});
+yes('the id line is said at load', atLoad.some(function (l) { return l.indexOf('gamemode.js is git blob') >= 0; }));
+yes('and it is what rolls a log left over 4 MB', fs.existsSync(LOG + '.1') && fs.statSync(LOG + '.1').size === FOUR + 10);
+yes('and it lands in the fresh thornswood.log', (read(LOG) || '').indexOf('gamemode.js is git blob') >= 0);
+yes('and thornswood-log.json says ok from the load on', !!state() && state().ok === true);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
