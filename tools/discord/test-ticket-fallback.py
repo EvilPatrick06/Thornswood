@@ -21,7 +21,8 @@ log_channel and ensure_panel. Only what touches Discord is replaced, by stub
 guilds, channels, roles and people, and the thread creation always raises.
 The site push is replaced by a counter. One scenario loads Build-Discord.py
 too, without running it, to build #tickets from the PLAN's own roles and
-overwrites.
+overwrites. The one open ticket file is pointed at a scratch folder, so the
+real one beside bot.py is never read or written.
 
 Read only. Never connects to anything.
 """
@@ -29,6 +30,7 @@ import asyncio
 import itertools
 import os
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -36,12 +38,16 @@ sys.path.insert(0, HERE)
 # called, which nothing here does.
 os.environ.setdefault('DISCORD_TOKEN', 'not-a-real-token')
 # The defaults are what is being tested, so nothing in this shell may move them.
-for _k in ('TICKET_CHANNEL', 'TICKET_LOG', 'STAFF_ROLES', 'CREATOR_ROLES'):
+for _k in ('TICKET_CHANNEL', 'TICKET_LOG', 'STAFF_ROLES', 'CREATOR_ROLES',
+           'TICKET_COOLDOWN'):
     os.environ.pop(_k, None)
 
 import discord  # noqa: E402
 
 import bot  # noqa: E402
+
+bot.OPEN_TICKETS = os.path.join(tempfile.mkdtemp(prefix='thornswood-fallback-'),
+                                'open-tickets.json')
 
 PASS = []
 FAIL = []
@@ -198,8 +204,14 @@ class Field(object):
 
 
 class Response(object):
+    def __init__(self):
+        self.said = []
+
     async def defer(self, **kw):
         pass
+
+    async def send_message(self, text=None, **kw):
+        self.said.append(text or '')
 
 
 class Followup(object):
@@ -214,6 +226,10 @@ class Interaction(object):
     def __init__(self, guild, user):
         self.guild = guild
         self.user = user
+        # Where the form was opened from, which the ticket limit reads to tell
+        # staff from everybody else. Without it the limit fails open and every
+        # form in here would pass it through its error path, not its real one.
+        self.channel = guild.text_channels[0] if guild.text_channels else None
         self.response = Response()
         self.followup = Followup()
 
@@ -238,9 +254,9 @@ def staff_only(g, mod):
     return {g.default_role: deny(), mod: allow()}
 
 
-def report(g):
+def report(g, who=None):
     """One person reports another, through the real modal."""
-    who = Person('Arvel')
+    who = who or Person('Arvel')
     ix = Interaction(g, who)
     PUSHED[:] = []
 
@@ -433,6 +449,28 @@ def no_panel_channel():
     yes('with no panel channel the ticket still reaches staff privately', SECRET in book.text())
 
 run('no panel channel', no_panel_channel)
+
+
+def fallback_counts():
+    # One new ticket every five minutes, from To Do entry 308. A ticket that
+    # fell back is still a ticket. If this path skipped the limit, the staff
+    # only channel would be the one a person could fill fifty times a minute.
+    g, panel, mod = server()
+    book = g.channel('tickets', overwrites=staff_only(g, mod))
+    SAID[:] = []
+    who, ix = report(g)
+    yes('a report that falls back reaches the staff only channel', SECRET in book.text())
+    posts = len(book.sent)
+    again, ix2 = report(g, who)
+    yes('THE SAME PERSON SENDING ANOTHER AT ONCE IS REFUSED, fallback or not',
+        len(ix2.response.said) == 1 and 'minute' in ix2.response.said[0])
+    yes('and nothing more is posted or pushed',
+        len(book.sent) == posts and not PUSHED and panel.thread_tries == 1)
+    yes('the limit was read, not skipped by an error',
+        not any('ticket limit could not be checked' in s for s in SAID))
+    bot._last_ticket.clear()
+
+run('a fallen back ticket counts', fallback_counts)
 
 
 # -------------------------------------------------- what private means --
