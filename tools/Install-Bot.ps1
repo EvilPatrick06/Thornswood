@@ -420,13 +420,40 @@ if (-not `$env:DISCORD_TOKEN) {
 
 if (-not `$env:PYTHONIOENCODING) { `$env:PYTHONIOENCODING = 'utf-8' }
 
+# Three quick exits in a row and it stops trying.
+#
+# This loop used to start the bot again fifteen seconds after every exit, for
+# ever. That is right for a dropped connection. It is wrong for a rejected
+# token, Server Members Intent switched off, or a bot.py that fails on import:
+# each of those is in bot.log within seconds and the process exits, and the
+# loop tried again about four times a minute, the same way every time, until
+# somebody happened to open bot.log. A run that lasts
+# thirty seconds got far enough to be worth another go, so a long run starts
+# the count again, and only three short ones in a row give up.
+#
+# It exits 0 when it gives up. The task has RestartCount 999, and whether Task
+# Scheduler repeats a task that exits non-zero has not been measured on this
+# box; a clean exit is not a failure either way. What starts it again is the
+# watchdog, Watch-Services.ps1, which tries at most three times an hour and
+# then writes that the bot needs a look. That rule is entry 99 and stays as it
+# is. Install-Bot.ps1 starts the task again too, which is how a fix goes up.
+`$fastSeconds = 30
+`$fastRuns = 0
 while (`$true) {
   # Python writes the log itself, through cmd's redirection, the same way the
   # game server and the voice server are run. Piping every line through
   # PowerShell and Out-File, which this did until 2026-09-16, re-encoded the
   # text and left the file unreadable past a point, and a slow pipeline could
   # hold the bot's own print() calls, which run on its event loop.
+  `$clock = [Diagnostics.Stopwatch]::StartNew()
   & cmd /c "python ""$rootWin\bot.py"" >> ""$rootWin\bot.log"" 2>&1"
+  `$code = `$LASTEXITCODE
+  if (`$clock.Elapsed.TotalSeconds -lt `$fastSeconds) { `$fastRuns++ } else { `$fastRuns = 0 }
+  if (`$fastRuns -ge 3) {
+    # Python has exited, so bot.log is free to append to.
+    ('[run] the bot stopped within ' + `$fastSeconds + ' seconds three times running, the last time with exit code ' + `$code + '. Not starting it again. The reason is in the lines above.') | Out-File '$rootWin\bot.log' -Append -Encoding utf8
+    exit 0
+  }
   Start-Sleep -Seconds 15
 }
 '@
