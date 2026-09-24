@@ -108,8 +108,13 @@ namespace Thornswood
                     string game = "";
                     try { game = OwnGame.Source(cfg); } catch { }
                     bool apart = !string.Equals(game, into, StringComparison.OrdinalIgnoreCase);
-                    var i = new Issue("Vortex deploys Thornswood's mods into " + into + ", not into " + Paths.Game +
-                                      ", so Fix will make Thornswood's own Skyrim folder from what Vortex deployed there" +
+                    // "Vortex deploys into", not "Thornswood's mods": the record
+                    // here says Vortex deployed something, not that it is the
+                    // Thornswood collection. Fix checks that before it builds
+                    // (OwnGame.WhyNot counts Thornswood's plugins) and says to
+                    // enable the Thornswood profile when it is not.
+                    var i = new Issue("Vortex deploys into " + into + ", not into " + Paths.Game +
+                                      ", so Fix will make Thornswood's own Skyrim folder from what Vortex deployed there, once it has checked that is Thornswood's collection" +
                                       (apart ? ", taking the game itself from the Steam copy and nothing else from that folder." : "."), true);
                     i.VortexFolder = into;
                     issues.Add(i);

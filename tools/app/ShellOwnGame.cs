@@ -17,6 +17,9 @@ namespace Thornswood
     static partial class Shell
     {
         static bool ownGameBusy, ownGameStarted, restarting;
+        // Only the window's thread changes this: DrawOwnGame bumps it, and the
+        // background answer compares it on the way back through the Dispatcher.
+        static int ownGameDrawGen;
         static TextBlock txtOwnGameState;
         static Button btnOwnGameMake, btnOwnGameRefresh, btnOwnGamePick, btnOwnGameForget;
 
@@ -345,23 +348,56 @@ namespace Thornswood
         static void DrawOwnGame()
         {
             if (txtOwnGameState == null) return;
+            // Every draw is numbered, so an answer that comes back from the
+            // background after a newer draw is thrown away rather than drawn
+            // over it.
+            int gen = ++ownGameDrawGen;
             bool active = OwnGame.Active;
             string into = OwnGame.DeploysInto(cfg), game = OwnGame.Source(cfg);
             string from = into + (string.Equals(game, into, StringComparison.OrdinalIgnoreCase) ? "" : ", with the game itself from " + game);
+            // Which folder is Vortex's, and whether somebody chose it, so a
+            // choice that has gone stale can be seen and forgotten.
+            string chosen = string.IsNullOrEmpty(cfg.VortexGame) ? "" :
+                "\nVortex's folder is set to " + cfg.VortexGame + ". Forget the chosen folder to have Thornswood look for it again.";
             string state;
             if (ownGameBusy) state = "Working on it now.";
             else if (active) state = "On. Thornswood runs from " + OwnGame.Folder + ", made from " + from + ".";
             else if (!Paths.Collection) state = "This install already has a Game folder of its own from its installer.";
             else
             {
-                string why = OwnGame.WhyNot(cfg, into);
-                state = why == null ? "Off. Vortex has the Thornswood collection deployed in " + from + ", so it can be made now." : "Off. " + why;
+                /*
+                    WhyNot reads Vortex's record, and when Vortex deploys into
+                    a folder other than the Steam copy that means parsing all of
+                    it, six megabytes on a full collection: about 0.4 s measured
+                    on an SSD, longer on a hard disk, and this runs at startup
+                    on the window's thread. Found in review, 24 September. So it
+                    is asked in the background and drawn when it comes back. The
+                    answer is kept until Vortex deploys again, so Play and Make
+                    it, which ask it again when pressed, find it ready.
+                */
+                state = "Off. Checking what Vortex has deployed in " + from + ".";
+                Config askCfg = cfg;
+                string askInto = into, askFrom = from, askChosen = chosen;
+                System.Threading.ThreadPool.QueueUserWorkItem(delegate
+                {
+                    string why;
+                    try { why = OwnGame.WhyNot(askCfg, askInto); }
+                    catch (Exception ex) { why = "Thornswood could not read what Vortex has deployed: " + ex.Message; }
+                    string text = (why == null
+                        ? "Off. Vortex has the Thornswood collection deployed in " + askFrom + ", so it can be made now."
+                        : "Off. " + why) + askChosen;
+                    try
+                    {
+                        win.Dispatcher.BeginInvoke((Action)delegate
+                        {
+                            if (gen != ownGameDrawGen || txtOwnGameState == null) return;
+                            txtOwnGameState.Text = text;
+                        });
+                    }
+                    catch { }
+                });
             }
-            // Which folder is Vortex's, and whether somebody chose it, so a
-            // choice that has gone stale can be seen and forgotten.
-            if (!string.IsNullOrEmpty(cfg.VortexGame))
-                state += "\nVortex's folder is set to " + cfg.VortexGame + ". Forget the chosen folder to have Thornswood look for it again.";
-            txtOwnGameState.Text = state;
+            txtOwnGameState.Text = state + chosen;
             if (btnOwnGamePick != null) btnOwnGamePick.IsEnabled = !ownGameBusy;
             if (btnOwnGameForget != null)
             {

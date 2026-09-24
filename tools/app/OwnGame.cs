@@ -121,17 +121,22 @@ namespace Thornswood
         /// <summary>
         /// The Skyrim folder Vortex deploys into, where its record of what it
         /// deployed is read. In order: the config's VortexGame when it names a
-        /// Skyrim (Fix and the picker in Settings set it); the Steam copy when
+        /// Skyrim that still holds Vortex's record (Fix and the picker in
+        /// Settings set it; without the record it is passed over, so a choice
+        /// Vortex has since purged cannot pin Thornswood to it); the Steam copy when
         /// Vortex's record is in it, which is the answer this always gave;
         /// another folder in a Steam library that has Vortex's record (Find);
         /// and last the Steam copy anyway, so WhyNot has a folder to name.
         /// </summary>
         public static string DeploysInto(Config cfg)
         {
-            string s = cfg == null || cfg.VortexGame == null ? "" : cfg.VortexGame.Trim();
-            if (s.Length > 0 && File.Exists(Path.Combine(s, "SkyrimSE.exe")))
+            // Fix saves VortexGame by itself, so a tester who later points
+            // Vortex back at the Steam copy would otherwise leave Thornswood
+            // following a folder Vortex has purged, with nothing said and only
+            // Forget in Settings as a way out. Found in review, 24 September.
+            string s = cfg == null || cfg.VortexGame == null ? "" : cfg.VortexGame.Trim().TrimEnd('\\');
+            if (s.Length > 0 && File.Exists(Path.Combine(s, "SkyrimSE.exe")) && HasRecord(s))
             {
-                s = s.TrimEnd('\\');
                 Chosen(s, "VortexGame in config.json names it");
                 return s;
             }
@@ -327,7 +332,7 @@ namespace Thornswood
             if (!HasRecord(src))
                 return "Vortex has nothing deployed in " + src + " right now. In Vortex, enable the Thornswood profile and let it deploy, then try again. " +
                        "If it is deployed, Vortex is deploying into another folder: in Vortex, Mods, Open, Open Game Folder shows which, " +
-                       "and Fix on the Mods page or Choose Vortex's folder in Settings points Thornswood at it.";
+                       "and Choose Vortex's folder in Settings points Thornswood at it.";
 
             List<string> want = ShippedPlugins();
             if (want.Count == 0)

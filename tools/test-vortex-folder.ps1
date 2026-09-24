@@ -682,6 +682,23 @@ namespace Thornswood
             Yes("among folders that are not Steam copies, the newest record wins", string.Equals(DeploysInto(t.Cfg), other, StringComparison.OrdinalIgnoreCase));
             t.Cfg.VortexGame = Path.Combine(t.Steam, "steamapps\\common\\Keizaal Online");
             Yes("and VortexGame wins over the search", string.Equals(DeploysInto(t.Cfg), t.Cfg.VortexGame, StringComparison.OrdinalIgnoreCase));
+
+            // A choice Vortex has since purged does not pin Thornswood to it.
+            // Fix saved Keizaal Online; the tester then pointed Vortex back at
+            // the Steam copy, which purges Keizaal and deploys into the copy.
+            Scene u = NewScene("purged", true);
+            string copy = SteamCopy(u, u.Steam, "STEAM");
+            string was = Keizaal(u, u.Steam, "Keizaal Online", DateTime.UtcNow.AddHours(-1));
+            u.Cfg.VortexGame = was;
+            Yes("a saved folder with Vortex's record is used", string.Equals(DeploysInto(u.Cfg), was, StringComparison.OrdinalIgnoreCase));
+            File.Delete(Path.Combine(was, "Data\\vortex.deployment.json"));
+            Record(Path.Combine(copy, "Data\\vortex.deployment.json"), u.Staging, Path.Combine(copy, "Data"),
+                   new string[][] { new string[] { "TsOne.esp", "ModA" } }, DateTime.UtcNow);
+            Yes("once Vortex has purged it and deploys into the Steam copy, the Steam copy is used, with nothing to forget by hand",
+                string.Equals(DeploysInto(u.Cfg), copy, StringComparison.OrdinalIgnoreCase));
+            File.Delete(Path.Combine(copy, "Data\\vortex.deployment.json"));
+            Yes("and with no record anywhere it names the Steam copy for WhyNot, not the purged folder",
+                string.Equals(DeploysInto(u.Cfg), copy, StringComparison.OrdinalIgnoreCase));
         }
 
         // ---- the ordinary case, unchanged -----------------------------------
@@ -752,8 +769,10 @@ namespace Thornswood
             string why = OwnGame.WhyNot(s.Cfg, DeploysInto(s.Cfg));
             Yes("with nothing deployed anywhere it still names the Steam copy", why != null && why.IndexOf("nothing deployed in " + steam, StringComparison.Ordinal) >= 0);
             Yes("and says how to find the folder Vortex deploys into", why != null && why.IndexOf("Open Game Folder", StringComparison.Ordinal) >= 0);
-            Yes("and that Fix or the picker points Thornswood at it",
-                why != null && why.IndexOf("Fix", StringComparison.Ordinal) >= 0 && why.IndexOf("Choose Vortex's folder", StringComparison.Ordinal) >= 0 && Clean(why));
+            // The picker, not Fix: when this sentence shows, the search found
+            // no folder with a record, so Fix has nothing to point at.
+            Yes("and that the picker points Thornswood at it, without promising Fix can",
+                why != null && why.IndexOf("Choose Vortex's folder", StringComparison.Ordinal) >= 0 && why.IndexOf("Fix", StringComparison.Ordinal) < 0 && Clean(why));
         }
 
         // ---- 7: no Steam copy at all -------------------------------------------
@@ -835,6 +854,17 @@ try {
         (([regex]::Matches($own, 'string src = OwnGame\.DeploysInto\(')).Count -ge 3)
     Yes 'Downgrade still works on the Steam copy (OwnGame.Source), never the folder Vortex deploys into' `
         (($down -match 'OwnGame\.Source\(cfg\)') -and ($down -notmatch 'DeploysInto'))
+
+    # Review, 24 September: a pack removal read Vortex's record from the
+    # Steam copy, which has none when Vortex deploys elsewhere.
+    $upd = [IO.File]::ReadAllText((Join-Path $AppPath 'Updater.cs'))
+    Yes 'a pack removal reads Vortex''s record where Vortex deploys (DeploysInto), not the Steam copy' `
+        (($upd -match 'OwnGame\.Active\s*\?\s*OwnGame\.DeploysInto\(cfg\)') -and ($upd -notmatch 'OwnGame\.Active\s*\?\s*OwnGame\.Source\(cfg\)'))
+    # Review, 24 September: the Settings card parsed Vortex's record on the
+    # window's thread at startup.
+    Yes 'the Settings card asks WhyNot in the background and drops a stale answer' `
+        (($own -match 'ThreadPool\.QueueUserWorkItem') -and ($own -match 'gen\s*!=\s*ownGameDrawGen') -and
+         ($own -notmatch 'string why = OwnGame\.WhyNot\(cfg, into\);'))
 }
 finally {
     try { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction Stop } catch { }
