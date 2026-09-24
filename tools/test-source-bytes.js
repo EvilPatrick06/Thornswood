@@ -1,0 +1,71 @@
+// test-source-bytes.js
+//
+// No tracked source file carries a control character it did not mean to.
+//
+// WHY THIS EXISTS. On 23 September two form feeds were found in
+// tools/Publish-Update.ps1, one of them inside the message Die prints when the
+// launcher's record of Vortex's files is missing:
+//
+//     "$ProfileDir\OwnGame<FF>iles.txt is missing"
+//
+// It was written as OwnGame\files.txt. Somewhere between a session and the
+// file, a tool that eats backslashes turned "\f" into the form feed character,
+// and the file parsed, ran, and passed every check there was, because nothing
+// looks at bytes. The same thing happened to tools/gamemode.js the same night
+// and was only caught by reading the line back. And a "\n" in a comment in
+// that file became a real line break at some point before that, splitting
+// tools\recipes.json across two lines.
+//
+// So this reads every tracked text file and fails on any byte below 32 that is
+// not a tab, a line feed or a carriage return. A form feed, a vertical tab, a
+// bell or a NUL in source is always one of these accidents: nothing in this
+// repository needs one on purpose.
+//
+// Read only.
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+const ROOT = path.join(__dirname, '..');
+const TEXT = /\.(js|mjs|cjs|ps1|psm1|psd1|py|cs|xaml|md|json|html|htm|css|txt|yml|yaml|toml|cmd|bat|sh|ini|xml)$/i;
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+
+let files = [];
+try {
+  files = execSync('git ls-files -z', { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
+    .toString('utf8').split('\0').filter(Boolean);
+} catch (e) {
+  console.log('SKIP  git ls-files did not answer, so there is nothing to read: ' + e.message);
+  process.exit(0);
+}
+const text = files.filter(function (f) { return TEXT.test(f); });
+yes('there are tracked text files to read, ' + text.length + ' of them', text.length > 50);
+
+const bad = [];
+text.forEach(function (rel) {
+  let d = null;
+  try { d = fs.readFileSync(path.join(ROOT, rel)); } catch (e) { return; }
+  let line = 1;
+  for (let i = 0; i < d.length; i++) {
+    const b = d[i];
+    if (b === 10) { line++; continue; }
+    if (b < 32 && b !== 9 && b !== 13) {
+      const from = Math.max(0, i - 30);
+      const near = d.slice(from, Math.min(d.length, i + 12)).toString('latin1')
+        .replace(/[\x00-\x1f]/g, function (c) { return '<' + c.charCodeAt(0).toString(16).padStart(2, '0') + '>'; });
+      bad.push(rel + ':' + line + '  byte 0x' + b.toString(16).padStart(2, '0') + '  ...' + near + '...');
+    }
+  }
+});
+
+bad.forEach(function (b) { console.log('      ' + b); });
+yes('no tracked text file carries a stray control character', bad.length === 0);
+
+console.log('');
+console.log(pass + ' passed, ' + fail + ' failed');
+process.exit(fail ? 1 : 0);
