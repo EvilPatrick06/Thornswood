@@ -39,6 +39,17 @@ jobs:
           if ($bad) { exit 1 }
           Write-Host "every script parses"
 
+      - name: Check the launcher window
+        shell: powershell
+        run: |
+          # The launcher builds its window from ui.xaml at startup and finds
+          # every control by name, so a renamed control or a window that does
+          # not parse compiles clean and is found by the person using it. This
+          # fails on either. Windows PowerShell on purpose: it parses with the
+          # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
+          & powershell -NoProfile -File tools\Check-Controls.ps1 -NoPause
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tools/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
+
       - name: Parse every game script
         shell: pwsh
         run: |
