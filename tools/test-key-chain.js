@@ -91,6 +91,23 @@ if (recipes) {
       /e\.count > 1/.test(b) && /entries\.splice\(i, 1\)/.test(b));
 }
 
+{
+  /*
+    THE TRANSITION. The plugin reaches clients only through the Nexus
+    collection and the launcher refuses Play on any plugin size difference, so
+    the gamemode runs for a while against a plugin with no blank mold in it.
+    Demanding a blank then would refuse every /mold in the world.
+  */
+  const b = body('function blankMoldsExist()', 700);
+  yes('the gamemode asks the engine whether the blank mold recipe is loaded', b.length > 0 &&
+      /mp\.lookupEspmRecordById\(id\)/.test(b) && /found\.record/.test(b));
+  yes('and it asks about the recipe the plugin adds',
+      /var BLANK_MOLD_RECIPE = '15496:Thornswood-Content\.esp'/.test(code));
+  const m = body('function mold(actorId, profileId, toProfile)', 2600);
+  yes('a blank is only demanded once the plugin carries one',
+      /if \(blankMoldsExist\(\)\) \{\s*if \(!takeBlankMold\(actorId\)\)/.test(m));
+}
+
 // ------------------------------------------- 3. the key comes out named for it
 {
   const b = body('mp.onCraft = guard(', 6000);
