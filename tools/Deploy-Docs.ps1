@@ -216,13 +216,42 @@ if ($SeedDocs -and $sent) {
 if ($Password) {
   Write-Host ''
   Write-Host 'Setting the password...'
-  # Through base64 so quoting survives ssh, cmd and PowerShell, and so it is
-  # not sitting in a command line on either machine.
-  $json = (@{ password = $Password } | ConvertTo-Json -Compress)
-  $b64  = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+  # Read, set, write: only the password changes. This used to write
+  # {"password": ...} over the whole of config.json, which took the Discord
+  # client id and secret, the bot token, the bot key, the admins, the server
+  # password and the cookie secret with it. With no client id, discordReady()
+  # in server.js is false, and isMember and /api/login take the password
+  # again, so a wipe reopened the door Discord had shut. Rotate-ServerPassword
+  # already reads before it writes; this is the same shape.
+  #
+  # A file that is there and will not parse is left exactly as it is, which is
+  # server.js's own rule: unreadable is not empty, and the difference is
+  # somebody's client secret. Read as UTF-8 because Get-Content in Windows
+  # PowerShell reads a file with no byte order mark as the local code page,
+  # and node writes none. Written with no mark, because one is how the site
+  # once ran for days on its defaults while looking configured.
+  #
+  # Base64 so quoting survives ssh, cmd and PowerShell. It still travels inside
+  # the command handed to ssh, so while this runs it is on the command line of
+  # ssh here and of powershell on the VPS.
+  $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Password))
   Remote @"
-[IO.File]::WriteAllBytes('$rootWin\config.json', [Convert]::FromBase64String('$b64'))
-'set'
+`$ErrorActionPreference = 'Stop'
+`$pw = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64'))
+`$f = '$rootWin\config.json'
+`$cfg = [ordered]@{}
+if (Test-Path -LiteralPath `$f) {
+  `$old = `$null
+  try { `$old = ConvertFrom-Json -InputObject ([IO.File]::ReadAllText(`$f, [Text.Encoding]::UTF8)) } catch { }
+  if (-not (`$old -is [Management.Automation.PSCustomObject])) {
+    'CONFIG.JSON IS THERE AND WILL NOT READ AS JSON. Nothing written, the password is unchanged.'
+    return
+  }
+  foreach (`$p in `$old.PSObject.Properties) { `$cfg[`$p.Name] = `$p.Value }
+}
+`$cfg['password'] = `$pw
+[IO.File]::WriteAllText(`$f, (ConvertTo-Json -InputObject `$cfg -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
+'set, ' + (`$cfg.Count - 1) + ' other setting(s) kept'
 "@ | ForEach-Object { "  $_" }
 }
 
