@@ -51,43 +51,95 @@
     return false;
   }
 
+  /*
+    THE LOOK IS THE K PANEL'S. Patrick, 23 September, playing on dev: "Also
+    the journal menu works but is ugly asf and doesn't match the theme we use
+    with our other menus". It had been drawn from another template: system-ui
+    sans serif, rounded 12px and 7px corners, flat grey #1b1f26 and a brass
+    #d9ab52, which is the To Do List web page's palette and not the game's.
+    Every colour below is one thornswood-skills.js already uses, and the rest
+    follows it too: the Palatino stack (fonts on the machine, never one off
+    the network, because this is the game's own browser), parchment text,
+    gold hairlines, square corners, the dark vignette behind the panel,
+    uppercase gold buttons with one gold primary, and gold scrollbars.
+    tools/test-journal-theme.js fails on a colour here that the K panel does
+    not use.
+
+    Only the look changed. The grid, the sizes, the ids and classes the
+    script reads and every line it sends are as they were.
+
+    No :hover and no transitions, for the reason the K panel has none (see
+    the head of thornswood-skills.js). The journal and page you picked are
+    lit by the click, and the cursor still turns into a hand.
+
+    The front's own stylesheet, in this same document, sets margin, padding,
+    border and background to nothing on every element (measured in its
+    build.js on 24 September), so each rule sets what it needs rather than
+    leaning on the browser's defaults.
+  */
   var CSS = [
     '#' + ID + '{position:fixed;inset:0;z-index:2147483000;display:none;',
-    '  background:rgba(6,7,9,.72);font-family:Georgia,serif;color:#e9e7e1}',
+    '  background:radial-gradient(ellipse at center,rgba(0,0,0,.50) 0%,rgba(0,0,0,.72) 100%);',
+    '  font-family:"Palatino Linotype",Palatino,Georgia,serif;color:#d9cfb4}',
     '#' + ID + '.on{display:grid;place-items:center}',
     '#' + ID + ' .panel{width:1040px;max-width:calc(100vw - 48px);height:660px;',
     '  max-height:calc(100vh - 48px);display:grid;grid-template-rows:auto 1fr auto;',
-    '  background:#1b1f26;border:2px solid #3a424e;border-radius:12px;',
-    '  box-shadow:0 18px 60px rgba(0,0,0,.6);overflow:hidden}',
-    '#' + ID + ' h2{margin:0;padding:18px 24px 14px;font-size:24px;font-weight:600;',
-    '  border-bottom:1px solid #2b313a}',
+    '  background:rgba(11,10,8,.94);border:1px solid rgba(198,170,109,.42);',
+    '  outline:1px solid rgba(198,170,109,.14);outline-offset:4px;',
+    '  box-shadow:0 24px 80px rgba(0,0,0,.7);overflow:hidden}',
+    '#' + ID + ' h2{margin:0;padding:18px 24px 14px;font-size:26px;font-weight:normal;line-height:1.1;',
+    '  color:#f6e9c8;border-bottom:1px solid rgba(198,170,109,.22)}',
     '#' + ID + ' .cols{display:grid;grid-template-columns:280px 1fr;overflow:hidden}',
-    '#' + ID + ' .side{overflow:auto;border-right:1px solid #2b313a;padding:14px;',
-    '  font-family:system-ui,sans-serif;font-size:13.5px}',
-    '#' + ID + ' .main{overflow:auto;padding:16px 22px;font-family:system-ui,sans-serif;font-size:14px}',
-    '#' + ID + ' .foot{padding:12px 24px;border-top:1px solid #2b313a;display:flex;gap:10px;',
-    '  align-items:center;font-family:system-ui,sans-serif;font-size:13px;color:#98a2ae}',
-    '#' + ID + ' h3{margin:14px 0 7px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;',
-    '  color:#79828f;font-weight:600}',
+    '#' + ID + ' .side{overflow:auto;border-right:1px solid rgba(198,170,109,.22);padding:14px;',
+    '  font-size:13.5px}',
+    '#' + ID + ' .main{overflow:auto;padding:16px 22px;font-size:14px}',
+    '#' + ID + ' .foot{padding:12px 24px;border-top:1px solid rgba(198,170,109,.22);display:flex;gap:10px;',
+    '  align-items:center;font-size:13.5px;font-style:italic;color:rgba(217,207,180,.7)}',
+    '#' + ID + ' h3{margin:14px 0 7px;padding-bottom:6px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;',
+    '  color:rgba(198,170,109,.85);font-weight:normal;border-bottom:1px solid rgba(198,170,109,.22)}',
     '#' + ID + ' h3:first-child{margin-top:0}',
+    // The K panel's button at 11px rather than its 13px. Uppercase and spaced
+    // is wider than the old buttons were, and at 12px Save no longer fit on
+    // the line with the page's title and went onto one of its own, pushing
+    // the text box down (measured in Edge at 1920 by 1080, 24 September).
+    '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
+    '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
+    '  padding:5px 10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
+    '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
+    // A journal in the list and a page tab are names rather than actions, so
+    // they read as the K panel's cards and choices do, not as its buttons.
     '#' + ID + ' .item{display:block;width:100%;text-align:left;margin-bottom:5px;',
-    '  padding:7px 9px;border:1px solid #2b313a;border-radius:7px;background:#212630;',
-    '  color:#e9e7e1;font:inherit;cursor:pointer}',
-    '#' + ID + ' .item:hover{border-color:#d9ab52}',
-    '#' + ID + ' .item.sel{border-color:#d9ab52;color:#d9ab52}',
-    '#' + ID + ' .item .c{float:right;color:#79828f;font-size:12px}',
-    '#' + ID + ' button{font:inherit;cursor:pointer;border-radius:7px;border:1px solid #3a424e;',
-    '  background:#1b1f26;color:#e9e7e1;padding:5px 11px;font-size:13px}',
-    '#' + ID + ' button:hover{border-color:#d9ab52;color:#d9ab52}',
-    '#' + ID + ' button.go{background:#d9ab52;border-color:#d9ab52;color:#1a1500;font-weight:600}',
-    '#' + ID + ' input,#' + ID + ' textarea,#' + ID + ' select{font:inherit;color:#e9e7e1;',
-    '  background:#13161b;border:1px solid #3a424e;border-radius:7px;padding:8px 10px;width:100%}',
-    '#' + ID + ' textarea{min-height:300px;resize:vertical;line-height:1.55;font-family:Georgia,serif;font-size:15px}',
+    '  padding:7px 9px;border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);',
+    '  color:#f6e9c8;font-size:14px;letter-spacing:.02em;text-transform:none;white-space:normal}',
+    '#' + ID + ' .item.sel{border-color:rgba(198,170,109,.55);background:rgba(120,94,44,.24);',
+    '  box-shadow:inset 3px 0 0 0 #c6aa6d}',
+    '#' + ID + ' .item.go{text-align:center;font-size:11px;letter-spacing:.14em;text-transform:uppercase;',
+    '  background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
+    '#' + ID + ' .item .c{float:right;color:rgba(217,207,180,.5);font-size:12px;font-style:italic}',
+    '#' + ID + ' button[data-page]{font-size:13.5px;letter-spacing:.02em;text-transform:none;color:#d9cfb4;',
+    '  border-color:rgba(198,170,109,.30);background:rgba(0,0,0,.20)}',
+    '#' + ID + ' button[data-page].go{border-color:#e9d19b;background:rgba(201,162,75,.20);color:#f6e9c8}',
+    '#' + ID + ' input,#' + ID + ' textarea,#' + ID + ' select{font:inherit;color:#f6e9c8;',
+    '  background:rgba(0,0,0,.35);border:1px solid rgba(198,170,109,.30);padding:8px 10px;width:100%}',
+    '#' + ID + ' input:focus,#' + ID + ' textarea:focus,#' + ID + ' select:focus{border-color:rgba(198,170,109,.55)}',
+    // the list the select drops down is drawn on its own, so it gets a solid
+    // colour rather than a see-through one
+    '#' + ID + ' option{background:#1b1205;color:#d9cfb4}',
+    '#' + ID + ' textarea{min-height:300px;resize:vertical;line-height:1.55;font-size:15px}',
     '#' + ID + ' .bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}',
     '#' + ID + ' .bar .grow{flex:1}',
-    '#' + ID + ' .none{color:#79828f;padding:8px 2px;line-height:1.55}',
-    '#' + ID + ' .read{white-space:pre-wrap;line-height:1.6;font-family:Georgia,serif;font-size:15px}',
-    '#' + ID + ' .from{color:#79828f;font-size:12.5px;margin-bottom:10px}'
+    '#' + ID + ' .none{color:rgba(217,207,180,.6);font-style:italic;padding:8px 2px;line-height:1.55}',
+    '#' + ID + ' .read{white-space:pre-wrap;line-height:1.6;font-size:15px;color:#d9cfb4}',
+    '#' + ID + ' .from{color:rgba(217,207,180,.6);font-style:italic;font-size:12.5px;margin-bottom:10px}',
+    '#' + ID + ' .main b{font-weight:normal;font-size:16.5px;color:#f6e9c8}',
+    // The K panel's scrollbars, the same rules scoped to this panel, so the
+    // journal has them whether or not the K panel's page loaded first.
+    '#' + ID + ' ::-webkit-scrollbar{width:10px;height:10px}',
+    '#' + ID + ' ::-webkit-scrollbar-track{background:rgba(0,0,0,.25)}',
+    '#' + ID + ' ::-webkit-scrollbar-thumb{background:rgba(198,170,109,.35);border:2px solid transparent;',
+    '  background-clip:padding-box;border-radius:6px}',
+    '#' + ID + ' ::-webkit-scrollbar-thumb:active{background:rgba(233,209,155,.55);background-clip:padding-box}',
+    '#' + ID + ' ::-webkit-scrollbar-corner{background:transparent}'
   ].join('\n');
 
   function build() {
@@ -159,7 +211,7 @@
         html += '<button class="item' + (readingShared === j ? ' sel' : '') +
                 '" data-shared="' + j + '">' + esc(shared[j].title) +
                 '<span class="c">' + shared[j].pages.length + '</span>' +
-                '<div style="color:#79828f;font-size:12px">from ' + esc(shared[j].from) + '</div></button>';
+                '<div style="color:rgba(217,207,180,.6);font-size:12px;font-style:italic">from ' + esc(shared[j].from) + '</div></button>';
       }
     }
     side.innerHTML = html;
@@ -227,7 +279,7 @@
       '<input id="' + ID + '-title" value="' + esc(book.title) + '" style="max-width:280px">' +
       '<button data-do="rename">Rename</button>' +
       '<span class="grow"></span>' +
-      '<span style="color:#79828f;font-size:12.5px">share</span>' +
+      '<span style="color:rgba(198,170,109,.85);font-size:11.5px;letter-spacing:.24em;text-transform:uppercase">share</span>' +
       pick +
       '<button data-do="sharebook">Whole journal</button>' +
       '<button data-do="unsharebook">Stop</button>' +
