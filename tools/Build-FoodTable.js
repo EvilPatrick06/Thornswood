@@ -33,6 +33,21 @@
 //      progressively worse with each one, so the server has to know which
 //      drinks are drink.
 //
+//   4. ONE LINE PER RECORD, UNDER THE PLUGIN THAT MADE IT, WORTH WHAT THE
+//      LAST PLUGIN SAYS. Djinn, 24 September: "if any drink is supposed to
+//      satiate your thirst, any alcohol doesn't do this at all", with Thirst
+//      at 0% and "You have eaten enough" on the screen. This used to key
+//      every version of a record by the plugin it was read out of, so Ale
+//      was three lines: 34c5e:Skyrim.esm reading food (its name is a strings
+//      file number, so no word matched), 34c5e:Update.esm the same, and
+//      34c5e:Gourmet.esp reading ale. An override keeps the form id of the
+//      plugin that first made the record, so the game reports that ale as
+//      34c5e of Skyrim.esm, the server found the food line, and the drink
+//      filled hunger. The Gourmet.esp line could never be found at all.
+//      So a record's high byte is read through the plugin's own MAST list,
+//      the way Build-FireTable.js does it, and the version kept is the last
+//      one in the load order, which is the one the game uses.
+//
 // Read only. It opens the plugins of the build and writes tools\food.json.
 //
 // Usage:
@@ -81,10 +96,60 @@ function loadOrder() {
   the food flag is food.
 */
 const DRINK = /\b(ale|mead|wine|brandy|spirits?|grog|rum|liquor|beer|cider|water|milk|juice|tea|broth|soup|stew|nog|brew|flagon|bottle)\b/i;
-const ALCOHOL = /\b(ale|mead|wine|brandy|spirits?|grog|rum|liquor|beer|cider|nog|firebrand|honningbrew|black-?briar)\b/i;
+/*
+  sujamma to homebrew were added on 24 September, once rule 4 put the last
+  plugin's names in front of this list: Flin, Mazte, Shein, Sujamma, Sadri's
+  Sujamma, Argonian Bloodwine and Windhelm Homebrew are the alcohol of this
+  build and none of them matched, so they read food.
+*/
+const ALCOHOL = /\b(ale|mead|wine|brandy|spirits?|grog|rum|liquor|beer|cider|nog|firebrand|honningbrew|black-?briar|sujamma|shein|mazte|flin|bloodwine|homebrew)\b/i;
+/*
+  AND THE EDITOR ID, FOR A DRINK WITH NO DRINK WORD IN ITS NAME. Gourmet
+  calls every drink it adds or takes over MAG_Drink..., and Cliff Racer,
+  White-Gold Tower and Velvet LeChance are three of them whose names say
+  nothing. Only the drink half is read off the editor id, never the alcohol
+  half: WindhelmSSE.esp's Glacier Water is FoodMeadWHIceWater and its
+  Snowberry Juice is BYOHFoodWineBottle03WHSnowJuice, so an editor id saying
+  mead or wine is a reused bottle, not a fact about what is in it.
+*/
+const DRINK_EDID = /drink/i;
 
 const FOOD_FLAG = 0x00000002;   // ENIT: this ALCH is a food item
 const POISON_FLAG = 0x00020000; // ENIT: and this one is a poison
+
+/*
+  The masters a plugin declares, in order. A record's high byte is an index
+  into this list, and anything past the end is the plugin's own. The same
+  reading as Build-FireTable.js.
+*/
+function mastersOf(b) {
+  const out = [];
+  let k = 24;
+  const end = 24 + b.readUInt32LE(4);
+  while (k + 6 <= end) {
+    const sub = b.toString('ascii', k, k + 4);
+    const sz = b.readUInt16LE(k + 4);
+    k += 6;
+    if (sub === 'MAST' && sz > 1) { out.push(b.toString('latin1', k, k + sz - 1)); }
+    k += sz;
+  }
+  return out;
+}
+
+/*
+  A master named the way the load order names it. The server turns a
+  descriptor into a form id by looking the file up in its own list with an
+  exact match (FormDesc::ToFormId in the fork), so a plugin that happens to
+  write "skyrim.esm" in its MAST must not put a line in the table the server
+  cannot find.
+*/
+function asLoaded(name, order) {
+  const low = name.toLowerCase();
+  for (const n of order) {
+    if (n.toLowerCase() === low) { return n; }
+  }
+  return name;
+}
 
 function subrecords(rec) {
   const got = { EDID: '', FULL: '', value: 0, flags: 0 };
@@ -109,9 +174,22 @@ function subrecords(rec) {
 }
 
 const rows = [];
-const here = { file: '' };
+// Which plugin the walk is inside, and what it declares as its masters.
+const here = { file: '', masters: [], order: [] };
 let scanned = 0;
 let notFood = 0;
+
+/*
+  Which record this is: the plugin that made it and the id within that
+  plugin. An index inside the master list means the record belongs to that
+  master and this plugin is only changing it. See rule 4.
+*/
+function ownerOf(formId) {
+  const idx = (formId >>> 24) & 0xff;
+  const local = formId & 0x00ffffff;
+  const file = idx < here.masters.length ? asLoaded(here.masters[idx], here.order) : here.file;
+  return { file: file, local: '0x' + local.toString(16) };
+}
 
 function walk(b, start, end) {
   let j = start;
@@ -150,9 +228,11 @@ function walk(b, start, end) {
           */
           notFood++;
           const pname = s.FULL || s.EDID;
+          const pown = ownerOf(formId);
           rows.push({
-            file: here.file,
-            local: '0x' + (formId & 0x00ffffff).toString(16),
+            file: pown.file,
+            local: pown.local,
+            from: here.file,
             edid: s.EDID,
             name: pname,
             kind: (s.flags & POISON_FLAG) ? 'poison' : 'potion',
@@ -160,11 +240,13 @@ function walk(b, start, end) {
           });
         } else {
           const name = s.FULL || s.EDID;
-          const drink = DRINK.test(name);
+          const drink = DRINK.test(name) || DRINK_EDID.test(s.EDID);
           const booze = ALCOHOL.test(name);
+          const own = ownerOf(formId);
           rows.push({
-            file: here.file,
-            local: '0x' + (formId & 0x00ffffff).toString(16),
+            file: own.file,
+            local: own.local,
+            from: here.file,
             edid: s.EDID,
             name: name,
             kind: booze ? 'ale' : (drink ? 'drink' : 'food'),
@@ -178,6 +260,7 @@ function walk(b, start, end) {
 }
 
 const order = loadOrder();
+here.order = order;
 const missing = [];
 for (const file of order) {
   const full = path.join(DATA, file);
@@ -185,13 +268,19 @@ for (const file of order) {
   here.file = file;
   let buf = null;
   try { buf = fs.readFileSync(full); } catch (e) { continue; }
+  here.masters = [];
+  try {
+    if (buf.length > 24 && buf.toString('ascii', 0, 4) === 'TES4') { here.masters = mastersOf(buf); }
+  } catch (e) { here.masters = []; }
   try { walk(buf, 0, buf.length); } catch (e) {
     console.error('FAIL  ' + file + ' would not parse: ' + e.message);
     process.exitCode = 1;
   }
 }
 
-// Later plugins win, the way the game resolves them.
+// Later plugins win, the way the game resolves them. Every version of a
+// record has the same key now (rule 4), so this is one line per record and
+// the one left standing is the last plugin's, which row.from names.
 const byDesc = {};
 for (const r of rows) {
   byDesc[r.local.replace(/^0x/, '') + ':' + r.file] = r;
@@ -245,6 +334,10 @@ function install() {
     ? src.replace(re, line)
     : src.replace(/^(const WARMTH = .*;)$/m, '$1\n' + line);
   if (next === src) {
+    // Run twice on the same load order, the line is already there and is the
+    // same line. That is the table being generated, not a failure to find it,
+    // and it used to say FAIL and exit 1.
+    if (re.test(src)) { console.log('tools\\gamemode.js already holds this table'); return; }
     console.error('FAIL  could not find anywhere in gamemode.js to put the table');
     process.exitCode = 1;
     return;
