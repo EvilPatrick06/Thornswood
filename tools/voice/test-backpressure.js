@@ -57,6 +57,10 @@ const ROWS = 1500;
 // The ceiling the service promises. A connection whose queue passes it is
 // closed so it can reconnect, rather than held onto at any size.
 const CEILING = 1024 * 1024;
+// The chat limit, set here rather than left to the service's defaults so the
+// check on it below counts against numbers this file chose.
+const CHAT_BURST = 5;
+const CHAT_REFILL_MS = 1500;
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -113,6 +117,9 @@ const srv = spawn(process.execPath, ['--expose-gc', '-r', path.join(dir, 'probe.
     THORNSWOOD_VOICE_AUTH: 'off',
     THORNSWOOD_SITE: '',
     THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'),
+    THORNSWOOD_CHAT_BURST: String(CHAT_BURST),
+    THORNSWOOD_CHAT_REFILL_MS: String(CHAT_REFILL_MS),
+    THORNSWOOD_CHAT_RANGE: '',
   }),
 });
 let log = '';
@@ -210,6 +217,12 @@ function open() {
 
 /* A masked text frame, the way a browser sends one. */
 function send(s, obj) {
+  s.write(frameOf(obj));
+}
+
+/* The frame on its own, so many can go out in a single write, which is how
+   they arrive together in one read at the other end. */
+function frameOf(obj) {
   const data = Buffer.from(JSON.stringify(obj), 'utf8');
   const len = data.length;
   let head;
@@ -222,7 +235,7 @@ function send(s, obj) {
   const key = crypto.randomBytes(4);
   const body = Buffer.alloc(len);
   for (let i = 0; i < len; i++) body[i] = data[i] ^ key[i & 3];
-  s.write(Buffer.concat([head, key, body]));
+  return Buffer.concat([head, key, body]);
 }
 
 /* Read every frame the service sends and hand the JSON ones on. */
@@ -297,9 +310,11 @@ yes('only the roster is sent newest-only',
   const R = await open();
   let roster = [];
   const got = [];
+  const heard = [];
   read(R, (m) => {
     if (m.t === 'peers') roster = m.peers;
     if (m.t === 'pos') got.push(Date.now());
+    if (m.t === 'chat') heard.push(m);
   });
   send(R, { t: 'join', profileId: 100000, name: 'keeps up' });
 
@@ -453,6 +468,72 @@ yes('only the roster is sent newest-only',
   const gotAt = got.length;
   await sleep(1000);
   yes('the rest of the room carries on', got.length - gotAt >= 3);
+
+  /*
+    A socket closed in the middle of its own read.
+
+    The ceiling closes a socket from inside a write, so something a person
+    sends that comes back to them (an offer addressed to themselves, their own
+    chat line, a notice) can close their socket while the service is still
+    working through the frames that arrived in the same read. Found in review
+    on 24 September: those frames went on being handled for a peer the close
+    had already taken out of the room. The chat limit found nobody's bucket
+    and let every line through, and each one reached the room and the chat
+    log as profile 0 with no name, so the moderators could not say who sent
+    it. Twelve lines got out that way past the five the limit allows, and the
+    slash commands among them were queued as nobody's.
+
+    So this one sends itself offers until its own queue passes the ceiling,
+    each followed by a chat line and a slash command, all in one write so
+    they land in the same reads at the other end. A lot of it, because the
+    loopback buffers take a few MB before anything queues.
+  */
+  console.log('');
+  const S3 = await open();
+  send(S3, { t: 'join', profileId: 100003, name: 'talks to itself' });
+  await until('roster', () => roster.some((p) => p.name === 'talks to itself'), 3000);
+  const self = (roster.find((p) => p.name === 'talks to itself') || {}).peer;
+  yes('a third stuck socket is in the room', !!self);
+
+  const note = 'y'.repeat(4000);
+  const burst = [];
+  for (let i = 0; i < 3000; i++) {
+    burst.push(frameOf({ t: 'sdp', to: self, sdp: note }));
+    burst.push(frameOf({ t: 'chat', text: 'line ' + i }));
+    burst.push(frameOf({ t: 'chat', text: '/roll ' + i }));
+  }
+  const wroteAt = Date.now();
+  S3.write(Buffer.concat(burst));
+  const gone = await until('closed', async () => (await health()).closedBacklogged === 2 &&
+      !roster.some((p) => p.name === 'talks to itself'), 10000);
+  const tookMs = Date.now() - wroteAt;
+  await sleep(500);
+
+  const fromIt = heard.filter((m) => m.from === self);
+  const asNobody = fromIt.filter((m) => !m.profileId);
+  // The limit refills one line every CHAT_REFILL_MS, so a slow machine that
+  // took a while to read the burst may fairly let a line or two more through.
+  const allowed = CHAT_BURST + Math.floor(tookMs / CHAT_REFILL_MS);
+  let logged = [];
+  try {
+    for (const f of fs.readdirSync(path.join(dir, 'chat'))) {
+      for (const line of fs.readFileSync(path.join(dir, 'chat', f), 'utf8').split('\n')) {
+        if (line) { try { logged.push(JSON.parse(line)); } catch (e) { } }
+      }
+    }
+  } catch (e) { }
+  const loggedIt = logged.filter((l) => l.profileId === 100003).length;
+  const loggedNobody = logged.filter((l) => !l.profileId).length;
+  console.log('      ' + fromIt.length + ' of its lines reached the room (' + asNobody.length +
+              ' as nobody), ' + loggedIt + ' logged as it and ' + loggedNobody + ' as nobody, closed after ' +
+              tookMs + ' ms');
+
+  yes('a socket that sends itself enough to pass the ceiling is closed', gone);
+  yes('nothing it sent after the close reaches the room as nobody', gone && asNobody.length === 0);
+  yes('no more of its lines reach the room than the chat limit allows (' + allowed + ')',
+      gone && fromIt.length <= allowed);
+  yes('the chat log says who sent every line and command in it',
+      gone && loggedIt > 0 && loggedNobody === 0);
 
   console.log('');
   console.log(pass + ' passed, ' + fail + ' failed');

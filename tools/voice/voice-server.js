@@ -632,6 +632,17 @@ class Sock {
     // A frame can arrive split across reads, and several can arrive in one, so
     // this loops until what is left is not a whole frame.
     for (;;) {
+      /*
+        And stops the moment the socket is closed, whatever is left. The
+        ceiling closes a socket from inside write, so a message that comes
+        back to its own sender (their chat line, an offer addressed to
+        themselves, a notice) can close it partway through this loop. The
+        frames after that belong to somebody onclose has already taken out
+        of the room: they used to be handled anyway, and chat from them went
+        past the chat limit to the room and the log as profile 0 with no
+        name. tools/voice/test-backpressure.js sends exactly that.
+      */
+      if (this.closed) return;
       if (this.buf.length < 2) return;
       const b0 = this.buf[0], b1 = this.buf[1];
       const op = b0 & 0x0f;
