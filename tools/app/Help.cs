@@ -91,6 +91,12 @@ namespace Thornswood
                 "Press K. While your town is still to choose, the server puts the panel back on your screen every 30 seconds, and only says so in the chat if it could not. Closing it on purpose is fine: nothing is chosen, and it waits 10 minutes before it comes back by itself. If K does nothing, the chat may have the keyboard: press Escape and try again. A refusal shows on the panel and in the chat, with the reason."),
 
             // =========================================== chat and commands
+            // "Everybody connected" is how chat ships. Entry 150 put a range on
+            // it behind THORNSWOOD_CHAT_RANGE in the voice service, and that is
+            // off until Install-Voice.ps1 is run with -ChatRange on or a number
+            // (after that it keeps whatever range the box has). Whoever turns it
+            // on changes this item in the same release, and says what /me, /do,
+            // /w and /s do here, because with the range on they are chat.
             new HelpItem("Chat and commands", "The chat box",
                 "Enter opens it and Escape gives the keyboard back to the game. A line typed there goes to everybody connected, wherever they are in Skyrim, so treat it as the whole server rather than the room. A line that starts with a slash is a command for the server and is not shown to anybody else. Text chat is kept, with the name and the time. Voice is not recorded."),
 

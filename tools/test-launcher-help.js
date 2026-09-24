@@ -43,6 +43,7 @@ const front   = read('ts-plugins', 'thornswood-front.js');
 const vplug   = read('ts-plugins', 'thornswood-voice.js');
 const vpage   = read('ts-ui', 'thornswood-voice.js');
 const vserver = read('voice', 'voice-server.js');
+const vinstall = read('Install-Voice.ps1');
 const keys    = read('app', 'Keys.cs');
 const shell   = read('app', 'Shell.cs');
 const enforce = read('app', 'Enforce.cs');
@@ -209,14 +210,30 @@ yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(e
 
 // ---------------------------------------------------------- the chat box
 /*
-  The chat box is server wide today: the voice service sends every plain line
-  to every peer. Entry 150 would make it local. When it does, this fails, and
-  the page has to be changed with it rather than going on saying the old thing.
+  The chat box is server wide as it ships: the voice service sends every plain
+  line to every peer. Entry 150 reached main as a setting, THORNSWOOD_CHAT_RANGE,
+  that keeps a line to the people near and ships off, so the old loop is still
+  there for the off case and finding it proves nothing on its own. What the
+  page stands on is the default: off in the voice service when nothing sets
+  it, and off in Install-Voice.ps1, which is what sets it on the box. Turn
+  either default on and this fails, and the page has to change with it rather
+  than going on saying the old thing. Turning it on by hand for one install is
+  Patrick's call and is not in the repository, so no harness can see it.
 */
 {
   const c = vserver.indexOf("if (msg.t === 'chat') {");
   const block = c < 0 ? '' : vserver.slice(c, vserver.indexOf('ws.onclose', c));
-  yes('the voice service still sends a plain chat line to every peer',
+  let rangeOf = null;
+  const fr = /function chatRangeOf\(v\) \{[\s\S]*?\n\}/.exec(vserver);
+  try { rangeOf = fr ? new Function(fr[0] + '\nreturn chatRangeOf;')() : null; } catch (e) { rangeOf = null; }
+  yes('the voice service reads its chat range from THORNSWOOD_CHAT_RANGE',
+      /const CHAT_RANGE = chatRangeOf\(process\.env\.THORNSWOOD_CHAT_RANGE\);/.test(vserver) && !!rangeOf);
+  yes('and an unset or off range is no range at all, so every line goes to everybody',
+      !!rangeOf && rangeOf(undefined) === 0 && rangeOf('') === 0 && rangeOf('off') === 0);
+  yes('Install-Voice.ps1 installs the voice service with the range off',
+      /\[string\]\$ChatRange = 'off'/.test(vinstall) &&
+      /set THORNSWOOD_CHAT_RANGE=\$ChatRange/.test(vinstall));
+  yes('the voice service still sends a plain chat line to every peer when the range is off',
       /for \(const \[, p\] of peers\) p\.ws\.send\(out\);/.test(block));
   yes('so the page says a chat line goes to everybody connected',
       /goes to everybody connected/.test(item('Chat and commands', 'The chat box')));
