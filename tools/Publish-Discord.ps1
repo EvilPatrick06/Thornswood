@@ -153,7 +153,9 @@ $noise = @(
   '^\s*Launcher rebuilt\s*:',
   '^\s*Launcher \d+\.\d+',
   'files? to download',
-  '[\\/](SKSE|Data|tools)[\\/]'
+  '[\\/](SKSE|Data|tools)[\\/]',
+  '^\s*Load order\s*:',
+  '^\s*The gamemode was rebuilt\b'
 )
 
 $lines = @()
