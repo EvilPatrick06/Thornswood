@@ -2437,7 +2437,10 @@
     }
     fireHere = out;
     fireHits = out.length;
-    log('fires: ' + out.length + ' of ours in this cell, out of ' + walked +
+    // fireWalked, not walked: that one lives inside refsInCell. Naming it here
+    // threw on every cell change from #184 on, 80 times in the dev log of
+    // 23 September, and the place report for that tick never went.
+    log('fires: ' + out.length + ' of ours in this cell, out of ' + fireWalked +
         ' thing(s) looked at');
     return fireHere;
   }

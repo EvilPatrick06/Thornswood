@@ -124,6 +124,10 @@ param(
     #>
     [long[]]$Devs        = @(),
     [long[]]$Playtesters = @(),
+    # The launcher whose config.json holds MaxOnline, the number the live feed
+    # announces and this writes as maxPlayers. Empty means the one
+    # Publish-Update.ps1 would find. See MaxOnline.ps1.
+    [string]$LauncherRoot = '',
     # Deploy even though the collection installed here is behind the one
     # Vortex knows is out. For the case where that is deliberate; it is a
     # refusal rather than a warning because a warning in a long run is a line
@@ -211,6 +215,13 @@ if (-not (Test-Path -LiteralPath $Dist)) {
         "Patrick's machine, and .\tools\Check-ShipReady.ps1 says what this machine is missing."
     )
 }
+
+# How many the server seats, read before anything is written, so a number the
+# engine would refuse stops this with the build untouched. MaxOnline.ps1 says
+# where the number lives and why there.
+. (Join-Path $Here 'MaxOnline.ps1')
+if (-not $LauncherRoot) { $LauncherRoot = Find-LauncherRoot }
+$maxOnline = Get-MaxOnline $LauncherRoot
 
 Copy-Item -LiteralPath $Gamemode -Destination (Join-Path $Dist 'gamemode.js') -Force
 $kb = [math]::Round((Get-Item (Join-Path $Dist 'gamemode.js')).Length / 1KB)
@@ -468,6 +479,9 @@ $s | Add-Member -NotePropertyName name        -NotePropertyValue $ServerName -Fo
 $s | Add-Member -NotePropertyName port        -NotePropertyValue $Port       -Force
 $s | Add-Member -NotePropertyName offlineMode -NotePropertyValue $true       -Force
 $s | Add-Member -NotePropertyName dataDir     -NotePropertyValue 'data'      -Force
+# How many it seats: the engine's slot count, set from the MaxOnline the feed
+# announces rather than left at whatever the build put there (100).
+Set-MaxPlayers $s $maxOnline
 
 <#
   WHICH VOICE SERVICE THIS SERVER TALKS TO, written every time rather than
