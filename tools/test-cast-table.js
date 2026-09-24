@@ -24,8 +24,16 @@
 //   - IsGuardFaction alone, which the Companions carry and are not the watch
 //   - a thin guard whose own race is a wolf and whose name, race and factions
 //     all come from its template, and one whose template is a leveled list
-//   - a placement switched off by its own flag, one switched off by its enable
-//     parent, and one switched ON by an enable parent marked opposite
+//   - a placement switched off by its own flag
+//   - enable parents every way a real one comes: a marker switched off by its
+//     own flag, a marker that follows it, a marker set opposite to it, a
+//     marker a patch switches back on, a marker that is simply on, and a
+//     placed person switched off. A trader hangs off each, so the answer for
+//     every one is checked by its reference and not only by a count. Two
+//     children of one parent, one plain and one opposite, are not enough on
+//     their own: a pass that never read the parent swaps them and the count
+//     comes out the same. The guards are uneven for the same reason, two off
+//     and one switched on, so their count moves when the parent is not read.
 //   - a worldspace's persistent cell, which says it is at 0,0 and is not the
 //     ground at 0,0
 //   - a patch naming its master SKYRIM.ESM, which is the same file as Skyrim.esm
@@ -131,17 +139,29 @@ const L = { whiterunHold: 0x300, whiterun: 0x301, riftHold: 0x302, belethors: 0x
 const F = {
   belethor: 0x400, follower: 0x401, carriage: 0x402, isGuard: 0x403, guardTalk: 0x404,
   guardWhiterun: 0x405, crimeWhiterun: 0x406, mareOwner: 0x407, jobMerchant: 0x408,
+  market: 0x409,
 };
 const N = {
   belethor: 0x500, faendal: 0x501, bjorlam: 0x502, guard: 0x503, thin: 0x504, wolf: 0x505,
   mannequin: 0x506, gjalund: 0x507, aela: 0x508, patron: 0x509, nazeem: 0x50A,
-  leveled: 0x50B, hermit: 0x50C, riftTrader: 0x50D,
+  leveled: 0x50B, hermit: 0x50C, riftTrader: 0x50D, market: 0x50E,
 };
 const LV = 0x600;
 const C = { shop: 0x700, house: 0x701 };
 const W = { tamriel: 0x900, persistent: 0x901, whiterunSq: 0x902, openSq: 0x903, riftSq: 0x904,
   farSq: 0x905, zeroSq: 0x906 };
-const MARKER = 0x820;
+// The enable parents, all REFRs. marker is switched off by its own flag. chain
+// follows marker, so it is off too; flip is set opposite to marker, so it is
+// on. relit is switched off here and back on by the patch, last one wins.
+// lamp is on and nothing says otherwise, which is why the script never keeps
+// a row for it.
+const P = { marker: 0x820, chain: 0x821, flip: 0x822, relit: 0x823, lamp: 0x824 };
+// Belethor's second placement, switched off by its own flag, is a placed
+// person that is also an enable parent.
+const OFF_BELETHOR = 0x803;
+// One Market Trader hangs off each parent, and the reference says which.
+const M = { underMarker: 0x830, oppositeMarker: 0x831, oppositeLamp: 0x832, underChain: 0x833,
+  underFlip: 0x834, underRelit: 0x835, underPerson: 0x836 };
 
 function npc(fid, name, race, more, flags, compress) {
   return rec('NPC_', fid, [edid(name.replace(/[^A-Za-z0-9]/g, '')), full(name), sub('RNAM', u32(race))]
@@ -172,6 +192,7 @@ const skyrim = Buffer.concat([
     rec('FACT', F.crimeWhiterun, [edid('CrimeFactionWhiterun'), fdata(0)]),
     rec('FACT', F.mareOwner, [edid('WhiterunBanneredMareFaction'), fdata(VENDOR)]),
     rec('FACT', F.jobMerchant, [edid('JobMerchantFaction'), fdata(0)]),
+    rec('FACT', F.market, [edid('ServicesWhiterunMarketStall'), fdata(VENDOR), sub('VEND', u32(0))]),
   ]),
   top('NPC_', [
     // Compressed, so nothing about Belethor is known until it is inflated.
@@ -195,6 +216,7 @@ const skyrim = Buffer.concat([
       acbs(0, TRAITS | FACTIONS | BASE)]),
     npc(N.hermit, 'Hermit', R.nord),
     npc(N.riftTrader, 'Rift Peddler', R.nord, [snam(F.belethor, 0)]),
+    npc(N.market, 'Market Trader', R.nord, [snam(F.market, 0)]),
   ]),
   top('LVLN', [rec('LVLN', LV, [edid('LvlGuard'),
     sub('LVLO', Buffer.concat([Buffer.from([1, 0, 0, 0]), u32(N.guard), Buffer.from([1, 0, 0, 0])]))])]),
@@ -205,7 +227,7 @@ const skyrim = Buffer.concat([
       achr(0x800, N.belethor),
       achr(0x801, N.faendal),
       achr(0x802, N.mannequin),
-      achr(0x803, N.belethor, [], DISABLED),
+      achr(OFF_BELETHOR, N.belethor, [], DISABLED),
       achr(0x804, N.patron),
       achr(0x807, N.nazeem),
       achr(0x80F, N.aela),
@@ -233,11 +255,26 @@ const skyrim = Buffer.concat([
         achr(0x812, N.thin, [pos(6 * SQ + 20, -1 * SQ + 20)]),
         achr(0x813, N.leveled, [pos(6 * SQ + 30, -1 * SQ + 30)]),
         achr(0x814, N.wolf, [pos(6 * SQ + 40, -1 * SQ + 40)]),
-        achr(0x815, N.thin, [pos(6 * SQ + 50, -1 * SQ + 50), xesp(MARKER, 0)]),
-        achr(0x816, N.thin, [pos(6 * SQ + 60, -1 * SQ + 60), xesp(MARKER, 1)]),
+        // Three guards behind parents: two off, one on. With a plain and an
+        // opposite child only, the count could not tell a parent read from
+        // one never looked at.
+        achr(0x815, N.thin, [pos(6 * SQ + 50, -1 * SQ + 50), xesp(P.marker, 0)]),
+        achr(0x816, N.thin, [pos(6 * SQ + 60, -1 * SQ + 60), xesp(P.marker, 1)]),
+        achr(0x81A, N.thin, [pos(6 * SQ + 65, -1 * SQ + 65), xesp(P.chain, 0)]),
         achr(0x818, N.belethor, [pos(6 * SQ + 70, -1 * SQ + 70)], DELETED),
         achr(0x819, N.hermit, [pos(100, 100)]),
-        rec('REFR', MARKER, [sub('NAME', u32(0x999)), pos(6 * SQ, -1 * SQ)], DISABLED),
+        rec('REFR', P.marker, [sub('NAME', u32(0x999)), pos(6 * SQ, -1 * SQ)], DISABLED),
+        rec('REFR', P.chain, [sub('NAME', u32(0x999)), pos(6 * SQ, -1 * SQ), xesp(P.marker, 0)]),
+        rec('REFR', P.flip, [sub('NAME', u32(0x999)), pos(6 * SQ, -1 * SQ), xesp(P.marker, 1)]),
+        rec('REFR', P.relit, [sub('NAME', u32(0x999)), pos(6 * SQ, -1 * SQ)], DISABLED),
+        rec('REFR', P.lamp, [sub('NAME', u32(0x999)), pos(6 * SQ, -1 * SQ)]),
+        achr(M.underMarker, N.market, [pos(6 * SQ + 80, -1 * SQ + 80), xesp(P.marker, 0)]),
+        achr(M.oppositeMarker, N.market, [pos(6 * SQ + 81, -1 * SQ + 81), xesp(P.marker, 1)]),
+        achr(M.oppositeLamp, N.market, [pos(6 * SQ + 82, -1 * SQ + 82), xesp(P.lamp, 1)]),
+        achr(M.underChain, N.market, [pos(6 * SQ + 83, -1 * SQ + 83), xesp(P.chain, 0)]),
+        achr(M.underFlip, N.market, [pos(6 * SQ + 84, -1 * SQ + 84), xesp(P.flip, 0)]),
+        achr(M.underRelit, N.market, [pos(6 * SQ + 85, -1 * SQ + 85), xesp(P.relit, 0)]),
+        achr(M.underPerson, N.market, [pos(6 * SQ + 86, -1 * SQ + 86), xesp(OFF_BELETHOR, 0)]),
       ]),
     ]),
   ]),
@@ -246,7 +283,8 @@ const skyrim = Buffer.concat([
 // A patch that spells its master SKYRIM.ESM. It repeats Bjorlam and his
 // placement word for word, and deletes Nazeem's second placement keeping only
 // the flag. Read with the spelling as written, that is a second Bjorlam and a
-// Nazeem nobody deleted.
+// Nazeem nobody deleted. It also switches the relit marker back on, so the
+// Market Trader behind it stands only if the last word on a parent wins.
 const patch = Buffer.concat([
   tes4(['SKYRIM.ESM']),
   top('NPC_', [npc(N.bjorlam, 'Bjorlam', R.nord, [snam(F.carriage, 0), acbs(UNIQUE, 0)])]),
@@ -259,7 +297,10 @@ const patch = Buffer.concat([
     rec('WRLD', W.tamriel, [edid('Tamriel')]),
     grup(u32(W.tamriel), 1, [
       rec('CELL', W.persistent, [sub('DATA', Buffer.from([0, 0])), xclc(0, 0)]),
-      children(W.persistent, [achr(0x810, N.bjorlam, [pos(6 * SQ + 10, -1 * SQ + 10)])]),
+      children(W.persistent, [
+        achr(0x810, N.bjorlam, [pos(6 * SQ + 10, -1 * SQ + 10)]),
+        rec('REFR', P.relit, [sub('NAME', u32(0x999)), pos(6 * SQ, -1 * SQ)]),
+      ]),
     ]),
   ]),
 ]);
@@ -304,10 +345,16 @@ try {
     const hold = function (name) { return j.holds[name] || { traders: [], transport: [], guards: {}, everyoneElse: {}, offAtStart: [], offAtStartBy: {} }; };
     const wr = hold('Whiterun'), rift = hold('the Rift'), none = hold('no hold');
     const named = function (rows, name) { return rows.filter(function (r) { return r.name === name; }); };
+    // Every form in the load order built here is Skyrim.esm's own, and the
+    // script writes a reference as <hex>:<plugin>.
+    const refOf = function (fid) { return fid.toString(16) + ':Skyrim.esm'; };
+    const refsOf = function (rows) {
+      return named(rows, 'Market Trader').map(function (r) { return r.ref; }).sort().join(' ');
+    };
 
     yes('nothing was lost to a record that would not inflate', j.counts.failedToInflate === 0);
-    yes('19 placements read, 2 of them deleted, one by a patch that kept only the flag',
-      j.counts.placed === 19 && j.counts.deleted === 2);
+    yes('27 placements read, 2 of them deleted, one by a patch that kept only the flag',
+      j.counts.placed === 27 && j.counts.deleted === 2);
     yes('a wolf and a mannequin are counted, not listed as people', j.counts.notPeople === 2);
 
     const bel = named(wr.traders, 'Belethor');
@@ -318,12 +365,15 @@ try {
     yes('his hold came up from the shop he stands in, through the city to the hold',
       bel.length === 1 && bel[0].holdFrom === 'the cell it stands in');
     yes('his second placement, switched off by its own flag, is named apart and not counted as cast',
-      wr.offAtStart.some(function (r) { return r.name === 'Belethor' && r.offBy === 'its own flag'; }));
+      wr.offAtStart.some(function (r) {
+        return r.name === 'Belethor' && r.ref === refOf(OFF_BELETHOR) && r.offBy === 'its own flag';
+      }));
     yes('Faendal, in a vendor faction at rank -1 and a job faction at rank 0, is not a trader',
       named(wr.traders, 'Faendal').length === 0 && wr.everyoneElse.Faendal === 1);
     yes('a vendor-flagged faction with no buy and sell list makes nobody a trader',
       named(wr.traders, 'Patron').length === 0 && wr.everyoneElse.Patron === 1);
-    yes('only Belethor trades in Whiterun', wr.traders.length === 1);
+    yes('the only traders standing in Whiterun are Belethor and three Market Traders',
+      wr.traders.length === 4 && bel.length === 1 && named(wr.traders, 'Market Trader').length === 3);
 
     const bj = named(wr.transport, 'Bjorlam');
     yes('Bjorlam is transport in Whiterun, once, though a patch spells the master SKYRIM.ESM',
@@ -335,7 +385,35 @@ try {
 
     yes('the guards are counted through their templates: a thin one, a leveled one, and one switched on by an opposite parent',
       wr.guards['Whiterun Guard'] === 3 && Object.keys(wr.guards).length === 1);
-    yes('the guard behind a switched-off enable parent is counted off, not as a guard', wr.offAtStartBy.guards === 1);
+    yes('the two guards behind a switched-off parent, one directly and one two steps up, are counted off',
+      wr.offAtStartBy.guards === 2);
+
+    // One Market Trader behind each kind of enable parent. A trader is listed
+    // by reference, standing or off, so each answer is checked on its own
+    // rather than hidden in a total that two wrong answers can balance.
+    const standing = function (fid) {
+      return wr.traders.some(function (r) { return r.ref === refOf(fid); }) &&
+        !wr.offAtStart.some(function (r) { return r.ref === refOf(fid); });
+    };
+    const offByParent = function (fid) {
+      return wr.offAtStart.some(function (r) { return r.ref === refOf(fid) && r.offBy === 'its enable parent'; }) &&
+        !wr.traders.some(function (r) { return r.ref === refOf(fid); });
+    };
+    yes('a trader behind a marker switched off by its own flag starts off', offByParent(M.underMarker));
+    yes('a trader set opposite to that switched-off marker is standing', standing(M.oppositeMarker));
+    yes('a trader set opposite to a marker that is on starts off', offByParent(M.oppositeLamp));
+    yes('a trader behind a marker that follows a switched-off one starts off, two steps up',
+      offByParent(M.underChain));
+    yes('a trader behind a marker set opposite to a switched-off one is standing', standing(M.underFlip));
+    yes('a trader behind a marker a patch switched back on is standing, because the last word wins',
+      standing(M.underRelit));
+    yes('a trader whose enable parent is a placed person switched off by its own flag starts off',
+      offByParent(M.underPerson));
+    yes('and those are all the Market Traders there are, three standing and four off',
+      refsOf(wr.traders) === [M.oppositeMarker, M.underFlip, M.underRelit].map(refOf).sort().join(' ') &&
+      refsOf(wr.offAtStart) === [M.underMarker, M.oppositeLamp, M.underChain, M.underPerson].map(refOf).sort().join(' '));
+    yes('five traders in Whiterun start off: Belethor by his own flag and four Market Traders by a parent',
+      wr.offAtStartBy.traders === 5);
     yes('IsGuardFaction alone does not make a guard', wr.everyoneElse['Aela the Huntress'] === 1);
 
     yes('Nazeem, in a house that names no place, is placed by whose law he answers to', wr.everyoneElse.Nazeem === 1);
@@ -344,9 +422,9 @@ try {
       named(rift.traders, 'Rift Peddler').length === 1 && named(rift.traders, 'Rift Peddler')[0].holdFrom === 'the nearest named place');
     yes('the persistent cell at 0,0 is not taken for the ground at 0,0', rift.everyoneElse.Hermit === 1);
     yes('and somebody nothing places is under no hold', none.everyoneElse.Hermit === 1);
-    yes('the totals add up: 2 traders, 2 transport, 3 guards, 6 everyone else, 2 off, 15 people',
-      j.counts.traders === 2 && j.counts.transport === 2 && j.counts.guards === 3 &&
-      j.counts.offAtStart === 2 && j.counts.people === 15);
+    yes('the totals add up: 5 traders, 2 transport, 3 guards, 6 everyone else, 7 off, 23 people',
+      j.counts.traders === 5 && j.counts.transport === 2 && j.counts.guards === 3 &&
+      j.counts.everyoneElse === 6 && j.counts.offAtStart === 7 && j.counts.people === 23);
   }
 } catch (e) {
   yes('the load order built here was driven without throwing: ' + e.message, false);
