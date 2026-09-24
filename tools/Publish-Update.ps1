@@ -887,6 +887,18 @@ if (-not $Repo) {
 if (-not $Repo) { Die 'Could not work out which repo to publish to. Pass -Repo owner/name.' }
 Say "  repo: $Repo" 'DarkGray'
 
+# Packs go only into the repository launchers read this feed from, because it
+# is the one they can download from with no token. On 24 September 164 packs
+# on the feed pointed at the private source repository and answered 404 to
+# every launcher; see Feed-Rules.ps1. Refused here, before a byte is uploaded
+# to the wrong place.
+. (Join-Path $Here 'Feed-Rules.ps1')
+$feedRepo = Get-FeedRepo $doc
+if (-not [string]::Equals($Repo, $feedRepo, [StringComparison]::OrdinalIgnoreCase)) {
+    Die ("This would upload to $Repo, but launchers read this feed from $feedRepo and cannot download a pack from anywhere else. " +
+         "Nothing was uploaded and version.json has not been touched. Pass -Repo $feedRepo, or point the origin of $ReleaseDir at it.")
+}
+
 $gh = Get-Command gh -EA SilentlyContinue
 $exeUrl = ''
 
@@ -958,6 +970,28 @@ try {
 } catch {
     Say "  the client runtime could not be prepared: $_" 'Yellow'
     $clientRel = $null
+}
+
+# ---- nothing that must never ship, read off what was built ----------------
+#
+# Entry 236. Ship-Rules decides what goes into a pack, and twice a secret got
+# past it because nobody had listed the file yet: the SkyMP sign in in the
+# installer, and voice-token.txt in nine main packs from 18 to 20 September.
+# Check-Secrets reads what was actually built, every pack, the launcher and the
+# client runtime, and stops the release here, before anything is uploaded, on a
+# credential by name or by shape or on a file Ship-Rules says never ships.
+# It prints the file, the line and the rule, never the value. Measured on 24
+# September over the 54 packs and 2 client runtimes on Patrick's machine: the
+# two dev packs that carried a token and the 16 September one that carried
+# five files the rules keep out now fail, and the other 53 pass.
+$scanZips = @($chunks | ForEach-Object { $_.Path })
+if ($clientRel) { $scanZips += $clientRel.path }
+$scanExes = @()
+if ($Launcher -and (Test-Path -LiteralPath $exePath)) { $scanExes += $exePath }
+if ($scanZips.Count -or $scanExes.Count) {
+    Head 'Checking for secrets'
+    & (Join-Path $Here 'Check-Secrets.ps1') -Zip $scanZips -Binary $scanExes
+    if ($LASTEXITCODE -ne 0) { Die 'Something that must never ship is in what was just built. The lines above name each file and rule. Nothing was uploaded.' }
 }
 
 if (-not $NoUpload -and $gh) {
@@ -1105,9 +1139,33 @@ if (-not $NoPush -and (Test-Path (Join-Path $ReleaseDir '.git'))) {
     } finally { $ErrorActionPreference = $old }
 }
 Head 'version.json'
+# ==== thornswood feed append ====
+# tools\test-feed-rules.ps1 runs this block on its own. If the markers move,
+# it stops rather than quietly testing nothing.
+#
+# The feed as pulled, before anything is added to it. What is already there is
+# not rewritten by a publish: taking packs off the feed is Repair-Manifest's
+# job. It is said on every publish until it is done, so it cannot be forgotten.
+$feedRepo = Get-FeedRepo $doc
+$stale = @()
+if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $stale = @((Split-FeedPacks $doc.packs $feedRepo).Drop) }
+if ($stale.Count) {
+    Say ("  {0} pack(s) already on the feed cannot be downloaded by a launcher, {1} to {2}:" -f
+         $stale.Count, (Val $stale[0].Pack 'id'), (Val $stale[$stale.Count - 1].Pack 'id')) 'Yellow'
+    foreach ($why in @($stale | ForEach-Object { $_.Why } | Sort-Object -Unique)) { Say "    $why" 'Yellow' }
+    Say ("  .\tools\Repair-Manifest.ps1{0} -DryRun lists them, and without -DryRun takes them out and pushes." -f $(if ($Dev) { ' -Channel dev' } else { '' })) 'Yellow'
+}
 if ($chunks.Count) {
     $packs = @()
     if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $packs = @($doc.packs) }
+    # Every new pack must download from the repository launchers read this
+    # feed from (Feed-Rules.ps1). An empty url is left to the check further
+    # down, which says what that means.
+    $wrongHost = @($chunks | Where-Object { $_.Url -and -not (Test-FeedPackUrl $_.Url $feedRepo) })
+    if ($wrongHost.Count) {
+        foreach ($w in $wrongHost) { Say "  pack-$($w.Id).zip is at $($w.Url)" 'Red' }
+        Die "Launchers read this feed from $feedRepo and cannot download a pack from anywhere else, so version.json has not been touched. Nobody has been sent a pack they cannot fetch."
+    }
     # In order. The launcher applies whatever it has not seen, in the order it
     # finds them, so part one has to be listed before part two.
     foreach ($c in $chunks) {
@@ -1121,6 +1179,7 @@ if ($chunks.Count) {
     }
     Set-Prop $doc 'packs' $packs
 }
+# ==== end thornswood feed append ====
 # The client runtime's address, so a launcher missing one of those six files
 # asks for it by name instead of searching the packs for it.
 if ($clientRel -and $clientRel.url) {
@@ -1507,7 +1566,7 @@ if ($blank.Count) {
     Write-Host ''
     Say 'version.json has been written but NOT pushed. Nobody has this yet.' 'Yellow'
     Say 'The upload is what failed, usually the token or the release. Fix that and run Ship again.' 'Yellow'
-    Say 'If a bad one did go out, .\tools\Repair-Manifest.ps1 takes it back out and pushes.' 'Yellow'
+    Say ("If a bad one did go out, .\tools\Repair-Manifest.ps1{0} takes it back out and pushes." -f $(if ($Dev) { ' -Channel dev' } else { '' })) 'Yellow'
     Write-Host ''
     [void](Read-Host 'Enter to exit')
     exit 1

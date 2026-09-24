@@ -1,0 +1,1267 @@
+{
+ "buildings": {
+  "10a8b:Dawnguard.esm": {
+   "name": "Forgotten Vale Cave",
+   "onTheWayIn": [
+    "4346:Dawnguard.esm"
+   ],
+   "ores": {
+    "Shellbug Chitin": 1
+   },
+   "veins": 1
+  },
+  "1382e:Skyrim.esm": {
+   "name": "Redbelly Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Ebony Ore": 3
+   },
+   "veins": 3
+  },
+  "13901:Skyrim.esm": {
+   "name": "Steamscorch Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Malachite Ore": 7
+   },
+   "veins": 7
+  },
+  "13909:Skyrim.esm": {
+   "name": "Sanuarach Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Silver Ore": 7
+   },
+   "veins": 7
+  },
+  "13978:Skyrim.esm": {
+   "name": "Fenn's Gulch Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Silver Ore": 1
+   },
+   "veins": 1
+  },
+  "13a8a:Skyrim.esm": {
+   "name": "Goldenrock Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 4
+   },
+   "veins": 4
+  },
+  "140a:Dawnguard.esm": {
+   "name": "Arkngthamz",
+   "onTheWayIn": [],
+   "ores": {
+    "Ebony Ore": 2,
+    "Quicksilver Ore": 1
+   },
+   "veins": 3
+  },
+  "142e2:Dragonborn.esm": {
+   "name": "Benkongerike",
+   "onTheWayIn": [],
+   "ores": {
+    "Silver Ore": 4
+   },
+   "veins": 4
+  },
+  "142ed:Dragonborn.esm": {
+   "name": "White Ridge Barrow",
+   "onTheWayIn": [],
+   "ores": {
+    "Heart Stone": 2,
+    "Ruby": 4
+   },
+   "veins": 6
+  },
+  "142ee:Dragonborn.esm": {
+   "name": "Kolbjorn Barrow",
+   "onTheWayIn": [],
+   "ores": {
+    "Emerald": 1,
+    "Stalhrim": 3
+   },
+   "veins": 4
+  },
+  "142f1:Dragonborn.esm": {
+   "name": "Nchardak Great Chamber",
+   "onTheWayIn": [
+    "34fd2:Dragonborn.esm"
+   ],
+   "ores": {
+    "Malachite Ore": 4
+   },
+   "veins": 4
+  },
+  "142f6:Dragonborn.esm": {
+   "name": "Gyldenhul Barrow",
+   "onTheWayIn": [],
+   "ores": {
+    "Stalhrim": 2
+   },
+   "veins": 2
+  },
+  "142f7:Dragonborn.esm": {
+   "name": "Frossel",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 5
+   },
+   "veins": 5
+  },
+  "142f8:Dragonborn.esm": {
+   "name": "Fort Frostmoth",
+   "onTheWayIn": [],
+   "ores": {
+    "Heart Stone": 2,
+    "Ruby": 3
+   },
+   "veins": 5
+  },
+  "142fc:Dragonborn.esm": {
+   "name": "Raven Rock Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Ebony Ore": 13,
+    "Iron Ore": 23,
+    "Stalhrim": 1
+   },
+   "veins": 37
+  },
+  "151f2:Skyrim.esm": {
+   "name": "Steepfall Burrow",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1
+   },
+   "veins": 1
+  },
+  "151f3:Skyrim.esm": {
+   "name": "Soljund's Sinkhole",
+   "onTheWayIn": [],
+   "ores": {
+    "Moonstone Ore": 5
+   },
+   "veins": 5
+  },
+  "151f9:Skyrim.esm": {
+   "name": "White River Watch",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "151fb:Skyrim.esm": {
+   "name": "Volunruud",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 2
+   },
+   "veins": 2
+  },
+  "15201:Skyrim.esm": {
+   "name": "Tolvald's Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 2,
+    "Silver Ore": 1
+   },
+   "veins": 3
+  },
+  "1520a:Skyrim.esm": {
+   "name": "Sleeping Tree Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Orichalcum Ore": 1
+   },
+   "veins": 1
+  },
+  "15220:Skyrim.esm": {
+   "name": "Saarthal Excavation",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 1,
+    "Iron Ore": 2
+   },
+   "veins": 3
+  },
+  "15226:Skyrim.esm": {
+   "name": "Reachwater Rock",
+   "onTheWayIn": [],
+   "ores": {
+    "Orichalcum Ore": 1
+   },
+   "veins": 1
+  },
+  "15227:Skyrim.esm": {
+   "name": "Reachcliff Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "1522c:Skyrim.esm": {
+   "name": "Purewater Run",
+   "onTheWayIn": [],
+   "ores": {
+    "Quicksilver Ore": 1
+   },
+   "veins": 1
+  },
+  "15230:Skyrim.esm": {
+   "name": "Pinepeak Cavern",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1
+   },
+   "veins": 1
+  },
+  "15237:Skyrim.esm": {
+   "name": "Nchuand-Zel Excavation Site",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1,
+    "Iron Ore": 4
+   },
+   "veins": 5
+  },
+  "1523c:Skyrim.esm": {
+   "name": "Mor Khazgur Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Orichalcum Ore": 7
+   },
+   "veins": 7
+  },
+  "1523f:Skyrim.esm": {
+   "name": "Mzulft",
+   "onTheWayIn": [],
+   "ores": {
+    "Moonstone Ore": 3
+   },
+   "veins": 3
+  },
+  "15251:Skyrim.esm": {
+   "name": "Lost Knife Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 3
+   },
+   "veins": 3
+  },
+  "15253:Skyrim.esm": {
+   "name": "Lost Echo Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Quicksilver Ore": 1
+   },
+   "veins": 1
+  },
+  "15261:Skyrim.esm": {
+   "name": "Hillgrund's Tomb",
+   "onTheWayIn": [],
+   "ores": {
+    "Silver Ore": 1
+   },
+   "veins": 1
+  },
+  "15265:Skyrim.esm": {
+   "name": "Halldir's Cairn",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 2
+   },
+   "veins": 2
+  },
+  "1526b:Skyrim.esm": {
+   "name": "Greywater Grotto",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1,
+    "Gold Ore": 1,
+    "Iron Ore": 1
+   },
+   "veins": 3
+  },
+  "1526d:Skyrim.esm": {
+   "name": "Gloomreach Cavern",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 3
+   },
+   "veins": 3
+  },
+  "1526e:Skyrim.esm": {
+   "name": "Glenmoril Coven",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "1526f:Skyrim.esm": {
+   "name": "Movarth's Lair",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 2
+   },
+   "veins": 2
+  },
+  "1528a:Skyrim.esm": {
+   "name": "Dushnikh Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Orichalcum Ore": 7
+   },
+   "veins": 7
+  },
+  "15294:Skyrim.esm": {
+   "name": "Northwind Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 3
+   },
+   "veins": 3
+  },
+  "15296:Skyrim.esm": {
+   "name": "Darkshade",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 3
+   },
+   "veins": 3
+  },
+  "152a0:Skyrim.esm": {
+   "name": "Crystaldrift Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1,
+    "Moonstone Ore": 1
+   },
+   "veins": 2
+  },
+  "152a2:Skyrim.esm": {
+   "name": "Clearspring Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "152a7:Skyrim.esm": {
+   "name": "Cronvangr Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "152a8:Skyrim.esm": {
+   "name": "Cragwallow Slope",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1
+   },
+   "veins": 1
+  },
+  "152aa:Skyrim.esm": {
+   "name": "Ustengrav Depths",
+   "onTheWayIn": [
+    "270ab:Skyrim.esm"
+   ],
+   "ores": {
+    "Corundum Ore": 2,
+    "Iron Ore": 1,
+    "Silver Ore": 1
+   },
+   "veins": 4
+  },
+  "152ae:Skyrim.esm": {
+   "name": "Brood Cavern",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1,
+    "Iron Ore": 1
+   },
+   "veins": 2
+  },
+  "152b0:Skyrim.esm": {
+   "name": "Broken Helm Hollow",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 2
+   },
+   "veins": 2
+  },
+  "152b7:Skyrim.esm": {
+   "name": "Blind Cliff Bastion",
+   "onTheWayIn": [],
+   "ores": {
+    "Quicksilver Ore": 3
+   },
+   "veins": 3
+  },
+  "152be:Skyrim.esm": {
+   "name": "Avanchnzel",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 2
+   },
+   "veins": 2
+  },
+  "152c0:Skyrim.esm": {
+   "name": "Ansilvund Excavation",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "161e7:Skyrim.esm": {
+   "name": "Whistling Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 2
+   },
+   "veins": 2
+  },
+  "161f5:Skyrim.esm": {
+   "name": "Left Hand Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 5
+   },
+   "veins": 5
+  },
+  "161f6:Skyrim.esm": {
+   "name": "Kolskeggr Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 17
+   },
+   "veins": 17
+  },
+  "16200:Skyrim.esm": {
+   "name": "Gloombound Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Ebony Ore": 16,
+    "Iron Ore": 6
+   },
+   "veins": 22
+  },
+  "16203:Skyrim.esm": {
+   "name": "Cidhna Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Silver Ore": 6
+   },
+   "veins": 6
+  },
+  "16ea1:Skyrim.esm": {
+   "name": "Bloodlet Throne",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1,
+    "Silver Ore": 1
+   },
+   "veins": 2
+  },
+  "17b6a:Dragonborn.esm": {
+   "name": "Hrothmund's Barrow",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 1,
+    "Silver Ore": 1
+   },
+   "veins": 2
+  },
+  "181c8:Dawnguard.esm": {
+   "name": "Dead Drop Mine",
+   "onTheWayIn": [
+    "9bde:Dawnguard.esm",
+    "1dba:Dawnguard.esm"
+   ],
+   "ores": {
+    "Corundum Ore": 4
+   },
+   "veins": 4
+  },
+  "184f0:Dragonborn.esm": {
+   "name": "Highpoint Tower",
+   "onTheWayIn": [],
+   "ores": {
+    "Amethyst": 1,
+    "Emerald": 1,
+    "Gold Ore": 1,
+    "Orichalcum Ore": 3,
+    "Ruby": 2,
+    "Sapphire": 4
+   },
+   "veins": 12
+  },
+  "186c2:SkyrimSewers.esp": {
+   "name": "Ruins of Old Haafingar",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 2
+   },
+   "veins": 2
+  },
+  "1a337:Skyrim.esm": {
+   "name": "Lost Knife Hideout",
+   "onTheWayIn": [
+    "15251:Skyrim.esm"
+   ],
+   "ores": {
+    "Corundum Ore": 2,
+    "Gold Ore": 1
+   },
+   "veins": 3
+  },
+  "1a7a8:Dragonborn.esm": {
+   "name": "Benkongerike Great Hall",
+   "onTheWayIn": [
+    "142e2:Dragonborn.esm"
+   ],
+   "ores": {
+    "Stalhrim": 1
+   },
+   "veins": 1
+  },
+  "1b147:Skyrim.esm": {
+   "name": "Bilegulch Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Orichalcum Ore": 9
+   },
+   "veins": 9
+  },
+  "1c080:Dragonborn.esm": {
+   "name": "Damphall Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1,
+    "Silver Ore": 2
+   },
+   "veins": 3
+  },
+  "1f358:Skyrim.esm": {
+   "name": "Ansilvund Burial Chambers",
+   "onTheWayIn": [
+    "152c0:Skyrim.esm"
+   ],
+   "ores": {
+    "Gold Ore": 1
+   },
+   "veins": 1
+  },
+  "22f53:Skyrim.esm": {
+   "name": "Forelhost Crypt",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 1,
+    "Quicksilver Ore": 1
+   },
+   "veins": 2
+  },
+  "2471a:Skyrim.esm": {
+   "name": "Volskygge Passages",
+   "onTheWayIn": [],
+   "ores": {
+    "Orichalcum Ore": 1
+   },
+   "veins": 1
+  },
+  "24cad:Dragonborn.esm": {
+   "name": "Bloodskal Barrow",
+   "onTheWayIn": [
+    "142fc:Dragonborn.esm"
+   ],
+   "ores": {
+    "Stalhrim": 1
+   },
+   "veins": 1
+  },
+  "26e93:Dragonborn.esm": {
+   "name": "Glacial Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Malachite Ore": 1
+   },
+   "veins": 1
+  },
+  "275d8:Skyrim.esm": {
+   "name": "Tolvald's Crossing",
+   "onTheWayIn": [
+    "15201:Skyrim.esm"
+   ],
+   "ores": {
+    "Moonstone Ore": 1,
+    "Quicksilver Ore": 1
+   },
+   "veins": 2
+  },
+  "275d9:Skyrim.esm": {
+   "name": "Tolvald's Gap",
+   "onTheWayIn": [
+    "15201:Skyrim.esm"
+   ],
+   "ores": {
+    "Quicksilver Ore": 1
+   },
+   "veins": 1
+  },
+  "2c778:Skyrim.esm": {
+   "name": "Iron-Breaker Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 6
+   },
+   "veins": 6
+  },
+  "2c779:Skyrim.esm": {
+   "name": "Quicksilver Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Quicksilver Ore": 5
+   },
+   "veins": 5
+  },
+  "2d524:Skyrim.esm": {
+   "name": "Angarvunde Catacombs",
+   "onTheWayIn": [
+    "152c1:Skyrim.esm"
+   ],
+   "ores": {
+    "Corundum Ore": 1
+   },
+   "veins": 1
+  },
+  "2d5d1:Skyrim.esm": {
+   "name": "Cronvangr Broodlair",
+   "onTheWayIn": [
+    "152a7:Skyrim.esm"
+   ],
+   "ores": {
+    "Moonstone Ore": 1
+   },
+   "veins": 1
+  },
+  "2e760:Skyrim.esm": {
+   "name": "Rockwallow Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 4
+   },
+   "veins": 4
+  },
+  "30442:Skyrim.esm": {
+   "name": "Bthardamz Arcanex",
+   "onTheWayIn": [],
+   "ores": {
+    "Quicksilver Ore": 1
+   },
+   "veins": 1
+  },
+  "3377b:Dragonborn.esm": {
+   "name": "Broken Tusk Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 1,
+    "Heart Stone": 2
+   },
+   "veins": 3
+  },
+  "35604:Skyrim.esm": {
+   "name": "Ironbind Barrow",
+   "onTheWayIn": [],
+   "ores": {
+    "Moonstone Ore": 1,
+    "Silver Ore": 1
+   },
+   "veins": 2
+  },
+  "361f9:Skyrim.esm": {
+   "name": "Bthardamz Lower District",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 1
+   },
+   "veins": 1
+  },
+  "361fa:Skyrim.esm": {
+   "name": "Bthardamz Upper District",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 2
+   },
+   "veins": 2
+  },
+  "36798:Dragonborn.esm": {
+   "name": "Altar of Thrond Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Moonstone Ore": 1,
+    "Quicksilver Ore": 2,
+    "Silver Ore": 1
+   },
+   "veins": 4
+  },
+  "371dd:Skyrim.esm": {
+   "name": "Bleak Falls Sanctum",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "371de:Skyrim.esm": {
+   "name": "Bleak Falls Temple",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "3929e:Dragonborn.esm": {
+   "name": "Coldcinder Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Heart Stone": 3
+   },
+   "veins": 3
+  },
+  "3bf0:Dawnguard.esm": {
+   "name": "Ruunvald Excavation",
+   "onTheWayIn": [],
+   "ores": {
+    "Malachite Ore": 4
+   },
+   "veins": 4
+  },
+  "3c7f5:Dragonborn.esm": {
+   "name": "White Ridge Sanctum",
+   "onTheWayIn": [],
+   "ores": {
+    "Ruby": 9
+   },
+   "veins": 9
+  },
+  "3e908:Skyrim.esm": {
+   "name": "Chillwind Depths",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1,
+    "Orichalcum Ore": 2
+   },
+   "veins": 3
+  },
+  "41777:Skyrim.esm": {
+   "name": "Swindler's Den",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "4346:Dawnguard.esm": {
+   "name": "Darkfall Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Moonstone Ore": 2
+   },
+   "veins": 2
+  },
+  "43fab:Skyrim.esm": {
+   "name": "Halted Stream Camp",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1,
+    "Iron Ore": 16
+   },
+   "veins": 17
+  },
+  "4401b:Skyrim.esm": {
+   "name": "Druadach Redoubt Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1,
+    "Quicksilver Ore": 2
+   },
+   "veins": 3
+  },
+  "446bf:Skyrim.esm": {
+   "name": "Fort Fellhammer Mines",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 10
+   },
+   "veins": 10
+  },
+  "471dc:Skyrim.esm": {
+   "name": "Frostflow Abyss",
+   "onTheWayIn": [
+    "15274:Skyrim.esm"
+   ],
+   "ores": {
+    "Quicksilver Ore": 1
+   },
+   "veins": 1
+  },
+  "4761b:Skyrim.esm": {
+   "name": "Treva's Watch Escape Tunnel",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "4b8fb:Skyrim.esm": {
+   "name": "Stony Creek Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Moonstone Ore": 2
+   },
+   "veins": 2
+  },
+  "52feb:Skyrim.esm": {
+   "name": "Kagrenzel",
+   "onTheWayIn": [],
+   "ores": {
+    "Moonstone Ore": 1
+   },
+   "veins": 1
+  },
+  "54b6f:Skyrim.esm": {
+   "name": "Mzulft Aedrome",
+   "onTheWayIn": [],
+   "ores": {
+    "Moonstone Ore": 1
+   },
+   "veins": 1
+  },
+  "54b70:Skyrim.esm": {
+   "name": "Mzulft Boilery",
+   "onTheWayIn": [],
+   "ores": {
+    "Moonstone Ore": 3
+   },
+   "veins": 3
+  },
+  "54d0e:Skyrim.esm": {
+   "name": "Cold Rock Pass",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 2,
+    "Quicksilver Ore": 1
+   },
+   "veins": 3
+  },
+  "55215:Skyrim.esm": {
+   "name": "Nchuand-Zel",
+   "onTheWayIn": [],
+   "ores": {
+    "Moonstone Ore": 1
+   },
+   "veins": 1
+  },
+  "5554a:Skyrim.esm": {
+   "name": "Lost Prospect Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 3
+   },
+   "veins": 3
+  },
+  "5734:Dawnguard.esm": {
+   "name": "Aetherium Forge",
+   "onTheWayIn": [],
+   "ores": {
+    "Silver Ore": 2
+   },
+   "veins": 2
+  },
+  "5eab:Dawnguard.esm": {
+   "name": "Redwater Den",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 1,
+    "Iron Ore": 1
+   },
+   "veins": 2
+  },
+  "5f536:Skyrim.esm": {
+   "name": "Harmugstahl",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "681dd:Skyrim.esm": {
+   "name": "Boulderfall Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1
+   },
+   "veins": 1
+  },
+  "79f9f:Skyrim.esm": {
+   "name": "Knifepoint Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 19,
+    "Iron Ore": 6
+   },
+   "veins": 25
+  },
+  "7bc27:Skyrim.esm": {
+   "name": "Uttering Hills Cave",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1
+   },
+   "veins": 1
+  },
+  "81dec:Skyrim.esm": {
+   "name": "Brittleshin Pass",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 2
+   },
+   "veins": 2
+  },
+  "8995:Dawnguard.esm": {
+   "name": "Sharpslope Cave",
+   "onTheWayIn": [
+    "4346:Dawnguard.esm"
+   ],
+   "ores": {
+    "Shellbug Chitin": 1
+   },
+   "veins": 1
+  },
+  "8b84d:Skyrim.esm": {
+   "name": "Sunderstone Gorge",
+   "onTheWayIn": [],
+   "ores": {
+    "Silver Ore": 4
+   },
+   "veins": 4
+  },
+  "91872:Skyrim.esm": {
+   "name": "Labyrinthian Thoroughfare",
+   "onTheWayIn": [],
+   "ores": {
+    "Gold Ore": 2
+   },
+   "veins": 2
+  },
+  "a5a71:Skyrim.esm": {
+   "name": "Geirmund's Hall",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "a87c5:Skyrim.esm": {
+   "name": "Ravenscar Hollow",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1,
+    "Iron Ore": 1
+   },
+   "veins": 2
+  },
+  "a9194:Skyrim.esm": {
+   "name": "Rebel's Cairn",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 1
+   },
+   "veins": 1
+  },
+  "aa20c:Skyrim.esm": {
+   "name": "Liar's Retreat",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 3
+   },
+   "veins": 3
+  },
+  "abd31:Skyrim.esm": {
+   "name": "Frostmere Crypt",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 2,
+    "Silver Ore": 1
+   },
+   "veins": 3
+  },
+  "ac5d2:Skyrim.esm": {
+   "name": "Wolfskull Ruins",
+   "onTheWayIn": [
+    "151f6:Skyrim.esm"
+   ],
+   "ores": {
+    "Iron Ore": 1,
+    "Moonstone Ore": 1
+   },
+   "veins": 2
+  },
+  "b6be6:Skyrim.esm": {
+   "name": "Embershard Mine",
+   "onTheWayIn": [],
+   "ores": {
+    "Iron Ore": 8
+   },
+   "veins": 8
+  },
+  "ba599:Skyrim.esm": {
+   "name": "Broken Oar Grotto",
+   "onTheWayIn": [],
+   "ores": {
+    "Corundum Ore": 1,
+    "Iron Ore": 2,
+    "Silver Ore": 1
+   },
+   "veins": 4
+  },
+  "eb7:Dawnguard.esm": {
+   "name": "Dimhollow Cavern",
+   "onTheWayIn": [],
+   "ores": {
+    "Malachite Ore": 8
+   },
+   "veins": 8
+  }
+ },
+ "builtBy": "tools/Measure-MineBuildings.py",
+ "calledAMineWithNoVein": {},
+ "counts": {
+  "behindABuilding": 53,
+  "buildings": 121,
+  "disabled": 2,
+  "failedToInflate": 0,
+  "inBuildings": 448,
+  "noDoor": 22,
+  "openGround": 1202,
+  "placed": 1725,
+  "removedByLaterPlugin": 0,
+  "veinBases": 581,
+  "worldsBehindABuilding": 3
+ },
+ "noDoor": {
+  "27333:Dragonborn.esm": {
+   "name": "DLC2 Warehouse Ambushes",
+   "veins": 5
+  },
+  "285c6:Dragonborn.esm": {
+   "name": "DLC2 WarehouseSpiders",
+   "veins": 14
+  },
+  "37d7:Dawnguard.esm": {
+   "name": "Swindler's Den",
+   "veins": 1
+  },
+  "42b5:Dawnguard.esm": {
+   "name": "testl",
+   "veins": 2
+  }
+ },
+ "onTheWayIn": {
+  "142e2:Dragonborn.esm": {
+   "holdsVein": true,
+   "name": "Benkongerike",
+   "shuts": [
+    "1a7a8:Dragonborn.esm"
+   ]
+  },
+  "142fc:Dragonborn.esm": {
+   "holdsVein": true,
+   "name": "Raven Rock Mine",
+   "shuts": [
+    "24cad:Dragonborn.esm"
+   ]
+  },
+  "151f6:Skyrim.esm": {
+   "holdsVein": false,
+   "name": "Wolfskull Cave",
+   "shuts": [
+    "ac5d2:Skyrim.esm"
+   ]
+  },
+  "15201:Skyrim.esm": {
+   "holdsVein": true,
+   "name": "Tolvald's Cave",
+   "shuts": [
+    "275d8:Skyrim.esm",
+    "275d9:Skyrim.esm"
+   ]
+  },
+  "15251:Skyrim.esm": {
+   "holdsVein": true,
+   "name": "Lost Knife Cave",
+   "shuts": [
+    "1a337:Skyrim.esm"
+   ]
+  },
+  "15274:Skyrim.esm": {
+   "holdsVein": false,
+   "name": "Frostflow Lighthouse",
+   "shuts": [
+    "471dc:Skyrim.esm"
+   ]
+  },
+  "1529c:Skyrim.esm": {
+   "holdsVein": false,
+   "name": "Deepwood Redoubt",
+   "shuts": [
+    "29ab7:Skyrim.esm"
+   ]
+  },
+  "152a7:Skyrim.esm": {
+   "holdsVein": true,
+   "name": "Cronvangr Cave",
+   "shuts": [
+    "2d5d1:Skyrim.esm"
+   ]
+  },
+  "152c0:Skyrim.esm": {
+   "holdsVein": true,
+   "name": "Ansilvund Excavation",
+   "shuts": [
+    "1f358:Skyrim.esm"
+   ]
+  },
+  "152c1:Skyrim.esm": {
+   "holdsVein": false,
+   "name": "Angarvunde",
+   "shuts": [
+    "2d524:Skyrim.esm"
+   ]
+  },
+  "1dba:Dawnguard.esm": {
+   "holdsVein": false,
+   "name": "Fort Dawnguard",
+   "shuts": [
+    "181c8:Dawnguard.esm"
+   ]
+  },
+  "270ab:Skyrim.esm": {
+   "holdsVein": false,
+   "name": "Ustengrav",
+   "shuts": [
+    "152aa:Skyrim.esm"
+   ]
+  },
+  "34fd2:Dragonborn.esm": {
+   "holdsVein": false,
+   "name": "Nchardak Reading Room",
+   "shuts": [
+    "142f1:Dragonborn.esm"
+   ]
+  },
+  "4346:Dawnguard.esm": {
+   "holdsVein": true,
+   "name": "Darkfall Cave",
+   "shuts": [
+    "10a8b:Dawnguard.esm",
+    "8995:Dawnguard.esm",
+    "bb5:Dawnguard.esm"
+   ]
+  },
+  "9bde:Dawnguard.esm": {
+   "holdsVein": false,
+   "name": "Dead Drop Falls",
+   "shuts": [
+    "181c8:Dawnguard.esm"
+   ]
+  },
+  "abd31:Skyrim.esm": {
+   "holdsVein": true,
+   "name": "Frostmere Crypt",
+   "shuts": [
+    "c97eb:Skyrim.esm"
+   ]
+  }
+ },
+ "openGround": {
+  "Blackreach": 44,
+  "BlindCliffCaveWorld": 6,
+  "BloatedMansGrottoWorld": 1,
+  "DLC2SolstheimWorld": 67,
+  "DarkwaterWorld": 2,
+  "EldergleamSanctuaryWorld": 1,
+  "FallowstoneCaveWorldEnd": 4,
+  "FallowstoneCaveWorldStart": 3,
+  "KarthspireRedoubtWorld": 3,
+  "MossMotherCavernWorld": 2,
+  "RedEagleRedoubtWorld": 1,
+  "ShadowgreenCavernWorld": 2,
+  "SouthfringeWorld": 2,
+  "Tamriel": 1063,
+  "TestMeganWorld": 1
+ },
+ "openWorlds": [
+  "DLC2SolstheimWorld",
+  "Tamriel"
+ ],
+ "reachedByNoDoor": [
+  "DLC2ApocryphaWorld",
+  "JaphetsFollyWorld",
+  "SkuldafnWorld",
+  "Sovngarde",
+  "TestMeganWorld"
+ ],
+ "readFrom": "99 plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
+ "whatAMineIs": "a building holding at least one placed reference whose base is in ORES_BY_BASE, which is exactly what mineOre lets a person work. A building is what BUILDING_BY_DOOR says, the one /claim takes.",
+ "whatOpenGroundIs": "the worldspaces in openWorlds, any other worldspace with a road in that no one building sits on, and every worldspace in reachedByNoDoor. A worldspace whose every road in goes through one building is in worlds, with the buildings on that road.",
+ "worlds": {
+  "29ab7:Skyrim.esm": {
+   "edid": "DeepwoodRedoubtWorld",
+   "name": "Deepwood Vale",
+   "onTheWayIn": [
+    "1529c:Skyrim.esm"
+   ],
+   "ores": {
+    "Corundum Ore": 1,
+    "Quicksilver Ore": 1
+   },
+   "veins": 2
+  },
+  "bb5:Dawnguard.esm": {
+   "edid": "DLC01FalmerValley",
+   "name": "Forgotten Vale",
+   "onTheWayIn": [
+    "4346:Dawnguard.esm"
+   ],
+   "ores": {
+    "Gold Ore": 6,
+    "Malachite Ore": 8,
+    "Moonstone Ore": 9,
+    "Orichalcum Ore": 8,
+    "Quicksilver Ore": 12,
+    "Silver Ore": 7
+   },
+   "veins": 50
+  },
+  "c97eb:Skyrim.esm": {
+   "edid": "FrostmereCryptWorld",
+   "name": "Frostmere Depths",
+   "onTheWayIn": [
+    "abd31:Skyrim.esm"
+   ],
+   "ores": {
+    "Orichalcum Ore": 1
+   },
+   "veins": 1
+  }
+ }
+}
