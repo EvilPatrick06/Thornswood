@@ -227,9 +227,8 @@ SIX.forEach(function (d) {
   yes('plugins: Keep and Ship-Rules still tell ours by the thornswood- name the README gives',
       keep.indexOf('StartsWith("thornswood-"') >= 0 && rules.indexOf("'thornswood-*.js'") >= 0 &&
       t.indexOf('`thornswood-*.js`') >= 0);
-  const chargen = read('tools/ts-plugins/thornswood-chargen.js') || '';
-  yes('plugins: thornswood-chargen.js is still the retired file the README says it is',
-      /RETIRED/.test(chargen) && /retired/.test(t));
+  yes('plugins: the retired thornswood-chargen.js is gone, and the README no longer names it',
+      read('tools/ts-plugins/thornswood-chargen.js') === null && t.indexOf('thornswood-chargen') < 0);
 }
 
 // ---------------------------------------------------------------- overlays --
