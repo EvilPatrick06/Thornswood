@@ -351,7 +351,9 @@ it per session and ignores which profile Vortex has on.
 
 ## Where things are written down
 
-- `README.md`, `SETUP.md`: the repo and a fresh install.
+- `README.md`: what the repo is and where to start. A customer's install is
+  the site's join page, `tools\docs-app\data\site\join.md`; setting up a
+  developer's machine is "Setting up a machine" above.
 - `tools\app\HOOKUP.md`: how the launcher classes hang together.
 - `tools\MOVING-THE-SERVER.md`, `tools\COLLECTION-METHOD.md`: the VPS and the
   mod collection.

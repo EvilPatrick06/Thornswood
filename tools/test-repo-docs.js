@@ -14,11 +14,15 @@
 // opened with "SKYRIM TOGETHER", named SkyrimTogether-Setup.exe and told a new
 // customer to ask in the Discord for a password. config.example.json still
 // pointed at the old box (192.135.119.166, port 25565) and the old product's
-// update repository.
+// update repository. SETUP.md walked a reader through making a repository
+// called skyrim-together, a personal access token and a build script that
+// does not exist, and CLAUDE.md and SECOND-DEVELOPER.md both sent people to it.
 //
 // So this reads those three and fails on the old product, on the words the
 // repo does not use, on a Google Drive link anywhere, and on an example config
-// that has drifted away from what Config.cs actually defaults to.
+// that has drifted away from what Config.cs actually defaults to. It also
+// fails if SETUP.md comes back into the tree or either document lists it
+// again.
 //
 // Read only.
 const fs = require('fs');
@@ -152,6 +156,17 @@ if (cfgText === null) {
 // ------------------------------------------------------------- repo wide
 if (tracked) {
   yes('tools/Message to friends.txt is not tracked', tracked.indexOf('tools/Message to friends.txt') < 0);
+  // SETUP.md is deleted rather than rewritten: a customer's install is the
+  // join page and a developer's machine is SECOND-DEVELOPER.md, so a third
+  // copy of either would only drift again, the way this one did.
+  yes('SETUP.md is not tracked', tracked.indexOf('SETUP.md') < 0);
+  ['CLAUDE.md', 'SECOND-DEVELOPER.md'].forEach(function (rel) {
+    const t = read(rel);
+    yes(rel + ' is there', t !== null);
+    if (t !== null) {
+      yes(rel + ' does not list SETUP.md, which is gone' + where(t, /SETUP\.md/), !/SETUP\.md/.test(t));
+    }
+  });
   const TEXT = /\.(js|mjs|cjs|ps1|psm1|psd1|py|cs|xaml|md|json|html|htm|css|txt|yml|yaml|toml|cmd|bat|sh|ini|xml)$/i;
   const drive = [];
   tracked.filter(function (f) { return TEXT.test(f); }).forEach(function (rel) {
