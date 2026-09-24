@@ -127,7 +127,9 @@ yes('gone: a "Playing together" section about parties that did not exist',
 {
   const player = /\bplayers?\b/i.exec(helpSrc);
   yes('the file never says "player"' + (player ? ' (says "' + player[0] + '")' : ''), !player);
-  yes('and has no em dash', helpSrc.indexOf('—') === -1);
+  // Built from its code, the way CR is above, so a search of the repository
+  // for the character itself finds only the places that say it.
+  yes('and has no em dash', helpSrc.indexOf(String.fromCharCode(0x2014)) === -1);
 }
 
 // ------------------------------------------------------------ the sections
