@@ -375,7 +375,6 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
     <a class="mark" href="/"><img src="/logo.png" alt="">Thornswood</a>
     <button class="burger" id="burger" aria-label="Menu" aria-expanded="false">&#9776;</button>
     <nav class="top" id="nav">
-      <a href="/downloads">Download</a>
       <a href="/rules">Rules</a>
       <a href="/classes">Professions</a>
       <a href="/roadmap">Roadmap</a>
@@ -383,7 +382,11 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
       <a href="https://www.patreon.com/thornswood" id="navPatreon"
          target="_blank" rel="noopener">Patreon</a>
       <a href="DISCORD_URL" target="_blank" rel="noopener">Discord</a>
-      <a class="enter" href="/hub">Admin login</a>
+      <!-- The one gold button in the bar is Download, because that is what a
+           stranger came for. It was Admin login, a door only staff can use;
+           that link is in the footer now. It stays last, where the narrow
+           screen rule for .enter sets it apart from the list. -->
+      <a class="enter" href="/downloads">Download</a>
     </nav>
   </div>
 </header>
@@ -714,7 +717,7 @@ var BLURB = {
   '/join':    ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
   '/credits': ['Credits', 'Everyone whose work Thornswood is built on.'],
   '/classes': ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
-  '/known':   ['Known issues', 'Permanent limits of how a shared Skyrim works, each with the reason. Read this before reporting anything.'],
+  '/known':   ['Known issues', 'What is limited or broken right now and why, and which of it is on the roadmap. Read this before reporting anything.'],
   '/help':    ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
   '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
   '/roadmap': ['Roadmap', 'What is being worked on and roughly in what order.'],
@@ -875,6 +878,20 @@ if (PAGES[here]) {
       if (b >= 1048576)    return Math.round(b / 1048576) + ' MB';
       return Math.max(1, Math.round(b / 1024)) + ' KB';
     }
+    // The installer's SHA-256, under the size and date, and a link to
+    // VirusTotal's report on that hash. To Do entry 176 asked for exactly this
+    // "rather than instructions for running one": somebody who wants to know
+    // what the file is before running it reads a report instead of uploading
+    // it. It is not a signature, and signing is still entry 2. An installer
+    // published before Publish-Installer wrote a hash has none, and then
+    // nothing shows rather than a link to nothing.
+    function sum(f) {
+      var h = f && /^[0-9a-f]{64}$/.test(f.sha256 || '') ? f.sha256 : '';
+      if (!h) return '';
+      return '<br>SHA-256 <span style="overflow-wrap:anywhere">' + h + '</span> · ' +
+             '<a href="https://www.virustotal.com/gui/file/' + h + '" target="_blank" ' +
+             'rel="noopener">VirusTotal report</a>';
+    }
     // hidden is the payload: on the site because the installer fetches it,
     // never on this page, because clicking it gets you 700 MB that does
     // nothing on its own.
@@ -919,7 +936,7 @@ if (PAGES[here]) {
              '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
              'Download the installer</a>' +
              '<p class="also faintly">' + esc(human(exe.size)) +
-             (exe.version ? ' · ' + esc(clock(exe.version)) : '') + '</p></div>';
+             (exe.version ? ' · ' + esc(clock(exe.version)) : '') + sum(exe) + '</p></div>';
     } else {
       grab = '<div class="grab">' +
              '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
@@ -930,7 +947,7 @@ if (PAGES[here]) {
              'Do not unzip anything yourself.</p>' +
              '<p class="also faintly">' + esc(human(exe.size)) + ' and ' +
              esc(human(zip.size)) + (exe.version ? ' · ' + esc(clock(exe.version)) : '') +
-             '</p></div>';
+             sum(exe) + '</p></div>';
     }
 
     out += '<h2>Apply first, then four steps</h2>' +
