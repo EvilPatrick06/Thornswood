@@ -238,12 +238,22 @@ const grace = (/const int GraceHours = (\d+);/.exec(read('tools/app/Door.cs') ||
 yes('the grace the README gives, ' + grace + ' hours, is GraceHours in Door.cs',
     !!grace && new RegExp('a yes from the last ' + grace + '\\s+hours').test(readme));
 
-// If Deploy-Docs.ps1 learns to merge the password into the file, this fails,
-// and the -Password sentence in the README is what to change.
-yes('Deploy-Docs.ps1 -Password still writes config.json with the password alone, as the README warns',
-    /\$json = \(@\{ password = \$Password \} \| ConvertTo-Json -Compress\)/.test(deploy) &&
-    deploy.indexOf("WriteAllBytes('$rootWin" + BS + "config.json'") >= 0 &&
-    /`-Password` writes a `config\.json`\s+holding the password and nothing else/.test(readme));
+// The README tells whoever runs -Password what happens to the VPS config.json,
+// the one file there holding the Discord settings, the bot's key and the cookie
+// secret, so it has to say what the script does. The script reads the file,
+// sets the password and writes the rest back, and leaves a file that will not
+// parse alone. If that changes, this fails and the -Password sentence in the
+// README is what to change. tools\test-docs-password.ps1 runs the script itself.
+yes('Deploy-Docs.ps1 -Password sets the password in the config.json it read, and the README says so',
+    deploy.indexOf("`$cfg['password'] = `$pw") >= 0 &&
+    deploy.indexOf('WILL NOT READ AS JSON. Nothing written') >= 0 &&
+    deploy.indexOf('$json = (@{ password = $Password }') < 0 &&
+    /`-Password` reads the `config\.json`\s+on the VPS, changes the member password in it and keeps every other setting/.test(readme) &&
+    /will not read as JSON, an empty one included, is\s+left exactly as it is and the password is not changed/.test(readme) &&
+    readme.indexOf('holding the password and nothing else') < 0);
+yes('the README names the harness that runs -Password, and it is there',
+    readme.indexOf('tools' + BS + 'test-docs-password.ps1') >= 0 &&
+    read('tools/test-docs-password.ps1') !== null);
 yes('the README says the site is one node process', /one\s+node process/.test(readme));
 
 // ------------------------------------------------------------- the copies --

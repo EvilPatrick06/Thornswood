@@ -84,11 +84,11 @@ and the cookie secret, and is never in the repo. `.\tools\Deploy-Docs.ps1`
 sends `server.js` and everything in `public\` and restarts the task, and
 `-Site` also sends the public pages. A plain deploy never overwrites a
 document somebody has typed into on the site; `-Boards`, `-Docs` and
-`-SeedDocs` do, after a `.bak` of each. `-Password` writes a `config.json`
-holding the password and nothing else, with no `.bak`, so the Discord
-settings, the bot's key and the cookie secret on the VPS go with it: nobody
-can sign in or link, and every ticket the launchers hold stops working, until
-they are put back.
+`-SeedDocs` do, after a `.bak` of each. `-Password` reads the `config.json`
+on the VPS, changes the member password in it and keeps every other setting.
+A `config.json` there that will not read as JSON, an empty one included, is
+left exactly as it is and the password is not changed.
+`tools\test-docs-password.ps1` runs that part of the script against copies.
 
 The pages, the downloads, the hub and every route in the table above are one
 node process. A route that throws is answered 500 and the rest carry on, and a
