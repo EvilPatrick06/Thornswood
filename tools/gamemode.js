@@ -1266,6 +1266,56 @@ const MINE_COOLDOWN_MS = {
 
 const lastUse = new Map();   // "actorId:refrId" -> timestamp
 
+/*
+  WHAT TAKES A ROW BACK OUT OF lastUse.
+
+  From the To Do List: "Any cache keyed by something unbounded gets an eviction
+  rule: a size cap, an age sweep, or removal when the session ends." Every press
+  that gives something adds a row here, one per character and per reference:
+  the quarry, the kiln, every plant, every river, the hanging game and every
+  carcass. Nothing ever took one out, so the map was bounded only by how long
+  the server had been up. Measured on 24 September: about 140 bytes a row.
+
+  A row older than the longest wait anybody asks about gives the answer a
+  missing row gives, which is ready, because cooldownLeft reads a missing row
+  as a stamp at time zero. So dropping those rows changes no answer anybody
+  gets, and that is the whole rule. It is not removal when somebody leaves: a
+  four hour wait on a master fishing spot has to outlast logging out and back.
+
+  The longest wait is read off the tables rather than typed here. A number
+  typed here that ever fell below one of them would hand a spot back early,
+  and those four hours are the only limit on it. A new table of waits that
+  stamps this map goes in longestWaitMs, and test-cooldown-sweep.js fails
+  until it does.
+
+  The sweep runs when a stamp takes the map past a mark, not on a timer. A
+  stamp is the only way a row gets in, so this bounds the map without another
+  interval to lose on a hot reload. After a sweep the mark moves to twice what
+  is left, so a map full of rows that are all still waiting is walked once per
+  doubling rather than on every press.
+*/
+const LAST_USE_SWEEP_FROM = 5000;
+let lastUseSweepAt = LAST_USE_SWEEP_FROM;
+
+function longestWaitMs() {
+  let most = Math.max(COOLDOWN_MS, HARVEST_COOLDOWN_MS);
+  const tables = [MINE_COOLDOWN_MS, FISH_TUNING.cooldownMs,
+                  GAME_TUNING.cooldownMs, HUNT_TUNING.cooldownMs];
+  for (const t of tables) {
+    for (const k of Object.keys(t)) most = Math.max(most, Number(t[k]) || 0);
+  }
+  return most;
+}
+
+/** Drops every row older than the longest wait, and moves the mark. */
+function forgetOldUses(now) {
+  const keep = longestWaitMs();
+  lastUse.forEach(function (at, key) {
+    if (now - at > keep) lastUse.delete(key);
+  });
+  lastUseSweepAt = Math.max(LAST_USE_SWEEP_FROM, lastUse.size * 2);
+}
+
 /** Seconds still to wait, 0 if ready. Read only: a refused action must not
  *  start a cooldown, or walking up to a kiln without firewood locks you out.
  *  spanMs is how long this source stays worked out and defaults to the twenty
@@ -1278,9 +1328,14 @@ function cooldownLeft(actorId, refrId, spanMs) {
   return left > 0 ? Math.ceil(left / 1000) : 0;
 }
 
-/** Start the cooldown. Call this only once the yield has actually been given. */
+/** Start the cooldown. Call this only once the yield has actually been given.
+ *  Every row goes in through here, so the sweep above sees every one. */
 function stampCooldown(actorId, refrId) {
-  lastUse.set(actorId + ':' + refrId, Date.now());
+  const now = Date.now();
+  lastUse.set(actorId + ':' + refrId, now);
+  if (lastUse.size >= lastUseSweepAt) {
+    try { forgetOldUses(now); } catch (e) { lastUseSweepAt = lastUse.size * 2; }
+  }
 }
 
 /**
@@ -5939,7 +5994,7 @@ function harvest(actorId, refrId, baseDesc) {
     return 'This one has already been picked.';
   }
   if (!addItem(actorId, plant.produce, 1)) return null;
-  lastUse.set(actorId + ':' + refrId, Date.now());
+  stampCooldown(actorId, refrId);
   const rank = creditWork(actorId, 'harvest');
   return 'You pick the ' + plant.name + '.' + (rank ? ' ' + rank : '');
 }
@@ -10577,9 +10632,36 @@ log('gamemode loaded:',
     return out;
   }
 
+  /*
+    Into a file beside it and then renamed over it, never written in place.
+
+    writeFileSync empties the file before it writes it. A server stopped in
+    between left a half written book, the load above could not parse it, and
+    it started again from nothing: every row for somebody offline was gone
+    from the server's own copy. The site merges what it is sent and kept its
+    rows, but this file is the one a restart reads.
+
+    Still synchronous, on purpose. Measured on 24 September on Patrick's
+    machine, a book of 8 to 167 kilobytes, three runs of two hundred writes:
+    0.8 to 2.1 ms in place, 2.3 to 4.7 ms through the rename, and this runs at
+    most once every four seconds and only when a row changed. An asynchronous
+    write could still be running when a hot reload starts the next copy of
+    this block writing the same two files.
+
+    If the rename is refused, which Windows does while something else holds
+    the file open, the book is written in place the way it always was.
+  */
   function write() {
+    var text = JSON.stringify({ at: Date.now(), who: book });
+    var tmp = FILE + '.tmp';
     try {
-      fs.writeFileSync(FILE, JSON.stringify({ at: Date.now(), who: book }));
+      fs.writeFileSync(tmp, text);
+      try {
+        fs.renameSync(tmp, FILE);
+      } catch (e) {
+        fs.writeFileSync(FILE, text);
+        try { fs.unlinkSync(tmp); } catch (e2) { }
+      }
     } catch (e) { }
     push();
   }
