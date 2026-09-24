@@ -136,7 +136,14 @@ shipBad.forEach(function (c) { console.log('      Ship.ps1:' + c.line + '  ' + c
 yes('Ship.ps1 never adds, commits, pushes or moves a branch in the source repository', shipBad.length === 0);
 yes('Ship.ps1 has no git add -A anywhere', !/&\s*git\s+(?:-C\s+\$\w+\s+)?add\s+-A/.test(shipSrc));
 yes('Ship.ps1 refuses a main release with anything uncommitted', /uncommitted change\(s\)\. A release ships what is on GitHub/.test(shipSrc));
-yes('Ship.ps1 refuses a main release that is ahead of origin/main', /ahead of origin\/main\. Run git push first/.test(shipSrc));
+// The ahead refusal used to say "Run git push first". main refuses that push
+// from everybody, so since #253 it sends people through a pull request, and
+// the documents say so.
+yes('Ship.ps1 refuses a main release that is ahead of origin/main, and sends it through a pull request rather than a push',
+    /ahead of origin\/main\. A release has to be buildable[\s\S]{0,300}?through a pull request/.test(shipSrc) &&
+    !/ahead of origin\/main\. Run git push first/.test(shipSrc));
+yes('Ship.ps1 refuses a main release with a file under tools that git does not know, which both documents now name',
+    /file\(s\) under tools that git does not know about/.test(shipSrc));
 
 // ------------------------------------------------------------ Bump-Version.ps1
 const bump = gitCalls(read('tools/Bump-Version.ps1'));
@@ -211,6 +218,10 @@ yes('SECOND-DEVELOPER.md does not say the other person reads every pull request,
     !/The other person reads the pull request/i.test(sd));
 yes('SECOND-DEVELOPER.md says Patrick\'s own work goes through a pull request too',
     /Every change goes through a pull request, Patrick's included/.test(sd));
+[docs[0], docs[1]].forEach(function (d) {
+  yes(d.name + ' says a main release stops on a file under tools that git does not know, as Ship.ps1 does',
+      /file under tools that git does not know/.test(d.text));
+});
 
 // ------------------------------------------------------------ --live
 if (!LIVE) {
