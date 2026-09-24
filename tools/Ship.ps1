@@ -87,6 +87,10 @@
   newest is deleted. The first -Channel dev run on a machine makes the dev
   branch of the releases repo and pushes it to GitHub, dry run or not.
 
+  DO NOT GIVE IT -Package. The installer step does not look at -DryRun, so on
+  the main channel it rebuilds the installer and Package-Thornswood.ps1 puts
+  it on the site, which is a real publish.
+
 .PARAMETER Package
   Also rebuilds the two installer files for new people, after the release is
   out. Twenty minutes or more. A dev release never touches the installer.
