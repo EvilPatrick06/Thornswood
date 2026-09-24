@@ -253,12 +253,16 @@ namespace Thornswood
             BuildStatRow();
             BuildPathRows();
             BuildHelp();
+
+            // Windows Settings sends people here with -uninstall. The window
+            // and the Settings page above are what the uninstall is made of;
+            // everything below is a launcher starting up to play, and none of
+            // it belongs on the way out. ShellUninstall.cs says what still runs.
+            if (askedToUninstall) { OpenForUninstall(); return; }
+
             BuildModList();
             RefreshDiscord();
-            // Windows Settings sends people here with -uninstall, so land on
-            // the page that does it rather than on Play with no clue why the
-            // launcher opened.
-            ShowPage(askedToUninstall ? PageSettings : PagePlay);
+            ShowPage(PagePlay);
 
             // And put Thornswood in Installed apps, or bring the entry up to
             // date. Done here rather than in the installer so that every
@@ -899,7 +903,10 @@ namespace Thornswood
         static MediaPlayer music;
         static void StartMenuMusic()
         {
-            if (cfg == null) return;
+            // Not for somebody who opened this from Windows Settings to
+            // uninstall. The theme playing is the loudest way to say the
+            // launcher has started up to play when that is not why it opened.
+            if (cfg == null || askedToUninstall) return;
             string src = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-theme.mp3");
             if (!File.Exists(src)) return;
 
@@ -1013,7 +1020,9 @@ namespace Thornswood
             // Unticking it left the person at a main menu with no way in and
             // nothing on screen saying why.
             if (!cfg.AutoJoin) { cfg.AutoJoin = true; cfg.Save(Paths.CfgFile); }
-            DrawVoiceState();
+            // A request to the voice service. Somebody who came to uninstall
+            // is not waiting on its answer, and the Server page asks again.
+            if (!askedToUninstall) DrawVoiceState();
 
             // The emblem travels inside the exe rather than beside it, so the
             // update that replaces the launcher carries its artwork with it and
