@@ -48,11 +48,19 @@ second machine.
 
 ```
 cd C:\Users\<you>\Downloads\Thornswood-Repo
+.\tools\Bump-Version.ps1
+# then the branch and pull request it prints; once that is merged:
+git checkout main
+git pull
 .\tools\Ship.ps1 "what changed, in plain words"
 ```
 
-Ship bumps `Version` in `tools\app\Updater.cs` (1.1.35 to 1.1.36), builds the
-launcher, patches the client, then runs `tools\Publish-Update.ps1`, which
+`Bump-Version.ps1` moves `Version` in `tools\app\Updater.cs` (1.1.35 to
+1.1.36), commits that one file, and prints the branch and pull request
+commands for it, because main refuses a push from everybody. Ship runs once
+that pull request is merged and pulled; it writes nothing to this repository.
+It builds the launcher, checks the client is the recorded build, then runs
+`tools\Publish-Update.ps1`, which
 scans the game folder for loose files that are not Vortex's, not vanilla, not
 runtime and not per machine, diffs them against this machine's baseline
 (`%LOCALAPPDATA%\Thornswood\published.json`), zips the difference as a pack,
@@ -79,9 +87,11 @@ repo root, which every Claude Code session reads on its own; this is the long
 form.
 
 - **main is what ships.** Only Patrick's machine ships main. `Ship.ps1`
-  refuses a main release that is not on the `main` branch or is behind
-  `origin/main`, and when a main release is out it commits the source and
-  pushes it, so the other machine can `git pull` exactly what shipped.
+  refuses a main release that is not on the `main` branch, is behind or
+  ahead of `origin/main`, has anything uncommitted, or has a file under
+  `tools` that git does not know. It commits and pushes nothing, so what
+  shipped is already on GitHub and the other machine can `git pull` exactly
+  that.
 - **Work happens on a branch.** `git checkout -b djinn/what-it-is` (or
   `gavin/...`), small commits with plain messages, `git push -u origin
   <branch>`, then `gh pr create --fill`. The other person reads the pull
