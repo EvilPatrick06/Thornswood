@@ -25,6 +25,7 @@ Everything it needs is in env:
   TICKET_LOG       staff only channel closed tickets are recorded in
   STAFF_ROLES      comma separated, who gets pulled into every ticket thread
   CREATOR_ROLES    comma separated, added to Apply: Content Creator only
+  TICKET_COOLDOWN  seconds between one person's tickets, default 300
   WATCH_CHANNEL_ID id of the staff channel the site watcher speaks in,
                    default whatever dev-channel.txt beside this file holds
   WATCH_EVERY      seconds between checks, default 300
@@ -41,6 +42,7 @@ import json
 import os
 import re
 import ssl
+import time
 import traceback
 import typing
 import urllib.request
@@ -576,6 +578,16 @@ class TicketModal(discord.ui.Modal):
             self.add_item(item)
 
     async def on_submit(self, interaction):
+        # Checked again here, and counted here rather than on the panel, so a
+        # form opened by mistake and cancelled costs nobody five minutes. See
+        # TICKET_COOLDOWN for why there is a limit at all.
+        no = ticket_refusal(interaction)
+        if no:
+            await interaction.response.send_message(no, ephemeral=True)
+            return
+        # Before the first await, so two forms sent in the same moment cannot
+        # both get past the check above.
+        _last_ticket[_ticket_key(interaction.guild, interaction.user)] = _now()
         await interaction.response.defer(ephemeral=True, thinking=True)
         guild = interaction.guild
         who = interaction.user
@@ -649,6 +661,7 @@ class TicketModal(discord.ui.Modal):
         # happen: one member who could not be added took the whole ticket down
         # and left an empty thread nobody was in.
         if opened is not None:
+            remember_ticket(guild, who, opened)
             try:
                 await opened.add_user(who)
             except Exception as e:
@@ -760,6 +773,127 @@ def is_staff(who, ch):
         return False
 
 
+# ------------------------------------------------------- one at a time --
+# From the To Do List: "A public panel that auto-adds staff to every thread is
+# otherwise a free way to ping every moderator fifty times a minute". One
+# ticket is a thread, every member of every staff role added to it one at a
+# time, a post that mentions them all and a row in the site inbox, and the
+# panel sits in a channel everybody can see. Before this nothing counted any of
+# it. So a person gets one open ticket at a time, and one new ticket every five
+# minutes. Staff are held to neither.
+TICKET_COOLDOWN = _int_env('TICKET_COOLDOWN', 300)
+
+# When each person last sent one. In memory, so a restart forgets it, and that
+# is fine for a cooldown. The one open ticket rule is the one that has to
+# survive a restart, and it does not live here.
+_last_ticket = {}
+
+# Which thread is each person's open ticket. On disk beside the code, for the
+# same reason as STAMP further down: the process restarts in a loop, and a rule
+# that forgets on every restart is not a rule. The thread name cannot carry it,
+# because the name is the label and a display name, and a display name is
+# neither unique nor fixed.
+OPEN_TICKETS = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'open-tickets.json')
+
+
+def _now():
+    return time.monotonic()
+
+
+def _ticket_key(guild, who):
+    return '%s:%s' % (getattr(guild, 'id', 0), who.id)
+
+
+def _open_tickets():
+    try:
+        with open(OPEN_TICKETS) as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _open_thread(guild, tid):
+    """
+    The thread, if it is still open, or None.
+
+    get_thread reads the bot's own cache and asks Discord nothing, which
+    matters on a click that has three seconds to be answered in. discord.py
+    drops a thread from that cache the moment it is archived, and Close
+    archives, so a closed ticket and a deleted one both come back None and
+    the person is let through.
+    """
+    try:
+        t = guild.get_thread(int(tid))
+    except Exception:
+        return None
+    if t is None or getattr(t, 'archived', False):
+        return None
+    return t
+
+
+def remember_ticket(guild, who, thread):
+    """
+    Write down that this thread is this person's open ticket.
+
+    Entries for threads that are no longer open are dropped on the way, so the
+    file stays the size of the queue rather than the size of everybody who
+    ever asked for anything.
+    """
+    try:
+        mine = '%s:' % getattr(guild, 'id', 0)
+        keep = {}
+        for k, v in _open_tickets().items():
+            if k.startswith(mine) and _open_thread(guild, v) is None:
+                continue
+            keep[k] = v
+        keep[_ticket_key(guild, who)] = thread.id
+        with open(OPEN_TICKETS, 'w') as f:
+            json.dump(keep, f)
+    except Exception:
+        log('could not write down which ticket %s has open, so they can open '
+            'a second one:\n' % who + traceback.format_exc())
+
+
+def ticket_refusal(interaction):
+    """
+    Why this person cannot open a ticket right now, in words, or None.
+
+    Asked twice: when somebody picks from the panel, so they hear it before
+    typing anything, and again when the form comes back, because the form can
+    be opened several times before any of them is sent.
+
+    Anything that goes wrong in here lets them through. A bug that refused
+    every ticket would refuse every playtest application with it, and that is
+    the only way in.
+    """
+    try:
+        who = interaction.user
+        guild = interaction.guild
+        if guild is None or is_staff(who, interaction.channel):
+            return None
+        key = _ticket_key(guild, who)
+        tid = _open_tickets().get(key)
+        t = _open_thread(guild, tid) if tid else None
+        if t is not None:
+            return ('You already have a ticket open: %s. Say it in there and '
+                    'staff will see it.' % t.mention)
+        at = _last_ticket.get(key)
+        if at is not None:
+            left = TICKET_COOLDOWN - (_now() - at)
+            if left > 0:
+                mins = int((left + 59) // 60)
+                return ('You have only just sent a ticket. You can send '
+                        'another in %d minute%s.'
+                        % (mins, '' if mins == 1 else 's'))
+        return None
+    except Exception:
+        log('the ticket limit could not be checked, so this one was let '
+            'through:\n' + traceback.format_exc())
+        return None
+
+
 async def close_here(interaction, why=None):
     """
     Close the ticket this was used in.
@@ -850,6 +984,12 @@ class TicketPicker(discord.ui.Select):
                      for k, lab, desc in KINDS])
 
     async def callback(self, interaction):
+        # Told here, before the form opens, so nobody types out a whole
+        # application only to be turned away at the end of it.
+        no = ticket_refusal(interaction)
+        if no:
+            await interaction.response.send_message(no, ephemeral=True)
+            return
         k = self.values[0]
         lab = dict((a, b) for a, b, _ in KINDS)[k]
         await interaction.response.send_modal(TicketModal(k, lab))
