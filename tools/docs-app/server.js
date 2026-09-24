@@ -1788,7 +1788,8 @@ async function handle(req, res) {
     gate and stay public, because an installer cannot sign in.
 
     The reply is read by Bootstrap.cs with plain string searches for "name":",
-    "url":" and "size":, so the shape matters more than the field order.
+    "url":", "size": and "sha256":", so the shape matters more than the field
+    order.
   */
   if (route === '/api/payload' && req.method === 'GET') {
     let best = null;
@@ -1804,10 +1805,19 @@ async function handle(req, res) {
     // and nothing should be fetched. Bootstrap turns an empty url into "The
     // site is not offering a download right now", which is the truth.
     if (!best) return sendJson(res, 200, {});
+    // The SHA-256 Publish-Installer measured on the zip it sent, kept in
+    // files.json beside its name. best is built from a stat and has no hash on
+    // it, so it is looked up here. Only a well formed one goes out: anything
+    // else would make every install delete a good download. An empty value
+    // tells the installer there is nothing to check, which is also what an
+    // installer from before this sees when the field is missing.
+    const meta = jsonFile(path.join(FILES, 'files.json'), {});
+    const sha = String((meta[best.name] || {}).sha256 || '');
     return sendJson(res, 200, {
       name: best.name,
       url: '/file/' + encodeURIComponent(best.name),
-      size: best.size
+      size: best.size,
+      sha256: /^[0-9a-f]{64}$/i.test(sha) ? sha.toLowerCase() : ''
     });
   }
 
