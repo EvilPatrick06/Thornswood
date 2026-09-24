@@ -10738,10 +10738,13 @@ log('gamemode loaded:',
     was already in the world. They stayed until they logged out.
 
     ONLY A LIST THAT LANDED DOES THIS. A refresh that failed, was rate limited
-    or could not reach Discord returns before it moves listAt, and one that
-    came back empty carries nobody, so neither touches anybody already in.
-    A Discord hiccup that throws the whole server out at once is the outage
-    the watch-only start above was written to avoid.
+    or could not reach Discord for anybody returns before it moves listAt, and
+    one that came back empty carries nobody, so neither touches anybody already
+    in. One that reached Discord for some people and not others does land, but
+    the ones it could not check keep the standing they had (keepWhatFailed
+    below), so they are left alone too. A Discord hiccup that throws the whole
+    server out at once is the outage the watch-only start above was written to
+    avoid.
   */
   var letIn = {};
 

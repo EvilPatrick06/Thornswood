@@ -301,7 +301,9 @@ if (block !== null) {
   }
 
   // S6: the site could not reach Discord. It still sends what it did get,
-  //     which is a short list, and that short list is the lockout.
+  //     which is a short list, and that short list is the lockout. It names
+  //     nobody in failedProfiles, which is what an older site sends, so the
+  //     door keeps the whole list. S16 is the answer that does name them.
   failing('S6 Discord unreachable', function (r) {
     r.answer(200, { profiles: [101], lookupFailed: true,
                     lookupFailedWhy: 'Discord is rate limiting the bot' });
@@ -395,6 +397,36 @@ if (block !== null) {
     r.tick();
     yes('S15 and the next list from the site does, with enforce as it was left',
         r.kicked.length === 1 && r.kicked[0] === 2);
+  }
+
+  // S16: DISCORD ANSWERED FOR SOME. The site reached Discord for most people
+  //      and names the one it could not check in failedProfiles. The door
+  //      writes that list with the unchecked one kept as they were, so a ban
+  //      in the same answer lands and the person nobody could check stays in.
+  {
+    const r = rig(true, [101, 202, 303]);
+    r.answer(200, { profiles: [101, 202, 303] });
+    r.arrive(A, 101, 1);
+    r.arrive(B, 202, 2);
+    r.arrive(C, 303, 3);
+    r.tick();
+    const mark = r.said.length;
+    r.advance(300000);
+    r.refresh();
+    r.answer(200, { profiles: [101], lookupFailed: true, failedProfiles: [303],
+                    lookupFailedWhy: 'Discord is rate limiting the bot' });
+    r.tick();
+    yes('S16 Discord answered for some: the one it could not check is still on the list on disk',
+        JSON.parse(r.files[ALLOWED]).profiles.indexOf(303) >= 0);
+    yes('S16 and the ban in the same answer turns that one away',
+        r.kicked.length === 1 && r.kicked[0] === 2 &&
+        r.since(mark, /turned away profile 202/) === 1);
+    yes('S16 and the one nobody could check is not judged again',
+        r.since(mark, /profile 303 dropped off|turned away profile 303|WOULD TURN AWAY profile 303/) === 0);
+    const kicks = r.kicked.length;
+    r.tick(); r.advance(60000); r.tick();
+    yes('S16 and nothing more happens on the ticks after',
+        r.kicked.length === kicks && r.kicked.indexOf(3) < 0);
   }
 
   // Every tick runs inside a try that notes "tick failed". None of the above
