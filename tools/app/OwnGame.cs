@@ -1235,6 +1235,17 @@ namespace Thornswood
                         r.Refused.Add(f.Substring(src.TrimEnd('\\').Length).TrimStart('\\') + "  (Vortex's record could not be read, so nothing it lists was brought in)");
                         continue;
                     }
+                    // A mods folder that is the folder Vortex deploys into, or
+                    // sits inside it, would bring that folder's own files in
+                    // whenever the record listed them. Vortex does not accept a
+                    // staging folder inside the game folder, so such a record
+                    // was not written by it; refusing it keeps the no-bleed rule
+                    // true for any record at all. Verification of hotfix 1.1.93.
+                    if (Overlaps(doc.stagingPath, src))
+                    {
+                        r.Refused.Add(f.Substring(src.TrimEnd('\\').Length).TrimStart('\\') + "  (Vortex's record names a mods folder that overlaps " + src + ", so nothing it lists was brought in)");
+                        continue;
+                    }
                     bool listed = false;
                     foreach (string s in r.Staging) if (SameFolder(s, doc.stagingPath)) listed = true;
                     if (!listed) r.Staging.Add(doc.stagingPath);
@@ -1277,6 +1288,22 @@ namespace Thornswood
                 return mod;
             }
             catch { return null; }
+        }
+
+        /// <summary>
+        /// One folder is the other or holds it. Anything that cannot be
+        /// worked out counts as overlapping, because refusing only means
+        /// nothing is brought in from that record.
+        /// </summary>
+        static bool Overlaps(string a, string b)
+        {
+            try
+            {
+                string x = Path.GetFullPath(a).TrimEnd('\\') + "\\";
+                string y = Path.GetFullPath(b).TrimEnd('\\') + "\\";
+                return x.StartsWith(y, StringComparison.OrdinalIgnoreCase) || y.StartsWith(x, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return true; }
         }
 
         /// <summary>A path under the game folder that stays under it: no drive, no "..".</summary>

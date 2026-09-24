@@ -421,6 +421,7 @@ namespace Thornswood
                     TwoCopies();
                     StaleInSteam();
                     Preference();
+                    StagingInside();
                     Ordinary();
                     Picker();
                     NothingDeployed();
@@ -699,6 +700,37 @@ namespace Thornswood
             File.Delete(Path.Combine(copy, "Data\\vortex.deployment.json"));
             Yes("and with no record anywhere it names the Steam copy for WhyNot, not the purged folder",
                 string.Equals(DeploysInto(u.Cfg), copy, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // ---- a record whose mods folder is the other folder itself ---------
+        //
+        // The judge of the hotfix 1.1.93 verification: nothing checked that
+        // Vortex's mods folder named in a record lies outside the folder it
+        // deploys into, so a record naming Keizaal Online itself as staging
+        // would bring in any of Keizaal's own files it listed. Vortex will not
+        // write such a record; the launcher must not trust one anyway.
+        static void StagingInside()
+        {
+            Scene s = NewScene("inside", true);
+            string steam = SteamCopy(s, s.Steam, "STEAM");
+            Staging(s);
+            string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow);
+            // Everything the record lists really is under the folder it names,
+            // so without the refusal the build goes ahead and takes them.
+            Put(Path.Combine(k, "ModA\\TsOne.esp"), "KEIZAAL-MODA-ONE");
+            Put(Path.Combine(k, "ModA\\TsTwo.esm"), "KEIZAAL-MODA-TWO");
+            Record(Path.Combine(k, "Data\\vortex.deployment.json"), k, Path.Combine(k, "Data"),
+                   new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" }, new string[] { "x.txt", "Mods" } }, DateTime.UtcNow);
+            Paths.Game = steam;
+            string made = null;
+            try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
+            string game = OwnGame.Folder;
+            bool none = !File.Exists(Path.Combine(game, "Data\\x.txt")) &&
+                        Text(Path.Combine(game, "Data\\TsOne.esp")) != "KEIZAAL-MODA-ONE" && Text(Path.Combine(game, "Data\\TsTwo.esm")) != "KEIZAAL-MODA-TWO";
+            Yes("a record whose mods folder is the other folder itself brings nothing of that folder in", none);
+            string left = "";
+            try { left = File.ReadAllText(Path.Combine(OwnGame.Dir, "left-out.txt")); } catch { }
+            Yes("and says why, if a folder was built at all", made == null || left.IndexOf("overlaps", StringComparison.Ordinal) >= 0);
         }
 
         // ---- the ordinary case, unchanged -----------------------------------
