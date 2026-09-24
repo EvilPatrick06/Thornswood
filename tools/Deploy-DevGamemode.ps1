@@ -285,6 +285,27 @@ Write-Host 'Pointing the dev server at the dev voice service...'
 # rebuilt from thornswood/engine-changes before it does anything; an unknown key
 # is ignored until then.
 #
+# AND THE START POINT MOVES WITH THE LOAD ORDER, added 23 September.
+#
+# The block below rewrites loadOrder on the dev box whenever the build's
+# order differs from the one up there. startPoints sits in the same file and
+# holds a form id, and a form id is fileIndex * 0x01000000 + local id, so
+# moving the load order under it silently points it at a different plugin,
+# or at no plugin at all.
+#
+# That is what happened. The dev settings were written on 22 September when
+# Skyrim Unbound.esp was at index 58; the order moved and Unbound is at 54
+# there now, in a list of 57. Every new character on dev died at login with
+#   Error: FromFormId failed due to invalid file index 58  (spawn.ts:38)
+# and the client showed its OOPS box with no way to tell what was wrong.
+# Patrick hit it on 23 September at 18:30.
+#
+# The index is recomputed here from whatever load order this run leaves on
+# the box, and only the index: the local id is kept exactly as it was, so
+# this fixes a moved plugin and never decides where the creation room is.
+# Deploy-Gamemode.ps1 computes the same thing the same way for the live
+# server, which is why live was right and dev was not.
+#
 # This comment is HERE and not inside the here-string below on purpose. Anything
 # in that string is base64 encoded and sent as an ssh command line, where it
 # counts double and the far end truncates at about 8191 characters. Ten lines of
@@ -324,6 +345,27 @@ if (`$orderPath -and (Test-Path `$orderPath)) {
     }
   }
 }
+# The start point, against the order this run leaves behind.
+`$wantStart = `$false
+`$startWas = 0
+`$startWant = 0
+`$order2 = @(`$(if (`$wantOrder) { `$newOrder } else { @(`$s.loadOrder) }))
+`$unb = -1
+for (`$i = 0; `$i -lt `$order2.Count; `$i++) {
+  if ((Split-Path `$order2[`$i] -Leaf) -eq 'Skyrim Unbound.esp') { `$unb = `$i; break }
+}
+`$pt = @(`$s.startPoints)[0]
+if (`$pt -and `$unb -ge 0) {
+  `$startWas = [int64]`$pt.worldOrCell
+  `$startWant = (`$unb * 0x01000000) + (`$startWas -band 0x00FFFFFF)
+  if (`$startWas -ne `$startWant) {
+    `$wantStart = `$true
+    'the start point names file index ' + [int](`$startWas -shr 24) +
+      ', and Skyrim Unbound.esp is at ' + `$unb + ' in this load order. A new character cannot spawn.'
+  }
+} elseif (-not `$pt) { 'no startPoints in the dev settings, leaving that alone' }
+elseif (`$unb -lt 0) { 'Skyrim Unbound.esp is not in this load order, leaving the start point alone' }
+
 # A byte order mark counts as needing a rewrite even when the number is
 # already right. The run on 18 September set the value AND wrote a mark, so
 # a second run that only compared the number would have said 'already 7789'
@@ -331,11 +373,16 @@ if (`$orderPath -and (Test-Path `$orderPath)) {
 `$bom = `$false
 try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
-if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder) {
+if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart) {
   'thornswoodVoicePort is already $VoicePort, both equipment checks are already off, and the load order is already right'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
   if (`$wantOrder) { `$s | Add-Member -NotePropertyName loadOrder -NotePropertyValue `$newOrder -Force }
+  if (`$wantStart) {
+    `$pt.worldOrCell = ('0x{0:X8}' -f `$startWant)
+    `$s | Add-Member -NotePropertyName startPoints -NotePropertyValue @(`$pt) -Force
+    'start point moved to 0x{0:X8}, index {1}' -f `$startWant, `$unb
+  }
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
@@ -370,7 +417,8 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
             ', gear strip ' + `$back.equipmentSlotCheckEnabled +
             ', spell strip ' + `$back.equipmentSpellCheckEnabled +
             ', unknown item vetoes ' + `$back.equipmentInventoryCheckEnabled +
-            ', load order ' + @(`$back.loadOrder).Count + ' plugins' }
+            ', load order ' + @(`$back.loadOrder).Count + ' plugins' +
+            ', start point ' + @(`$back.startPoints)[0].worldOrCell }
   } catch {
     'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
   }
