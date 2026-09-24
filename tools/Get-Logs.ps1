@@ -20,6 +20,8 @@
 
   Three files come back:
 
+      site.log      the website, the Discord door and the launcher check in
+      bot.log       the Discord bot, the panel and the site watcher
       server.log    the game server, which is where character creation,
                     connections, item handouts and gamemode errors are
       voice.log     the voice and register service
@@ -73,6 +75,10 @@ $target = "$User@$Vps"
 # only change needed to have it come down with the rest.
 $srvRoot   = if ($Dev) { 'C:\Thornswood-Server-Dev' } else { 'C:\Thornswood-Server' }
 $voiceRoot = if ($Dev) { 'C:\Thornswood-Voice-Dev' }  else { 'C:\Thornswood-Voice' }
+# There is one site and one bot, live or dev: the dev launcher and the dev
+# server both talk to the same site, so these two do not move with -Dev.
+$docsRoot  = 'C:\Thornswood-Docs'
+$botRoot   = 'C:\Thornswood-Bot'
 Say ("  reading the {0} server at {1}" -f $(if ($Dev) { 'DEV' } else { 'live' }), $srvRoot) 'DarkGray'
 
 $logs = @(
@@ -96,6 +102,20 @@ $logs = @(
     #>
     @{ Name = 'door.log'; Path = (Join-Path $srvRoot 'private\door.log'); What = 'the door: who it let in and what the site said' }
     @{ Name = 'voice.log';  Path = (Join-Path $voiceRoot 'voice.log');   What = 'voice and the character register' }
+    <#
+      The site, added 23 September. It printed everything it worked out into
+      a handle nobody held: no redirect on the task and no file anywhere on
+      the box. The sentences discordGet works out for every kind of refusal,
+      which exist because a dead token, a rate limit and somebody genuinely
+      not in the Discord used to look identical, had never once been
+      readable. server.js writes them here now and rolls the file at 4 MB,
+      keeping five, so site.log.1 to .5 are the older ones if the answer is
+      not in the current one.
+    #>
+    @{ Name = 'site.log';   Path = (Join-Path $docsRoot 'site.log');     What = 'the website and the Discord door' }
+    # The bot has written this all along and nothing ever fetched it, which
+    # is why the site watcher's startup line had to be read over ssh by hand.
+    @{ Name = 'bot.log';    Path = (Join-Path $botRoot 'bot.log');       What = 'the Discord bot, the panel and the site watcher' }
 )
 
 Head 'Pulling'
