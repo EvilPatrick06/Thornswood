@@ -36,6 +36,15 @@
 # SteamUpdates.cs say why in a comment instead, because test-steam-updates.ps1
 # compiles that class on its own and it cannot reach Swallow. So the numbers
 # below held at 376 and none was raised.
+#
+# Main brought seven more on the second merge, the same afternoon: two in
+# Shell.cs where the launcher clears the copy its self update kept, two in
+# SelfSwap.cs and three in ShellUninstall.cs. The two in Shell.cs, and the
+# scroll and status line in ShellUninstall.cs, log with Swallow.Note. The two
+# in SelfSwap.cs say why in a comment, because test-self-update.ps1 compiles
+# that class on its own. The third in ShellUninstall.cs, the fault handler's
+# write to the log, says why in a comment too, because it is the log that
+# failed. Still 376, and none was raised.
 Art.cs 1
 Chars.cs 18
 Checks.cs 21

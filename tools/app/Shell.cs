@@ -445,9 +445,9 @@ namespace Thornswood
                 ThreadPool.QueueUserWorkItem(delegate
                 {
                     string said = null;
-                    try { said = SelfSwap.Settle(self); } catch { }
+                    try { said = SelfSwap.Settle(self); } catch (Exception ex) { Swallow.Note("Shell.Run, clearing the copy the self update kept", ex); }
                     if (string.IsNullOrEmpty(said)) return;
-                    try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); }); } catch { }
+                    try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying what the self update left", ex); }
                 });
             };
 
