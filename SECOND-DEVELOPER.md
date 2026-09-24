@@ -137,6 +137,16 @@ gh auth login
 gh auth status
 ```
 
+Every change goes to the dev channel first, and the dev channel needs the dev
+build on this machine too: in the main launcher, Settings, Maintenance, The dev
+build, Install the dev build. That puts it at `<drive>:\Thornswood-DevBuild`,
+beside the main install. Then open it once and let it make its own game folder,
+`<Root>-DevBuild\Game`: it offers at startup, and its own Settings, Maintenance
+has "Make it". Ship refuses `-Channel dev` without the dev build, and with the
+dev build but without that folder it builds the dev release out of the Steam
+copy instead. `.\tools\Check-ShipReady.ps1 -Channel dev` says whether both are
+in place, without shipping anything.
+
 Then in `Thornswood-Repo`:
 
 ```
@@ -270,9 +280,10 @@ the mod has them. The sign in file the 16 Sep installer carried is removed from
 the Steam copy as well as from the folder (`Leaks.cs`).
 
 **Testing it on the dev channel.** The dev build runs from
-`<Root>-DevBuild`, which has no Game folder, so it starts on the Steam copy.
-Its own Settings, Maintenance has "Make it", which builds
-`<Root>-DevBuild\Game` the same way.
+`<Root>-DevBuild`, which has no Game folder when it is first installed. It
+offers to make `<Root>-DevBuild\Game` the same way at its first start, its own
+Settings, Maintenance has "Make it", and until the folder is there Play will
+not start the game out of the Steam copy.
 
 Skyrim reads its plugin list from one Windows folder per user. Thornswood swaps
 it per session and ignores which profile Vortex has on.
