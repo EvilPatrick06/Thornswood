@@ -29,7 +29,11 @@
 //
 // A line that has only moved is reported, not failed: every edit above it
 // moves it, and the name is the anchor the page tells people to search for.
-// Each NOTE says where the line is now, so updating the page is a copy.
+// Each NOTE says where the line is now, so updating the page is a copy. Where
+// a name is on several lines (a method's declaration and its call), the one
+// meant is the one that moved with the references around it, not the nearest;
+// settle() below says why, and a check after the order check proves it
+// against the code on every run.
 //
 // Read only.
 const fs = require('fs');
@@ -198,27 +202,94 @@ malformed.forEach(function (b) { console.log('      not in the File.cs:line Name
 yes('every file:line reference on the page is in the File.cs:line Name form', malformed.length === 0);
 yes('the page makes at least 100 file:line references, ' + refs.length + ' of them', refs.length >= 100);
 
-const gone = [];
-let exact = 0, moved = 0;
-refs.forEach(function (r) {
-  const lines = source(r.file);
-  if (lines === null) { gone.push(r.text + ' (page line ' + r.pageLine + '): tools/app/' + r.file + ' does not exist'); return; }
+// Every line a reference's name is on: as a declaration when the page gives it
+// with (), as code otherwise.
+function hitsOf(lines, r) {
   const rx = r.decl ? declRx(r.name.split('.').pop()) : refRx(r.name);
   const hits = [];
   lines.forEach(function (l, i) { if (rx.test(l)) hits.push(i + 1); });
-  if (hits.length === 0) {
+  return hits;
+}
+
+// Which of those lines is the one the page means, once lines have moved.
+//
+// The nearest line with the name is the wrong answer for any name that is on
+// more than one line. A method's declaration and its call carry the same name,
+// and once an edit above both moves them further than half the gap between
+// them, the declaration is nearer to where the page says the call is. Measured
+// on 24 Sep: 16 comment lines added near the top of Shell.cs, nothing renamed
+// and nothing reordered, and the order check failed with "Door.Check then
+// StartPlay", because it had taken StartPlay's declaration for its call. At 80
+// lines five pairs failed. That is a docs page turning a required check red on
+// an ordinary pull request.
+//
+// An edit moves every line below it by the same amount, so references that sit
+// near each other in a file move together. So the references into one file are
+// taken in the order of the lines the page gives them, and between them they
+// get the lines with their names over which the move changes least: counted in
+// lines, plus one for each time it changes, starting from no move at the top.
+// A step picked on another line with its name costs twice, once to jump there
+// and once to jump back, so it only wins where the references around it moved
+// that way too. A name on one line settles itself, and it settles the names on
+// several lines around it. `spots` are one file's references, one per line the
+// page gives and name, sorted by that line, each with at least one hit; each
+// gets .now, the line it settled on.
+function settle(spots) {
+  let prev = [{ shift: 0, cost: 0 }];
+  const rows = spots.map(function (s) {
+    const row = s.hits.map(function (h) { return { at: h, shift: h - s.line, cost: 0, from: 0 }; });
+    // Nearest first, so that of two choices that cost the same, the line
+    // nearer to where the page says wins, as it did before.
+    row.sort(function (a, b) { return Math.abs(a.shift) - Math.abs(b.shift) || a.at - b.at; });
+    row.forEach(function (c) {
+      c.cost = Infinity;
+      prev.forEach(function (p, j) {
+        const d = Math.abs(c.shift - p.shift);
+        const v = p.cost + d + (d ? 1 : 0);
+        if (v < c.cost) { c.cost = v; c.from = j; }
+      });
+    });
+    prev = row;
+    return row;
+  });
+  let k = 0;
+  prev.forEach(function (c, j) { if (c.cost < prev[k].cost) k = j; });
+  for (let i = rows.length - 1; i >= 0; i--) { spots[i].now = rows[i][k].at; k = rows[i][k].from; }
+}
+function bySpot(a, b) { return a.line - b.line || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0); }
+
+const gone = [];
+const spotsIn = {};
+refs.forEach(function (r) {
+  const lines = source(r.file);
+  if (lines === null) { gone.push(r.text + ' (page line ' + r.pageLine + '): tools/app/' + r.file + ' does not exist'); return; }
+  const all = spotsIn[r.file] || (spotsIn[r.file] = {});
+  const key = r.line + ' ' + r.name + (r.decl ? '()' : '');
+  const s = all[key] || (all[key] = { key: key, line: r.line, hits: hitsOf(lines, r) });
+  if (s.hits.length === 0) {
     gone.push(r.text + ' (page line ' + r.pageLine + '): ' +
       (r.decl ? 'no method of that name is declared in ' : 'that name is no longer in the code of ') + r.file);
     return;
   }
-  if (hits.indexOf(r.line) >= 0) { r.now = r.line; exact++; }
+  r.spot = s;
+});
+function spotsOf(file) {
+  const all = spotsIn[file];
+  return Object.keys(all).map(function (k) { return all[k]; })
+    .filter(function (s) { return s.hits.length > 0; }).sort(bySpot);
+}
+Object.keys(spotsIn).forEach(function (file) { settle(spotsOf(file)); });
+
+let exact = 0, moved = 0;
+refs.forEach(function (r) {
+  if (!r.spot) return;
+  r.now = r.spot.now;
+  if (r.now === r.line) exact++;
   else {
-    let best = hits[0];
-    hits.forEach(function (h) { if (Math.abs(h - r.line) < Math.abs(best - r.line)) best = h; });
-    r.now = best; moved++;
-    note(r.text + ' has moved to ' + r.file + ':' + best + ' (page line ' + r.pageLine + ')');
+    moved++;
+    note(r.text + ' has moved to ' + r.file + ':' + r.now + ' (page line ' + r.pageLine + ')');
   }
-  r.member = r.file + '|' + enclosing(lines, r.now);
+  r.member = r.file + '|' + enclosing(source(r.file), r.now);
 });
 gone.forEach(function (m) { console.log('      ' + m); });
 yes('every name the page gives is still in the file it names', gone.length === 0);
@@ -257,6 +328,56 @@ yes('the steps the page lists inside each method are in the order the code runs 
   yes('the page walks at least ten steps inside Play(), ' + inPlay.length + ' of them', inPlay.length >= 10);
   yes('and the same steps listed backwards would be caught as out of order',
       outOfOrder(inPlay.slice().reverse()).length > 0);
+}
+
+// Proof that a line which has only moved is a NOTE and never a failure. For
+// each file, the page taken as exactly right, then every line from its first
+// reference down pushed further down by 16, 80 and 400, the way lines added
+// above all of them would: each reference has to follow its own line and not
+// another line with its name. 16 is where the nearest-line choice this
+// replaced first went wrong in Shell.cs. The answer is certain, whatever the
+// code says, in any file where one referenced name is on one line only, since
+// that name pins the move for the rest; a file without one is left out rather
+// than guessed at.
+{
+  const wrong = [];
+  let files = 0;
+  Object.keys(spotsIn).forEach(function (file) {
+    const real = spotsOf(file);
+    if (!real.some(function (s) { return s.hits.length === 1; })) return;
+    files++;
+    let top = Infinity;
+    real.forEach(function (s) { if (s.now < top) top = s.now; });
+    [16, 80, 400].forEach(function (k) {
+      const pushed = real.map(function (s) {
+        return { key: s.key, line: s.now, hits: s.hits.map(function (h) { return h >= top ? h + k : h; }) };
+      }).sort(bySpot);
+      settle(pushed);
+      pushed.forEach(function (s) {
+        if (s.now !== s.line + k) wrong.push(file + ':' + s.line + ' ' + s.key.replace(/^\d+ /, '') + ' pushed ' + k + ' lines came out at ' + s.now + ', not ' + (s.line + k));
+      });
+    });
+  });
+  wrong.slice(0, 10).forEach(function (m) { console.log('      ' + m); });
+  yes('pushed down 16, 80 or 400 lines, every reference in ' + files + ' files follows its own line', files > 0 && wrong.length === 0);
+}
+
+// And inside one method, the StartPlay case as it is laid out in Shell.cs:
+// StartPlay declared at 100, Door.Check at 115, StartPlay called again at 130,
+// CheckIn at 140, then 40 lines added between Door.Check and the call. The
+// declaration is now 30 lines from where the page says the call is and the
+// call is 40, so the nearest line is the wrong one; the steps either side say
+// which is right.
+{
+  const fixture = [
+    { key: '100 StartPlay()', line: 100, hits: [100] },
+    { key: '115 Door.Check', line: 115, hits: [115] },
+    { key: '130 StartPlay', line: 130, hits: [100, 170] },
+    { key: '140 CheckIn', line: 140, hits: [180] }
+  ];
+  settle(fixture);
+  yes('a call moved 40 lines past its own declaration is found at the call, 170, not the declaration: ' + fixture[2].now,
+      fixture[0].now === 100 && fixture[1].now === 115 && fixture[2].now === 170 && fixture[3].now === 180);
 }
 
 // ------------------------------------------------------------ 6. shape
