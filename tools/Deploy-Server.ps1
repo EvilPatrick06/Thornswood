@@ -420,6 +420,22 @@ foreach ($f in $files) {
   '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
 }
 
+# The build stamp Deploy-Gamemode.ps1 left beside gamemode.js goes up with it,
+# so the box can say which gamemode it runs. It is made again here when it does
+# not describe the gamemode about to be sent, which is what happens when the
+# copy above took the one in tools, because a stamp naming a different
+# gamemode is worse than none. From tools when that is the same file, so git
+# can say whether the commit holds it. See BuildStamp.ps1.
+. (Join-Path $Here 'BuildStamp.ps1')
+$stampPath = Join-Path $Dist 'thornswood-build.json'
+if (-not (Test-ThornswoodBuildStamp -Path $stampPath -Gamemode $built)) {
+  $stampFrom = $built
+  if ((Test-Path -LiteralPath $src) -and
+      (Get-FileHash -LiteralPath $src).Hash -eq (Get-FileHash -LiteralPath $built).Hash) { $stampFrom = $src }
+  $null = Save-ThornswoodBuildStamp -Gamemode $stampFrom -Channel main -RepoDir (Split-Path -Parent $Here) -Path $stampPath
+}
+'{0,-22} {1}' -f 'thornswood-build.json', (Format-ThornswoodBuildStamp (Get-Content -LiteralPath $stampPath -Raw | ConvertFrom-Json)) | Write-Host
+
 # ---------------------------------------------------------- which build is this
 #
 # The binaries have always been copied rather than rebuilt here, and until
@@ -584,6 +600,14 @@ foreach ($f in $files) {
 # the question, what source and what binary, both have an answer on the machine
 # serving people rather than only on a developer's disk.
 if (Test-Path -LiteralPath $recordPath) { $send['server-build.json'] = $recordPath }
+# The build stamp goes up in the stage with the gamemode it describes, so it
+# is hashed and checked with the rest, swapped in beside gamemode.js, and put
+# back with it on a rollback. Sent on its own straight into the live folder,
+# the way it went before the stage, a rollback would leave the new stamp
+# describing the old gamemode. A failed send was a warning then because the
+# server was already down; here it stops the run like any other file, because
+# nothing has been stopped yet and nobody has been warned, so it costs a rerun.
+$send['thornswood-build.json'] = $stampPath
 
 $hashes = [ordered]@{}
 foreach ($rel in $send.Keys) {

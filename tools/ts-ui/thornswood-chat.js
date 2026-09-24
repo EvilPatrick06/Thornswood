@@ -43,6 +43,10 @@
   var C_TEXT = '#e8e3d8';
   var C_SYS  = '#8f8a7d';
   var C_WARN = '#c98b6b';
+  // An action, /me and /do, and a whisper. Only used while the voice service
+  // has THORNSWOOD_CHAT_RANGE on; see partsFor.
+  var C_ACT   = '#b8a6cf';
+  var C_QUIET = '#b3ada0';
 
   var ws = null;
   var tries = 0;
@@ -69,6 +73,37 @@
   }
 
   function chat() { return window.thornswoodChat; }
+
+  /*
+    How one chat line is drawn, by what kind of line it is.
+
+    kind only arrives while the voice service has THORNSWOOD_CHAT_RANGE on. A
+    line without one, which is every line while it is off and every line from
+    a service older than it, is drawn exactly as it always was: the name, then
+    the words. /me and /do are actions and read as one, the way text roleplay
+    has written them for decades; a whisper is dimmer; a shout says so. A kind
+    this page has never heard of is drawn as a plain line rather than dropped.
+  */
+  function partsFor(msg) {
+    var who = String(msg.name || '').trim() || 'Someone';
+    var mine = ME && Number(msg.profileId) === ME;
+    var nc = mine ? '#d8c79a' : C_NAME;
+    var said = String(msg.text || '');
+    var kind = String(msg.kind || '');
+    if (kind === 'me') {
+      return [{ text: '* ' + who + ' ', color: nc }, { text: said, color: C_ACT }];
+    }
+    if (kind === 'do') {
+      return [{ text: '* ' + said + ' ', color: C_ACT }, { text: '(' + who + ')', color: nc }];
+    }
+    if (kind === 'whisper') {
+      return [{ text: who + ' whispers: ', color: nc }, { text: said, color: C_QUIET }];
+    }
+    if (kind === 'shout') {
+      return [{ text: who + ' shouts: ', color: nc }, { text: said, color: C_TEXT }];
+    }
+    return [{ text: who + ': ', color: nc }, { text: said, color: C_TEXT }];
+  }
 
   function note(text, color) {
     var c = chat();
@@ -133,14 +168,9 @@
       // There was a second `if (msg.t === 'chat')` wrapped round all of this,
       // which could never be false.
       {
-        var who = String(msg.name || '').trim() || 'Someone';
-        var mine = ME && Number(msg.profileId) === ME;
         var c = chat();
         if (!c) return;
-        c.add([
-          { text: who + ': ', color: mine ? '#d8c79a' : C_NAME },
-          { text: String(msg.text || ''), color: C_TEXT }
-        ], 'plain');
+        c.add(partsFor(msg), 'plain');
         return;
       }
 
