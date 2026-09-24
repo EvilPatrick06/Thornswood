@@ -296,7 +296,7 @@ const BLURB = {
   '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
   '/credits':   ['Credits', 'Everyone whose work Thornswood is built on.'],
   '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
-  '/known':     ['Known issues', 'Permanent limits of how a shared Skyrim works, each with the reason. Read this before reporting anything.'],
+  '/known':     ['Known issues', 'What is limited or broken right now and why, and which of it is on the roadmap. Read this before reporting anything.'],
   '/help':      ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
   '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
   '/roadmap':   ['Roadmap', 'What is being worked on and roughly in what order.'],
@@ -441,8 +441,14 @@ function listFiles() {
     // server's address. Anything with a script extension is hidden whatever
     // files.json says about it.
     const script = /[.](ps1|psm1|cmd|bat|py|sh)$/i.test(name);
+    // The installer's SHA-256, which Publish-Installer writes, so the Downloads
+    // page can print it beside the size and date and link VirusTotal's report
+    // on it (To Do entry 176). Only a well formed hash goes out, in lower case
+    // because Get-FileHash writes upper and the page builds an address from it.
+    const sha256 = String(m.sha256 || '').toLowerCase();
     out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,
-      label: m.label || name, version: m.version || '', note: m.note || '' });
+      label: m.label || name, version: m.version || '', note: m.note || '',
+      sha256: /^[0-9a-f]{64}$/.test(sha256) ? sha256 : '' });
   }
   out.sort((a, b) => b.at - a.at);
   return out;
@@ -585,6 +591,67 @@ function send(res, code, payload, type, extra) {
   res.end(payload);
 }
 const sendJson = (res, code, obj) => send(res, code, JSON.stringify(obj));
+
+/*
+  One byte range, when a client asks for one. Answers 206 or 416 and returns
+  true, or returns false when there is no range to honour and the caller sends
+  its own 200.
+
+  The static files had this and /file/ did not. /file/ is where the installer
+  gets its payload, and Bootstrap.cs asks for the rest of a half downloaded zip
+  with a Range header and appends whatever a 206 brings. The site answered
+  every such request 200 with the whole file and no Accept-Ranges, so a
+  connection that dropped at 300 MB started again from nothing, while the Join
+  page promises it carries on. The To Do List has it measured live: a Range
+  request for the payload came back 200 with the full length.
+
+  A 206 that starts anywhere but the byte asked for is written onto the end of
+  the partial file and corrupts it with nothing to notice, so the start is
+  exactly the number in the header and test-file-range.js holds it there.
+
+  headers are the ones this file is served with (content-type, and on /file/
+  the attachment name and its validators), lower case so none is sent twice.
+  When they carry an etag or last-modified, an If-Range that names neither is
+  a client resuming a file that has since changed, and it gets the whole new
+  file rather than the tail of it. head is a HEAD: headers only, and a HEAD
+  with a range on the installer does not read half a gigabyte to throw away.
+*/
+function rangeReply(req, res, file, size, headers, head) {
+  const range = req.headers.range;
+  const m = range && /^bytes=(\d*)-(\d*)$/.exec(String(range).trim());
+  if (!m) return false;
+  const ifRange = req.headers['if-range'];
+  if (ifRange && (headers.etag || headers['last-modified']) &&
+      ifRange !== headers.etag && ifRange !== headers['last-modified']) return false;
+  let start = m[1] === '' ? null : parseInt(m[1], 10);
+  let end = m[2] === '' ? null : parseInt(m[2], 10);
+  // bytes=-500 means the LAST 500, not "from 0 to 500".
+  if (start === null && end !== null) { start = Math.max(0, size - end); end = size - 1; }
+  if (start !== null && end === null) { end = size - 1; }
+  if (start === null || start > end || start >= size) {
+    res.writeHead(416, {
+      'content-range': 'bytes */' + size,
+      'accept-ranges': 'bytes',
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff'
+    });
+    res.end();
+    return true;
+  }
+  end = Math.min(end, size - 1);
+  // send() puts the last two on every other answer; a range must not be the
+  // one reply that quietly goes out without them.
+  res.writeHead(206, Object.assign({}, headers, {
+    'content-range': 'bytes ' + start + '-' + end + '/' + size,
+    'content-length': (end - start) + 1,
+    'accept-ranges': 'bytes',
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff'
+  }));
+  if (head) { res.end(); return true; }
+  fs.createReadStream(file, { start: start, end: end }).pipe(res);
+  return true;
+}
 
 function body(req, cap) {
   return new Promise((resolve) => {
@@ -2020,39 +2087,7 @@ async function handle(req, res) {
         Everything else is unaffected. No Range header means the old path, byte
         for byte, with Accept-Ranges added so a client knows it may ask.
       */
-      const range = req.headers.range;
-      const m = range && /^bytes=(\d*)-(\d*)$/.exec(String(range).trim());
-      if (m) {
-        const size = fs.statSync(file).size;
-        let start = m[1] === '' ? null : parseInt(m[1], 10);
-        let end = m[2] === '' ? null : parseInt(m[2], 10);
-        // bytes=-500 means the LAST 500, not "from 0 to 500".
-        if (start === null && end !== null) { start = Math.max(0, size - end); end = size - 1; }
-        if (start !== null && end === null) { end = size - 1; }
-        if (start === null || start > end || start >= size) {
-          res.writeHead(416, {
-            'content-range': 'bytes */' + size,
-            'accept-ranges': 'bytes',
-            'cache-control': 'no-store',
-            'x-content-type-options': 'nosniff'
-          });
-          res.end();
-          return;
-        }
-        end = Math.min(end, size - 1);
-        res.writeHead(206, {
-          'content-type': type,
-          'content-range': 'bytes ' + start + '-' + end + '/' + size,
-          'content-length': (end - start) + 1,
-          'accept-ranges': 'bytes',
-          // send() puts these on every other answer; a range must not be the
-          // one reply that quietly goes out without them.
-          'cache-control': 'no-store',
-          'x-content-type-options': 'nosniff'
-        });
-        fs.createReadStream(file, { start: start, end: end }).pipe(res);
-        return;
-      }
+      if (rangeReply(req, res, file, fs.statSync(file).size, { 'content-type': type }, head)) return;
       /*
         AND A CACHE HEADER, BECAUSE A LOGO IS NOT SOMEBODY'S PRIVATE DATA.
 
@@ -2102,11 +2137,23 @@ async function handle(req, res) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
-    res.writeHead(200, {
-      'Content-Type': 'application/octet-stream',
-      'Content-Length': st.size,
-      'Content-Disposition': 'attachment; filename="' + path.basename(file) + '"'
-    });
+    /* Resumable, because the payload is hundreds of megabytes and the Join
+       page says a dropped connection carries on. Accept-Ranges on the 200 so
+       a client knows before it starts. The ETag and Last-Modified are what a
+       browser needs before it will resume at all, and what If-Range is
+       checked against, so a one file installer taken in the browser resumes
+       too and never onto a different build. */
+    const kind = {
+      'content-type': 'application/octet-stream',
+      'content-disposition': 'attachment; filename="' + path.basename(file) + '"',
+      'etag': '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"',
+      'last-modified': new Date(st.mtimeMs).toUTCString()
+    };
+    if (rangeReply(req, res, file, st.size, kind, head)) return;
+    res.writeHead(200, Object.assign({}, kind, {
+      'content-length': st.size,
+      'accept-ranges': 'bytes'
+    }));
     if (head) return res.end();
     return fs.createReadStream(file).pipe(res);
   }
@@ -2205,6 +2252,27 @@ async function handle(req, res) {
 
     const st = await standing(t.d);
     standCache.delete(String(t.d));
+    /*
+      Could not ask Discord is not the same answer as not in the Discord.
+
+      standing() leaves inGuild false on every failed lookup and sets
+      lookupFailed to say why, because only a 404 means "not in the server".
+      This door tested inGuild alone, so a rate limit or a Discord outage came
+      back as 403 why 'guild', and the launcher writes a 'guild' down as a
+      remembered no, which erased the 72 hour grace it keeps for exactly the
+      day the site cannot vouch for anybody. The restart wave after every
+      release is when Discord rate limits the site, and a stranger told they
+      are not in a Discord they joined ten minutes ago assumes the thing is
+      broken and leaves.
+
+      So it answers 503 with the same why /api/play/owns already uses, and
+      Door.cs treats that like a site that did not answer: a yes from the last
+      few days still opens the door. The hand written admin list is left out
+      of this, because standing() already let them in and it is the way back
+      in on exactly this kind of morning.
+    */
+    if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok:false, why:'could not ask Discord', message:
+      'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
     if (!st.inGuild) return sendJson(res, 403, { ok:false, why:'guild', message:
       'That Discord account is not in the Thornswood Discord.',
       invite: cfg.discord.invite || '' });
@@ -2490,9 +2558,10 @@ async function handle(req, res) {
     the profile ids of everyone currently allowed in. Everyone who has ever
     checked in through the launcher is re-asked of Discord, so leaving the
     server or picking up the Banned role drops their numbers off the list
-    within a refresh. If any lookup failed the answer says so and the door
-    keeps the list it had, because a short list built while Discord was down
-    would turn away everybody missing from it.
+    within a refresh. If any lookup failed the answer says so and names the
+    profiles it could not check in failedProfiles, and the door keeps those
+    as they were, because a short list built while Discord was down would
+    turn away everybody missing from it.
 
     devProfiles rides along in the same answer: the subset of the same people
     who also hold the dev or admin role, whichever server they connect to.
@@ -2525,10 +2594,11 @@ async function handle(req, res) {
                   'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
+    const seenFailed = new Set();
     for (const d of Object.keys(linked)) {
       const row = linked[d] || {};
       const profiles = (Array.isArray(row.profiles) ? row.profiles : [])
@@ -2547,6 +2617,14 @@ async function handle(req, res) {
            enough; a list where every lookup fails fails for one reason. */
         out.lookupFailed = true;
         if (!out.lookupFailedWhy) { out.lookupFailedWhy = String(st.lookupFailed); }
+        /* AND WHOSE. lookupFailed alone makes one rate limited lookup throw
+           the whole list away, so the door kept a stale list for everybody
+           because one person could not be checked. Naming the profiles lets a
+           door that knows this field keep just those as they were and take
+           everybody else's fresh answer. lookupFailed and lookupFailedWhy stay
+           exactly as they were, so a door older than this still keeps the
+           whole list, which is what it did before. */
+        for (const n of profiles) if (!seenFailed.has(n)) { seenFailed.add(n); out.failedProfiles.push(n); }
         continue;
       }
       if (!st.play || st.banned) continue;

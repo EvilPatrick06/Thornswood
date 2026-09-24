@@ -96,6 +96,62 @@ function log() {
 }
 
 /*
+  Which gamemode.js this is.
+
+  From the To Do List, entry 254: "A version and commit logged at load." Until
+  this, nothing the server wrote said which gamemode.js it was running.
+  Check-LiveGamemode.ps1 can say over ssh whether the file up there matches
+  the repo right now, but a line in last night's thornswood.log could not be
+  tied to any commit, and 28 commits changed this file on 23 September alone.
+
+  So at load the file names itself the way git names it: SHA-1 over
+  "blob <length>", a NUL, and the bytes. That is the id
+      git hash-object tools\gamemode.js
+  prints on the machine that shipped it, and
+      git log --all --oneline --find-object=<id>
+  names the commit that made gamemode.js exactly this file. Nothing is stamped
+  into the file at deploy time instead: Check-LiveGamemode.ps1 compares the two
+  copies byte for byte and a stamp would make them differ, and a file cannot
+  hold the id of the commit it is in.
+
+  The bytes are read from __filename. requireTemp() in skymp5-server copies
+  gamemode.js to a temp file, requires that, and deletes it afterwards, so this
+  hashes the text that is actually loading, even if gamemode.js on disk is
+  replaced a moment later. The copy goes through a string, and gives back the
+  same bytes because the file is valid UTF-8.
+
+  A carriage return before a line feed is dropped before hashing, which is what
+  git does to this file on the way in when core.autocrlf is on, as it is on the
+  machine that ships. Measured on 24 September, before this block went in: the
+  checkout had 22,774 CRLF line ends in 2,147,089 bytes, and those bytes hashed
+  as they are give an id no git command knows. Without the carriage returns it
+  is 2,124,315 bytes and the id git hash-object printed. The size logged is the
+  one on disk, the number Check-LiveGamemode.ps1 prints for both ends.
+
+  Once per load, so a hot reload logs the new id. Anything that goes wrong is
+  logged and the load carries on: the server runs the same without this line.
+*/
+function gamemodeId(bytes) {
+  const lf = Buffer.alloc(bytes.length);
+  let n = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 13 && bytes[i + 1] === 10) { continue; }
+    lf[n++] = bytes[i];
+  }
+  const sha = require('crypto').createHash('sha1');
+  sha.update('blob ' + n + '\0');
+  sha.update(lf.subarray(0, n));
+  return { blob: sha.digest('hex'), size: bytes.length };
+}
+
+try {
+  const me = gamemodeId(require('fs').readFileSync(__filename));
+  log('gamemode.js is git blob ' + me.blob + ', ' + me.size + ' bytes');
+} catch (e) {
+  log('could not name this gamemode.js: ' + e);
+}
+
+/*
   Which voice service this server talks to.
 
   It used to be the number 7778 written out in five places, which was fine
@@ -9686,14 +9742,26 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
   if (!madeFromNothing) {
     /*
       A thing that already existed, with no recipe behind it. Tempering is the
-      case that matters and there is nothing here to gate: the recipe gate owns
-      plugin forms and it answered, and the rulebook's Mastercraft perk is about
-      tempering and was never enforceable anyway. Let it through and say so
-      once, so the log shows this path being used rather than being silent.
+      case that matters and there is nothing here to gate: the rulebook's
+      Mastercraft perk is about tempering and was never enforceable anyway.
+      Let it through and say so once, so the log shows this path being used
+      rather than being silent.
+
+      IT IS NOT ONLY TEMPERING. CraftService matches a recipe only when the
+      client's list holds exactly the count of each input the recipe wants, so
+      an ordinary smithing craft whose list says more of one of them comes
+      here as well, and the recipe gate never sees it. On the dev server on
+      23 September a Riekling helmet whose recipe wants three iron ingots
+      arrived listing thirteen entries, sixteen ingots among them, and was
+      allowed on this path; the server then failed to take the inputs because
+      one listed entry was not in the pack (To Do 347). So the line says what
+      is known, that no recipe matched, and not what it was assumed to be.
     */
     log(actorId.toString(16), 'worked', craftedItemBaseId.toString(16),
-        'with no recipe at bench', (workbenchId || 0).toString(16) +
-        ', which is tempering or the like. Allowed.');
+        'at bench', (workbenchId || 0).toString(16) +
+        ' and no recipe matched the inputs the client listed. Allowed:' +
+        ' tempering comes this way, and so does a craft whose list of' +
+        ' inputs matches no recipe exactly.');
     return;
   }
 
@@ -10020,6 +10088,23 @@ log('gamemode loaded:',
     req.end(body);
   }
 
+  /*
+    Which party somebody is in, or '' for none.
+
+    The voice service only tells each person about the people near enough to
+    hear and about their own party, wherever they are, because the party
+    strip draws an arrow to every member off this feed (entry 282). It cannot
+    know the parties itself, so each row carries one. Read at tick time, not
+    once here, because the social block that keeps the parties loads further
+    down this file.
+  */
+  function partyFor(profileId) {
+    try {
+      var soc = globalThis.__thornswoodSocial;
+      return String((soc && soc.inParty && soc.inParty[profileId]) || '');
+    } catch (e) { return ''; }
+  }
+
   // Stored and cleared like the chargen timers, so a hot reload replaces
   // this feed rather than adding a second one that never stops.
   if (globalThis.__thornswoodVoiceFeed) {
@@ -10043,7 +10128,8 @@ log('gamemode loaded:',
             // side of a loading door do not, which is exactly the line voice
             // should stop at.
             cell: String(mp.get(id, 'worldOrCellDesc') || ''),
-            name: String(mp.get(id, 'appearance') && mp.get(id, 'appearance').name || '')
+            name: String(mp.get(id, 'appearance') && mp.get(id, 'appearance').name || ''),
+            party: partyFor(mp.get(id, 'profileId'))
           });
         } catch (e) { }
       }
@@ -10740,6 +10826,62 @@ log('gamemode loaded:',
   */
   var doorSaid = false;
 
+  /*
+    ONE PERSON WHO COULD NOT BE CHECKED IS NOT A REASON TO KEEP EVERYBODY STALE.
+
+    From the To Do List: "one rate-limited lookup throws the whole list
+    away". The site marked its whole answer failed when any single lookup
+    failed, and this kept the old list for everybody, so a ban, a new tester
+    or a removed role waited on the one person Discord would not answer for.
+
+    The site now names the profiles it could not check, in failedProfiles.
+    Each of those keeps exactly the standing it had in the file before: on
+    the list if it was, off it if it was not, and the same in devProfiles and
+    adminProfiles. A failed lookup can neither let somebody in nor turn
+    somebody away. Everybody else takes the fresh answer.
+
+    Only called when the site named who failed AND reached somebody; the
+    check in refresh() below still keeps the whole list when it did not.
+  */
+  function keepWhatFailed(doc, had) {
+    var failed = {};
+    for (var i = 0; i < doc.failedProfiles.length; i++) {
+      var f = Number(doc.failedProfiles[i]);
+      if (f) failed[f] = true;
+    }
+    function merged(fresh, old) {
+      var out = Array.isArray(fresh) ? fresh.slice() : [];
+      var seen = {};
+      for (var j = 0; j < out.length; j++) seen[Number(out[j])] = true;
+      if (Array.isArray(old)) {
+        for (var k = 0; k < old.length; k++) {
+          var n = Number(old[k]);
+          if (n && failed[n] && !seen[n]) { seen[n] = true; out.push(n); }
+        }
+      }
+      return out;
+    }
+    // The people rows are what Set-Door.ps1 prints, so a kept profile keeps
+    // the row that names whose it is.
+    var people = Array.isArray(doc.people) ? doc.people.slice() : [];
+    var named = {};
+    for (var p = 0; p < people.length; p++) if (people[p]) named[String(people[p].id)] = true;
+    var oldPeople = Array.isArray(had.people) ? had.people : [];
+    for (var q = 0; q < oldPeople.length; q++) {
+      var row = oldPeople[q];
+      if (!row || named[String(row.id)] || !Array.isArray(row.profiles)) continue;
+      for (var r = 0; r < row.profiles.length; r++) {
+        if (failed[Number(row.profiles[r])]) { named[String(row.id)] = true; people.push(row); break; }
+      }
+    }
+    return {
+      profiles: merged(doc.profiles, had.profiles),
+      devProfiles: merged(doc.devProfiles, had.devProfiles),
+      adminProfiles: merged(doc.adminProfiles, had.adminProfiles),
+      people: people
+    };
+  }
+
   function refresh() {
     var conf;
     try {
@@ -10790,8 +10932,13 @@ log('gamemode loaded:',
           }
           // Keeping the old list is the safe failure. Writing a short one built
           // while Discord was unreachable would turn away everybody missing
-          // from it.
-          if (doc.lookupFailed) {
+          // from it. A site that names who failed (failedProfiles) and reached
+          // Discord for somebody (a profile came back) gets the partial write
+          // below instead, which keeps just those as they were; a site older
+          // than that, or one that reached nobody, keeps the whole list.
+          if (doc.lookupFailed &&
+              !(Array.isArray(doc.failedProfiles) && doc.failedProfiles.length &&
+                Array.isArray(doc.profiles) && doc.profiles.length)) {
             /*
               AND WHY. This said only that the site could not reach Discord,
               and on 22 September that one line was the whole of what anybody
@@ -10827,10 +10974,22 @@ log('gamemode loaded:',
           }
 
           var enforce = false;
+          var had = {};
           try {
-            var had = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^\uFEFF/, ''));
+            had = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^\uFEFF/, '')) || {};
             enforce = had.enforce === true;
           } catch (e) { }
+
+          if (doc.lookupFailed) {
+            var kept = keepWhatFailed(doc, had);
+            doc.profiles = kept.profiles;
+            doc.devProfiles = kept.devProfiles;
+            doc.adminProfiles = kept.adminProfiles;
+            doc.people = kept.people;
+            note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
+                 'and keep the standing they had' +
+                 (doc.lookupFailedWhy ? ': ' + doc.lookupFailedWhy : ''));
+          }
 
           try {
             fs.writeFileSync(FILE, JSON.stringify({
@@ -15633,7 +15792,9 @@ log('gamemode loaded:',
       return true;
     }
     var list = notices[hold] || [];
-    if (!list.length) {
+    var up = 0;
+    for (var u = 0; u < list.length; u++) { if (!list[u].down) { up++; } }
+    if (!up) {
       toProfile(profileId, 'Nothing on the board in ' + hold + '.');
       return true;
     }
@@ -15646,20 +15807,22 @@ log('gamemode loaded:',
       indexes the real array, so the moment anything was hidden the numbers a
       person could read stopped being the numbers they could take.
 
-      Nothing takes a notice down yet, which is its own entry; showing the
-      newest is what keeps a board usable until something does.
+      A notice somebody took down with /unpin stays in the list marked down,
+      so it is skipped here and leaves a gap in the numbers rather than
+      moving every newer one. See unpin below.
     */
     var lines = [];
     var shown = 0;
     for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
       var n = list[i];
+      if (n.down) { continue; }
       lines.push('[' + (i + 1) + '] ' +
                  (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') +
                  n.name + ': ' + n.text);
       shown++;
     }
-    var more = list.length > shown
-      ? '\n(' + (list.length - shown) + ' older, and /take uses the numbers shown)' : '';
+    var more = up > shown
+      ? '\n(' + (up - shown) + ' older, and /take uses the numbers shown)' : '';
     toProfile(profileId, 'The board in ' + hold + ':\n' + lines.join('\n') + more);
     return true;
   }
@@ -15695,6 +15858,10 @@ log('gamemode loaded:',
       return true;
     }
     var n = list[at];
+    if (n.down) {
+      toProfile(profileId, 'That one has been taken down.');
+      return true;
+    }
     if (!n.job) {
       toProfile(profileId, 'That is a notice, not a job. There is nothing to take.');
       return true;
@@ -15766,6 +15933,75 @@ log('gamemode loaded:',
     return true;
   }
 
+  /*
+    ------------------------------------------------------- taking one down
+
+        /unpin 3      take down notice 3 on the board you are standing at
+
+    Until this, nothing took a notice down: a notice paid for was up for ever,
+    and so was a job its poster no longer needed doing. A poster can take down
+    their own notice or their own untaken job, and nobody else's.
+
+    A JOB SOMEBODY HAS TAKEN STAYS UP. It is on the taker's list, and pulling
+    it out from under them would empty their /jobs with no word to either of
+    them. It can come down once they hand it back with /dropjob.
+
+    NO REFUND. The fee went into the hold's box the moment the notice was
+    posted, and the box is the hold's money, which only the City Court draws.
+
+    THE NUMBERS DO NOT MOVE. /take and /dropjob act on a notice's place in the
+    list, and a person reads that number off /board and types it a moment
+    later. Cutting a notice out would shift every newer one down by one, so
+    somebody who read [4] and typed /take 4 would take the job that had been
+    [5]. So a notice that comes down stays in the list marked down, and /board
+    and /take step over it.
+
+    takedown is the store half, with no rule in it about who may. It is on
+    g.__thornswoodProperty so the guards (entries 209 and 208) can tear
+    notices down on their own rule when they exist; until then the only
+    caller is a poster's own /unpin.
+  */
+  function takedown(hold, at, byWhom) {
+    var list = notices[hold] || [];
+    var n = list[at];
+    if (!n || n.down) { return null; }
+    n.down = Date.now();
+    n.downBy = byWhom;
+    save();
+    return n;
+  }
+
+  function unpin(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at the board you put it on.');
+      return true;
+    }
+    var list = notices[hold] || [];
+    var at = Number((parts && parts[1]) || 0) - 1;
+    if (!(at >= 0 && at < list.length)) {
+      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      return true;
+    }
+    var n = list[at];
+    if (n.down) {
+      toProfile(profileId, 'That one is already down.');
+      return true;
+    }
+    if (n.by !== profileId) {
+      toProfile(profileId, 'That is not yours to take down.');
+      return true;
+    }
+    if (n.job && n.taken) {
+      toProfile(profileId, n.takenName + ' has taken that job. It can come down once they hand it back.');
+      return true;
+    }
+    takedown(hold, at, profileId);
+    plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.text);
+    toProfile(profileId, 'You take it down. The fee stays with ' + hold + '.');
+    return true;
+  }
+
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
@@ -15791,6 +16027,7 @@ log('gamemode loaded:',
     if (word === '/take') { return take(parts, actorId, profileId, toProfile); }
     if (word === '/jobs') { return jobs(profileId, toProfile); }
     if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
+    if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
     return false;
   }
 
@@ -15906,7 +16143,7 @@ log('gamemode loaded:',
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
-    notices: function () { return notices; },
+    notices: function () { return notices; }, takedown: takedown,
     boards: function () { return boards; }, boardHere: boardHere,
     stewards: function () { return stewards.slice(); }
   };
@@ -17267,7 +17504,7 @@ log('gamemode loaded:',
         word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
-        word === '/dropjob') {
+        word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
         toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
         return true;
@@ -17582,7 +17819,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
                '/steward', '/evict', '/box', '/rent',
-               '/notice', '/job', '/board', '/take', '/jobs', '/dropjob',
+               '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
@@ -17633,7 +17870,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // the steward half answers "only a steward sets rent"
                       // to everybody else.
                       '/box', '/rent', '/notice', '/job', '/board',
-                      '/take', '/jobs', '/dropjob', '/help',
+                      '/take', '/jobs', '/dropjob', '/unpin', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty.
                       '/needs', '/rest', '/eat', '/drink', '/bard',
@@ -17761,6 +17998,122 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       delete lastActor[profileId];
     }
     return 0;
+  }
+
+  /*
+    A LINE TYPED WHILE THE CHARACTER IS ON ITS WAY BACK WAITS FOR IT.
+
+    Patrick, 23 September: "Tried to do /give key so I could atleast test that
+    way and it said it couldn't find my chacther". He was coming back from a
+    deploy at the time.
+
+    The remembered actor above was never going to help, and not because it
+    was wrong. A deploy is a new process, so there is nothing remembered to
+    fall back on. Measured in the dev server log for that evening: the
+    gamemode loaded at 20:39:00.541 and his character came in at 20:39:47.177;
+    loaded at 20:44:04.992, in at 20:44:52.111. About 47 seconds both times.
+    The voice service is its own process and keeps every slash line typed
+    while the server is down, and the polls in those 47 seconds hand them over
+    along with anything typed since, before there is a character to run them
+    on. So each one was told "cannot find your character" by a server that was
+    about to find it.
+
+    So a line that needs a character and has none waits for one. Every tick
+    the waiting lines are tried again, and the moment the sweep finds the
+    character they run in the order they were typed. A new line from somebody
+    who still has lines waiting goes behind them, so a /give then a /tp cannot
+    swap places.
+
+    NOTHING HERE WIDENS THE FALLBACK. A waiting line holds the text and never
+    an actor, and it runs through handle() like any other line, which does the
+    sweep again at that moment. A line kept with the actor it arrived with
+    would be kept with exactly the character that no longer exists.
+
+    BOUNDED BOTH WAYS, so nothing grows. A line waits at most HOLD_FOR, twice
+    the 47 seconds measured, and is then answered exactly as it always was.
+    One person can have HOLD_MAX lines waiting and the server HOLD_ALL, and a
+    line past either is answered at once, the old way. The profile id is a
+    claim the page makes about itself, so a page sending lines under a hundred
+    made up ids is held to HOLD_ALL as well.
+
+    What never waits: /help, and /tp with nothing after it, which need no
+    character; a word this server does not answer, which gets its answer now;
+    and the client's reports of a moment, /place, /burn and /chopped, because
+    a minute later they describe a moment that has passed.
+  */
+  // On globalThis, so a hot reload keeps what was waiting. It is plain data,
+  // the line and when it began to wait, so the reloaded handle() runs it.
+  if (!g.__thornswoodHeld) { g.__thornswoodHeld = {}; }
+  var held = g.__thornswoodHeld;
+  var HOLD_FOR = 90000;
+  var HOLD_MAX = 20;
+  var HOLD_ALL = 200;
+
+  function runsNow(word, parts) {
+    if (word === '/help' || word === '/commands' ||
+        word === '/restart' || word === '/shutdown') { return true; }
+    if ((word === '/tp' || word === '/goto') && !parts.slice(1).join(' ').trim()) { return true; }
+    if (word === '/place' || word === '/burn' || word === '/chopped') { return true; }
+    return WORDS.indexOf(word) === -1;
+  }
+
+  function heldCount() {
+    var n = 0;
+    for (var k in held) {
+      if (Object.prototype.hasOwnProperty.call(held, k)) { n += held[k].lines.length; }
+    }
+    return n;
+  }
+
+  /** Every line from the voice service, on its way to handle(). */
+  function dispatch(cmd) {
+    var profileId = Number(cmd && cmd.profileId) || 0;
+    var parts = String((cmd && cmd.text) || '').trim().split(/\s+/);
+    var word = parts[0].toLowerCase();
+    if (!profileId || runsNow(word, parts)) { handle(cmd); return; }
+
+    var q = held[profileId];
+    if (!q && actorOf(profileId)) { handle(cmd); return; }
+    if ((q && q.lines.length >= HOLD_MAX) || heldCount() >= HOLD_ALL) { handle(cmd); return; }
+
+    if (!q) {
+      q = held[profileId] = { lines: [], told: false };
+      log('holding', word, 'for profile', profileId, 'until the character is in the world');
+    }
+    q.lines.push({ cmd: cmd, at: Date.now() });
+    // Said once, and never for the client's own lines: /face, /ate and a
+    // broken lockpick are not things anybody typed.
+    if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks') {
+      q.told = true;
+      toProfile(profileId, 'Your character is not back in the world yet. That will run ' +
+                           'as soon as you arrive.');
+    }
+  }
+
+  /** Once a tick: run what can run now, and answer what has waited too long. */
+  function drainHeld() {
+    var now = Date.now();
+    for (var key in held) {
+      if (!Object.prototype.hasOwnProperty.call(held, key)) { continue; }
+      var q = held[key];
+      var run = [];
+      if (actorOf(Number(key))) {
+        run = q.lines;
+        delete held[key];
+        log('running', run.length, 'held line(s) for profile', key, 'after',
+            Math.round((now - run[0].at) / 1000) + 's');
+      } else {
+        while (q.lines.length && now - q.lines[0].at >= HOLD_FOR) { run.push(q.lines.shift()); }
+        if (!q.lines.length) { delete held[key]; }
+        if (run.length) { log('gave up on', run.length, 'held line(s) for profile', key); }
+      }
+      // Out of the queue before it runs, so a line that throws is not run
+      // again on the next tick.
+      for (var i = 0; i < run.length; i++) {
+        try { handle(run[i].cmd); }
+        catch (e) { log('held command threw:', e && e.stack ? e.stack : e); }
+      }
+    }
   }
 
   /** key -> the arrival point the launcher would have used. */
@@ -19615,21 +19968,68 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     }
   }
 
+  /*
+    WHAT HAS RUN, SO A COMMAND OFFERED TWICE RUNS ONCE.
+
+    The voice service used to empty its queue the moment this asked, before a
+    byte of the answer was read, so a batch that failed to parse below was
+    lost with nobody told. Now it is asked with ?ack=1: it keeps every command
+    until this acknowledges it, and offers it again until then. That makes
+    delivery at least once, and a command run twice is a second teleport
+    somebody did not ask for, so every id that has run is remembered here and
+    skipped when it comes round again.
+
+    On globalThis so a hot reload does not forget, and capped, oldest out. The
+    service gives up on a command after five offers, so no id needs keeping
+    for long; two thousand is ten full queues.
+  */
+  if (!g.__thornswoodCommandsRun) {
+    g.__thornswoodCommandsRun = { seen: Object.create(null), order: [] };
+  }
+  var commandsRun = g.__thornswoodCommandsRun;
+  var COMMANDS_RUN_KEEP = 2000;
+
+  function markRun(id) {
+    if (commandsRun.seen[id] === true) { return; }
+    commandsRun.seen[id] = true;
+    commandsRun.order.push(id);
+    while (commandsRun.order.length > COMMANDS_RUN_KEEP) {
+      delete commandsRun.seen[commandsRun.order.shift()];
+    }
+  }
+
   function poll() {
     var http;
     try { http = require('http'); } catch (e) { return; }
     var req = http.request({
-      host: '127.0.0.1', port: VOICE_PORT, path: '/commands', method: 'GET', timeout: 2000
+      // A service from before ?ack=1 reads its routes with the query cut off,
+      // so it answers this as it always did: the queue emptied, no ids on the
+      // commands, and nothing for this to acknowledge.
+      host: '127.0.0.1', port: VOICE_PORT, path: '/commands?ack=1', method: 'GET', timeout: 2000
     }, function (res) {
       var body = '';
       res.on('data', function (d) { body += d; });
       res.on('end', function () {
         var list = [];
+        // Nothing is acknowledged when this fails, so the service offers the
+        // same batch again on the next poll rather than it being lost.
         try { list = (JSON.parse(body) || {}).commands || []; } catch (e) { return; }
+        var ran = [];
         for (var i = 0; i < list.length; i++) {
-          try { handle(list[i]); }
+          var id = (list[i] && list[i].id) ? String(list[i].id) : '';
+          // Offered again because an acknowledgement went missing. It has
+          // run, so it is acknowledged again and not run a second time.
+          if (id && commandsRun.seen[id] === true) { ran.push(id); continue; }
+          // Marked before it runs and acknowledged even when it throws: one
+          // that threw part way through may already have moved somebody.
+          // A line dispatch() holds for a character still on its way back is
+          // acknowledged too: it waits in the held queue here from then on,
+          // just as it did when the service emptied its queue on every ask.
+          if (id) { markRun(id); ran.push(id); }
+          try { dispatch(list[i]); }
           catch (e) { log('command threw:', e && e.stack ? e.stack : e); }
         }
+        if (ran.length) { post('/commands/ack', { ids: ran }); }
       });
     });
     req.on('error', function () { });
@@ -19639,6 +20039,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
 
   if (g.__thornswoodCommandTimer) { clearInterval(g.__thornswoodCommandTimer); }
   g.__thornswoodCommandTimer = setInterval(function () {
+    // Every tick, whatever the poll brings back, so a waiting line runs within
+    // a second and a half of its character arriving. See dispatch.
+    try { drainHeld(); } catch (e) { log('held commands threw:', e); }
     try { poll(); } catch (e) { }
     try { restartTick(); } catch (e) { log('restart tick threw:', e); }
   }, 1500);
