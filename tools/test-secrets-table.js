@@ -133,6 +133,26 @@ yes('the section records that a launcher older than 1.0.197 keeps what version.j
 yes('Publish-Update.ps1 still takes serverPassword out of the feed, as the section says',
     /PSObject\.Properties\.Remove\('serverPassword'\)/.test(publish));
 
+// ------------------------------------------------- the retired register secret ---
+// The join password row used to place "the old four digit value" in
+// server-secret.txt and the voice folder's secret.txt. They never held it after
+// 18 September: they held the character register secret, 32 random bytes, and
+// nothing has read them since the register went on 23 September. Publish-Update's
+// own comment says what server-secret.txt holds, so the row is held against it.
+yes('the join password row no longer names server-secret.txt or secret.txt',
+    !/secret\.txt/.test(pw[1]));
+const reg = row(/register secret/i) || ['', '', '', ''];
+yes('there is a row for the retired character register secret', !!row(/register secret/i));
+yes('the register secret row names server-secret.txt and the voice folder secret.txt',
+    /`server-secret\.txt`/.test(reg[1]) &&
+    reg[1].indexOf('C:' + BS + 'Thornswood-Voice' + BS + 'secret.txt') >= 0);
+yes('the register secret row says not enforced, and 32 random bytes rather than the join password',
+    /\*\*not enforced\.?\*\*/i.test(reg[2]) && /32 random bytes/.test(reg[2]) && /not the join password/i.test(reg[2]));
+yes('Publish-Update.ps1 still says server-secret.txt holds the register secret, 32 random bytes',
+    /character register\s+#\s*secret is 32 random bytes written into server-secret\.txt/.test(publish));
+yes('Install-Voice.ps1 still sends no secret.txt, so the VPS copy has no reader either',
+    installVoice.length > 0 && !/secret\.txt/.test(installVoice));
+
 // ------------------------------------------------------------------ the door ---
 const key = row(/botKey/) || ['', '', '', ''];
 yes('the botKey row says it is also the door key', /door key/i.test(key[0]));
@@ -185,6 +205,31 @@ yes('the voice key row says not enforced unless -Auth on', /\*\*not enforced\*\*
 yes('the voice service still defaults to log and keeps its key in token-key.txt',
     /THORNSWOOD_VOICE_AUTH \|\| 'log'/.test(voice) && /'token-key\.txt'/.test(voice));
 yes('Install-Voice.ps1 still defaults -Auth to log', /\[string\]\$Auth\s+= 'log'/.test(installVoice));
+
+// ---------------------------------------------------------------- the VPS key ---
+// The row used to say "Setup-SshKey.ps1 -KeyOnly makes a new key". It does not
+// while the old one is there. The script first asks ssh whether it already gets
+// in, through the config entry that names the old key, and stops if it does;
+// then it uses a .pub it finds at the path again. So those steps handed Patrick
+// the same public line, and then had him remove "the old one", which was the
+// same key. Nothing was rotated and the developer lost VPS access.
+const vps = row(/vps access/i) || ['', '', '', ''];
+const aside = vps[3].indexOf('thornswood_ed25519.pub');
+const keyOnly = vps[3].indexOf('Setup-SshKey.ps1 -KeyOnly');
+yes('the VPS access row moves the old key and its .pub aside before Setup-SshKey.ps1 -KeyOnly',
+    aside >= 0 && keyOnly > aside && /rename/i.test(vps[3].slice(0, keyOnly)));
+yes('the VPS access row removes the old line out of the moved .pub, not the new line',
+    /\.old \.pub>' -Remove/.test(vps[3]));
+const setupSsh = read('tools/Setup-SshKey.ps1');
+const firstWorks = setupSsh.indexOf('if (Works) {');
+const reusePub = setupSsh.indexOf('if (Test-Path -LiteralPath "$KeyPath.pub") {');
+yes('Setup-SshKey.ps1 still stops when a key already gets in, before it looks at the key file',
+    firstWorks >= 0 && reusePub > firstWorks);
+yes('Setup-SshKey.ps1 still uses a .pub it finds again rather than making a new key',
+    reusePub >= 0 && setupSsh.indexOf('using the one already at', reusePub) > reusePub);
+const worksFn = (setupSsh.match(/function Works \{[\s\S]*?\n\}/) || [''])[0];
+yes('Setup-SshKey.ps1 still checks through the ssh config rather than -KeyPath, so a new -KeyPath does not get round it',
+    worksFn.length > 0 && !/KeyPath|\s-i\s/.test(worksFn));
 
 // ------------------------------------------------------------- the rule itself ---
 yes('the rule under the table: a control that does not exist is listed as not enforced',
