@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -241,6 +241,192 @@ function chatPrune() {
 }
 setInterval(chatPrune, 6 * 3600000);
 chatPrune();
+
+/* ------------------------------------------------------ who hears a line ---
+ *
+ * Entry 150 on the To Do List: "Two people robbing a traveller on the
+ * Whiterun road are currently read by a smith in Markarth." Every plain line
+ * went to every socket on the server, and /ooc, the one line that is meant to
+ * step out of the scene, was the only one kept to the people near it.
+ *
+ * THORNSWOOD_CHAT_RANGE decides, and it ships OFF:
+ *
+ *   unset, off, 0   every line to everybody, exactly as before. /me, /do, /w
+ *                   and /s are not caught here and go on to the game server
+ *                   like any other slash
+ *   on              the same cell and 4000 units, the range /ooc already
+ *                   uses (OOC_RANGE in gamemode.js)
+ *   a number        the same cell and that many units
+ *
+ * Off by default because whether plain text is local is Patrick's call and
+ * has not been made, and a setting that ships off can go out in any release
+ * without changing anybody's evening. Anything that is not on or a positive
+ * number counts as off, so a typo leaves the room as it was rather than
+ * silencing it. /health says which it is.
+ *
+ * /ooc and /roll are the same either way. They are slash commands, they are
+ * queued for the game server as before, and the game server works out who is
+ * near from its own positions.
+ */
+function chatRangeOf(v) {
+  const s = String(v == null ? '' : v).trim().toLowerCase();
+  if (s === 'on') return 4000;
+  const n = Number(s);
+  return (s && isFinite(n) && n > 0) ? n : 0;
+}
+const CHAT_RANGE = chatRangeOf(process.env.THORNSWOOD_CHAT_RANGE);
+
+/*
+ * The verbs, which only exist while the range is on, because a whisper and a
+ * shout are ranges. /me and /do are how an attempt gets said as an attempt:
+ * "/me swings at the guard" leaves whether it lands to the other person,
+ * which a plain line cannot. A quarter of the range for a whisper and three
+ * times it for a shout, near enough the same proportions as the voice modes
+ * (7, 30 and 85 metres in thornswood-voice.js).
+ */
+const CHAT_VERBS = {
+  '/me': 'me', '/do': 'do',
+  '/whisper': 'whisper', '/w': 'whisper',
+  '/shout': 'shout', '/s': 'shout', '/yell': 'shout', '/y': 'shout'
+};
+const CHAT_USAGE = {
+  me: 'Say /me and then what your character does, like /me draws a sword.',
+  do: 'Say /do and then what there is to see, like /do The door is barred.',
+  whisper: 'Say /w and then what you whisper.',
+  shout: 'Say /s and then what you shout.'
+};
+
+/* The verb a line starts with and the rest of it, or null for a plain line
+   and for every other slash, which still goes to the game server. */
+function chatVerb(text) {
+  const m = /^(\/[a-z]+)(?:\s+([\s\S]*))?$/i.exec(String(text == null ? '' : text));
+  if (!m) return null;
+  const kind = CHAT_VERBS[m[1].toLowerCase()];
+  if (!kind) return null;
+  return { kind: kind, text: String(m[2] || '').trim() };
+}
+
+function chatReach(kind) {
+  if (kind === 'whisper') return CHAT_RANGE / 4;
+  if (kind === 'shout') return CHAT_RANGE * 3;
+  return CHAT_RANGE;
+}
+
+/*
+ * Who a line reaches: { to, placed }, or null for everybody.
+ *
+ * Measured the way /ooc measures in gamemode.js: the same cell first, because
+ * two people at the same coordinates either side of a loading door are not in
+ * earshot, then a straight line. The positions are the ones the gamemode
+ * posts here five times a second, and one older than STALE_MS does not count,
+ * the same rule voice goes quiet by.
+ *
+ * Two cases nobody has decided yet, so each takes the side that loses least:
+ *
+ *   NO FRESH POSITION FOR ANYBODY, which is the gamemode's feed stopped or not
+ *   installed. Range cannot be judged for anyone, and taking chat off the
+ *   whole server because of a fault somewhere else is worse than an hour of
+ *   the old global chat, so it is everybody, as before.
+ *
+ *   THE SENDER HAS NONE while other people do: at the menu, loading, between
+ *   worlds. The line goes back to them alone, and placed says so, rather than
+ *   to the whole server, which is the thing this exists to stop.
+ *
+ * The sender's own socket always gets the line, because the chat page only
+ * shows what comes back from here.
+ */
+function hearers(myId, me, reach) {
+  const now = Date.now();
+  const fresh = (pid) => {
+    const v = positions.get(Number(pid) || 0);
+    return (v && now - v.at <= STALE_MS && Array.isArray(v.pos)) ? v : null;
+  };
+  let any = false;
+  for (const [, v] of positions) { if (now - v.at <= STALE_MS) { any = true; break; } }
+  if (!any) return null;
+
+  const mine = me ? fresh(me.profileId) : null;
+  const to = [];
+  for (const [id, p] of peers) {
+    if (id === myId) { to.push(p); continue; }
+    if (!mine) continue;
+    const them = fresh(p.profileId);
+    if (!them || them.cell !== mine.cell) continue;
+    const dx = (Number(them.pos[0]) || 0) - (Number(mine.pos[0]) || 0);
+    const dy = (Number(them.pos[1]) || 0) - (Number(mine.pos[1]) || 0);
+    const dz = (Number(them.pos[2]) || 0) - (Number(mine.pos[2]) || 0);
+    if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
+    to.push(p);
+  }
+  return { to: to, placed: !!mine };
+}
+
+/* ----------------------------------------------------------- chat limit ---
+ *
+ * HOW FAST ONE CONNECTION CAN TALK TO THE ROOM. The To Do List, entry 149:
+ * "Chat is server-wide, unfiltered, has no rate limit anywhere". Every plain
+ * line went to every peer the moment it arrived, and the only limit was the
+ * 400 character cap, so one open console could fill every screen in the
+ * world faster than anybody could read it, let alone answer it.
+ *
+ * A TOKEN BUCKET ON THE PEER RECORD. Five lines at once, then one more every
+ * second and a half, which is forty a minute: more than anybody types, and
+ * the five cover a quick back and forth. It lives on the peer that onJoin
+ * writes rather than in the broadcast, because the broadcast is the part
+ * that changes when chat goes local, and a limit written into it would go
+ * with it.
+ *
+ * SAID LINES ONLY. The handler asks after the slash branch, never before.
+ * The plugins report gameplay down this same socket as slash lines: /chopped
+ * on every fall of the axe, /place as somebody walks about, /ate, /burn, the
+ * journal, the party and the trade window. A limit ahead of that branch
+ * would lose somebody's firewood for talking too much.
+ *
+ * DROPPED, AND THE SENDER IS TOLD ONCE. A held line is not queued, because a
+ * flood that is queued is still a flood, only later. The notice goes to the
+ * sender alone, the first time a line of theirs is dropped, and not again
+ * until one of their lines has gone through, so the notice cannot become a
+ * flood of its own. A dropped line is not in the chat log as said, because
+ * it never reached the room; the service log says who was slowed.
+ *
+ * PER CONNECTION, NOT PER ACCOUNT, on purpose while THORNSWOOD_VOICE_AUTH is
+ * log. Until it is on, the profile id on a join is whatever the message
+ * claimed, and a bucket keyed on it would let anybody empty somebody else's.
+ * A reconnect starts with a full bucket; it costs a join and a roster to
+ * everybody, so it slows a flood rather than stopping a determined one.
+ *
+ * Both numbers are settable so they can be tuned on the box without a
+ * release.
+ */
+const CHAT_BURST = Number(process.env.THORNSWOOD_CHAT_BURST) || 5;
+const CHAT_REFILL_MS = Number(process.env.THORNSWOOD_CHAT_REFILL_MS) || 1500;
+const CHAT_SLOW = 'Slow down: lines sent this quickly are not going out. ' +
+                  'Wait a few seconds, then say it again.';
+
+/* Whether this peer's line may go to the room. Tells them the first time it
+   may not. A record without a bucket starts full rather than silenced, and a
+   clock that steps backwards refills nothing rather than locking anybody
+   out. */
+function chatAllow(me, peerId, now) {
+  if (!me) return true;
+  if (typeof me.chatTokens !== 'number') { me.chatTokens = CHAT_BURST; me.chatAt = now; }
+  const since = Math.max(0, now - me.chatAt);
+  me.chatTokens = Math.min(CHAT_BURST, me.chatTokens + since / CHAT_REFILL_MS);
+  me.chatAt = now;
+  if (me.chatTokens >= 1) {
+    me.chatTokens -= 1;
+    me.chatSlowed = false;
+    return true;
+  }
+  if (!me.chatSlowed) {
+    me.chatSlowed = true;
+    console.log('[voice] slowed peer ' + peerId + ' (profile ' + me.profileId + ', ' +
+                (me.name || 'no name') + '): more than ' + CHAT_BURST +
+                ' lines at once, or more than one every ' + CHAT_REFILL_MS + 'ms');
+    me.ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: CHAT_SLOW, at: now });
+  }
+  return false;
+}
 
 // ------------------------------------------------------------ websocket ----
 // RFC 6455, the parts a small JSON relay needs: the handshake, masked text
@@ -468,7 +654,8 @@ function onJoin(ws, msg) {
 
   const id = nextPeer++;
   const name = String(msg.name || '').slice(0, 40);
-  peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode), proven: !!profileId && !why });
+  peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode), proven: !!profileId && !why,
+                  chatTokens: CHAT_BURST, chatAt: Date.now(), chatSlowed: false });
 
   ws.send({ t: 'welcome', peer: id, profileId: profileId });
   announce();
@@ -766,7 +953,60 @@ function readToken(raw) {
   do the REST scheme, but the ephemeral one is better and is what to prefer.
 */
 const TURN_URL = String(process.env.THORNSWOOD_TURN_URL || '').trim();
-const TURN_SECRET = String(process.env.THORNSWOOD_TURN_SECRET || '').trim();
+/*
+  AND THE SECRET CAN SIT IN A FILE, turn-key.txt beside this one.
+
+  From the To Do List, "Voice is a full peer-to-peer mesh with no relay": step
+  one is a relay, with its credentials minted here and the secret kept on the
+  VPS, named by location only. Install-Voice.ps1 writes this service's whole
+  environment into the command line of the shell that starts it, which the
+  same script reads back out of the process list, so THORNSWOOD_TURN_SECRET
+  would put the relay's key wherever that line is shown. The join token key
+  already lives in a file here, token-key.txt above, and this is the same
+  idea: the relay's static-auth-secret goes in turn-key.txt in the service's
+  folder on the VPS, put there by hand, and is read once at start. The
+  variable still wins when it is set.
+
+  No file, which is every box today, changes nothing: nothing is logged, /ice
+  answers the same bytes, and /health the same fields, with only the build name
+  moved so an install can tell this copy is the one running.
+  tools/voice/test-turn-key.js holds it to that. The key itself is never logged,
+  only where it was read from.
+
+  Written by hand on Windows, so it may arrive as UTF-16 with a byte order
+  mark, which is what Windows PowerShell's > and Out-File write, or as UTF-8
+  with one, which is what its Set-Content -Encoding UTF8 writes. Read as plain
+  UTF-8 either one is a different key, the relay refuses every credential made
+  from it, and the only symptom is the same pair of people still not hearing
+  each other.
+
+  Not settled by this: which relay, and who may have its credential. /ice
+  answers anybody who asks, so a relay switched on while that is true is a
+  relay for a stranger too.
+*/
+const TURN_KEY_FILE = path.join(HERE, 'turn-key.txt');
+function readTurnKey(file) {
+  let buf;
+  try {
+    buf = fs.readFileSync(file);
+  } catch (e) {
+    // Absent is the ordinary case and says nothing. Anything else is a file
+    // somebody put there on purpose that cannot be read, which is worth a line.
+    if (!e || e.code !== 'ENOENT') {
+      console.log('[voice] could not read ' + file + ' (' + (e && e.code) + '), so there is no relay key');
+    }
+    return '';
+  }
+  const text = (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xFE) ? buf.toString('utf16le') : buf.toString('utf8');
+  // trim takes the byte order mark off too: U+FEFF is white space to it.
+  return text.trim();
+}
+const TURN_SECRET_SET = String(process.env.THORNSWOOD_TURN_SECRET || '').trim();
+const TURN_SECRET = TURN_SECRET_SET || readTurnKey(TURN_KEY_FILE);
+if (TURN_SECRET && !TURN_SECRET_SET) {
+  console.log('[voice] relay key read from ' + TURN_KEY_FILE +
+              (TURN_URL ? '' : ', but THORNSWOOD_TURN_URL is not set, so no relay is offered'));
+}
 const TURN_USER = String(process.env.THORNSWOOD_TURN_USER || '').trim();
 const TURN_PASS = String(process.env.THORNSWOOD_TURN_PASS || '').trim();
 const TURN_TTL = Number(process.env.THORNSWOOD_TURN_TTL || 3600) || 3600;
@@ -1023,6 +1263,7 @@ const server = http.createServer((req, res) => {
                             startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
                             bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
+                            chatRange: CHAT_RANGE,
                             peers: peers.size, tracked: positions.size,
                             queuedCommands: commands.length }));
     return;
@@ -1093,6 +1334,16 @@ server.on('upgrade', (req, socket, head) => {
       const text = String(msg.text == null ? '' : msg.text).slice(0, 400);
       if (!text) return;
 
+      // /me, /do, /w and /s are caught here rather than queued, and only
+      // while the range is on. With it off they go on to the game server
+      // exactly as they did before. See the note over CHAT_RANGE.
+      const verb = CHAT_RANGE ? chatVerb(text) : null;
+      if (verb && !verb.text) {
+        ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood',
+                  text: CHAT_USAGE[verb.kind], at: Date.now() });
+        return;
+      }
+
       // A line beginning with a slash is for the game server, not for the
       // room, so it is queued rather than broadcast.
       //
@@ -1106,7 +1357,7 @@ server.on('upgrade', (req, socket, head) => {
       // exactly five console commands to the server (additem, equipitem,
       // placeatme, disable, mp) and coc is not one of them, so a coc moves you
       // in your own game and the server puts you straight back.
-      if (text.charAt(0) === '/') {
+      if (!verb && text.charAt(0) === '/') {
         chatWrite('command', myId, me, text);
         // Full: the newest is refused and its sender told, and everything
         // already taken stays. See the note over COMMAND_CAP.
@@ -1135,6 +1386,10 @@ server.on('upgrade', (req, socket, head) => {
         return;
       }
 
+      // After the slash branch and never before it; see the chat limit note
+      // above the websocket code.
+      if (!chatAllow(me, myId, Date.now())) return;
+
       /* Written before it is sent, so a line that reached the room is always
          in the log. The other way round loses the last thing somebody said
          before this process went down, which is exactly the line an argument
@@ -1149,6 +1404,23 @@ server.on('upgrade', (req, socket, head) => {
         text: text,
         at: Date.now()
       };
+      // With the range off nothing here runs and the line goes to everybody
+      // below, the same object as always. The log above keeps what was typed,
+      // verb and all, so a moderator reads "/me swings at him" as it was sent.
+      if (CHAT_RANGE) {
+        out.kind = verb ? verb.kind : 'say';
+        if (verb) out.text = verb.text;
+        const heard = hearers(myId, me, chatReach(out.kind));
+        if (heard) {
+          for (const p of heard.to) p.ws.send(out);
+          if (heard.to.length <= 1) {
+            ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', at: Date.now(),
+                      text: heard.placed ? 'Nobody near enough to hear that.'
+                                         : 'Your character is not in the world yet, so nobody heard that.' });
+          }
+          return;
+        }
+      }
       for (const [, p] of peers) p.ws.send(out);
       return;
     }
