@@ -9686,14 +9686,26 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
   if (!madeFromNothing) {
     /*
       A thing that already existed, with no recipe behind it. Tempering is the
-      case that matters and there is nothing here to gate: the recipe gate owns
-      plugin forms and it answered, and the rulebook's Mastercraft perk is about
-      tempering and was never enforceable anyway. Let it through and say so
-      once, so the log shows this path being used rather than being silent.
+      case that matters and there is nothing here to gate: the rulebook's
+      Mastercraft perk is about tempering and was never enforceable anyway.
+      Let it through and say so once, so the log shows this path being used
+      rather than being silent.
+
+      IT IS NOT ONLY TEMPERING. CraftService matches a recipe only when the
+      client's list holds exactly the count of each input the recipe wants, so
+      an ordinary smithing craft whose list says more of one of them comes
+      here as well, and the recipe gate never sees it. On the dev server on
+      23 September a Riekling helmet whose recipe wants three iron ingots
+      arrived listing thirteen entries, sixteen ingots among them, and was
+      allowed on this path; the server then failed to take the inputs because
+      one listed entry was not in the pack (To Do 347). So the line says what
+      is known, that no recipe matched, and not what it was assumed to be.
     */
     log(actorId.toString(16), 'worked', craftedItemBaseId.toString(16),
-        'with no recipe at bench', (workbenchId || 0).toString(16) +
-        ', which is tempering or the like. Allowed.');
+        'at bench', (workbenchId || 0).toString(16) +
+        ' and no recipe matched the inputs the client listed. Allowed:' +
+        ' tempering comes this way, and so does a craft whose list of' +
+        ' inputs matches no recipe exactly.');
     return;
   }
 
