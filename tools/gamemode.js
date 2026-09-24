@@ -15791,7 +15791,9 @@ log('gamemode loaded:',
       return true;
     }
     var list = notices[hold] || [];
-    if (!list.length) {
+    var up = 0;
+    for (var u = 0; u < list.length; u++) { if (!list[u].down) { up++; } }
+    if (!up) {
       toProfile(profileId, 'Nothing on the board in ' + hold + '.');
       return true;
     }
@@ -15804,20 +15806,22 @@ log('gamemode loaded:',
       indexes the real array, so the moment anything was hidden the numbers a
       person could read stopped being the numbers they could take.
 
-      Nothing takes a notice down yet, which is its own entry; showing the
-      newest is what keeps a board usable until something does.
+      A notice somebody took down with /unpin stays in the list marked down,
+      so it is skipped here and leaves a gap in the numbers rather than
+      moving every newer one. See unpin below.
     */
     var lines = [];
     var shown = 0;
     for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
       var n = list[i];
+      if (n.down) { continue; }
       lines.push('[' + (i + 1) + '] ' +
                  (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') +
                  n.name + ': ' + n.text);
       shown++;
     }
-    var more = list.length > shown
-      ? '\n(' + (list.length - shown) + ' older, and /take uses the numbers shown)' : '';
+    var more = up > shown
+      ? '\n(' + (up - shown) + ' older, and /take uses the numbers shown)' : '';
     toProfile(profileId, 'The board in ' + hold + ':\n' + lines.join('\n') + more);
     return true;
   }
@@ -15853,6 +15857,10 @@ log('gamemode loaded:',
       return true;
     }
     var n = list[at];
+    if (n.down) {
+      toProfile(profileId, 'That one has been taken down.');
+      return true;
+    }
     if (!n.job) {
       toProfile(profileId, 'That is a notice, not a job. There is nothing to take.');
       return true;
@@ -15924,6 +15932,75 @@ log('gamemode loaded:',
     return true;
   }
 
+  /*
+    ------------------------------------------------------- taking one down
+
+        /unpin 3      take down notice 3 on the board you are standing at
+
+    Until this, nothing took a notice down: a notice paid for was up for ever,
+    and so was a job its poster no longer needed doing. A poster can take down
+    their own notice or their own untaken job, and nobody else's.
+
+    A JOB SOMEBODY HAS TAKEN STAYS UP. It is on the taker's list, and pulling
+    it out from under them would empty their /jobs with no word to either of
+    them. It can come down once they hand it back with /dropjob.
+
+    NO REFUND. The fee went into the hold's box the moment the notice was
+    posted, and the box is the hold's money, which only the City Court draws.
+
+    THE NUMBERS DO NOT MOVE. /take and /dropjob act on a notice's place in the
+    list, and a person reads that number off /board and types it a moment
+    later. Cutting a notice out would shift every newer one down by one, so
+    somebody who read [4] and typed /take 4 would take the job that had been
+    [5]. So a notice that comes down stays in the list marked down, and /board
+    and /take step over it.
+
+    takedown is the store half, with no rule in it about who may. It is on
+    g.__thornswoodProperty so the guards (entries 209 and 208) can tear
+    notices down on their own rule when they exist; until then the only
+    caller is a poster's own /unpin.
+  */
+  function takedown(hold, at, byWhom) {
+    var list = notices[hold] || [];
+    var n = list[at];
+    if (!n || n.down) { return null; }
+    n.down = Date.now();
+    n.downBy = byWhom;
+    save();
+    return n;
+  }
+
+  function unpin(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at the board you put it on.');
+      return true;
+    }
+    var list = notices[hold] || [];
+    var at = Number((parts && parts[1]) || 0) - 1;
+    if (!(at >= 0 && at < list.length)) {
+      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      return true;
+    }
+    var n = list[at];
+    if (n.down) {
+      toProfile(profileId, 'That one is already down.');
+      return true;
+    }
+    if (n.by !== profileId) {
+      toProfile(profileId, 'That is not yours to take down.');
+      return true;
+    }
+    if (n.job && n.taken) {
+      toProfile(profileId, n.takenName + ' has taken that job. It can come down once they hand it back.');
+      return true;
+    }
+    takedown(hold, at, profileId);
+    plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.text);
+    toProfile(profileId, 'You take it down. The fee stays with ' + hold + '.');
+    return true;
+  }
+
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
@@ -15949,6 +16026,7 @@ log('gamemode loaded:',
     if (word === '/take') { return take(parts, actorId, profileId, toProfile); }
     if (word === '/jobs') { return jobs(profileId, toProfile); }
     if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
+    if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
     return false;
   }
 
@@ -16064,7 +16142,7 @@ log('gamemode loaded:',
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
-    notices: function () { return notices; },
+    notices: function () { return notices; }, takedown: takedown,
     boards: function () { return boards; }, boardHere: boardHere,
     stewards: function () { return stewards.slice(); }
   };
@@ -17425,7 +17503,7 @@ log('gamemode loaded:',
         word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
-        word === '/dropjob') {
+        word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
         toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
         return true;
@@ -17740,7 +17818,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
                '/steward', '/evict', '/box', '/rent',
-               '/notice', '/job', '/board', '/take', '/jobs', '/dropjob',
+               '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
@@ -17791,7 +17869,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // the steward half answers "only a steward sets rent"
                       // to everybody else.
                       '/box', '/rent', '/notice', '/job', '/board',
-                      '/take', '/jobs', '/dropjob', '/help',
+                      '/take', '/jobs', '/dropjob', '/unpin', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty.
                       '/needs', '/rest', '/eat', '/drink', '/bard',
