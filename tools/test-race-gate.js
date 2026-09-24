@@ -153,8 +153,17 @@ if (!recipes) {
       /if \(!mine\) \{ return ''; \}/.test(code));
   yes('the word is matched inside the editor id, so every variant of a race counts',
       /mine\.indexOf\(want\) !== -1/.test(code));
+  /*
+    Read inside craftAnswer, not across the file: "raceGate(actorId, row)"
+    also matches the function's own definition further up, so a whole-file
+    comparison answers where it is written rather than when it is asked.
+  */
+  const at = code.indexOf('function craftAnswer(actorId, row)');
+  const body = at >= 0 ? code.slice(at, at + 4000) : '';
   yes('and it is asked before the profession, the half and the rank',
-      code.indexOf('raceGate(actorId, row)') < code.indexOf('const half = String(row.half'));
+      at >= 0 &&
+      body.indexOf('raceGate(actorId, row)') > 0 &&
+      body.indexOf('raceGate(actorId, row)') < body.indexOf('const half = String(row.half'));
   yes('the refusal says Wood Elf out loud rather than woodelf',
       /RACE_CALLED\[want\]/.test(code) && /woodelf: 'Wood Elf'/.test(code));
 }

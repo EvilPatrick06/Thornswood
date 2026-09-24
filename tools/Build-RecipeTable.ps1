@@ -1404,6 +1404,39 @@ if ($RACE_LOCKED -and (Test-Path -LiteralPath $racesJson)) {
 $WOODWRIGHT_TAKES_SPEARS = $true
 $SPEAR_WORDS = @('Spear', 'Pike', 'Halberd', 'FishingRod', 'Fishing Rod', 'FishingPole', 'Fishing Pole')
 
+# WHAT NOBODY MAKES AT ALL.
+#
+# Patrick, 23 September: "Remove all of the house pars except for a key", and
+# asked which parts he meant, "I mean the craftable stuff in the forge hinges,
+# locks, nails, iron fittings, etc". Separately, about the same menu: "Locks
+# shouldn't be craftable".
+#
+# These are HearthFires house building stock. Nobody builds a HearthFires house
+# on this server: property is claimed through the deed system and a door is
+# opened with a key the holder has cut from a mold, so a nail is a thing you can
+# make and can then do nothing whatever with.
+#
+# THE KEY HE IS KEEPING IS NOT ONE OF THESE and is not a recipe at all: there
+# is no craftable key anywhere in the order, measured across all 4,527 rows. It
+# comes from the mold, 15495:Thornswood-Content.esp, which the property system
+# hands to the holder, and /key cuts it.
+#
+# REFUSED IS NOT THE SAME AS UNOWNED, which is the distinction this knob adds.
+# Unowned means anybody may make it, and that is the right answer for an ingot.
+# These four went to unowned under the stock-and-tools rule and so were open to
+# everybody, which is the opposite of what he asked for. A refused row is
+# carried into the gamemode with a sentence and mp.onCraft turns it down.
+#
+# The listing stays in the forge menu either way. A menu entry is the BNAM
+# keyword on the record and no server code moves it, which is the same wall
+# entry 345 is against.
+$NOBODY_MAKES = [ordered]@{
+    'Nails'         = 'a nail, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold.'
+    'Hinge'         = 'a hinge, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold.'
+    'Lock'          = 'a lock, and locks are not made at a forge here. A door takes the key its holder cut from a mold.'
+    'Iron Fittings' = 'house fittings, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold.'
+}
+
 # WHICH FOOD IS A DESSERT. This was expected to be a judgement and it is not,
 # on this build, which is worth writing down because the next person will
 # expect it to be a judgement too.
@@ -2873,6 +2906,15 @@ function ConditionRead($cond, $masters, [string]$plugin) {
 
 $owned    = New-Object System.Collections.Specialized.OrderedDictionary
 $unowned  = New-Object System.Collections.Specialized.OrderedDictionary
+# See $NOBODY_MAKES. Owned means one half makes it, unowned means anybody does,
+# and refusedRows means nobody does. There was no third answer until 23 September.
+#
+# NOT $refused, WHICH IS TAKEN, 600 lines further down, by the map of bases a
+# class is refused. This was called that for one run and the symptom is worth
+# knowing: the rows went in correctly, counted 0, 1, 2, 3 as they arrived, and
+# the collection read as empty everywhere it was used afterwards, because the
+# other assignment had replaced the whole variable in between. Nothing errored.
+$refusedRows = New-Object System.Collections.Specialized.OrderedDictionary
 $instrumentRows = New-Object 'System.Collections.Generic.List[string]'
 $tailorByName   = New-Object 'System.Collections.Generic.List[string]'
 $noOutput = 0
@@ -3083,14 +3125,48 @@ foreach ($desc in $recipes.Keys) {
         }
     }
     else {
-        # MISC and INGR off a bench nobody has claimed. Ingots, leather, fur
-        # plates, nails, fishing poles. Stock and tools rather than a finished
-        # good of any half.
-        $unowned[$desc] = [pscustomobject]@{
-            Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type; BenchDesc = $r.BenchDesc; BenchName = $benchName
-            Why = 'a ' + $o.Type + ' off ' + $benchName + '. It is stock or a tool rather than a finished good of any half, so nobody owns it and anybody may make it.'
+        # MISC and INGR off a bench nobody has claimed: ingots, leather, fur
+        # plates. Stock and tools rather than a finished good of any half.
+        #
+        # THIS BUCKET WAS SORTING TWO OTHER THINGS INTO ITSELF, and its own
+        # comment used to name them both as examples of stock: 'nails, fishing
+        # poles'. On 23 September Patrick said what each should be and neither
+        # is stock. Nine MISC rows come off the forge on this build and all nine
+        # were open to everybody: four house parts, four fishing poles and a
+        # Dwarven depth charge, which is the only one that belongs here.
+        #
+        # The house parts first. See $NOBODY_MAKES.
+        $refusedWhy = ''
+        foreach ($part in $NOBODY_MAKES.Keys) {
+            if ((MatchesWord $o.Name @($part)) -or (MatchesWord $o.Edid @($part))) {
+                $refusedWhy = [string]$NOBODY_MAKES[$part]
+                break
+            }
         }
-        continue
+        if ($refusedWhy) {
+            $refusedRows[$desc] = [pscustomobject]@{
+                Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type; BenchDesc = $r.BenchDesc; BenchName = $benchName
+                Why = $refusedWhy
+            }
+            continue
+        }
+        #
+        # Then the fishing poles, which are the Woodwright's by the same
+        # sentence that gave him spears. Patrick, 23 September: 'Same with
+        # fishing poles which should be woodworkers'. The rule that catches a
+        # spear sits under WEAP and a fishing pole is a MISC record, so it has
+        # never once been reached: that is why the poles sat here with the
+        # ingots while the spears went where he asked.
+        if ($WOODWRIGHT_TAKES_SPEARS -and ((MatchesWord $o.Edid $SPEAR_WORDS) -or (MatchesWord $o.Name $SPEAR_WORDS))) {
+            $ownerName = 'Woodworker'; $half = 'Woodwright'
+            $reason = 'the output is a fishing pole, a shaft of wood with a line on it, and a MISC record rather than a WEAP so the spear rule above never sees it'
+        } else {
+            $unowned[$desc] = [pscustomobject]@{
+                Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type; BenchDesc = $r.BenchDesc; BenchName = $benchName
+                Why = 'a ' + $o.Type + ' off ' + $benchName + '. It is stock or a tool rather than a finished good of any half, so nobody owns it and anybody may make it.'
+            }
+            continue
+        }
     }
 
     $fires = $true
@@ -4670,9 +4746,10 @@ $doc.Add('  "sisterHalf": ' + (JsonStr 'classes.md gives you the novice work of 
 $doc.Add('  "needs": ' + (JsonStr 'the recipe''s own conditions, read out of its CTDA subrecords. An empty list means anybody standing at the bench can make it. serverSees false means the fork has no function for that condition and the server answers True, so the only thing enforcing it is the crafting menu on the machine in front of the person, which hides the recipe rather than refusing it.') + ',')
 $doc.Add('  "default": ' + (JsonStr 'a recipe id this table does not carry is one nobody owns, and anybody may make it') + ',')
 $doc.Add('  "fires": ' + (JsonStr 'false means the server is never asked about this recipe. CraftService::RecipeItemsMatch throws out the armour table (adb78) and the sharpening wheel (88108) before it considers anything, so tempering never reaches onCraft.') + ',')
-$doc.Add('  "count": ' + ($owned.Count + $unowned.Count) + ',')
+$doc.Add('  "count": ' + ($owned.Count + $unowned.Count + $refusedRows.Count) + ',')
 $doc.Add('  "owned": ' + $owned.Count + ',')
 $doc.Add('  "unownedCount": ' + $unowned.Count + ',')
+$doc.Add('  "refusedCount": ' + $refusedRows.Count + ',')
 
 # Items a recipe asks for that nothing in the load order hands out. A recipe
 # behind one of these is not gated, it is dead, and it is written down here so
@@ -4833,6 +4910,19 @@ foreach ($desc in $owned.Keys) {
 }
 $doc.Add('  },')
 
+$doc.Add('  "refused": {')
+$n = 0
+foreach ($desc in $refusedRows.Keys) {
+    $n++
+    $comma = ','
+    if ($n -eq $refusedRows.Count) { $comma = '' }
+    $u = $refusedRows[$desc]
+    $doc.Add('    ' + (JsonStr $desc) + ': { "editorId": ' + (JsonStr $u.Edid) +
+             ', "out": ' + (JsonStr $u.OutDesc) + ', "name": ' + (JsonStr $u.OutName) +
+             ', "type": ' + (JsonStr $u.OutType) + ', "benchName": ' + (JsonStr $u.BenchName) +
+             ', "why": ' + (JsonStr $u.Why) + ' }' + $comma)
+}
+$doc.Add('  },')
 $doc.Add('  "unowned": {')
 $n = 0
 foreach ($desc in $unowned.Keys) {
@@ -4877,6 +4967,16 @@ foreach ($desc in $owned.Keys) {
                    ', "race": ' + (JsonStr $r.Race) +
                    ', "rank": ' + (JsonStr $r.Rank) + ', "family": ' + (JsonStr $r.Family) +
                    ', "open": ' + $dayOneTxt + ' },')
+}
+# And the refused rows, which carry a sentence instead of an owner. The gate
+# reads nobody before it reads anything else, so these never reach a question
+# about profession or rank: there is no rank at which a nail becomes useful.
+foreach ($desc in $refusedRows.Keys) {
+    $r = $refusedRows[$desc]
+    $blockRows.Add('    ' + (JsonStr $desc) + ': { "out": ' + (JsonStr $r.OutDesc) + ', "name": ' + (JsonStr $r.OutName) +
+                   ', "type": ' + (JsonStr $r.OutType) + ', "makes": 1' +
+                   ', "owner": "", "half": "", "race": "", "rank": "", "family": ""' +
+                   ', "nobody": ' + (JsonStr $r.Why) + ' },')
 }
 if ($blockRows.Count -gt 0) {
     $last = $blockRows[$blockRows.Count - 1]
@@ -5030,4 +5130,8 @@ if ($fail) {
     Write-Host "$fail check(s) failed. Read those before the table ships." -ForegroundColor Red
     exit 1
 }
-Write-Host ("the table is complete: {0} recipes, {1} of them owned by a half of a profession, {2} the server is asked about." -f ($owned.Count + $unowned.Count), $owned.Count, $blockRows.Count) -ForegroundColor Green
+Write-Host ("the table is complete: {0} recipes, {1} of them owned by a half of a profession, {2} the server is asked about." -f ($owned.Count + $unowned.Count + $refusedRows.Count), $owned.Count, $blockRows.Count) -ForegroundColor Green
+if ($refusedRows.Count) {
+    Write-Host ("nobody makes {0} of them, and the gate says why:" -f $refusedRows.Count) -ForegroundColor Yellow
+    foreach ($desc in $refusedRows.Keys) { Write-Host ('    ' + $refusedRows[$desc].OutName + '  (' + $refusedRows[$desc].BenchName + ')') -ForegroundColor DarkGray }
+}
