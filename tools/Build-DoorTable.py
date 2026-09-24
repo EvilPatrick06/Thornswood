@@ -399,10 +399,53 @@ def main():
         c = cells.get(b, {})
         names[b] = c.get('name') or c.get('edid') or b
 
+    # WHICH DOORS ARE A WAY OUT, because a lock keeps people out and never
+    # shuts them in. Both halves of a front door answer with the house, so
+    # until this a stranger inside when the holder locked up found every way
+    # out locked: measured on 24 September against doors.json, 3,326 of the
+    # 4,891 doors above stand inside the building they belong to, in 812 of
+    # the 852 buildings.
+    #
+    # A door is a way out when it stands inside its own building, or when it
+    # stands in a room whose only road to open ground is through that
+    # building. The second is a cellar: Windstad Manor's, an inn's, the
+    # Winking Skeever's lower cellar two rooms down. Somebody down there got
+    # in through the house, so letting them back through it lets nobody in who
+    # was not already inside. Every door that stands on open ground still
+    # locks, which is what keeps people out.
+    leaves = {}
+    for d, r in placed.items():
+        other = placed.get(r.get('to'))
+        if other:
+            leaves.setdefault(r['cell'], []).append(other['cell'])
+
+    def open_ground_without(start, building):
+        # A cell this table never read is taken as open ground, so a door this
+        # cannot follow stays a door that locks.
+        seen, todo = set([start]), [start]
+        while todo:
+            c = todo.pop()
+            if not cells.get(c, {}).get('interior'):
+                return True
+            for n in leaves.get(c, []):
+                if n != building and n not in seen:
+                    seen.add(n)
+                    todo.append(n)
+        return False
+
+    way_out = {}
+    for d, b in by_door.items():
+        stands = placed[d]['cell']
+        if stands == b or (cells.get(stands, {}).get('interior')
+                           and not open_ground_without(stands, b)):
+            way_out[d] = 1
+
     print('')
     print('What the server carries')
     print('  %s door(s) answer with a building, across %s building(s)'
           % (format(len(by_door), ','), format(len(names), ',')))
+    print('  %s of those door(s) are a way out, so a lock never turns on them'
+          % format(len(way_out), ','))
 
     text = io.open(args.gamemode, encoding='utf-8', newline='').read()
     blocks = [
@@ -421,6 +464,14 @@ def main():
           '   this, so an editor id here is an editor id in somebody\'s pack. */',
           'const BUILDING_NAME = ' + json.dumps(names, sort_keys=True,
                                                 separators=(',', ':')) + ';']),
+        ('WAY_OUT',
+         ['/* Placed door -> 1 when it is a way out rather than a way in. Generated',
+          '   by tools\\Build-DoorTable.py; do not hand edit. A door that stands',
+          '   inside the building it belongs to, or in a room whose only road to open',
+          '   ground is through that building. A lock keeps people out and never',
+          '   shuts them in, so none of these is ever locked. */',
+          'const WAY_OUT = ' + json.dumps(way_out, sort_keys=True,
+                                          separators=(',', ':')) + ';']),
     ]
     for mark, lines in blocks:
         a = text.find('// ==== %s, generated ====' % mark)

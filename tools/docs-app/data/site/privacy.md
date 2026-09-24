@@ -52,12 +52,13 @@ are on. It is how somebody who cannot play gets helped without a conversation.
 
 Honesty about the things a page does by existing:
 
-- **Fonts** are fetched from `fonts.googleapis.com` and a markdown renderer
-  from `cdnjs.cloudflare.com`, so loading a page tells those two your address.
-  Neither is tracking, and neither is asked anything about you.
 - **Discord** is where sign-in happens, so signing in tells Discord that you
   signed in here.
 - **GitHub** hosts the launcher updates, so your launcher asks GitHub for them.
+
+Opening a page on this site loads nothing from anybody else. The fonts came
+from Google and a markdown renderer from cdnjs until 24 September 2026, and
+both are served from here now.
 
 ## How long it is kept
 
