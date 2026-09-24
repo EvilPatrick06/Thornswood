@@ -110,6 +110,7 @@ const DEAD = [
   [/switch for it in Settings|change it in Settings/i, 'an address switch Settings no longer has'],
   [/every half minute/i, 'a reminder in the chat, which is silent now unless the panel failed'],
   [/after yourself/i, 'naming the character after yourself (entry 163)'],
+  [/once every \d+ hours|hands you one/i, 'a free tool at the seam, which toolGate stopped handing over on 21 September'],
   [/Profile\\+MyGames\\+Saves/i, 'a saves folder, when the character lives on the server']
 ];
 DEAD.forEach(function (d) {
@@ -379,9 +380,34 @@ function tableNames(src, name) {
   yes('the gamemode hands out ' + tools.length + ' tools (' + tools.join(', ') + ')', tools.length === 3);
   const lostTool = tools.filter(function (x) { return item('Character', 'The tools come with the pick').indexOf(x) === -1; });
   yes('and the page names every one' + (lostTool.length ? ' (not: ' + lostTool.join(', ') + ')' : ''), lostTool.length === 0);
-  const again = num(gm, /const TOOL_AGAIN_HOURS = (\d+);/);
-  yes('a lost tool comes back after ' + again + ' hours, as the page says',
-      again > 0 && item('Character', 'The tools come with the pick').indexOf('once every ' + again + ' hours') !== -1);
+  /*
+    What happens once the tool is gone, read from what the code DOES rather
+    than from a constant. TOOL_AGAIN_HOURS is still defined, and the first
+    version of this check passed on it while the page promised a free tool at
+    the seam that toolGate had stopped handing over (Patrick, 21 September:
+    "Don't let p[eople chop wood, mine, or farm without a pickaxe, shovel, or
+    woodcutters axe"). So: toolGate refuses and hands nothing over, nothing
+    calls offerTool, and every refusal sends people to a smith. The day a
+    handout comes back, the first two fail and the page has to follow.
+  */
+  const gateAt = gm.indexOf('function toolGate(actorId, key) {');
+  const gate = gateAt < 0 ? '' : gm.slice(gateAt, gm.indexOf('\n}\n', gateAt))
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  yes('toolGate refuses somebody with no tool and hands nothing over',
+      /return 'You need a ' \+ tool\.name \+ ' in your pack for that\. ' \+ tool\.where;/.test(gate) &&
+      !/\b(offerTool|handTool|giveTool)\(/.test(gate));
+  const offerCalls = (gm.match(/\bofferTool\(/g) || []).length;
+  yes('nothing calls offerTool, so no seam, block, kiln or plot gives a tool away (' +
+      (offerCalls - 1) + ' callers)', offerCalls === 1 && /function offerTool\(/.test(gm));
+  const toolsAt = gm.indexOf('const TOOLS = {');
+  const toolsBlock = toolsAt < 0 ? '' : gm.slice(toolsAt, gm.indexOf('\n};\n', toolsAt));
+  const wheres = toolsBlock.match(/where: '[^']*/g) || [];
+  yes('every refusal names a smith as the way to another (' + wheres.length + ' of 3)',
+      wheres.length === 3 && wheres.every(function (w) { return /a smith forges them/i.test(w); }));
+  const toolItem = item('Character', 'The tools come with the pick');
+  yes('and the page says a smith forges the next one and nothing hands one out',
+      /a smith forges the next one/.test(toolItem) && /nothing in the world hands one out/.test(toolItem) &&
+      !/once every \d+ hours|hands you one/.test(toolItem));
 
   const remind = num(gm, /const CHOOSE_REMIND_MS = (\d+);/) / 1000;
   const later = num(gm, /const CHOOSE_LATER_MS = (\d+);/) / 60000;
