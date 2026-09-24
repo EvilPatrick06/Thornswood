@@ -875,6 +875,20 @@ if (PAGES[here]) {
       if (b >= 1048576)    return Math.round(b / 1048576) + ' MB';
       return Math.max(1, Math.round(b / 1024)) + ' KB';
     }
+    // The installer's SHA-256, under the size and date, and a link to
+    // VirusTotal's report on that hash. To Do entry 176 asked for exactly this
+    // "rather than instructions for running one": somebody who wants to know
+    // what the file is before running it reads a report instead of uploading
+    // it. It is not a signature, and signing is still entry 2. An installer
+    // published before Publish-Installer wrote a hash has none, and then
+    // nothing shows rather than a link to nothing.
+    function sum(f) {
+      var h = f && /^[0-9a-f]{64}$/.test(f.sha256 || '') ? f.sha256 : '';
+      if (!h) return '';
+      return '<br>SHA-256 <span style="overflow-wrap:anywhere">' + h + '</span> · ' +
+             '<a href="https://www.virustotal.com/gui/file/' + h + '" target="_blank" ' +
+             'rel="noopener">VirusTotal report</a>';
+    }
     // hidden is the payload: on the site because the installer fetches it,
     // never on this page, because clicking it gets you 700 MB that does
     // nothing on its own.
@@ -919,7 +933,7 @@ if (PAGES[here]) {
              '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
              'Download the installer</a>' +
              '<p class="also faintly">' + esc(human(exe.size)) +
-             (exe.version ? ' · ' + esc(clock(exe.version)) : '') + '</p></div>';
+             (exe.version ? ' · ' + esc(clock(exe.version)) : '') + sum(exe) + '</p></div>';
     } else {
       grab = '<div class="grab">' +
              '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
@@ -930,7 +944,7 @@ if (PAGES[here]) {
              'Do not unzip anything yourself.</p>' +
              '<p class="also faintly">' + esc(human(exe.size)) + ' and ' +
              esc(human(zip.size)) + (exe.version ? ' · ' + esc(clock(exe.version)) : '') +
-             '</p></div>';
+             sum(exe) + '</p></div>';
     }
 
     out += '<h2>Apply first, then four steps</h2>' +
