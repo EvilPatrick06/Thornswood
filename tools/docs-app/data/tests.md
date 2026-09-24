@@ -219,4 +219,4 @@ Make a fresh character and wait two minutes after logging in. It used to freeze 
 
 ## Do not report these
 
-Typing in another window still moves your character. Bard instruments look wrong. Mod settings menus reset every session. NPCs stand still when nobody is near them. You cannot save.
+Typing in another window still moves your character. A flute, lute or drum looks wrong when you equip it and plays nothing. They come from PlayFluteLuteDrum.esp, which handles equipping one and playing it with scripts that never fire here. Use the Lute, Flute and Drum emotes instead: press B, then pick Revelry. Mod settings menus reset every session. NPCs stand still when nobody is near them. You cannot save.

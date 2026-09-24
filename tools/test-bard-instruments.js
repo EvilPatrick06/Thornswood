@@ -1,0 +1,175 @@
+// test-bard-instruments.js
+//
+// The tester note says what is actually wrong with the instruments, and what
+// it says is still true of the code and of the plugin.
+//
+// From the To Do List, entry 306: "Bard instruments render badly and nobody
+// has looked at why... Worth half an hour to find out which mod owns them and
+// whether it is one of the scripted ones". The Do not report these list on
+// the Test These page said only "Bard instruments look wrong.", which tells a
+// tester nothing and the next developer less.
+//
+// Measured on 24 Sep. The flute, lute and drum a Woodwright can make are the
+// WEAP records FluteWeapon, LuteWeapon and DrumWeapon in PlayFluteLuteDrum.esp.
+// Each one carries the script instrumentOnEquip, and the three effects that
+// play a note carry instrumentPlayOcarina, instrumentPlayLute and
+// instrumentPlayDrum. The meshes are in the game folder and point at Skyrim's
+// own textures, which are in Skyrim - Textures3.bsa. So no file is missing.
+// What goes wrong is scripts, and a script attached to a record never fires
+// here (known.md). That is the blocked Papyrus bucket, not something a release
+// can fix.
+//
+// Read only. The plugin half runs only where the game folder is, and says SKIP
+// anywhere else, because the build check on GitHub has no Skyrim.
+const fs = require('fs');
+const path = require('path');
+const zlib = require('zlib');
+const CR = String.fromCharCode(13);
+const read = (p) => fs.readFileSync(p, 'utf8').split(CR).join('');
+
+const TESTS = process.env.TESTS_MD || path.join(__dirname, 'docs-app', 'data', 'tests.md');
+const KNOWN = path.join(__dirname, 'docs-app', 'data', 'known.md');
+const EMOTES = path.join(__dirname, 'ts-plugins', 'thornswood-emotes.js');
+const GM = process.env.GM || path.join(__dirname, 'gamemode.js');
+const DATA = process.env.GAME_DATA || 'C:\\Thornswood\\Game\\Data';
+const PLUGIN = 'PlayFluteLuteDrum.esp';
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+
+// ------------------------------------------------------------ the note
+const tests = read(TESTS);
+const at = tests.indexOf('## Do not report these');
+const next = at < 0 ? -1 : tests.indexOf('\n## ', at + 1);
+const note = at < 0 ? '' : tests.slice(at, next < 0 ? tests.length : next);
+yes('the Do not report these list is on the Test These page', at >= 0);
+
+yes('the vague line is gone', note.indexOf('Bard instruments look wrong') < 0);
+yes('it names the plugin the instruments come from', note.indexOf(PLUGIN) >= 0);
+yes('it says scripts are the cause, and that they never fire here',
+    /scripts that never fire here/.test(note));
+yes('it says what the instruments do: look wrong and play nothing',
+    /flute, lute or drum looks wrong when you equip it and plays nothing/.test(note));
+yes('it sends people to the wheel instead: B, then Revelry',
+    /press B, then pick Revelry/.test(note));
+yes('the rest of the list is still there',
+    note.indexOf('Typing in another window') >= 0 &&
+    note.indexOf('Mod settings menus reset') >= 0 &&
+    note.indexOf('NPCs stand still') >= 0 &&
+    note.indexOf('You cannot save') >= 0);
+
+const EM = String.fromCharCode(0x2014);
+yes('no em dash in it', note.indexOf(EM) < 0);
+yes('it never says player', !/player/i.test(note));
+
+// ------------------------------------------------------ what it relies on
+/*
+  "scripts that never fire here" is the Known Issues page's own reason. If
+  that row ever changes, because scripts start running, this line is wrong.
+*/
+const known = read(KNOWN);
+yes('Known Issues still says mod scripts never fire',
+    /Most mod scripts never fire \| All Papyrus events except OnUpdate are blocked/.test(known));
+
+/*
+  The wheel. B opens it and the instruments are in the Revelry category. The
+  launcher's help used to say Tab turns to a second ring; the wheel has had
+  categories since the 1.1.36 source, so the note says Revelry.
+*/
+const emotes = read(EMOTES);
+yes('B is the key that opens the wheel', /const OPEN_KEY\s*=\s*key\('WheelKey', 48\);/.test(emotes) &&
+    /48: 'b'/.test(emotes));
+const rv = emotes.indexOf("{ name: 'Revelry', items: [");
+const rvEnd = rv < 0 ? -1 : emotes.indexOf(']}', rv);
+const revelry = (rv >= 0 && rvEnd >= 0) ? emotes.slice(rv, rvEnd) : '';
+yes('the wheel has a Revelry category', revelry !== '');
+yes('Revelry holds Lute, Flute and Drum, played by Skyrim\'s own idles',
+    /name: 'Lute',\s*event: 'IdleLuteStart'/.test(revelry) &&
+    /name: 'Flute',\s*event: 'IdleFluteStart'/.test(revelry) &&
+    /name: 'Drum',\s*event: 'IdleDrumStart'/.test(revelry));
+
+/*
+  The instruments a person can actually hold are the three this plugin adds,
+  because they are the only instruments anybody can make. Skyrim's own lute,
+  drum and flute are MISC records and cannot be held at all.
+*/
+const gm = read(GM);
+const made = {};
+gm.split('\n').forEach(function (line) {
+  const m = /"out": "([0-9a-f]+):PlayFluteLuteDrum\.esp", "name": "([^"]+)"/.exec(line);
+  if (m) made[m[2]] = m[1];
+});
+yes('a flute, a lute and a drum can be made, and all three are ' + PLUGIN + '\'s',
+    made.Flute === 'd62' && made.Lute === '1d9b' && made.Drum === '287f');
+
+// ------------------------------------------------------------ the plugin
+/*
+  A plain walk of the plugin: records, groups, and the subrecords of each
+  record. What it looks for is the script name in each record's VMAD and the
+  mesh in its MODL.
+*/
+function records(buf) {
+  const out = [];
+  (function walk(s, e) {
+    let p = s;
+    while (p + 24 <= e) {
+      const type = buf.toString('latin1', p, p + 4);
+      const size = buf.readUInt32LE(p + 4);
+      if (type === 'GRUP') { walk(p + 24, p + size); p += size; continue; }
+      const flags = buf.readUInt32LE(p + 8);
+      const id = (buf.readUInt32LE(p + 12) & 0xFFFFFF).toString(16);
+      let body = buf.slice(p + 24, p + 24 + size);
+      if (flags & 0x40000) body = zlib.inflateSync(body.slice(4));
+      const subs = {};
+      let q = 0, big = null;
+      while (q + 6 <= body.length) {
+        const st = body.toString('latin1', q, q + 4);
+        let ss = body.readUInt16LE(q + 4);
+        q += 6;
+        if (st === 'XXXX') { big = body.readUInt32LE(q); q += ss; continue; }
+        if (big !== null) { ss = big; big = null; }
+        if (!subs[st]) subs[st] = body.slice(q, q + ss);
+        q += ss;
+      }
+      out.push({ type: type, id: id, subs: subs });
+      p += 24 + size;
+    }
+  })(0, buf.length);
+  return out;
+}
+const str = (b) => b ? b.toString('latin1').replace(/\0+$/, '') : '';
+
+const espPath = path.join(DATA, PLUGIN);
+if (!fs.existsSync(espPath)) {
+  console.log('SKIP  no ' + espPath + ' on this machine, so the plugin itself is not read');
+} else {
+  const recs = records(fs.readFileSync(espPath));
+  const byId = {};
+  recs.forEach(function (r) { byId[r.type + ' ' + r.id] = r; });
+
+  [['Flute', 'd62'], ['Lute', '1d9b'], ['Drum', '287f']].forEach(function (w) {
+    const r = byId['WEAP ' + w[1]];
+    yes('the ' + w[0] + ' is a WEAP record in the plugin', !!r);
+    if (!r) return;
+    yes('the ' + w[0] + ' runs instrumentOnEquip when equipped',
+        str(r.subs.VMAD).indexOf('instrumentOnEquip') >= 0);
+    const nif = str(r.subs.MODL);
+    yes('the ' + w[0] + '\'s mesh ' + nif + ' is in the game folder',
+        nif !== '' && fs.existsSync(path.join(DATA, 'meshes', nif)));
+  });
+
+  [['PlayFluteEffect', 'instrumentPlayOcarina'],
+   ['PlayLuteEffect', 'instrumentPlayLute'],
+   ['PlayDrumEffect', 'instrumentPlayDrum']].forEach(function (e) {
+    const r = recs.filter(function (x) { return x.type === 'MGEF' && str(x.subs.EDID) === e[0]; })[0];
+    yes(e[0] + ' plays its notes through ' + e[1],
+        !!r && str(r.subs.VMAD).indexOf(e[1]) >= 0);
+  });
+}
+
+console.log('');
+console.log(pass + ' passed, ' + fail + ' failed');
+process.exit(fail ? 1 : 0);
