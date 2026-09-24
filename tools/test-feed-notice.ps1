@@ -90,6 +90,11 @@ if (-not (Test-Path -LiteralPath $noticePath)) { Done }
 $configSrc = Read-Text $configPath
 # Config.Load and Save call Secrets, so it comes along. Nothing here calls it.
 $secretsSrc = Read-Text (Join-Path $AppDir 'Secrets.cs')
+# Config.Save logs what it swallows through Swallow.Note (entry 239), so
+# Swallow.cs comes along too, with a stand-in for the one field of Paths it
+# reads. Left null, a note writes nothing, which keeps this read only.
+$swallowSrc = Read-Text (Join-Path $AppDir 'Swallow.cs')
+$pathsStub = "namespace Thornswood`r`n{`r`n    static class Paths { public static string LogFile; }`r`n}`r`n"
 $updaterSrc = Read-Text $updaterPath
 $noticeSrc = Read-Text $noticePath
 $shellSrc = Read-Text $shellPath
@@ -127,7 +132,7 @@ $cp.GenerateExecutable = $false
 foreach ($r in @('System.dll', 'System.Core.dll', 'System.Xml.dll', 'System.Runtime.Serialization.dll', 'System.Security.dll')) {
     [void]$cp.ReferencedAssemblies.Add($r)
 }
-$built = $provider.CompileAssemblyFromSource($cp, [string[]]@($configSrc, $secretsSrc, $noticeSrc, $updaterStub))
+$built = $provider.CompileAssemblyFromSource($cp, [string[]]@($configSrc, $secretsSrc, $swallowSrc, $pathsStub, $noticeSrc, $updaterStub))
 $errors = @($built.Errors | Where-Object { -not $_.IsWarning })
 foreach ($e in $errors) { Write-Host ('      ' + [IO.Path]::GetFileName($e.FileName) + ':' + $e.Line + '  ' + $e.ErrorNumber + '  ' + $e.ErrorText) }
 Yes 'Config.cs and FeedNotice.cs compile with the .NET Framework C# compiler' ($errors.Count -eq 0)

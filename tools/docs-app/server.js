@@ -310,6 +310,144 @@ const escAttr = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+// ==== thornswood page render ====
+//
+// THE WRITTEN PAGES GO OUT AS HTML. Until entry 247 the rules, the world, how
+// to join and the rest were an empty page that the browser filled in: it
+// fetched the markdown and turned it into HTML with marked, loaded from
+// cdnjs.cloudflare.com with no integrity check, in fonts from Google. So the
+// rules page was blank to anything that does not run the page's script (a
+// search engine, a link preview), it was blank whenever cdnjs could not be
+// reached, and every visitor's address went to two other companies for
+// opening it. The same marked, 12.0.2, now sits in public/ and runs here, and
+// the page leaves this server with its words already in it.
+//
+// NO HTML THROUGH, BY CONSTRUCTION. Help is edited in the hub and the rest are
+// files anybody with the box can change. Rendered in the browser, a line of
+// HTML in one of them ran on the page; rendered here it would be written into
+// the public front as served. So the renderer never recognises HTML at all: a
+// tag in the markdown is text and comes out escaped, a link or a picture only
+// goes somewhere if its address is http, https, mailto or on this site, and
+// every attribute it writes is one it built and escaped itself. That is an
+// allowlist in the renderer rather than a regex over its output afterwards,
+// and it needs no package: the site has no package.json and Deploy-Docs sends
+// files, not node_modules.
+//
+// The one piece of HTML any page used is the empty anchor world.md puts above
+// the Accord, which the footer's /world#accord points at. An empty anchor with
+// an id and nothing else is the one shape let through.
+function makePageRenderer(lib) {
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  // marked escapes a title and a picture's words while it reads them, so this
+  // leaves a finished entity alone rather than showing "&amp;quot;".
+  const escOnce = (s) => String(s == null ? '' : s)
+    .replace(/&(?!#\d{1,7};|#[Xx][0-9A-Fa-f]{1,6};|\w+;)/g, '&amp;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  // An address as it goes into href or src, or null when it is not one this
+  // site hands out. encodeURI is what marked itself does to it. After that
+  // anything before a colon, with no slash, ? or # ahead of it, is a scheme,
+  // and only three are allowed. The & is escaped on the way out, so
+  // javascript&#58; reaches the browser as those characters and not as a
+  // colon.
+  function address(href) {
+    let h;
+    try { h = encodeURI(String(href == null ? '' : href)).replace(/%25/g, '%'); }
+    catch (e) { return null; }
+    const scheme = /^([^:/?#]*):/.exec(h);
+    if (scheme && !/^(https?|mailto)$/i.test(scheme[1])) return null;
+    return esc(h);
+  }
+  const m = new lib.Marked({ gfm: true, breaks: false });
+  m.use({
+    // Undefined is "not this", so marked goes on to read it as text, which it
+    // escapes. A tag never becomes an html token and never switches marked
+    // into the raw mode that stops it escaping what follows.
+    tokenizer: {
+      html() { return undefined; },
+      tag() { return undefined; }
+    },
+    extensions: [{
+      name: 'emptyAnchor',
+      level: 'inline',
+      start(src) { const i = src.indexOf('<a id='); return i < 0 ? undefined : i; },
+      tokenizer(src) {
+        const a = /^<a id=(["'])([A-Za-z][A-Za-z0-9_-]{0,63})\1\s*><\/a>/.exec(src);
+        return a ? { type: 'emptyAnchor', raw: a[0], id: a[2] } : undefined;
+      },
+      renderer(t) { return '<a id="' + t.id + '"></a>'; }
+    }],
+    renderer: {
+      // Nothing above produces one. Escaped anyway, so a later marked that
+      // does is still safe.
+      html(text, block) { return block ? '<p>' + esc(text) + '</p>\n' : esc(text); },
+      link(href, title, text) {
+        const to = address(href);
+        if (to === null) return text;
+        return '<a href="' + to + '"' + (title ? ' title="' + escOnce(title) + '"' : '') +
+               '>' + text + '</a>';
+      },
+      image(href, title, text) {
+        const to = address(href);
+        if (to === null) return escOnce(text);
+        return '<img src="' + to + '" alt="' + escOnce(text) + '"' +
+               (title ? ' title="' + escOnce(title) + '"' : '') + '>';
+      }
+    }
+  });
+  return (md) => m.parse(String(md == null ? '' : md));
+}
+
+// home.html with a written page put into it: the page shown, the front hidden,
+// and the tab named after the page's first heading. Each marker is replaced
+// once with a function, so a $ in somebody's text is a dollar and not a
+// replacement pattern. A home.html without the markers comes back unchanged,
+// and its own script fetches the page instead.
+function fillPage(html, body) {
+  const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(body);
+  const name = h1 ? h1[1].replace(/<[^>]*>/g, '').trim() : '';
+  return html
+    .replace('<div id="landing">', () => '<div id="landing" hidden>')
+    .replace('<div class="page" id="page" hidden><div class="wrap" id="pagebody"></div></div>',
+             () => '<div class="page" id="page"><div class="wrap" id="pagebody">' + body + '</div></div>')
+    .replace('<title>Thornswood</title>',
+             () => '<title>' + (name ? name + ' · Thornswood' : 'Thornswood') + '</title>');
+}
+// ==== end thornswood page render ====
+
+/* The addresses that are a markdown page. The same list as PAGES in
+   home.html, and tools/test-site-render.js checks that the two agree. */
+const MD_PAGES = ['/world', '/rules', '/join', '/credits', '/classes',
+                  '/known', '/help', '/privacy', '/terms'];
+const MARKED = 'marked-12.0.2.min.js';
+let renderMd = null;
+try { renderMd = makePageRenderer(require(path.join(PUBLIC, MARKED))); }
+catch (e) {
+  console.error('[thornswood-docs] ' + MARKED + ' did not load, so the written ' +
+                'pages go out as plain text until it does: ' + e.message);
+}
+// Plain text rather than no page, if the library is missing or a page will
+// not render, so one bad edit to Help cannot turn /help into an error.
+function pageHtml(md) {
+  if (renderMd) {
+    try { return renderMd(md); }
+    catch (e) {
+      console.error('[thornswood-docs] a page would not render, sent as plain text: ' + e.message);
+    }
+  }
+  return '<pre style="white-space:pre-wrap">' + escAttr(md) + '</pre>';
+}
+// A written page's markdown, or null. Known Issues and Help live in the data
+// folder with the other documents (Help is edited in the hub), not under site.
+function pageMarkdown(name) {
+  const dir = PUBLIC_DOCS.indexOf(name) >= 0 ? DATA : SITE;
+  const file = path.join(dir, name + '.md');
+  if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) return null;
+  try { return fs.readFileSync(file, 'utf8'); } catch (e) { return null; }
+}
+
 const PAGES = {
   '/hub':         'home',
   '/hub/help':    'help',
@@ -416,6 +554,111 @@ const INBOX   = path.join(DATA, 'inbox.json');
    launcher shows, stripped of the server password before it leaves his
    machine. Nothing here writes it. */
 const NEWS    = path.join(DATA, 'news.json');
+
+// ==== thornswood report limits ====
+//
+// THE PUBLIC REPORT FORM TOOK ANYTHING FROM ANYBODY, AS OFTEN AS THEY LIKED.
+// No limit, nothing to tell a person from a script, and one list shared with
+// the bot's tickets and trimmed to its newest 2000 rows. So 2000 posts from
+// anywhere pushed every ticket and every real report off the end of
+// inbox.json, on a page that tells the person "Somebody will read it".
+//
+// FIVE AN HOUR AND TWENTY A DAY FROM ONE PLACE. Somebody with a real problem
+// sends one or two. Past that the answer is a 429 with a sentence saying when
+// to try again, never a quiet drop: a limiter that swallows a report and says
+// Sent breaks that promise worse than the flood did. Only reports that were
+// taken count, so a script hammering on a refusal does not keep somebody on
+// the same connection locked out for ever.
+//
+// WHERE A REQUEST COMES FROM. Caddy holds 443 and hands everything on from
+// 127.0.0.1, so behind it every request looks like it came from here, and
+// keyed on that the form would lock for everybody after five reports. The
+// forwarded header is believed only when the socket really is loopback, which
+// is Caddy, and only its LAST hop, which is the one Caddy wrote; anything
+// before it is whatever the sender typed. A request that reached 3001 straight
+// (THORNSWOOD_DOCS_LOCAL not set) is keyed by its own socket and its header is
+// ignored. An IPv6 address counts as its /64, because one home connection is
+// handed a whole /64 and would otherwise be millions of senders.
+//
+// NO ADDRESS IS KEPT. privacy.md says the sign-in log is the only thing here
+// holding one. This table holds a hash of it under a key made fresh at every
+// start and never written anywhere, and forgets it after a day. That is also
+// why the cap per sender lives here at the door rather than in inbox.json:
+// capping the file per sender would mean writing who sent each report into it.
+//
+// TICKETS AND REPORTS ARE TRIMMED APART. Each kind keeps the newest 2000 the
+// shared list used to keep, so nothing posted to the public page can push a
+// ticket out, and a pile of tickets cannot push a report out either.
+const REPORT_HOUR = 5;
+const REPORT_DAY = 20;
+const INBOX_KEEP = 2000;
+const reportSalt = crypto.randomBytes(32);
+const reportSeen = new Map();
+
+function reportFrom(req) {
+  const sock = String((req.socket && req.socket.remoteAddress) || '');
+  let addr = sock;
+  if (/^(127\.|::1$|::ffff:127\.)/i.test(sock)) {
+    const hops = String(req.headers['x-forwarded-for'] || '').split(',')
+      .map((s) => s.trim()).filter(Boolean);
+    if (hops.length) addr = hops[hops.length - 1];
+  }
+  addr = addr.toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  if (net.isIPv6(addr)) {
+    const halves = addr.split('%')[0].split('::');
+    const head = halves[0] ? halves[0].split(':') : [];
+    const tail = halves.length > 1 && halves[1] ? halves[1].split(':') : [];
+    const gap = halves.length > 1 ? Math.max(0, 8 - head.length - tail.length) : 0;
+    addr = head.concat(new Array(gap).fill('0'), tail).slice(0, 4)
+      .map((g) => (parseInt(g, 16) || 0).toString(16)).join(':') + '::/64';
+  }
+  return crypto.createHmac('sha256', reportSalt).update(addr).digest('hex').slice(0, 32);
+}
+
+function reportRefusal(key, now) {
+  const HOUR = 60 * 60 * 1000, DAY = 24 * HOUR;
+  const at = Number(now) || Date.now();
+  const day = (reportSeen.get(key) || []).filter((t) => t > at - DAY);
+  const hour = day.filter((t) => t > at - HOUR);
+  const wait = (ms) => Math.max(1, Math.ceil(ms / 1000));
+  const said = (s) => s >= 5400 ? 'about ' + Math.round(s / 3600) + ' hours'
+    : 'about ' + Math.max(1, Math.ceil(s / 60)) + (s > 60 ? ' minutes' : ' minute');
+  if (hour.length >= REPORT_HOUR) {
+    const s = wait(hour[0] + HOUR - at);
+    return { wait: s, error: 'That is five reports from your connection in the last hour, ' +
+      'which is as many as this page takes. Try again in ' + said(s) +
+      ', or open a ticket in the Discord if it cannot wait.' };
+  }
+  if (day.length >= REPORT_DAY) {
+    const s = wait(day[0] + DAY - at);
+    return { wait: s, error: 'That is twenty reports from your connection today, ' +
+      'which is as many as this page takes in a day. Try again in ' + said(s) +
+      ', or open a ticket in the Discord if it cannot wait.' };
+  }
+  return null;
+}
+
+function reportTaken(key, now) {
+  const list = reportSeen.get(key) || [];
+  list.push(Number(now) || Date.now());
+  reportSeen.set(key, list.slice(-REPORT_DAY));
+}
+
+function reportPrune(now) {
+  const cut = (Number(now) || Date.now()) - 24 * 60 * 60 * 1000;
+  for (const [key, list] of reportSeen) {
+    const kept = list.filter((t) => t > cut);
+    if (kept.length) reportSeen.set(key, kept); else reportSeen.delete(key);
+  }
+}
+
+function trimInbox(rows) {
+  let tickets = 0, reports = 0;
+  return (Array.isArray(rows) ? rows : []).filter((r) =>
+    (r && r.kind === 'ticket') ? ++tickets <= INBOX_KEEP : ++reports <= INBOX_KEEP);
+}
+// ==== end thornswood report limits ====
+setInterval(() => reportPrune(Date.now()), 10 * 60 * 1000).unref?.();
 
 // ------------------------------------------------------------- downloads --
 function listFiles() {
@@ -529,12 +772,24 @@ const isMember = (req) =>
 
 /* The Discord cookie carries the id and a signature of it, and proves only who
    somebody is. What they may do is asked of Discord, so that removing a role
-   or removing a person takes effect here without anybody editing a list. */
+   or removing a person takes effect here without anybody editing a list.
+
+   It carries when it was made as well, inside the signature, and anything
+   older than ADMIN_DAYS reads as signed out. Max-Age is the browser promising
+   to throw the cookie away; nothing held the site to it, so a value copied out
+   of a browser was good forever, because all this checked was that the site
+   had signed it. Entry 248. A cookie made before that has three parts rather
+   than four and reads as signed out once. That only costs staff a sign in,
+   because only staff may use the hub; the launcher's ticket is not this. */
+const ADMIN_DAYS = 30;
 function identity(req) {
   const raw = cookies(req)[ADMIN] || '';
-  const [id, name, sig] = decodeURIComponent(raw).split('|');
-  if (!id || !sig) return null;
-  if (!sameSecret(sig, sign(id + '|' + (name || '')))) return null;
+  const [id, name, at, sig] = decodeURIComponent(raw).split('|');
+  if (!id || !at || !sig) return null;
+  if (!sameSecret(sig, sign(id + '|' + (name || '') + '|' + at))) return null;
+  // A minute of slack the other way, for a clock that stepped back.
+  const age = Date.now() - Number(at);
+  if (!(age > -60000 && age < ADMIN_DAYS * 86400000)) return null;
   return { id: String(id), name: name || '' };
 }
 
@@ -684,6 +939,38 @@ const secureHere = (req) =>
 const setCookie = (req, name, value, days) =>
   name + '=' + value + '; Path=/; Max-Age=' + (days * 86400) +
   '; HttpOnly; SameSite=Lax' + (secureHere(req) ? '; Secure' : '');
+
+/*
+  One Discord sign in attempt, tied to the browser that started it. Entry 248.
+
+  The OAuth state was the same string for every attempt that asked for the
+  same page: signed, and nothing else. Anybody holding one could hand it to
+  somebody else's browser, or use it again, and the callback took it. Now
+  every press of the button makes a random value that goes two ways, inside
+  the signed state out through Discord and back, and into a short cookie in
+  this browser only. The callback wants the two to match, once, inside ten
+  minutes, and refuses before Discord is asked anything.
+
+  The launcher's nonce is a different thing and rides alongside unchanged. It
+  proves the ticket landed on the port of the button that was pressed; this
+  proves the callback is finishing an attempt this browser began.
+
+  Named per attempt, so two tabs signing in at once do not overwrite each
+  other. The path keeps it off every other request. The launcher waits two
+  minutes for its ticket (Discord.cs), so ten is room to spare.
+*/
+const ATTEMPT = 'twst_';
+const ATTEMPT_MS = 10 * 60000;
+const attemptsSpent = new Map();
+const attemptCookie = (req, attempt, value, seconds) =>
+  ATTEMPT + attempt.slice(0, 8) + '=' + value + '; Path=/auth/discord; Max-Age=' + seconds +
+  '; HttpOnly; SameSite=Lax' + (secureHere(req) ? '; Secure' : '');
+
+/* Which doors have been answered with the key in the address, so site.log
+   says once, and without the key, that a game server still runs a gamemode
+   from before the key moved into a header. When neither door has said it
+   since both servers were redeployed, the address form can go. */
+const keyInAddress = new Set();
 
 // --------------------------------------------------------------- discord --
 function post(url, form) {
@@ -959,11 +1246,18 @@ const SLOG_DAYS = 365;
 
 /* The names the launcher may send. Anything else is dropped rather than
    written: this is a path coming from outside, and a file name is the shortest
-   way into a folder nobody meant to write. */
+   way into a folder nobody meant to write.
+
+   In the order a set too big for SLOG_ALL keeps them. crash.log is the SKSE
+   crash log from that session, if it crashed, and it goes second because it
+   is the one that settles a crash with no message (entry 105).
+   skyrim-platform.log is the tail of Skyrim Platform's own log, and it goes
+   last because it is the biggest and the noisiest. */
 const SLOG_NAMES = [
-  'launcher.log', 'thornswood-front.log', 'thornswood-voice.log',
+  'launcher.log', 'crash.log', 'thornswood-front.log', 'thornswood-voice.log',
   'thornswood-emotes.log', 'thornswood-input.log', 'thornswood-dress.log',
-  'thornswood-loadorder.txt', 'thornswood-plugins-light.txt'
+  'thornswood-loadorder.txt', 'thornswood-plugins-light.txt',
+  'skyrim-platform.log'
 ];
 
 function slogFile(key) { return path.join(SLOGS, key + '.json'); }
@@ -1174,8 +1468,26 @@ const SERVER_LOGS = {
 
 /* Where the voice service writes what people said. Its folder, not this one:
    it owns the file and this only reads it, so there is one writer and no
-   question about which copy is the real one. */
-const CHAT_DIR = process.env.THORNSWOOD_CHAT_DIR || 'C:\\Thornswood-Voice\\chat';
+   question about which copy is the real one.
+
+   dev and main are different voice services with different folders, the same
+   way they are different game servers with different logs, and the session
+   says which it was on. This used to be one folder, the live one, for every
+   session. So a dev session showed nothing, or worse, showed what the same
+   profile number said on the live server in that window, which is somebody
+   else's words in a report about behaviour.
+
+   The dev folder is where the dev service actually writes. voice-server.js
+   puts chat in its own folder unless THORNSWOOD_CHAT_DIR is set. Neither
+   Install-Voice.ps1 nor vps-dev-instance.ps1 sets it, and the dev service's
+   folder is C:\Thornswood-Voice-Dev (voice\README.md, vps-dev-instance.ps1).
+   Measured 23 September: Get-Logs -Dev read that folder's voice.log and it
+   says "listening on 127.0.0.1:7789", which is the dev port.
+   tools\test-session-chat.js checks both defaults against those scripts. */
+const CHAT_DIRS = {
+  main: process.env.THORNSWOOD_CHAT_DIR || 'C:\\Thornswood-Voice\\chat',
+  dev:  process.env.THORNSWOOD_DEV_CHAT_DIR || 'C:\\Thornswood-Voice-Dev\\chat'
+};
 
 /* What this person said during THIS session, and nothing else.
 
@@ -1195,10 +1507,16 @@ const CHAT_DIR = process.env.THORNSWOOD_CHAT_DIR || 'C:\\Thornswood-Voice\\chat'
    A session that runs over midnight is in two files, so both days are read.
    A line that will not parse is skipped rather than thrown: an append-only
    log killed mid-write has a truncated last line by design, and one bad line
-   must not cost the rest. */
-function chatSlice(profileId, from, to) {
+   must not cost the rest.
+
+   channel picks the voice service by the same rule serverLogSlice picks the
+   game server's log, so the chat and the server log under one session always
+   come from the same server. */
+function chatSlice(profileId, from, to, channel) {
   const want = Number(profileId) || 0;
   if (!want) return { ok: true, why: '', lines: [] };
+  const dev = channel === 'dev';
+  const dir = CHAT_DIRS[dev ? 'dev' : 'main'];
   const days = {};
   for (const at of [from, to]) {
     const d = new Date(at);
@@ -1209,7 +1527,7 @@ function chatSlice(profileId, from, to) {
   let read = 0;
   for (const day of Object.keys(days).sort()) {
     let raw = '';
-    try { raw = fs.readFileSync(path.join(CHAT_DIR, day + '.jsonl'), 'utf8'); }
+    try { raw = fs.readFileSync(path.join(dir, day + '.jsonl'), 'utf8'); }
     catch (e) { continue; }
     read++;
     for (const l of raw.split('\n')) {
@@ -1229,7 +1547,8 @@ function chatSlice(profileId, from, to) {
   out.sort((a, b) => a.at - b.at);
   /* "Nothing was said" and "the chat log is not on this box" look identical
      once both are an empty list, and only one of them is a fault. */
-  return { ok: true, why: read ? '' : 'no chat log for those days on this box', lines: out };
+  return { ok: true, why: read ? '' : 'no chat log for those days on this box' +
+           (dev ? ' from the dev voice service' : ''), lines: out };
 }
 
 function serverLogSlice(channel, from, to) {
@@ -1566,8 +1885,11 @@ function notAllowedPage(me, st) {
 */
 function failed(req, res, e) {
   const bad = e instanceof URIError;
+  // The path and never the query. A caller that puts a key or a ticket in the
+  // address would have it copied into site.log, which Get-Logs brings down
+  // off the VPS. Entry 248.
   console.error('[thornswood-docs] ' + (bad ? 'malformed request ' : 'handler threw on ') +
-                JSON.stringify(String(req.url || '').slice(0, 200)) + ': ' +
+                JSON.stringify(String(req.url || '').split('?')[0].slice(0, 200)) + ': ' +
                 (e && e.stack ? e.stack : e));
   try {
     // Half an answer is already on the wire and cannot be taken back. Cutting
@@ -1692,28 +2014,52 @@ async function handle(req, res) {
     // knows the ticket it just caught belongs to the button its owner pressed
     // and not to a web page that guessed the port.
     const nonce = String(url.searchParams.get('nonce') || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 64);
-    const raw = Buffer.from(back + '\u0000' + askedPort + '\u0000' + nonce).toString('base64url');
+    // This attempt's own value and the time it began, after the three above,
+    // and the same value in a cookie for this browser. See ATTEMPT.
+    const attempt = crypto.randomBytes(16).toString('hex');
+    const raw = Buffer.from(back + '\u0000' + askedPort + '\u0000' + nonce + '\u0000' +
+                            attempt + '\u0000' + Date.now()).toString('base64url');
     const state = raw + '.' + sign(raw);
     const go = 'https://discord.com/api/oauth2/authorize' +
       '?client_id=' + encodeURIComponent(cfg.discord.clientId) +
       '&redirect_uri=' + encodeURIComponent(origin(req) + '/auth/discord/callback') +
       '&response_type=code&scope=identify' +
       '&state=' + encodeURIComponent(state);
-    return send(res, 302, '', 'text/plain', { Location: go });
+    return send(res, 302, '', 'text/plain', {
+      Location: go, 'Set-Cookie': attemptCookie(req, attempt, attempt, ATTEMPT_MS / 1000) });
   }
 
   if (p === '/auth/discord/callback' && req.method === 'GET') {
     const code = url.searchParams.get('code') || '';
     const state = (url.searchParams.get('state') || '').split('.');
-    let back = '/', port = '', nonce = '';
+    let back = '/', port = '', nonce = '', attempt = '', began = 0;
     if (state.length === 2 && sameSecret(state[1], sign(state[0]))) {
       try {
         const bits = Buffer.from(state[0], 'base64url').toString().split('\u0000');
         back = bits[0] || '/';
         port = (bits[1] || '').replace(/[^0-9]/g, '').slice(0, 5);
         nonce = (bits[2] || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 64);
+        attempt = (bits[3] || '').replace(/[^0-9a-f]/g, '').slice(0, 32);
+        began = Number(bits[4]) || 0;
       } catch (e) { }
     }
+    // Refused here, before Discord is asked anything: a state with no attempt
+    // in it, one this browser did not start, one already used, or one older
+    // than ten minutes. A signature alone used to be enough, and it is the
+    // same for everybody who asked for the same page.
+    const now = Date.now();
+    for (const [k, t] of attemptsSpent) { if (now - t > ATTEMPT_MS) attemptsSpent.delete(k); }
+    const age = now - began;
+    if (attempt.length !== 32 || attemptsSpent.has(attempt) ||
+        !(age > -60000 && age < ATTEMPT_MS) ||
+        !sameSecret(cookies(req)[ATTEMPT + attempt.slice(0, 8)] || '', attempt)) {
+      return send(res, 302, '', 'text/plain', { Location: '/?discord=expired' });
+    }
+    // Spent whatever happens next, and the cookie cleared on every answer
+    // below. The one that sets cookies of its own carries this in its list.
+    attemptsSpent.set(attempt, now);
+    const spent = attemptCookie(req, attempt, '', 0);
+    res.setHeader('Set-Cookie', spent);
     if (!/^\/[A-Za-z0-9/_-]*$/.test(back)) back = '/';
     if (!code) return send(res, 302, '', 'text/plain', { Location: '/?discord=cancelled' });
 
@@ -1745,7 +2091,11 @@ async function handle(req, res) {
       return send(res, 200, notAllowedPage(me, st), TYPES['.html']);
     }
     const name = String(st.name || me.global_name || me.username || '').replace(/[|;]/g, '');
-    const value = encodeURIComponent(me.id + '|' + name + '|' + sign(me.id + '|' + name));
+    // When it was made goes inside the signature, so identity() can refuse
+    // it once it is older than ADMIN_DAYS whatever the browser kept.
+    const at = String(Date.now());
+    const value = encodeURIComponent(me.id + '|' + name + '|' + at + '|' +
+                                     sign(me.id + '|' + name + '|' + at));
 
     // Remembered so there is a list of who has linked, when, and under what
     // name, which is what makes a ban traceable to a person later.
@@ -1759,8 +2109,8 @@ async function handle(req, res) {
     });
     putJson(LINKED, linked);
 
-    const cookies2 = [setCookie(req, ADMIN, value, 30),
-                      setCookie(req, COOKIE, memberToken(), 365)];
+    const cookies2 = [setCookie(req, ADMIN, value, ADMIN_DAYS),
+                      setCookie(req, COOKIE, memberToken(), 365), spent];
 
     // The launcher asked, so hand the ticket back to it on the loopback
     // address rather than leaving it in the browser.
@@ -1817,6 +2167,14 @@ async function handle(req, res) {
           html = html.replace(re, '$1' + escAttr(blurb[1]) + '$2');
         }
       }
+      // A written page goes out with its words in it. After the invite link
+      // above, so nothing anybody typed is mistaken for DISCORD_URL.
+      if (MD_PAGES.indexOf(route) >= 0) {
+        const md = pageMarkdown(route.slice(1));
+        html = fillPage(html, md === null
+          ? '<h1>Not here</h1><p>That page does not exist yet.</p>'
+          : pageHtml(md));
+      }
       return send(res, 200, html, TYPES['.html']);
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
   }
@@ -1855,7 +2213,8 @@ async function handle(req, res) {
     gate and stay public, because an installer cannot sign in.
 
     The reply is read by Bootstrap.cs with plain string searches for "name":",
-    "url":" and "size":, so the shape matters more than the field order.
+    "url":", "size": and "sha256":", so the shape matters more than the field
+    order.
   */
   if (route === '/api/payload' && req.method === 'GET') {
     let best = null;
@@ -1871,23 +2230,52 @@ async function handle(req, res) {
     // and nothing should be fetched. Bootstrap turns an empty url into "The
     // site is not offering a download right now", which is the truth.
     if (!best) return sendJson(res, 200, {});
+    // The SHA-256 Publish-Installer measured on the zip it sent, kept in
+    // files.json beside its name. best is built from a stat and has no hash on
+    // it, so it is looked up here. Only a well formed one goes out: anything
+    // else would make every install delete a good download. An empty value
+    // tells the installer there is nothing to check, which is also what an
+    // installer from before this sees when the field is missing.
+    const meta = jsonFile(path.join(FILES, 'files.json'), {});
+    const sha = String((meta[best.name] || {}).sha256 || '');
     return sendJson(res, 200, {
       name: best.name,
       url: '/file/' + encodeURIComponent(best.name),
-      size: best.size
+      size: best.size,
+      sha256: /^[0-9a-f]{64}$/i.test(sha) ? sha.toLowerCase() : ''
     });
   }
 
   /* Reporting a problem is public on purpose. Somebody whose install will not
      start cannot sign in to say so, and making them ask in Discord first is
      how a bug turns into nobody bothering. Held to one short message at a
-     time, and the inbox is capped so it cannot be used to fill the disk. */
+     time, five an hour from one place, and the inbox is capped so it cannot
+     be used to fill the disk. See thornswood report limits above. */
   if (route === '/api/report' && req.method === 'POST') {
+    const sender = reportFrom(req);
+    const refuse = (no) => send(res, 429, JSON.stringify({ error: no.error }), null,
+                                { 'Retry-After': String(no.wait) });
+    // Asked before the body is read, so a sender already past the limit is
+    // turned away without the site reading 20 KB from them first.
+    const early = reportRefusal(sender, Date.now());
+    if (early) return refuse(early);
     let o;
     try { o = JSON.parse(await body(req, 20000)); }
     catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+    // The form's hidden field. A person never sees it, so anything in it was
+    // put there by a script filling in every box it found. Answered as if it
+    // worked, so the script has nothing to learn from, and nothing is kept.
+    if (o && String(o.homepage || '').trim()) return sendJson(res, 200, { ok: true });
     const title = String(o.title || '').trim().slice(0, 200);
     if (!title) return sendJson(res, 400, { error: 'say what happened in the first box' });
+    // And asked again now the body is in, because the answer above is stale.
+    // A script that opens thirty connections, sends every set of headers and
+    // then every body gets all thirty past the first check before any of
+    // them is counted, and Caddy passes headers on before it has the body, so
+    // that works through it. From here to reportTaken nothing awaits, so no
+    // other request can run in between and each one sees the last one's count.
+    const late = reportRefusal(sender, Date.now());
+    if (late) return refuse(late);
     const list = jsonFile(INBOX, []);
     list.unshift({
       id: 'i' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'),
@@ -1899,9 +2287,10 @@ async function handle(req, res) {
       state: 'new',
       from: 'the public page'
     });
-    if (!putJson(INBOX, list.slice(0, 2000))) {
+    if (!putJson(INBOX, trimInbox(list))) {
       return sendJson(res, 500, { error: 'could not save' });
     }
+    reportTaken(sender, Date.now());
     return sendJson(res, 200, { ok: true });
   }
 
@@ -1928,7 +2317,7 @@ async function handle(req, res) {
       state: 'new',
       from: 'the Discord bot'
     });
-    if (!putJson(INBOX, list.slice(0, 2000))) {
+    if (!putJson(INBOX, trimInbox(list))) {
       return sendJson(res, 500, { error: 'could not save' });
     }
     return sendJson(res, 200, { ok: true });
@@ -1936,7 +2325,11 @@ async function handle(req, res) {
 
   if (route === '/api/roadmap' && req.method === 'GET') {
     const all = readBoard();
-    return sendJson(res, 200, all.roadmap || { intro:'', sections:[] });
+    // The intro is markdown, and it is rendered here like the written pages
+    // so the front page needs no markdown library of its own.
+    const rm = all.roadmap || { intro:'', sections:[] };
+    return sendJson(res, 200, Object.assign({}, rm,
+      { introHtml: rm.intro ? pageHtml(rm.intro) : '' }));
   }
 
   if (route === '/api/releases' && req.method === 'GET') {
@@ -1960,14 +2353,11 @@ async function handle(req, res) {
 
   const pg = route.match(/^\/api\/page\/([a-z-]+)$/);
   if (pg && req.method === 'GET') {
-    // Known Issues and Help live in the data folder with the other documents
-    // (Help is edited in the hub), not under site. Same read, other folder.
-    const dir = PUBLIC_DOCS.indexOf(pg[1]) >= 0 ? DATA : SITE;
-    const file = path.join(dir, pg[1] + '.md');
-    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
-      return sendJson(res, 404, { error: 'no such page' });
-    }
-    return sendJson(res, 200, { md: fs.readFileSync(file, 'utf8') });
+    // The same page the front route renders, for a home.html that was served
+    // without it. html is the one to show; md is kept for anything reading it.
+    const md = pageMarkdown(pg[1]);
+    if (md === null) return sendJson(res, 404, { error: 'no such page' });
+    return sendJson(res, 200, { md: md, html: pageHtml(md) });
   }
 
   // Pictures chosen for the gallery are public. Everything else in uploads is
@@ -2501,8 +2891,22 @@ async function handle(req, res) {
   const devDoor = (route === '/dev/api/allowed');
   if ((route === '/api/allowed' || devDoor) && req.method === 'GET') {
     if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
-    if (!sameSecret(String(url.searchParams.get('key') || ''), String(cfg.botKey))) {
+    // The key comes in the X-Thornswood-Key header. In the address it was
+    // written down by anything that logs a request line, this site's own
+    // failed() included. Entry 248. The address form stays for one release,
+    // for a game server still running a gamemode from before 24 September,
+    // and only when there is no header at all; keyInAddress says when a door
+    // still uses it.
+    const inHeader = req.headers['x-thornswood-key'];
+    const given = inHeader !== undefined ? inHeader : (url.searchParams.get('key') || '');
+    if (!sameSecret(String(given), String(cfg.botKey))) {
       return sendJson(res, 401, { error: 'no' });
+    }
+    if (inHeader === undefined && !keyInAddress.has(route)) {
+      keyInAddress.add(route);
+      console.log('[thornswood-docs] ' + route + ' answered a door that sent its key in ' +
+                  'the address, so that game server runs a gamemode from before 24 ' +
+                  'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
     const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
@@ -2731,7 +3135,7 @@ async function handle(req, res) {
       const from = (Number(row.start) || Number(row.end) || 0) - 60000;
       const to = (Number(row.end) || Date.now()) + 60000;
       const server = serverLogSlice(row.channel, from, to);
-      const chat = chatSlice(row.profile, from, to);
+      const chat = chatSlice(row.profile, from, to, row.channel);
 
       return sendJson(res, 200, {
         session: key,

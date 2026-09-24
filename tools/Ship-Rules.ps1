@@ -17,6 +17,9 @@
       Test-ShipRuntime $rel        written by the game or a tool at runtime; never shipped, listed as removed when it goes
       Test-ShipMachine $rel        one machine's own; never shipped, never removed
       Test-ShipOtherServer $rel    not one of ours, or somebody's sign in; never shipped, never removed
+      Test-ShipVanilla $rel        Bethesda's own files; never shipped, never removed
+      Test-ShipForeignFramework $rel
+                                   somebody else's framework or modding tool under Data; never shipped, never removed
       Test-ShipBethesdaLeftAlone   Bethesda's, and a pack once carried it; never shipped, never removed
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
@@ -210,6 +213,11 @@ function Test-ShipOtherServer([string]$rel) {
     $leaf = Split-Path $rel -Leaf
     if ($rel.StartsWith('Data\Platform\PluginsNoLoad\', 'OrdinalIgnoreCase')) { return $true }
     if ($leaf -like '*.bak') { return $true }
+    # The retired dresser, To Do List entry 127. It is deleted from the repo
+    # and never ships again, and it is on $ShipDeleteAlways below so every
+    # pack takes it off the machines that have it. OwnGame.Foreign carries the
+    # same rule; change the two together.
+    if ($rel -ieq 'Data\Platform\Plugins\thornswood-chargen.js') { return $true }
     # In Plugins only our overlays belong. The bundle is ours by record above.
     if ($rel -like 'Data\Platform\Plugins\*.js') {
         if ($leaf -like 'thornswood-*.js') { return $false }
@@ -231,6 +239,144 @@ function Test-ShipOtherServer([string]$rel) {
     return $false
 }
 
+# ---------------------------------------------------------------------------
+# BETHESDA'S OWN FILES, AND OTHER PEOPLE'S FRAMEWORKS AND TOOLS.
+#
+# Never shipped, and never listed as removed. Until 24 September these were
+# two lists, one inside Publish-Update.ps1 and a longer one inside
+# Package-Thornswood.ps1, which is exactly what the header of this file says
+# must not happen, and they had drifted.
+#
+# MEASURED 24 SEPTEMBER over all 30,697 files in C:\Thornswood\Game on the
+# machine that ships: packs carried 90 files (55.5 MB) that the installer
+# deliberately left out, and all 90 were in both publish baselines. 82 were
+# Nemesis's cache, logs and temporary behaviour files under
+# Data\Nemesis_Engine, six were the Bethesda launcher's own state under
+# BStarData (that machine's load order, plugin list and Skyrim.ini backups
+# among them), and the last two were imgui.ini and steam_appid.txt. None of
+# them came from Vortex: the launcher's record has every one as taken from the
+# Steam copy. The lists below are the union of the two, so packs now leave out
+# what the installer always did, and the installer leaves out what it always
+# did.
+#
+# NEVER REMOVED, ON PURPOSE. A file the pack stops carrying looks gone from
+# the build to Publish-Update, and a file gone from the build becomes a line
+# in delete.txt unless Test-ShipMachine claims it. So Test-ShipMachine asks
+# both tests below. Without that, the first pack after the lists became one
+# would have deleted all 90 from every tester, steam_appid.txt with them. They
+# stay on every machine that has them; packs simply stop carrying them.
+
+# The five masters every copy of the game has, and the resource pack Steam
+# installs beside them.
+$ShipVanillaDataFiles = @(
+    'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm',
+    '_ResourcePack.esl', '_ResourcePack.bsa'
+)
+# The game's own archives, and Creation Club content by its cc prefix. Steam
+# installs some Creation Club plugins with the game, the rest is Bethesda's
+# paid content, and none of it is ours to hand out. OwnGame.UnwantedCreation
+# in the launcher counts on packs never carrying a cc plugin.
+$ShipVanillaDataPatterns = @('Skyrim - *.bsa', 'cc*.esm', 'cc*.esl', 'cc*.esp', 'cc*.bsa')
+# Bethesda's intro videos and the game's translated strings.
+$ShipVanillaDataDirs     = @('Video', 'Strings')
+
+# Other people's frameworks and modding tools, by their folder under Data.
+#
+# Vortex's manifest answers "did Vortex put this here", which is not the same
+# question as "does Thornswood need this". These folders answered no to the
+# first and were shipped to everybody as though they were ours.
+#
+# NirnLabUIPlatform is another roleplay server's user interface framework and
+# on its own it is 356 MB. Nemesis, FNIS, BodySlide and xEdit are tools that
+# belong on the machine of somebody who builds mods, not in a folder handed to
+# somebody who plays. Source is Papyrus script sources, which the game never
+# reads. The rest is documentation, installer leftovers and a shader cache
+# that rebuilds itself on first launch.
+#
+# All of them stay where they are on every machine. This only decides what
+# goes into a pack or the installer.
+#
+# Only the installer had this list until 24 September. Packs kept NirnLab out
+# anyway, through Test-ShipOtherServer above; the 82 Nemesis files were what
+# they carried from it.
+#
+# NirnLab is still an open question for Patrick and Djinn, and merging the
+# lists does not answer it. The note over Checks.ForeignNames in the launcher
+# says NirnLabUIPlugin.dll is this build's own browser and must never be
+# treated as foreign. This file, the installer, OwnGame.Foreign and
+# Firewall.cs all treat it as foreign. What this machine runs on, read
+# 24 September: SkyrimPlatform.ini says BackendName = tilted, the plugin log of
+# the 10:20 session on 23 September says "browser backend: tilted", and there
+# is no Data\NirnLabUIPlatform in C:\Thornswood\Game.
+$ShipForeignDataDirs = @(
+    'NirnLabUIPlatform',
+    'Nemesis_Engine', 'FNIS Behavior SE 7.6', 'CalienteTools', 'tools',
+    'Source', 'ModderResource', 'FOMod',
+    'Docs', 'Docs and Screenshots', 'readmes',
+    'ShaderCache'
+)
+
+$ShipVanillaRootFiles = @(
+    # The game, its launcher, Steam's library and the video codec. The
+    # installer fingerprints three of them into vanilla.json so it can tell a
+    # clean Steam copy from a patched one; it never carries them.
+    'SkyrimSE.exe', 'SkyrimSELauncher.exe', 'steam_api64.dll', 'bink2w64.dll',
+    # The game's Creation Club list, Steam's install script, and the settings
+    # presets Bethesda's launcher picks from.
+    'Skyrim.ccc', 'installscript.vdf', 'Skyrim_Default.ini',
+    'High.ini', 'Low.ini', 'Medium.ini', 'Ultra.ini',
+
+    # Only on the installer's list until 24 September.
+    #
+    # The script extender is not ours to hand out and it is in the collection
+    # now, so shipping it again would be redistributing somebody's mod and
+    # doing it twice. VERSION and steam_appid.txt belong to Steam and the
+    # downgrader. imgui.ini and the d3dx9 log are written at runtime by
+    # whatever was last run against this install.
+    #
+    # The installer said these were only ever seen when building out of the
+    # Steam copy. Not so: the launcher copies steam_appid.txt and imgui.ini
+    # from the Steam copy into Thornswood's own folder, and packs carried both.
+    'skse64_loader.exe', 'skse64_1_6_1170.dll',
+    'skse64_readme.txt', 'skse64_whatsnew.txt',
+    'VERSION', 'steam_appid.txt', 'imgui.ini', 'd3dx9_42.log'
+)
+$ShipVanillaRootDirs = @(
+    # The downgrader's backups of the files it replaced: the game's own
+    # programs and Creation Club archives, 46 files on the machine that ships.
+    '_DowngraderBackups',
+    # Two folders beside the game that are empty on the machine that ships,
+    # and Skyrim\, which holds only SkyrimPrefs.ini.
+    'Creations', 'Mods', 'Skyrim',
+    # The script extender's source code, which comes with it.
+    'src',
+    # Bethesda's launcher keeps its own folder. Not ours, not in an installer,
+    # and not in a pack either: six of its files rode in packs until
+    # 24 September.
+    'BStarData'
+)
+
+function Test-ShipVanilla([string]$rel) {
+    $parts = $rel -split '\\'
+    $top   = $parts[0]
+    if ($ShipVanillaRootDirs -contains $top) { return $true }
+    if ($parts.Count -eq 1) { return ($ShipVanillaRootFiles -contains $top) }
+    if ($top -ne 'Data') { return $false }
+    if ($parts.Count -ge 3 -and ($ShipVanillaDataDirs -contains $parts[1])) { return $true }
+    if ($parts.Count -eq 2) {
+        $leaf = $parts[1]
+        if ($ShipVanillaDataFiles -contains $leaf) { return $true }
+        foreach ($p in $ShipVanillaDataPatterns) { if ($leaf -like $p) { return $true } }
+    }
+    return $false
+}
+
+function Test-ShipForeignFramework([string]$rel) {
+    $parts = $rel -split '\\'
+    if ($parts[0] -ne 'Data') { return $false }
+    return ($parts.Count -ge 2 -and ($ShipForeignDataDirs -contains $parts[1]))
+}
+
 # Bethesda's own files that packs have already carried. Never shipped again,
 # and never listed as removed.
 #
@@ -242,21 +388,26 @@ function Test-ShipOtherServer([string]$rel) {
 # does not provide it, so it was in neither vanilla list and in no record,
 # and every pack and the installer carried it.
 #
-# WHY IT IS NOT WITH SKYRIM.ESM IN THE VANILLA LISTS. Measured 24 September:
-# both pack baselines, published.json and published-dev.json, list
+# WHY IT WAS NOT PUT WITH SKYRIM.ESM IN THE VANILLA LISTS. Measured 24
+# September: both pack baselines, published.json and published-dev.json, list
 # Data\MarketplaceTextures.bsa. Publish-Update lists as removed anything the
 # last pack had that this scan does not, and the only thing that stops that is
-# Test-ShipMachine. A vanilla rule would have left it out of the scan, the
-# next pack would have put it in delete.txt, and every launcher that took the
-# pack would have deleted a Bethesda file off a tester who has every right to
-# it. Asked here, through Test-ShipMachine, it leaves packs and the installer
-# and nobody's copy is touched. The launcher builds Thornswood's game folder
-# out of the tester's own Steam copy, which is where this machine's came from:
+# Test-ShipMachine. When this list was made the vanilla lists were not asked
+# there, so a vanilla rule would have left it out of the scan, the next pack
+# would have put it in delete.txt, and every launcher that took the pack would
+# have deleted a Bethesda file off a tester who has every right to it. Asked
+# here, through Test-ShipMachine, it leaves packs and the installer and
+# nobody's copy is touched. The launcher builds Thornswood's game folder out
+# of the tester's own Steam copy, which is where this machine's came from:
 # Profile\OwnGame\files.txt has it as linked in from the Steam copy (L), and
 # not deployed by Vortex (O).
 #
-# Put a Bethesda file here, not in a vanilla list, whenever a pack has
-# already carried it.
+# The same day the vanilla lists moved into this file and Test-ShipMachine
+# started asking them as well (the note over $ShipVanillaDataFiles), so a
+# vanilla rule is now just as safe. This list stays because it is the record
+# of which Bethesda files a pack has already carried, each with its
+# measurement. Put a Bethesda file here whenever a pack has already carried
+# it, so that record stays whole.
 $ShipBethesdaLeftAlone = @(
     'Data\MarketplaceTextures.bsa'
 )
@@ -273,6 +424,12 @@ function Test-ShipBethesdaLeftAlone([string]$rel) {
 # server's install off a tester.
 function Test-ShipMachine([string]$rel) {
     if (Test-ShipOtherServer $rel) { return $true }
+    # So do Bethesda's files and other people's frameworks and tools, for the
+    # same reason. See the note over $ShipVanillaDataFiles for the 90 files
+    # that needed it on 24 September, and the one over $ShipBethesdaLeftAlone
+    # for MarketplaceTextures.bsa.
+    if (Test-ShipVanilla $rel) { return $true }
+    if (Test-ShipForeignFramework $rel) { return $true }
     if (Test-ShipBethesdaLeftAlone $rel) { return $true }
     foreach ($f in $ShipMachineFiles) {
         if ($rel -eq $f) { return $true }
@@ -443,7 +600,24 @@ $ShipDeleteAlways = @(
     # pack: a launcher that took the old one would fail its checksum and stop.
     # Breaking the feed to remove an expired token is a worse trade than
     # leaving nine dead tokens in nine old zips.
-    'Data\Platform\voice-token.txt'
+    'Data\Platform\voice-token.txt',
+
+    # THE RETIRED DRESSER, To Do List entry 127. It put the best armour it
+    # could find into every empty slot, which is Patrick's "it is auto
+    # equipping things sometimes, like a hat", and it is deleted from the repo.
+    #
+    # Test-ShipOtherServer above calls it not ours, which keeps it out of
+    # packs and the installer and, on its own, out of the removal diff as well.
+    # So it goes here, the way map.swf did, and every pack deletes it whether
+    # or not this machine's baseline still carries it.
+    #
+    # The launcher's own folder is why that is not enough by itself. A Steam
+    # copy that took packs before its machine had a folder of its own still
+    # has the old dresser (11,654 bytes, 16 Sep, on Patrick's machine), and a
+    # refresh copies whatever the Steam copy has and the folder lacks straight
+    # back in. OwnGame.Foreign refuses it, which is what makes the deletion
+    # stick. The name is never used again, so nothing legitimate is lost.
+    'Data\Platform\Plugins\thornswood-chargen.js'
 )
 
 function Get-ShipDeleteAlways { return $ShipDeleteAlways }

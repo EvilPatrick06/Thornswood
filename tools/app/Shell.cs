@@ -253,12 +253,16 @@ namespace Thornswood
             BuildStatRow();
             BuildPathRows();
             BuildHelp();
+
+            // Windows Settings sends people here with -uninstall. The window
+            // and the Settings page above are what the uninstall is made of;
+            // everything below is a launcher starting up to play, and none of
+            // it belongs on the way out. ShellUninstall.cs says what still runs.
+            if (askedToUninstall) { OpenForUninstall(); return; }
+
             BuildModList();
             RefreshDiscord();
-            // Windows Settings sends people here with -uninstall, so land on
-            // the page that does it rather than on Play with no clue why the
-            // launcher opened.
-            ShowPage(askedToUninstall ? PageSettings : PagePlay);
+            ShowPage(PagePlay);
 
             // And put Thornswood in Installed apps, or bring the entry up to
             // date. Done here rather than in the installer so that every
@@ -313,7 +317,7 @@ namespace Thornswood
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch { }
             try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch { }
             // Steam's Updates setting for the Skyrim the downgrade looks after, read only (SteamUpdates).
-            try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) { string upd = SteamUpdates.Report(Downgrade.Target(cfg)); if (upd != null) Log(upd); } } catch { }
+            try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) { string upd = SteamUpdates.Report(Downgrade.Target(cfg)); if (upd != null) Log(upd); } } catch (Exception ex) { Swallow.Note("Shell.Run, reading Steam's Updates setting", ex); }
             {
                 int parked = playing ? 0 : Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");
@@ -430,6 +434,22 @@ namespace Thornswood
             win.Dispatcher.BeginInvoke(
                 new Action(delegate { Voice.Start(delegate (string m) { Log(m); }, cfg); }),
                 System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            // The self update's way back. A launcher that got as far as drawing
+            // its window started cleanly, so the copy of the one before it can
+            // go, and not before: the update script watches for that copy to
+            // disappear and puts it back if this one closes first. SelfSwap.cs.
+            win.ContentRendered += delegate
+            {
+                string self = Assembly.GetExecutingAssembly().Location;
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    string said = null;
+                    try { said = SelfSwap.Settle(self); } catch (Exception ex) { Swallow.Note("Shell.Run, clearing the copy the self update kept", ex); }
+                    if (string.IsNullOrEmpty(said)) return;
+                    try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying what the self update left", ex); }
+                });
+            };
 
             CentreOnMainScreen();
 
@@ -784,7 +804,21 @@ namespace Thornswood
         /// screen, and a stopped one next to nothing. If it will not play (Windows
         /// N without the Media Feature Pack, a file that will not open) it is
         /// hidden and the still picture shows exactly as before.
+        ///
+        /// Stopped while the game runs as well, the way the music is. With Keep
+        /// Launcher Open ticked the window is never minimised, so until 24
+        /// September the video went on decoding behind the game for the whole
+        /// session, 3 to 14% of one core that the game could have had. The one
+        /// time it failed on Patrick's machine, in 42 game starts since 19
+        /// September, came one second after a start: "Starting the game" at
+        /// 20:47:59 on 21 September, then "Title band: the video did not play
+        /// (MILAVERR_UNEXPECTEDWMPFAILURE ...)" at 20:48:00, and a failure keeps
+        /// the still picture until the launcher is restarted. Every place that
+        /// changes playing calls headerVideoDecide straight after, except the
+        /// check at startup, which runs before the window is shown; showing it
+        /// decides then.
         /// </summary>
+        static Action headerVideoDecide = delegate { };
         static void StartHeaderVideo()
         {
             string file = Art.HeaderVideo();
@@ -809,7 +843,7 @@ namespace Thornswood
             Action decide = delegate
             {
                 if (gone || clock == null) return;
-                bool seen = page.IsVisible && win.WindowState != WindowState.Minimized;
+                bool seen = page.IsVisible && win.WindowState != WindowState.Minimized && !playing;
                 if (seen && heldAt != null)
                 {
                     TimeSpan at = heldAt.Value;
@@ -859,6 +893,7 @@ namespace Thornswood
             decide();
             win.StateChanged += delegate { decide(); };
             page.IsVisibleChanged += delegate { decide(); };
+            headerVideoDecide = decide;
         }
 
         /// <summary>
@@ -883,7 +918,10 @@ namespace Thornswood
         static MediaPlayer music;
         static void StartMenuMusic()
         {
-            if (cfg == null) return;
+            // Not for somebody who opened this from Windows Settings to
+            // uninstall. The theme playing is the loudest way to say the
+            // launcher has started up to play when that is not why it opened.
+            if (cfg == null || askedToUninstall) return;
             string src = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-theme.mp3");
             if (!File.Exists(src)) return;
 
@@ -997,7 +1035,9 @@ namespace Thornswood
             // Unticking it left the person at a main menu with no way in and
             // nothing on screen saying why.
             if (!cfg.AutoJoin) { cfg.AutoJoin = true; cfg.Save(Paths.CfgFile); }
-            DrawVoiceState();
+            // A request to the voice service. Somebody who came to uninstall
+            // is not waiting on its answer, and the Server page asks again.
+            if (!askedToUninstall) DrawVoiceState();
 
             // The emblem travels inside the exe rather than beside it, so the
             // update that replaces the launcher carries its artwork with it and
@@ -1459,6 +1499,7 @@ namespace Thornswood
                 playing = false;
                 inPlayTicks = 0;
                 MusicDecide();
+                headerVideoDecide();
                 // An update was seen during the session and they quit before
                 // the five minutes were up. The clock goes, the fact does not:
                 // it is fetched now, the same as it would have been had the
@@ -1699,7 +1740,9 @@ namespace Thornswood
             bool all = true;
             foreach (Check c in Checks.All(cfg))
             {
-                if (!c.Ok) all = false;
+                // An advisory row that fails is drawn amber and leaves Play
+                // alone. See Check.Advisory.
+                if (c.Blocks) all = false;
                 var row = new Grid();
                 row.Margin = new Thickness(0, 0, 0, 1);
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1717,7 +1760,7 @@ namespace Thornswood
                 dot.Width = 7; dot.Height = 7;
                 dot.Margin = new Thickness(0, 0, 12, 0);
                 dot.VerticalAlignment = VerticalAlignment.Center;
-                dot.Fill = Res(c.Ok ? "Ok" : "Bad");
+                dot.Fill = Res(c.Ok ? "Ok" : c.Advisory ? "Warn" : "Bad");
                 Grid.SetColumn(dot, 0); row.Children.Add(dot);
 
                 var t1 = new TextBlock();
@@ -1728,7 +1771,7 @@ namespace Thornswood
                 var t2 = new TextBlock();
                 t2.Text = c.Detail; t2.FontSize = 11.5;
                 t2.VerticalAlignment = VerticalAlignment.Center;
-                t2.Foreground = Res(c.Ok ? "Muted" : "Bad");
+                t2.Foreground = Res(c.Ok ? "Muted" : c.Advisory ? "Warn" : "Bad");
                 Grid.SetColumn(t2, 2); row.Children.Add(t2);
 
                 back.Child = row;
@@ -3863,6 +3906,7 @@ namespace Thornswood
                 Swap.Apply();
                 playing = true;
                 MusicDecide();
+                headerVideoDecide();
                 btnPlay.IsEnabled = false;
                 btnPlay.Content = "RUNNING";
                 btnQuitGame.Visibility = Visibility.Visible;
@@ -3962,6 +4006,7 @@ namespace Thornswood
                 try { Presence.Stop(); } catch { }
                 Keep.TakeNote();
                 playing = false;
+                headerVideoDecide();
                 btnPlay.Content = "PLAY";
                 DrawStatus();
 
