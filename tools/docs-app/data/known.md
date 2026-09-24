@@ -21,19 +21,18 @@ They are not going to change.
 | Most mod scripts never fire | All Papyrus events except OnUpdate are blocked. Records still work, scripted behaviour does not |
 | Killmoves and stagger do not show on other people | Those animation events are blanked |
 
-## Mods that do not work as installed
+## Mods taken out
 
-These are in the collection and do nothing useful. Whether each one is
-replaced with a version that works here, or comes out of the list, is not
-settled yet.
+These were in the collection and could not work on a shared server. The first
+four are out of the list, and Immersive Armors is its script free version now.
 
-| Mod | What happens |
+| Mod | Why it came out |
 |---|---|
-| SunHelm Survival | Polls on a timer, the one script type still running. Writes health, stamina, magicka and carry weight against a server that crops and corrects them |
-| SunHelm Diseases | Same, and depends on SunHelm |
-| Respawn - Death Overhaul | Sets you essential and runs its own death handler. Death cannot complete on your own machine and the server owns respawn, so it can only fight the server |
-| Tavern Games | Creates gold on your own machine, which the server does not accept. The games run and the coin never arrives |
-| Immersive Armors, standard version | Distributes through a script with settings that do not persist. A script free version exists |
+| SunHelm Survival | Polled on a timer, the one script type still running, and wrote health, stamina, magicka and carry weight against a server that crops and corrects them. Hunger, thirst, rest and warmth run on the server now instead. They are the four bars in the bottom left corner, and /needs gives the numbers |
+| SunHelm Diseases | Depended on SunHelm and came out with it. Diseases have not been rebuilt |
+| Respawn - Death Overhaul | Set you essential and ran its own death handler. Death cannot complete on your own machine and the server owns respawn, so it could only fight the server |
+| Tavern Games | Created gold on your own machine, which the server does not accept. The games ran and the coin never arrived |
+| Immersive Armors, standard version | Handed armour out through a script whose settings did not persist. The script free version replaced it |
 
 ## What the server owns
 

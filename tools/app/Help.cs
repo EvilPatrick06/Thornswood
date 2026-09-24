@@ -139,8 +139,16 @@ new HelpItem("Emotes", "It will not open over a menu",
             new HelpItem("In game", "Menus do not pause the world",
                 "Inventory, favourites, crafting and the map all keep the world running. Do not sort your bags mid fight."),
 
+            // The needs run on the server now. This used to send people to the
+            // SunHelm MCM, which left the collection with SunHelm (To Do List
+            // entry 133), and to promise that a bedroll or a hot drink warms
+            // you, which nothing on the server counts. What it names instead
+            // is what is there: the four bars hudScript in gamemode.js draws
+            // bottom left, /needs, and the fire, roof and clothes the
+            // temperature is worked out from. tools\test-sunhelm-gone.js
+            // checks each of those against the gamemode.
             new HelpItem("In game", "You will get hungry, thirsty and cold",
-                "Eat, drink and stay warm. Cold bites hardest in the north and at night, and a fire, a bedroll or a hot drink all help. The needs display is configurable in the SunHelm MCM."),
+                "Eat, drink, rest and stay warm. Cold bites hardest in the north, up high and at night. A fire warms you and standing in one burns you, a roof keeps the weather off, and what you wear counts: fur is the warmest thing there is and metal the worst. The four bars in the bottom left corner are Hunger, Thirst, Rest and Temp, and /needs gives the numbers and says where your warmth is heading."),
 
             new HelpItem("In game", "What dying costs you",
                 "You keep everything you were carrying. Nothing is taken off your body and nobody loots you, whatever the mod's own defaults said: those are set to zero in this build. What you do lose is up to two fifths of the gold on you, a quarter of your progress toward the next level, and a quarter of your progress in whatever skills you were part way through. You wake up at the nearest temple. It is meant to sting rather than set you back a night."),
