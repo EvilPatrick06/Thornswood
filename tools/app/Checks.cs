@@ -243,9 +243,22 @@ namespace Thornswood
         /// The file is 100 bytes and holds no records, so flagging it costs
         /// nothing and the mod keeps working. This is what the author's own ESL
         /// variant is.
+        ///
+        /// HOTHTROOPER44_ARMOR_ECKSSTRA.ESP IS THE SAME CASE, found on
+        /// 2026-09-24 from Djinn's dev build: "Your load order is not the
+        /// server's from position 52: you have Hothtrooper44_Armor_Ecksstra.esp
+        /// there, the server has SkyHUD.esp", with Fix, a Vortex purge and a
+        /// redeploy all failing to clear it. Measured: the Nexus archive of
+        /// Immersive Armors, Script Free and Skypatched 1.3.0, ships this file
+        /// light (171 bytes, flags 0x200), and so does the machine the server's
+        /// order is built from, so the server leaves it out and counts SkyHUD at
+        /// 52. A copy without the flag gets an index of its own and pushes every
+        /// plugin after it one place along. Fix only reorders the list, so it
+        /// could never clear it; flagging it is what this list is for.
         /// </summary>
         public static readonly string[] MustBeLight = {
             "MCMHelper.esp",
+            "Hothtrooper44_Armor_Ecksstra.esp",
         };
 
         const uint LightFlag = 0x200;
