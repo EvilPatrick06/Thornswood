@@ -127,6 +127,24 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The three lines typed into Steam's console, in the order they are
+        /// typed. The Downgrade button shows these before anything starts, and
+        /// Run types the same strings, so the question cannot name one command
+        /// and the keyboard send another.
+        /// </summary>
+        public static string[] Commands()
+        {
+            var all = new string[Depots.Length];
+            for (int i = 0; i < Depots.Length; i++) all[i] = Command(Depots[i]);
+            return all;
+        }
+
+        static string Command(string[] depot)
+        {
+            return "download_depot " + AppId + " " + depot[0] + " " + depot[1];
+        }
+
+        /// <summary>
         /// Runs the whole thing on its own thread. <paramref name="log"/> goes
         /// to the launcher log, <paramref name="status"/> to the one line under
         /// the button, <paramref name="done"/> fires at the end either way with
@@ -197,7 +215,7 @@ namespace Thornswood
             {
                 string depot = Depots[i][0], manifest = Depots[i][1];
                 string folder = Path.Combine(content, "depot_" + depot);
-                string cmd = "download_depot " + AppId + " " + depot + " " + manifest;
+                string cmd = Command(Depots[i]);
 
                 // The marker holds the manifest it was written for, and only
                 // that manifest counts as this build being down. A folder left
