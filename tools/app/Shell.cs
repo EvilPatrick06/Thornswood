@@ -431,6 +431,22 @@ namespace Thornswood
                 new Action(delegate { Voice.Start(delegate (string m) { Log(m); }, cfg); }),
                 System.Windows.Threading.DispatcherPriority.ApplicationIdle);
 
+            // The self update's way back. A launcher that got as far as drawing
+            // its window started cleanly, so the copy of the one before it can
+            // go, and not before: the update script watches for that copy to
+            // disappear and puts it back if this one closes first. SelfSwap.cs.
+            win.ContentRendered += delegate
+            {
+                string self = Assembly.GetExecutingAssembly().Location;
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    string said = null;
+                    try { said = SelfSwap.Settle(self); } catch { }
+                    if (string.IsNullOrEmpty(said)) return;
+                    try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); }); } catch { }
+                });
+            };
+
             CentreOnMainScreen();
 
             /*
