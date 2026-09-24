@@ -31,6 +31,21 @@ var conns = new Map();   // peerId -> record
 var places = {};         // profileId -> {pos, angleZ, cell, name}
 var lastMode = {};       // peerId -> the last mode heard for them
 
+/*
+  Who this person has muted, by profile id: profileId -> true.
+
+  The mute from #133 lived only in the game's own page, and that page carries
+  no audio once the launcher has it. A reviewer measured it on 23 September:
+  profile 123 muted in the game, standing beside you, and this page still
+  played them at full level, because nothing here had ever heard of a mute.
+  So a muted person went on being heard.
+
+  The list comes from the server, through the game's page, the voice plugin
+  and a file the launcher watches (voice-muted.txt), and arrives here as a
+  'muted' message. place() reads it before anything else.
+*/
+var muted = {};
+
 var UNITS_PER_METRE = 70;
 
 /*
@@ -282,6 +297,9 @@ function open(id, info, initiator) {
   var pc = new RTCPeerConnection({ iceServers: ICE });
   var a = audio();
   var gain = a.createGain();
+  // A gain node starts at full level and the next position is up to a fifth
+  // of a second away, so somebody already muted starts silent instead.
+  if (muted[info.profileId]) { gain.gain.value = 0; }
   var panner = a.createPanner();
   panner.panningModel = 'HRTF';
   // Direction only. The distance is the gain node's job, above: with no
@@ -391,11 +409,18 @@ function drop(id) {
 // ------------------------------------------------------------- positions --
 function place() {
   var me = places[myProfile];
-  if (!me || !me.pos) return;
+  if (!me || !me.pos) {
+    // Nowhere to measure from, so distance is left as it was. A mute is not a
+    // distance and does not wait for one.
+    conns.forEach(function (rec) { if (muted[rec.profileId]) { setGain(rec, 0); } });
+    return;
+  }
   var rad = (Number(me.angleZ) || 0) * Math.PI / 180;
   var cos = Math.cos(rad), sin = Math.sin(rad);
 
   conns.forEach(function (rec) {
+    // Muted beats distance: somebody standing next to you and muted is silent.
+    if (muted[rec.profileId]) { setGain(rec, 0); return; }
     var them = places[rec.profileId];
     // A wall is not a distance. Another cell is silence whatever the maths says.
     if (!them || !them.pos || them.cell !== me.cell) { setGain(rec, 0); return; }
@@ -466,6 +491,23 @@ window.chrome.webview.addEventListener('message', function (e) {
   if (m.t === 'mode') {
     mode = m.mode || 'local';
     send({ t: 'vmode', mode: mode });
+    return;
+  }
+
+  /*
+    The mute list, as the line the game wrote: profile ids with spaces between.
+    The whole list every time, never a change to it, so a message that is
+    missed is put right by the next one. Anything that is not a profile id is
+    dropped rather than trusted.
+  */
+  if (m.t === 'muted') {
+    var next = {};
+    String(m.list || '').split(/\s+/).forEach(function (id) {
+      var n = Number(id);
+      if (n > 0 && Math.floor(n) === n) { next[n] = true; }
+    });
+    muted = next;
+    place();
     return;
   }
 });
