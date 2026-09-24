@@ -95,6 +95,17 @@ before code; a Claude does not settle it for them.
   machine can `git pull` exactly what shipped. Corrected 24 Sep: this bullet
   used to say a main Ship committed and pushed the source after the release,
   which stopped being true on 22 Sep (f917dd8).
+- The one live release that does not come off main is a hotfix, decided by
+  Patrick on 24 Sep for a tester who could not get in while a day of dev work
+  sat on main: "the only thing that should be going to main now is the fix
+  for him". A branch named `hotfix/...` starts from the commit the live
+  release was built from, carries only the fix and its `Bump-Version.ps1`
+  commit, is pushed, and Ship runs from a checkout of it; every other gate
+  above still applies, and Ship refuses a hotfix branch that is not on
+  GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
+  through its own pull request, or the next main release loses it. 1.1.93 was
+  the first, built from 55ac6ef. A hotfix is Patrick's call, like any live
+  release.
 - Nobody pushes to main any more, Patrick included. Everything goes through a
   pull request. This replaces the 18 Sep decision that his own work went
   straight to main, which held while `enforce_admins` was off and stopped

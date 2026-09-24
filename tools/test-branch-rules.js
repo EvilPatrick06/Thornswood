@@ -140,8 +140,10 @@ yes('Ship.ps1 refuses a main release with anything uncommitted', /uncommitted ch
 // from everybody, so since #253 it sends people through a pull request, and
 // the documents say so.
 yes('Ship.ps1 refuses a main release that is ahead of origin/main, and sends it through a pull request rather than a push',
-    /ahead of origin\/main\. A release has to be buildable[\s\S]{0,300}?through a pull request/.test(shipSrc) &&
-    !/ahead of origin\/main\. Run git push first/.test(shipSrc));
+    // origin/$branch since the hotfix path (24 September): the same refusal,
+    // naming whichever branch is shipping, main or hotfix/...
+    /ahead of origin\/(main|\$branch)\. A release has to be buildable[\s\S]{0,300}?through a pull request/.test(shipSrc) &&
+    !/ahead of origin\/(main|\$branch)\. Run git push first/.test(shipSrc));
 yes('Ship.ps1 refuses a main release with a file under tools that git does not know, which both documents now name',
     /file\(s\) under tools that git does not know about/.test(shipSrc));
 
