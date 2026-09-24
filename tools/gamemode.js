@@ -14869,6 +14869,142 @@ log('gamemode loaded:',
   }
 
   /*
+    A BLANK PRESSED INTO THE LOCK, ON A KEY, AT THE DOOR ITSELF.
+
+    Patrick, 24 September, in order: "you should press e on a un molded door
+    to fill the mold", then "not type" /mold, then "actually can we make it a
+    different key that is unused in tis scenario and include a prompt when
+    loooking at a door to press that key to set a mold". So the plugin draws a
+    line while somebody carrying a Key Mold looks at a door, and the mold key
+    (U unless it was rebound) sends /moldhere and that door's form id in hex.
+
+    THE CLIENT'S WORD ABOUT WHICH DOOR IS A HINT. Anybody can type /moldhere
+    with any number after it. So the number has to be a door of a building
+    this block knows, and the person has to be standing at that very door by
+    the server's own reckoning of where the two of them are, in the same cell
+    or world. The prompt and the key are conveniences; this is the gate.
+
+    MOLD_REACH IS 400 UNITS. Skyrim's default reach for pressing something is
+    180 (fActivatePickLength), measured from the camera, which in third person
+    sits behind the character; a door's position is its own origin, which on
+    a wide or double door is off to one side; and the position the server holds
+    is a moment behind the client's. 400 covers all three and is still under
+    six metres at the seventy units to a metre the party strip uses, which is
+    standing at the door and not across the street from it. It is also the
+    number the plugin's door rescue uses for "still within reach of the door".
+
+    THE RULES ARE /mold's, LESS THE SMITH. The blank has to exist in this
+    build and be in the pack, the building has to be held, its holder has to
+    be the one pressing or be standing there, which is Patrick's own balance
+    for molds, "I don't want people to make new molds when somone is
+    offline", and there must not already be a mold for it in either pack.
+    Pressing is not a smith's work: the smith's part is forging the blank and
+    cutting the keys. The typed /mold stays exactly as it was.
+  */
+  var MOLD_REACH = 400;
+
+  /** Is there a BLANK mold in this pack: a Key Mold with no name on it. */
+  function carriesBlankMold(actorId) {
+    var baseId = idOf(MOLD);
+    if (!baseId) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.count > 0 && e.baseId === baseId && !e.name) { return true; }
+    }
+    return false;
+  }
+
+  /*
+    How far this person stands from a placed reference, or -1 when the server
+    cannot say: either position unreadable, or the two in different cells or
+    worlds, where one position means nothing against the other.
+  */
+  function distanceTo(actorId, refrId) {
+    var mine = '', its = '', a = null, b = null;
+    try {
+      mine = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      its = String(mp.get(refrId, 'worldOrCellDesc') || '');
+      a = mp.get(actorId, 'pos');
+      b = mp.get(refrId, 'pos');
+    } catch (e) { return -1; }
+    if (!mine || mine !== its || !a || !b) { return -1; }
+    var dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  function moldHere(parts, actorId, profileId, toProfile) {
+    // A form id in hex and nothing else, the way the plugin writes it.
+    var raw = String((parts && parts[1]) || '');
+    var refrId = /^[0-9a-f]{1,8}$/i.test(raw) ? parseInt(raw, 16) : 0;
+    var desc = '';
+    if (refrId) {
+      try { desc = String(mp.getDescFromId(refrId) || ''); } catch (e) { desc = ''; }
+    }
+    var building = desc ? buildingOf(desc) : null;
+    if (!building) {
+      toProfile(profileId, 'That door does not belong to a building anybody can hold, so ' +
+                           'there is no lock on it to take a mold of.');
+      return true;
+    }
+    var far = distanceTo(actorId, refrId);
+    if (far < 0 || far > MOLD_REACH) {
+      toProfile(profileId, 'You are too far from the door of ' + nameOf(building) + '. Stand ' +
+                           'at it, look at it and press the key again.');
+      return true;
+    }
+    if (!blankMoldsExist()) {
+      toProfile(profileId, 'There are no blank key molds on this server yet. Until there are, ' +
+                           'a smith makes the mold at the door with /mold.');
+      return true;
+    }
+    if (!carriesBlankMold(actorId)) {
+      toProfile(profileId, 'You are carrying no blank key mold. A smith forges one at a forge ' +
+                           'out of one iron ingot.');
+      return true;
+    }
+    var held = holderOf(building);
+    if (!held) {
+      toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is no lock to take ' +
+                           'a mold of. It can be claimed for nothing.');
+      return true;
+    }
+    var owner = holderNearby(actorId, building, held);
+    if (!owner) {
+      toProfile(profileId, 'Whoever holds ' + nameOf(building) + ' has to be here for its lock ' +
+                           'to be taken. A mold is not pressed on somebody else\'s say so.');
+      return true;
+    }
+    if (holdsMold(owner.actorId, building) || holdsMold(actorId, building)) {
+      toProfile(profileId, 'There is already a mold for ' + nameOf(building) + '. Cut the keys ' +
+                           'from that one.');
+      return true;
+    }
+    if (!takeBlankMold(actorId)) {
+      toProfile(profileId, 'You are carrying no blank key mold. A smith forges one at a forge ' +
+                           'out of one iron ingot.');
+      return true;
+    }
+    if (!giveNamed(owner.actorId, MOLD, moldLabel(building))) {
+      toProfile(profileId, 'The mold could not be handed over. Say so in the dev channel.');
+      return true;
+    }
+    plog('a mold for', nameOf(building), 'was pressed at the door for', held.name);
+    var yours = owner.actorId === actorId;
+    toProfile(profileId, 'You press the blank into the lock of ' + nameOf(building) + '. It is ' +
+                         'the mold for it now' + (yours ? ' and it is in your pack' :
+                         ', and it goes to the holder standing with you') +
+                         '. Keys come off it at a forge, as many as you want.');
+    if (!yours && owner.profileId && owner.profileId !== profileId) {
+      toProfile(owner.profileId, 'The mold for ' + nameOf(building) + ' is yours. Bring it to ' +
+                                 'a smith at a forge for as many keys as you want.');
+    }
+    return true;
+  }
+
+  /*
     A key off the mold, at a forge, by a smith.
 
     Whoever is holding the mold is who the key is for, which is the same shape as
@@ -15101,11 +15237,38 @@ log('gamemode loaded:',
     'Near' is the engine's own answer: getNeighborsByPosition is what the server
     uses everywhere else to mean 'people who can see each other'. Somebody who is
     not online is not in it, which is the whole point.
+
+    IT WAS NEVER ASKED PROPERLY, so until 24 September nobody but the person
+    pressing could ever count as the holder standing there. Read in the fork:
+    ScampServer::GetNeighborsByPosition takes a cell or world descriptor and a
+    position, and NapiHelper::ExtractString throws on anything that is not a
+    string. This passed the actor's form id alone, so every call threw into
+    its own catch and the list was always empty, so a smith cutting a mold for
+    somebody else was told the holder was not there with the holder standing
+    beside them: test-mold-key.js runs the old body against an engine that
+    answers the way the fork does, and that is what it says. The farming
+    block's nearestPlot asks it the right way, and so does this now.
+
+    PEOPLE ONLY. The engine hands back everything in the squares around a
+    position, chests and NPCs with it, and a chest with the deed in it is not
+    a householder at the door. So only the people online are looked at. The
+    same filter steps over the empty slots the list starts with: the fork
+    makes the array at its full length and then appends, so the ids come after
+    as many holes as there are ids.
   */
   function holderNearby(actorId, building, held) {
     var near = [];
-    try { near = mp.getNeighborsByPosition(actorId) || []; } catch (e) { near = []; }
-    var all = near.slice();
+    try {
+      var cell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      var pos = mp.get(actorId, 'pos');
+      if (cell && pos) { near = mp.getNeighborsByPosition(cell, pos) || []; }
+    } catch (e) { near = []; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var all = [];
+    for (var n = 0; n < near.length; n++) {
+      if (near[n] !== actorId && online.indexOf(near[n]) !== -1) { all.push(near[n]); }
+    }
     all.push(actorId);
     for (var i = 0; i < all.length; i++) {
       var id = all[i];
@@ -16008,6 +16171,7 @@ log('gamemode loaded:',
     if (word === '/lock') { return setLock(actorId, profileId, toProfile, true); }
     if (word === '/unlock') { return setLock(actorId, profileId, toProfile, false); }
     if (word === '/mold') { return mold(actorId, profileId, toProfile); }
+    if (word === '/moldhere') { return moldHere(parts, actorId, profileId, toProfile); }
     if (word === '/key') { return cutKey(actorId, profileId, toProfile); }
     if (word === '/claim') {
       // Only when they are actually at a door. Otherwise this is farming's word
@@ -17499,7 +17663,7 @@ log('gamemode loaded:',
     */
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
-        word === '/unlock' || word === '/mold' || word === '/key' ||
+        word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
         word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
@@ -17841,6 +18005,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
                '/place', '/burn', '/ate',
+               // The mold key: a blank pressed into the door under the
+               // crosshair. Sent by the plugin, not typed; see moldHere.
+               '/moldhere',
                // Friends, parties, mutes, trade and journals. See the
                // social block at the end of this file.
                '/friend', '/party', '/mute', '/trade', '/journal',
