@@ -112,6 +112,12 @@ namespace Thornswood
         static Border downgradeBar;
         static TextBlock txtDowngradeNote, txtDowngradeTitle;
         static Button btnDowngrade;
+        // The feed's word to everybody and whether it holds Play (entry 262).
+        // Empty until a document has actually been read, so nothing here can
+        // hold Play on a check that failed. See FeedNotice.cs.
+        static Border noticeBar;
+        static TextBlock txtNoticeTitle, txtNoticeNote;
+        static FeedNotice feedNotice = new FeedNotice();
         static Grid titleBar;
         static Button buttonDiscord, buttonDiscordForget;
         static TextBlock labelDiscord, noteDiscord;
@@ -516,6 +522,7 @@ namespace Thornswood
             updateBar = F<Border>("UpdateBar"); titleBar = F<Grid>("TitleBar");
             downgradeBar = F<Border>("DowngradeBar"); txtDowngradeNote = F<TextBlock>("TxtDowngradeNote"); btnDowngrade = F<Button>("BtnDowngrade");
             txtDowngradeTitle = F<TextBlock>("TxtDowngradeTitle");
+            noticeBar = F<Border>("NoticeBar"); txtNoticeTitle = F<TextBlock>("TxtNoticeTitle"); txtNoticeNote = F<TextBlock>("TxtNoticeNote");
 
             btnPlay = F<Button>("BtnPlay"); btnRecheck = F<Button>("BtnRecheck"); btnCopy = F<Button>("BtnCopy");
             btnUpdate = F<Button>("BtnUpdate"); btnMin = F<Button>("BtnMin"); btnMax = F<Button>("BtnMax");
@@ -1792,7 +1799,7 @@ namespace Thornswood
                     txtDowngradeTitle.Text = steamCopyWrong ? "The Steam copy of Skyrim is on the wrong build" : "Skyrim is on the wrong build";
             }
 
-            btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy;
+            btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy && feedNotice.Hold == null;
             // Only worth offering while there is something to quit, and it is
             // the one control on this page that stays live during a session.
             if (btnQuitGame != null)
@@ -1823,6 +1830,16 @@ namespace Thornswood
                     : updateAnswered
                     ? "There is an update waiting. Install it and Play comes back."
                     : "Checking for updates before letting anybody in. A moment.";
+            }
+            // The feed holds Play (entry 262). Below the three above because
+            // each of those is something to do or already under way, and the
+            // bar above Play says why it is held either way. Above the two
+            // below because they label a button that stays live, and this one
+            // is not.
+            else if (feedNotice.Hold != null && !playing)
+            {
+                btnPlay.Content = feedNotice.Button;
+                btnPlay.ToolTip = feedNotice.Hold;
             }
             else if (wrongBuild && !playing && !collectionBarUp)
             {
@@ -3720,6 +3737,7 @@ namespace Thornswood
                 if (updatePending) { Log("An update is going in. Play comes back when it is done."); return; }
                 if (collectionBarUp) { Log("The collection is not installed yet. Open it from the card above Play, then come back."); return; }
                 if (ownGameBusy) { Log("Thornswood's own Skyrim folder is being prepared. Play comes back when it is done."); return; }
+                if (feedNotice.Hold != null) { Log(feedNotice.Hold); return; }
 
                 if (!File.Exists(Paths.Loader)) { Log("skse64_loader.exe is missing from this build."); return; }
                 if (!File.Exists(Paths.MpClient)) { Log("MpClientPlugin.dll is missing, so this build has no multiplayer in it."); return; }
@@ -4340,6 +4358,38 @@ namespace Thornswood
             DrawStatus();
         }
 
+        /// <summary>
+        /// The feed's message in the bar above Play, and the hold on Play when
+        /// the feed asks for one. Entry 262: until this the message was one
+        /// Log line that scrolled away, so there was no way to say anything to
+        /// everybody when something outside the build broke.
+        ///
+        /// Only ever called with a document that was read, which is what keeps
+        /// the hold from coming out of a failed check. Every call replaces the
+        /// last answer, so a feed that drops the message or the maintenance
+        /// flag takes the bar and the hold away with it. DrawStatus, which
+        /// every path through OnVersionDoc reaches, puts the button right.
+        /// </summary>
+        static void ShowNotice(VersionDoc v)
+        {
+            FeedNotice was = feedNotice;
+            feedNotice = FeedNotice.From(v, Updater.Version);
+            if (noticeBar != null)
+            {
+                noticeBar.Visibility = feedNotice.Title == null ? Visibility.Collapsed : Visibility.Visible;
+                noticeBar.BorderBrush = Res(feedNotice.Hold != null ? "Bad" : "Accent");
+            }
+            if (txtNoticeTitle != null) txtNoticeTitle.Text = feedNotice.Title == null ? "" : feedNotice.Title;
+            if (txtNoticeNote != null) txtNoticeNote.Text = feedNotice.Text;
+
+            // Once in the log when it changes, so a report still shows what the
+            // bar said, without a line on every check.
+            if (feedNotice.Title != null && (feedNotice.Title != was.Title || feedNotice.Text != was.Text))
+                Log(feedNotice.Title + ". " + feedNotice.Text);
+            if (was.Hold != null && feedNotice.Hold == null)
+                Log("The update feed no longer holds Play.");
+        }
+
         static void OnVersionDoc(VersionDoc v, bool loud)
         {
             checkFailed = false;
@@ -4393,7 +4443,7 @@ namespace Thornswood
                 if (txtUpdateSource != null) txtUpdateSource.Text = Updater.WhyDisabled(cfg);
                 DrawVoiceState();
             }
-            if (!string.IsNullOrEmpty(v.message)) Log(v.message);
+            ShowNotice(v);
             BuildNews();
 
             // The add-ons tab is drawn straight from this document, so redraw
