@@ -467,10 +467,14 @@ yes('W14 AND NOTHING WENT TO THE PUBLIC CHANNEL WITH THE SAME NAME',
 # ------------------------------------------------- it is actually started --
 src_bot = open(os.path.join(HERE, 'bot.py'), encoding='utf-8').read()
 guard = src_bot[src_bot.index('    if not _watching:'):src_bot.index("    log('up as")]
-yes('W15 on_ready starts it, once, beside the other two watchers',
+yes('W15 on_ready starts it, once, beside the other watchers',
     'asyncio.create_task(watch_services())' in guard)
-body = src_bot[src_bot.index('async def watch_services():'):
-               src_bot.index('# on_ready fires again on every reconnect')]
+# The function ends at the next line that starts in the first column. It used
+# to run to the comment above on_ready, which held while nothing else sat
+# between them; main's report watcher now does, and its own .send( was being
+# read as this one's.
+_start = src_bot.index('async def watch_services():')
+body = src_bot[_start:re.compile(r'^\S', re.M).search(src_bot, _start + 1).start()]
 yes('W15 and it speaks only through watch_say, which has no public fallback',
     'watch_say(' in body and '.send(' not in body and 'by_name' not in body)
 
