@@ -181,6 +181,39 @@ if (block !== null) {
           .indexOf('swing(actorId, SWING_MINE, function ()') !== -1);
   yes('a press inside a swing is not a second strike',
       /if \(swinging\(actorId\)\) \{ return ''; \}/.test(code));
+  /*
+    ONE PRESS IS A SPELL OF MINING, not one swing.
+
+    Patrick, in the world on 23 September: "it's not doing one animation with
+    multiple swings it's doing it one at a time and you have to keep
+    clicking". These hold the six ways a spell ends, because the one that
+    matters is not the happy path: a loop that keeps swinging after somebody
+    has walked away, logged out or broken their pick is worse than clicking.
+  */
+  yes('one press starts a spell of mining rather than a single swing',
+      /MINE_SESSION\[actorId\] = spell;/.test(code));
+  yes('and pressing again puts the pick down',
+      /if \(mining\(actorId\)\) \{[\s\S]{0,120}stopMining\(actorId\);/.test(code));
+  yes('every swing checks it is still the spell it started under',
+      /if \(MINE_SESSION\[actorId\] !== spell\) \{ return; \}/.test(code));
+  yes('walking away from the seam ends it',
+      /if \(!stillAt\(actorId, refrId\)\)/.test(code) && /MINE_AWAY/.test(code));
+  yes('and the distance is measured off the server rather than asked of the client',
+      /function stillAt[\s\S]{0,400}mp\.get\(refrId, 'pos'\)/.test(code));
+  yes('a pick that broke ends it',
+      /if \(toolGate\(actorId, 'miner'\)\) \{ stopMining\(actorId\); return; \}/.test(code));
+  yes('the seam running out ends it',
+      /const more = takeFromDeposit\(refrId, backMs\);[\s\S]{0,120}stopMining\(actorId\);/.test(code));
+  yes('the last piece of the seam ends it rather than swinging at nothing',
+      /if \(took === 1\) \{ stopMining\(actorId\); return; \}/.test(code));
+  yes('logging out ends it, by the next swing asking who is online',
+      /if \(miningGone\(actorId\)\) \{ stopMining\(actorId\); return; \}/.test(code) &&
+      /function miningGone[\s\S]{0,300}mp\.getOnlinePlayers\(\)/.test(code));
+  yes('and there is a hard stop that no real seam reaches',
+      /swungThisSpell >= MINE_MOST/.test(code) && /const MINE_MOST = \d+;/.test(code));
+  yes('the next swing waits for the one in the air to let go',
+      /\(SWING_MS - SWING_LAND_MS\) \+ MINE_GAP_MS/.test(code));
+
   yes('the chopping block is left to Skyrim\'s own furniture',
       code.slice(code.indexOf('function chopWood'),
                  code.indexOf('const KILN_ARMED'))
