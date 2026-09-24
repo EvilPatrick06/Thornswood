@@ -240,6 +240,10 @@ function client(opt) {
     'function rememberKey() {}',
     'function wantTyping() {}',
     'function lookVerb(cmd) { verbs.push(cmd); return true; }',
+    // The J block's two hooks, which the key handler calls on every key and
+    // on J. What they do is test-journal-key.js's business, not this one's.
+    'function journalKeyDown() {}',
+    'function journalKeyPressed() {}',
     PIECES_FRONT.mold,
     PIECES_FRONT.keys,
     'return { MOLD_KEY: MOLD_KEY, MOLD_NAME: MOLD_NAME, moldPress: moldPress };'
