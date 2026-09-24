@@ -147,11 +147,23 @@ namespace Thornswood
                         // longer stands is an unreachable site on its own, since
                         // that is also exactly what blocking thornswood.net in a
                         // hosts file looks like from here.
-                        if (st.Why == "offline")
+                        //
+                        // The site answering "could not ask Discord" is the same
+                        // case one step further along: the site is up and Discord
+                        // did not answer it, usually a rate limit in the restart
+                        // wave after a release. Until 24 September the site said
+                        // 'guild' for that, which put up "not in the Thornswood
+                        // Discord" and wrote a remembered no over the grace. It is
+                        // an outage, so it takes the outage path and never the
+                        // Remember(false) one below.
+                        bool noDiscord = st.Why == "could not ask Discord";
+                        if (st.Why == "offline" || noDiscord)
                         {
                             if (RecentYes())
                             {
-                                log("thornswood.net did not answer, so the last answer it gave stands and you are let in.");
+                                log(noDiscord
+                                    ? "thornswood.net could not ask Discord just now, so the last answer it gave stands and you are let in."
+                                    : "thornswood.net did not answer, so the last answer it gave stands and you are let in.");
                                 clearedAt = DateTime.Now;
                                 if (onAllowed != null) onAllowed();
                                 return;
@@ -159,7 +171,9 @@ namespace Thornswood
                             // What actually went wrong stays in the log. The box
                             // gets the plain version.
                             if (st.Message != null && st.Message.Length > 0) log(st.Message);
-                            st.Message = "Could not reach thornswood.net, and it has not checked this copy in recently enough to go on that. Check your internet connection and try again.";
+                            st.Message = noDiscord
+                                ? "Thornswood could not ask Discord about your account just now, so it cannot say yet whether you are in. Try again in a minute."
+                                : "Could not reach thornswood.net, and it has not checked this copy in recently enough to go on that. Check your internet connection and try again.";
                         }
                         else if (st.Why == "banned" || st.Why == "role" || st.Why == "guild")
                         {

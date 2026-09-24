@@ -22,14 +22,24 @@
   asked again.
 
   winget does not exist on Windows Server 2022, so everything here is a direct
-  MSI. Versions are resolved at download time rather than baked in, because
-  pinned URLs rot.
+  MSI. PowerShell 7 and Git are resolved at download time. Node is not: it is
+  one exact release with the SHA-256 nodejs.org publishes for it, because the
+  newest v24 on the day is whatever the next fresh box happens to get, and
+  nodejs.org keeps every release at the same address, so that URL does not rot.
 #>
 [CmdletBinding()]
 param(
     [int]   $GamePort     = 7777,
     [int]   $ResourcePort = 3000,
     [string]$NodeMajor    = 'v24',
+    # The Node release a fresh box gets, and the SHA-256 of its x64 msi from
+    # https://nodejs.org/dist/<version>/SHASUMS256.txt. Bump both together, on
+    # purpose. Never below the build machine, which ran v24.15.0 on 24 Sep.
+    # v24.21.0 is the newest v24 as of that day and so what this script was
+    # already installing; v24.17.0 and v24.18.1, both after the build
+    # machine's, are security releases.
+    [string]$NodeVersion  = 'v24.21.0',
+    [string]$NodeSha256   = 'bb0eaee134f9357f22aea915ee793343e627aefc1e66488164bac6915bce2cac',
     [switch]$IncludeGit,
     [switch]$SkipFirewall
 )
@@ -72,10 +82,20 @@ Write-Host ''
 $tmp = Join-Path $env:TEMP 'thornswood-bootstrap'
 if (-not (Test-Path $tmp)) { New-Item -ItemType Directory -Path $tmp -Force | Out-Null }
 
-function Install-Msi([string]$url, [string]$name) {
+function Install-Msi([string]$url, [string]$name, [string]$sha256) {
     $file = Join-Path $tmp (Split-Path $url -Leaf)
     Write-Host "  downloading $name" -ForegroundColor DarkGray
     Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
+    # Checked before msiexec sees it, when there is a published value to check
+    # against. A file that does not match is deleted and never installed.
+    if ($sha256) {
+        $got = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+        if ($got -ne $sha256) {
+            Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+            throw "$name does not match its published SHA-256, so it was not installed. Expected $sha256, got $got"
+        }
+        Write-Host "  checksum matched for $name" -ForegroundColor DarkGray
+    }
     $mb = [math]::Round((Get-Item $file).Length / 1MB, 1)
     Write-Host "  installing  $name ($mb MB), this takes a minute" -ForegroundColor DarkGray
     $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$file`"", '/quiet', '/norestart') -Wait -PassThru
@@ -102,11 +122,10 @@ if (Get-Command node -ErrorAction SilentlyContinue) { $haveNode = (& node --vers
 if ($haveNode -and $haveNode.StartsWith($NodeMajor)) {
     Write-Host "Node already on the right major: $haveNode" -ForegroundColor Green
 } else {
-    Write-Host "Node ($NodeMajor, currently $(if ($haveNode) { $haveNode } else { 'absent' }))" -ForegroundColor Cyan
-    $index = Invoke-RestMethod 'https://nodejs.org/dist/index.json' -UseBasicParsing
-    $pick = $index | Where-Object { $_.version -like "$NodeMajor.*" } | Select-Object -First 1
-    if (-not $pick) { throw "no $NodeMajor release listed on nodejs.org" }
-    Install-Msi "https://nodejs.org/dist/$($pick.version)/node-$($pick.version)-x64.msi" "Node $($pick.version)"
+    Write-Host "Node ($NodeVersion, currently $(if ($haveNode) { $haveNode } else { 'absent' }))" -ForegroundColor Cyan
+    # The exact release above rather than the newest $NodeMajor on the day.
+    if (-not $NodeVersion.StartsWith("$NodeMajor.")) { throw "NodeVersion $NodeVersion is not a $NodeMajor release" }
+    Install-Msi "https://nodejs.org/dist/$NodeVersion/node-$NodeVersion-x64.msi" "Node $NodeVersion" $NodeSha256
 }
 
 # --- Git, only if asked -----------------------------------------------------
