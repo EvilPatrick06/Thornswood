@@ -34,9 +34,11 @@ namespace Thornswood
       this page does not, that harness fails.
 
       The site's help.md and known.md were the sources the entry named, and
-      they were not safe ones: both still said the launcher asks for the
-      profession, the half, the class and the town, which stopped being true on
-      20 September. Where they agree with the code, the wording follows them.
+      when this was written they were not safe ones: both still said the
+      launcher asks for the profession, the half, the class and the town, which
+      stopped being true on 20 September. Entry 162 put the site right later
+      the same day. Where they agree with the code, the wording follows them,
+      and the code wins where they do not.
 
       No server address is written here, and none should be. It arrives with
       the update (OnVersionDoc in Shell.cs), so moving the server needs no
@@ -56,15 +58,19 @@ namespace Thornswood
             new HelpItem("Joining", "There is nothing to type",
                 "No address, no password and no join screen. The server's address arrives with the launcher's updates, and the launcher writes it into the game's settings every time you press Play, so the game connects on its own. If the server ever moves, the next update carries the new address and nothing has to be reinstalled."),
 
+            // The name rule is here, in the same words as the first-run card on
+            // the Play page (entry 163), and test-first-run-words.js holds the
+            // two to each other. It is said once, so the Character section below
+            // does not repeat it.
+            new HelpItem("Joining", "You pick your character at the game's main menu",
+                "When the game loads it lists your characters, with an empty slot for a new one. Click a character and you go straight in as them. Click an empty slot to make a new one. Give a new one a name that belongs in Skyrim: a first name and a family name or a byname, and not your own. That name is what everybody else sees above your head, and it is given when you make the face, so changing it later means making a new character."),
+
+            new HelpItem("Joining", "There is no saving",
+                "The server holds your character, not a save file on your machine: what you carry, what you wear and where you stand are handed back when you connect. So there is nothing to save before you connect and nothing lost when you quit."),
+
             // =================================================== character
-            new HelpItem("Character", "You pick your character at the game's main menu",
-                "When the game loads it lists your characters, with an empty slot for a new one. Click a character and you go straight in as them. Click an empty slot to make a new one. A character lives on the server, not in a save file: what you carry, what you wear and where you stand are handed back when you connect, so there is nothing to save first and quitting is safe."),
-
-            new HelpItem("Character", "A name that belongs in Skyrim",
-                "You name your character when you make its face, and that name is what everybody else sees above your head. Give it a first name and a family name or a byname that would not look out of place in Skyrim, not your own name. It cannot be changed afterwards without making a new character."),
-
             new HelpItem("Character", "The creation hall",
-                "A new character wakes in a shut room with nothing in it, and the appearance menu opens on its own: make your face and close it. The character panel then opens on its own. Choose the town you will wake up in and you are sent to its inn, in a plain shift. Your class and your profession are on the same panel, and can be chosen there or later in the world. Nothing else is decided in the hall."),
+                "A new character wakes in a shut room with nothing in it, and the appearance menu opens on its own: make your face, give it its name, and close it. The character panel then opens on its own. Choose the town you will wake up in and you are sent to its inn, in a plain shift. Your class and your profession are on the same panel, and can be chosen there or later in the world. Nothing else is decided in the hall."),
 
             new HelpItem("Character", "Where you wake up",
                 "Whiterun, Riften, Solitude, Windhelm, Markarth, Falkreath, Morthal, Dawnstar or Winterhold, each at its inn. The town is the choice that ends creation, and it cannot be changed afterwards, so choose your class and profession first if you want them settled before you arrive."),
