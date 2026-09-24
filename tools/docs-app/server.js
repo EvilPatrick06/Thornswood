@@ -1181,8 +1181,26 @@ const SERVER_LOGS = {
 
 /* Where the voice service writes what people said. Its folder, not this one:
    it owns the file and this only reads it, so there is one writer and no
-   question about which copy is the real one. */
-const CHAT_DIR = process.env.THORNSWOOD_CHAT_DIR || 'C:\\Thornswood-Voice\\chat';
+   question about which copy is the real one.
+
+   dev and main are different voice services with different folders, the same
+   way they are different game servers with different logs, and the session
+   says which it was on. This used to be one folder, the live one, for every
+   session. So a dev session showed nothing, or worse, showed what the same
+   profile number said on the live server in that window, which is somebody
+   else's words in a report about behaviour.
+
+   The dev folder is where the dev service actually writes. voice-server.js
+   puts chat in its own folder unless THORNSWOOD_CHAT_DIR is set. Neither
+   Install-Voice.ps1 nor vps-dev-instance.ps1 sets it, and the dev service's
+   folder is C:\Thornswood-Voice-Dev (voice\README.md, vps-dev-instance.ps1).
+   Measured 23 September: Get-Logs -Dev read that folder's voice.log and it
+   says "listening on 127.0.0.1:7789", which is the dev port.
+   tools\test-session-chat.js checks both defaults against those scripts. */
+const CHAT_DIRS = {
+  main: process.env.THORNSWOOD_CHAT_DIR || 'C:\\Thornswood-Voice\\chat',
+  dev:  process.env.THORNSWOOD_DEV_CHAT_DIR || 'C:\\Thornswood-Voice-Dev\\chat'
+};
 
 /* What this person said during THIS session, and nothing else.
 
@@ -1202,10 +1220,16 @@ const CHAT_DIR = process.env.THORNSWOOD_CHAT_DIR || 'C:\\Thornswood-Voice\\chat'
    A session that runs over midnight is in two files, so both days are read.
    A line that will not parse is skipped rather than thrown: an append-only
    log killed mid-write has a truncated last line by design, and one bad line
-   must not cost the rest. */
-function chatSlice(profileId, from, to) {
+   must not cost the rest.
+
+   channel picks the voice service by the same rule serverLogSlice picks the
+   game server's log, so the chat and the server log under one session always
+   come from the same server. */
+function chatSlice(profileId, from, to, channel) {
   const want = Number(profileId) || 0;
   if (!want) return { ok: true, why: '', lines: [] };
+  const dev = channel === 'dev';
+  const dir = CHAT_DIRS[dev ? 'dev' : 'main'];
   const days = {};
   for (const at of [from, to]) {
     const d = new Date(at);
@@ -1216,7 +1240,7 @@ function chatSlice(profileId, from, to) {
   let read = 0;
   for (const day of Object.keys(days).sort()) {
     let raw = '';
-    try { raw = fs.readFileSync(path.join(CHAT_DIR, day + '.jsonl'), 'utf8'); }
+    try { raw = fs.readFileSync(path.join(dir, day + '.jsonl'), 'utf8'); }
     catch (e) { continue; }
     read++;
     for (const l of raw.split('\n')) {
@@ -1236,7 +1260,8 @@ function chatSlice(profileId, from, to) {
   out.sort((a, b) => a.at - b.at);
   /* "Nothing was said" and "the chat log is not on this box" look identical
      once both are an empty list, and only one of them is a fault. */
-  return { ok: true, why: read ? '' : 'no chat log for those days on this box', lines: out };
+  return { ok: true, why: read ? '' : 'no chat log for those days on this box' +
+           (dev ? ' from the dev voice service' : ''), lines: out };
 }
 
 function serverLogSlice(channel, from, to) {
@@ -2738,7 +2763,7 @@ async function handle(req, res) {
       const from = (Number(row.start) || Number(row.end) || 0) - 60000;
       const to = (Number(row.end) || Date.now()) + 60000;
       const server = serverLogSlice(row.channel, from, to);
-      const chat = chatSlice(row.profile, from, to);
+      const chat = chatSlice(row.profile, from, to, row.channel);
 
       return sendJson(res, 200, {
         session: key,
