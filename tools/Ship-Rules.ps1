@@ -17,7 +17,9 @@
       Test-ShipRuntime $rel        written by the game or a tool at runtime; never shipped, listed as removed when it goes
       Test-ShipMachine $rel        one machine's own; never shipped, never removed
       Test-ShipOtherServer $rel    not one of ours, or somebody's sign in; never shipped, never removed
+      Test-ShipBethesdaLeftAlone   Bethesda's, and a pack once carried it; never shipped, never removed
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
+      Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
 
   Paths are relative to the game folder, with backslashes.
@@ -226,11 +228,49 @@ function Test-ShipOtherServer([string]$rel) {
     return $false
 }
 
+# Bethesda's own files that packs have already carried. Never shipped again,
+# and never listed as removed.
+#
+# Data\MarketplaceTextures.bsa is Bethesda's archive for the in-game Creations
+# menu: 121 files, every one under interface\marketplace (buttons for pc and
+# xbox, and the stars). 2.8 MB, dated 10 September 11:08:10, five seconds
+# after _ResourcePack.bsa, and _DowngraderBackups holds a 3.2 MB copy of it
+# beside the rest of Bethesda's files. No plugin loads it by name and Vortex
+# does not provide it, so it was in neither vanilla list and in no record,
+# and every pack and the installer carried it.
+#
+# WHY IT IS NOT WITH SKYRIM.ESM IN THE VANILLA LISTS. Measured 24 September:
+# both pack baselines, published.json and published-dev.json, list
+# Data\MarketplaceTextures.bsa. Publish-Update lists as removed anything the
+# last pack had that this scan does not, and the only thing that stops that is
+# Test-ShipMachine. A vanilla rule would have left it out of the scan, the
+# next pack would have put it in delete.txt, and every launcher that took the
+# pack would have deleted a Bethesda file off a tester who has every right to
+# it. Asked here, through Test-ShipMachine, it leaves packs and the installer
+# and nobody's copy is touched. The launcher builds Thornswood's game folder
+# out of the tester's own Steam copy, which is where this machine's came from:
+# Profile\OwnGame\files.txt has it as linked in from the Steam copy (L), and
+# not deployed by Vortex (O).
+#
+# Put a Bethesda file here, not in a vanilla list, whenever a pack has
+# already carried it.
+$ShipBethesdaLeftAlone = @(
+    'Data\MarketplaceTextures.bsa'
+)
+
+function Test-ShipBethesdaLeftAlone([string]$rel) {
+    foreach ($f in $ShipBethesdaLeftAlone) {
+        if ($rel -ieq $f) { return $true }
+    }
+    return $false
+}
+
 # One machine's own, never shipped and never listed as removed. Other servers'
 # files count as the machine's here, so a release never strips another
 # server's install off a tester.
 function Test-ShipMachine([string]$rel) {
     if (Test-ShipOtherServer $rel) { return $true }
+    if (Test-ShipBethesdaLeftAlone $rel) { return $true }
     foreach ($f in $ShipMachineFiles) {
         if ($rel -eq $f) { return $true }
     }
@@ -268,6 +308,58 @@ function Get-ShipOwnGameCollection([string]$ProfileDir) {
         if ($p.Count -eq 5 -and $p[1] -eq 'V') { [void]$set.Add($p[4]) }
     }
     return ,$set
+}
+
+# LOOSE ART NOBODY HAS ACCOUNTED FOR, named so a build says what it carries.
+#
+# Measured from Profile\OwnGame\files.txt on 24 September: 563 files and 539
+# MB under Data\textures and Data\meshes, the menu backdrop not counted, that
+# Vortex never deployed, dropped into the Steam copy by hand. Lost Ark armour
+# ports, somebody's custom weapons, BodySlide output built for one person's
+# body, Nemesis output, and leftovers of mods no longer installed. The
+# installer leaves out what the collection provides and nothing else, so every
+# one of them went to everybody who installed, and nothing on screen said so.
+#
+# This reports and does not refuse. Which of these may ship at all (BodySlide
+# output, the Nemesis output in meshes\actors) is Patrick's to decide, and a
+# refusal would stop every installer build until the folders are gone.
+#
+# Ours is the main menu backdrop: the three files Go.ps1 writes from
+# tools\art\menu ($menuPairs there; change the two together). Anything else
+# here is somebody else's until it is traced to a mod page and put in the
+# collection, or moved into the Thornswood Content mod, and either way it then
+# leaves the installer by itself.
+$ShipOwnArt = @(
+    'Data\meshes\interface\logo\logo.nif',
+    'Data\meshes\interface\logo\logo01ae.nif',
+    'Data\textures\interface\objects\Mainmenuwallpaper.dds'
+)
+
+# $files is what is about to ship: anything with a Rel (the path under the game
+# folder) and a Len (its bytes). Returns one row per first folder under
+# Data\textures or Data\meshes, biggest first, as Folder, Files and Bytes.
+# Files straight under Data\textures or Data\meshes are a row of their own.
+function Get-ShipLooseArt($files) {
+    $own = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($o in $ShipOwnArt) { [void]$own.Add($o) }
+    $rows = @{}
+    foreach ($f in @($files)) {
+        if ($null -eq $f) { continue }
+        $rel = [string]$f.Rel
+        if ($own.Contains($rel)) { continue }
+        $parts = $rel -split '\\'
+        if ($parts.Count -lt 3 -or $parts[0] -ne 'Data') { continue }
+        if ($parts[1] -ne 'textures' -and $parts[1] -ne 'meshes') { continue }
+        if ($parts.Count -eq 3) { $folder = $parts[0] + '\' + $parts[1] }
+        else { $folder = $parts[0] + '\' + $parts[1] + '\' + $parts[2] }
+        $key = $folder.ToLowerInvariant()
+        if (-not $rows.ContainsKey($key)) {
+            $rows[$key] = [pscustomobject]@{ Folder = $folder; Files = 0; Bytes = [long]0 }
+        }
+        $rows[$key].Files++
+        $rows[$key].Bytes += [long]$f.Len
+    }
+    return ,@($rows.Values | Sort-Object -Property @{ Expression = 'Bytes'; Descending = $true }, 'Folder')
 }
 
 # Where this build's reference plugins.txt and loadorder.txt are read from.
