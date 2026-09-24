@@ -678,6 +678,8 @@ namespace Thornswood
         // so that path asks for a config whatever this says.
         static void Configure(Action<string> log)
         {
+            // Nor who is muted, so the file channel hands that over again.
+            mutedSeen = null;
             Configure(log, true);
         }
 
@@ -841,6 +843,8 @@ namespace Thornswood
         //                      "<mic> <peers> <talking> <mode>"
         //   voice-ptt.txt      written by the game, read here
         //                      "<on> <mode>"
+        //   voice-muted.txt    written by the game, read here
+        //                      "<profileId> <profileId> ...", who is muted
         //
         // The game plugin already reads voice-port.txt out of this same folder
         // every three seconds and has never once failed to, which is the whole
@@ -907,6 +911,44 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The last mute line handed to the voice page, or null when the page
+        /// has not been given one. Written from the UI thread when the page
+        /// loads and from the file channel's thread, hence volatile.
+        /// </summary>
+        static volatile string mutedSeen;
+
+        /// <summary>
+        /// Who this person has muted, from the game to the page that plays
+        /// the audio.
+        ///
+        /// The mute from #133 reached the game's own page and stopped there.
+        /// That page carries no audio once the launcher has it, so the voice
+        /// page here went on playing a muted person at full level: measured on
+        /// 23 September, profile 123 muted in the game and beside you, gain 1
+        /// here. The server's list reaches the game's page, the voice plugin
+        /// writes it into voice-muted.txt, and this passes it on whenever it
+        /// changes. The page reads the ids out of the line itself and drops
+        /// anything that is not one.
+        /// </summary>
+        static void PassMuted(string[] dirs)
+        {
+            string now = null;
+            foreach (string d in dirs)
+            {
+                string f = Path.Combine(d, "voice-muted.txt");
+                if (!File.Exists(f)) continue;
+                try { now = File.ReadAllText(f).Trim(); }
+                catch { now = null; }   // mid-write, try again in 100ms
+                if (now != null) break;
+            }
+            if (now == null || now == mutedSeen) return;
+            mutedSeen = now;
+            Post("{\"t\":\"muted\",\"list\":\"" + JsonEscape(now) + "\"}");
+            int n = Regex.Matches(now, "\\d+").Count;
+            Quiet("Voice: the game says " + n + (n == 1 ? " person is" : " people are") + " muted");
+        }
+
+        /// <summary>
         /// Watches for push to talk and mode changes written by the game, and
         /// republishes our own state on a slow tick so a game that starts late
         /// still finds something to read.
@@ -951,6 +993,10 @@ namespace Thornswood
                             RenewToken();
                         }
                         PublishStatus();
+
+                        // Before push to talk, whose unchanged line ends the
+                        // pass with a continue.
+                        PassMuted(dirs);
 
                         // The game folder copy is read first: it is the one a
                         // plugin on a collection install can write.
