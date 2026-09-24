@@ -237,8 +237,11 @@ if (`$p) { 'bot up, pid ' + (`$p | Select-Object -First 1).ProcessId } else { 'B
 `$fs = `$null
 try {
   `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
-  if (`$fs.Length -gt `$before) {
-    [void]`$fs.Seek(`$before, 'Begin')
+  # Shorter than it was means run.ps1 rolled it at this start.
+  `$from = `$before
+  if (`$fs.Length -lt `$from) { `$from = 0 }
+  if (`$fs.Length -gt `$from) {
+    [void]`$fs.Seek(`$from, 'Begin')
     `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
     (`$sr.ReadToEnd()) -split "\r?\n" | Where-Object { `$_ } | Select-Object -Last 12
     `$sr.Close()
@@ -420,6 +423,44 @@ if (-not `$env:DISCORD_TOKEN) {
 
 if (-not `$env:PYTHONIOENCODING) { `$env:PYTHONIOENCODING = 'utf-8' }
 
+# bot.log is rolled here, before each start, because nothing can move it during
+# a run.
+#
+# It only ever grew. Python writes it through cmd's redirection below, and cmd
+# holds it open for as long as the bot runs. Measured for entry 220, a file
+# held that way cannot be renamed or cut short, and can be renamed the moment
+# the holder exits, which is when this runs. So a bot.log over 4 MB becomes
+# bot.log.1, the old .1 becomes .2 and so on, and the oldest of five goes, the
+# same size and count as site.log on the same box. Rolled, never cut short,
+# because the lines before an exit are the reason for it.
+#
+# This is the interim, entry 249: a bot that runs for a month without exiting
+# is not rolled in that month, and a service with its own roll-by-size log is
+# what fixes that. Nothing is moved unless bot.log itself can be, so a copy
+# started by hand that still holds it, or somebody reading it at that second,
+# leaves every older log where it is and the bot appends as it always did. A
+# roll that fails never stops the bot starting. tools\test-bot-log-roll.ps1
+# runs this, with a file held open and without.
+`$logBytes = 4MB
+`$logKeep = 5
+function Roll-BotLog {
+  `$log = '$rootWin\bot.log'
+  try {
+    if (-not [IO.File]::Exists(`$log)) { return }
+    if ((New-Object IO.FileInfo(`$log)).Length -lt `$logBytes) { return }
+    # Anything else with it open, and it is left alone until the next start.
+    [IO.File]::Open(`$log, 'Open', 'ReadWrite', 'None').Close()
+    `$oldest = `$log + '.' + `$logKeep
+    if ([IO.File]::Exists(`$oldest)) { [IO.File]::Delete(`$oldest) }
+    for (`$i = `$logKeep - 1; `$i -ge 1; `$i--) {
+      `$from = `$log + '.' + `$i
+      if ([IO.File]::Exists(`$from)) { [IO.File]::Move(`$from, `$log + '.' + (`$i + 1)) }
+    }
+    [IO.File]::Move(`$log, `$log + '.1')
+  } catch { return }
+  '[run] bot.log passed its size limit and was rolled to bot.log.1, so what came before this line is in there.' | Out-File `$log -Append -Encoding utf8
+}
+
 # Three quick exits in a row and it stops trying.
 #
 # This loop used to start the bot again fifteen seconds after every exit, for
@@ -440,6 +481,7 @@ if (-not `$env:PYTHONIOENCODING) { `$env:PYTHONIOENCODING = 'utf-8' }
 `$fastSeconds = 30
 `$fastRuns = 0
 while (`$true) {
+  Roll-BotLog
   # Python writes the log itself, through cmd's redirection, the same way the
   # game server and the voice server are run. Piping every line through
   # PowerShell and Out-File, which this did until 2026-09-16, re-encoded the
@@ -501,8 +543,12 @@ function Fresh {
   `$fs = `$null
   try {
     `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
-    if (`$fs.Length -gt `$before) {
-      [void]`$fs.Seek(`$before, 'Begin')
+    # Shorter than it was means run.ps1 rolled it at this start, so all of it
+    # is this run's.
+    `$from = `$before
+    if (`$fs.Length -lt `$from) { `$from = 0 }
+    if (`$fs.Length -gt `$from) {
+      [void]`$fs.Seek(`$from, 'Begin')
       `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
       `$out = @((`$sr.ReadToEnd()) -split "\r?\n")
       `$sr.Close()
