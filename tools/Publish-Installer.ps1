@@ -100,6 +100,12 @@ if (-not (Test-Path -LiteralPath $exe)) {
   throw "not built: $exe  (run Package-Thornswood.ps1 first, or pass -OutDir)"
 }
 $exeItem = Get-Item -LiteralPath $exe
+# The SHA-256 of the exact file people download. The Downloads page prints it
+# beside the size and date, with a link to VirusTotal's report on that hash, so
+# somebody who wants to know what they are about to run can read a report
+# rather than upload the file themselves (To Do entry 176). Nothing wrote one
+# before, so the page had nothing to print.
+$exeSha = (Get-FileHash -LiteralPath $exeItem.FullName -Algorithm SHA256).Hash
 
 # A one file build is decided by the exe rather than by the switch, because the
 # switch is easy to forget on a rerun and the file on disk is not. Anything
@@ -152,6 +158,7 @@ if ($single) {
     $exeOut = @{
       label   = 'Thornswood installer'
       version = $Version
+      sha256  = $exeSha
       note    = 'One file. Download it and run it.'
     }
   }
@@ -170,6 +177,7 @@ if ($single) {
     $exeOut = @{
       label   = 'Thornswood installer'
       version = $Version
+      sha256  = $exeSha
       note    = 'One file. Download it and run it. It gets the mods itself, about 700 MB.'
     }
     $zipOut = @{
@@ -224,3 +232,7 @@ Write-Host ''
 # door that no longer exists, and it read as if the password still crossed
 # the wire in clear.
 Write-Host "  on the site under Downloads: https://thornswood.net" -ForegroundColor Green
+# Where the page's VirusTotal link for this build goes. A file nobody has sent
+# to VirusTotal has no report, so until this exe is uploaded there once the
+# link lands on a page saying so. Printed here so that is one click to check.
+Write-Host "  VirusTotal: https://www.virustotal.com/gui/file/$($exeSha.ToLowerInvariant())"
