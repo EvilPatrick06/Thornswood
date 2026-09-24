@@ -44,7 +44,14 @@ param(
     # Bootstrap.cs has always been able to read. This was dropped when the
     # payload was 14 GB, because Windows would not load an executable that big.
     # It is under a gigabyte now that the mods come from the collection.
-    [switch]$OneFile
+    [switch]$OneFile,
+    # The public releases clone. Its version.json is how this build knows which
+    # packs it already has (applied.txt, further down). Left empty it is the
+    # Thornswood-Releases folder beside this repo, where Ship, Publish-Update
+    # and Check-ShipReady already look. It was a path into one home folder, so
+    # only one machine could build an installer that knew its own packs.
+    # Last in the list so no existing positional argument moves.
+    [string]$ReleaseDir = ''
 )
 
 
@@ -128,6 +135,29 @@ if (-not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+
+# ==== thornswood release feed ====
+# Found and checked before anything is staged or any game is closed, because
+# without it the build cannot write applied.txt and there is no point spending
+# twenty minutes on an installer that is wrong.
+#
+# It used to fall back to this repo's own version.json when the home folder
+# path was missing. MEASURED 24 SEPTEMBER: the feed lists 227 packs and the
+# repo's copy lists 164, so on any machine but Patrick's the installer marked
+# 63 packs as missing from a build that had them, and a fresh install fetched
+# them all again. With neither file there it shipped no applied.txt at all:
+# every one of the 227 packs pending on first launch, and 164 of them point at
+# the private repository. So it stops and says where it looked.
+if (-not $ReleaseDir) { $ReleaseDir = Join-Path (Split-Path -Parent (Split-Path -Parent $Here)) 'Thornswood-Releases' }
+$vLive = Join-Path $ReleaseDir 'version.json'
+if (-not (Test-Path -LiteralPath $vLive)) {
+    Die ("No version.json in $ReleaseDir, so this installer cannot say which packs it already has, " +
+         "and everybody who installs from it would be offered every pack ever published. " +
+         "Clone the feed there (git clone https://github.com/EvilPatrick06/Thornswood-Releases.git $ReleaseDir) " +
+         "or pass -ReleaseDir with the folder it is in.")
+}
+# ==== end thornswood release feed ====
+
 . (Join-Path $Here 'Close-Launcher.ps1')
 
 Head 'Packaging'
@@ -582,8 +612,7 @@ if ($collectionCount -gt 0) {
 }
 
 $appliedOut = Join-Path $stage 'applied.txt'
-$vLive = Join-Path 'C:\Users\evilp\Downloads\Thornswood-Releases' 'version.json'
-if (-not (Test-Path -LiteralPath $vLive)) { $vLive = Join-Path (Split-Path -Parent $here) 'version.json' }
+# $vLive is the releases feed, found and checked before anything was staged.
 if (Test-Path -LiteralPath $vLive) {
     try {
         $vd = ((Get-Content $vLive -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
