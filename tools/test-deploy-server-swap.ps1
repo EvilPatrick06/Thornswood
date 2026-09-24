@@ -31,6 +31,8 @@
       the old files back, the old server started again, and SWAP ROLLED BACK
     - a good deploy swaps every file in, keeps what it replaced, answers,
       keeps the newest three .prev folders, and never touches the other server
+    - the build stamp is one of the staged files, so it goes in beside
+      gamemode.js on a good deploy and goes back with it on a rollback
 
   Connects to nothing but 127.0.0.1.
 #>
@@ -193,6 +195,10 @@ function MakeStage {
     $files['gamemode.js']            = $Gamemode
     $files['server-settings.json']   = SettingsJson $root $Port $Order
     $files['server-build.json']      = '{ "sha256": "' + (Sha $RecordFor) + '" }'
+    # The build stamp Deploy-Gamemode leaves beside gamemode.js goes up in the
+    # stage with it, so a rollback cannot leave a new stamp describing the old
+    # gamemode. tools\test-build-stamp.ps1 leans on this harness for that.
+    $files['thornswood-build.json']  = '{ "gamemode": "' + (Sha $Gamemode) + '" }'
     $want = [ordered]@{}
     foreach ($k in $files.Keys) {
         $path = Join-Path $dir ($k -replace '/', '\')
@@ -261,6 +267,7 @@ try {
     Put (Join-Path $root 'scam_native.node') 'old binary'
     Put (Join-Path $root 'gamemode.js') '// old gamemode'
     Put (Join-Path $root 'server-build.json') ('{ "sha256": "' + (Sha 'old binary') + '" }')
+    Put (Join-Path $root 'thornswood-build.json') ('{ "gamemode": "' + (Sha '// old gamemode') + '" }')
     Put (Join-Path $root 'plugins\Skyrim.esm') 'skyrim'
     Put (Join-Path $root ('plugins\' + $bob)) 'bob v1'
     Put (Join-Path $root 'data\keep.txt') 'the character book'
@@ -363,6 +370,7 @@ try {
     Yes '  and what it replaced is kept in .prev, and a plugin that is new has nothing there' (
         ([IO.File]::ReadAllText((Join-Path $prev 'scam_native.node')) -eq 'old binary') -and
         ([IO.File]::ReadAllText((Join-Path $prev 'gamemode.js')) -eq '// old gamemode') -and
+        ([IO.File]::ReadAllText((Join-Path $prev 'thornswood-build.json')) -match (Sha '// old gamemode')) -and
         ([IO.File]::ReadAllText((Join-Path $prev ('plugins\' + $bob))) -eq 'bob v1') -and
         -not (Test-Path -LiteralPath (Join-Path $prev 'plugins\New Plugin.esp')))
     Yes '  and the stage is gone' (-not (Test-Path -LiteralPath (Join-Path $root '.stage-20260924-000401')))
