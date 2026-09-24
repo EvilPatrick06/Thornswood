@@ -10,8 +10,8 @@
   notices when one does. Somebody turns up, cannot get in, and the first you
   hear about it is a message in Discord hours later.
 
-  This puts a small watcher on the server that looks at all four every five
-  minutes and starts back up whatever is not answering.
+  This puts a small watcher on the server that looks at all of them every
+  five minutes and starts back up whatever is not answering.
 
   It will not fight a service that is properly broken. Three restarts of the
   same thing inside an hour and it stops trying and writes that it needs a
@@ -28,6 +28,17 @@
     game      answers on 3000, which is the resources the client pulls
     voice     answers on 7778
     bot       a python process is alive with the bot script in its command line
+    dev game  answers on 7788, the dev server's resources port
+    dev voice answers on 7789
+
+  The two dev ones are here because the box has been watching them since 16
+  September and this file did not know. vps-dev-instance.ps1, which runs ON
+  the VPS, appends them to the installed watch.ps1 in place. So the copy up
+  there watched six things, the copy here watched four, and -Install would
+  have written the shorter list over the longer one and taken the dev server
+  and dev voice off the watchdog with nothing said. That script checks for
+  'Thornswood Dev Server' before it patches, so with them here it now finds
+  its work already done and says so.
 
   The game's own traffic is UDP on 7777 and there is nothing to connect to, so
   3000 stands in for it. They are the same process, so if one is gone both are.
@@ -95,7 +106,7 @@ function Remote($script) {
 }
 
 Write-Host ''
-Write-Host '  THORNSWOOD  -  keep the four services up' -ForegroundColor White
+Write-Host '  THORNSWOOD  -  keep the services up' -ForegroundColor White
 
 # The watcher itself. Single quoted, so nothing in here is touched on the way
 # up. It goes to the server as base64 and is written out there as a file,
@@ -169,7 +180,12 @@ $checks = @(
   @{ Name = 'website'; Task = 'Thornswood Docs';   Port = 3001 },
   @{ Name = 'game';    Task = 'Thornswood Server'; Port = 3000 },
   @{ Name = 'voice';   Task = 'Thornswood Voice';  Port = 7778 },
-  @{ Name = 'bot';     Task = 'Thornswood Bot';    Port = 0    }
+  @{ Name = 'bot';     Task = 'Thornswood Bot';    Port = 0    },
+  # The dev pair. The dev game server's own traffic is UDP on 7787 and
+  # cannot be connected to, so its resources port stands in, exactly as
+  # 3000 does for the live one.
+  @{ Name = 'dev game';  Task = 'Thornswood Dev Server'; Port = 7788 },
+  @{ Name = 'dev voice'; Task = 'Thornswood Dev Voice';  Port = 7789 }
 )
 
 # One place that knows how each of them is asked.
@@ -313,6 +329,8 @@ foreach (`$p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA
 'game      ' + `$(if (Answers 3000) { 'up' } else { 'DOWN' })
 'voice     ' + `$(if (Answers 7778) { 'up' } else { 'DOWN' })
 'bot       ' + `$(if (`$bot) { 'up' } else { 'DOWN' })
+'dev game  ' + `$(if (Answers 7788) { 'up' } else { 'DOWN' })
+'dev voice ' + `$(if (Answers 7789) { 'up' } else { 'DOWN' })
 `$t = & schtasks /query /tn '$Task' /fo list 2>`$null
 if (`$LASTEXITCODE -eq 0) { 'watcher   installed' } else { 'watcher   NOT installed. Run this with -Install' }
 "@
