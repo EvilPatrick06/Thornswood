@@ -283,6 +283,68 @@ def say(mark, what):
     print('  %-9s %s' % (mark, what))
 
 
+# THE BOT'S OWN WAY IN, in every channel that shuts everybody else out.
+#
+# To Do List 223, "The bot is invited with Administrator and keeps it".
+# Administrator overrides every channel overwrite, and that is the only
+# reason the bot can see the staff channels and post in the read only ones:
+# nothing below ever named it. Untick Administrator and the @everyone deny
+# lands on the bot too. The trouble alerts in #staff-general and the site
+# watcher in the staff #news (bot.py, _trouble_channel and WATCH_ID) go
+# quiet, and -Posts can no longer write the rules, welcome and faq posts,
+# because @everyone may not send in the read only channels.
+#
+# So the bot gets an overwrite for itself as a member, the way bot.py's
+# log_channel already makes #ticket-log. Discord applies a member's own
+# overwrite last, after @everyone and every role, so it wins over the deny.
+# Three permissions and no more: see the channel, post in it, and read
+# back what is there, which is how post() finds its old messages to delete.
+# The build itself still wants Administrator, because it makes the Owner and
+# Dev roles with Administrator on them and Discord refuses that from a bot
+# which does not hold it.
+BOT_NEEDS = ('view_channel', 'send_messages', 'read_message_history')
+
+
+def with_bot(guild, out):
+    me = getattr(guild, 'me', None)
+    if me is not None:
+        out[me] = discord.PermissionOverwrite(**dict((n, True) for n in BOT_NEEDS))
+    return out
+
+
+async def keep_bot(ch, mode):
+    """Give the bot its own overwrite in a channel that is already there.
+
+       overwrites() only reaches a channel when it is made, and every channel
+       on the live server was made before this existed, so without this a
+       re-run would let the bot into nothing. Only the bot's own overwrite is
+       touched. Only the three it needs are set, anything else already on it
+       stays as it is, and a channel that already has all three is not written
+       to at all, so running this again after Administrator is gone changes
+       nothing and asks Discord for nothing."""
+    if ch is None or mode not in ('read', 'staff', 'pathfind'):
+        return
+    me = getattr(getattr(ch, 'guild', None), 'me', None)
+    if me is None:
+        return
+    have = ch.overwrites_for(me)
+    need = dict((n, True) for n in BOT_NEEDS if getattr(have, n) is not True)
+    if not need:
+        return
+    what = '#' + ch.name + ' lets the bot in without Administrator'
+    if CHECK:
+        say('would change', what)
+        return
+    have.update(**need)
+    try:
+        await ch.set_permissions(me, overwrite=have,
+                                 reason='Thornswood setup, the bot keeps its '
+                                        'channels without Administrator')
+        say('bot', what)
+    except discord.HTTPException:
+        failed.append(what + ' (Discord refused it)')
+
+
 def overwrites(guild, mode, roles):
     ev = guild.default_role
     deny_all  = discord.PermissionOverwrite(view_channel=False)
@@ -301,19 +363,19 @@ def overwrites(guild, mode, roles):
             if roles.get(r):
                 out[roles[r]] = discord.PermissionOverwrite(send_messages=True,
                                                             manage_messages=True)
-        return out
+        return with_bot(guild, out)
     if mode == 'staff':
         out = {ev: deny_all}
         for r in STAFF:
             if roles.get(r):
                 out[roles[r]] = talk
-        return out
+        return with_bot(guild, out)
     if mode == 'pathfind':
         out = {ev: deny_all}
         for r in list(STAFF) + ['Playtester']:
             if roles.get(r):
                 out[roles[r]] = talk
-        return out
+        return with_bot(guild, out)
     return {}
 
 
@@ -422,6 +484,7 @@ async def ensure_channel(guild, cat, spec, roles, found):
                     await existing.edit(topic=spec['topic'])
         except Exception:
             pass
+        await keep_bot(existing, spec.get('mode', 'open'))
 
     if kind == 'announce' and isinstance(existing, discord.TextChannel):
         try:
@@ -514,11 +577,11 @@ async def on_ready():
 
         for catname, specs in PLAN:
             cat = None
+            mode = 'staff' if catname in ('Staff',) else (
+                   'pathfind' if catname == 'Testing' else 'open')
             if catname:
                 cat = discord.utils.get(guild.categories, name=catname)
                 if cat is None:
-                    mode = 'staff' if catname in ('Staff',) else (
-                           'pathfind' if catname == 'Testing' else 'open')
                     cat = await guild.create_category(
                         catname, overwrites=overwrites(guild, mode, roles),
                         reason='Thornswood setup')
@@ -526,10 +589,23 @@ async def on_ready():
                     say('category', catname)
                 else:
                     kept.append(catname)
+                    await keep_bot(cat, mode)
+            done = []
             for spec in specs:
                 ch = await ensure_channel(guild, cat, spec, roles, found)
+                done.append(ch)
                 if spec.get('post'):
                     posts.append((ch, spec['post']))
+            # A channel somebody made by hand inside Staff or Testing is shut
+            # to @everyone like the rest, and the bot only saw it because of
+            # Administrator. The staff #news the site watcher speaks in is one:
+            # bot.py says it sits in Staff, and the plan does not name it.
+            # Letting the bot into those keeps what it can see today and
+            # widens nothing.
+            if cat is not None:
+                for ch in list(getattr(cat, 'channels', None) or []):
+                    if ch not in done:
+                        await keep_bot(ch, mode)
 
         # ------------------------------------------------------- pruning --
         # Only inside the categories this script manages, and only names it
