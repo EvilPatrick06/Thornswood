@@ -61,6 +61,15 @@ too. Say in the reply which entries moved.
   Profile\launcher.log records "runs from the new folder". A session reading
   the old wording would have believed the wrong layout was live, which is the
   one thing this section exists to prevent.
+  Decided by Patrick on 24 Sep, for a tester whose Vortex deploys into
+  another server's copy of Skyrim (`steamapps\common\Keizaal Online`), in
+  his words "detcts and fixes this but doesnt have the servers bleed": when
+  Vortex deploys anywhere but the Steam copy, `Thornswood\Game` is the Steam
+  copy's game plus exactly the files Vortex's record in that folder lists,
+  taken from Vortex's own mods folder, and nothing else of that folder is
+  read. Scan names the folder, Fix and Settings point the launcher at it,
+  and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
+  Gather, tools\test-vortex-folder.ps1). Djinn to agree it in #dev.
 - Whichever folder the game runs from, the launcher looks after its own
   files: Keep puts its files back before Play and parks any plugin in
   `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
