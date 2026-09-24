@@ -227,6 +227,181 @@ if (builder && everyM) {
   }
 }
 
+/*
+  ============================== A LOCK KEEPS PEOPLE OUT AND NEVER SHUTS THEM IN
+
+  Entry 330, step 1. Both halves of a front door answer with the house in
+  BUILDING_BY_DOOR, so shutFor locked the inside half as well, and a guest or
+  a burglar inside when the holder locked up found every way out locked. The
+  refusal in onActivate then refused the same door if the client lock had not
+  run. Measured against doors.json on 24 September: 3,326 of the 4,891 doors
+  stand inside their own building, in 812 of the 852 buildings, and 124 more
+  stand in a room, a cellar or a lodging, whose only road to open ground is
+  through the building.
+
+  This runs the real shutFor, mayPass and doorsOf, and the real refusal lifted
+  out of onActivate, against a small house, and then checks the generated
+  table against doors.json.
+*/
+function liftFn(name) {
+  const a = src.indexOf('  function ' + name + '(');
+  if (a < 0) { return null; }
+  const b = src.indexOf('\n  }\n', a);
+  return b > 0 ? src.slice(a, b + 4) : null;
+}
+
+{
+  // One house. Its front and back doors each have a half on the street and a
+  // half in the hall, there is a bedroom door inside, and a cellar whose only
+  // way out is the door up into the hall.
+  const HOUSE = 'h:Test.esp', CELLAR = 'c:Test.esp';
+  const BY = {
+    'f0:Test.esp': HOUSE,   // front door, the half on the street
+    'f1:Test.esp': HOUSE,   // front door, the half in the hall
+    'b0:Test.esp': HOUSE,   // back door, the half in the yard
+    'b1:Test.esp': HOUSE,   // back door, the half in the kitchen
+    'r1:Test.esp': HOUSE,   // the bedroom door, inside
+    'c0:Test.esp': CELLAR,  // down into the cellar, standing in the hall
+    'c1:Test.esp': HOUSE    // up out of the cellar into the hall
+  };
+  const OUT = { 'f1:Test.esp': 1, 'b1:Test.esp': 1, 'r1:Test.esp': 1, 'c1:Test.esp': 1 };
+  const ID = { 'f0:Test.esp': 0xf0, 'f1:Test.esp': 0xf1, 'b0:Test.esp': 0xb0,
+               'b1:Test.esp': 0xb1, 'r1:Test.esp': 0x71, 'c0:Test.esp': 0xc0,
+               'c1:Test.esp': 0xc1 };
+  const HOLDER = 7, STRANGER = 9, KEYED = 11;
+  const PID = { 0x107: HOLDER, 0x109: STRANGER, 0x111: KEYED };
+
+  const parts = ['wayOut', 'mayPass', 'shutFor', 'doorsOf'].map(liftFn);
+  yes('wayOut is in the gamemode', !!parts[0]);
+  yes('and mayPass, shutFor and doorsOf are where they were', !!parts[1] && !!parts[2] && !!parts[3]);
+
+  function town(locked) {
+    const claims = {};
+    claims[HOUSE] = { by: HOLDER, name: 'Holder', locked: locked };
+    return new Function('BUILDING_BY_DOOR', 'WAY_OUT', 'claims', 'holderOf', 'holdsKey',
+      'holdsDeed', 'idOf',
+      'var doorIndex = null;\n' + parts.filter(Boolean).join('\n') +
+      '\nreturn { shutFor: shutFor, mayPass: mayPass,' +
+      ' wayOut: typeof wayOut === "function" ? wayOut : null };')(
+      BY, OUT, claims,
+      function (b) { return claims[b] || null; },
+      function (actorId, b) { return actorId === 0x111 && b === HOUSE; },
+      function () { return false; },
+      function (d) { return ID[d] || 0; });
+  }
+  function ids(list) { return list.slice().sort(function (x, y) { return x - y; }).join(','); }
+  function same(list, want) {
+    return ids(list) === ids(want.map(function (d) { return ID[d]; }));
+  }
+
+  if (parts[1] && parts[2] && parts[3]) {
+    const T = town(true);
+    const s = T.shutFor(0x109, STRANGER);
+    yes('a stranger finds both doors in from outside locked, and only those',
+        same(s.shut, ['f0:Test.esp', 'b0:Test.esp']));
+    yes('and every way out of the house open, so nobody inside is shut in',
+        same(s.open, ['f1:Test.esp', 'b1:Test.esp', 'r1:Test.esp', 'c1:Test.esp']));
+    yes('the door up out of the cellar is one of them',
+        s.open.indexOf(0xc1) !== -1 && s.shut.indexOf(0xc1) === -1);
+    yes('and the cellar door, which is its own building nobody holds, is left alone',
+        s.open.indexOf(0xc0) === -1 && s.shut.indexOf(0xc0) === -1);
+
+    const h = T.shutFor(0x107, HOLDER);
+    yes('the holder still finds every door of the house open', h.shut.length === 0 &&
+        same(h.open, ['f0:Test.esp', 'f1:Test.esp', 'b0:Test.esp', 'b1:Test.esp',
+                      'r1:Test.esp', 'c1:Test.esp']));
+    const k = T.shutFor(0x111, KEYED);
+    yes('and so does somebody carrying the key', k.shut.length === 0);
+
+    const U = town(false);
+    yes('a claim nobody has locked shuts nothing, as before',
+        U.shutFor(0x109, STRANGER).shut.length === 0);
+
+    /*
+      THE SECOND HALF, the refusal in onActivate, lifted out and run with the
+      same house. It is the half a client that did not lock the door meets, so
+      it has to agree with the list above or a way out is open on the client
+      and refused by the server.
+    */
+    const at = src.indexOf('const shutTo = prop.buildingOf(doorDesc);');
+    const end = at >= 0 ? src.indexOf('\n        }\n', at) : -1;
+    yes('the refusal is in onActivate', at >= 0 && end > at);
+    if (at >= 0 && end > at) {
+      const told = [];
+      const refusal = new Function('prop', 'mp', 'casterRefrId', 'doorDesc', 'notify', 'say',
+        'log', src.slice(at, end + 10) + '\nreturn true;');
+      const prop = {
+        buildingOf: function (d) { return BY[d] || null; },
+        mayPass: T.mayPass, wayOut: T.wayOut,
+        nameOf: function () { return 'the house'; }
+      };
+      const mp = { get: function (id, k) { return k === 'profileId' ? (PID[id] || 0) : null; } };
+      function press(actor, door) {
+        return refusal(prop, mp, actor, door, function (id, text) { told.push(text); },
+                       function () { }, function () { });
+      }
+      yes('a stranger pressing the street half of the front door is refused',
+          press(0x109, 'f0:Test.esp') === false && /locked and you have no key/.test(told[0] || ''));
+      yes('a stranger pressing the hall half walks out', press(0x109, 'f1:Test.esp') === true);
+      yes('and out of the back door', press(0x109, 'b1:Test.esp') === true);
+      yes('and up out of the cellar', press(0x109, 'c1:Test.esp') === true);
+      yes('and through the bedroom door', press(0x109, 'r1:Test.esp') === true);
+      yes('the holder is not refused anywhere', press(0x107, 'f0:Test.esp') === true);
+    }
+  }
+
+  // ------------------------------------------------ the table the server carries
+  const wayM = /const WAY_OUT = (\{.*\});/.exec(src);
+  const byM = /const BUILDING_BY_DOOR = (\{.*\});/.exec(src);
+  const nameM = /const BUILDING_NAME = (\{.*\});/.exec(src);
+  yes('WAY_OUT is generated into the gamemode',
+      !!wayM && src.indexOf('// ==== WAY_OUT, generated ====') >= 0 &&
+      src.indexOf('// ==== end WAY_OUT ====') >= 0);
+  let doorsJson = null;
+  try { doorsJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'doors.json'), 'utf8')); }
+  catch (e) { doorsJson = null; }
+  yes('doors.json is readable', !!doorsJson);
+  if (wayM && byM && nameM && doorsJson) {
+    const WAY = JSON.parse(wayM[1]), ALL = JSON.parse(byM[1]), NAME = JSON.parse(nameM[1]);
+    const placed = doorsJson.doors, cells = doorsJson.cells;
+    let stray = 0;
+    for (const d in WAY) { if (!Object.prototype.hasOwnProperty.call(ALL, d)) { stray++; } }
+    yes('every way out is a door of a building the server knows', stray === 0);
+
+    let inside = 0, insideMissed = 0, street = 0, streetOut = 0;
+    for (const d in ALL) {
+      const r = placed[d];
+      if (!r) { continue; }
+      if (r.cell === ALL[d]) { inside++; if (!WAY[d]) { insideMissed++; } }
+      const c = cells[r.cell];
+      if (c && !c.interior) { street++; if (WAY[d]) { streetOut++; } }
+    }
+    yes('every door standing inside its own building is a way out (' + inside + ' of them)',
+        inside > 3000 && insideMissed === 0);
+    yes('and not one of the ' + street + ' doors on open ground is, so a lock still keeps people out',
+        street > 900 && streetOut === 0);
+
+    // A Hearthfire cellar, where a guest is most likely to be when the holder
+    // locks up, and the Winking Skeever's lower cellar, two rooms down.
+    function cellNamed(n) {
+      for (const c in cells) { if (cells[c].name === n) { return c; } }
+      return null;
+    }
+    function upOutOf(room, into) {
+      for (const d in ALL) {
+        if (placed[d] && placed[d].cell === room && NAME[ALL[d]] === into) { return d; }
+      }
+      return null;
+    }
+    const windstad = upOutOf(cellNamed('Windstad Manor, Cellar'), 'Windstad Manor');
+    yes('the door up out of Windstad Manor\'s cellar is a way out', !!windstad && !!WAY[windstad]);
+    const lower = upOutOf(cellNamed('Winking Skeever Lower Cellar'), 'Winking Skeever Cellar');
+    const upper = upOutOf(cellNamed('Winking Skeever Cellar'), 'The Winking Skeever');
+    yes('and both doors up out of the Winking Skeever\'s cellars',
+        !!lower && !!WAY[lower] && !!upper && !!WAY[upper]);
+  }
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
