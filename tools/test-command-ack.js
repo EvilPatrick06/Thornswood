@@ -120,20 +120,29 @@ function join(profileId, name) {
 // ----------------------------------------------------- the gamemode's poll ---
 /*
   The real poll(), with the real post() it acknowledges through, over a
-  pretend globalThis. handle() is the one thing supplied: it records what it
-  was asked to run, and throws when told to.
+  pretend globalThis. What runs a line is the one thing supplied: it records
+  what it was asked to run, and throws when told to.
+
+  Since entry 352 poll() hands every line to dispatch(), which runs it through
+  handle() or holds it until the character is back in the world, and
+  test-held-commands.js drives the real dispatch(). Here the supplied function
+  stands in for dispatch(), and handle() only writes down a line handed to it
+  straight, since that line would skip the hold.
 */
-function rig(port, g, handle) {
+function rig(port, g, run) {
   const pa = gm.indexOf('  function post(path, payload) {');
   const pb = gm.indexOf('  /** A line in the chat, to one person. */', pa);
   const a = gm.indexOf('  if (!g.__thornswoodCommandsRun) {');
   const b = a < 0 ? -1 : gm.indexOf('  if (g.__thornswoodCommandTimer)', a);
   if (pa < 0 || pb < 0 || a < 0 || b < 0) { return null; }
-  const fn = new Function('g', 'VOICE_PORT', 'handle', 'log', 'require',
+  const fn = new Function('g', 'VOICE_PORT', 'dispatch', 'handle', 'log', 'require',
     gm.slice(pa, pb) + '\n' + gm.slice(a, b) + '\nreturn { poll: poll };');
   const logged = [];
-  const api = fn(g, port, handle, function () { logged.push([].slice.call(arguments).join(' ')); }, require);
+  const straight = [];
+  const api = fn(g, port, run, function (cmd) { straight.push(cmd); },
+                 function () { logged.push([].slice.call(arguments).join(' ')); }, require);
   api.logged = logged;
+  api.straight = straight;
   return api;
 }
 
@@ -324,6 +333,8 @@ function done() {
     const run = g.__thornswoodCommandsRun;
     yes('what it remembers is capped at two thousand', !!run && run.order.length === 2000);
     yes('oldest out', !!run && run.seen['b:1'] !== true && run.seen['m:2000'] === true);
+    yes('every line went to dispatch(), none straight to handle()',
+        api.straight.length === 0 && reloaded.straight.length === 0);
   }
 
   // ---- end to end: typed in the chat, run once by the real poll ------------
@@ -341,6 +352,7 @@ function done() {
     live.poll();
     await wait(400);
     yes('and the next poll runs nothing', ran2.length === 1);
+    yes('and it went through dispatch(), not straight to handle()', live.straight.length === 0);
   } else {
     yes('the poll block lifts out of gamemode.js for the end to end run', false);
   }

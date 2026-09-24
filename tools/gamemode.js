@@ -19784,6 +19784,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           if (id && commandsRun.seen[id] === true) { ran.push(id); continue; }
           // Marked before it runs and acknowledged even when it throws: one
           // that threw part way through may already have moved somebody.
+          // A line dispatch() holds for a character still on its way back is
+          // acknowledged too: it waits in the held queue here from then on,
+          // just as it did when the service emptied its queue on every ask.
           if (id) { markRun(id); ran.push(id); }
           try { dispatch(list[i]); }
           catch (e) { log('command threw:', e && e.stack ? e.stack : e); }
