@@ -449,11 +449,16 @@ if (-not $NoNews -and $up) {
                 if ($t -match '^[-*\u2022]\s*(.+)$') { $details += $Matches[1].Trim() }
             }
 
-            if ($gamemodeMoved) { $details += 'The gamemode was rebuilt: starting kits, creation and arrival points live in it' }
-
+            # Two lines used to go in here that were for whoever ran this, not
+            # for the people reading the News tab and the site: "The gamemode
+            # was rebuilt: starting kits, creation and arrival points live in
+            # it", untrue since the kits went on 20 September, and "Load order:
+            # 60 plugins server side". Entry 187 on the To Do List: patch notes
+            # people read are about what they will notice. The gamemode copy is
+            # said above where it happens; the count is said here, on screen.
             try {
                 $ss = Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json
-                if ($ss.loadOrder) { $details += ('Load order: {0} plugins server side' -f @($ss.loadOrder).Count) }
+                if ($ss.loadOrder) { Say ('  load order: {0} plugins server side' -f @($ss.loadOrder).Count) 'DarkGray' }
             } catch { }
 
             if ($FreshWorld) { $details += 'The world was thrown away, so every character on the server is gone' }
@@ -468,8 +473,11 @@ if (-not $NoNews -and $up) {
                 $line = $noteLines[$i].Trim()
                 if ($line -and $line -notmatch '^[-*\u2022]') { $bodyBits += $line }
             }
+            # A one-line note leaves the body empty, the same as a one-line
+            # Ship. It used to be filled with "The server at" and the VPS
+            # address "was reinstalled and is answering", which put the address
+            # on the public news page and told nobody anything they would notice.
             $body = ($bodyBits -join ' ').Trim()
-            if (-not $body) { $body = "The server at ${VpsHost} was reinstalled and is answering." }
 
             # 'kind' and 'stamp' are extra members the launcher never asked
             # for. NewsItem is read with DataContractJsonSerializer, which

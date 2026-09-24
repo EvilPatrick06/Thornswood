@@ -7,13 +7,94 @@
   without making anything twice.
 """
 
+import os
+import re
+
+# HOW TO GET IN IS READ OUT OF THE JOIN PAGE, NOT WRITTEN HERE A SECOND TIME.
+#
+# From the To Do List, entry 185: the start channel promised the old
+# installer's exe and zip, "and that the Skyrim you already play will not be
+# touched; the person then meets Vortex, a collection and a downgrade."
+# #start-here, #welcome and #faq were written by hand for the old installer
+# and the site's join page moved on without them. Not one of them said
+# Vortex, Nexus or collection.
+#
+# So #start-here is tools\docs-app\data\site\join.md, and the welcome and the
+# questions take what you need and what happens to your own Skyrim out of its
+# "What you need" section. Change the page and the next Setup-Discord.ps1
+# -Posts says the same thing. join.md rather than help.md because the site's
+# pages go out from the repo with Deploy-Docs.ps1 -Site, while help.md is
+# edited in the hub and a redeploy never overwrites it, so the repo copy of
+# help.md is not always the one people read.
+#
+# The only words here are the ones the page cannot have: which channel a
+# ticket goes in and where logs go, as the <#KEY> mentions Build-Discord.py
+# fills in.
+_JOIN = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                     '..', 'docs-app', 'data', 'site', 'join.md')
+_SITE = 'https://thornswood.net'
+
+# Build-Discord.py packs paragraphs into messages of up to 1900 characters
+# and never splits one, and it deletes the old messages before it sends. A
+# paragraph past 2000 would be refused by Discord with the channel already
+# half emptied, so a long one is refused here instead, when content.py
+# loads and before anything is deleted. 1800 leaves room for the <#KEY>
+# mentions growing into real channel ids.
+LONGEST_PARAGRAPH = 1800
+
+
+def as_discord(md, where='join.md'):
+    """A site page as Discord shows it. Links on the site are relative, so
+       each becomes the full address, in angle brackets so Discord does not
+       put a preview card of the site under every one of them. Discord has no
+       horizontal rule, so a --- line would be three dashes on their own."""
+    md = md.replace('\r\n', '\n')
+    md = '\n'.join(line for line in md.split('\n') if line.strip() != '---')
+    md = re.sub(r'\]\((/[^)\s]*)\)', lambda m: '](<' + _SITE + m.group(1) + '>)', md)
+    md = re.sub(r'\n{3,}', '\n\n', md).strip()
+    for para in md.split('\n\n'):
+        if len(para) > LONGEST_PARAGRAPH:
+            raise ValueError('%s has a paragraph of %d characters, and Discord '
+                             'takes %d at most in one message: "%s..."'
+                             % (where, len(para), LONGEST_PARAGRAPH, para[:60]))
+    return md
+
+
+def section(md, heading, where='join.md'):
+    """The body under one ## heading, up to the next one."""
+    m = re.search(r'^## ' + re.escape(heading) + r'[ \t]*\n(.*?)(?=^## |\Z)',
+                  md, re.M | re.S)
+    if not m:
+        raise ValueError('%s has no "## %s" section, and the Discord text is '
+                         'read out of it' % (where, heading))
+    return m.group(1).strip()
+
+
+with open(_JOIN, encoding='utf-8') as _f:
+    JOIN = as_discord(_f.read())
+
+# The page without its own "# How to join", which the channel replaces.
+_JOIN_BODY = re.sub(r'\A# [^\n]*\n+', '', JOIN)
+
+# "What you need" is four paragraphs, and the one about your own Skyrim is
+# the answer to a question of its own. Picked by what it says rather than
+# where it sits, and refused if it has gone, because the welcome would
+# otherwise quietly lose it. tools\discord\test-read-channels.py runs on
+# every pull request, so an edit to join.md that does this goes red there.
+_NEED = section(JOIN, 'What you need').split('\n\n')
+_YOURS = [p for p in _NEED if 'the Skyrim you already have' in p]
+if len(_YOURS) != 1:
+    raise ValueError('join.md "What you need" should have one paragraph about '
+                     '"the Skyrim you already have", and has %d' % len(_YOURS))
+_YOURS = _YOURS[0]
+_NEED = '\n\n'.join(p for p in _NEED if p != _YOURS)
+
 WELCOME = """\
 # Thornswood
 
 Skyrim, except everybody's in the same one.
 
-It doesn't touch the Skyrim you already have. It installs its own copy, its own
-mods, its own launcher, off to one side, and leaves yours alone.
+""" + _YOURS + """
 
 ## We're playtesting
 
@@ -31,9 +112,8 @@ Not in yet isn't the same as turned away. Stick around, you'll get asked.
 ## Once you're in
 
 1. Read <#RULES>.
-2. Grab both installer files from **https://thornswood.net/downloads**
-3. Open Thornswood from the desktop shortcut. Not Steam, not SKSE. It patches
-   itself and drops you into the world.
+2. Follow <#START>. It's **https://thornswood.net/join** word for word, read out
+   of the same file, so the two can't disagree.
 
 ## Everything else
 
@@ -84,60 +164,11 @@ three skip to the end when they're bad enough.
 START = """\
 # Getting in
 
-**We're playtesting.** Before anything below, open a ticket in <#TICKETS> and
-say hello. A few lines about who you are. Somebody will answer.
+This is **https://thornswood.net/join**, read out of the same file, so the two
+can't disagree. Step 1 happens in <#TICKETS>. Logs and crash files go in
+<#LOGS>.
 
-The rest of this is for once you're in.
-
-## 1. Two files, same folder
-
-From **https://thornswood.net/downloads**. There's a small **exe** and a large
-**zip**, and they have to sit next to each other because the exe reads the zip.
-Downloads folder is fine.
-
-Run the exe. Don't unzip anything yourself.
-
-First run copies about twenty gigabytes into place. Start it and go do
-something else.
-
-## 2. Open Thornswood
-
-The desktop shortcut. Not Skyrim, not Steam, not SKSE.
-
-It checks for updates, patches whatever moved, and the Play button puts you in.
-No address to type, no password to remember.
-
-If an update's waiting it takes that first. Everyone has to be on the same
-files or nobody connects.
-
-## Voice
-
-Runs in the launcher, not the game, so leave the launcher open. Push to talk.
-Whisper and yell change how far you carry.
-
-## When it breaks
-
-Check **https://thornswood.net/known** first, a lot of it is on that list.
-
-Still stuck? Ticket in <#TICKETS>, and bring:
-
-- what you were doing
-- what actually happened
-- the crash log, if it closed itself:
-
-```
-C:\\Thornswood\\Profile\\SKSE\\CrashLogger\\
-```
-
-- or the launcher's own log, if it never got that far:
-
-```
-C:\\Thornswood\\Profile\\launcher.log
-```
-
-Drag either straight into the channel. They're plain text and they're usually
-the difference between a fix and a guess.
-"""
+""" + _JOIN_BODY + "\n"
 
 NEWS_FIRST = """\
 Release notes land here on their own whenever an update goes out, straight from
@@ -266,12 +297,11 @@ the Empire's, and neither side can reach in and drag somebody out.
 FAQ = """\
 # Questions
 
-**Do I need to own Skyrim?**
-Yes. Special Edition, on Steam. Not Anniversary. If you have it, fine, it just
-isn't used.
+**What do I need?**
+""" + _NEED + """
 
 **Will this mess up the Skyrim I already play?**
-No. It installs somewhere else entirely and never touches yours.
+""" + _YOURS + """
 
 **Can I add mods?**
 No. Everyone has to be running the identical plugin list or nobody connects.
