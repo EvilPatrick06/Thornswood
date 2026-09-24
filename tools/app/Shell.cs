@@ -22,8 +22,8 @@ namespace Thornswood
     /// sequence. There is no compiled window class. Run parses tools\ui.xaml,
     /// which Build-Launcher.ps1 embeds in the exe, into a live Window at run
     /// time; Bind finds the named controls in it and Wire attaches every
-    /// handler. So this is one static class, not a Window subclass, in Shell.cs,
-    /// Pages.cs, ShellOwnGame.cs, ShellSteamUpdates.cs, Waiting.cs and Stall.cs.
+    /// handler. So this is one static class, not a Window subclass, split
+    /// across Shell.cs and every other file that declares partial class Shell.
     ///
     /// tools\app\ARCHITECTURE.md walks through it: the startup order, what
     /// each of the other classes owns on disk, and every step between the
