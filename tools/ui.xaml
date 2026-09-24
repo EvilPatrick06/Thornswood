@@ -555,6 +555,7 @@
               <RowDefinition Height="*"/>
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
@@ -705,7 +706,22 @@
               </Grid>
             </Border>
 
-            <Grid Grid.Row="3" Margin="36,4,36,28">
+            <!-- What the update feed says to everybody (To Do List entry 262): its
+                 message, and the reason when it holds Play for maintenance or for
+                 a launcher too old to play. A row of its own, so it can stand
+                 under an update card without covering it; UpdateBar and
+                 DowngradeBar share row 2 because DrawStatus keeps the downgrade
+                 card down while an update card is up.
+                 Filled in by ShowNotice in Shell.cs. -->
+            <Border x:Name="NoticeBar" Grid.Row="3" Background="{DynamicResource Card}" BorderBrush="{DynamicResource Accent}"
+                    BorderThickness="1" CornerRadius="2" Padding="20,16" Margin="36,0,36,16" Visibility="Collapsed">
+              <StackPanel>
+                <TextBlock x:Name="TxtNoticeTitle" Style="{StaticResource H2}"/>
+                <TextBlock x:Name="TxtNoticeNote" Style="{StaticResource Small}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+
+            <Grid Grid.Row="4" Margin="36,4,36,28">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1.9*" MinWidth="330"/>
                 <ColumnDefinition Width="30"/>

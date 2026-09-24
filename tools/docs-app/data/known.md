@@ -4,14 +4,16 @@ What is limited or broken right now, and why. Worth reading before you report
 something, because a lot of what looks like a bug is how a shared Skyrim has
 to work.
 
-Not all of it is permanent. The first group follows from SkyMP itself and is
-not going to change. Everything after it is where things stand today, and some
-of that is being worked on.
+Not all of it is permanent. The first group follows from SkyMP itself, and
+none of it is settled for good. Everything after it is where things stand
+today, and some of that is being worked on.
 
 ## Limits of a shared Skyrim
 
 These follow from the server owning the world instead of your own machine.
-They are not going to change.
+What NPCs do is on the roadmap: **Thinning the crowd** and
+**NPCs with their own work**. The rest of this table is being looked at.
+Report one of these only if it does something this table does not describe.
 
 | Behaviour | Reason |
 |---|---|
@@ -21,19 +23,26 @@ They are not going to change.
 | Most mod scripts never fire | All Papyrus events except OnUpdate are blocked. Records still work, scripted behaviour does not |
 | Killmoves and stagger do not show on other people | Those animation events are blanked |
 
-## Mods that do not work as installed
+## What the collection took out
 
-These are in the collection and do nothing useful. Whether each one is
-replaced with a version that works here, or comes out of the list, is not
-settled yet.
+Revision 5 of the collection, from 22 September, took out four mods that
+worked against the server and a patch that needs one of them, and swapped
+Immersive Armors for a version that does without a script. Each one is named
+by its plugin file as well, because that is what your plugin list shows.
+Immersive Armors, for one, is Hothtrooper44_ArmorCompilation.esp, and a
+search for the words Immersive Armors finds nothing.
 
-| Mod | What happens |
-|---|---|
-| SunHelm Survival | Polls on a timer, the one script type still running. Writes health, stamina, magicka and carry weight against a server that crops and corrects them |
-| SunHelm Diseases | Same, and depends on SunHelm |
-| Respawn - Death Overhaul | Sets you essential and runs its own death handler. Death cannot complete on your own machine and the server owns respawn, so it can only fight the server |
-| Tavern Games | Creates gold on your own machine, which the server does not accept. The games run and the coin never arrives |
-| Immersive Armors, standard version | Distributes through a script with settings that do not persist. A script free version exists |
+If a file marked Out is still in your plugin list, your collection is older
+than revision 5. Update it in Vortex.
+
+| Mod | Plugin file | Where it stands |
+|---|---|---|
+| SunHelm Survival | SunHelmSurvival.esp | Out. It polled on a timer, the one script type still running, and wrote health, stamina, magicka and carry weight against a server that crops and corrects them |
+| SunHelm Diseases | SunHelmDiseases.esp | Out. Same, and it depends on SunHelm |
+| Embers XD, SunHelm patch | Embers XD - Patch - SunHelm Survival.esp | Out. It patches SunHelm and cannot load without it. Embers XD itself stays |
+| Respawn - Death Overhaul | Respawn - Death Overhaul.esp | Out. It set you essential and ran its own death handler. Death cannot complete on your own machine and the server owns respawn, so it could only fight the server |
+| Tavern Games | TavernGames.esp | Out. It created gold on your own machine, which the server does not accept. The games ran and the coin never arrived |
+| Immersive Armors | Hothtrooper44_ArmorCompilation.esp, Hothtrooper44_Armor_Ecksstra.esp, AZ_IADistribution.esp | In, as the script free version. The standard one handed out its armour through a script whose settings do not persist here. Immersive Armors - Script Free and Skypatched replaces its plugins and does without that script. The armour itself still comes from Immersive Armors 8.1 |
 
 ## What the server owns
 
