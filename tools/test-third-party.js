@@ -26,6 +26,13 @@
 // that say which subproject each client file comes from. On a runner without
 // the fork those lines say SKIP and the rest still runs.
 //
+// The same goes for the Thornswood Client Runtime, Thornswood's own mod on
+// Nexus Mods: where Vortex's copy of it is here (%APPDATA%\Vortex\skyrimse\mods,
+// or THORNSWOOD_VORTEX_MODS), every file in it is held to its section, and
+// where the launcher's Profile\OwnGame\files.txt is here (C:\Thornswood\Profile,
+// or THORNSWOOD_PROFILE), so is every file the collection puts under
+// Data\Platform\Distribution.
+//
 // Read only.
 'use strict';
 const fs = require('fs');
@@ -376,6 +383,194 @@ if (!haveFork) {
     yes(lib + ' is in upstream\'s THIRD_PARTY_LICENSES and in THIRD-PARTY.md',
         tpl.indexOf(lib) >= 0 && N.indexOf(lib) >= 0);
   });
+}
+
+// ---------------------------------------------------------------- Nexus Mods
+//
+// Two of the collection's mods are Thornswood's own uploads. One of them, the
+// Thornswood Client Runtime (Nexus 192762), is the largest thing somebody else
+// wrote that Thornswood hands out: 68 files of CEF, Chromium, ANGLE, ICU, Node,
+// Microsoft's shader compiler and one Skyrim Platform script, about 349 MB.
+// THIRD-PARTY.md once filed all of it under "Not shipped by Thornswood", and
+// nothing here noticed, because this harness looked no further than the
+// launcher, tools\lib, the site and the six client files. So the section on
+// that mod is held to the mod itself where Vortex's copy is on this machine,
+// and to the launcher's record of where each game file came from.
+function section(title) {
+  const at = N.indexOf('\n## ' + title);
+  if (at < 0) { return ''; }
+  const next = N.indexOf('\n## ', at + 4);
+  return next < 0 ? N.slice(at) : N.slice(at, next);
+}
+function commas(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function reEscape(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+const RUNTIME_ID = '192762';
+const CONTENT_ID = '192001';
+const runtimeSec = section('Thornswood Client Runtime');
+const runtimeFlat = flat(runtimeSec);
+const reachSec = section('How it reaches people');
+const notShipped = section('Not shipped by Thornswood');
+const sourceSec = section('Where the source is');
+const missingSec = section('What is still missing');
+yes('THIRD-PARTY.md has a section for the Thornswood Client Runtime', runtimeSec.length > 0);
+yes('that section links its Nexus page, mod ' + RUNTIME_ID, runtimeSec.indexOf('/mods/' + RUNTIME_ID) >= 0);
+yes('THIRD-PARTY.md has a section for Thornswood Content, mod ' + CONTENT_ID,
+    section('Thornswood Content').indexOf('/mods/' + CONTENT_ID) >= 0);
+yes('"How it reaches people" names Nexus Mods and both of Thornswood\'s mods there',
+    reachSec.indexOf('Nexus Mods') >= 0 && reachSec.indexOf(RUNTIME_ID) >= 0 && reachSec.indexOf(CONTENT_ID) >= 0);
+yes('THIRD-PARTY.md has a "Not shipped by Thornswood" section', notShipped.length > 0);
+['libcef', 'libnode', 'Distribution'].forEach(function (w) {
+  yes('"Not shipped by Thornswood" does not claim ' + w, notShipped.indexOf(w) < 0);
+});
+yes('"What is still missing" does not say nothing hands a person the GPL text',
+    missingSec.length > 0 && !/nothing hands a person the GPL/i.test(flat(missingSec)));
+const polyRows = runtimeSec.split('\n').filter(function (l) {
+  return l.charAt(0) === '|' && l.indexOf('`___systemPolyfill.js`') >= 0;
+});
+yes('the Client Runtime section gives ___systemPolyfill.js as GPL-3.0',
+    polyRows.some(function (l) { return /(^|[^A])GPL-3\.0/.test(l) && l.indexOf('AGPL') < 0; }));
+const polySrc = new RegExp(reEscape(forkUrl) + '/tree/([0-9a-f]{40})/skyrim-platform/tools/system_polyfill').exec(sourceSec);
+yes('"Where the source is" gives a commit of the fork that still has ___systemPolyfill.js', !!(forkUrl && polySrc));
+yes('the credits page names the Thornswood Client Runtime and links its Nexus page',
+    C.indexOf('Thornswood Client Runtime') >= 0 && C.indexOf('/mods/' + RUNTIME_ID) >= 0);
+yes('the credits page names ___systemPolyfill.js and its licence',
+    /___systemPolyfill\.js[\s\S]{0,200}GNU GPL version 3/.test(C));
+
+// The polyfill's source, where the fork is here: the commit named for it has
+// the same script, the recorded commit no longer has it, and the licence text
+// the mod carries is skyrim-platform's own.
+const POLY = 'skyrim-platform/tools/system_polyfill';
+let polyUpstream = null;
+let spLicence = null;
+if (haveFork && polySrc) {
+  try { polyUpstream = git(['show', polySrc[1] + ':' + POLY + '/dist/___systemPolyfill.js']); } catch (e) { polyUpstream = null; }
+  try { spLicence = git(['show', polySrc[1] + ':skyrim-platform/LICENSE']); } catch (e) { spLicence = null; }
+  yes('the fork at ' + polySrc[1].slice(0, 8) + ' has ' + POLY + '/src/___systemPolyfill.ts', (function () {
+    try { git(['cat-file', '-e', polySrc[1] + ':' + POLY + '/src/___systemPolyfill.ts']); return true; } catch (e) { return false; }
+  })());
+  yes('the fork at the recorded commit no longer has ' + POLY, (function () {
+    try { git(['cat-file', '-e', commit + ':' + POLY]); return false; } catch (e) { return true; }
+  })());
+} else {
+  skip('no fork here to read ___systemPolyfill.js\'s source commit in');
+}
+
+// Vortex's copy of the mod. The newest one Vortex holds is the one read; an
+// older upload than the notices describe is a machine that has not caught up,
+// and says SKIP, while a newer one fails until the notices describe it.
+const VORTEX_MODS = process.env.THORNSWOOD_VORTEX_MODS ||
+  path.join(process.env.APPDATA || '', 'Vortex', 'skyrimse', 'mods');
+function versionOf(s) { return String(s).split('.').map(function (x) { return parseInt(x, 10) || 0; }); }
+function compareVersions(a, b) {
+  const x = versionOf(a), y = versionOf(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    if ((x[i] || 0) !== (y[i] || 0)) { return (x[i] || 0) < (y[i] || 0) ? -1 : 1; }
+  }
+  return 0;
+}
+let runtimeDir = null, runtimeVer = null;
+try {
+  fs.readdirSync(VORTEX_MODS).forEach(function (n) {
+    const m = new RegExp('^Thornswood Client Runtime ' + RUNTIME_ID + ' (\\d+(?:\\.\\d+)*) ').exec(n);
+    if (m && (runtimeVer === null || compareVersions(m[1], runtimeVer) > 0)) {
+      runtimeVer = m[1]; runtimeDir = path.join(VORTEX_MODS, n);
+    }
+  });
+} catch (e) { runtimeDir = null; }
+const notedVer = (/version (\d+(?:\.\d+)*), file \d+/.exec(runtimeFlat) || [])[1] || null;
+yes('the Client Runtime section gives the version and file it describes', !!notedVer);
+if (!runtimeDir) {
+  skip('no copy of the Thornswood Client Runtime in ' + VORTEX_MODS + ', so its files were not read');
+} else if (notedVer && compareVersions(runtimeVer, notedVer) < 0) {
+  skip('Vortex here holds the Client Runtime ' + runtimeVer + ', older than the ' + notedVer + ' THIRD-PARTY.md describes');
+} else {
+  yes('THIRD-PARTY.md describes the Client Runtime Vortex holds here, ' + runtimeVer,
+      !!notedVer && compareVersions(runtimeVer, notedVer) === 0);
+  const dist = path.join(runtimeDir, 'Platform', 'Distribution');
+  const modFiles = walk(dist, []);
+  const rel = function (p) { return path.relative(dist, p).split(path.sep).join('\\'); };
+  let bytes = 0;
+  modFiles.forEach(function (p) { bytes += fs.statSync(p).size; });
+  yes('the section gives the file count, ' + modFiles.length + ' files', runtimeFlat.indexOf(modFiles.length + ' files') >= 0);
+  yes('the section gives the size, ' + commas(bytes) + ' bytes', runtimeFlat.indexOf(commas(bytes) + ' bytes') >= 0);
+  const locales = modFiles.filter(function (p) { return /^CEF\\locales\\[^\\]+\.pak$/i.test(rel(p)); });
+  yes('the section counts the language packs, ' + locales.length + ' `CEF\\locales\\*.pak`',
+      runtimeFlat.indexOf(locales.length + ' `CEF\\locales\\*.pak`') >= 0);
+  const unnamed = modFiles.filter(function (p) {
+    return locales.indexOf(p) < 0 && runtimeSec.indexOf(path.basename(p)) < 0;
+  }).map(rel);
+  unnamed.forEach(function (r) { console.log('      not named in the section: ' + r); });
+  yes('every other file in the mod is named in the section (' + (modFiles.length - locales.length) + ')', unnamed.length === 0);
+  const leaves = cbFiles.map(function (r) { return r.split('\\').pop().toLowerCase(); });
+  yes('none of the six recorded client files is in the mod, as the section says',
+      modFiles.every(function (p) { return leaves.indexOf(path.basename(p).toLowerCase()) < 0; }));
+
+  // By sha256: every program, data file and script, and nothing listed that
+  // the mod does not have.
+  const hashRows = {};
+  runtimeSec.split('\n').forEach(function (l) {
+    const m = /^\| `([^`]+)` \| [\d,]+ \| `([0-9a-f]{64})` \|/.exec(l);
+    if (m) { hashRows[m[1]] = m[2]; }
+  });
+  modFiles.filter(function (p) { return /\.(dll|exe|dat|js)$/i.test(p); }).forEach(function (p) {
+    const r = rel(p);
+    const sha = crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+    yes(r + ' is in the section by its sha256, ' + sha.slice(0, 16), hashRows[r] === sha);
+  });
+  Object.keys(hashRows).forEach(function (r) {
+    yes(r + ', hashed in the section, is in the mod', fs.existsSync(path.join(dist, r)));
+  });
+
+  // The licence texts it installs, each named, and the versions its README
+  // gives, each in the section.
+  const docs = path.join(runtimeDir, 'Docs', 'Thornswood Client Runtime');
+  let licences = [];
+  try { licences = fs.readdirSync(path.join(docs, 'licences')); } catch (e) { licences = []; }
+  yes('the mod carries licence texts (' + licences.length + ')', licences.length > 0);
+  licences.forEach(function (n) { yes(n + ', in the mod, is named in the section', runtimeSec.indexOf('`' + n + '`') >= 0); });
+  const readme = read(path.join(docs, 'README.txt')) || '';
+  const what = readme.split(/\nNot included/)[0];
+  const vers = (what.match(/\b\d+\.\d+\.\d+(?:\.\d+)?(?:\+g[0-9a-f]+)?/g) || []).filter(function (v, i, a) { return a.indexOf(v) === i; });
+  yes('the mod\'s README gives versions to check (' + vers.join(', ') + ')', vers.length > 0);
+  vers.forEach(function (v) { yes('the section gives ' + v + ', from the mod\'s README', runtimeSec.indexOf(v) >= 0); });
+
+  const polyMod = read(path.join(dist, '___systemPolyfill.js'));
+  if (polyMod !== null && polyUpstream !== null) {
+    yes('the mod\'s ___systemPolyfill.js is the fork\'s at ' + polySrc[1].slice(0, 8) + ', line endings aside',
+        polyMod === polyUpstream);
+  }
+  const spMod = read(path.join(docs, 'licences', 'SkyrimPlatform-LICENSE.txt'));
+  if (spMod !== null && spLicence !== null) {
+    yes('the mod\'s SkyrimPlatform-LICENSE.txt is skyrim-platform/LICENSE', spMod === spLicence);
+  }
+}
+
+// The launcher's record of where each game file came from, where the profile
+// is here. Every file under Data\Platform\Distribution that the collection
+// provides is covered by the Client Runtime section, and there are as many as
+// it says.
+const PROFILE = process.env.THORNSWOOD_PROFILE || 'C:\\Thornswood\\Profile';
+const filesTxt = read(path.join(PROFILE, 'OwnGame', 'files.txt'));
+if (filesTxt === null) {
+  skip('no ' + path.join(PROFILE, 'OwnGame', 'files.txt') + ' here, so where the game files came from was not read');
+} else {
+  const fromCollection = filesTxt.split('\n').map(function (l) { return l.split('|'); })
+    .filter(function (f) { return f.length >= 5 && f[1] === 'V'; })
+    .map(function (f) { return f.slice(4).join('|'); })
+    .filter(function (r) { return /^Data\\Platform\\Distribution\\/i.test(r); });
+  if (fromCollection.length === 0) {
+    skip('files.txt here gives the collection no file under Data\\Platform\\Distribution');
+  } else {
+    const loose = fromCollection.filter(function (r) {
+      if (/\\CEF\\locales\\[^\\]+\.pak$/i.test(r)) { return runtimeSec.indexOf('`CEF\\locales\\*.pak`') < 0; }
+      return runtimeSec.indexOf(r.split('\\').pop()) < 0;
+    });
+    loose.forEach(function (r) { console.log('      from the collection and not in the section: ' + r); });
+    yes('every file the collection puts under Data\\Platform\\Distribution is in the Client Runtime section (' +
+        fromCollection.length + ')', loose.length === 0);
+    yes('the section says ' + fromCollection.length + ' files, as files.txt does',
+        runtimeFlat.indexOf(fromCollection.length + ' files') >= 0);
+  }
 }
 
 // ---------------------------------------------------------------- the words

@@ -15,7 +15,10 @@ resource Build-Launcher.ps1 compiles into the launcher, every file under
 `tools\lib`, every font and minified script the site serves from
 `tools\docs-app\public`, the six client files and the commits in
 `tools\client-build.json` and `tools\server-build.json`, and the source
-paragraph on the public credits page. When a rebuild records a new commit, this file and
+paragraph on the public credits page. Where Vortex's copy of the Thornswood
+Client Runtime and the launcher's `Profile\OwnGame\files.txt` are on the
+machine, it also holds the section on that mod to every file in it. When a
+rebuild records a new commit, this file and
 `tools\docs-app\data\site\credits.md` have to change in the same pull request,
 or the build check goes red.
 
@@ -28,6 +31,17 @@ or the build check goes red.
   in game packs and the installer.
 - **Game packs and the installer payload**: every file in the game folder that
   the collection did not provide and Ship-Rules.ps1 does not hold back.
+- **Nexus Mods**, through the collection
+  (https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a).
+  Most of what Vortex installs from it is other people's mods, under their own
+  terms. Two of them are Thornswood's own uploads, by EvilPatrick06, and
+  Vortex installs both for everybody who installs the collection: Thornswood
+  Content (mod 192001) and Thornswood Client Runtime (mod 192762). Each has
+  its own section below. What the collection provides stays out of the
+  installer and the packs (Get-ShipOwnGameCollection in Ship-Rules.ps1), so
+  the collection is the only way these reach anybody, with one exception: a dev
+  pack carries our own `Thornswood-Content.esp` until Nexus has the current
+  one (`$DevShipsOurs` in Publish-Update.ps1).
 - **The game server** runs on the VPS. Nobody receives a copy, but the AGPL
   still asks for its source to be offered to everybody who connects.
 - **The site**, thornswood.net, hands every visitor's browser the files in
@@ -107,7 +121,9 @@ What is compiled into them:
   which has no licence file of its own.
 - The libraries in the fork's `vcpkg.json`, linked in by the build. Among them
   is the Chromium Embedded Framework (cef-prebuilt 108.4.13), which
-  SkyrimPlatformCEF and SkyrimPlatformImpl link against. vcpkg copies each
+  SkyrimPlatformCEF and SkyrimPlatformImpl link against. CEF's own runtime
+  files do not go out with these six: they are the Thornswood Client Runtime
+  mod on Nexus Mods, below. vcpkg copies each
   port's licence text to `build\vcpkg_installed\x64-windows-sp\share\<port>\copyright`
   in the fork's build folder. Read on 24 September, two of them are worth
   knowing about: antigo's is the GNU Lesser General Public License version 3,
@@ -145,6 +161,101 @@ byte the files in upstream's `skymp5-front\src\fonts`:
 Futura PT and DIN Pro point at their foundries' end user licences. This file
 found nothing that gives SkyMP or Thornswood the right to hand them on, and
 upstream names none. Upstream SkyMP ships them the same way.
+
+## Thornswood Client Runtime, Thornswood's mod on Nexus Mods
+
+Thornswood publishes this itself, as its own mod: Nexus Mods mod 192762,
+https://www.nexusmods.com/skyrimspecialedition/mods/192762, by EvilPatrick06.
+Revision 5 of the collection carries version 1.0.0, file 809366, uploaded on
+22 September, and it is not optional. The collection's `collection.json`
+records the download as 148,896,610 bytes, md5
+`c515679068f6563750b1ca1f9260031f`.
+
+It is the largest thing somebody else wrote that Thornswood hands out: 68
+files, 366,157,850 bytes, into `Data\Platform\Distribution`, and a README and
+six licence texts into `Data\Docs\Thornswood Client Runtime`. Read on
+24 September: Vortex's copy, in the staging folder `Thornswood Client Runtime
+192762 1.0 2026-09-22T22-17Z`, matched the 68 in `C:\Thornswood\Game` by
+sha256, and `Profile\OwnGame\files.txt` gives the collection as the origin of
+all 68. 67 of them are byte for byte the files the fork's build puts in
+`build\dist\client\Data\Platform\Distribution`. `___systemPolyfill.js` is the
+one that is not, and it has its own paragraph below.
+
+`SkyrimPlatformImpl.dll` and `SkyrimPlatformCEF.exe.hidden` are left out of the
+mod on purpose. They are two of the six recorded files above, and they come
+with the launcher, which checks them against its own record.
+
+What is in it, by path under `Data\Platform\Distribution`. Each version is the
+file's own version resource, or for ICU the name inside the data, and each
+agrees with the mod's README wherever the README gives one.
+
+| Part | Version | Files | Licence | Its text in the mod |
+|---|---|---|---|---|
+| Chromium Embedded Framework, and Chromium | CEF 108.4.13+ga98cd4c, Chromium 108.0.5359.125 | `RuntimeDependencies\libcef.dll`, `chrome_elf.dll`, `snapshot_blob.bin` and `v8_context_snapshot.bin`; `CEF\chrome_100_percent.pak`, `chrome_200_percent.pak` and `resources.pak`; 55 `CEF\locales\*.pak` | BSD-3-Clause | `CEF-LICENSE.txt`, `Chromium-LICENSE.txt` |
+| ICU data | ICU 71, by the name inside the file, `icudt71l` | `RuntimeDependencies\icudtl.dat` | Unicode's licence, below | `ICU-LICENSE.txt` |
+| ANGLE | 2.1.19724, git ceec659ac60b | `RuntimeDependencies\libEGL.dll`, `libGLESv2.dll` | BSD-3-Clause | `ANGLE-LICENSE.txt` |
+| Node.js | 23.2.0 | `RuntimeDependencies\libnode.dll` | MIT, with the licences of the libraries built into it | `Node-LICENSE.txt` |
+| Microsoft Direct3D HLSL Compiler | 10.0.20348.1 | `RuntimeDependencies\d3dcompiler_47.dll` | Microsoft's own. The file describes itself as "Direct3D HLSL Compiler for Redistribution", by Microsoft Corporation. | None |
+| Skyrim Platform | upstream's last copy, below | `___systemPolyfill.js` | GPL-3.0 | `SkyrimPlatform-LICENSE.txt` |
+
+The programs, the ICU data and the script, by sha256:
+
+| File | Bytes | sha256 |
+|---|---|---|
+| `RuntimeDependencies\libcef.dll` | 191,842,816 | `52aa8b457a5f174d0a51509da4dc8e128b6b4bb476b800bab6c7eb9c109219be` |
+| `RuntimeDependencies\libnode.dll` | 109,094,912 | `f22c87fa55e3c0e8b5626fd94c801ba7f1bf581e6fa555ce702c44e553d2d210` |
+| `RuntimeDependencies\icudtl.dat` | 10,462,432 | `97b978a19edd4746e9a44d9a44bb4bc519e127a203c247837ec0922f573449e3` |
+| `RuntimeDependencies\libGLESv2.dll` | 7,493,120 | `49ee2a4800a8eba183169152ecd5550b8d55989785e2f44a7de04930dcb3d7ef` |
+| `RuntimeDependencies\d3dcompiler_47.dll` | 4,891,080 | `e4bc3420a28069bd13dc3be725d46676a7c0e99de221026e8c43cd6f7ed45c0b` |
+| `RuntimeDependencies\chrome_elf.dll` | 1,411,072 | `4f5f1dc6d998b07e3919055b6f9cc8befc626d30479c7c2d07722051650491a0` |
+| `RuntimeDependencies\libEGL.dll` | 474,624 | `1100398a3fe57da76ea58b9b110be2f6a83a75a3e1863863f086d9218b46cc5a` |
+| `___systemPolyfill.js` | 2,605 | `38320fb897314ae7471bdab749f00442c00913f14d7b8f82bc793b3c2b669188` |
+
+Chromium and Node build other people's libraries into these files.
+`Node-LICENSE.txt`, 139,053 bytes, carries the licence of every library built
+into libnode.dll. For Chromium the README points at Chromium's own source at
+108.0.5359.125, where each component keeps its LICENSE file. No list of those
+travels with the mod.
+
+`icudtl.dat` is ICU 71's data. The `ICU-LICENSE.txt` beside it is the Unicode
+License V3, with a copyright line that runs from 1991 to 2026. That is the text
+of a far later ICU than 71, which came out in 2022.
+
+`___systemPolyfill.js`, 2,605 bytes, is the SystemJS module loader that Skyrim
+Platform used to run before a plugin's `index.js`. Line endings aside, it is
+upstream's `skyrim-platform/tools/system_polyfill/dist/___systemPolyfill.js`,
+which did not change from 28 June 2023 until upstream removed that folder on
+1 June 2026 (commit `ceba28bc`, "drop system-polyfill, multifile plugins &
+other deprecated features", #2711). That removal comes before `f926944b`, the
+upstream commit the fork starts from. So the fork at the recorded commit has
+no such file, no file there names it, its build does not make it, and nothing
+in the client Thornswood ships asks for it. It reaches everybody who installs
+the collection anyway. The folder's own `package.json` names no licence. It is
+part of skyrim-platform, whose `package.json` says `GPL-3.0`, and the mod's
+`SkyrimPlatform-LICENSE.txt` is byte for byte skyrim-platform's `LICENSE`, the
+GNU General Public License version 3, 35,149 bytes. Its source is under "Where
+the source is".
+
+## Thornswood Content, Thornswood's other mod on Nexus Mods
+
+Nexus Mods mod 192001,
+https://www.nexusmods.com/skyrimspecialedition/mods/192001, by EvilPatrick06.
+Revision 5 of the collection carries version 1.1.0, file 809365. Its three
+files, read in Vortex's copy on 24 September:
+
+- `Thornswood-Content.esp`, Thornswood's own plugin, 141,234 bytes, sha256
+  `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.
+  `tools\Thornswood-Content.esp` has changed since it was uploaded: it was
+  141,442 bytes on 24 September.
+- `SKSE\Plugins\SkyrimSoulsRE.ini`: Skyrim Souls RE's own settings file (mod
+  27859, in the collection) with one line changed, `bTweenMenu = false`. The
+  rest is as that mod's author wrote it.
+- `SKSE\Plugins\OpenAnimationReplacer.ini`: the settings file Open Animation
+  Replacer (mod 92109, in the collection) writes, holding the values Thornswood
+  wants.
+
+Both settings files belong to mods everybody already gets from the collection.
+This file did not read either mod's permissions.
 
 ## Shipped today with no licence this file can name
 
@@ -218,17 +329,14 @@ them, names the SIL Open Font License, Version 1.1.
 
 ## Not shipped by Thornswood
 
-- The collection. Each person installs every mod from Nexus Mods through
-  Vortex, under its author's own terms. The launcher lists every one with a
-  link to its page (`tools\app\Links.cs`), and the public credits page says so.
-  The mod files the installer carries anyway are entry 168, above.
+- The rest of the collection. Each person installs every mod from Nexus Mods
+  through Vortex, under its author's own terms. The launcher lists every one
+  with a link to its page (`tools\app\Links.cs`), and the public credits page
+  says so. The two mods in it that Thornswood uploads itself are not in this
+  group: they have their own sections above. The mod files the installer
+  carries anyway are entry 168, above.
 - SKSE, which is in the collection, and Skyrim Special Edition, which each
   person owns.
-- The Chromium Embedded Framework and Node runtime under
-  `Data\Platform\Distribution` (`libcef.dll`, `libnode.dll` and the rest). The
-  collection deploys them: their origin is V in `Profile\OwnGame\files.txt`.
-  Only `SkyrimPlatformImpl.dll` and `SkyrimPlatformCEF.exe.hidden` in that
-  folder are Thornswood's builds.
 - The WebView2 Runtime, which comes from Microsoft.
 
 ## On our servers
@@ -256,20 +364,54 @@ That covers what Thornswood built. It does not cover
 https://github.com/skyrim-multiplayer/skymp, but nobody recorded which commit
 it was built from.
 
-The same directions reach people in two places (entry 170). The installer
-carries `SOURCE CODE.txt`, which Package-Thornswood.ps1 writes from the two
-build records and Setup-Thornswood.ps1 copies into the install folder. The
-public credits page has them under "Source code", at
+Nor does it cover `___systemPolyfill.js` in the Thornswood Client Runtime,
+because the fork no longer has it at the recorded commit. Its source is the
+TypeScript it was compiled from, `src/___systemPolyfill.ts`, in the same fork
+at the last commit before upstream removed it:
+
+https://github.com/EvilPatrick06/skymp/tree/43eedb568e72d3ea2f04b946b7cf14cbd1139750/skyrim-platform/tools/system_polyfill
+
+That commit is upstream's, the parent of `ceba28bc`. It is an ancestor of the
+recorded commit, so it is in the history of the branch above, and the clone
+here showed `origin/thornswood/engine-changes` containing it on 24 September.
+The licence text is `skyrim-platform/LICENSE` in the same tree.
+
+The rest of that mod is CEF, Chromium, ANGLE, ICU and Node, under permissive
+licences that ask for no source offer, and Microsoft's compiler. The mod's
+README still gives the source of CEF (https://github.com/chromiumembedded/cef),
+Chromium (https://chromium.googlesource.com/chromium/src) and Node
+(https://github.com/nodejs/node).
+
+The directions reach people in three places. The installer carries
+`SOURCE CODE.txt`, which Package-Thornswood.ps1 writes from the two build
+records and Setup-Thornswood.ps1 copies into the install folder (entry 170).
+The public credits page has them under "Source code", at
 https://thornswood.net/credits#source, which the download page links beside
-the installer. `tools\test-source-offer.ps1` holds both to the records.
+the installer (entry 170). `tools\test-source-offer.ps1` holds both to the
+records. And the Thornswood Client Runtime's own README, installed as
+`Data\Docs\Thornswood Client Runtime\README.txt`, names the fork, its branch
+and upstream SkyMP, but no commit, and `___systemPolyfill.js` is not on that
+branch any more.
 
 ## What is still missing
 
-- The installer now says where the source is (`SOURCE CODE.txt`, above), but
-  nothing hands a person the GPL or AGPL text itself, this list or the
-  WebView2 notice together with the files. The WebView2 notice is on the
-  public credits page only. The launcher's updates and the release pages on
-  GitHub say nothing about source.
+- The GPL text does reach people, through Nexus: the Thornswood Client Runtime
+  installs `Data\Docs\Thornswood Client Runtime\licences\SkyrimPlatform-LICENSE.txt`,
+  the GNU General Public License version 3, with the CEF, Chromium, ANGLE, ICU
+  and Node texts beside it, for everybody who installs the collection. Nothing
+  hands a person the AGPL text, which MpClientPlugin.dll and the server are
+  under, and nothing hands them this list or the WebView2 notice together with
+  the files. The WebView2 notice is on the public credits page only. The
+  installer says where the source is (`SOURCE CODE.txt`, above), but the
+  launcher's updates and the release pages on GitHub say nothing about source.
+- The Client Runtime's README names the fork's branch and no commit, and
+  `___systemPolyfill.js` is gone from that branch, so the README's directions
+  do not lead to that file's source. The exact place is under "Where the
+  source is". Nothing in the shipped client loads that file.
+- `d3dcompiler_47.dll` goes out in the Client Runtime with no licence text,
+  and this file names none.
+- The `ICU-LICENSE.txt` in the Client Runtime is a later ICU's text than the
+  ICU 71 data it sits beside.
 - The vcpkg licence texts do not travel with the client runtime.
 - The MIT and OFL texts are not on the site beside marked and the fonts. The
   files keep their copyright lines and name their licences, as the copies

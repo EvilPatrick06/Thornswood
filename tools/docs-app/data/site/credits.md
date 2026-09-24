@@ -65,11 +65,28 @@ so no commit is named for them here. Their source is SkyMP's own, at
 | `skyrimPlatform.ts` | Skyrim Platform's type declarations | `skyrim-platform`, GNU GPL version 3 |
 | `MpClientPlugin.pex` | A compiled Papyrus script | `client-deps`, which has no `LICENSE` file and keeps no source for it |
 
+One more SkyMP file reaches you through Nexus Mods instead, in the Thornswood
+Client Runtime (below): `___systemPolyfill.js`, a small Skyrim Platform
+script, from `skyrim-platform` under the GNU GPL version 3. It is the last
+version SkyMP had before it removed the script in June 2026, so its source is
+in SkyMP's history rather than its current code:
+[the change that removed it](https://github.com/skyrim-multiplayer/skymp/pull/2711)
+shows every line of it.
+
 ## What else Thornswood hands you that somebody else wrote
 
 **The launcher** carries three files from Microsoft's WebView2 SDK, version
 1.0.2903.40. They give it the browser that voice runs in. Microsoft's licence
 for them is at the bottom of this page.
+
+**The Thornswood Client Runtime** is Thornswood's own mod on
+[Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/192762), and
+the collection installs it for you. It is the browser and script engine Skyrim
+Platform runs on, and Thornswood wrote none of it but the README: the Chromium
+Embedded Framework and Chromium 108, ANGLE and ICU's data (BSD and Unicode
+licences), Node.js 23.2.0 (MIT), Microsoft's Direct3D shader compiler, and the
+one SkyMP script above. The licence texts come with it, in
+`Data\Docs\Thornswood Client Runtime`.
 
 **Tavern**, the font Skyrim Platform draws its text in, is Typey McTypeface by
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes
