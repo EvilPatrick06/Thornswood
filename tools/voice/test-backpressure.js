@@ -48,7 +48,10 @@ const { spawn } = require('child_process');
 // VOICE_SERVER points it at another copy, which is how it is shown to fail on
 // the code before a change.
 const SERVER = process.env.VOICE_SERVER || path.join(__dirname, 'voice-server.js');
-const PORT = 7907;
+// Its own port. test-chat-limit.js reached main on 7907 while this branch
+// was open, and two harnesses on one port can each end up talking to the
+// other's service.
+const PORT = 7908;
 const BASE = 'http://127.0.0.1:' + PORT;
 const ROWS = 1500;
 // The ceiling the service promises. A connection whose queue passes it is
