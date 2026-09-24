@@ -48,6 +48,23 @@ bad buy, but it is RAM only. The storage is identical.
 Paying annually takes 15 percent off either one, so 16GB works out near $54 a
 month and 20GB near $68. That commits you for the year.
 
+## Measuring it first
+
+The decision above rests on one reading, taken on 15 September. Until
+`tools\Watch-Load.ps1` nothing on the box kept a number over time.
+
+    .\tools\Watch-Load.ps1 -Install   a line every five minutes, on the box
+    .\tools\Watch-Load.ps1            bring the record down and read it
+
+Each line holds the box's CPU, memory, free disk and network bytes, the people
+on, and each of the seven services' processor time, memory and I/O
+(`tools\vps-load.ps1` lists every column). `tools\Read-Load.ps1` turns it into
+which service leads each of those, and when the busiest hour was.
+
+Leave it a week that includes a busy evening before reading anything into it.
+Whether the answer is the plan above or moving some services off this box is
+for Patrick and Djinn in #dev, and whatever is done goes back on this page.
+
 ## Doing it
 
 It is self service. No ticket needed.

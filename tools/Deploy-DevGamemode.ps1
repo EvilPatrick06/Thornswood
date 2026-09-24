@@ -192,6 +192,16 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
   Write-Host '  node is not on this machine, so the syntax check was skipped' -ForegroundColor Yellow
 }
 
+# What this gamemode is, written down to go up beside it, so the dev server can
+# say which build it runs. Made here, before anything is stopped, so nothing
+# about it can leave the dev server down. The fields and the reasons are in
+# BuildStamp.ps1. -RepoDir is this script's own repo, which is the branch being
+# tried, and the dev feed is where the four part number lives.
+. (Join-Path $Here 'BuildStamp.ps1')
+$stampFile = Join-Path $env:TEMP 'thornswood-dev-build.json'
+$buildStamp = Save-ThornswoodBuildStamp -Gamemode $Gamemode -Channel dev -RepoDir (Split-Path -Parent $Here) -Path $stampFile
+Write-Host ('  build stamp: ' + (Format-ThornswoodBuildStamp $buildStamp))
+
 # How many the dev server seats, read here so a number the engine would refuse
 # stops this while the dev server is still up. MaxOnline.ps1 says where it
 # lives and why there.
@@ -500,6 +510,13 @@ Write-Host 'Copying...'
 & scp @ssh $Gamemode "$User@${Vps}:$Root/gamemode.js"
 if ($LASTEXITCODE -ne 0) { throw 'scp failed for gamemode.js' }
 Write-Host '  gamemode.js'
+# A warning and not a stop. The dev server is stopped at this point and the new
+# gamemode has already been sent, so throwing here would leave it stopped for a
+# file that nothing reads yet. An old stamp left behind names the old
+# gamemode's hash, so it cannot be mistaken for this one.
+& scp @ssh $stampFile "$User@${Vps}:$Root/thornswood-build.json"
+if ($LASTEXITCODE -ne 0) { Write-Host '  thornswood-build.json did not go up, carrying on' -ForegroundColor Yellow }
+else { Write-Host '  thornswood-build.json' }
 
 if ($LoadOrder) {
   foreach ($p in $sendPlugins) {
