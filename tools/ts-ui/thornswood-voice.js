@@ -1177,9 +1177,28 @@
       The mute list, from the server. Applied on the next placement pass,
       which runs five times a second, so a key press is silent within a frame
       or two and nothing here has to walk the connections itself.
+
+      And handed on to the launcher, because once it has the audio this page
+      holds no connections and the silence has to happen in the launcher's
+      page. Without that a muted person was still heard (entry 151). The
+      plugin writes the ids into voice-muted.txt and the launcher passes them
+      to its page.
+
+      setMuted(123, true) mutes one person and setMuted(123, false) unmutes
+      them, which is the call the To Do List entry was written against. The
+      server sends the whole list.
     */
-    setMuted: function (list) {
-      muted = (list && typeof list === 'object') ? list : {};
+    setMuted: function (list, on) {
+      if (typeof list === 'number' || typeof list === 'string') {
+        if (on) { muted[list] = true; } else { delete muted[list]; }
+      } else {
+        muted = (list && typeof list === 'object') ? list : {};
+      }
+      var ids = [];
+      for (var k in muted) {
+        if (Object.prototype.hasOwnProperty.call(muted, k) && muted[k] && Number(k) > 0) { ids.push(k); }
+      }
+      try { window.skyrimPlatform.sendMessage('thornswood-voice-muted', ids.join(' ')); } catch (e) { }
       try { place(); } catch (e) { }
       return true;
     },
