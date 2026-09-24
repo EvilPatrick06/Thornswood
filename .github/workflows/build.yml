@@ -120,7 +120,10 @@ jobs:
           # An install that fails says so and stops the step rather than the
           # build, because a pip outage is not a fault in the branch. A
           # harness that fails is red, which is the point.
-          python -m pip install --quiet --disable-pip-version-check discord.py pillow certifi
+          #
+          # From requirements.txt, the file Install-Bot.ps1 installs on the
+          # VPS, so the versions tested here are the versions the bot runs.
+          python -m pip install --quiet --disable-pip-version-check -r tools\discord\requirements.txt
           if ($LASTEXITCODE -ne 0) {
             Write-Host '::warning::could not install discord.py, so the bot harnesses did not run'
             exit 0

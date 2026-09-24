@@ -41,15 +41,24 @@ copy of that plugin. See LOAD ORDER ERROR below.
 
 ## Your first character
 
-Before the game starts, the launcher asks what you did before, which is a
-profession, one half of it and a class, and which town you wake up in. Those
-are the choices on the [Professions](/classes) page, and the launcher is the
-only place they are made.
+The game loads to its main menu and asks who you are today. Pick an empty slot
+to make a new character. Nothing about a character is chosen in the launcher.
 
-Then the game loads. You arrive in a quiet hall and the race menu opens, and
-that is where you make your face. When you are done you wake up at the inn in
-the town you chose, with the tools of your trade in your pack. The hall is only
-where the face gets made.
+You arrive in a quiet stone hall and the race menu opens, and that is where you
+make your face. When you are done you are dressed in a plain tunic and boots,
+and the panel behind **K** opens by itself. That panel is where the rest is
+chosen: your profession and the half of it you will make your own, your class,
+and your Home, which is the town you wake up in. Those are the choices on the
+[Professions](/classes) page.
+
+Only the town has to be chosen before you leave the hall. Your class and
+profession can wait, and can be picked later in the world from the same panel.
+Press **Confirm** on the Review page and you wake up at the inn in the town you
+chose.
+
+Nothing else is handed out at the start, except a tool to the three picks whose
+work needs one: a Miner is handed a pickaxe, a Woodworker a woodcutter's axe
+and a Farmer a shovel and seed to sow, at the moment each one is picked.
 
 ## Voice
 
@@ -115,13 +124,12 @@ they are usually the difference between a fix and a guess.
 - No saving. The server holds your character. Quitting is safe.
 - Mod settings menus forget themselves every session, because there is no save
   to write them to.
-- NPCs stand still when nobody is near them.
 - No levelling, no fast travel, and the difficulty is fixed at Expert.
 - Start On Save is in the mod list but never loads a save. The launcher points
   it at a character that does not exist, on purpose: an ordinary Skyrim save
   cannot be loaded under Thornswood.
-- The creation hall is empty on purpose. Your trade and town come from the
-  launcher, and the hall is only where the face gets made.
+- The creation hall is a bare room. Your face is made there, and everything
+  else is chosen on the panel that opens by itself once it is done.
 
 All of that is deliberate. None of it is worth reporting. [Known Issues](/known)
 covers the rest of what a shared Skyrim cannot do, and which of it is going to

@@ -12,7 +12,7 @@ namespace Thornswood
         {
             // ===================================================== joining
             new HelpItem("Joining", "1.  You pick your character at the game's main menu",
-                "Press Play and Skyrim opens on its own menu with your characters listed, and New character under them. Name a new one after yourself: the multiplayer client reads the name off your character when you connect, and that is what everyone else sees floating above you. It is set when you create the character, so changing it later means starting a new one."),
+                "Press Play and Skyrim opens on its own menu with your characters listed, and New character under them. Give a new one a name that belongs in Skyrim: a first name and a family name or a byname, and not your own. The multiplayer client reads the name off your character when you connect, and that is what everyone else sees floating above you. It is set when you create the character, so changing it later means starting a new one."),
 
             new HelpItem("Joining", "2.  Three choices and nothing else",
                 "There is no cart ride and no Helgen. You wake in a shut room, the creation hall, with nothing in it but you and whoever else is being made that day. The appearance menu opens on its own: build your face and close it. A moment later the character panel opens on its own: your class, your profession and the half of it you will make your own, and the town you wake up in. Take them in any order and confirm each. The third one sends you to your inn, wearing the shift and carrying nothing. Nothing else is decided in the hall."),
@@ -23,8 +23,8 @@ namespace Thornswood
             new HelpItem("Joining", "2b.  If the panel does not appear",
                 "Press K. That is the same panel you use for the rest of your character's life, for the skill tree, and the server reminds you in chat every half minute while the choices are still open. If K does nothing, the chat may have the keyboard: press Enter to close it and try again. A refusal from the server shows under the panel and in the chat, with the reason."),
 
-            new HelpItem("Joining", "3.  You do not need to save first",
-                "Skyrim Together would not accept a connection from an unsaved game and this one does not care. The client loads you into the world itself. Saving is still worth doing out of habit, but nothing here depends on it."),
+            new HelpItem("Joining", "3.  There is no saving",
+                "The server holds your character, not a save file on your machine, so there is nothing to save before you connect and nothing lost when you quit. The client loads you into the world itself."),
 
             new HelpItem("Joining", "4.  It connects on its own",
                 "The launcher writes the server address into the client settings before it starts the game, and the client connects on its own. You do not type an address, and there is no join screen to press anything on. There is a switch for it in Settings."),
