@@ -1038,6 +1038,13 @@ if (PAGES[here]) {
     '<div><label for="rBy">Your Discord name</label>' +
       '<span class="hint">So somebody can come back to you. Optional.</span>' +
       '<input id="rBy" type="text" maxlength="40"></div>' +
+    // Off the page and out of the tab order, so a person never meets it and a
+    // script that fills in every box does. The site keeps nothing that comes
+    // back with it filled in.
+    '<div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;' +
+      'height:1px;overflow:hidden"><label for="rHome">Leave this empty</label>' +
+      '<input id="rHome" name="homepage" type="text" tabindex="-1" ' +
+      'autocomplete="off"></div>' +
     '<label class="check"><input type="checkbox" id="rIdea"> ' +
       'This is an idea, not a fault</label>' +
     '<div><button class="btn first" type="submit">Send it</button></div>' +
@@ -1055,6 +1062,7 @@ if (PAGES[here]) {
         title:  document.getElementById('rTitle').value,
         detail: document.getElementById('rDetail').value,
         by:     document.getElementById('rBy').value,
+        homepage: document.getElementById('rHome').value,
         kind:   document.getElementById('rIdea').checked ? 'idea' : 'bug'
       })
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })

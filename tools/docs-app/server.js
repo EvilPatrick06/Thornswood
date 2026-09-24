@@ -417,6 +417,111 @@ const INBOX   = path.join(DATA, 'inbox.json');
    machine. Nothing here writes it. */
 const NEWS    = path.join(DATA, 'news.json');
 
+// ==== thornswood report limits ====
+//
+// THE PUBLIC REPORT FORM TOOK ANYTHING FROM ANYBODY, AS OFTEN AS THEY LIKED.
+// No limit, nothing to tell a person from a script, and one list shared with
+// the bot's tickets and trimmed to its newest 2000 rows. So 2000 posts from
+// anywhere pushed every ticket and every real report off the end of
+// inbox.json, on a page that tells the person "Somebody will read it".
+//
+// FIVE AN HOUR AND TWENTY A DAY FROM ONE PLACE. Somebody with a real problem
+// sends one or two. Past that the answer is a 429 with a sentence saying when
+// to try again, never a quiet drop: a limiter that swallows a report and says
+// Sent breaks that promise worse than the flood did. Only reports that were
+// taken count, so a script hammering on a refusal does not keep somebody on
+// the same connection locked out for ever.
+//
+// WHERE A REQUEST COMES FROM. Caddy holds 443 and hands everything on from
+// 127.0.0.1, so behind it every request looks like it came from here, and
+// keyed on that the form would lock for everybody after five reports. The
+// forwarded header is believed only when the socket really is loopback, which
+// is Caddy, and only its LAST hop, which is the one Caddy wrote; anything
+// before it is whatever the sender typed. A request that reached 3001 straight
+// (THORNSWOOD_DOCS_LOCAL not set) is keyed by its own socket and its header is
+// ignored. An IPv6 address counts as its /64, because one home connection is
+// handed a whole /64 and would otherwise be millions of senders.
+//
+// NO ADDRESS IS KEPT. privacy.md says the sign-in log is the only thing here
+// holding one. This table holds a hash of it under a key made fresh at every
+// start and never written anywhere, and forgets it after a day. That is also
+// why the cap per sender lives here at the door rather than in inbox.json:
+// capping the file per sender would mean writing who sent each report into it.
+//
+// TICKETS AND REPORTS ARE TRIMMED APART. Each kind keeps the newest 2000 the
+// shared list used to keep, so nothing posted to the public page can push a
+// ticket out, and a pile of tickets cannot push a report out either.
+const REPORT_HOUR = 5;
+const REPORT_DAY = 20;
+const INBOX_KEEP = 2000;
+const reportSalt = crypto.randomBytes(32);
+const reportSeen = new Map();
+
+function reportFrom(req) {
+  const sock = String((req.socket && req.socket.remoteAddress) || '');
+  let addr = sock;
+  if (/^(127\.|::1$|::ffff:127\.)/i.test(sock)) {
+    const hops = String(req.headers['x-forwarded-for'] || '').split(',')
+      .map((s) => s.trim()).filter(Boolean);
+    if (hops.length) addr = hops[hops.length - 1];
+  }
+  addr = addr.toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  if (net.isIPv6(addr)) {
+    const halves = addr.split('%')[0].split('::');
+    const head = halves[0] ? halves[0].split(':') : [];
+    const tail = halves.length > 1 && halves[1] ? halves[1].split(':') : [];
+    const gap = halves.length > 1 ? Math.max(0, 8 - head.length - tail.length) : 0;
+    addr = head.concat(new Array(gap).fill('0'), tail).slice(0, 4)
+      .map((g) => (parseInt(g, 16) || 0).toString(16)).join(':') + '::/64';
+  }
+  return crypto.createHmac('sha256', reportSalt).update(addr).digest('hex').slice(0, 32);
+}
+
+function reportRefusal(key, now) {
+  const HOUR = 60 * 60 * 1000, DAY = 24 * HOUR;
+  const at = Number(now) || Date.now();
+  const day = (reportSeen.get(key) || []).filter((t) => t > at - DAY);
+  const hour = day.filter((t) => t > at - HOUR);
+  const wait = (ms) => Math.max(1, Math.ceil(ms / 1000));
+  const said = (s) => s >= 5400 ? 'about ' + Math.round(s / 3600) + ' hours'
+    : 'about ' + Math.max(1, Math.ceil(s / 60)) + (s > 60 ? ' minutes' : ' minute');
+  if (hour.length >= REPORT_HOUR) {
+    const s = wait(hour[0] + HOUR - at);
+    return { wait: s, error: 'That is five reports from your connection in the last hour, ' +
+      'which is as many as this page takes. Try again in ' + said(s) +
+      ', or open a ticket in the Discord if it cannot wait.' };
+  }
+  if (day.length >= REPORT_DAY) {
+    const s = wait(day[0] + DAY - at);
+    return { wait: s, error: 'That is twenty reports from your connection today, ' +
+      'which is as many as this page takes in a day. Try again in ' + said(s) +
+      ', or open a ticket in the Discord if it cannot wait.' };
+  }
+  return null;
+}
+
+function reportTaken(key, now) {
+  const list = reportSeen.get(key) || [];
+  list.push(Number(now) || Date.now());
+  reportSeen.set(key, list.slice(-REPORT_DAY));
+}
+
+function reportPrune(now) {
+  const cut = (Number(now) || Date.now()) - 24 * 60 * 60 * 1000;
+  for (const [key, list] of reportSeen) {
+    const kept = list.filter((t) => t > cut);
+    if (kept.length) reportSeen.set(key, kept); else reportSeen.delete(key);
+  }
+}
+
+function trimInbox(rows) {
+  let tickets = 0, reports = 0;
+  return (Array.isArray(rows) ? rows : []).filter((r) =>
+    (r && r.kind === 'ticket') ? ++tickets <= INBOX_KEEP : ++reports <= INBOX_KEEP);
+}
+// ==== end thornswood report limits ====
+setInterval(() => reportPrune(Date.now()), 10 * 60 * 1000).unref?.();
+
 // ------------------------------------------------------------- downloads --
 function listFiles() {
   const meta = jsonFile(path.join(FILES, 'files.json'), {});
@@ -1888,13 +1993,33 @@ async function handle(req, res) {
   /* Reporting a problem is public on purpose. Somebody whose install will not
      start cannot sign in to say so, and making them ask in Discord first is
      how a bug turns into nobody bothering. Held to one short message at a
-     time, and the inbox is capped so it cannot be used to fill the disk. */
+     time, five an hour from one place, and the inbox is capped so it cannot
+     be used to fill the disk. See thornswood report limits above. */
   if (route === '/api/report' && req.method === 'POST') {
+    const sender = reportFrom(req);
+    const refuse = (no) => send(res, 429, JSON.stringify({ error: no.error }), null,
+                                { 'Retry-After': String(no.wait) });
+    // Asked before the body is read, so a sender already past the limit is
+    // turned away without the site reading 20 KB from them first.
+    const early = reportRefusal(sender, Date.now());
+    if (early) return refuse(early);
     let o;
     try { o = JSON.parse(await body(req, 20000)); }
     catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+    // The form's hidden field. A person never sees it, so anything in it was
+    // put there by a script filling in every box it found. Answered as if it
+    // worked, so the script has nothing to learn from, and nothing is kept.
+    if (o && String(o.homepage || '').trim()) return sendJson(res, 200, { ok: true });
     const title = String(o.title || '').trim().slice(0, 200);
     if (!title) return sendJson(res, 400, { error: 'say what happened in the first box' });
+    // And asked again now the body is in, because the answer above is stale.
+    // A script that opens thirty connections, sends every set of headers and
+    // then every body gets all thirty past the first check before any of
+    // them is counted, and Caddy passes headers on before it has the body, so
+    // that works through it. From here to reportTaken nothing awaits, so no
+    // other request can run in between and each one sees the last one's count.
+    const late = reportRefusal(sender, Date.now());
+    if (late) return refuse(late);
     const list = jsonFile(INBOX, []);
     list.unshift({
       id: 'i' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'),
@@ -1906,9 +2031,10 @@ async function handle(req, res) {
       state: 'new',
       from: 'the public page'
     });
-    if (!putJson(INBOX, list.slice(0, 2000))) {
+    if (!putJson(INBOX, trimInbox(list))) {
       return sendJson(res, 500, { error: 'could not save' });
     }
+    reportTaken(sender, Date.now());
     return sendJson(res, 200, { ok: true });
   }
 
@@ -1935,7 +2061,7 @@ async function handle(req, res) {
       state: 'new',
       from: 'the Discord bot'
     });
-    if (!putJson(INBOX, list.slice(0, 2000))) {
+    if (!putJson(INBOX, trimInbox(list))) {
       return sendJson(res, 500, { error: 'could not save' });
     }
     return sendJson(res, 200, { ok: true });
