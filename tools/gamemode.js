@@ -9757,6 +9757,100 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
       one listed entry was not in the pack (To Do 347). So the line says what
       is known, that no recipe matched, and not what it was assumed to be.
     */
+
+    /*
+      BUT SOMEBODY'S OWN WORK IS STILL THEIRS WITHOUT A RECIPE (To Do 347g).
+
+      Until 24 September everything below the line was allowed with no race,
+      profession or rank asked, so a list of inputs that was off by one entry
+      was a door round the whole craft gate. The stale furniture streak after
+      a respawn opens it on its own, which is how the Riekling helmet came
+      through on 23 September, and a changed client could open it on purpose.
+      Patrick, 23 September: "Riekling stuff should only be able to be made by
+      a riekling", and this path let anybody make it.
+
+      So when a row in RECIPES_BY_ID makes this item, each such row goes to
+      craftAnswer, the same question the recipe gate asks of a matched recipe:
+      nobody, race, profession, half, rank. The craft goes through when any
+      row lets this person make it, because one item can have several recipes
+      at different ranks (Apple Dumpling has four, at novice and advanced) and
+      nothing here says which one the client reached for. When none does, it
+      is refused with the sentence of the lowest ranked row, so the rank named
+      is the least that would have done.
+
+      THREE THINGS STILL COME THROUGH UNASKED, EXACTLY AS BEFORE. Tempering, at
+      the sharpening wheel and the armour table, whose recipes CraftService
+      throws out: 1,190 of the 1,773 things the table makes can also be
+      tempered, so a tempered steel sword must never be read as somebody making
+      one. No furniture in the load order carries either of those two keywords
+      beside another one, measured on 24 September, so the bench keyword alone
+      tells a temper apart. An item no row makes, which is stock anybody may
+      make. And a bench that cannot be read or that BENCH_BY_BASE does not
+      know: that is a hole in our table, and it must not cost anybody their
+      materials.
+
+      craftAnswer's one side effect is the once-only note for somebody with no
+      profession yet, and it only sets it on an answer that allows. The loop
+      stops at the first of those, so asking several rows tells that person
+      once, the same as a matched recipe does, and the note is said here rather
+      than set and swallowed.
+
+      The work is not credited and no handle is taken, which is how this path
+      has always been. The server matched these inputs to nothing, and on 23
+      September the helmet allowed here was then dropped, because one input on
+      its list was not in the pack, so a credit or a handle here would have
+      been paid for a craft that never happened.
+    */
+    var benchKey = '';
+    try {
+      var benchBase = mp.get(workbenchId, 'baseDesc');
+      if (benchBase && Object.prototype.hasOwnProperty.call(BENCH_BY_BASE, benchBase)) {
+        benchKey = String(BENCH_BY_BASE[benchBase]);
+      }
+    } catch (e) {
+      benchKey = '';
+    }
+    var tempering = benchKey === '88108:Skyrim.esm' || benchKey === 'adb78:Skyrim.esm';
+    var outDesc = null;
+    if (benchKey && !tempering) {
+      try { outDesc = mp.getDescFromId(craftedItemBaseId); } catch (e) { outDesc = null; }
+    }
+    if (outDesc && typeof outDesc === 'string') {
+      var allowedBy = null;
+      var refusedBy = null;
+      for (var rid in RECIPES_BY_ID) {
+        if (!Object.prototype.hasOwnProperty.call(RECIPES_BY_ID, rid)) { continue; }
+        var row = RECIPES_BY_ID[rid];
+        if (!row || typeof row !== 'object' || row.out !== outDesc) { continue; }
+        var answer = craftAnswer(actorId, row);
+        if (!answer.refusal) {
+          allowedBy = { id: rid, row: row, answer: answer };
+          break;
+        }
+        if (!refusedBy ||
+            RANK_LADDER.indexOf(String(row.rank || 'novice').toLowerCase()) <
+            RANK_LADDER.indexOf(String(refusedBy.row.rank || 'novice').toLowerCase())) {
+          refusedBy = { id: rid, row: row, answer: answer };
+        }
+      }
+      if (allowedBy) {
+        if (allowedBy.answer.note) {
+          notify(actorId, allowedBy.answer.note);
+          say(actorId, allowedBy.answer.note);
+        }
+        log(actorId.toString(16), 'worked', outDesc, 'at bench', benchKey,
+            'with no recipe matched, and', allowedBy.id, '(' + allowedBy.row.name + ') lets them make it');
+        return;
+      }
+      if (refusedBy) {
+        notify(actorId, refusedBy.answer.refusal);
+        say(actorId, refusedBy.answer.refusal);
+        log(actorId.toString(16), 'was refused', outDesc, '(' + refusedBy.row.name + ')',
+            'with no recipe matched at bench', benchKey + ':', refusedBy.answer.refusal);
+        return false;
+      }
+    }
+
     log(actorId.toString(16), 'worked', craftedItemBaseId.toString(16),
         'at bench', (workbenchId || 0).toString(16) +
         ' and no recipe matched the inputs the client listed. Allowed:' +
