@@ -252,6 +252,12 @@ async def push_async(*a):
         log('site push failed:', e)
 
 
+# Site copies still on their way. The event loop holds a task only weakly, so a
+# task nothing else refers to can be collected before it has finished. This
+# set holds each one until it is done, and each one takes itself out.
+_pushes = set()
+
+
 def by_name(guild, names, kind='text'):
     """
     Find a channel by name.
@@ -700,8 +706,20 @@ class TicketModal(discord.ui.Modal):
             except Exception as e:
                 log('could not even DM %s about the failed ticket: %s' % (who, e))
 
-        await push_async(self.kind, '%s: %s' % (self.label_text, who.display_name),
-                         detail, str(who), who.id)
+        # The site copy is bookkeeping, and nobody waits on it. It used to be
+        # awaited here, before the reply, and push gives the site twelve
+        # seconds to answer, so with the site down a stranger pressing Submit
+        # watched the bot think for twelve seconds before hearing their ticket
+        # was open. To Do List 253: "A spinner that sits for ten seconds reads
+        # as broken to somebody who has never used the server, and the site
+        # copy still lands." It is started here rather than after the replies
+        # so that a reply Discord refuses cannot take the site copy with it.
+        # push_async logs its own failure, so nothing is lost by not awaiting.
+        task = asyncio.create_task(push_async(
+            self.kind, '%s: %s' % (self.label_text, who.display_name),
+            detail, str(who), who.id))
+        _pushes.add(task)
+        task.add_done_callback(_pushes.discard)
 
         if posted:
             await interaction.followup.send(
