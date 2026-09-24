@@ -10,14 +10,18 @@ reading the report in the channel is a safety problem, not a formatting one."
 
 The fallback used to post the whole ticket into the channel the panel lives
 in, which the whole server can read. The obvious fix, posting it into the log
-channel instead, was broken too: TICKET_LOG's first name is tickets, and
-Build-Discord.py's PLAN makes a #tickets with mode='open'. So the log channel
-is now checked by its permissions, not trusted by its name.
+channel instead, was broken too: TICKET_LOG's first name is tickets, and until
+24 September Build-Discord.py's PLAN made a #tickets with mode='open'. The PLAN
+now makes #tickets staff only, but it never changes a channel that is already
+there, so the log channel is checked by its permissions, not trusted by its
+name.
 
 The real bot module is imported and the real coroutines are run: on_submit,
 log_channel and ensure_panel. Only what touches Discord is replaced, by stub
 guilds, channels, roles and people, and the thread creation always raises.
-The site push is replaced by a counter.
+The site push is replaced by a counter. One scenario loads Build-Discord.py
+too, without running it, to build #tickets from the PLAN's own roles and
+overwrites.
 
 Read only. Never connects to anything.
 """
@@ -260,9 +264,64 @@ def run(what, fn):
 
 
 # ------------------------------------------------ THE ONE THIS IS FOR --
-def live_shape():
-    # The panel channel is public, the thread refuses, and Build-Discord.py's
-    # public #tickets is back, which is TICKET_LOG's first name.
+def load_build_discord():
+    """Build-Discord.py as a module. Its client only runs under __main__."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        'build_discord', os.path.join(HERE, 'Build-Discord.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def plan_shape():
+    # The server as Build-Discord.py's PLAN builds it since 24 September: the
+    # panel in #tickets-and-applications, which anybody can read, and #tickets
+    # beside it with mode='staff'. Every role the PLAN makes is here with the
+    # permissions it gives it, and both channels carry the PLAN's own
+    # overwrites, so a change to either shows up here.
+    bd = load_build_discord()
+    where = {}
+    for cat, specs in bd.PLAN:
+        for spec in specs:
+            where[spec['name']] = (cat, spec.get('mode'))
+    tickets = where.get('tickets', (None, None))
+    panel_at = where.get('tickets-and-applications', (None, None))
+    yes("the PLAN makes #tickets, TICKET_LOG's first name, with mode='staff'",
+        bot.TICKET_LOG[0] == 'tickets' and tickets[1] == 'staff')
+    yes("and the panel channel, TICKET_CHANNEL's first name, beside it",
+        bot.TICKETS[0] == 'tickets-and-applications'
+        and panel_at[0] is not None and panel_at[0] == tickets[0])
+
+    g = Guild()
+    roles = {}
+    for name, _colour, _hoist, perms in bd.ROLES:
+        roles[name] = g.role(name, admin=bool(perms.administrator))
+    g.role('Thornswood bot', bot_role=True)
+    # Each with the mode the PLAN gives it, and 'open' when the PLAN gives none,
+    # the same default Build-Discord.py uses.
+    panel = g.channel('tickets-and-applications',
+                      overwrites=bd.overwrites(g, panel_at[1] or 'open', roles))
+    book = g.channel('tickets', overwrites=bd.overwrites(g, tickets[1] or 'open', roles))
+    who, ix = report(g)
+
+    yes("A REPORT WHOSE THREAD FAILS LANDS IN THE PLAN'S STAFF ONLY #tickets",
+        SECRET in book.text())
+    nowhere_public('and not in the panel channel', [panel])
+    yes('nothing new is made, so a -Prune run has nothing of the bot\'s to delete',
+        not g.made)
+    yes("the PLAN's #tickets passes the staff only check", bot.private_channel_ok(g, book))
+    yes('closed tickets are written down there too',
+        asyncio.run(bot.log_channel(g)) is book)
+
+run("the PLAN's shape", plan_shape)
+
+
+def public_tickets_shape():
+    # The panel channel is public, the thread refuses, and a #tickets that
+    # everybody can read is there, which is TICKET_LOG's first name. The PLAN
+    # made exactly that until 24 September, and a re-run of the new PLAN
+    # leaves a channel that is already there as it was.
     g, panel, mod = server()
     public_tickets = g.channel('tickets')
     who, ix = report(g)
@@ -284,7 +343,7 @@ def live_shape():
         'only staff' in said and 'in the channel' not in said)
     yes('the site inbox still gets it', len(PUSHED) == 1)
 
-run('the live shape', live_shape)
+run('a public #tickets', public_tickets_shape)
 
 
 def private_log_exists():

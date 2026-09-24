@@ -5,9 +5,11 @@ the server up once and exits.
 What it does:
 
   Joins    draws a card and puts it in #welcome
-  Tickets  a panel in #tickets, one private thread per ticket, and a copy
-           pushed to the site so the inbox has it whether or not anybody was
-           looking at Discord
+  Tickets  a panel in #tickets-and-applications, one private thread per
+           ticket, and a copy pushed to the site so the inbox has it whether
+           or not anybody was looking at Discord. #tickets is the staff only
+           channel closed tickets are written down in, and where a ticket
+           goes when its thread will not open
   Watch    asks the site every five minutes over its public name, and says so
            in #dev when it stops answering and when it comes back
   Holds    a panel in #choose-your-hold where a Member picks their hold
@@ -88,7 +90,9 @@ TICKETS_SAID = ' or #'.join(TICKETS)
 # Everybody who can apply can read that one, so a closed application posted
 # there is somebody else's answers sitting in front of the next person
 # queueing up, and it buries the panel besides. Staff only, and made if it is
-# not there.
+# not there. A ticket whose private thread will not open goes here too, so a
+# report about somebody is never posted where that somebody can read it.
+# log_channel checks that by the channel's permissions, not by these names.
 TICKET_LOG = [n.strip().lower() for n in
               os.environ.get('TICKET_LOG', 'tickets,ticket-log').split(',')
               if n.strip()]
@@ -338,14 +342,18 @@ async def log_channel(guild, make=True):
     Creator is left out on purpose, the same reason it is left out of every
     ticket that is not an application to join it.
 
-    CHECKED, NOT TRUSTED BY NAME. TICKET_LOG's first name is tickets, and
-    Build-Discord.py's PLAN makes a #tickets in Help with mode='open', which
-    everybody in the server can read. This used to take the first channel with
-    a TICKET_LOG name, so the one run of Build-Discord.py that brought that
-    channel back would have made it the log, and every closed application and
-    every report that missed its thread would have gone into it. Now a channel
-    with the right name and the wrong permissions is passed over and said so,
-    and the next free name is made instead.
+    CHECKED, NOT TRUSTED BY NAME. TICKET_LOG's first name is tickets. Until
+    24 September Build-Discord.py's PLAN made a #tickets in Help with
+    mode='open', which everybody in the server could read. The PLAN now makes
+    #tickets staff only, in Applications beside the panel, and that is the
+    channel this is meant to find. But the PLAN's modes only apply to a
+    channel it makes, never to one already there, so a #tickets left over
+    from the old PLAN, or made by hand, keeps whatever permissions it had.
+    This used to take the first channel with a TICKET_LOG name, so a public
+    one would have become the log, and every closed application and every
+    report that missed its thread would have gone into it. Now a channel with
+    the right name and the wrong permissions is passed over and said so, and
+    the next free name is made instead.
     """
     taken = set()
     for want in TICKET_LOG:

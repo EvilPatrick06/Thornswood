@@ -196,7 +196,11 @@ PLAN = [
  ]),
  # Where somebody applies, before they have Member. The ticket panel lives in
  # #tickets-and-applications, which is what <#TICKETS> in content.py points
- # at. #tickets is staff only, where the bot writes closed tickets.
+ # at. #tickets is staff only, where the bot writes closed tickets, and where
+ # it puts a whole ticket, reports included, when the private thread will not
+ # open. So it stays staff only: open it to anybody else and a report about
+ # somebody can land in front of them. The bot checks its permissions and
+ # passes over a #tickets that is not staff only.
  ('Applications', [
    dict(kind='text',  name='tickets-and-applications', key='TICKETS', mode='read'),
    dict(kind='text',  name='tickets',     mode='staff'),
