@@ -47,41 +47,77 @@
     return false;
   }
 
+  /*
+    THE LOOK IS THE K PANEL'S, as the journal's and the party panel's are.
+    Patrick, 23 September, about the journal: "the journal menu works but is
+    ugly asf and doesn't match the theme we use with our other menus". This
+    window was drawn from the same old template: system-ui sans serif, a
+    rounded 12px panel, flat grey #1b1f26 and #212630 and a brass #d9ab52.
+    It now carries thornswood-skills.js's values, the way the head of
+    thornswood-party.js describes, and tools/test-party-trade-theme.js fails
+    on a colour here that the K panel does not use.
+
+    THIS IS WHERE ITEMS CHANGE HANDS, so no control got smaller. Every button
+    keeps the font size and padding it had, Agree and Walk away keep their
+    larger ones, and the buttons and the two boxes carry the line height the
+    old type gave them, so each is the height it was whichever font of the
+    stack the machine has. Uppercase and spaced, every button is wider than
+    it was. Measured in Edge at 1920 by 1080 under the front's reset on
+    24 September: the row buttons 24px tall as before, Agree and Walk away
+    35px, the find and gold boxes 32px, and all of them inside their rows.
+    Agree, once you have agreed, is drawn at the same opacity it was.
+
+    No :hover, for the reason the K panel has none (see the head of
+    thornswood-skills.js). The front's stylesheet in this same document sets
+    margin, padding, border and background to nothing on every element, so
+    each rule sets what it needs.
+  */
   var CSS = [
     '#' + ID + '{position:fixed;inset:0;z-index:2147483100;display:none;',
-    '  background:rgba(6,7,9,.72);font-family:Georgia,serif;color:#e9e7e1}',
+    '  background:radial-gradient(ellipse at center,rgba(0,0,0,.50) 0%,rgba(0,0,0,.72) 100%);',
+    '  font-family:"Palatino Linotype",Palatino,Georgia,serif;color:#d9cfb4}',
     '#' + ID + '.on{display:grid;place-items:center}',
     '#' + ID + ' .panel{width:1020px;max-width:calc(100vw - 48px);height:640px;',
     '  max-height:calc(100vh - 48px);display:grid;grid-template-rows:auto 1fr auto;',
-    '  background:#1b1f26;border:2px solid #3a424e;border-radius:12px;',
-    '  box-shadow:0 18px 60px rgba(0,0,0,.6);overflow:hidden}',
-    '#' + ID + ' h2{margin:0;padding:18px 24px 14px;font-size:23px;font-weight:600;',
-    '  border-bottom:1px solid #2b313a}',
+    '  background:rgba(11,10,8,.94);border:1px solid rgba(198,170,109,.42);',
+    '  outline:1px solid rgba(198,170,109,.14);outline-offset:4px;',
+    '  box-shadow:0 24px 80px rgba(0,0,0,.7);overflow:hidden}',
+    '#' + ID + ' h2{margin:0;padding:18px 24px 14px;font-size:26px;font-weight:normal;line-height:1.1;',
+    '  color:#f6e9c8;border-bottom:1px solid rgba(198,170,109,.22)}',
     '#' + ID + ' .cols{display:grid;grid-template-columns:1fr 1fr 1fr;overflow:hidden}',
-    '#' + ID + ' .col{overflow:auto;padding:14px 16px;border-right:1px solid #2b313a;',
-    '  font-family:system-ui,sans-serif;font-size:13.5px}',
+    '#' + ID + ' .col{overflow:auto;padding:14px 16px;border-right:1px solid rgba(198,170,109,.22);',
+    '  font-size:13.5px}',
     '#' + ID + ' .col:last-child{border-right:none}',
-    '#' + ID + ' h3{margin:0 0 9px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;',
-    '  color:#79828f;font-weight:600}',
+    '#' + ID + ' h3{margin:0 0 9px;padding-bottom:6px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;',
+    '  color:rgba(198,170,109,.85);font-weight:normal;border-bottom:1px solid rgba(198,170,109,.22)}',
     '#' + ID + ' .line{display:flex;align-items:center;gap:8px;padding:6px 8px;',
-    '  border:1px solid #2b313a;border-radius:7px;background:#212630;margin-bottom:5px}',
+    '  border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);margin-bottom:5px}',
     '#' + ID + ' .line .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-    '#' + ID + ' .line .c{color:#98a2ae;font-variant-numeric:tabular-nums}',
-    '#' + ID + ' button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid #3a424e;',
-    '  background:#1b1f26;color:#e9e7e1;padding:3px 9px;font-size:12.5px}',
-    '#' + ID + ' button:hover{border-color:#d9ab52;color:#d9ab52}',
-    '#' + ID + ' .foot button{padding:7px 16px;font-size:14px}',
-    '#' + ID + ' button.go{background:#d9ab52;border-color:#d9ab52;color:#1a1500;font-weight:600}',
+    '#' + ID + ' .line .c{color:rgba(217,207,180,.66);font-variant-numeric:tabular-nums}',
+    '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
+    '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
+    '  padding:3px 9px;font-size:12.5px;line-height:16px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
+    '#' + ID + ' .foot button{padding:7px 16px;font-size:14px;line-height:19px}',
+    '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     '#' + ID + ' button.off{opacity:.55}',
-    '#' + ID + ' input{font:inherit;color:#e9e7e1;background:#13161b;border:1px solid #3a424e;',
-    '  border-radius:7px;padding:6px 9px;width:100%;margin-bottom:9px}',
-    '#' + ID + ' .none{color:#79828f;padding:6px 2px;line-height:1.5}',
+    '#' + ID + ' input{font:inherit;line-height:18px;color:#f6e9c8;background:rgba(0,0,0,.35);',
+    '  border:1px solid rgba(198,170,109,.30);padding:6px 9px;width:100%;margin-bottom:9px}',
+    '#' + ID + ' input:focus{border-color:rgba(198,170,109,.55)}',
+    '#' + ID + ' .none{color:rgba(217,207,180,.6);font-style:italic;padding:6px 2px;line-height:1.5}',
     '#' + ID + ' .gold{display:flex;gap:8px;align-items:center;margin-top:10px}',
     '#' + ID + ' .gold input{width:110px;margin:0}',
-    '#' + ID + ' .ok{color:#6fae7e}',
-    '#' + ID + ' .wait{color:#98a2ae}',
-    '#' + ID + ' .foot{padding:12px 20px;border-top:1px solid #2b313a;display:flex;gap:12px;',
-    '  align-items:center;font-family:system-ui,sans-serif;font-size:13px;color:#98a2ae}'
+    '#' + ID + ' .ok{color:#9fcf92}',
+    '#' + ID + ' .wait{color:rgba(217,207,180,.6)}',
+    '#' + ID + ' .foot{padding:12px 20px;border-top:1px solid rgba(198,170,109,.22);display:flex;gap:12px;',
+    '  align-items:center;font-size:13.5px;font-style:italic;color:rgba(217,207,180,.7)}',
+    // The K panel's scrollbars, the same rules scoped to this window, so it
+    // has them whether or not the K panel's page loaded first.
+    '#' + ID + ' ::-webkit-scrollbar{width:10px;height:10px}',
+    '#' + ID + ' ::-webkit-scrollbar-track{background:rgba(0,0,0,.25)}',
+    '#' + ID + ' ::-webkit-scrollbar-thumb{background:rgba(198,170,109,.35);border:2px solid transparent;',
+    '  background-clip:padding-box;border-radius:6px}',
+    '#' + ID + ' ::-webkit-scrollbar-thumb:active{background:rgba(233,209,155,.55);background-clip:padding-box}',
+    '#' + ID + ' ::-webkit-scrollbar-corner{background:transparent}'
   ].join('\n');
 
   function build() {

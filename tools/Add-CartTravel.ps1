@@ -159,8 +159,13 @@ Say "  $($plugLines.Count) lines in plugins.txt, $($loLines.Count) in loadorder.
 Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host ''
-Say '  Fast travel itself is switched off by SunHelm, which the survival' 'Gray'
-Say '  recording already handles. Carriages are how people get about now.' 'Gray'
+# This used to say SunHelm switched fast travel off. SunHelm left the
+# collection (To Do List entry 133) and was never what did it: the SkyMP
+# client's DisableFastTravelService calls Game.enableFastTravel(false) on
+# every update, and the skymp5-client.js in the game folder carries that call,
+# checked 24 September. tools\test-sunhelm-gone.js looks for it.
+Say '  Fast travel itself is switched off by the SkyMP client on every frame,' 'Gray'
+Say '  so nothing here has to. Carriages are how people get about now.' 'Gray'
 Write-Host ''
 
 if ($NoShip) {

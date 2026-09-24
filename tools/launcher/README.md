@@ -18,8 +18,10 @@ file in `Data\Platform`.
 There is nothing to run on its own. `tools\Build-Launcher.ps1` compiles the
 launcher with the .NET Framework 4 csc and puts this page inside
 `Thornswood.exe` as a resource, by name, and stops if it is missing, so a
-change here takes a launcher build. To compile without touching the installed
-launcher or the Desktop shortcut, build into a scratch root:
+change here takes a launcher build. A build writes the exe into
+`<Root>\Launcher` and touches nothing else; the shortcut and the icon are
+`tools\Install-Launcher.ps1`, which Ship runs. To compile without replacing an
+installed launcher, build into a scratch root:
 
 ```
 powershell -NoProfile -File tools\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
