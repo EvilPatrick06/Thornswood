@@ -142,7 +142,40 @@
     // Well below the hint and centred, so it is nowhere near the characters.
     '#ts-select .quitrow{display:flex;justify-content:center;margin-top:18px}',
     '#ts-select .quit{opacity:.72}',
-    '#ts-select .quit:hover{opacity:1}'
+    '#ts-select .quit:hover{opacity:1}',
+    /*
+      The scroll in front of the choice, Djinn, 24 September. The painting
+      plays with the sealed "To Start" scroll resting on the ledge by the
+      warrior; clicking it (or Enter) breaks the seal, the scroll rises and
+      unrolls, and Continue brings up the slots. The stage below is 16:9 and
+      covers the window the way the loop does (object-fit:cover), so the
+      scroll sits on the same spot of the ledge at any size. Same rules as
+      the rest of this page: no hover, no cursor rules, no transitions; the
+      only motion is keyframes started by the click.
+    */
+    '#ts-select .intro{position:absolute;inset:0;z-index:1;overflow:hidden}',
+    '#ts-select .intro .stage{position:absolute;left:50%;top:50%;width:max(100vw,177.778vh);height:max(56.25vw,100vh);transform:translate(-50%,-50%)}',
+    '#ts-select .intro .closed{position:absolute;left:20.625%;top:74.931%;width:17.93%;height:auto}',
+    '#ts-select .intro .flash{position:absolute;left:29.881%;top:79.632%;width:3%;height:0;padding-bottom:3%;border-radius:50%;opacity:0;',
+    'transform:translate(-50%,-50%) scale(0);pointer-events:none;',
+    'background:radial-gradient(circle,#fff8e0 0%,rgba(243,211,143,.95) 22%,rgba(158,111,201,.55) 52%,transparent 72%)}',
+    '#ts-select .intro .open{position:absolute;left:50%;top:58%;width:44%;opacity:0;transform:translate(-50%,-50%) scale(.04,.12);pointer-events:none}',
+    '#ts-select .intro .open img{display:block;width:100%;height:auto}',
+    '#ts-select .intro .words{position:absolute;left:17%;right:17%;top:20%;bottom:18%;display:flex;flex-direction:column;',
+    'align-items:center;justify-content:center;text-align:center;opacity:0}',
+    '#ts-select .intro .said{font-style:italic;font-size:1.6vw;line-height:1.45;color:#2c1e10}',
+    '#ts-select .intro .skip{margin-top:1.1vw;font-size:1vw;color:#2c1e10;display:flex;align-items:center;gap:.5vw}',
+    '#ts-select .intro .skip input{width:1.1vw;height:1.1vw;margin:0}',
+    '#ts-select .intro .go{margin-top:1vw;background:rgba(20,14,8,.85)}',
+    '#ts-select .intro.opening .flash{animation:tsFlash .7s ease-out forwards}',
+    '#ts-select .intro.opening .closed{animation:tsFade .5s ease .35s forwards}',
+    '#ts-select .intro.opening .open{pointer-events:auto;animation:tsRise 1.1s cubic-bezier(.22,.9,.25,1) .35s forwards}',
+    '#ts-select .intro.opening .words{animation:tsShow .9s ease 1.6s forwards}',
+    '@keyframes tsFlash{0%{opacity:0;transform:translate(-50%,-50%) scale(0)}12%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(8)}}',
+    '@keyframes tsFade{to{opacity:0}}',
+    '@keyframes tsShow{to{opacity:1}}',
+    '@keyframes tsRise{0%{opacity:0;left:29.5%;top:81%;transform:translate(-50%,-50%) scale(.04,.12)}30%{opacity:1}',
+    '60%{transform:translate(-50%,-50%) scale(.3,1)}100%{opacity:1;left:50%;top:58%;transform:translate(-50%,-50%) scale(1,1)}}'
   ].join('');
   var style = document.createElement('style');
   style.id = 'ts-select-css';
@@ -153,6 +186,14 @@
   root.id = 'ts-select';
   root.innerHTML =
     '<div class="bg"></div><div class="shade"></div>' +
+    '<div class="intro" style="display:none"><div class="stage">' +
+      '<img class="closed" src="thornswood-scroll.webp" alt="To Start">' +
+      '<div class="flash"></div>' +
+      '<div class="open"><img src="thornswood-scroll-open.webp" alt="">' +
+        '<div class="words"><div class="said">The seal is broken.<br>Your journey through Thornswood begins.</div>' +
+        '<label class="skip"><input type="checkbox" class="skipnext"> Start without the scroll next time</label>' +
+        '<div class="btn2 go">Continue</div></div></div>' +
+    '</div></div>' +
     '<div class="panel">' +
       '<div class="head"><div><div class="eyebrow">Thornswood</div><div class="title">Who are you today?</div></div>' +
       '<div class="count"></div></div>' +
@@ -203,6 +244,68 @@
   }
   var elCount = root.querySelector('.count');
   var elStatus = root.querySelector('.status');
+
+  /*
+    The scroll, Djinn, 24 September. Up first unless this person ticked
+    "Start without the scroll next time" (the launcher passes intro:false
+    then, from Data/Platform/thornswood-intro.txt, which the plugin writes).
+    It only stands in front of the slots: the painting, the music and the
+    pick are exactly as before, and if either picture of the scroll is
+    missing the slots come straight up.
+  */
+  var elIntro = root.querySelector('.intro');
+  var elShade = root.querySelector('.shade');
+  var introPhase = 0;       // 0 not showing, 1 on the ledge, 2 opened
+  var introSay = '';        // 'intro off' or 'intro on', said again with the pick
+  function introEnd(why) {
+    if (!introPhase) return;
+    introPhase = 0;
+    var box = root.querySelector('.intro .skipnext');
+    if (box && box.checked) { introSay = 'intro off'; tell(introSay); }
+    elIntro.style.display = 'none';
+    elPanel.style.display = '';
+    elShade.style.display = '';
+    if (why) tell('intro: ' + why);
+    fit(); draw();
+  }
+  function introOpen() {
+    if (introPhase !== 1) return;
+    introPhase = 2;
+    elIntro.className = 'intro opening';
+    tell('intro: the scroll was opened');
+  }
+  // Keys while the scroll is up. The slots are not on screen yet, so no
+  // other key reaches them; Space on the checkbox still ticks it.
+  function introKey(ev) {
+    if (!introPhase) return false;
+    if (ev.key === 'Escape') { introEnd('skipped with Escape'); ev.preventDefault(); return true; }
+    if (ev.key === ' ' && ev.target && ev.target.className === 'skipnext') return true;
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      if (introPhase === 1) introOpen(); else introEnd('');
+      ev.preventDefault();
+    }
+    return true;
+  }
+  if (elIntro && LIST.intro !== false) {
+    introPhase = 1;
+    elPanel.style.display = 'none';
+    elShade.style.display = 'none';
+    elIntro.style.display = '';
+    var introImgs = elIntro.querySelectorAll('img');
+    for (var ii = 0; ii < introImgs.length; ii++) {
+      introImgs[ii].onerror = function () { introEnd('a scroll picture is missing, straight to the slots'); };
+    }
+    elIntro.querySelector('.closed').onclick = introOpen;
+    elIntro.querySelector('.go').onclick = function () { introEnd(''); };
+    tell('intro: the scroll is up');
+  } else if (LIST.intro === false) {
+    var introBack = el('div', 'hint', 'The scroll at the start is off. Click here to have it back next time.');
+    introBack.onclick = function () {
+      introSay = 'intro on'; tell(introSay);
+      introBack.textContent = 'The scroll will be back next time.';
+    };
+    root.querySelector('.foot').insertBefore(introBack, root.querySelector('.quitrow'));
+  }
 
   /*
     Close the game. Asked twice, then sent to the front, which calls the
@@ -467,6 +570,7 @@
   function sendPick() {
     if (!picked || acked) return;
     try { window.skyrimPlatform.sendMessage('thornswood', 'select', picked); } catch (err) { }
+    if (introSay) tell(introSay);
   }
   function play() {
     if (sent) return;
@@ -491,6 +595,7 @@
 
   function onKey(ev) {
     if (root.className === 'gone') return;
+    if (introKey(ev)) return;
     var list = slots();
     var n = list.length;
     if (asking) {
