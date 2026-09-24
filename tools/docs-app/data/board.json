@@ -681,62 +681,8 @@
     "intro": "Where Thornswood actually is. Command blocks copy with the button on the right.\n\nSections are in the order they want doing. Anything ticked is done and kept so you can see it.",
     "sections": [
       {
-        "id": "s1",
-        "name": "1. Broken right now",
-        "note": "Three things that are failing, not waiting.",
-        "columns": [
-          {
-            "id": "s1a",
-            "name": "Item"
-          },
-          {
-            "id": "s1b",
-            "name": "What it means"
-          },
-          {
-            "id": "s1c",
-            "name": "How"
-          }
-        ],
-        "rows": [
-          {
-            "id": "s1r0",
-            "done": false,
-            "at": 0,
-            "by": "",
-            "cells": {
-              "s1a": "**The installer will not build**",
-              "s1b": "7-Zip exits 2 part way through. The staged copy is 21.5 GB, the zip is about 18 GB, and both land on C: on top of a 22 GB game. Packaging now checks free space first and tells you the numbers rather than letting 7-Zip fail with a wall of progress text.",
-              "s1c": "```powershell\nGet-PSDrive C | Select-Object @{n='Used GB';e={[math]::Round($_.Used/1GB,1)}}, @{n='Free GB';e={[math]::Round($_.Free/1GB,1)}}\n```\n\nThen either:\n\n```powershell\n.\\tools\\Package-Thornswood.ps1 -ReuseStage\n```\n\nor put the archive on another drive:\n\n```powershell\n.\\tools\\Package-Thornswood.ps1 -ReuseStage -OutDir D:\\Thornswood-dist\n```"
-            }
-          },
-          {
-            "id": "s1r1",
-            "done": false,
-            "at": 0,
-            "by": "",
-            "cells": {
-              "s1a": "**The news feed publishes nothing**",
-              "s1b": "Ship says `could not read news-public.json, skipping it` and then `news published, 0 entries, launcher 1.0.196`. Two faults: it cannot find the file, and it reports a stale launcher version. So the site and the launcher both show an empty News page however many releases go out.",
-              "s1c": "Not fixed yet. Tell me and I will do it."
-            }
-          },
-          {
-            "id": "s1r2",
-            "done": false,
-            "at": 0,
-            "by": "",
-            "cells": {
-              "s1a": "**The bot is not running**",
-              "s1b": "Install-Bot got as far as the TLS handshake and failed, because Windows Server has no root certificate store Python can use. It now installs certifi and points SSL_CERT_FILE at it. Not re-run since.",
-              "s1c": "```powershell\n.\\tools\\Install-Bot.ps1\n.\\tools\\Deploy-Docs.ps1\n```\n\nYou want `bot up, pid` at the end, then a panel in #tickets."
-            }
-          }
-        ]
-      },
-      {
         "id": "s2",
-        "name": "2. The door on the game server",
+        "name": "1. The door on the game server",
         "note": "The biggest hole, and the one nothing else closes.",
         "columns": [
           {
@@ -779,8 +725,8 @@
       },
       {
         "id": "s3",
-        "name": "3. Taking the mods out of the installer",
-        "note": "Everything ships in the installer today: 21.5 GB staged, about 18 GB zipped, all of it required. This is the job that makes the installer small and the one that is blocking the rebuild above.",
+        "name": "2. Taking the mods out of the installer",
+        "note": "Everything ships in the installer today: 21.5 GB staged, about 18 GB zipped, all of it required. This is the job that makes the installer small.",
         "columns": [
           {
             "id": "s3a",
@@ -866,7 +812,7 @@
       },
       {
         "id": "s4",
-        "name": "4. Character creation",
+        "name": "3. Character creation",
         "note": "The picker is written and compiles. Two things behind it are yours.",
         "columns": [
           {
@@ -920,7 +866,7 @@
       },
       {
         "id": "s5",
-        "name": "5. Discord",
+        "name": "4. Discord",
         "note": "",
         "columns": [
           {
@@ -944,7 +890,7 @@
             "by": "",
             "cells": {
               "s5a": "**Onboarding**",
-              "s5b": "Section 2 below has every field written out, including the three Server Guide steps: the welcome sign, the four to do items and the resource pages.",
+              "s5b": "Section 7 below has every field written out, including the three Server Guide steps: the welcome sign, the four to do items and the resource pages.",
               "s5c": "Server Settings, Onboarding. Nothing to run."
             }
           },
@@ -956,7 +902,7 @@
             "cells": {
               "s5a": "**Ticket bot**",
               "s5b": "Nine kinds: Apply to play, Apply to playtest, Gamemaster, Loremaster, Moderator, Dev, Content Creator, Report somebody, I need help. Each opens a private thread and pushes a copy to your inbox.",
-              "s5c": "Written. Waiting on the bot actually starting, section 1."
+              "s5c": "Written. It runs in the bot, section 8."
             }
           },
           {
@@ -967,14 +913,14 @@
             "cells": {
               "s5a": "**Join cards**",
               "s5b": "Drawn with their avatar and the member count, into #general. Discord's own plain join line is switched off.",
-              "s5c": "Same, waiting on the bot."
+              "s5c": "Same, section 8."
             }
           }
         ]
       },
       {
         "id": "s6",
-        "name": "6. Patreon",
+        "name": "5. Patreon",
         "note": "Blocked at the browser, not at Patreon. Both browsers refuse the domain because it handles payments, so this is you clicking and me having written every word.",
         "columns": [
           {
@@ -1028,7 +974,7 @@
       },
       {
         "id": "s7",
-        "name": "7. The world, still to build",
+        "name": "6. The world, still to build",
         "note": "Decided, not written. Roughly in the order it makes sense.",
         "columns": [
           {
@@ -1118,7 +1064,7 @@
             "by": "",
             "cells": {
               "s7a": "**Optional graphics packs**",
-              "s7b": "The customer facing half of section 3.",
+              "s7b": "The customer facing half of section 2.",
               "s7c": ""
             }
           },
@@ -1148,7 +1094,7 @@
       },
       {
         "id": "s24n",
-        "name": "8. Discord onboarding, field by field",
+        "name": "7. Discord onboarding, field by field",
         "note": "Server Settings, Onboarding. This is what hands out Member, because Discord has no auto role of its own.",
         "columns": [
           {
@@ -1268,7 +1214,7 @@
       },
       {
         "id": "s5bot",
-        "name": "9. The bot that stays running",
+        "name": "8. The bot that stays running",
         "note": "Build-Discord.py sets the server up once and exits. This one stays up: it draws the card when somebody joins, and it runs the tickets. Same bot, same token, different job.",
         "columns": [
           {
@@ -1355,7 +1301,7 @@
       },
       {
         "id": "s4pt",
-        "name": "10. Patreon, every word to paste",
+        "name": "9. Patreon, every word to paste",
         "note": "Patreon is blocked in both browsers I can drive, at Anthropic's end rather than yours, because it handles payments. So this section is you clicking and me having written every word you need to paste. Once the tiers exist, Patreon hands out the Discord roles by itself and nothing in our code touches it.",
         "columns": [
           {
@@ -1464,7 +1410,7 @@
       },
       {
         "id": "s60g",
-        "name": "11. Every link in one place",
+        "name": "10. Every link in one place",
         "note": "",
         "columns": [
           {
@@ -1744,16 +1690,6 @@
             }
           },
           {
-            "id": "r21rm",
-            "done": false,
-            "at": 0,
-            "by": "",
-            "cells": {
-              "c17rm": "Emote wheel",
-              "c18rm": "Wanted since the start, never started"
-            }
-          },
-          {
             "id": "r22rm",
             "done": false,
             "at": 0,
@@ -1898,6 +1834,16 @@
             "cells": {
               "c26rm": "Doors and chests that stay locked",
               "c27rm": "They were all unlocked for a while. They are not now"
+            }
+          },
+          {
+            "id": "r21rm",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c26rm": "Emote wheel",
+              "c27rm": "G opens and closes it. Thirty four emotes in six categories, Tab steps to the next category while one is open, and N stops an emote you are stuck in. The launcher's Controls page moves any of those keys"
             }
           }
         ]
