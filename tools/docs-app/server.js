@@ -1929,11 +1929,12 @@ async function handle(req, res) {
      be used to fill the disk. See thornswood report limits above. */
   if (route === '/api/report' && req.method === 'POST') {
     const sender = reportFrom(req);
-    const no = reportRefusal(sender, Date.now());
-    if (no) {
-      return send(res, 429, JSON.stringify({ error: no.error }), null,
-                  { 'Retry-After': String(no.wait) });
-    }
+    const refuse = (no) => send(res, 429, JSON.stringify({ error: no.error }), null,
+                                { 'Retry-After': String(no.wait) });
+    // Asked before the body is read, so a sender already past the limit is
+    // turned away without the site reading 20 KB from them first.
+    const early = reportRefusal(sender, Date.now());
+    if (early) return refuse(early);
     let o;
     try { o = JSON.parse(await body(req, 20000)); }
     catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
@@ -1943,6 +1944,14 @@ async function handle(req, res) {
     if (o && String(o.homepage || '').trim()) return sendJson(res, 200, { ok: true });
     const title = String(o.title || '').trim().slice(0, 200);
     if (!title) return sendJson(res, 400, { error: 'say what happened in the first box' });
+    // And asked again now the body is in, because the answer above is stale.
+    // A script that opens thirty connections, sends every set of headers and
+    // then every body gets all thirty past the first check before any of
+    // them is counted, and Caddy passes headers on before it has the body, so
+    // that works through it. From here to reportTaken nothing awaits, so no
+    // other request can run in between and each one sees the last one's count.
+    const late = reportRefusal(sender, Date.now());
+    if (late) return refuse(late);
     const list = jsonFile(INBOX, []);
     list.unshift({
       id: 'i' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'),

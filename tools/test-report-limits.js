@@ -206,6 +206,45 @@ function freePort() {
   });
 }
 
+// Many reports from one address at once, each connection sending its headers
+// first and its body only once every connection has sent its headers. fetch
+// cannot do that, so this speaks HTTP over plain sockets. The site hands a
+// request to handle() as soon as the headers are in, so this is how a script
+// gets every one of them past a check made before the body is read, and Caddy
+// passes headers on before it has the body, so it works through Caddy too.
+// Answers each connection's status code.
+function heldBack(port, n, xff) {
+  const CRLF = CR + String.fromCharCode(10);
+  const conns = [];
+  for (let i = 0; i < n; i++) {
+    const text = JSON.stringify({ title: 'held ' + i });
+    const s = net.connect(port, '127.0.0.1');
+    let got = '';
+    const answer = new Promise((done) => {
+      s.on('data', (d) => { got += d; });
+      s.on('close', () => done(got));
+      s.on('error', () => done(got));
+    });
+    const ready = new Promise((done) => s.once('connect', () => {
+      s.write('POST /api/report HTTP/1.1' + CRLF + 'Host: 127.0.0.1' + CRLF +
+        'Content-Type: application/json' + CRLF + 'X-Forwarded-For: ' + xff + CRLF +
+        'Content-Length: ' + Buffer.byteLength(text) + CRLF + 'Connection: close' + CRLF + CRLF);
+      done();
+    }));
+    conns.push({ s, text, answer, ready });
+  }
+  return Promise.all(conns.map((c) => c.ready))
+    // Long enough for the site to have read every set of headers and started
+    // waiting on every body.
+    .then(() => new Promise((r) => setTimeout(r, 400)))
+    .then(() => { conns.forEach((c) => c.s.write(c.text)); })
+    .then(() => Promise.all(conns.map((c) => c.answer)))
+    .then((all) => all.map((raw) => {
+      const m = /^HTTP\/1\.1 (\d{3})/.exec(raw);
+      return m ? Number(m[1]) : 0;
+    }));
+}
+
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-report-'));
 const KEY = crypto.randomBytes(16).toString('hex');
 let srv = null;
@@ -329,6 +368,18 @@ function finish() {
       rows1.length === rows0 && probes.join(',') === 'probe 0,probe 1,probe 2,probe 3,probe 4');
   yes('a made up first hop does not get round it',
       (await post('/api/report', { title: 'sneaky' }, '10.9.8.7, 203.0.113.77')).status === 429);
+
+  // Thirty at once from one address with the bodies held back. Before the
+  // site asked again after reading the body, all thirty were taken and
+  // written, and two thousand of those flush every real report out.
+  const heldCodes = await heldBack(PORT, 30, '203.0.113.60');
+  const took = heldCodes.filter((c) => c === 200).length;
+  const refused = heldCodes.filter((c) => c === 429).length;
+  console.log('      thirty held back from one address: ' + took + ' taken, ' + refused + ' refused');
+  yes('thirty at once with the bodies held back still take only five',
+      took === 5 && refused === 25);
+  yes('and only five of them are written',
+      inbox().filter((r) => /^held /.test(r.title)).length === 5);
 
   // The hidden field.
   const rows2 = inbox().length;
