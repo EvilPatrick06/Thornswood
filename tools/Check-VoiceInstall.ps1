@@ -14,6 +14,11 @@ $Site = 'https://thornswood.net'
 $Bind = '0.0.0.0'
 $Auth = 'log'
 $ChatRange = 'off'
+# The relay line, built before the here-string and empty when there is no
+# relay, which is every box today. Empty is right here and not a missing
+# value: with a relay it is "set THORNSWOOD_TURN_URL=<address>&& ", which
+# tools\test-voice-turn-url.ps1 builds and runs.
+$turnSet = ''
 
 $m = [regex]::Match($src, '(?s)\$remote = @"\r?\n(.*?)\r?\n"@')
 if (-not $m.Success) { throw 'could not find the install here-string' }
