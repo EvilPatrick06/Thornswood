@@ -399,8 +399,35 @@ elseif ($null -ne $ownCollection) {
         Die "The launcher's record of what came from Vortex (Profile\OwnGame\files.txt) lists nothing, so this release would carry every mod file. In the launcher, Settings, Maintenance, bring the folder up to date from Vortex, then publish again."
     }
 }
+# OUR OWN PLUGIN GOES OUT IN DEV PACKS UNTIL NEXUS CARRIES IT.
+#
+# Patrick, 24 September: "we can put a temp patch for the plugins until we put
+# them on nexus", then "yeah they shoul be entrily isolated for testing" and
+# "thats the point of a dev build".
+#
+# Thornswood-Content.esp is ours, but it reaches people through the Nexus
+# collection, so it is in the launcher's record of what Vortex deployed and
+# Test-FromCollection keeps it out of every pack. That was right until a
+# change to the plugin had to be tested before a Nexus upload: the key mold and
+# key recipes of pull request 199 sat in the repo with no way to a tester, and
+# the launcher refuses Play when the server's plugin differs from the client's
+# in size, so the plugin could not go on the dev server either.
+#
+# So a DEV release carries it. The launcher already writes every pack file as
+# its own copy (Updater calls OwnGame.Unshare before it extracts over a file
+# that exists), so the dev folder's copy stops being a hard link and the live
+# folder, the Steam copy and Vortex's staging copy keep the Nexus bytes. A main
+# release still leaves it to the collection. Measured on 24 September: on
+# Patrick's machine that one file has four names, and a copy written through
+# the link on 23 September changed all four, Vortex's included, which is the
+# accident this avoids.
+#
+# TAKE IT OUT when Nexus carries the same bytes as tools/Thornswood-Content.esp.
+$DevShipsOurs = @('Data\Thornswood-Content.esp')
+
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
+    if ($Dev -and ($DevShipsOurs -contains $rel)) { return $false }
     return $vortexFiles.Contains($rel)
 }
 $null = New-Item -ItemType Directory -Force -Path $DistDir
