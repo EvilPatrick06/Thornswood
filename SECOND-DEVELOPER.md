@@ -69,8 +69,9 @@ resets the dev feed and baseline to match main, so dev starts at .1 again.
 
 Everything else: `Deploy-Server.ps1` pushes a server build, `Deploy-Gamemode.ps1`
 the gamemode, `Deploy-Docs.ps1` the site, `Install-Bot.ps1` the bot,
-`Request-Restart.ps1` an announcement, `Rotate-ServerPassword.ps1` the server
-password. Every script closes the launcher and Skyrim itself when it needs to.
+`Request-Restart.ps1` an announcement. `Rotate-ServerPassword.ps1` changes a
+password nothing checks any more; the secrets table below says why. Every
+script closes the launcher and Skyrim itself when it needs to.
 
 ## Two machines shipping
 
@@ -165,17 +166,77 @@ what you changed.
 which is not in the repo. Patrick gives it to you if you will ship main releases
 from your machine; without it Ship says so and carries on.
 
-## Secrets, by name, none of them in the repo
+## Secrets, by name and place, never by value
 
-| Secret | Where it lives | Who needs it |
-| --- | --- | --- |
-| Server password (`sPassword`, `sAdminPassword`) | VPS `server-settings.json`; the launcher gets it from the site at check in | Nobody types it |
-| Site `botKey`, `secret`, Discord client secret and bot token | VPS `C:\Thornswood-Docs\config.json` | The site and the bot |
-| Bot token, `THORNSWOOD_KEY` | VPS `C:\Thornswood-Bot\bot.env.json` | The bot |
-| Door key | VPS `C:\Thornswood-Server*\data\door.json`, same as `botKey` | The game servers |
-| #news webhook | `tools\discord\news-webhook.txt` on a shipping machine, ignored by git | Whoever ships main |
-| GitHub access | your own `gh auth` | You |
-| VPS access | your own SSH key in `administrators_authorized_keys` | You |
+None of these is tracked by git. Four of them sit inside the repo folder on
+the machine that holds them and are kept out by `.gitignore`: the two webhooks,
+`tools\signing.json` and the retired `server-secret.txt`. The rest are on the VPS or in
+your own profile. Each row says what the thing actually protects today, and
+says **not enforced** where nothing checks it.
+
+| Secret | Where it lives | What it actually protects | Who reissues it |
+| --- | --- | --- | --- |
+| Server password, for joining the game server | Nowhere the game server looks. `serverPassword` in the site's `C:\Thornswood-Docs\config.json` on the VPS, where `Rotate-ServerPassword.ps1` writes it | **Not enforced.** Nothing reads it. SkyMP has no join password and the site's join reply stopped carrying one. The old four digit value was in the public `version.json` before 1.0.197, so treat it as known. | Nobody needs to. `Rotate-ServerPassword.ps1` still runs and changes a value nothing reads. |
+| Character register secret, retired | `server-secret.txt` at the repo root on Patrick's machine, and `C:\Thornswood-Voice\secret.txt` on the VPS if it is still there. Nothing removed that one when the register went, and `C:\Thornswood-Voice-Dev` may hold a copy, because `vps-dev-instance.ps1` copies the live voice folder whole | **Not enforced.** Nothing has read it since 23 September, when the voice service's character register (`/whoami`, `/claim`, `/owners`) was taken out and `Install-Voice.ps1` stopped sending it. It is not the join password: since 18 September it has been 32 random bytes. | Nobody. With no reader there is nothing to reissue. It is listed so nobody takes it for a live secret, or for the join password. |
+| Site member password | `password` in `C:\Thornswood-Docs\config.json`; without it the site falls back to a default written in `server.js` | **Not enforced** while Discord sign in is set up: `/api/login` refuses it and the member cookie is ignored. It is a way in only to a site with no Discord client id and secret. | Nobody needs to while Discord is set up. Otherwise anyone with VPS access edits that line and restarts the site. |
+| Site `botKey`, which is also the door key | `botKey` in `C:\Thornswood-Docs\config.json`. The same value is `THORNSWOOD_KEY` in `C:\Thornswood-Bot\bot.env.json`, and `key` in `C:\Thornswood-Server\private\door.json` and `C:\Thornswood-Server-Dev\private\door.json` | The site's `/api/ticket` (the bot filing tickets), `/api/roster` (the game server sending its character book) and `/api/allowed` and `/dev/api/allowed` (the door's list). Each answers 401 without it. Whoever holds it can read every allowed person's name and profile ids, the admins' included. | Anyone with VPS access: `Install-Bot.ps1 -RotateKey`, then `Deploy-Docs.ps1` so the site loads it, then `Set-Door.ps1 -Connect` and `Set-Door.ps1 -Connect -Root C:\Thornswood-Server-Dev -Site https://thornswood.net/dev`. Skip the last two and both doors are refused on their next fetch. |
+| Site `secret` | `secret` in `C:\Thornswood-Docs\config.json`. The site makes it on its first start. | Signs the site's Discord sign in cookie and the ticket every launcher keeps in `Profile\discord.txt`. Whoever holds it can pass as any Discord account, to the site and to the launcher's check in. | Anyone with VPS access, and there is no script: delete that line and restart the site with `Deploy-Docs.ps1`, which makes a new one. Everybody is signed out of the site and every launcher has to link Discord again. |
+| Discord client secret | `discord.clientSecret` in `C:\Thornswood-Docs\config.json` | Discord sign in on the site: with the client id it turns a sign in into who somebody is. | The Discord application's owner resets it in the developer portal (OAuth2). Then `Set-DiscordLogin.ps1` takes it at a prompt and restarts the site. |
+| Discord bot token | `discord.botToken` in `C:\Thornswood-Docs\config.json` and `DISCORD_TOKEN` in `C:\Thornswood-Bot\bot.env.json`, the same token in both | Everything the bot may do in the Discord, and the site's reading of who holds which role, which is what decides who may play. | The application's owner resets it in the developer portal (Bot, Reset Token). Then both `Set-DiscordLogin.ps1` and `Install-Bot.ps1`, each at its own prompt. Nothing ties the two together yet, so doing one leaves the other on a dead token. |
+| #news webhook | `tools\discord\news-webhook.txt` on a machine that ships main | Posting in #news as the bot, for anybody holding the URL. | Delete the webhook called Thornswood in #news (Edit Channel, Integrations, Webhooks), make a new one, and put its URL in that file. |
+| Dev updates webhook | `tools\discord\dev-webhook.txt` on a machine that ships dev | Posting in the dev updates channel as the bot, for anybody holding the URL. | Delete it in that channel's Integrations, Webhooks, make a new one, and give its URL to `Set-DevNews.ps1`, which checks it points at the dev channel before it saves anything. |
+| Voice join token key | `token-key.txt` in `C:\Thornswood-Voice` on the VPS. `C:\Thornswood-Voice-Dev` has its own; `vps-dev-instance.ps1` copies the whole live folder, this file included, when it makes the dev one | Signs the token that says which profile a voice connection belongs to. **Not enforced** unless the service runs with `-Auth on`: the default, `log`, lets an unproven connection in as whoever it claims and writes a line saying so. The `auth` field of the service's `/health` says which. | The service makes it itself. Delete the file and run `Install-Voice.ps1 -Restart`; tokens already issued stop working and the launcher fetches new ones on its next renewal. |
+| Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` makes one when `key.txt` is missing and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |
+| GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and every release: `Publish-Update.ps1` uploads to the releases repo with `gh`, and every launcher installs what that feed says. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to both repos is Patrick's to give or take away. |
+| VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, and its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. None of the scripts needs the Administrator password; `Add-VpsKey.ps1` exists so nobody else has to hold it. | You. First move the old key aside: rename both `.ssh\thornswood_ed25519` and `.ssh\thornswood_ed25519.pub`, say by adding `.old`. While the old key still opens the VPS, `Setup-SshKey.ps1` says it already works and stops, and while the `.pub` is there it uses that one again rather than making a new one. Passing `-KeyPath` a new file does not get round this, because that first check goes through your ssh config, which still names the old key. Then `Setup-SshKey.ps1 -KeyOnly` makes a new key at the same path and prints its public line. Patrick adds it with `Add-VpsKey.ps1 -PublicKey '<the new line>'` and takes the old one off with `Add-VpsKey.ps1 -PublicKey '<the line in the .old .pub>' -Remove`. For his own key, Patrick runs `Setup-SshKey.ps1` without `-KeyOnly`, which asks for the Administrator password once and puts the new key on itself, and then removes the old line the same way. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes and the old line is off. |
+| Code signing | `tools\signing.json` on a machine that signs. It names the setup and holds no key: the credential is the Azure account behind Artifact Signing, or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Whoever owns the Azure signing account, in Azure. Without the file `Sign-Artifact.ps1` signs nothing and the build carries on unsigned. |
+
+**The rule for this table.** A control that does not exist is listed as
+**not enforced**, never left out and never left in as though it worked. The
+first row used to say the game server had a password, in
+`server-settings.json`, while the script that manages it said there was
+nothing there to write.
+
+**Who gets into the game.** No password decides it. `Deploy-Gamemode.ps1`
+writes `offlineMode` true into `server-settings.json` on every deploy, and in
+offline mode SkyMP lets a client connect as whatever profile id it names (the
+fork's `docs\docs_server_configuration_reference.md`, under offlineMode). The
+launcher's Discord check at Play stops people using our launcher, not a stock
+SkyMP client. What the server has of its own is the door in `gamemode.js`: it
+compares each connection's profile id with `private\allowed.json`, which it
+refreshes from the site every five minutes, and turns somebody away only when
+that file says `"enforce": true`. Until `Set-Door.ps1 -Enforce` sets that, it
+writes WOULD TURN AWAY in `private\door.log` and lets them stay. Even
+enforcing, it checks a number the client chose, so it keeps out somebody who
+does not know a listed profile id and not somebody who does.
+
+**Old launchers.** A launcher older than 1.0.197 read the join password out of
+`version.json` rather than asking the site. `Publish-Update.ps1` takes it out
+of the feed on every publish, so those copies keep whatever they last read. It
+opens nothing either way.
+
+**Copies.** The nightly backups, on the box and in `Downloads\Thornswood-Backups`
+once `Fetch-Backups.ps1` has brought them down, are encrypted with the
+passphrase. `Backup-Server.ps1` makes a plain zip in that same folder, with
+the site's config, the bot and voice folders whole and every game server's
+`private` folder, so a machine that has run it holds every VPS secret above
+except the backup passphrase, in the clear.
+
+**Checking a row.** Each of these reads, and none prints a value:
+
+- `.\tools\Check-Roster.ps1`: whether `door.json` and `allowed.json` are in
+  both servers' `private` folders, by name and size.
+- `.\tools\Set-Door.ps1`: whether the live door is enforcing or only watching,
+  and whether it is refreshing. Add `-Root C:\Thornswood-Server-Dev` for dev.
+- `.\tools\Check-Site.ps1`: whether the site's client secret and bot token look
+  right and the bot can read the Discord.
+- `.\tools\Install-Backup.ps1 -Status`: whether the passphrase is on the box,
+  by length.
+- `.\tools\Set-DevNews.ps1 -Check`: whether the dev webhook is set and which
+  channel it points at.
+- `.\tools\Setup-SshKey.ps1 -Test` and `gh auth status`: your own two.
+- `https://thornswood.net/api/allowed` in a browser answers `no` with a 401
+  while `botKey` is set, and `not set up` with a 404 when it is not.
 
 Never paste any of them into a chat, a commit, a Discord message or a doc.
 
