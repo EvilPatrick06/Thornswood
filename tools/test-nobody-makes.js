@@ -62,9 +62,25 @@ function rowFor(name) {
   }
 });
 
-// A key is the thing he is keeping, and it was never a recipe.
-yes('no key is craftable anywhere, which is why the mold exists',
-    !Object.keys(rows).some(function (k) { return /^key$/i.test(String(rows[k].name || '')); }));
+/*
+  AND THE ONE THING HE KEPT, which is now the only thing in that list of his
+  that a forge still makes.
+
+  Patrick: "Remove all of the house pars except for a key". When this file was
+  first written there was no craftable key anywhere in the order, so this check
+  said so. He then said plainly that there should be: "Smith's are supposed to
+  be able to make a key", and "make a fucking mold item craftable dude this
+  would solve alot". Both records are in the plugin now, so the check says the
+  opposite thing for the same reason: the parts go, the key stays.
+*/
+const theKey = rowFor('Key');
+yes('a key IS craftable, because it is the one he kept', !!theKey);
+if (theKey) {
+  yes('  and only a smith makes it', theKey.owner === 'Smith');
+  yes('  and nobody is not set on it, so it is not refused with the parts', !theKey.nobody);
+}
+const theMold = rowFor('Key Mold');
+yes('and the mold that names it is craftable too', !!theMold && theMold.owner === 'Smith');
 
 // --------------------------------------------- and what the Woodwright makes
 ['Fishing Pole - Crude', 'Fishing Pole - Fine', 'Fishing Pole - Master'].forEach(function (what) {

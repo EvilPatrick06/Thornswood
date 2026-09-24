@@ -20,6 +20,22 @@ a woodworker, so a smith could make every tool in the game on their own.
 
 So this adds:
 
+    ThornswoodRecipeKeyMold       one iron ingot into a blank key mold.
+    ThornswoodRecipeKey           one iron ingot into a key, named server side
+                                  for whichever stamped mold is in the pack.
+
+                                  Both added 23 September, at a forge. The
+                                  property system's two items had no maker:
+                                  the only mold in the world was conjured by
+                                  /mold at a door, so the ceremony had to
+                                  happen before the object existed and a smith
+                                  on their own could never reach a key.
+                                  Patrick: "you make a mold, mold gets used on
+                                  door to assign mold to the door, than key
+                                  uses that mold during crafting to make a key
+                                  to specifically that house and it can be
+                                  reused".
+
     ThornswoodMiscToolHandle      the handle itself. A MISC, cloned from the
                                   charcoal, which already uses
                                   Clutter\\Quest\\TG06CharcoalStick.nif: a stick,
@@ -117,6 +133,8 @@ DEED = 0x5015493
 # as the deed is: "Key to Breezehome", "Key mold for Honeyside".
 KEY = 0x5015494
 MOLD = 0x5015495
+RECIPE_MOLD = 0x5015496
+RECIPE_KEY = 0x5015497
 
 DEED_WORDS = (
     '<p align="center"><font size="30">Deed</font></p>'
@@ -311,7 +329,9 @@ def main():
                       ('ThornswoodRecipeToolShovel', RECIPE_SHOVEL),
                       ('ThornswoodBookDeed', DEED),
                       ('ThornswoodMiscKey', KEY),
-                      ('ThornswoodMiscKeyMold', MOLD)):
+                      ('ThornswoodMiscKeyMold', MOLD),
+                      ('ThornswoodRecipeKeyMold', RECIPE_MOLD),
+                      ('ThornswoodRecipeKey', RECIPE_KEY)):
         here_already = name in by_edid
         if here_already and by_edid[name].fid != fid:
             print('')
@@ -360,6 +380,43 @@ def main():
         b'FULL': zstr('Key Mold'),
         b'DATA': struct.pack('<If', 25, 1.0),
     })
+    # THE MOLD AND THE KEY ARE BOTH MADE BY A SMITH, WHICH IS WHAT MAKES THE
+    # CHAIN START AT ALL.
+    #
+    # Patrick, 23 September: "Wait how tf does someone use a mold if you can't
+    # make a key to own the building make this shit make sense make a fucking
+    # mold item craftable dude this would solve alot", and then the whole
+    # shape: "The key should be too what should happen is you make a mold,
+    # mold gets used on door to assign mold to the door, than key uses that
+    # mold during crafting to make a key to specifically that house and it can
+    # be reused".
+    #
+    # He is right and it was circular. Both records have been in this plugin
+    # since the property system was built and nothing in the game made either
+    # one: the only mold in the world was conjured out of nothing by /mold at
+    # a door, so the ceremony had to happen before the object existed, and a
+    # smith on their own could never reach a key at all.
+    #
+    # ONE IRON INGOT EACH, at a forge, the same shape as the pickaxe and the
+    # axe beside them. The mold is the blank; the door stamps it; the key
+    # recipe is answered server side by which stamped mold is in the pack, so
+    # the key comes out named for that house and THE MOLD IS NOT CONSUMED.
+    # That is why the mold is not an input here: a CNTO is taken away by the
+    # engine before the server is asked, and he asked for it to be reusable.
+    #
+    # Both cloned from the charcoal recipe rather than the pickaxe, because
+    # the pickaxe wants a handle as well and carries COCT 2. These take one
+    # input each.
+    make_mold = clone(cobj_charcoal, RECIPE_MOLD, 'ThornswoodRecipeKeyMold', sets={
+        b'CNTO': cnto(IRON_INGOT, 1),
+        b'CNAM': struct.pack('<I', MOLD),
+        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+    })
+    make_key = clone(cobj_charcoal, RECIPE_KEY, 'ThornswoodRecipeKey', sets={
+        b'CNTO': cnto(IRON_INGOT, 1),
+        b'CNAM': struct.pack('<I', KEY),
+        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+    })
     make_shovel = clone(cobj_pickaxe, RECIPE_SHOVEL, 'ThornswoodRecipeToolShovel', sets={
         b'CNAM': struct.pack('<I', SHOVEL),
     }, after={b'CNTO': [(b'CNTO', cnto(HANDLE, 1))]})
@@ -382,6 +439,11 @@ def main():
           % KEY)
     print('  MISC 0x%07X ThornswoodMiscKeyMold         the mold a smith cuts keys from'
           % MOLD)
+    print('  COBJ 0x%07X ThornswoodRecipeKeyMold       1 iron ingot -> 1 blank mold, at a forge'
+          % RECIPE_MOLD)
+    print('  COBJ 0x%07X ThornswoodRecipeKey           1 iron ingot -> 1 key, at a forge, named '
+          'by the stamped mold in the pack'
+          % RECIPE_KEY)
     print('')
     print('What changes')
     print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
@@ -394,7 +456,8 @@ def main():
         print('  --check, so nothing was written.')
         return 0
 
-    built = [r for r in (handle, make_handle, make_shovel, deed, key, mold)
+    built = [r for r in (handle, make_handle, make_shovel, deed, key, mold,
+                         make_mold, make_key)
              if r.editor_id() not in already]
     # An edit that has already been made is not made twice. A recipe that already
     # asks for a handle would otherwise gain a second one on every run.
