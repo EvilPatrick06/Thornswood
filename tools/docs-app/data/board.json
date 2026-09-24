@@ -1744,16 +1744,6 @@
             }
           },
           {
-            "id": "r21rm",
-            "done": false,
-            "at": 0,
-            "by": "",
-            "cells": {
-              "c17rm": "Emote wheel",
-              "c18rm": "Wanted since the start, never started"
-            }
-          },
-          {
             "id": "r22rm",
             "done": false,
             "at": 0,
@@ -1898,6 +1888,16 @@
             "cells": {
               "c26rm": "Doors and chests that stay locked",
               "c27rm": "They were all unlocked for a while. They are not now"
+            }
+          },
+          {
+            "id": "r21rm",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c26rm": "Emote wheel",
+              "c27rm": "G opens and closes it. Thirty four emotes in six categories, Tab steps to the next category while one is open, and N stops an emote you are stuck in. The launcher's Controls page moves any of those keys"
             }
           }
         ]

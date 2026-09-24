@@ -85,8 +85,10 @@ redeploy brings the collection back.
 ## Done, and worth remembering why
 
 - Emote wheel. It was on this list as never investigated. It has been in
-  `thornswood-emotes.js` the whole time: B opens it, Tab turns the ring, N
-  stops, twenty four emotes.
+  `thornswood-emotes.js` the whole time: G opens it, Tab steps to the next
+  category, N stops, thirty four emotes in six categories. G is WheelKey = 34
+  in `tools\emotes\Thornswood.ini`; the plugin falls back to B only when that
+  line is missing, which is where the B in this note used to come from.
 - The installer is one small file now and fetches its own payload, which is
   what lets the icon render, lets a dropped download resume, and lets a
   signature accumulate reputation later.
