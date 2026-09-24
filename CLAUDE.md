@@ -87,9 +87,14 @@ before code; a Claude does not settle it for them.
 ## How work moves between the two machines
 
 - main is what ships. Only Patrick's machine ships main, and Ship.ps1 refuses
-  a main release that is not on main, has anything uncommitted, or is behind
-  or ahead of origin. A main Ship commits and pushes nothing, so what shipped
-  is already on GitHub and the other machine can `git pull` exactly that.
+  a main release that is not on main, is behind or ahead of origin, has
+  anything uncommitted, has a file under `tools` that git does not know, or
+  asks for a new number with `-Version`. A main Ship writes nothing to the
+  repository: the version moves first through `Bump-Version.ps1` and its own
+  pull request, and Ship builds only what is already on GitHub, so the other
+  machine can `git pull` exactly what shipped. Corrected 24 Sep: this bullet
+  used to say a main Ship committed and pushed the source after the release,
+  which stopped being true on 22 Sep (f917dd8).
 - Nobody pushes to main any more, Patrick included. Everything goes through a
   pull request. This replaces the 18 Sep decision that his own work went
   straight to main, which held while `enforce_admins` was off and stopped

@@ -55,7 +55,7 @@ git pull
 
 The version moves first and on its own. `Bump-Version.ps1` changes `Version`
 in `tools\app\Updater.cs` (1.1.35 to 1.1.36), commits that one file, and
-prints the rest. main takes nothing but a pull request, so it prints the
+prints the rest. main refuses a push from everybody, so it prints the
 commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
 push it and open the pull request, which is merged once `Launcher builds` is
 green (see Two machines shipping). Then, back on main:
@@ -66,10 +66,12 @@ git pull
 .\tools\Ship.ps1 "what changed, in plain words"
 ```
 
-Ship commits and pushes nothing. It refuses a main release with
-anything uncommitted, or with main here behind or ahead of `origin/main`, so
-what ships is what is on GitHub. It builds the launcher, checks that the game
-folder holds the recorded client build (`Sync-Client.ps1 -Check`), then runs
+Ship writes nothing to this repository. It refuses a main release with
+anything uncommitted, with a file under `tools` that git does not know, with
+a `-Version` other than the number already on main, or with main here behind
+or ahead of `origin/main`, so what ships is what is on GitHub. It builds the
+launcher, checks that the game folder holds the recorded client build
+(`Sync-Client.ps1 -Check`), then runs
 `tools\Publish-Update.ps1`, which
 scans the game folder for loose files that are not Vortex's, not vanilla, not
 runtime and not per machine, diffs them against this machine's baseline
@@ -98,10 +100,11 @@ repo root, which every Claude Code session reads on its own; this is the long
 form.
 
 - **main is what ships.** Only Patrick's machine ships main. `Ship.ps1`
-  refuses a main release that is not on the `main` branch, has anything
-  uncommitted, or is behind or ahead of `origin/main`. It commits and pushes
-  nothing itself, so what shipped is already on GitHub and the other machine
-  can `git pull` exactly that.
+  refuses a main release that is not on the `main` branch, is behind or
+  ahead of `origin/main`, has anything uncommitted, or has a file under
+  `tools` that git does not know. It commits and pushes nothing, so what
+  shipped is already on GitHub and the other machine can `git pull` exactly
+  that.
 - **Every change goes through a pull request, Patrick's included.** Nobody
   pushes to main from either machine; GitHub refuses it. `git checkout -b
   djinn/what-it-is` (Patrick's start `patrick/`, older ones `gavin/`), small
