@@ -250,7 +250,7 @@ this section exists for.
 ## Where things are
 
 HANDOFF.md (the open work list and what is live, as of 17 Sep),
-SECOND-DEVELOPER.md (the long form), README.md, SETUP.md, tools\app\HOOKUP.md
+SECOND-DEVELOPER.md (the long form), README.md, tools\app\HOOKUP.md
 (launcher classes), tools\MOVING-THE-SERVER.md (the VPS), lore\ (the world),
 tools\docs-app\data\site\*.md (public pages), tools\Ship-Rules.ps1 (what
 never leaves a machine in a release).

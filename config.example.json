@@ -1,8 +1,8 @@
 {
-    "ServerAddress":  "192.135.119.166",
-    "ServerPort":  "25565",
+    "ServerAddress":  "192.135.112.23",
+    "ServerPort":  "7777",
     "ExpectedExeBytes":  37157144,
-    "UpdateRepo":  "EvilPatrick06/skyrim-together",
+    "UpdateRepo":  "EvilPatrick06/Thornswood-Releases",
     "UpdateToken":  "",
     "UpdateBranch":  "main",
     "Theme":  "Nightfall",
