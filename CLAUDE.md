@@ -87,9 +87,9 @@ before code; a Claude does not settle it for them.
 ## How work moves between the two machines
 
 - main is what ships. Only Patrick's machine ships main, and Ship.ps1 refuses
-  a main release that is not on main or is behind origin. A main Ship
-  commits and pushes the source when the release is out, so the other
-  machine can `git pull` exactly what shipped.
+  a main release that is not on main, has anything uncommitted, or is behind
+  or ahead of origin. A main Ship commits and pushes nothing, so what shipped
+  is already on GitHub and the other machine can `git pull` exactly that.
 - Nobody pushes to main any more, Patrick included. Everything goes through a
   pull request. This replaces the 18 Sep decision that his own work went
   straight to main, which held while `enforce_admins` was off and stopped
@@ -97,9 +97,9 @@ before code; a Claude does not settle it for them.
 - What branch protection on main actually enforces, read off GitHub on
   23 Sep and not off this file: `enforce_admins` is **on**, the one required
   check is `Launcher builds`, required approving reviews is **0**, and the
-  code owner review is **off**. So a pull request from either of them merges
-  itself once the build goes green, and neither of them can push to main at
-  all. Force pushes are refused.
+  code owner review is **off**. So a pull request from either of them can be
+  merged by its own author once the build goes green, and neither of them can
+  push to main at all. Force pushes are refused.
   The three things that changed since 22 Sep: the review requirement was one
   approving review, which Patrick could not give himself and had to override
   with `--admin` on every one of his own pull requests, and it is now zero.
@@ -119,9 +119,8 @@ before code; a Claude does not settle it for them.
   main.
   The branches opened before 17 Sep use a `gavin/` prefix; they are the same
   person and were left alone rather than renamed under open pull requests.
-- One fix per commit either way. Going straight to main is not permission to
-  put eight unrelated things in one push, and the reason is the same: a commit
-  that changes eight things cannot be reverted when one of them is wrong.
+- One fix per commit, on a branch as much as anywhere: a commit that changes
+  eight things cannot be reverted when one of them is wrong.
 - `git pull` before starting anything. If a pull conflicts, resolve it on
   your branch (`git fetch`, `git rebase origin/main`), never on main. If a
   push is rejected, pull, do not force.
