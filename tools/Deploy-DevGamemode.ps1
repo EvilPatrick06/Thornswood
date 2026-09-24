@@ -22,8 +22,51 @@
                                    load order and plugins up to what the built
                                    server has
 
+    .\Deploy-DevGamemode.ps1 -Minutes 3
+                                   a longer warning for the people on it
+    .\Deploy-DevGamemode.ps1 -Mode restart
+                                   tells them to log out, and puts out
+                                   whoever is still on when it runs out
+    .\Deploy-DevGamemode.ps1 -Now  no warning and no wait, which is what this
+                                   did for everybody until 24 September
+
   A gamemode change that also changes the CHARGEN records needs
   Deploy-Gamemode.ps1 -Vortex first. Code-only changes do not.
+
+  WHO IS ON, AND A WARNING BEFORE THE STOP.
+
+  Stopping the dev server drops everybody on it. Their games reconnect when it
+  comes back and a reconnect is a respawn, which from a chair is a teleport, a
+  burst of equipping and an inventory that flashes. On 23 September this
+  script did that to Patrick six times in an hour while he was testing: "I
+  randomly teleportes as I was typing this and I heard the noise of things
+  equipping", and then "I did the teleport thing again, it was while looking
+  in the forge". The dev server.log has it: 'gamemode loaded' at 20:39:00.5
+  and 'login ff000003 put 2 worn thing(s) back on' at 20:39:47.2, and the same
+  pair at 20:44:05.0 and 20:44:52.1. About 47 seconds each time, and not one
+  restart request in that log before either of them.
+
+  So it now reads online.json on the dev box before anything is stopped and
+  says how many are on. That file carries a count and not names, so the count
+  is what it says. Nobody on means straight down, as before. Anybody on means
+  the same warning Ship.ps1 and Deploy-Server.ps1 give: Request-Restart.ps1
+  drops restart.json into the dev server's data folder, the dev gamemode
+  announces it in chat and on screen, and this waits out the countdown before
+  the stop, leaving early if the room empties. -Mode notice is the default,
+  as it is in Deploy-Server, because it puts nobody out; -Mode restart asks
+  them to log out and clears the room at zero.
+
+  It will not stop a dev server with people on it without telling them. If
+  the warning does not go out, or the box cannot say who is on, it stops
+  there and the dev server is left running exactly as it was. -Now is how to
+  take it down anyway, for a fix that cannot wait a minute.
+
+  A server that is not running has nobody on it, whatever online.json says.
+  The gamemode writes that file only when the count moves, so a killed or
+  crashed process leaves its last count behind. The same read asks whether
+  anything is on the dev game port, and nothing there means nobody on. And
+  the stop removes any restart.json the old process never read, so the next
+  one does not find it and count down on its own.
 
   THE LOAD ORDER, AND WHY -LoadOrder HAD TO EXIST.
 
@@ -69,6 +112,10 @@ param(
   # voice service on 7778, pushes its positions over the live ones and
   # drains the live command and choice queues.
   [int]$VoicePort = 7789,
+  # The launcher whose config.json holds MaxOnline for the dev server: the
+  # dev launcher, whose file the dev feed is published from. Empty means the
+  # one Publish-Update.ps1 -Channel dev would find. See MaxOnline.ps1.
+  [string]$LauncherRoot = '',
   [string]$Gamemode,
   # Bring the dev server's load order and plugins up to what the built server
   # has. Off by default: a code-only gamemode change does not need it, and the
@@ -79,7 +126,14 @@ param(
   [string]$Dist = 'C:\Thornswood-Dev\skymp\build\dist\server',
   # Where the other plugins live on this machine. Ours is taken from the repo
   # instead; see the header.
-  [string]$Data = 'C:\Thornswood\Game\Data'
+  [string]$Data = 'C:\Thornswood\Game\Data',
+  # The warning, the same four switches Deploy-Server.ps1 has. See WHO IS ON in
+  # the header. Why is only worded into -Mode restart.
+  [double]$Minutes = 1,
+  [ValidateSet('notice','restart')]
+  [string]$Mode = 'notice',
+  [string]$Why = 'a gamemode update',
+  [switch]$Now
 )
 
 $ErrorActionPreference = 'Stop'
@@ -147,6 +201,16 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
 $stampFile = Join-Path $env:TEMP 'thornswood-dev-build.json'
 $buildStamp = Save-ThornswoodBuildStamp -Gamemode $Gamemode -Channel dev -RepoDir (Split-Path -Parent $Here) -Path $stampFile
 Write-Host ('  build stamp: ' + (Format-ThornswoodBuildStamp $buildStamp))
+
+# How many the dev server seats, read here so a number the engine would refuse
+# stops this while the dev server is still up. MaxOnline.ps1 says where it
+# lives and why there.
+. (Join-Path $Here 'MaxOnline.ps1')
+if (-not $LauncherRoot) { $LauncherRoot = (Find-LauncherRoot) + '-DevBuild' }
+$got = Get-MaxOnline $LauncherRoot
+$maxOnline = $got.Value
+if ($maxOnline -gt 0) { Write-Host ('  most online: {0}, from MaxOnline in {1}' -f $maxOnline, $got.From) }
+else { Write-Host ('  most online: {0} gave no number ({1}), so the dev server keeps the one it has' -f $got.From, $got.Why) -ForegroundColor Yellow }
 
 # --------------------------------------------------------- the load order ---
 #
@@ -229,9 +293,188 @@ if ($LoadOrder) {
   $farOrder = 'C:/Windows/Temp/thornswood-dev-loadorder.txt'
 }
 
+# ------------------------------------------------------------ the warning ---
+#
+# Who is on, and a warning in the game before anything stops. It comes after
+# the load order is worked out, so a missing plugin still stops this before
+# anybody has been told an update is coming. WHO IS ON in the header says why.
+#
+# The functions sit between markers so tools\test-dev-deploy-warning.ps1 can
+# load them and drive them with no VPS behind them.
+# ==== thornswood dev deploy warning ====
+function Read-DevRoom($lines) {
+  # What the box answered, as the port, the data folder and a head count.
+  # Online -1 means it could not tell, which is not the same thing as nobody.
+  $room = @{ Port = 0; Data = ''; Online = -1; Up = $null; Stale = -1; Said = @($lines) }
+  foreach ($line in @($lines)) {
+    $t = "$line".Trim()
+    if ($t -match '^PORT (\d+)$') { $room.Port = [int]$Matches[1] }
+    elseif ($t -match '^DATA (.+)$') { $room.Data = $Matches[1].Trim() }
+    elseif ($t -match '^ONLINE (\d+)$') { $room.Online = [int]$Matches[1] }
+    elseif ($t -match '^UP (yes|no)$') { $room.Up = ($Matches[1] -eq 'yes') }
+  }
+  # Nothing on the game port is no server, and no server has nobody on it,
+  # whatever online.json says. The gamemode writes that file only when the
+  # count moves, so a process that was killed or crashed leaves its last count
+  # behind. Measured in review on 24 September: online.json {"now":1} with
+  # nothing on the port read as one on, and this warned a room that was not
+  # there, waited 80 seconds, and left restart.json for the next boot. When
+  # the box could not list its ports there is no UP line, and the count is
+  # kept, which errs toward a warning.
+  if ($room.Up -eq $false) { $room.Stale = $room.Online; $room.Online = 0 }
+  return $room
+}
+
+function Get-DevRoom {
+  # The data folder is read from the dev settings the way the dev gamemode
+  # reads it, because restart.json only reaches the room if it lands where the
+  # gamemode looks, and online.json is written to the same place. No
+  # online.json at all means the server has never run there, so nobody. A
+  # file with no count in it is unknown: node empties it before it writes, and
+  # Windows PowerShell reads an empty file as nothing at all rather than an
+  # error, which came out as nobody on until the test for this caught it.
+  # UP says whether anything is on the game port. Every endpoint is listed and
+  # filtered here, because -LocalPort with nothing on it is an error, and an
+  # error has to stay distinct from nothing there.
+  Read-DevRoom (Remote @"
+`$s = Get-Content '$rootWin\server-settings.json' -Raw | ConvertFrom-Json
+`$port = [int]`$s.port
+'PORT ' + `$port
+`$d = 'data'
+if (`$s.dataDir) { `$d = [string]`$s.dataDir }
+`$d = [IO.Path]::Combine('$rootWin', `$d)
+'DATA ' + `$d.Replace('\', '/')
+if (`$port -gt 0) {
+  try {
+    `$u = @(Get-NetUDPEndpoint -EA Stop | Where-Object { `$_.LocalPort -eq `$port })
+    if (`$u.Count) { 'UP yes' } else { 'UP no' }
+  } catch { }
+}
+`$o = Join-Path `$d 'online.json'
+if (-not (Test-Path `$o)) { 'ONLINE 0' }
+else {
+  try {
+    `$j = Get-Content `$o -Raw -EA Stop | ConvertFrom-Json -EA Stop
+    if (`$null -eq `$j -or `$null -eq `$j.now) { throw 'no count' }
+    'ONLINE ' + [int]`$j.now
+  } catch { 'ONLINE unreadable' }
+}
+"@)
+}
+
+function Warn-DevRoom {
+  $room = Get-DevRoom
+  # The gamemode rewrites online.json whenever the count moves, so a read can
+  # land on it half written. One more look before calling it unknown.
+  if ($room.Port -gt 0 -and $room.Online -lt 0) {
+    Start-Sleep -Seconds 2
+    $room = Get-DevRoom
+  }
+  # The stop below refuses 7777 as well, but by then the live room would
+  # already have been told an update was coming.
+  if ($room.Port -eq 7777) {
+    throw "Refused: $Root is on port 7777, which is the live server. Nobody was warned and nothing was stopped."
+  }
+  $known = ($room.Port -gt 0 -and $room.Online -ge 0 -and $room.Data)
+
+  if ($Now) {
+    if (-not $known) { Write-Host '  -Now: could not tell who is on the dev server, and nobody is warned' -ForegroundColor Yellow }
+    elseif ($room.Online -gt 0) {
+      Write-Host ('  -Now: {0} on the dev server and not warned. They respawn when it comes back.' -f $room.Online) -ForegroundColor Yellow
+    }
+    else { Write-Host '  -Now: nobody is on the dev server' }
+    return
+  }
+
+  if (-not $known) {
+    Write-Host ''
+    Write-Host '  Could not tell who is on the dev server, so there is no knowing who the' -ForegroundColor Red
+    Write-Host '  stop would drop. Nothing has been stopped. What the box said:' -ForegroundColor Red
+    foreach ($l in $room.Said) { Write-Host ('    ' + $l) -ForegroundColor DarkGray }
+    Write-Host '  Run this again, or pass -Now to go down without warning anybody.' -ForegroundColor Red
+    throw 'could not read who is on the dev server, so it was left running'
+  }
+
+  if ($room.Online -eq 0) {
+    if ($room.Up -eq $false) {
+      Write-Host ('  the dev server is not running, nothing is on UDP {0}, so nobody is on it' -f $room.Port)
+      if ($room.Stale -gt 0) {
+        Write-Host ('  online.json still says {0}, left over from before it stopped' -f $room.Stale) -ForegroundColor DarkGray
+      }
+      return
+    }
+    Write-Host '  nobody is on the dev server, going straight down'
+    return
+  }
+
+  $unit = 'minutes'
+  if ($Minutes -eq 1) { $unit = 'minute' }
+  Write-Host ('  {0} on the dev server. Warning them in the game: {1}, {2} {3}.' -f
+              $room.Online, $Mode, $Minutes, $unit) -ForegroundColor Yellow
+
+  $ask = Join-Path $Here 'Request-Restart.ps1'
+  $code = 1
+  if (Test-Path -LiteralPath $ask) {
+    # -RestartFollows because this script stops and starts the process a few
+    # lines below, which is the promise Request-Restart wants before it lets
+    # -Mode restart put anybody out.
+    $global:LASTEXITCODE = 0
+    try {
+      & $ask -Minutes $Minutes -Mode $Mode -Why $Why -Vps $Vps -User $User -Data $room.Data -RestartFollows
+      $code = $LASTEXITCODE
+    } catch {
+      Write-Host ('  ' + $_.Exception.Message) -ForegroundColor Red
+      $code = 1
+    }
+  } else {
+    Write-Host '  Request-Restart.ps1 is not beside this script.' -ForegroundColor Red
+  }
+  # Read, not assumed. Deploy-Server once called this and never looked, so a
+  # warning that failed dropped everybody with no notice while the log said the
+  # countdown had been given.
+  if ($code -ne 0) {
+    Write-Host ''
+    Write-Host ('  THE WARNING DID NOT GO OUT. {0} on the dev server would be dropped with' -f $room.Online) -ForegroundColor Red
+    Write-Host '  no notice. Nothing has been sent or stopped. Run this again once the box' -ForegroundColor Red
+    Write-Host '  answers, or pass -Now to go down without warning them.' -ForegroundColor Red
+    throw 'the warning did not go out, so the dev server was left running'
+  }
+
+  # The countdown, plus twenty seconds so its last line lands before the stop,
+  # the same margin Deploy-Server gives. Out early the moment the room is
+  # empty: nobody left on is nobody left to wait for.
+  $deadline = (Get-Date).AddMinutes($Minutes).AddSeconds(20)
+  while ($true) {
+    $rest = ($deadline - (Get-Date)).TotalSeconds
+    if ($rest -le 0) { break }
+    Start-Sleep -Seconds ([int][Math]::Ceiling([Math]::Min(15, $rest)))
+    $left = (Get-DevRoom).Online
+    if ($left -eq 0) { Write-Host '  the room is empty, going now'; return }
+    if ($left -gt 0) {
+      Write-Host ('  {0} still on, {1} seconds to go' -f $left,
+                  [int][Math]::Max(0, ($deadline - (Get-Date)).TotalSeconds))
+    }
+  }
+  Write-Host '  the countdown has run out in the game, going now'
+}
+# ==== end thornswood dev deploy warning ====
+
+Write-Host ''
+Write-Host 'Who is on the dev server...'
+Warn-DevRoom
+
 # The port comes from the dev server's own settings on the box, so the process
 # stopped is the one on that port and nothing else. 7777 is the live server;
 # refusing it here is what makes this script safe to run without thinking.
+#
+# Once the process is gone, so is any restart.json it never read. The gamemode
+# deletes that file when it reads it, and a process that is down, or whose
+# gamemode failed at load, never does. The next one to start then finds it
+# within a tick and a half and counts down on its own: under -Mode notice a
+# "Pushing a server update in 1 minute" with nothing behind it, to people who
+# have just come back to the fixed server, and under -Mode restart a kick a
+# minute after boot with no restart behind it, which is the empty world with
+# no NPCs that Request-Restart's -RestartFollows guard exists to prevent.
 Write-Host ''
 Write-Host 'Stopping the dev server...'
 Remote @"
@@ -250,6 +493,13 @@ Start-Sleep -Seconds 2
 if (Test-Path '$rootWin\gamemode.js') {
   Copy-Item '$rootWin\gamemode.js' ('$rootWin\gamemode.js.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
   'kept the old gamemode beside it as gamemode.js.before-<stamp>'
+}
+`$d = 'data'
+if (`$s.dataDir) { `$d = [string]`$s.dataDir }
+`$rq = Join-Path ([IO.Path]::Combine('$rootWin', `$d)) 'restart.json'
+if (Test-Path -LiteralPath `$rq) {
+  try { Remove-Item -LiteralPath `$rq -Force -EA Stop; 'removed a restart.json the old process never read' }
+  catch { 'COULD NOT REMOVE ' + `$rq + ', so the new process will count down on its own: ' + `$_.Exception.Message }
 }
 'stopped'
 "@ | ForEach-Object { "  $_" }
@@ -323,6 +573,11 @@ Write-Host 'Pointing the dev server at the dev voice service...'
 # Deploy-Gamemode.ps1 computes the same thing the same way for the live
 # server, which is why live was right and dev was not.
 #
+# AND HOW MANY IT SEATS, added 24 September for entry 281. maxPlayers is the
+# engine's own slot count, and it is set to the dev launcher's MaxOnline, read
+# above, so the dev feed and the dev server say one number. With no number it
+# is left as the box has it and does not count as a reason to rewrite.
+#
 # This comment is HERE and not inside the here-string below on purpose. Anything
 # in that string is base64 encoded and sent as an ssh command line, where it
 # counts double and the far end truncates at about 8191 characters. Ten lines of
@@ -382,6 +637,11 @@ if (`$pt -and `$unb -ge 0) {
   }
 } elseif (-not `$pt) { 'no startPoints in the dev settings, leaving that alone' }
 elseif (`$unb -lt 0) { 'Skyrim Unbound.esp is not in this load order, leaving the start point alone' }
+`$wantMax = `$false
+if ($maxOnline -gt 0 -and [int]`$s.maxPlayers -ne $maxOnline) {
+  `$wantMax = `$true
+  'the most online moves from ' + `$s.maxPlayers + ' to $maxOnline'
+}
 
 # A byte order mark counts as needing a rewrite even when the number is
 # already right. The run on 18 September set the value AND wrote a mark, so
@@ -390,7 +650,7 @@ elseif (`$unb -lt 0) { 'Skyrim Unbound.esp is not in this load order, leaving th
 `$bom = `$false
 try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
-if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart) {
+if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax) {
   'thornswoodVoicePort is already $VoicePort, both equipment checks are already off, and the load order is already right'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
@@ -400,6 +660,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
     `$s | Add-Member -NotePropertyName startPoints -NotePropertyValue @(`$pt) -Force
     'start point moved to 0x{0:X8}, index {1}' -f `$startWant, `$unb
   }
+  if (`$wantMax) { `$s | Add-Member -NotePropertyName maxPlayers -NotePropertyValue $maxOnline -Force }
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
@@ -435,6 +696,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
             ', spell strip ' + `$back.equipmentSpellCheckEnabled +
             ', unknown item vetoes ' + `$back.equipmentInventoryCheckEnabled +
             ', load order ' + @(`$back.loadOrder).Count + ' plugins' +
+            ', most online ' + `$back.maxPlayers +
             ', start point ' + @(`$back.startPoints)[0].worldOrCell }
   } catch {
     'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
