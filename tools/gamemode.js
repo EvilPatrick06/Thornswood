@@ -3592,7 +3592,49 @@ const HALL = {
   rot: [0, 0, 180],
 };
 
-const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-178.0,-1504.0,128.0],"rot":[0,0,90.0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16.0],"rot":[0,0,180.0]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[673.1,-620.3,0.0],"rot":[0,0,180.0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1824.3,-683.7,0.0],"rot":[0,0,180.0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}}};
+/*
+  WHERE A NEW ARRIVAL STANDS IN EACH INN, AND WHERE THE NUMBERS CAME FROM.
+
+  Eight of the nine arrival points below were first written by hand, and all
+  eight are the same sum: the inn's front door, moved 110 units along the
+  door's own heading, at the door's height and with its facing. Nobody stood
+  on any of them. Whether that lands in the room depends on which way the
+  door's model happens to face, and for seven of the eight it did not: it
+  put the point along the wall beside the door, past the door's edge, or
+  110 units behind the door, outside the room.
+
+  1.1.41 replaced five by walking to them (Whiterun, Riften, Windhelm, Morthal
+  and Winterhold). Riften's hand point was the one that had been in the room,
+  and the walk kept it. Three were still the sum until 24 September:
+
+    Solitude   -178, -1504, 128    on the line of the wall the door is set
+                                   in, 54 units past the door's edge, at the
+                                   height of the door's middle: in the wall
+    Falkreath  673.1, -620.3, 0    110 units behind the front door
+    Dawnstar   1824.3, -683.7, 0   110 units behind the front door
+
+  Those three are now the point the game itself puts anybody on who walks in
+  through that front door: the teleport carried by the outside half of the
+  door (its XTEL), read out of the load order, with the facing it gives,
+  which is into the room. Skyrim Unbound's own start marker in each of those
+  inns is within 7, 9 and 20 units of them. No number here was made up, and a
+  walk can still pick a better spot than the doorway: stand there, press the
+  mark key, run Mark-Spot.ps1.
+
+  Markarth is not the sum. It stands 386 units into the room, on the floor,
+  and nothing in the records says it is wrong, so it is left as it was.
+
+  tools/test-arrivals.js holds the nine front doors and the game's own point
+  for each, and fails when an arrival is not on the room side of its door or
+  not on the floor the door opens onto. On a machine with the game folder it
+  reads them again from the plugins.
+
+  Interior coordinates belong to their own cell, so two towns' points being
+  close means nothing. Moorside Inn and Windpeak Inn are one layout, their
+  front doors two units apart, which is the only reason Morthal's and
+  Dawnstar's old points looked like one spot.
+*/
+const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-293.9,-1450.6,0],"rot":[0,0,0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16.0],"rot":[0,0,180.0]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[670.4,-443.1,0.5],"rot":[0,0,0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1823.2,-534.7,0.5],"rot":[0,0,0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}}};
 
 /* Something to wear while choosing. The appearance menu hands you back with an
  * empty inventory, and choosing a life naked in a stone room is nobody's idea
