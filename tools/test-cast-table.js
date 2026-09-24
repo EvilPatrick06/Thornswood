@@ -24,6 +24,10 @@
 //   - IsGuardFaction alone, which the Companions carry and are not the watch
 //   - a thin guard whose own race is a wolf and whose name, race and factions
 //     all come from its template, and one whose template is a leveled list
+//     that names a guard first and a wolf last, read through its first entry
+//   - a thin guard at home in a house that names no place, placed by the
+//     crime faction of its template, since the crime faction comes with the
+//     factions and the thin record has none
 //   - templates that give some traits and not others, which the ACBS use bits
 //     decide one trait at a time: a carriage driver whose template gives him
 //     nothing he is checked on (0x230, the way CFTO.esp builds Bjorlam), and a
@@ -48,6 +52,8 @@
 //     ground at 0,0
 //   - a patch naming its master SKYRIM.ESM, which is the same file as Skyrim.esm
 //     and must not make a second Bjorlam
+//   - a plugins.txt that lists Skyrim.esm again as skyrim.esm, the same file,
+//     which is read once and not twice
 //   - a patch deleting a placement and keeping nothing of it but the flag
 //
 // Read only apart from a folder in the temp directory, removed at the end.
@@ -166,6 +172,7 @@ const N = {
 // Where Sigaar and the Riften merchant are placed, so each is found by its
 // reference and not by a name a template could have handed it.
 const SIGAAR = 0x81C, MERCHANT = 0x81D;
+const GUARD_AT_HOME = 0x81B;
 const LV = 0x600;
 const C = { shop: 0x700, house: 0x701 };
 const W = { tamriel: 0x900, persistent: 0x901, whiterunSq: 0x902, openSq: 0x903, riftSq: 0x904,
@@ -221,7 +228,8 @@ const skyrim = Buffer.concat([
       sub('CRIF', u32(F.crimeWhiterun)), acbs(UNIQUE, 0)], 0, true),
     npc(N.faendal, 'Faendal', R.nord, [snam(F.follower, -1), snam(F.jobMerchant, 0), acbs(UNIQUE, 0)]),
     npc(N.bjorlam, 'Bjorlam', R.nord, [snam(F.carriage, 0), acbs(UNIQUE, 0)]),
-    npc(N.guard, 'Whiterun Guard', R.nord, [snam(F.guardWhiterun, 0), snam(F.isGuard, 0), snam(F.guardTalk, 0)]),
+    npc(N.guard, 'Whiterun Guard', R.nord, [snam(F.guardWhiterun, 0), snam(F.isGuard, 0), snam(F.guardTalk, 0),
+      sub('CRIF', u32(F.crimeWhiterun))]),
     // A thin record: its own race is a wolf and it names nobody. Everything
     // comes from the template, the way 6,521 real placements are built.
     rec('NPC_', N.thin, [edid('GuardThin'), sub('RNAM', u32(R.wolf)), sub('TPLT', u32(N.guard)),
@@ -257,8 +265,11 @@ const skyrim = Buffer.concat([
     rec('NPC_', N.merchant, [edid('PCRiftenMerchant'), sub('RNAM', u32(R.wolf)),
       snam(F.riftenMarket, 0), sub('TPLT', u32(N.merchantTemplate)), acbs(UNIQUE, POPULATED_USES)]),
   ]),
+  // A guard first and a wolf last, so a pass that reads the list through its
+  // last entry turns the leveled guard into a wolf and the counts move.
   top('LVLN', [rec('LVLN', LV, [edid('LvlGuard'),
-    sub('LVLO', Buffer.concat([Buffer.from([1, 0, 0, 0]), u32(N.guard), Buffer.from([1, 0, 0, 0])]))])]),
+    sub('LVLO', Buffer.concat([Buffer.from([1, 0, 0, 0]), u32(N.guard), Buffer.from([1, 0, 0, 0])])),
+    sub('LVLO', Buffer.concat([Buffer.from([1, 0, 0, 0]), u32(N.wolf), Buffer.from([1, 0, 0, 0])]))])]),
   top('CELL', [grup(u32(0), 2, [grup(u32(0), 3, [
     rec('CELL', C.shop, [edid('WhiterunBelethorsGeneralGoods'), full("Belethor's General Goods"),
       sub('DATA', Buffer.from([1, 0])), sub('XLCN', u32(L.belethors))]),
@@ -272,7 +283,9 @@ const skyrim = Buffer.concat([
       achr(0x80F, N.aela),
     ]),
     rec('CELL', C.house, [edid('NazeemsHouse'), sub('DATA', Buffer.from([1, 0]))]),
-    children(C.house, [achr(0x805, N.nazeem), achr(0x806, N.hermit)]),
+    // A guard at home. The house names no place and the thin record has no
+    // crime faction, so only its template's CrimeFactionWhiterun places it.
+    children(C.house, [achr(0x805, N.nazeem), achr(0x806, N.hermit), achr(GUARD_AT_HOME, N.thin)]),
   ])])]),
   top('WRLD', [
     rec('WRLD', W.tamriel, [edid('Tamriel')]),
@@ -368,7 +381,11 @@ try {
       fs.writeFileSync(path.join(dir, m), tes4([]));
     });
     fs.writeFileSync(path.join(dir, 'Patch.esp'), patch);
-    fs.writeFileSync(path.join(dir, 'plugins.txt'), '# a load order of one patch\r\n*Patch.esp\r\n');
+    // One patch, and Skyrim.esm listed again in another spelling. Windows
+    // opens skyrim.esm as Skyrim.esm, so read twice every placement in it
+    // would stand twice.
+    fs.writeFileSync(path.join(dir, 'plugins.txt'),
+      '# a load order of one patch\r\n*skyrim.esm\r\n*Patch.esp\r\n');
     const out = path.join(dir, 'cast.json');
     const run = spawnSync(py[0], py[1].concat([TOOL, '--data', dir, '--plugins',
       path.join(dir, 'plugins.txt'), '--out', out]), { encoding: 'utf8' });
@@ -396,8 +413,10 @@ try {
     };
 
     yes('nothing was lost to a record that would not inflate', j.counts.failedToInflate === 0);
-    yes('29 placements read, 2 of them deleted, one by a patch that kept only the flag',
-      j.counts.placed === 29 && j.counts.deleted === 2);
+    yes('six plugins read, though plugins.txt lists Skyrim.esm again as skyrim.esm',
+      /^6 plugins,/.test(j.readFrom || ''));
+    yes('30 placements read, 2 of them deleted, one by a patch that kept only the flag',
+      j.counts.placed === 30 && j.counts.deleted === 2);
     yes('a wolf and a mannequin are counted, not listed as people', j.counts.notPeople === 2);
 
     const bel = named(wr.traders, 'Belethor');
@@ -444,8 +463,10 @@ try {
       !rift.everyoneElse['Carriage Driver'] && !rift.everyoneElse['Riften Merchant'] &&
       !rift.everyoneElse.Sigaar && !rift.everyoneElse.PCRiftenMerchant);
 
-    yes('the guards are counted through their templates: a thin one, a leveled one, and one switched on by an opposite parent',
-      wr.guards['Whiterun Guard'] === 3 && Object.keys(wr.guards).length === 1);
+    yes('the guards are counted through their templates: a thin one, a leveled one read through its first entry and not the wolf at its last, one switched on by an opposite parent, and one at home',
+      wr.guards['Whiterun Guard'] === 4 && Object.keys(wr.guards).length === 1);
+    yes('the guard at home, in a house that names no place, is placed by the crime faction its template carries',
+      Object.keys(none.guards).length === 0 && !rift.guards['Whiterun Guard']);
     yes('the two guards behind a switched-off parent, one directly and one two steps up, are counted off',
       wr.offAtStartBy.guards === 2);
 
@@ -483,9 +504,9 @@ try {
       named(rift.traders, 'Rift Peddler').length === 1 && named(rift.traders, 'Rift Peddler')[0].holdFrom === 'the nearest named place');
     yes('the persistent cell at 0,0 is not taken for the ground at 0,0', rift.everyoneElse.Hermit === 1);
     yes('and somebody nothing places is under no hold', none.everyoneElse.Hermit === 1);
-    yes('the totals add up: 6 traders, 3 transport, 3 guards, 6 everyone else, 7 off, 25 people',
-      j.counts.traders === 6 && j.counts.transport === 3 && j.counts.guards === 3 &&
-      j.counts.everyoneElse === 6 && j.counts.offAtStart === 7 && j.counts.people === 25);
+    yes('the totals add up: 6 traders, 3 transport, 4 guards, 6 everyone else, 7 off, 26 people',
+      j.counts.traders === 6 && j.counts.transport === 3 && j.counts.guards === 4 &&
+      j.counts.everyoneElse === 6 && j.counts.offAtStart === 7 && j.counts.people === 26);
   }
 } catch (e) {
   yes('the load order built here was driven without throwing: ' + e.message, false);
