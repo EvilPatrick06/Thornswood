@@ -5,7 +5,7 @@
   Runs next to the SkyMP server. Two jobs and nothing else:
 
     1. Take position snapshots from the gamemode over plain HTTP on loopback,
-       and fan them out to everyone connected.
+       and tell each person connected where the people they could hear are.
     2. Relay WebRTC signalling between people so their browsers can talk to
        each other directly. The audio never comes through here.
 
@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'chat-local-1';
+const BUILD = 'cull-1-command-ack-1-chat-local-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -66,7 +66,7 @@ const BUILD = 'chat-local-1';
 const STALE_MS = 3000;
 
 // ---------------------------------------------------------------- state ----
-let positions = new Map();   // profileId -> {pos:[x,y,z], angleZ, cell, name, at}
+let positions = new Map();   // profileId -> {pos:[x,y,z], angleZ, cell, name, party, at}
 let nextPeer = 1;
 const peers = new Map();     // peerId -> {ws, profileId, name}
 
@@ -117,6 +117,55 @@ function owns(ticket, profileId, then) {
 // Held in memory on purpose: a command nobody was there to run is not worth
 // keeping across a restart.
 const commands = [];
+
+/*
+  A COMMAND STAYS UNTIL THE GAMEMODE SAYS IT RAN.
+
+  GET /commands used to empty this queue in one splice, before the gamemode
+  had read a byte of the answer. Its poll() then parsed the body inside a
+  catch that returned, so a batch that failed to parse, or an answer lost to
+  its two second timeout, was gone from here and never run by anybody, with
+  no word to whoever typed it.
+
+  So a gamemode that asks with ?ack=1 is handed the queue without it being
+  emptied, each command carrying an id, and takes away what it ran with
+  POST /commands/ack. A plain GET /commands still empties the queue exactly
+  as before, because a gamemode from before this change never acknowledges
+  anything and would be handed the same commands on every poll.
+
+  The id is a stamp made when this process starts, then a counter, so an id
+  from before a restart can never be mistaken for one after it. The gamemode
+  remembers the ids it has run and skips one that comes round again, which is
+  what stops a lost acknowledgement turning into a second teleport.
+
+  The retry is bounded: a command offered COMMAND_OFFERS times with no
+  acknowledgement is given up on and logged here, rather than offered on
+  every poll for as long as this process lives.
+*/
+const COMMANDS_BOOT = crypto.randomBytes(4).toString('hex');
+let nextCommand = 1;
+const COMMAND_OFFERS = 5;
+
+/*
+  AND A FULL QUEUE REFUSES THE NEWEST, AND SAYS SO.
+
+  It used to shift the oldest off the front without a word, so a command that
+  had already been taken, and that somebody had every reason to think would
+  run, vanished to make room. Refusing the new one is the only way round that
+  can tell anybody: the sender is still connected to be told. Two hundred is
+  what the cap always was.
+
+  One notice per connection every ten seconds, because the plugins report on
+  this queue too, a swing of the axe once or twice a second, and a full queue
+  would otherwise answer every one of them with a line in the chat.
+*/
+const COMMAND_CAP = 200;
+const COMMAND_REFUSED_EVERY_MS = 10000;
+
+// What the gamemode is handed. The offer count is this service's business.
+function commandOut(c) {
+  return { id: c.id, profileId: c.profileId, name: c.name, text: c.text, at: c.at };
+}
 
 /* ------------------------------------------------------------- chat log ---
  *
@@ -556,10 +605,105 @@ function snapshot() {
   return out;
 }
 
+/*
+  WHO IS TOLD ABOUT WHOM.
+
+  Every peer used to be sent the whole snapshot five times a second: every
+  person's coordinates, facing, cell and name, wherever they were. That is two
+  faults in one, and it is entry 282 on the To Do List. Anybody holding a
+  socket learned where everybody in the world was standing. And the traffic
+  grew with the square of the room, against a box that measured 93 Mbit/s and
+  an 8 TB monthly cap. tools/voice/test-cull.js measures it on the wire with
+  two hundred people across ten cells: 5,284,000 bytes a tick, 26 MB a
+  second, 380 GB over a four hour evening, sent whole; 492,203 bytes a tick,
+  2.5 MB a second, culled. Nine of those ten cells are interiors where all
+  twenty can hear each other, so that is close to the floor voice needs.
+
+  So each person is told about three kinds of people and nobody else:
+
+    themselves, because every client places everybody against its own row
+      and does nothing at all without it;
+    anybody in the same cell within HEAR_UNITS, which is everybody any
+      speaking mode on any client could reach;
+    their own party, wherever they are, because the party strip draws an
+      arrow and a distance to every member anywhere in the world off this
+      same feed (ts-ui/thornswood-party.js), and gold on it means "somewhere
+      else". The gamemode sends the party id with each row for this.
+
+  A missing row is already silence on every client. The overlay
+  (ts-ui/thornswood-voice.js), the launcher's voice host and the plain
+  browser page all replace their table with each message and set the gain to
+  nothing for a person with no row, exactly as for another cell. So no client
+  changes, and nobody needs a "you left their range" message: the next view
+  simply does not have them in it. Connections are still opened and closed by
+  the roster, as they always were.
+
+  NEVER TIGHTER THAN A CLIENT, because that cuts people off mid sentence.
+  Another cell is silence on every client, and the longest reach any client
+  has is the overlay's yell at 85 metres (thornswood-voice.js MODES).
+  HEAR_UNITS is 100 metres, so a yell fading out at its edge is never cut
+  before the client's own falloff reaches nothing. Raise this before raising
+  a range there: tools/voice/test-cull.js reads the client range tables and
+  fails when one outgrows it.
+*/
+const UNITS_PER_METRE = 70;
+const HEAR_UNITS = 100 * UNITS_PER_METRE;
+
+// The same straight line in three dimensions that the clients measure.
+function inReach(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  const dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+  return dx * dx + dy * dy + dz * dz <= HEAR_UNITS * HEAR_UNITS;
+}
+
+/*
+  Every person's view of one snapshot, as a function of their profile id.
+
+  Grouped by cell first, so distance is only ever worked out between people
+  who share one: two hundred people across ten cells is two hundred times
+  twenty comparisons a tick, not two hundred times two hundred. Kept per
+  profile for the tick, because the same person can be connected twice, the
+  chat window and the launcher's voice host, and the answer is the same.
+*/
+function viewsOf(snap) {
+  const byCell = new Map();
+  const byParty = new Map();
+  for (const pid of Object.keys(snap)) {
+    const cell = snap[pid].cell;
+    if (!byCell.has(cell)) byCell.set(cell, []);
+    byCell.get(cell).push(pid);
+    const v = positions.get(Number(pid));
+    const party = v ? v.party : '';
+    if (!party) continue;
+    if (!byParty.has(party)) byParty.set(party, []);
+    byParty.get(party).push(pid);
+  }
+  const made = new Map();
+  return function (profileId) {
+    const key = String(profileId);
+    if (made.has(key)) return made.get(key);
+    const out = {};
+    const me = snap[key];
+    // Nobody with no row of their own is told about anybody: there is
+    // nothing to measure a distance from, and no client could use it.
+    if (me) {
+      out[key] = me;
+      for (const pid of byCell.get(me.cell)) {
+        if (pid !== key && inReach(me.pos, snap[pid].pos)) out[pid] = snap[pid];
+      }
+      const v = positions.get(Number(key));
+      const party = v ? v.party : '';
+      for (const pid of (party && byParty.get(party)) || []) out[pid] = snap[pid];
+    }
+    made.set(key, out);
+    return out;
+  };
+}
+
 setInterval(() => {
   if (peers.size === 0) return;
-  const snap = snapshot();
-  for (const [, p] of peers) p.ws.send({ t: 'pos', at: Date.now(), who: snap });
+  const viewOf = viewsOf(snapshot());
+  for (const [, p] of peers) p.ws.send({ t: 'pos', at: Date.now(), who: viewOf(p.profileId) });
 }, 200);
 
 function isLoopback(req) {
@@ -824,7 +968,10 @@ const server = http.createServer((req, res) => {
           seen.add(pid);
           positions.set(pid, {
             pos: row.pos, angleZ: Number(row.angleZ) || 0,
-            cell: String(row.cell || ''), name: String(row.name || ''), at: now
+            cell: String(row.cell || ''), name: String(row.name || ''),
+            // Kept here and never sent on: it only decides who is told about
+            // whom. See WHO IS TOLD ABOUT WHOM.
+            party: String(row.party || ''), at: now
           });
         }
         for (const pid of Array.from(positions.keys())) if (!seen.has(pid)) positions.delete(pid);
@@ -881,13 +1028,43 @@ const server = http.createServer((req, res) => {
   // launcher's creation choice, waiting for the gamemode to collect it. Gone
   // with the launcher's selector; the picks ride the command queue below.
 
-  // The gamemode's end of the command queue. Read and emptied in one go: a
-  // command handled twice is a second teleport somebody did not ask for.
+  // The gamemode's end of the command queue. A command handled twice is a
+  // second teleport somebody did not ask for, which is why this was read and
+  // emptied in one go, and why ?ack=1 needs the gamemode to remember what it
+  // ran. See the note over COMMANDS_BOOT.
   if (req.method === 'GET' && route === '/commands') {
     if (!isLoopback(req)) { res.writeHead(403).end('no'); return; }
-    const out = commands.splice(0, commands.length);
+    let out;
+    if (/(^|&)ack=1(&|$)/.test((req.url || '').split('?')[1] || '')) {
+      for (let i = commands.length - 1; i >= 0; i--) {
+        if (commands[i].offers < COMMAND_OFFERS) continue;
+        const c = commands.splice(i, 1)[0];
+        // The id and who, not the text: a journal page can be a command.
+        console.log('[voice] gave up on command ' + c.id + ' from profile ' + c.profileId +
+                    ' after ' + c.offers + ' offers with no acknowledgement');
+      }
+      for (const c of commands) c.offers++;
+      out = commands.map(commandOut);
+    } else {
+      out = commands.splice(0, commands.length).map(commandOut);
+    }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ commands: out }));
+    return;
+  }
+
+  // What the gamemode has run, by id, so it is not offered again.
+  if (req.method === 'POST' && route === '/commands/ack') {
+    if (!isLoopback(req)) { res.writeHead(403).end('no'); return; }
+    readBody(req, res, 20000, (doc) => {
+      const ids = new Set((doc && Array.isArray(doc.ids) ? doc.ids : []).map(String));
+      let removed = 0;
+      for (let i = commands.length - 1; i >= 0; i--) {
+        if (ids.has(commands[i].id)) { commands.splice(i, 1); removed++; }
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ removed: removed }));
+    });
     return;
   }
 
@@ -992,6 +1169,8 @@ server.on('upgrade', (req, socket, head) => {
 
   const ws = new Sock(socket);
   let myId = 0;
+  // When this connection was last told the command queue is full.
+  let refusedAt = 0;
 
   ws.onmessage = (msg) => {
     if (msg.t === 'join') { myId = onJoin(ws, msg); return; }
@@ -1059,13 +1238,30 @@ server.on('upgrade', (req, socket, head) => {
       // in your own game and the server puts you straight back.
       if (!verb && text.charAt(0) === '/') {
         chatWrite('command', myId, me, text);
+        // Full: the newest is refused and its sender told, and everything
+        // already taken stays. See the note over COMMAND_CAP.
+        if (commands.length >= COMMAND_CAP) {
+          const now = Date.now();
+          if (now - refusedAt >= COMMAND_REFUSED_EVERY_MS) {
+            refusedAt = now;
+            console.log('[voice] the command queue is full at ' + COMMAND_CAP +
+                        ', so a command from profile ' + (me ? me.profileId : 0) +
+                        ' was refused and they were told');
+            ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood',
+                      text: 'The server is not taking commands right now, so that one was not run. ' +
+                            'Try again in a minute.',
+                      at: now });
+          }
+          return;
+        }
         commands.push({
+          id: COMMANDS_BOOT + ':' + (nextCommand++),
           profileId: me ? me.profileId : 0,
           name: (me && me.name) || '',
           text: text,
-          at: Date.now()
+          at: Date.now(),
+          offers: 0
         });
-        while (commands.length > 200) commands.shift();
         return;
       }
 
