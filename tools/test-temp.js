@@ -77,6 +77,14 @@ function rig() {
   const Fake = {
     getOnlinePlayers: function () { return Object.keys(store).map(Number); },
     makeProperty: function () { },
+    // The real one turns a form id back into its descriptor. The rig knows
+    // both halves already, because it is what hands out the ids.
+    getDescFromId: function (id) {
+      for (const d in ids) {
+        if (Object.prototype.hasOwnProperty.call(ids, d) && ids[d] === id) { return d; }
+      }
+      return '';
+    },
     get: function (id, key) {
       if (key === 'worldOrCellDesc') { return cells[id] || 'cell:X.esm'; }
       if (key === 'inventory') { return { entries: worn[id] || [] }; }
@@ -122,6 +130,10 @@ function rig() {
   /** The same things, in the pack rather than on. */
   api.carry = function (id, descs) {
     worn[id] = descs.map(function (d) { return { baseId: idOf(d), worn: false }; });
+  };
+  /** A worn thing by raw id, for the piece no table has heard of. */
+  api.wearRaw = function (id, baseId) {
+    worn[id] = [{ baseId: baseId, worn: true }];
   };
   api.minutes = function (m) { clock.now += m * 60000; };
   return api;
@@ -417,6 +429,50 @@ if (block) {
       yes('a coat in your pack keeps nobody warm', Math.abs(carried - bare) < 0.01);
       // Nothing makes a blizzard comfortable.
       yes('and no outfit turns a blizzard into a spring day', inFur < 45);
+
+      /*
+        AND THE REPORT NAMES WHAT IT COUNTED.
+
+        Patrick, 23 September: "temperature was not right it said the same
+        with clothes, without clothes, and with a mix". Four different faults
+        produce that sentence and nothing on screen told them apart. This is
+        the half that separates the server not knowing about the clothes from
+        the clothes being worth little on the day.
+      */
+      {
+        const api = rig();
+        api.view(11);
+        api.dress(11, [fur]);
+        const v = api.view(11);
+        yes('the report lists what is worn', Array.isArray(v.worn) && v.worn.length === 1);
+        /*
+          The descriptor, not a bare id. The installed table has no editor
+          ids in it, so this is what a worn thing is called, and it is the
+          more useful of the two here: it names the plugin the piece came
+          from, which is the question being asked when clothes are not
+          counting.
+        */
+        yes('and names it rather than printing a bare id',
+            !!v.worn[0].name && v.worn[0].name.indexOf(':') > 0);
+        yes('and says what it is worth', v.worn[0].known === true && v.worn[0].worth > 0);
+        yes('and the cover matches the pieces', v.cover > 0);
+
+        const bare2 = rig();
+        bare2.view(12);
+        const vb = bare2.view(12);
+        yes('somebody the server sees nothing on lists nothing',
+            Array.isArray(vb.worn) && vb.worn.length === 0 && vb.cover === 0);
+
+        // A worn thing the table has never heard of is said out loud rather
+        // than counted as zero and forgotten, because that is the shape of a
+        // mod piece nobody classified.
+        const odd = rig();
+        odd.view(13);
+        odd.wearRaw(13, 0x7ffffff);
+        const vo = odd.view(13);
+        yes('an unknown worn thing is named as unknown rather than ignored',
+            vo.worn.length === 1 && vo.worn[0].known === false);
+      }
     }
 
     /*

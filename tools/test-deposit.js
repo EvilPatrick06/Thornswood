@@ -211,8 +211,32 @@ if (block !== null) {
       /function miningGone[\s\S]{0,300}mp\.getOnlinePlayers\(\)/.test(code));
   yes('and there is a hard stop that no real seam reaches',
       /swungThisSpell >= MINE_MOST/.test(code) && /const MINE_MOST = \d+;/.test(code));
-  yes('the next swing waits for the one in the air to let go',
-      /\(SWING_MS - SWING_LAND_MS\) \+ MINE_GAP_MS/.test(code));
+  /*
+    ONE ANIMATION FOR THE SPELL, NOT ONE PER STRIKE.
+
+    Patrick, 23 September: "It's stopping the animation and going back in that
+    doesn't flow smoothly", and "Still a pick on my hip when I am swinging".
+    The first strike enters IdlePickaxeEnter and HOLDS it with the pickaxe in
+    hand; the strikes after it send nothing to the client at all; the exit is
+    one message when the spell ends. These hold that shape, because "play the
+    animation again" is the obvious thing to write here and it is the bug.
+  */
+  yes('the first strike holds the animation instead of letting it go',
+      /swing\(actorId, SWING_MINE, function \(\) \{ lands\(\); \}, \{ hold: true, tool: pick \}\)/.test(code));
+  yes('and the ones after it send no animation, only the yield',
+      /setTimeout\(guard\('mineLands', function \(\) \{ lands\(\); \}\), SWING_LAND_MS\)/.test(code));
+  yes('the strikes come at the rhythm of the swing itself',
+      /setTimeout\(guard\('mineAgain', again\), SWING_MS\)/.test(code));
+  yes('the pickaxe the person owns is the one put in their hands',
+      /const pick = toolIdIn\(actorId, 'miner'\)/.test(code) &&
+      /function toolIdIn\(actorId, key\)/.test(code));
+  yes('the client equips it before the animation and takes it off after',
+      /pc\.equipItem\(it, false, true\)/.test(code) &&
+      /unequipItem\(/.test(code));
+  yes('a held swing is not ended by a timer, because the spell ends it',
+      /if \(o\.hold\) \{/.test(code) && /function swingEnd\(actorId, tool\)/.test(code));
+  yes('and stopping a spell is the one place the animation is left',
+      /function stopMining\(actorId\) \{[\s\S]{0,260}swingEnd\(actorId, tool\);/.test(code));
 
   yes('the chopping block is left to Skyrim\'s own furniture',
       code.slice(code.indexOf('function chopWood'),
