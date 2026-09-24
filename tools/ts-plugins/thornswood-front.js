@@ -2720,6 +2720,9 @@
   let burnUntil = 0;
   let burnTold = false;
   let burnAt = 0;
+  // When the flames were last put back on. See the burning tick.
+  let burnFxAt = 0;
+  const BURN_FX_EVERY = 3000;
   let burnSaidAt = 0;
 
   // The hook the gamemode's property script calls. On the global on purpose:
@@ -2746,12 +2749,33 @@
 
     if (alight) {
       try { pc.damageActorValue('Health', BURN_PER_SECOND); } catch (e) { }
-      if (!burnTold) {
-        burnTold = true;
+      /*
+        THE FLAMES ARE PUT BACK ON, over and over, for as long as it burns.
+
+        Patrick, 23 September: "when I am on fire the fire on me goes away
+        after awhile even if I am still in the fire but OI still correctly
+        keep taking damage its just visibly wrong though".
+
+        An effect shader is played once and runs for as long as the shader
+        itself says, which is a few seconds: it was written for a spell
+        landing on somebody, not for standing in a fire pit. Playing it once
+        when the burning started meant the flames ran out while the burning
+        carried on, so the one thing on screen telling somebody they are on
+        fire stopped while the damage did not.
+
+        So it is played again every BURN_FX_EVERY while they are alight.
+        Playing a shader that is already running on the same target is what
+        the engine does to itself constantly; it does not stack into anything.
+      */
+      if (!burnTold || (now - burnFxAt) >= BURN_FX_EVERY) {
+        burnFxAt = now;
         try {
           const shader = sp.EffectShader.from(sp.Game.getFormEx(FIRE_SHADER));
           if (shader) { shader.play(pc, 0); }
         } catch (e) { }
+      }
+      if (!burnTold) {
+        burnTold = true;
         note('you have caught fire');
       }
       if (now - burnSaidAt >= BURN_REPORT) {
@@ -2763,6 +2787,7 @@
 
     burnTold = false;
     burnSaidAt = 0;
+    burnFxAt = 0;
     try {
       const shader = sp.EffectShader.from(sp.Game.getFormEx(FIRE_SHADER));
       if (shader) { shader.stop(pc); }
