@@ -25,9 +25,19 @@ uncompressed length and then zlib, and whether it is compressed is an archive
 wide flag that an individual file may invert. Names may be embedded at the front
 of the data as well, which has to be skipped when they are.
 
+In a version 105 archive, which is every archive Skyrim Special Edition makes,
+the compressed data is an LZ4 frame and not zlib. Measured 24 September: every
+compressed file in Gourmet.bsa, RaceMenu.bsa, UIExtensions.bsa and Apocalypse -
+Magic of Skyrim.bsa starts 04 22 4D 18 after its length, which is the LZ4 frame
+magic, and zlib refused every one of them. Ten of the twenty five archives in
+the game folder that carry scripts are compressed, and none of them could be
+read here before this. Python has no LZ4 without a package, so the decoder is
+below; it is short, because LZ4 is only literals and copies.
+
 Read only. It opens files and never writes one.
 """
 
+import mmap
 import os
 import struct
 import zlib
@@ -37,6 +47,7 @@ FLAG_COMPRESSED = 0x004
 FLAG_EMBEDDED_NAMES = 0x100
 SIZE_MASK = 0x3FFFFFFF
 INVERT_COMPRESSION = 0x40000000
+LZ4_MAGIC = 0x184D2204
 
 
 def read(path, wanted_folder=None):
@@ -44,8 +55,22 @@ def read(path, wanted_folder=None):
 
     wanted_folder limits it to one folder, compared without case, because
     pulling a 400MB archive into memory to read one string table would be silly.
+
+    The archive is mapped rather than read, so only the pages actually looked at
+    come off the disk. It used to be read whole: measured 24 September, looking
+    for the scripts folder in all 63 archives in the game folder took 80 seconds,
+    nearly all of it reading textures, sounds and voices nobody asked for.
+    Mapped, the same took 1.8.
     """
-    buf = open(path, 'rb').read()
+    with open(path, 'rb') as fh:
+        buf = mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ)
+    try:
+        return _read(buf, path, wanted_folder)
+    finally:
+        buf.close()
+
+
+def _read(buf, path, wanted_folder):
     if len(buf) < HEADER or buf[:4] != b'BSA\x00':
         raise ValueError('%s is not a BSA' % path)
     (version, offset, flags, folder_count, file_count,
@@ -85,7 +110,9 @@ def read(path, wanted_folder=None):
     p = offset + folder_count * rec + folder_names_len + folder_count + file_count * 16
     names = []
     for _ in range(file_count):
-        e = buf.index(b'\x00', p)
+        e = buf.find(b'\x00', p)
+        if e < 0:
+            raise ValueError('%s ends inside its file names' % path)
         names.append(buf[p:e].decode('ascii', 'replace'))
         p = e + 1
 
@@ -103,13 +130,97 @@ def read(path, wanted_folder=None):
             n -= 1 + embedded
         if compressed:
             original = struct.unpack_from('<I', buf, q)[0]
-            data = zlib.decompress(buf[q + 4:q + n])
+            if version >= 105:
+                data = lz4_frame(buf[q + 4:q + n])
+            else:
+                data = zlib.decompress(buf[q + 4:q + n])
             if len(data) != original:
                 raise ValueError('%s/%s inflated to the wrong size' % (folder, fname))
         else:
             data = buf[q:q + n]
         out['%s/%s' % (folder.replace('\\', '/').lower(), fname.lower())] = data
     return out
+
+
+def lz4_frame(data):
+    """One LZ4 frame, inflated.
+
+    The frame is the magic, a flag byte, a block size byte, then an eight byte
+    content size and a four byte dictionary id if the flags say so, then a
+    header checksum. Then blocks, each a four byte length whose top bit means
+    stored rather than compressed, each followed by a checksum if the flags say
+    so, until a length of zero. Blocks may copy from the blocks before them,
+    which is why they all inflate into one buffer.
+    """
+    if len(data) < 7 or struct.unpack_from('<I', data, 0)[0] != LZ4_MAGIC:
+        raise ValueError('not an LZ4 frame')
+    flags = data[4]
+    p = 6
+    if flags & 0x08:
+        p += 8
+    if flags & 0x01:
+        p += 4
+    p += 1
+    out = bytearray()
+    while True:
+        size = struct.unpack_from('<I', data, p)[0]
+        p += 4
+        if size == 0:
+            break
+        n = size & 0x7FFFFFFF
+        if p + n > len(data):
+            raise ValueError('LZ4 block runs past the end of the frame')
+        if size & 0x80000000:
+            out += data[p:p + n]
+        else:
+            _lz4_block(data[p:p + n], out)
+        p += n
+        if flags & 0x10:
+            p += 4
+    return bytes(out)
+
+
+def _lz4_block(src, out):
+    """One LZ4 block, appended to out. A block is sequences: a token whose high
+    four bits are a literal length and low four a copy length, either one, when
+    it is 15, extended by adding the bytes after it until one is less than 255;
+    the literals; then a two byte distance back into what is already written.
+    The last sequence has literals and no copy. A copy may overlap its own
+    output, which repeats the last distance bytes."""
+    i, n = 0, len(src)
+    while i < n:
+        token = src[i]
+        i += 1
+        run = token >> 4
+        if run == 15:
+            while True:
+                b = src[i]
+                i += 1
+                run += b
+                if b != 255:
+                    break
+        out += src[i:i + run]
+        i += run
+        if i >= n:
+            break
+        back = src[i] | (src[i + 1] << 8)
+        i += 2
+        length = token & 15
+        if length == 15:
+            while True:
+                b = src[i]
+                i += 1
+                length += b
+                if b != 255:
+                    break
+        length += 4
+        start = len(out) - back
+        if back == 0 or start < 0:
+            raise ValueError('LZ4 copy reaches before the start of the data')
+        if back >= length:
+            out += out[start:start + length]
+        else:
+            out += (out[start:] * (length // back + 1))[:length]
 
 
 def strings(data, lengthed=False):

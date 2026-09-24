@@ -97,12 +97,14 @@ const PORT_FILE = 'voice-port.txt';
 
   voice-status.txt   written by the launcher   "<mic> <peers> <talking> <mode>"
   voice-ptt.txt      written by us             "<on> <mode>"
+  voice-muted.txt    written by us             "<profileId> <profileId> ..."
 */
 const STATUS_FILE = 'voice-status.txt';
 const PTT_FILE    = 'voice-ptt.txt';
+const MUTED_FILE  = 'voice-muted.txt';
 
 /*
-  Where those three files are. Data/Platform inside the game folder first,
+  Where those files are. Data/Platform inside the game folder first,
   then ../Profile.
 
   ../Profile was the only place, and it is right when the game folder is
@@ -654,8 +656,31 @@ sp.on('buttonEvent', guard('keys', (e) => {
   }
 }));
 
+/*
+  Who this person has muted, on its way to the launcher.
+
+  The page in the game gets the list from the server and used to be the only
+  thing that knew it, but the audio plays in the launcher's page, so a muted
+  person was still heard. The page sends the ids here and this writes them
+  where the launcher's file channel reads push to talk. Only digits and single
+  spaces go into the file, and it is written when the list changes. The first
+  list of a session is always written, so one left behind by another character
+  is replaced by this one's, even when this one is empty.
+*/
+let lastMutedWritten = null;
+
+function writeMuted(raw) {
+  const line = (String(raw == null ? '' : raw).match(/\d+/g) || []).join(' ');
+  if (line === lastMutedWritten) { return; }
+  lastMutedWritten = line;
+  const n = line ? line.split(' ').length : 0;
+  log('mute list for the launcher: ' + n + (n === 1 ? ' person' : ' people') +
+      (writeChannel(MUTED_FILE, line) ? '' : ', but the file could not be written'));
+}
+
 sp.on('browserMessage', guard('browserMessage', (event) => {
   const a = event.arguments;
+  if (a && a[0] === 'thornswood-voice-muted') { writeMuted(a[1]); return; }
   if (!a || a[0] !== 'thornswood-voice') return;
   log(String(a[1]));
 }));

@@ -399,8 +399,35 @@ elseif ($null -ne $ownCollection) {
         Die "The launcher's record of what came from Vortex (Profile\OwnGame\files.txt) lists nothing, so this release would carry every mod file. In the launcher, Settings, Maintenance, bring the folder up to date from Vortex, then publish again."
     }
 }
+# OUR OWN PLUGIN GOES OUT IN DEV PACKS UNTIL NEXUS CARRIES IT.
+#
+# Patrick, 24 September: "we can put a temp patch for the plugins until we put
+# them on nexus", then "yeah they shoul be entrily isolated for testing" and
+# "thats the point of a dev build".
+#
+# Thornswood-Content.esp is ours, but it reaches people through the Nexus
+# collection, so it is in the launcher's record of what Vortex deployed and
+# Test-FromCollection keeps it out of every pack. That was right until a
+# change to the plugin had to be tested before a Nexus upload: the key mold and
+# key recipes of pull request 199 sat in the repo with no way to a tester, and
+# the launcher refuses Play when the server's plugin differs from the client's
+# in size, so the plugin could not go on the dev server either.
+#
+# So a DEV release carries it. The launcher already writes every pack file as
+# its own copy (Updater calls OwnGame.Unshare before it extracts over a file
+# that exists), so the dev folder's copy stops being a hard link and the live
+# folder, the Steam copy and Vortex's staging copy keep the Nexus bytes. A main
+# release still leaves it to the collection. Measured on 24 September: on
+# Patrick's machine that one file has four names, and a copy written through
+# the link on 23 September changed all four, Vortex's included, which is the
+# accident this avoids.
+#
+# TAKE IT OUT when Nexus carries the same bytes as tools/Thornswood-Content.esp.
+$DevShipsOurs = @('Data\Thornswood-Content.esp')
+
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
+    if ($Dev -and ($DevShipsOurs -contains $rel)) { return $false }
     return $vortexFiles.Contains($rel)
 }
 $null = New-Item -ItemType Directory -Force -Path $DistDir
@@ -943,6 +970,17 @@ if (-not $NoUpload -and $gh) {
     $repoArg = @(); if ($Repo) { $repoArg = @('--repo', $Repo) }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 
+    # ==== thornswood release upload ====
+    # A dev build goes up marked prerelease, so Latest on the public releases
+    # page is always a build everybody gets. Measured 24 Sep with gh release
+    # list on Thornswood-Releases: 156 releases, 59 of them dev, not one marked
+    # prerelease, and Latest was 20260923-2246-dev while the newest main
+    # release was 20260923-2137. Nothing that updates anybody reads Latest:
+    # the launcher, the site and the bot go by version.json and asset ids,
+    # which this does not change. It is what a person browsing the page is
+    # told is current.
+    $pre = @(); if ($Dev) { $pre = @('--prerelease') }
+
     # Tried three times, because GitHub answers HTTP 500 to the release call
     # often enough to be a nuisance rather than an event: it happened on 1.0.133
     # and again on 1.0.135, and both times the identical command worked on the
@@ -954,12 +992,24 @@ if (-not $NoUpload -and $gh) {
     # the fallback, and it gets the same treatment.
     $tries = 3
     for ($try = 1; $try -le $tries; $try++) {
-        & gh release create $Id @assets @repoArg --title "Update $Id" --notes $(if ($Notes) { $Notes } else { "Update $Id" }) 2>&1 | Out-Host
+        & gh release create $Id @assets @repoArg @pre --title "Update $Id" --notes $(if ($Notes) { $Notes } else { "Update $Id" }) 2>&1 | Out-Host
         if ($LASTEXITCODE -eq 0) { break }
 
         Say '  Release exists, uploading into it instead.' 'DarkGray'
         & gh release upload $Id @assets @repoArg --clobber 2>&1 | Out-Host
-        if ($LASTEXITCODE -eq 0) { break }
+        if ($LASTEXITCODE -eq 0) {
+            # gh release upload has no --prerelease. Given one, gh 2.100.0
+            # stops with "unknown flag: --prerelease" and uploads nothing, so
+            # the flag goes on with an edit instead. This is the path a
+            # resumed release takes, and a create GitHub answered 500 after it
+            # had in fact made the release. A failed edit is said and passed:
+            # the assets are up, and the flag changes nothing a launcher reads.
+            if ($Dev) {
+                & gh release edit $Id @repoArg --prerelease 2>&1 | Out-Host
+                if ($LASTEXITCODE -ne 0) { Say "  $Id is up but could not be marked prerelease; mark it on GitHub." 'Yellow' }
+            }
+            break
+        }
 
         if ($try -lt $tries) {
             $wait = 5 * $try
@@ -967,6 +1017,7 @@ if (-not $NoUpload -and $gh) {
             Start-Sleep -Seconds $wait
         }
     }
+    # ==== end thornswood release upload ====
 
     $json = & gh api ("repos/{0}/releases/tags/{1}" -f $Repo, $Id) 2>$null
     $ErrorActionPreference = $old
