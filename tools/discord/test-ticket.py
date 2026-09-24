@@ -23,8 +23,11 @@ cannot come until the held push gives up, and every order check below fails.
 Read only. Never connects to anything.
 """
 import asyncio
+import json
 import os
+import shutil
 import sys
+import tempfile
 import threading
 import urllib.error
 import urllib.request
@@ -63,11 +66,18 @@ class Answer(object):
 
 
 class Perms(object):
-    """Everything thread_block asks about, all allowed."""
+    """
+    Everything thread_block asks about, all allowed.
+
+    Managing threads is not, because is_staff asks the same channel about the
+    person sending, and they are a newcomer: the one ticket at a time limit
+    applies to them as it would to anybody.
+    """
     view_channel = True
     send_messages = True
     create_private_threads = True
     send_messages_in_threads = True
+    manage_threads = False
 
 
 class Member(object):
@@ -99,6 +109,7 @@ class Role(object):
 class Thread(object):
     def __init__(self, events):
         self.events = events
+        self.id = 900
         self.mention = '<#900>'
         self.sent = []
         self.added = []
@@ -140,10 +151,17 @@ class Channel(object):
 
 class Guild(object):
     def __init__(self, channels, roles):
+        self.id = 7
         self.text_channels = channels
         self.voice_channels = []
         self.roles = roles
         self.me = Member(1, 'thornswood', is_bot=True)
+
+    def get_thread(self, tid):
+        for ch in self.text_channels:
+            if ch.thread is not None and ch.thread.id == tid:
+                return ch.thread
+        return None
 
 
 class Response(object):
@@ -173,6 +191,8 @@ class Interaction(object):
     def __init__(self, guild, user, events, refuse_reply):
         self.guild = guild
         self.user = user
+        # The panel's channel, which is where the form was sent from.
+        self.channel = guild.text_channels[0] if guild.text_channels else None
         self.response = Response(events)
         self.followup = Followup(events, refuse_reply)
 
@@ -198,6 +218,19 @@ def unreachable(gate, events, seen):
     return fake
 
 
+# on_submit asks the one ticket at a time limit before anything else
+# (test-tickets.py is where that limit is tested). Every case here is somebody
+# with nothing open who has not sent a ticket lately, so the limit lets them
+# through by its own check. Before the fakes above answered what it asks, it
+# let them through by failing, which proved nothing, and every case after the
+# first would have been refused as too soon the day that check stopped
+# failing. The file of open tickets goes in a temporary folder so this never
+# touches the one beside the code.
+TMP = tempfile.mkdtemp(prefix='thornswood-ticket-')
+bot.OPEN_TICKETS = os.path.join(TMP, 'open-tickets.json')
+ALL_LINES = []
+
+
 def submit(where, refuse_reply=False, real_push=False):
     """
     One ticket, from Submit to the site copy landing.
@@ -207,9 +240,14 @@ def submit(where, refuse_reply=False, real_push=False):
     the person is sent a message). Returns everything that was recorded.
     """
     out = {'events': [], 'calls': [], 'seen': [], 'lines': [],
-           'raised': None, 'in_flight': None, 'left': None}
+           'raised': None, 'in_flight': None, 'left': None, 'stored': None}
     events = out['events']
     gate = threading.Event()
+
+    # Nothing open and nothing sent lately, whatever the case before did.
+    bot._last_ticket.clear()
+    if os.path.exists(bot.OPEN_TICKETS):
+        os.remove(bot.OPEN_TICKETS)
 
     async def go():
         staff = Member(3, 'moderator')
@@ -243,6 +281,11 @@ def submit(where, refuse_reply=False, real_push=False):
                 out['raised'] = e
             events.append('on_submit returned')
             out['in_flight'] = len(getattr(bot, '_pushes', ()))
+            try:
+                with open(bot.OPEN_TICKETS) as f:
+                    out['stored'] = json.load(f)
+            except Exception:
+                out['stored'] = None
 
             # Now let the site answer, and wait for the copy to land.
             gate.set()
@@ -256,6 +299,7 @@ def submit(where, refuse_reply=False, real_push=False):
             (bot.push, bot.log, bot.KEY, urllib.request.urlopen) = keep
 
     asyncio.run(go())
+    ALL_LINES.extend(out['lines'])
     return out
 
 
@@ -294,6 +338,8 @@ yes('T1 the push in flight is held on to, so it cannot be collected half done',
     r['in_flight'] == 1)
 yes('T1 and it lets go of it once the copy has landed', r['left'] == 0)
 yes('T1 nothing raised', r['raised'] is None)
+yes('T1 the thread is written down as their one open ticket',
+    r['stored'] == {'7:42': 900})
 
 # T2: the thread is refused, so the ticket goes into the channel instead. Same
 #     answer: told as soon as it is there, not when the site has had its say.
@@ -344,6 +390,17 @@ yes('T5 and its failure is still written in the log',
     any(line.startswith('site push failed:') for line in r['lines']))
 yes('T5 nothing raised into the handler', r['raised'] is None)
 yes('T5 and nothing is left in flight', r['left'] == 0)
+
+# Every case above reached the ticket through the limit's own check, not past
+# it because the check fell over.
+yes('every case was let through by the ticket limit, none by its failing',
+    not any(line.startswith('the ticket limit could not be checked')
+            for line in ALL_LINES))
+yes('and no open ticket failed to be written down',
+    not any(line.startswith('could not write down which ticket')
+            for line in ALL_LINES))
+
+shutil.rmtree(TMP, ignore_errors=True)
 
 print('')
 print('%d passed, %d failed' % (len(PASS), len(FAIL)))
