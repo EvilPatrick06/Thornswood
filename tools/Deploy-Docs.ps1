@@ -301,12 +301,12 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
 # SYSTEM is registered exactly as it always was, Highest and no grants, so a
 # deploy without -RunAs changes nothing. Anything else runs Limited and is
 # given what the site touches and no more: Modify on its own folder, where it
-# writes config.json, data, uploads and site.log, and Read on the four places
+# writes config.json, data, uploads and site.log, and Read on the five places
 # outside it that server.js reads, measured on 24 Sep: onlineFile, the main
-# and dev SERVER_LOGS, and CHAT_DIR. Granted on the folder rather than the
-# file, because server.log is deleted and made again at every server start
-# and a grant on the file would go with it. (NP) keeps each one to the files
-# directly in that folder and out of the world data below it. In
+# and dev SERVER_LOGS, and the main and dev CHAT_DIRS. Granted on the folder
+# rather than the file, because server.log is deleted and made again at every
+# server start and a grant on the file would go with it. (NP) keeps each one
+# to the files directly in that folder and out of the world data below it. In
 # C:\Thornswood-Server that still includes server-settings.json.
 `$runAs = '$RunAs'
 `$sid = 'S-1-5-18'
@@ -322,7 +322,8 @@ if (`$runAs -eq 'SYSTEM') {
       @('C:\Thornswood-Server\data', '(OI)(NP)R'),
       @('C:\Thornswood-Server', '(OI)(NP)R'),
       @('C:\Thornswood-Server-Dev', '(OI)(NP)R'),
-      @('C:\Thornswood-Voice\chat', '(OI)(NP)R'))) {
+      @('C:\Thornswood-Voice\chat', '(OI)(NP)R'),
+      @('C:\Thornswood-Voice-Dev\chat', '(OI)(NP)R'))) {
     if (-not (Test-Path -LiteralPath `$g[0])) { 'not here, nothing granted: ' + `$g[0]; continue }
     `$said = & icacls `$g[0] /grant ('*' + `$sid + ':' + `$g[1]) 2>&1
     if (`$LASTEXITCODE -eq 0) { 'granted ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] }

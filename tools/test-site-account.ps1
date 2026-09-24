@@ -241,18 +241,21 @@ try {
     $server = Join-Path $tmp 'Thornswood-Server'
     $dev    = Join-Path $tmp 'Thornswood-Server-Dev'
     $voice  = Join-Path $tmp 'Thornswood-Voice\chat'
+    $voiceDev = Join-Path $tmp 'Thornswood-Voice-Dev\chat'
     Put (Join-Path $docs 'config.json') '{}'
     Put (Join-Path $docs 'data\board.json') '{}'
     Put (Join-Path $server 'server.log') 'before'
     Put (Join-Path $server 'data\online.json') '{"now":0}'
     Put (Join-Path $server 'world\changeForms.json') '{}'
     Put (Join-Path $voice '2026-09-24.jsonl') '{}'
+    Put (Join-Path $voiceDev '2026-09-24.jsonl') '{}'
     # $dev is left out on purpose: a box with no dev server has no folder.
     $map = @{
-        'C:\Thornswood-Server\data' = (Join-Path $server 'data')
-        'C:\Thornswood-Server'      = $server
-        'C:\Thornswood-Server-Dev'  = $dev
-        'C:\Thornswood-Voice\chat'  = $voice
+        'C:\Thornswood-Server\data'    = (Join-Path $server 'data')
+        'C:\Thornswood-Server'         = $server
+        'C:\Thornswood-Server-Dev'     = $dev
+        'C:\Thornswood-Voice\chat'     = $voice
+        'C:\Thornswood-Voice-Dev\chat' = $voiceDev
     }
 
     # -- SYSTEM: the principal it always had, and not one grant -----------------
@@ -297,10 +300,14 @@ try {
     Yes 'server.log made again after the grant can still be read' (ReadsOnly (RulesFor (Join-Path $server 'server.log') $ls))
     Yes 'online.json can be read' (ReadsOnly (RulesFor (Join-Path $server 'data\online.json') $ls))
     Yes 'the chat can be read' (ReadsOnly (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls))
-    Yes 'and none of those three can be written' (
+    # The dev voice service writes its own chat folder, and a dev session on
+    # /sessions reads it since main's #298.
+    Yes 'the dev chat can be read' (ReadsOnly (RulesFor (Join-Path $voiceDev '2026-09-24.jsonl') $ls))
+    Yes 'and none of those four can be written' (
         -not (Modifies (RulesFor (Join-Path $server 'server.log') $ls)) -and
         -not (Modifies (RulesFor (Join-Path $server 'data\online.json') $ls)) -and
-        -not (Modifies (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls)))
+        -not (Modifies (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls)) -and
+        -not (Modifies (RulesFor (Join-Path $voiceDev '2026-09-24.jsonl') $ls)))
     Yes 'the world data under the server folder is not reached' (
         (RulesFor (Join-Path $server 'world\changeForms.json') $ls).Count -eq 0 -and
         (RulesFor (Join-Path $server 'world') $ls).Count -eq 0)
@@ -315,7 +322,7 @@ try {
     $refused = @([regex]::Matches($said, 'COULD NOT GRANT')).Count
     Yes 'a grant that fails does not throw' (-not $threw)
     Yes 'each one that fails is said, with what icacls said, and the rest are still tried' (
-        $refused -eq 4 -and $said -match 'Access is denied')
+        $refused -eq 5 -and $said -match 'Access is denied')
 
     # -- an account this box does not have: nothing is stopped ------------------
     $script:icaclsCalls = 0
