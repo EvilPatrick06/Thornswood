@@ -107,12 +107,15 @@ foreach (`$p in (Get-Process -EA SilentlyContinue | Where-Object { `$want -conta
 }
 
 # Who is actually on. The gamemode publishes this every few seconds.
+# It writes {"now":3,...}. This read .count, which it has never written, and
+# fell back to counting the object itself, so it said 1 whoever was on. The
+# folder is named because the live and dev servers each have one.
 foreach (`$d in (Get-ChildItem 'C:\' -Directory -EA SilentlyContinue)) {
   `$f = Join-Path `$d.FullName 'data\online.json'
   if (Test-Path `$f) {
     try {
       `$o = Get-Content `$f -Raw | ConvertFrom-Json
-      'online    ' + `$(if (`$null -ne `$o.count) { `$o.count } else { @(`$o).Count }) + ' playing'
+      'online    ' + `$(if (`$null -ne `$o.now) { `$o.now } else { '?' }) + ' on ' + `$d.Name
     } catch { }
   }
 }
