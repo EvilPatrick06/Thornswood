@@ -93,6 +93,13 @@ describes something that download does not do.
 - No graphics card is needed. The run stops at the launcher's Play page, before
   the game starts.
 
+**The outside.** The day of the run, Patrick runs `.\tools\Check-Outside.ps1`
+from the repo folder on his own machine. It only reads, sends no token, and
+walks what a first install fetches from outside the project: the update feed,
+every pack, the launcher, the client runtime, Steam's public build and the
+collection page. Keep what it prints with the run's screenshots. A red line
+there is a row the run should expect to fail.
+
 **The accounts.** Name each one in the rows. Never write down a password, a code
 from an email or an authenticator, or anything a site or the launcher shows as
 a key.
@@ -122,7 +129,7 @@ when the text is too long to type.
   have done at this point, where that is different from the step. Blank when it
   is the same.
 
-The commands the measuring rows name (M1 to M7, C1 and C2) are under Commands,
+The commands the measuring rows name (M1 to M8, C1 and C2) are under Commands,
 further down. On the virtual machine they go into Windows PowerShell, from the
 Start menu.
 
@@ -166,7 +173,7 @@ Start menu.
 
 | # | Step | Clock | Seen, word for word | A stranger would instead |
 | --- | --- | --- | --- | --- |
-| 15 | Open https://thornswood.net/downloads and download the installer. Write down the file name, its size and every warning the browser shows. | | | |
+| 15 | Open https://thornswood.net/downloads and download the installer. Write down the file name, its size, the SHA-256 the page prints under it, and every warning the browser shows. Then measure the downloaded file's SHA-256 (M8) and write down whether the two match. | | | |
 | 16 | Run it. Write down the Windows warning word for word, and what had to be pressed to get past it. | | | |
 | 17 | Read the setup window before pressing anything. Write down the folder it offers, the free space line under the drives, and the Installing from box. | | | |
 | 18 | Leave the folder at `C:\Thornswood`, tick the box that says 18 or over, and press Install. Write down the download's size, its speed and when it finished. | | | |
@@ -187,9 +194,9 @@ Start menu.
 
 | # | Step | Clock | Seen, word for word | A stranger would instead |
 | --- | --- | --- | --- | --- |
-| 26 | Press Downgrade on the card. Write down every window that opened, and whether the tester had to touch Steam at all. | | | |
+| 26 | Press Downgrade on the card. Copy the question it asks before anything starts, word for word, and what the tester chose. Then write down every window that opened, and whether the tester had to touch Steam at all. | | | |
 | 27 | When the launcher says it is done, measure the build again (M2) and write down the build the Play page shows. | | | |
-| 28 | Open Steam's Downloads page and write down whether Skyrim is queued for an update again. | | | |
+| 28 | Copy the question the launcher asks once the downgrade has worked, about Steam updating Skyrim by itself, and write down what the tester did with it. With Steam running, write down what Skyrim's Properties, Updates page shows under Automatic Updates, and whether Steam's Downloads page has Skyrim queued for an update again. | | | |
 
 ### Discord in the launcher
 
@@ -229,7 +236,7 @@ takes it here, and row 30 records which order the tester really took.
 | # | Step | Clock | Seen, word for word | A stranger would instead |
 | --- | --- | --- | --- | --- |
 | 43 | Write down any update the launcher offered, how many, and how long it took. | | | |
-| 44 | Write down the line under the title (plugins, game build, launcher version) and every check row, green or red. | | | |
+| 44 | Write down the line under the title (plugins, game build, launcher version), every check row, green or red, the bar above Play if there is one, and the First time card. | | | |
 | 45 | The run ends when the Play button reads PLAY and can be pressed. Write down the time. Do not press it. | | | |
 | 46 | Measure the free space on C: again (M1), and the size of `C:\Thornswood` (M6). | | | |
 
@@ -251,7 +258,7 @@ with the row it came up at.
 
 ## Commands
 
-M1 to M7 run on the virtual machine. C1 and C2 run on Patrick's machine. All of
+M1 to M8 run on the virtual machine. C1 and C2 run on Patrick's machine. All of
 them only read, except M7, which copies files out of the virtual machine into
 `C:\ts-clean-run` on Patrick's machine.
 
@@ -324,6 +331,15 @@ Copy-Item C:\Thornswood\Profile\LocalAppData\plugins.txt "$out\Profile\LocalAppD
 Copy-Item C:\Thornswood\Profile\launcher.log "$out\"
 ```
 
+**M8, the installer's checksum.** Prints the SHA-256 of the newest installer in
+the Downloads folder, in lower case the way the Downloads page prints it, then
+the file it read. An installer published before the page printed a checksum has
+none there, and then row 15 says so.
+
+```powershell
+Get-ChildItem "$env:USERPROFILE\Downloads\Thornswood-Setup*.exe" | Sort-Object LastWriteTime | Select-Object -Last 1 | Get-FileHash -Algorithm SHA256 | ForEach-Object { $_.Hash.ToLower() + '  ' + $_.Path }
+```
+
 **C1 and C2, the two read-only checks, on Patrick's machine.** The first line
 goes to the repo folder.
 
@@ -379,7 +395,12 @@ tester confused by a list that no longer matches.
 | 23 | `Skyrim is on the wrong build` | `tools\app\Shell.cs` |
 | 23 | `Thornswood is sharing one Skyrim with every other server on this machine` | `tools\app\ShellOwnGame.cs` |
 | 25 | `MB the installer left behind on your drive.` | `tools\app\Shell.cs` |
+| 26 | `Downgrade Skyrim to 1.6.1170?` | `tools\app\Shell.cs` |
+| 26 | `Do not type or click while Steam's window is in front, or the keys go to the wrong place.` | `tools\app\Shell.cs` |
 | 26 | `Downgrading Skyrim to 1.6.1170.` | `tools\app\Downgrade.cs` |
+| 28 | `Skyrim is on 1.6.1170 now, but Steam can still update it by itself` | `tools\app\ShellSteamUpdates.cs` |
+| 28 | `Exit Steam from its own menu (Steam, Exit), then press Yes.` | `tools\app\ShellSteamUpdates.cs` |
+| 28 | `Wait until I launch the game` | `tools\app\SteamUpdates.cs` |
 | 29 | `Your mods are not installed yet` | `tools\app\Shell.cs` |
 | 29 | `Connect Discord first and this opens the collection.` | `tools\app\Shell.cs` |
 | 29 | `INSTALL THE MODS FIRST` | `tools\app\Shell.cs` |
@@ -394,6 +415,9 @@ tester confused by a list that no longer matches.
 | 42 | `is missing, the launcher will fetch it` | `tools\app\Checks.cs` |
 | 42 | `The client runtime is back to the recorded build.` | `tools\app\ClientRuntime.cs` |
 | 43 | `UPDATE FIRST` | `tools\app\Shell.cs` |
+| 44 | `Give your character a name that belongs in Skyrim` | `tools\ui.xaml` |
+| 44 | `Closed for maintenance` | `tools\app\FeedNotice.cs` |
+| 44 | `This launcher is too old to play` | `tools\app\FeedNotice.cs` |
 | 45 | `PLAY` | `tools\app\Shell.cs` |
 | 48 | `This build is byte for byte what the server expects.` | `tools\Check-Build.ps1` |
 | 49 | `you have every plugin the server wants` | `tools\Check-Manifest.ps1` |
@@ -417,11 +441,18 @@ right or wrong. To Do entries are named by title, because their numbers move.
 - **Two different ways to fix the build (rows 20 and 26).** The console says to
   pick 1.6.1170 under Betas in Steam. The launcher and the join page use the
   Downgrade button, which asks Steam for the old build through Steam's console.
-  Row 20 records whether Steam's Betas list offers 1.6.1170 at all. How the
-  button drives Steam is owned by "Downgrade
-  drives Valve's own window by synthesised keystrokes at a measured pixel
-  offset, with no consent screen". The two instructions disagreeing has no
-  entry, and neither has Steam queuing the update again (row 28).
+  Row 20 records whether Steam's Betas list offers 1.6.1170 at all. Since
+  24 Sep the button asks first, naming the three lines it will type into
+  Steam's console, so row 26 starts with a Yes or No. The keystrokes
+  themselves are still owned by "Downgrade drives Valve's own window by
+  synthesised keystrokes at a measured pixel offset, with no consent screen".
+  The two instructions disagreeing has no entry.
+- **Steam taking Skyrim back to the newer build (row 28).** Once a downgrade
+  has worked, the launcher asks whether to set Skyrim's Automatic Updates in
+  Steam to "Wait until I launch the game", and asks for Steam to be exited
+  first, because Steam writes its own setting back when it closes. No leaves
+  it as it is. Either way Steam still updates the game when it is started from
+  Steam. Owned by "Nothing stops Steam putting Skyrim back on the wrong build".
 - **"It does not make a second copy of the game" (rows 3 and 17).** The setup
   window and the join page both say so. Then the launcher makes
   `C:\Thornswood\Game`: hard links for most of it, but real copies of the master
@@ -437,10 +468,12 @@ right or wrong. To Do entries are named by title, because their numbers move.
   the collection. The launcher opens on Downgrade instead, keeps the collection
   card hidden until the build is right, and then asks for Discord before it will
   open the collection. No entry.
-- **The console's last word is out of date (row 22).** When every check passes
-  it ends with "Make a character named after yourself, save once, then connect."
-  The join page says the game asks at its main menu which character to be. No
-  entry.
+- **The console's last word is out of date (rows 22 and 44).** When every check
+  passes it ends with "Make a character named after yourself, save once, then
+  connect." The join page says the game asks at its main menu which character
+  to be, and since 24 Sep the launcher's First time card asks for a name that
+  belongs in Skyrim and not your own, and says nothing about saving. So the
+  console now disagrees with the launcher it opens. No entry.
 - **The Address Library and Start On Save (rows 36 and 41).** Expected missing
   unless the collection delivers them. Owned by "The launcher never checks the
   Address Library, so a whole class of failure reads as green" and by "Start On
@@ -450,9 +483,16 @@ right or wrong. To Do entries are named by title, because their numbers move.
   forever, and one GitHub login is all that stands between a stranger and every
   installed machine".
 - **Updates on the first open (row 43).** An installer older than the last
-  release offers what came after it. Owned by "The installer is a snapshot of
-  your game folder with your home folder path baked into the script, and it is
+  release offers what came after it. One built with no record of the packs it
+  already holds offers every pack ever published, and `tools\Check-Outside.ps1`
+  found on 24 Sep that 164 of the feed's 227 packs point at a repository a
+  stranger cannot download from. Owned by "The installer is a snapshot of your
+  game folder with your home folder path baked into the script, and it is
   stale by design".
+- **Play held by the feed (rows 44 and 45).** The update feed can now put a
+  bar above Play and hold Play for maintenance or for a launcher too old to
+  play. If row 45 never reaches PLAY because of it, copy the bar word for word
+  and stop there.
 - **The client runtime is left out of the own folder on purpose (row 42).** The
   own folder never takes the six client files from the Steam copy (`Skip` in
   `tools\app\OwnGame.cs`), so right after the restart the Client row should read
@@ -487,8 +527,10 @@ right or wrong. To Do entries are named by title, because their numbers move.
   Skyrim and Vortex are not ours, and once they have been timed from nothing a
   run that only tests what is ours can start there and say so on its Last run
   line.
-- M1 to M6 can become one script that writes its answers to a file, so the
-  measuring rows are pasted rather than typed.
+- M1 to M6 and M8 can become one script that writes its answers to a file, so
+  the measuring rows are pasted rather than typed. `tools\Check-Outside.ps1`
+  already scripts the outside half: what the feed, GitHub, Steam and Nexus
+  answer a stranger.
 - The setup console keeps no record of itself, which is why rows 20 to 22 lean
   on a screenshot taken in time. A transcript in `C:\Thornswood\Profile` would
   make those rows a copy.
