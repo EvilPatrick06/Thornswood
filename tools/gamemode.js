@@ -1376,7 +1376,20 @@ function creditWork(actorId, key) {
   */
   try {
     const needs = globalThis.__thornswoodNeeds;
-    if (needs && needs.worked) { needs.worked(actorId); }
+    if (needs && needs.worked) {
+      /*
+        AND IT SAYS SO WHEN THE WORK ACTUALLY TELLS. worked() costs rest per
+        swing now rather than nudging a rate, so it can cross a band, and a
+        band crossing is the one thing worth interrupting somebody for. Every
+        swing before that says nothing, which is the same rule the seam and
+        the chopping block already follow.
+      */
+      const tiredLine = needs.worked(actorId);
+      if (tiredLine) {
+        try { notify(actorId, tiredLine); } catch (e) { }
+        try { say(actorId, tiredLine); } catch (e) { }
+      }
+    }
   } catch (e) { }
 
   /*
@@ -19579,14 +19592,31 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     },
 
     /*
-      Working your trade costs rest faster, and rank pays it back.
+      WORKING COSTS REST, AND IT IS A COST PER SWING RATHER THAN A RATE.
 
       Blade: "When doing your skilled profession, it drains your Exhaustion
       faster. As you level up your skill it doesn't drain your exhaustion
-      meter as fast." A multiplier on the rest drain while somebody is working,
-      for the two minutes after each piece of work.
+      meter as fast."
+
+      That was a multiplier on the drain for two minutes after each piece of
+      work, and Patrick found what it is worth: "I didn't get anymore tired
+      while mining or smithing". He is right, and the arithmetic says why.
+      Rest drains 12.5 a real hour. Doubled for a novice, for two minutes,
+      that is four tenths of one point for a whole spell of mining. It was
+      working perfectly and nobody was ever going to feel it.
+
+      So the work itself costs, on the swing, and the rank is what it costs
+      rather than how fast the clock runs. A novice loses a point and a half
+      a swing, which is twenty swings for a third of the meter and is a
+      morning's work; a master loses half of that, which is the whole of what
+      Blade asked for.
+
+      THE MULTIPLIER IS GONE, not kept beside this. Two things charging for
+      the same swing is how a number ends up twice what anybody meant, and
+      the rate version is the one nobody could feel.
     */
-    workRest: { novice: 2.0, advanced: 1.75, expert: 1.5, master: 1.25 },
+    work: { novice: 1.5, advanced: 1.2, expert: 0.9, master: 0.6 },
+    workRest: { novice: 1.0, advanced: 1.0, expert: 1.0, master: 1.0 },
     workFor: 120000,   // how long one swing counts as still working
 
     /*
@@ -20471,11 +20501,36 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     return 'You settle down to rest.' + extra;
   }
 
-  /** A piece of work was done, so rest drains faster for a while. */
+  /*
+    A piece of work was done, so it costs rest. See NEEDS.work.
+
+    Answers a line when the cost crossed a band, because getting tired enough
+    to matter is worth being told about and every swing before that is not.
+  */
   function worked(actorId) {
     var n = settle(actorId);
+    var was = { food: bandOf(n.food), drink: bandOf(n.drink), rest: bandOf(n.rest),
+                temp: tempBand(n.temp).name };
+    var rank = 'novice';
+    try {
+      var P = g.__thornswoodProgression;
+      var C = g.__thornswoodCharacter;
+      if (P && C && C.stateOf) {
+        var s = C.stateOf(actorId);
+        var ranks = (s && s.ranks) || {};
+        var order = ['novice', 'advanced', 'expert', 'master'];
+        for (var k in ranks) {
+          if (!Object.prototype.hasOwnProperty.call(ranks, k)) { continue; }
+          if (order.indexOf(ranks[k]) > order.indexOf(rank)) { rank = ranks[k]; }
+        }
+      }
+    } catch (e) { }
+    var cost = NEEDS.work[rank];
+    if (typeof cost !== 'number') { cost = NEEDS.work.novice; }
+    n.rest = clamp(n.rest - cost);
     n.worked = Date.now();
     write(actorId, n);
+    return crossed(actorId, was, n);
   }
 
   /** Somebody says they are playing. See bardNear. */
