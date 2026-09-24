@@ -1,6 +1,6 @@
 # Thornswood
 
-Five player co-op Skyrim. One install, and it does not touch the Skyrim you
+Co-op Skyrim for five people. One install, and it does not touch the Skyrim you
 already have.
 
 ## Download
@@ -34,7 +34,7 @@ deleted, so whatever else you play with it keeps working.
 Our server runs game build **1.6.1170** and Steam ships something newer. If
 yours is newer, the installer shows three `download_depot` commands and puts
 them on your clipboard. Paste them into the Steam console **one at a time** and
-wait for each to print `Done` — there's no progress bar. Then press Enter in
+wait for each to print `Done`. There's no progress bar. Then press Enter in
 the installer.
 
 That's Steam giving you an older build of a game you already own. It downloads
@@ -52,7 +52,7 @@ Desktop shortcut: **Thornswood**.
 Then press Play and connect to the address in the launcher. Password is in
 Discord.
 
-`F2` — party, who's online, teleport to someone, chat.
+`F2`: party, who's online, teleport to someone, chat.
 
 ## Different from normal Skyrim
 
@@ -66,16 +66,16 @@ Discord.
 
 ## Adding your own mods
 
-**Textures, meshes, sounds — fine.** Launcher → Mods → *Your own*, drop them in
+**Textures, meshes, sounds: fine.** Launcher → Mods → *Your own*, drop them in
 that folder and they get copied in every launch.
 
-**Anything with a plugin — no.** The launcher checks your list before it lets
+**Anything with a plugin: no.** The launcher checks your list before it lets
 you play and will stop you, because a mismatched list desyncs the whole server.
 
 ## Updates
 
 The launcher checks on startup and you get only the files that changed, not the
-whole thing again. Take them when it offers — mismatched lists can't play
+whole thing again. Take them when it offers. Mismatched lists can't play
 together.
 
 ## Something's wrong

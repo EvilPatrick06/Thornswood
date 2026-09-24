@@ -46,7 +46,7 @@ Position and cell. Health, magicka and stamina. Death and respawn, including whe
 | Behaviour | Reason |
 |---|---|
 | Nothing in the creation hall is a choice | Your profession, half, class and town are chosen in the launcher before Play, and the hall holds nothing to pick up or read |
-| Start On Save is in the mod list but never loads a save | The launcher points it at a character that does not exist. A single player save cannot be loaded under Thornswood, and loading one crashed the game on a fresh install |
+| Start On Save is in the mod list but never loads a save | The launcher points it at a character that does not exist. An ordinary Skyrim save cannot be loaded under Thornswood, and loading one crashed the game on a fresh install |
 | Your face is made in the hall, not in the launcher | The race menu opens once the game has loaded. Everything else about a new character is decided in the launcher |
 
 ## The load order rule

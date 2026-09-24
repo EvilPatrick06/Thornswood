@@ -118,7 +118,7 @@ they are usually the difference between a fix and a guess.
 - NPCs stand still when nobody is near them.
 - No levelling, no fast travel, and the difficulty is fixed at Expert.
 - Start On Save is in the mod list but never loads a save. The launcher points
-  it at a character that does not exist, on purpose: a single player save
+  it at a character that does not exist, on purpose: an ordinary Skyrim save
   cannot be loaded under Thornswood.
 - The creation hall is empty on purpose. Your trade and town come from the
   launcher, and the hall is only where the face gets made.

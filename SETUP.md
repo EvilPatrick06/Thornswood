@@ -43,7 +43,7 @@ Once, after the bundle is out:
 .\tools\Publish-Update.ps1 -Baseline
 ```
 
-That writes `C:\SkyrimTogether\_dist\published.json` — the state everyone is
+That writes `C:\SkyrimTogether\_dist\published.json`, the state everyone is
 known to have. Every later run diffs against it.
 
 ## Publishing a change

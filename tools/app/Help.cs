@@ -204,7 +204,7 @@ new HelpItem("Emotes", "It will not open over a menu",
             new HelpItem("Tips", "Take updates when they are offered",
                 "When the mod list changes you get only the files that changed, not the whole build again, verified by checksum before anything is written. Lists that do not match cannot play together, so there is no upside to putting it off."),
 
-            new HelpItem("If it breaks", "You loaded into single player with no character creation",
+            new HelpItem("If it breaks", "You loaded into an offline game with no character creation",
                 "A long wait, a black screen, and then you are standing in Skyrim on your own with no menus and nobody else about. That is not a crash. Nothing was answering at the server address, so nothing ever created a character for you. The launcher checks before it starts the game now and says so rather than letting you find out twenty minutes in. If the server runs on your own machine, press Play and it starts it for you."),
 
             new HelpItem("If it breaks", "You keep getting yesterday's character",
