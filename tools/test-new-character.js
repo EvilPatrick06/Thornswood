@@ -151,6 +151,31 @@ if (block !== null) {
       /if \(e && e\.worn && e\.baseId\) \{ ids\.push\(e\.baseId\); \}/.test(code));
   yes('and the ask is taken back, so it cannot fire again at the next login',
       /mp\.set\(actorId, WEAR_PROPERTY, \{ ids: \[\], at: 0 \}\)/.test(code));
+
+  /*
+    AND NOBODY HAS TO WALK THROUGH A DOOR TO GET DRESSED.
+
+    Patrick, on being told a relog would show it: "your clothes should be
+    fucking on if you left them". Dressing at the door only helps the person
+    who arrives afterwards; anybody already standing in the world in their
+    skin stayed that way until they quit.
+
+    The server can READ the equipment record even though it cannot write one,
+    so it can see somebody wearing nothing beside a pack that says otherwise.
+    That is the only state it acts on: taking your boots off is a decision,
+    and this must never argue with one.
+  */
+  yes('somebody already standing there undressed is put right where they are',
+      /function dressIfBare\(actorId\)/.test(code) && /dressIfBare\(actorId\)/.test(
+        code.slice(code.indexOf('function dressIfBare'))));
+  yes('it reads what they actually have on rather than assuming',
+      /function wornNow\(actorId\)/.test(code) && /mp\.get\(actorId, 'equipment'\)/.test(code));
+  yes('an equipment record it cannot read is left alone, because unreadable is not empty',
+      /if \(on === null\) \{ return ''; \}/.test(code));
+  yes('and it only ever acts on somebody wearing nothing at all',
+      /if \(on\.length\) \{/.test(code));
+  yes('it gives up rather than arguing forever',
+      /DRESS_TRIES/.test(code) && /if \(\(dressTried\[actorId\] \|\| 0\) >= DRESS_TRIES\) \{ return ''; \}/.test(code));
 }
 
 console.log('');
