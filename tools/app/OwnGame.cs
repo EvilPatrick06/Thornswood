@@ -134,8 +134,17 @@ namespace Thornswood
             // Vortex back at the Steam copy would otherwise leave Thornswood
             // following a folder Vortex has purged, with nothing said and only
             // Forget in Settings as a way out. Found in review, 24 September.
-            string s = cfg == null || cfg.VortexGame == null ? "" : cfg.VortexGame.Trim().TrimEnd('\\');
-            if (s.Length > 0 && File.Exists(Path.Combine(s, "SkyrimSE.exe")) && HasRecord(s))
+            //
+            // Quotes are taken off and nothing here may throw: a path typed
+            // into config.json by hand, pasted from Explorer's Copy as path,
+            // arrives in quotes, and Path.Combine threw on it out of here and
+            // out of the Settings card on the window's thread. Found by the
+            // verification of hotfix 1.1.93.
+            string s = cfg == null || cfg.VortexGame == null ? "" : cfg.VortexGame.Trim().Trim('"').Trim().TrimEnd('\\');
+            bool usable = false;
+            try { usable = s.Length > 0 && File.Exists(Path.Combine(s, "SkyrimSE.exe")) && HasRecord(s); }
+            catch { usable = false; }
+            if (usable)
             {
                 Chosen(s, "VortexGame in config.json names it");
                 return s;
@@ -278,7 +287,8 @@ namespace Thornswood
         public static string PointAt(Config cfg, string folder, out bool ok)
         {
             ok = false;
-            string f = (folder ?? "").Trim();
+            // Quotes off, for the same reason as in DeploysInto.
+            string f = (folder ?? "").Trim().Trim('"').Trim();
             if (f.Length == 0)
             {
                 cfg.VortexGame = "";
@@ -297,8 +307,14 @@ namespace Thornswood
             ok = true;
             string game = GameFor(f);
             if (SameFolder(game, f)) return "Thornswood now takes what Vortex deployed from " + f + ".";
+            // No Steam copy: saying the game will come from one was untrue on
+            // exactly that machine (verification of hotfix 1.1.93). WhyNot
+            // refuses to build there; this says so up front.
+            if (game.Length == 0)
+                return "Thornswood will take what Vortex deployed into " + f + ", but it takes the game itself only from Steam's own copy of Skyrim Special Edition, " +
+                       "and this machine has none, so the folder cannot be made until Skyrim Special Edition is installed in Steam.";
             return "Thornswood now takes what Vortex deployed into " + f + " from Vortex's own mods folder, only the files Vortex's record lists, and the game itself from " +
-                   (game.Length > 0 ? "the Steam copy in " + game : "a Steam copy of Skyrim Special Edition") + ". Nothing else in " + f + " is used.";
+                   "the Steam copy in " + game + ". Nothing else in " + f + " is used.";
         }
 
         // ------------------------------------------------------------ is it time
@@ -339,27 +355,40 @@ namespace Thornswood
                 return "This install has no reference plugin list yet, so there is no telling whether Vortex has Thornswood's collection on. Let the launcher update first.";
             Record rec = apart ? Staged(src) : null;
             HashSet<string> stale = null;
-            int missing = 0;
+            int missing = 0, unstaged = 0;
             foreach (string p in want)
             {
                 try
                 {
                     // Apart, a plugin counts only where Gather will take it
                     // from: Vortex's mods folder by its record, or the Steam
-                    // copy's own game.
+                    // copy's own game. One the record lists whose copy in
+                    // Vortex's mods folder is gone is counted apart: the
+                    // Thornswood profile is deployed, the deployment is just
+                    // out of date (verification of hotfix 1.1.93).
                     string from;
                     if (!apart) { if (!File.Exists(Path.Combine(src, "Data", p))) missing++; }
                     else if (!(rec.From.TryGetValue("Data\\" + p, out from) && File.Exists(from)))
                     {
                         if (stale == null) stale = Deployed(game);
-                        if (!File.Exists(Path.Combine(game, "Data", p)) || stale.Contains("Data\\" + p)) missing++;
+                        if (!File.Exists(Path.Combine(game, "Data", p)) || stale.Contains("Data\\" + p))
+                        {
+                            if (from != null) unstaged++; else missing++;
+                        }
                     }
                 }
                 catch { missing++; }
             }
-            if (missing > 0)
-                return missing + " of Thornswood's " + want.Count + " plugins are not in " + src +
-                       ", so Vortex has another profile deployed. In Vortex, enable the Thornswood profile and let it deploy, then try again.";
+            if (missing == 0 && unstaged > 0)
+                return unstaged + " of Thornswood's " + want.Count + " plugins are in Vortex's record for " + src +
+                       " but no longer in Vortex's own mods folder, so that deployment is out of date. In Vortex, press Deploy Mods, then try again.";
+            // Not only another profile: Vortex may be deploying Thornswood into
+            // a different folder while an old record sits here, which is the
+            // one case the search cannot see past. The picker is the way out.
+            if (missing + unstaged > 0)
+                return (missing + unstaged) + " of Thornswood's " + want.Count + " plugins are not in " + src +
+                       ", so Vortex has another profile deployed, or deploys Thornswood into another folder. In Vortex, enable the Thornswood profile and let it deploy. " +
+                       "If it is deployed, Mods, Open, Open Game Folder in Vortex shows where, and Choose Vortex's folder in Settings points Thornswood at it.";
 
             if (!SameVolume(game, Paths.Root))
                 return "Skyrim is on " + Volume(game) + " and Thornswood is on " + Volume(Paths.Root) +

@@ -758,6 +758,25 @@ namespace Thornswood
             Yes("and says the game itself still comes from the Steam copy", said.IndexOf("Steam copy", StringComparison.Ordinal) >= 0 && Clean(said));
             said = PointAt(s.Cfg, "", out ok);
             Yes("and it can be cleared, handing back to the search", ok && s.Cfg.VortexGame == "" && Config.Load(Paths.CfgFile).VortexGame == "" && Clean(said));
+
+            // Verification of hotfix 1.1.93: a path pasted from Explorer's Copy
+            // as path arrives in quotes, and Path.Combine threw on it.
+            said = PointAt(s.Cfg, "\"" + k + "\"", out ok);
+            Yes("a folder pasted in quotes is taken", ok && string.Equals(Config.Load(Paths.CfgFile).VortexGame, k, StringComparison.OrdinalIgnoreCase));
+            s.Cfg.VortexGame = "\"" + k + "\"";
+            string into = null; bool threw = false;
+            try { into = DeploysInto(s.Cfg); } catch { threw = true; }
+            Yes("and VortexGame typed in quotes by hand neither throws nor is ignored", !threw && string.Equals(into, k, StringComparison.OrdinalIgnoreCase));
+            s.Cfg.VortexGame = k;
+
+            // Vortex's record lists a Thornswood plugin whose copy in Vortex's
+            // mods folder is gone: the Thornswood profile is deployed, the
+            // deployment is out of date. It must not say another profile.
+            Paths.Game = s.Common(s.Steam, "Skyrim Special Edition");
+            File.Delete(Path.Combine(s.Staging, "ModA\\TsOne.esp"));
+            string why = OwnGame.WhyNot(s.Cfg, k);
+            Yes("a staged copy gone missing is called an out of date deployment, not another profile",
+                why != null && why.IndexOf("Deploy Mods", StringComparison.Ordinal) >= 0 && why.IndexOf("another profile", StringComparison.Ordinal) < 0 && Clean(why));
         }
 
         // ---- 5: nothing deployed ---------------------------------------------
@@ -790,6 +809,12 @@ namespace Thornswood
             bool threw = false;
             try { OwnGame.Make(s.Cfg, null); } catch { threw = true; }
             Yes("and nothing is built", threw && !Directory.Exists(OwnGame.Folder));
+            // Verification of hotfix 1.1.93: the picker said the game would come
+            // from a Steam copy on the one machine that has none.
+            bool ok;
+            string said = PointAt(s.Cfg, k, out ok);
+            Yes("the picker does not promise a Steam copy the machine lacks",
+                said.IndexOf("has none", StringComparison.Ordinal) >= 0 && said.IndexOf("the Steam copy in", StringComparison.Ordinal) < 0 && Clean(said));
         }
     }
 }
