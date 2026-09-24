@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 177 of them, with the one line that says
+Every `.ps1` in this folder, 178 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -190,6 +190,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-swallow.ps1](test-swallow.ps1) | The silent catches in the launcher, entry 239 on the To Do List, and the rule that stops their number growing. |
 | [test-voice-ticket.ps1](test-voice-ticket.ps1) | The Discord ticket only goes to the voice service over https. |
 | [test-voice-turn-url.ps1](test-voice-turn-url.ps1) | Install-Voice.ps1 can hand the voice service a relay address, keeps it on the next install the way it keeps -Bind and -Auth, says so when it drops one that has no key, and with no relay sends the service the command line it always sent. |
+| [test-vortex-folder.ps1](test-vortex-folder.ps1) | Scan finds the Skyrim folder Vortex really deploys into, Fix builds Thornswood's own folder from it, and nothing of another server's install comes with it. |
 | [test-watch-disk.ps1](test-watch-disk.ps1) | The watchdog on the VPS watches the disk, and says so once when a line is crossed rather than on every five minute run. |
 | [test-watch-load.ps1](test-watch-load.ps1) | The load record the VPS keeps, and the note read out of it. |
 | [vps-dev-instance.ps1](vps-dev-instance.ps1) | Runs ON the VPS. Makes the dev game server and the dev voice server beside the live ones, from copies of the live installs, on their own ports, with their own scheduled tasks, firewall rules and watchdog entries. |
