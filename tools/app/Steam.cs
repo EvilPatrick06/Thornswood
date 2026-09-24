@@ -46,9 +46,18 @@ namespace Thornswood
             return cached;
         }
 
+        /// <summary>
+        /// Where Steam is, instead of asking the registry. Only
+        /// tools\test-vortex-folder.ps1 sets it, to a pretend Steam in a
+        /// scratch folder, so the search for Vortex's folder can be run
+        /// against libraries it made. The launcher leaves it null.
+        /// </summary>
+        public static string RootForTest;
+
         /// <summary>Where Steam is installed, or "" .</summary>
         public static string Path_()
         {
+            if (RootForTest != null) return RootForTest;
             foreach (string key in new string[] {
                 @"Software\Valve\Steam", @"Software\Wow6432Node\Valve\Steam" })
             {
@@ -112,7 +121,17 @@ namespace Thornswood
         /// </summary>
         public static string SkyrimPath()
         {
-            const string tail = "steamapps\\common\\Skyrim Special Edition";
+            System.Collections.Generic.List<string> copies = SkyrimCopies();
+            return copies.Count > 0 ? copies[0] : "";
+        }
+
+        /// <summary>
+        /// Every Steam library on this machine: Steam's own folder first, then
+        /// each path in config\libraryfolders.vdf, in the order Steam lists
+        /// them. The same list SkyrimPath has always searched.
+        /// </summary>
+        public static System.Collections.Generic.List<string> Libraries()
+        {
             string root = Path_();
 
             var roots = new System.Collections.Generic.List<string>();
@@ -138,17 +157,54 @@ namespace Thornswood
                 }
             }
             catch { }
+            return roots;
+        }
 
-            foreach (string r in roots)
+        /// <summary>
+        /// Every Steam copy of Skyrim Special Edition on this machine, in the
+        /// order SkyrimPath tries them, so the first is its answer. Somebody
+        /// with two libraries can have two.
+        /// </summary>
+        public static System.Collections.Generic.List<string> SkyrimCopies()
+        {
+            const string tail = "steamapps\\common\\Skyrim Special Edition";
+            var copies = new System.Collections.Generic.List<string>();
+            foreach (string r in Libraries())
             {
                 try
                 {
                     string g = System.IO.Path.Combine(r, tail);
-                    if (File.Exists(System.IO.Path.Combine(g, "SkyrimSE.exe"))) return g;
+                    if (!File.Exists(System.IO.Path.Combine(g, "SkyrimSE.exe"))) continue;
+                    bool seen = false;
+                    foreach (string c in copies) if (Same(c, g)) seen = true;
+                    if (!seen) copies.Add(g);
                 }
                 catch { }
             }
-            return "";
+            return copies;
+        }
+
+        /// <summary>
+        /// True when <paramref name="path"/> is one of Steam's own copies of
+        /// Skyrim Special Edition. Anything else, another server's copy of the
+        /// game above all, is never where Thornswood takes the game itself
+        /// from (OwnGame.Source).
+        /// </summary>
+        public static bool IsSkyrimCopy(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            foreach (string c in SkyrimCopies()) if (Same(c, path)) return true;
+            return false;
+        }
+
+        static bool Same(string a, string b)
+        {
+            try
+            {
+                return string.Equals(System.IO.Path.GetFullPath(a).TrimEnd('\\'),
+                                     System.IO.Path.GetFullPath(b).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
         }
 
         /// <summary>

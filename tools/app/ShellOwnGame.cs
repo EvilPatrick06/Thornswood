@@ -18,17 +18,21 @@ namespace Thornswood
     {
         static bool ownGameBusy, ownGameStarted, restarting;
         static TextBlock txtOwnGameState;
-        static Button btnOwnGameMake, btnOwnGameRefresh;
+        static Button btnOwnGameMake, btnOwnGameRefresh, btnOwnGamePick, btnOwnGameForget;
 
         static void WireOwnGame()
         {
             txtOwnGameState = F<TextBlock>("TxtOwnGameState");
             btnOwnGameMake = F<Button>("BtnOwnGameMake");
             btnOwnGameRefresh = F<Button>("BtnOwnGameRefresh");
+            btnOwnGamePick = F<Button>("BtnOwnGamePick");
+            btnOwnGameForget = F<Button>("BtnOwnGameForget");
             var panel = F<StackPanel>("PnlOwnGame");
 
             if (btnOwnGameMake != null) btnOwnGameMake.Click += delegate { AskOwnGame(false); };
             if (btnOwnGameRefresh != null) btnOwnGameRefresh.Click += delegate { StartOwnGame(false, true); };
+            if (btnOwnGamePick != null) btnOwnGamePick.Click += delegate { PickVortexFolder(); };
+            if (btnOwnGameForget != null) btnOwnGameForget.Click += delegate { ForgetVortexFolder(); };
             if (panel != null) panel.IsVisibleChanged += delegate { if (panel.IsVisible) DrawOwnGame(); };
 
             // Once the window is on screen, so a question has something to sit
@@ -102,7 +106,7 @@ namespace Thornswood
                     if (active) refresh = OwnGame.NeedsRefresh(c);
                     else if (collection && !OwnGame.Declined)
                     {
-                        string src = OwnGame.Source(c);
+                        string src = OwnGame.DeploysInto(c);
                         // Offered whenever it is possible. It used to be offered
                         // only when another server's files were found in the
                         // Steam copy, on the grounds that sharing a Skyrim was
@@ -159,7 +163,7 @@ namespace Thornswood
         {
             if (!Paths.Collection) return true;
 
-            string src = OwnGame.Source(cfg);
+            string src = OwnGame.DeploysInto(cfg);
             string why = OwnGame.WhyNot(cfg, src);
 
             if (why == null)
@@ -192,7 +196,8 @@ namespace Thornswood
         static void AskOwnGame(bool atStart)
         {
             if (OwnGame.Active) { Log("Thornswood already runs from its own Skyrim folder, " + OwnGame.Folder + "."); return; }
-            string src = OwnGame.Source(cfg);
+            string src = OwnGame.DeploysInto(cfg);
+            string game = OwnGame.Source(cfg);
             string why = OwnGame.WhyNot(cfg, src);
             if (why != null)
             {
@@ -205,7 +210,10 @@ namespace Thornswood
                 "Give Thornswood a Skyrim folder of its own?\n\n" +
                 "Thornswood and other servers are sharing one Skyrim right now, which is how their menus, plugins and mods get into each other. " +
                 "With a folder of its own, Thornswood only ever starts from " + OwnGame.Folder + ", and switching profiles in Vortex no longer reaches it.\n\n" +
-                "It is made from what Vortex has deployed in " + src + ". The big files are links, so the collection is not on the disk twice. " +
+                "It is made from what Vortex has deployed in " + src +
+                (string.Equals(game, src, StringComparison.OrdinalIgnoreCase) ? "" :
+                    ", only the files Vortex's record there lists, with the game itself from the Steam copy in " + game + ". Nothing else in " + src + " comes with it") +
+                ". The big files are links, so the collection is not on the disk twice. " +
                 "It takes a few minutes, and the launcher restarts when it is done." +
                 (atStart ? "\n\nSay no and the button stays in Settings, under Maintenance." : ""),
                 "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -338,16 +346,28 @@ namespace Thornswood
         {
             if (txtOwnGameState == null) return;
             bool active = OwnGame.Active;
+            string into = OwnGame.DeploysInto(cfg), game = OwnGame.Source(cfg);
+            string from = into + (string.Equals(game, into, StringComparison.OrdinalIgnoreCase) ? "" : ", with the game itself from " + game);
             string state;
             if (ownGameBusy) state = "Working on it now.";
-            else if (active) state = "On. Thornswood runs from " + OwnGame.Folder + ", made from " + OwnGame.Source(cfg) + ".";
+            else if (active) state = "On. Thornswood runs from " + OwnGame.Folder + ", made from " + from + ".";
             else if (!Paths.Collection) state = "This install already has a Game folder of its own from its installer.";
             else
             {
-                string why = OwnGame.WhyNot(cfg, OwnGame.Source(cfg));
-                state = why == null ? "Off. Vortex has the Thornswood collection deployed, so it can be made now." : "Off. " + why;
+                string why = OwnGame.WhyNot(cfg, into);
+                state = why == null ? "Off. Vortex has the Thornswood collection deployed in " + from + ", so it can be made now." : "Off. " + why;
             }
+            // Which folder is Vortex's, and whether somebody chose it, so a
+            // choice that has gone stale can be seen and forgotten.
+            if (!string.IsNullOrEmpty(cfg.VortexGame))
+                state += "\nVortex's folder is set to " + cfg.VortexGame + ". Forget the chosen folder to have Thornswood look for it again.";
             txtOwnGameState.Text = state;
+            if (btnOwnGamePick != null) btnOwnGamePick.IsEnabled = !ownGameBusy;
+            if (btnOwnGameForget != null)
+            {
+                btnOwnGameForget.Visibility = string.IsNullOrEmpty(cfg.VortexGame) ? Visibility.Collapsed : Visibility.Visible;
+                btnOwnGameForget.IsEnabled = !ownGameBusy;
+            }
 
             if (btnOwnGameMake != null)
             {
@@ -359,6 +379,47 @@ namespace Thornswood
                 btnOwnGameRefresh.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
                 btnOwnGameRefresh.IsEnabled = !ownGameBusy;
             }
+        }
+
+        /// <summary>
+        /// Choose Vortex's folder, in Settings: for a folder the search in
+        /// OwnGame.DeploysInto cannot find, because it is not in a Steam
+        /// library. OwnGame.PointAt takes it only when it is a Skyrim Vortex has
+        /// deployed into, and says what it did either way.
+        /// </summary>
+        static void PickVortexFolder()
+        {
+            if (ownGameBusy) return;
+            string chosen;
+            using (var dlg = new System.Windows.Forms.FolderBrowserDialog())
+            {
+                dlg.Description = "Choose the Skyrim folder Vortex deploys into. In Vortex, Mods, Open, Open Game Folder opens it.";
+                dlg.ShowNewFolderButton = false;
+                try
+                {
+                    string start = OwnGame.DeploysInto(cfg);
+                    if (start.Length > 0 && Directory.Exists(start)) dlg.SelectedPath = start;
+                }
+                catch { }
+                if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+                chosen = dlg.SelectedPath;
+            }
+            bool ok;
+            string said = OwnGame.PointAt(cfg, chosen, out ok);
+            Log(said);
+            if (!ok) MessageBox.Show(said, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
+            else if (OwnGame.Active) Log("Bring it up to date from Vortex takes it in now; otherwise the launcher does it the next time it starts.");
+            DrawOwnGame();
+            DrawStatus();
+        }
+
+        static void ForgetVortexFolder()
+        {
+            if (ownGameBusy) return;
+            bool ok;
+            Log(OwnGame.PointAt(cfg, "", out ok));
+            DrawOwnGame();
+            DrawStatus();
         }
 
         /// <summary>
