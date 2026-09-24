@@ -24,6 +24,10 @@
                                replaces just the named documents with the
                                repo copy, .bak first. For a page rewritten
                                here on purpose, when -SeedDocs is too much.
+    .\Deploy-Docs.ps1 -RunAs 'LOCAL SERVICE'
+                               runs the site as LOCAL SERVICE instead of
+                               SYSTEM, with its own folder and nothing else
+                               to write in. -RunAs SYSTEM puts it back.
 
   The password crosses the wire in clear, because this is plain HTTP on an IP.
   Do not reuse one that matters. That improves the day a real domain and a
@@ -51,7 +55,15 @@ param(
   # Named documents under data, by name with or without .md: help, known.
   # Only those are replaced, each after a .bak of the live copy, so a page
   # rewritten in the repo can go up without -SeedDocs flattening the rest.
-  [string[]]$Docs
+  [string[]]$Docs,
+  # The account the site's scheduled task runs as. Entry 219 on the To Do
+  # List: the site has run as SYSTEM since it was first installed, which is
+  # every right on the box for a node process that answers the internet.
+  # SYSTEM stays the default until Patrick has chosen the account and tried
+  # it, so a deploy without this changes nothing. LOCAL SERVICE is built in
+  # and needs no password kept anywhere, which a named local user would.
+  [ValidateSet('SYSTEM', 'LOCAL SERVICE')]
+  [string]$RunAs = 'SYSTEM'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -247,6 +259,43 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
   'firewall opened on $Port'
 } else { 'firewall rule already there' }
 
+# ==== thornswood site account ====
+# Who the site runs as, from -RunAs. Worked out before anything is stopped,
+# so an account that does not resolve leaves the running site alone.
+#
+# SYSTEM is registered exactly as it always was, Highest and no grants, so a
+# deploy without -RunAs changes nothing. Anything else runs Limited and is
+# given what the site touches and no more: Modify on its own folder, where it
+# writes config.json, data, uploads and site.log, and Read on the four places
+# outside it that server.js reads, measured on 24 Sep: onlineFile, the main
+# and dev SERVER_LOGS, and CHAT_DIR. Granted on the folder rather than the
+# file, because server.log is deleted and made again at every server start
+# and a grant on the file would go with it. (NP) keeps each one to the files
+# directly in that folder and out of the world data below it. In
+# C:\Thornswood-Server that still includes server-settings.json.
+`$runAs = '$RunAs'
+`$sid = 'S-1-5-18'
+if (`$runAs -eq 'SYSTEM') {
+  `$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+} else {
+  `$sid = ''
+  try { `$sid = (New-Object Security.Principal.NTAccount('NT AUTHORITY', `$runAs)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+  if (-not `$sid) { 'NO SUCH ACCOUNT HERE: ' + `$runAs + '. Nothing was stopped or changed.'; return }
+  `$principal = New-ScheduledTaskPrincipal -UserId ('NT AUTHORITY\' + `$runAs) -LogonType ServiceAccount -RunLevel Limited
+  foreach (`$g in @(
+      @('$rootWin', '(OI)(CI)M'),
+      @('C:\Thornswood-Server\data', '(OI)(NP)R'),
+      @('C:\Thornswood-Server', '(OI)(NP)R'),
+      @('C:\Thornswood-Server-Dev', '(OI)(NP)R'),
+      @('C:\Thornswood-Voice\chat', '(OI)(NP)R'))) {
+    if (-not (Test-Path -LiteralPath `$g[0])) { 'not here, nothing granted: ' + `$g[0]; continue }
+    `$said = & icacls `$g[0] /grant ('*' + `$sid + ':' + `$g[1]) 2>&1
+    if (`$LASTEXITCODE -eq 0) { 'granted ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] }
+    else { 'COULD NOT GRANT ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] + ': ' + ((`$said | Out-String).Trim()) }
+  }
+}
+# ==== end thornswood site account ====
+
 Get-CimInstance Win32_Process |
   Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*Thornswood-Docs*' } |
   ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
@@ -281,13 +330,15 @@ if (-not `$node) { 'NODE NOT FOUND ON THIS MACHINE'; return }
 if (-not (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue)) {
   `$t = New-ScheduledTaskTrigger -AtStartup
   Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$t -Settings `$s ``
-    -RunLevel Highest -User 'SYSTEM' | Out-Null
+    -Principal `$principal | Out-Null
   'scheduled task created'
 } else {
   # -Settings as well as -Action. Without it an existing task keeps whatever
   # it was first registered with, which is how the three restart cap survived
-  # every deploy that was meant to change it.
-  Set-ScheduledTask -TaskName '$Task' -Action `$a -Settings `$s | Out-Null
+  # every deploy that was meant to change it. -Principal for the same reason:
+  # without it -RunAs would never reach the task already on the box, and nor
+  # would going back to SYSTEM.
+  Set-ScheduledTask -TaskName '$Task' -Action `$a -Settings `$s -Principal `$principal | Out-Null
   'scheduled task updated'
 }
 
@@ -297,6 +348,15 @@ if (-not (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue)) {
 if (`$chk) {
   'task settings: restart count ' + `$chk.RestartCount +
   ', execution time limit ' + (`$(if (`$chk.ExecutionTimeLimit -eq 'PT0S') { 'none' } else { `$chk.ExecutionTimeLimit }))
+}
+# And the account, compared by SID, because the task says SYSTEM or LOCAL
+# SERVICE where -RunAs may have said it with NT AUTHORITY in front.
+`$who = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Principal
+if (`$who) {
+  `$got = ''
+  try { `$got = (New-Object Security.Principal.NTAccount(`$who.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+  if (`$got -eq `$sid) { 'task runs as ' + `$who.UserId + ', run level ' + `$who.RunLevel }
+  else { 'THE TASK RUNS AS ' + `$who.UserId + ', NOT ' + `$runAs }
 }
 
 Start-ScheduledTask -TaskName '$Task'
@@ -317,6 +377,7 @@ if (`$listen) {
   Start-Sleep -Seconds 4
   if (`$h -and -not `$h.HasExited) {
     'it runs fine by hand, so the scheduled task is what is wrong'
+    if (`$runAs -ne 'SYSTEM') { 'it runs as ' + `$runAs + ' now, so look first for a file that account cannot reach. -RunAs SYSTEM puts it back.' }
     Stop-Process -Id `$h.Id -Force -EA SilentlyContinue
   }
   Get-Content `$o,`$e -EA SilentlyContinue | Select-Object -First 25
