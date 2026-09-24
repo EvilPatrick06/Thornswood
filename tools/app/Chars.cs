@@ -604,6 +604,16 @@ namespace Thornswood
                     extra.Append(",\"video\":\"thornswood-menu.mp4\"");
                 if (File.Exists(Path.Combine(ui, "thornswood-menu.jpg")))
                     extra.Append(",\"still\":\"thornswood-menu.jpg\"");
+                // The scroll in front of the choice (thornswood-select.js).
+                // The page's "Start without the scroll next time" has the
+                // plugin write "off" here; anything else, or no file, shows it.
+                try
+                {
+                    string intro = Path.Combine(Paths.Game, "Data\\Platform\\thornswood-intro.txt");
+                    if (File.Exists(intro) && File.ReadAllText(intro).Trim() == "off")
+                        extra.Append(",\"intro\":false");
+                }
+                catch (Exception ex) { Swallow.Note("Chars.WriteCharacters", ex); }
                 // The fields go in before the closing brace of the object.
                 if (extra.Length > 0 && json.EndsWith("}")) json = json.Substring(0, json.Length - 1) + extra.ToString() + "}";
                 Directory.CreateDirectory(ui);
