@@ -10959,6 +10959,26 @@ log('gamemode loaded:',
   var askedAt = 0;
   var seenAt = {};
 
+  /*
+    Who was let in, with the profile they came in on and the list that let
+    them in, so a list that lands without them judges them again.
+
+    From the To Do List, entry 143: "an active session is severed when the ban
+    is written". judged above is cleared only when somebody leaves, so a ban
+    that took a profile off the list at the next refresh reached nobody who
+    was already in the world. They stayed until they logged out.
+
+    ONLY A LIST THAT LANDED DOES THIS. A refresh that failed, was rate limited
+    or could not reach Discord for anybody returns before it moves listAt, and
+    one that came back empty carries nobody, so neither touches anybody already
+    in. One that reached Discord for some people and not others does land, but
+    the ones it could not check keep the standing they had (keepWhatFailed
+    below), so they are left alone too. A Discord hiccup that throws the whole
+    server out at once is the outage the watch-only start above was written to
+    avoid.
+  */
+  var letIn = {};
+
   function tick() {
     var conf = load();
     if (!conf) return;                       // no allowed.json, door is off
@@ -10972,10 +10992,19 @@ log('gamemode loaded:',
     for (var i = 0; i < online.length; i++) here[online[i]] = true;
     for (var k in judged) { if (!here[k]) delete judged[k]; }
     for (var k2 in seenAt) { if (!here[k2]) delete seenAt[k2]; }
+    for (var k3 in letIn) { if (!here[k3]) delete letIn[k3]; }
 
     for (var j = 0; j < online.length; j++) {
       var actorId = online[j];
-      if (judged[actorId]) continue;
+      if (judged[actorId]) {
+        var was = letIn[actorId];
+        if (!was || was.at >= listAt || !conf.count) continue;
+        if (conf.ids[was.pid]) { was.at = listAt; continue; }
+        delete judged[actorId];
+        delete letIn[actorId];
+        note('profile ' + was.pid + ' dropped off the list while in the world (actor ' +
+             actorId.toString(16) + '), judging them again');
+      }
       if (!seenAt[actorId]) seenAt[actorId] = now;
 
       var pid = 0;
@@ -10992,6 +11021,7 @@ log('gamemode loaded:',
       }
       judged[actorId] = true;
       if (ok) {
+        letIn[actorId] = { pid: pid, at: listAt };
         note('let in profile ' + pid + ' (actor ' + actorId.toString(16) + ')');
         continue;
       }
