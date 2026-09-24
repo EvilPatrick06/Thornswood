@@ -28,10 +28,27 @@ so this counts what the server mines and nothing the server does not.
 
 ON THE WAY IN. A lock keeps people out of a building, and a mine whose veins
 are two rooms down is shut just as well by a lock on the first room. So for
-every building with a vein this also names the buildings that every road from
-open ground to it goes through. The roads come from tools\\doors.json, the
-table BUILDING_BY_DOOR was generated from, so a building here is the same
-building /claim would take.
+every building with a vein, and every worldspace with one behind a building,
+this also names the buildings that every road from open ground to it goes
+through. The roads come from tools\\doors.json, the table BUILDING_BY_DOOR was
+generated from, so a building here is the same building /claim would take.
+
+WHAT OPEN GROUND IS. Tamriel and Solstheim, unless --open names others.
+Solstheim is on it because the way there is a boat, not a door. Every other
+worldspace is one place of its own, because a person walks between its outdoor
+cells without a door, and it is measured the way a room is: a worldspace whose
+every road in goes through one building is behind that building, as a room two
+doors down is. One with a road in that no single building sits on, like
+Blackreach and its lifts, is open ground as far as a lock goes. So is one that
+no door road joins to Tamriel or Solstheim at all, because people get there by
+a spell, a book or a boat and no lock stands on that way; a room reached from
+it is measured from it.
+
+The first version counted every outdoor cell in every worldspace as open
+ground, and a reviewer measured what that missed on 24 September: Deepwood
+Redoubt is the only road into Deepwood Vale and was not listed, Darkfall Cave
+is the only road into the Forgotten Vale's 50 veins and was listed as shutting
+2, and Frostmere Crypt is the only road into Frostmere Depths.
 
 WHAT IT READS. The plugins in load order, the five masters and then
 plugins.txt, last one wins, which is the rule Build-DoorTable.py uses and whose
@@ -77,7 +94,7 @@ MINE_WORD = re.compile(r'\bMines?\b')
 
 
 def walk(pl, ores, cells, worlds, veins, removed):
-    """Every CELL, every WRLD's editor id, and every placed ore vein."""
+    """Every CELL, every WRLD's editor id and name, and every placed ore vein."""
     buf = pl.buf
     u32 = lambda i: struct.unpack_from('<I', buf, i)[0]
 
@@ -103,10 +120,17 @@ def walk(pl, ores, cells, worlds, veins, removed):
             if tag == b'WRLD':
                 d = pl.desc(fid)
                 if d:
+                    # The editor id is what --open matches and what openGround
+                    # is keyed by. The name is what a person reads, "Forgotten
+                    # Vale" rather than DLC01FalmerValley.
+                    row = {'edid': '', 'name': ''}
                     for st, body in dt.subrecords(pl.data(p, size, flags)):
                         if st == b'EDID':
-                            worlds[d] = body.rstrip(bytes([0])).decode('ascii', 'replace')
+                            row['edid'] = body.rstrip(bytes([0])).decode('ascii', 'replace')
+                        elif st == b'FULL':
+                            row['name'] = pl.text(body)
                             break
+                    worlds[d] = row
             elif tag == b'CELL':
                 d = pl.desc(fid)
                 if d:
@@ -181,7 +205,10 @@ def main():
     ap.add_argument('--gamemode', default=os.path.join(HERE, 'gamemode.js'))
     ap.add_argument('--doors', default=os.path.join(HERE, 'doors.json'))
     ap.add_argument('--out', default=None, help='write the measurement as JSON to this file')
+    ap.add_argument('--open', default='Tamriel,DLC2SolstheimWorld',
+                    help='editor ids of the worldspaces that are open ground, comma separated')
     args = ap.parse_args()
+    open_worlds = set(w.strip() for w in args.open.split(',') if w.strip())
 
     text = io.open(args.gamemode, encoding='utf-8', newline='').read()
     ores = ore_table(text)
@@ -231,9 +258,15 @@ def main():
         walk(pl, ores, cells, worlds, veins, removed)
         failed += pl.failed
 
+    def world_name(w):
+        row = worlds.get(w, {})
+        return row.get('name') or row.get('edid') or w
+
     def called(c):
         if c in names:
             return names[c]
+        if c in worlds:
+            return '%s (worldspace)' % world_name(c)
         row = cells.get(c, {})
         return row.get('name') or row.get('edid') or c
 
@@ -244,36 +277,73 @@ def main():
         row = cells.get(c) or doors['cells'].get(c)
         return bool(row and row.get('interior'))
 
-    in_building, no_door, open_ground = {}, {}, {}
+    # The places the roads join. An interior is a place of its own. An outdoor
+    # cell is its worldspace, keyed by the worldspace's form id, or open ground
+    # when that worldspace is one of --open. An outdoor cell with no worldspace
+    # this read is open ground, for the same reason an unknown cell is.
+    OPEN = 'open ground'
+
+    def place(c):
+        if interior(c):
+            return c
+        w = cells.get(c, {}).get('world')
+        if not w or worlds.get(w, {}).get('edid') in open_worlds:
+            return OPEN
+        return w
+
+    in_building, no_door, outdoors, open_ground = {}, {}, {}, {}
     disabled = 0
     for d, v in veins.items():
         c = v['cell']
         if v['disabled']:
             disabled += 1
-        if not interior(c):
+        where = place(c)
+        if where == OPEN:
             w = cells.get(c, {}).get('world')
-            w = worlds.get(w, w) or 'an unnamed worldspace'
+            w = worlds.get(w, {}).get('edid') or w or 'an unnamed worldspace'
             open_ground[w] = open_ground.get(w, 0) + 1
+        elif where != c:
+            outdoors.setdefault(where, []).append(v)
         elif c in claimable:
             in_building.setdefault(c, []).append(v)
         else:
             no_door.setdefault(c, []).append(v)
 
-    # The roads. Both halves of a door pair name each other, so every link is
-    # recorded both ways and it does not matter which half was read first.
+    # The roads, between places rather than cells. Both halves of a door pair
+    # name each other, so every link is recorded both ways and it does not
+    # matter which half was read first. A door between two outdoor cells of one
+    # worldspace joins a place to itself and says nothing about a way in.
     placed = doors['doors']
     links = {}
     for d, r in placed.items():
         other = placed.get(r.get('to'))
         if other:
-            links.setdefault(r['cell'], set()).add(other['cell'])
-            links.setdefault(other['cell'], set()).add(r['cell'])
+            a, b = place(r['cell']), place(other['cell'])
+            if a != b:
+                links.setdefault(a, set()).add(b)
+                links.setdefault(b, set()).add(a)
+
+    # A worldspace no door road joins to open ground is reached some other way,
+    # a spell, a book or a boat, and no lock stands on that way. So it is open
+    # ground too, and a room reached from it is measured from it rather than
+    # written off as reached by no door at all.
+    joined, todo = set([OPEN]), [OPEN]
+    while todo:
+        for n in links.get(todo.pop(), ()):
+            if n not in joined:
+                joined.add(n)
+                todo.append(n)
+    elsewhere = set(p for p in list(links) + list(outdoors)
+                    if p != OPEN and not interior(p) and p not in joined)
+
+    def is_open(p):
+        return p == OPEN or p in elsewhere
 
     def reaches_open(start, without):
         seen, todo = set([start]), [start]
         while todo:
             c = todo.pop()
-            if not interior(c):
+            if is_open(c):
                 return True
             for n in links.get(c, ()):
                 if n != without and n not in seen:
@@ -281,26 +351,40 @@ def main():
                     todo.append(n)
         return False
 
-    def indoors_from(start):
+    def behind_from(start):
+        # Every place reached from start without stepping onto open ground,
+        # through rooms and closed worldspaces alike. The buildings among them
+        # are the only ones that can be on every road in.
         seen, todo = set([start]), [start]
         while todo:
             c = todo.pop()
             for n in links.get(c, ()):
-                if n not in seen and interior(n):
+                if n not in seen and not is_open(n):
                     seen.add(n)
                     todo.append(n)
         return seen
 
     way_in, shuts, sealed = {}, {}, []
-    for v in in_building:
+    for v in list(in_building) + list(outdoors):
         if not reaches_open(v, None):
             sealed.append(v)
             continue
-        on = [b for b in indoors_from(v)
+        on = [b for b in behind_from(v)
               if b != v and b in claimable and not reaches_open(v, b)]
         way_in[v] = sorted(on, key=called)
         for b in on:
             shuts.setdefault(b, []).append(v)
+
+    # A closed worldspace with a road in that no one building sits on, like
+    # Blackreach and its lifts, is open ground as far as a lock goes, and so is
+    # one no door road reaches. The rest are behind a building.
+    behind = {}
+    for w, rows in outdoors.items():
+        if way_in.get(w):
+            behind[w] = rows
+        else:
+            k = worlds.get(w, {}).get('edid') or w
+            open_ground[k] = open_ground.get(k, 0) + len(rows)
 
     has_vein = set(in_building) | set(no_door)
     no_vein_mines = {b: n for b, n in names.items()
@@ -310,6 +394,7 @@ def main():
     inside = sum(len(v) for v in in_building.values())
     nowhere = sum(len(v) for v in no_door.values())
     outside = sum(open_ground.values())
+    shut_out = sum(len(v) for v in behind.values())
 
     print('')
     print('Ore veins')
@@ -317,8 +402,10 @@ def main():
     print('  %s placed vein reference(s), last plugin wins' % format(total, ','))
     print('  %d of them initially disabled, %d removed by a later plugin'
           % (disabled, len(removed)))
-    print('  %s on open ground: %s' % (format(outside, ','), ', '.join(
+    print('  %s on open ground, where no one lock shuts them: %s' % (format(outside, ','), ', '.join(
         '%s %d' % (w, n) for w, n in sorted(open_ground.items(), key=lambda x: (-x[1], x[0])))))
+    print('  %s outdoors in a worldspace whose every road in goes through one building, across %d worldspace(s)'
+          % (format(shut_out, ','), len(behind)))
     print('  %s inside a building somebody can /claim, across %d building(s)'
           % (format(inside, ','), len(in_building)))
     print('  %s inside an interior no door leads into, across %d cell(s), so nobody can claim it'
@@ -343,9 +430,30 @@ def main():
         if way_in.get(b):
             print('  %-30s      reached only through %s'
                   % ('', ', '.join(called(x) for x in way_in[b])))
+
+    print('')
+    print('Worldspaces holding a vein, where every road in goes through one building')
+    if not behind:
+        print('  none')
+    for w in sorted(behind, key=called):
+        rows = behind[w]
+        _, line = ore_line(rows)
+        print('  %-30s %3d  %s' % (called(w), len(rows), line))
+        print('  %-30s      reached only through %s'
+              % ('', ', '.join(called(x) for x in way_in[w])))
+
+    # Said by name, because each one is a judgement that no lock stands on the
+    # way there, and a door this read missed would make it a wrong one.
+    print('')
+    print('Worldspaces no door road reaches, so counted as open ground')
+    if not elsewhere:
+        print('  none')
+    for w in sorted(elsewhere, key=called):
+        print('  %-30s %3d  %s' % (called(w), len(outdoors.get(w, ())),
+                                   worlds.get(w, {}).get('edid') or w))
     if sealed:
         print('')
-        print('Holding a vein with no door road to open ground, so reached some other way')
+        print('Buildings holding a vein that no door road joins to any outdoor ground')
         for b in sorted(sealed, key=called):
             print('  %s' % called(b))
 
@@ -393,17 +501,35 @@ def main():
             row['noDoorRoad'] = True
         return row
 
+    def world_row(w):
+        rows = behind[w]
+        count, _ = ore_line(rows)
+        row = {'name': world_name(w), 'edid': worlds.get(w, {}).get('edid', ''),
+               'veins': len(rows), 'ores': count, 'onTheWayIn': way_in[w]}
+        off = sum(1 for r in rows if r['disabled'])
+        if off:
+            row['disabled'] = off
+        return row
+
     payload = {
         'builtBy': 'tools/Measure-MineBuildings.py',
         'readFrom': '%d plugins, the five masters then %s' % (len(order), args.plugins),
         'whatAMineIs': 'a building holding at least one placed reference whose base is in '
                        'ORES_BY_BASE, which is exactly what mineOre lets a person work. A '
                        'building is what BUILDING_BY_DOOR says, the one /claim takes.',
+        'whatOpenGroundIs': 'the worldspaces in openWorlds, any other worldspace with a road in '
+                            'that no one building sits on, and every worldspace in '
+                            'reachedByNoDoor. A worldspace whose every road in goes through '
+                            'one building is in worlds, with the buildings on that road.',
+        'openWorlds': sorted(open_worlds),
+        'reachedByNoDoor': sorted(worlds.get(w, {}).get('edid') or w for w in elsewhere),
         'counts': {'veinBases': len(ores), 'placed': total, 'disabled': disabled,
                    'removedByLaterPlugin': len(removed), 'openGround': outside,
+                   'behindABuilding': shut_out, 'worldsBehindABuilding': len(behind),
                    'inBuildings': inside, 'buildings': len(in_building),
                    'noDoor': nowhere, 'failedToInflate': failed},
         'buildings': dict((b, building_row(b)) for b in in_building),
+        'worlds': dict((w, world_row(w)) for w in behind),
         'onTheWayIn': dict((b, {'name': called(b), 'shuts': sorted(shuts[b]),
                                 'holdsVein': b in has_vein}) for b in shuts),
         'noDoor': dict((c, {'name': called(c), 'veins': len(no_door[c])}) for c in no_door),

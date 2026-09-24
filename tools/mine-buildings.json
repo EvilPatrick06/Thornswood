@@ -2,7 +2,9 @@
  "buildings": {
   "10a8b:Dawnguard.esm": {
    "name": "Forgotten Vale Cave",
-   "onTheWayIn": [],
+   "onTheWayIn": [
+    "4346:Dawnguard.esm"
+   ],
    "ores": {
     "Shellbug Chitin": 1
    },
@@ -936,7 +938,9 @@
   },
   "8995:Dawnguard.esm": {
    "name": "Sharpslope Cave",
-   "onTheWayIn": [],
+   "onTheWayIn": [
+    "4346:Dawnguard.esm"
+   ],
    "ores": {
     "Shellbug Chitin": 1
    },
@@ -1041,15 +1045,17 @@
  "builtBy": "tools/Measure-MineBuildings.py",
  "calledAMineWithNoVein": {},
  "counts": {
+  "behindABuilding": 53,
   "buildings": 121,
   "disabled": 2,
   "failedToInflate": 0,
   "inBuildings": 448,
   "noDoor": 22,
-  "openGround": 1255,
+  "openGround": 1202,
   "placed": 1725,
   "removedByLaterPlugin": 0,
-  "veinBases": 581
+  "veinBases": 581,
+  "worldsBehindABuilding": 3
  },
  "noDoor": {
   "27333:Dragonborn.esm": {
@@ -1113,6 +1119,13 @@
     "471dc:Skyrim.esm"
    ]
   },
+  "1529c:Skyrim.esm": {
+   "holdsVein": false,
+   "name": "Deepwood Redoubt",
+   "shuts": [
+    "29ab7:Skyrim.esm"
+   ]
+  },
   "152a7:Skyrim.esm": {
    "holdsVein": true,
    "name": "Cronvangr Cave",
@@ -1155,11 +1168,27 @@
     "142f1:Dragonborn.esm"
    ]
   },
+  "4346:Dawnguard.esm": {
+   "holdsVein": true,
+   "name": "Darkfall Cave",
+   "shuts": [
+    "10a8b:Dawnguard.esm",
+    "8995:Dawnguard.esm",
+    "bb5:Dawnguard.esm"
+   ]
+  },
   "9bde:Dawnguard.esm": {
    "holdsVein": false,
    "name": "Dead Drop Falls",
    "shuts": [
     "181c8:Dawnguard.esm"
+   ]
+  },
+  "abd31:Skyrim.esm": {
+   "holdsVein": true,
+   "name": "Frostmere Crypt",
+   "shuts": [
+    "c97eb:Skyrim.esm"
    ]
   }
  },
@@ -1167,14 +1196,11 @@
   "Blackreach": 44,
   "BlindCliffCaveWorld": 6,
   "BloatedMansGrottoWorld": 1,
-  "DLC01FalmerValley": 50,
   "DLC2SolstheimWorld": 67,
   "DarkwaterWorld": 2,
-  "DeepwoodRedoubtWorld": 2,
   "EldergleamSanctuaryWorld": 1,
   "FallowstoneCaveWorldEnd": 4,
   "FallowstoneCaveWorldStart": 3,
-  "FrostmereCryptWorld": 1,
   "KarthspireRedoubtWorld": 3,
   "MossMotherCavernWorld": 2,
   "RedEagleRedoubtWorld": 1,
@@ -1183,6 +1209,59 @@
   "Tamriel": 1063,
   "TestMeganWorld": 1
  },
+ "openWorlds": [
+  "DLC2SolstheimWorld",
+  "Tamriel"
+ ],
+ "reachedByNoDoor": [
+  "DLC2ApocryphaWorld",
+  "JaphetsFollyWorld",
+  "SkuldafnWorld",
+  "Sovngarde",
+  "TestMeganWorld"
+ ],
  "readFrom": "99 plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
- "whatAMineIs": "a building holding at least one placed reference whose base is in ORES_BY_BASE, which is exactly what mineOre lets a person work. A building is what BUILDING_BY_DOOR says, the one /claim takes."
+ "whatAMineIs": "a building holding at least one placed reference whose base is in ORES_BY_BASE, which is exactly what mineOre lets a person work. A building is what BUILDING_BY_DOOR says, the one /claim takes.",
+ "whatOpenGroundIs": "the worldspaces in openWorlds, any other worldspace with a road in that no one building sits on, and every worldspace in reachedByNoDoor. A worldspace whose every road in goes through one building is in worlds, with the buildings on that road.",
+ "worlds": {
+  "29ab7:Skyrim.esm": {
+   "edid": "DeepwoodRedoubtWorld",
+   "name": "Deepwood Vale",
+   "onTheWayIn": [
+    "1529c:Skyrim.esm"
+   ],
+   "ores": {
+    "Corundum Ore": 1,
+    "Quicksilver Ore": 1
+   },
+   "veins": 2
+  },
+  "bb5:Dawnguard.esm": {
+   "edid": "DLC01FalmerValley",
+   "name": "Forgotten Vale",
+   "onTheWayIn": [
+    "4346:Dawnguard.esm"
+   ],
+   "ores": {
+    "Gold Ore": 6,
+    "Malachite Ore": 8,
+    "Moonstone Ore": 9,
+    "Orichalcum Ore": 8,
+    "Quicksilver Ore": 12,
+    "Silver Ore": 7
+   },
+   "veins": 50
+  },
+  "c97eb:Skyrim.esm": {
+   "edid": "FrostmereCryptWorld",
+   "name": "Frostmere Depths",
+   "onTheWayIn": [
+    "abd31:Skyrim.esm"
+   ],
+   "ores": {
+    "Orichalcum Ore": 1
+   },
+   "veins": 1
+  }
+ }
 }

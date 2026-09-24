@@ -20,6 +20,13 @@
 // tools/mine-buildings.json against the real gamemode's tables, so the list
 // Patrick reads is the list /claim would act on.
 //
+// The made-up world has worldspaces of its own too, because the first version
+// counted the outdoors of every worldspace as open ground and so missed that a
+// lock on Darkfall Cave shuts the Forgotten Vale's 50 veins. A vale reached only
+// through a hall has to come out behind that hall, a worldspace with two roads
+// in through two halls (Blackreach's lifts) has to stay open ground, and one no
+// door reaches (Japhet's Folly, by boat) has to be open ground and said by name.
+//
 // Read only apart from its own temp folder, which it removes.
 const fs = require('fs');
 const os = require('os');
@@ -116,7 +123,21 @@ function interiors(pairs) {
 const IRON = 0x100, GOLD = 0x101, BARREL = 0x999;
 const DELETED = 0x20, DISABLED = 0x800;
 const A = 0xA01, H = 0xA02, N = 0xA03, M = 0xA04, S = 0xA05, K = 0xA06, T = 0xA07;
+// The gate hall into the vale, a cave inside the vale, the two lifts into the
+// reach, and a den reached only from the far world.
+const G = 0xA08, VC = 0xA09, L1 = 0xA0A, L2 = 0xA0B, FR = 0xA0C;
 const TAMRIEL = 0x3C, X = 0xB01;
+const VALE = 0x3D, VX = 0xB02, REACH = 0x3E, RX = 0xB03, FAR = 0x3F, FX = 0xB04;
+const SOLSTHEIM = 0x40, SX = 0xB05;
+
+// A worldspace, its one outdoor cell and what stands in it.
+function world(fid, edid, full, cellFid, refs) {
+  const subs = [sub('EDID', z(edid))];
+  if (full) subs.push(sub('FULL', z(full)));
+  return [rec('WRLD', 0, fid, cat(subs)),
+          grp(fid, 1, [grp(0, 4, [grp(0, 5, [
+            cell(cellFid, edid + 'Cell', '', false), inCell(cellFid, refs)])])])];
+}
 
 const skyrim = cat([
   tes4([]),
@@ -129,13 +150,19 @@ const skyrim = cat([
     [cell(M, 'OldMine', 'Old Mine', true), null],
     [cell(S, 'MinersBarracks', "Miner's Barracks", true), null],
     [cell(K, 'BackCave', 'Back Cave', true), inCell(K, [refr(0x2007, IRON)])],
-    [cell(T, 'TwinHall', 'Twin Hall', true), null]
+    [cell(T, 'TwinHall', 'Twin Hall', true), null],
+    [cell(G, 'GateHall', 'Gate Hall', true), null],
+    [cell(VC, 'ValeCave', 'Vale Cave', true), inCell(VC, [refr(0x2009, IRON)])],
+    [cell(L1, 'LiftOne', 'Lift One', true), null],
+    [cell(L2, 'LiftTwo', 'Lift Two', true), null],
+    [cell(FR, 'FarDen', 'Far Den', true), inCell(FR, [refr(0x200D, IRON)])]
   ]),
-  grp('WRLD', 0, [
-    rec('WRLD', 0, TAMRIEL, sub('EDID', z('Tamriel'))),
-    grp(TAMRIEL, 1, [grp(0, 4, [grp(0, 5, [
-      cell(X, 'Wilderness', '', false), inCell(X, [refr(0x2006, IRON)])])])])
-  ])
+  grp('WRLD', 0, [].concat(
+    world(TAMRIEL, 'Tamriel', '', X, [refr(0x2006, IRON)]),
+    world(VALE, 'TestValeWorld', 'Test Vale', VX, [refr(0x2008, GOLD)]),
+    world(REACH, 'TestReachWorld', 'Test Reach', RX, [refr(0x200A, IRON)]),
+    world(FAR, 'TestFarWorld', 'Test Far', FX, [refr(0x200B, IRON)]),
+    world(SOLSTHEIM, 'DLC2SolstheimWorld', 'Solstheim', SX, [refr(0x200C, IRON)])))
 ]);
 
 // The plugin after it deletes one vein in the mine and places a new one, as a
@@ -163,7 +190,15 @@ const doorPairs = [
   ['e01', X, 'e02', H], ['e03', H, 'e04', A],
   ['e05', X, 'e06', M], ['e07', X, 'e08', S],
   // outside -> Twin Hall -> Back Cave, and outside -> Back Cave as well.
-  ['e09', X, 'e0a', T], ['e0b', T, 'e0c', K], ['e0d', X, 'e0e', K]
+  ['e09', X, 'e0a', T], ['e0b', T, 'e0c', K], ['e0d', X, 'e0e', K],
+  // outside -> Gate Hall -> the vale, and the vale -> Vale Cave. Each pair is
+  // written with the building last, since that is the building both halves
+  // answer with.
+  ['e0f', X, 'e10', G], ['e11', VX, 'e12', G], ['e13', VX, 'e14', VC],
+  // outside -> Lift One -> the reach, and outside -> Lift Two -> the reach.
+  ['e15', X, 'e16', L1], ['e17', RX, 'e18', L1], ['e19', X, 'e1a', L2], ['e1b', RX, 'e1c', L2],
+  // The far world has no door from anywhere, and one to the den inside it.
+  ['e1d', FX, 'e1e', FR]
 ];
 const doors = { cells: {}, doors: {} };
 const byDoor = {};
@@ -175,13 +210,15 @@ doorPairs.forEach(function (p) {
   byDoor[d(parseInt(p[0], 16))] = d(p[3]);
   byDoor[d(parseInt(p[2], 16))] = d(p[3]);
 });
-doors.cells[d(X)] = { edid: 'Wilderness', interior: false };
-[A, H, M, S, K, T].forEach(function (c) { doors.cells[d(c)] = { edid: 'x', interior: true }; });
+[X, VX, RX, FX].forEach(function (c) { doors.cells[d(c)] = { edid: 'x', interior: false }; });
+[A, H, M, S, K, T, G, VC, L1, L2, FR].forEach(function (c) { doors.cells[d(c)] = { edid: 'x', interior: true }; });
 fs.writeFileSync(path.join(ROOT, 'doors.json'), JSON.stringify(doors));
 
 const names = {};
 names[d(A)] = 'Test Mine'; names[d(H)] = 'Test Hall'; names[d(M)] = 'Old Mine';
 names[d(S)] = "Miner's Barracks"; names[d(K)] = 'Back Cave'; names[d(T)] = 'Twin Hall';
+names[d(G)] = 'Gate Hall'; names[d(VC)] = 'Vale Cave'; names[d(L1)] = 'Lift One';
+names[d(L2)] = 'Lift Two'; names[d(FR)] = 'Far Den';
 const oreBlock = [
   '// ==== ORES_BY_BASE, generated ====',
   '  var ORES_BY_BASE = {',
@@ -220,8 +257,10 @@ const c = got.counts || {};
 const b = got.buildings || {};
 const mine = b[d(A)] || {};
 
-yes('six placed veins: three in the mine, one in the vault, one outside, one in the back cave',
-    c.placed === 6);
+yes('twelve placed veins: three in the mine, one in the vault, one on Tamriel, one in the back cave, ' +
+    'one in the vale and one in the cave inside it, one in the reach, one in the far world and one in ' +
+    'the den inside it, one on Solstheim',
+    c.placed === 12);
 yes('the vein a later plugin deleted is not counted, and is counted as removed',
     c.removedByLaterPlugin === 1);
 yes('the initially disabled vein is counted and said', c.disabled === 1 && mine.disabled === 1);
@@ -230,11 +269,11 @@ yes('the mine holds two iron and the gold the later plugin placed',
     !!mine.ores && mine.ores['Iron Ore'] === 2 && mine.ores['Gold Ore'] === 1 &&
     Object.keys(mine.ores).length === 2);
 yes('the mine is named the way BUILDING_NAME names it', mine.name === 'Test Mine');
-yes('two buildings hold veins, the mine and the back cave, and nothing else',
-    Object.keys(b).sort().join(',') === [d(A), d(K)].sort().join(',') && c.buildings === 2);
-yes('four veins stand inside a building somebody can claim', c.inBuildings === 4);
-yes('the vein on open ground is counted under its worldspace',
-    c.openGround === 1 && got.openGround && got.openGround.Tamriel === 1);
+yes('four buildings hold veins, the mine, the back cave, the vale cave and the far den, and nothing else',
+    Object.keys(b).sort().join(',') === [d(A), d(K), d(VC), d(FR)].sort().join(',') && c.buildings === 4);
+yes('six veins stand inside a building somebody can claim', c.inBuildings === 6);
+yes('the vein on Tamriel is counted under its worldspace',
+    !!got.openGround && got.openGround.Tamriel === 1);
 yes('the vault no door leads into, compressed, is found and kept out of the buildings',
     c.noDoor === 1 && got.noDoor && got.noDoor[d(N)] && got.noDoor[d(N)].name === 'Sealed Vault' &&
     got.noDoor[d(N)].veins === 1 && !b[d(N)]);
@@ -253,6 +292,43 @@ yes('the printed list names the mine and the road into it',
     /reached only through Test Hall/.test(r.stdout));
 yes('the printed list names the hall under the buildings that hold no vein',
     /Test Hall\s+shuts Test Mine/.test(r.stdout));
+
+// The worldspaces. Each is one place, whichever outdoor cell a door stands in.
+const worlds = got.worlds || {};
+const og = got.openGround || {};
+const byNoDoor = got.reachedByNoDoor || [];
+const vale = worlds[d(VALE)] || {};
+yes('a worldspace reached only through a hall is behind that hall, not on open ground',
+    JSON.stringify(vale.onTheWayIn) === JSON.stringify([d(G)]) && vale.veins === 1 &&
+    vale.name === 'Test Vale' && vale.edid === 'TestValeWorld' && !!vale.ores &&
+    vale.ores['Gold Ore'] === 1 && !og.TestValeWorld);
+yes('its vein is counted as behind a building, in one worldspace',
+    c.behindABuilding === 1 && c.worldsBehindABuilding === 1 && Object.keys(worlds).length === 1);
+yes('a cave inside that worldspace is behind the same hall',
+    JSON.stringify((b[d(VC)] || {}).onTheWayIn) === JSON.stringify([d(G)]));
+yes('the hall is listed as shutting the worldspace and the cave in it, and as holding no vein',
+    !!got.onTheWayIn && !!got.onTheWayIn[d(G)] &&
+    JSON.stringify(got.onTheWayIn[d(G)].shuts) === JSON.stringify([d(VALE), d(VC)].sort()) &&
+    got.onTheWayIn[d(G)].holdsVein === false);
+yes('a worldspace with two roads in through two halls is open ground, and neither hall shuts it',
+    og.TestReachWorld === 1 && !worlds[d(REACH)] &&
+    !got.onTheWayIn[d(L1)] && !got.onTheWayIn[d(L2)]);
+yes('a worldspace no door reaches is open ground, and said by name',
+    og.TestFarWorld === 1 && byNoDoor.indexOf('TestFarWorld') >= 0);
+yes('a room reached only from that worldspace is measured from it, not written off as doorless',
+    !!b[d(FR)] && JSON.stringify(b[d(FR)].onTheWayIn) === '[]' && !b[d(FR)].noDoorRoad);
+yes('Solstheim is open ground by default, not a place reached by no door',
+    og.DLC2SolstheimWorld === 1 && byNoDoor.indexOf('DLC2SolstheimWorld') < 0 &&
+    JSON.stringify(got.openWorlds) === JSON.stringify(['DLC2SolstheimWorld', 'Tamriel']));
+yes('four veins on open ground: Tamriel, the reach, the far world and Solstheim',
+    c.openGround === 4 && Object.keys(og).length === 4);
+yes('the counts add up: open ground, behind a building, in buildings and doorless rooms',
+    c.placed === c.openGround + c.behindABuilding + c.inBuildings + c.noDoor);
+yes('the printed list names the worldspace, its vein and the hall it is behind',
+    /Test Vale \(worldspace\)\s+1\s+Gold Ore 1\s+reached only through Gate Hall/.test(r.stdout) &&
+    /Gate Hall\s+shuts Test Vale \(worldspace\), Vale Cave/.test(r.stdout));
+yes('the printed list names the worldspace no door reaches',
+    /Test Far \(worldspace\)\s+1\s+TestFarWorld/.test(r.stdout));
 
 // ---------------------------------------------------------------------------
 // Read only
@@ -298,18 +374,31 @@ yes('every building in it is one /claim would take (' + stale + ')',
     rk.length > 0 && rk.every(function (k) { return claimable[k]; }));
 yes('every building in it is named the way BUILDING_NAME names it',
     rk.every(function (k) { return rb[k].name === realNames[k]; }));
-yes('every building on the way in is one /claim would take, and shuts a building in the list',
+const rw = real.worlds || {};
+yes('every building on the way in is one /claim would take, and shuts a building or worldspace in the list',
     Object.keys(real.onTheWayIn || {}).every(function (k) {
-      return claimable[k] && real.onTheWayIn[k].shuts.every(function (s) { return !!rb[s]; });
+      return claimable[k] && real.onTheWayIn[k].shuts.every(function (s) { return !!rb[s] || !!rw[s]; });
     }));
+yes('every worldspace behind a building names at least one building /claim would take',
+    Object.keys(rw).every(function (k) {
+      return rw[k].onTheWayIn.length > 0 && rw[k].onTheWayIn.every(function (x) { return claimable[x]; });
+    }));
+// The case the first version missed, pinned so a measurement written by it
+// again cannot pass: Darkfall Cave is the only road into the Forgotten Vale.
+yes('the Forgotten Vale is behind Darkfall Cave in it',
+    !!rw['bb5:Dawnguard.esm'] &&
+    JSON.stringify(rw['bb5:Dawnguard.esm'].onTheWayIn) === JSON.stringify(['4346:Dawnguard.esm']));
 const rc = real.counts || {};
 let inside = 0;
 rk.forEach(function (k) { inside += rb[k].veins; });
 let outside = 0;
 Object.keys(real.openGround || {}).forEach(function (w) { outside += real.openGround[w]; });
-yes('its counts add up: open ground, buildings and doorless rooms make every placed vein',
-    rc.placed === rc.openGround + rc.inBuildings + rc.noDoor &&
-    rc.inBuildings === inside && rc.openGround === outside && rc.buildings === rk.length);
+let shutOut = 0;
+Object.keys(rw).forEach(function (k) { shutOut += rw[k].veins; });
+yes('its counts add up: open ground, worldspaces behind a building, buildings and doorless rooms make every placed vein',
+    rc.placed === rc.openGround + rc.behindABuilding + rc.inBuildings + rc.noDoor &&
+    rc.inBuildings === inside && rc.openGround === outside && rc.buildings === rk.length &&
+    rc.behindABuilding === shutOut && rc.worldsBehindABuilding === Object.keys(rw).length);
 yes('every building the gamemode calls a mine is accounted for in it',
     Object.keys(realNames).every(function (k) {
       return !/\bMines?\b/.test(realNames[k]) || !!rb[k] || !!(real.onTheWayIn || {})[k] ||
