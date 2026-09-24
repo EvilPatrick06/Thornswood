@@ -19,6 +19,7 @@
       .\Install-Voice.ps1 -Restart     just restart it
       .\Install-Voice.ps1 -Remove      take it off again
       .\Install-Voice.ps1 -Auth on     require a join to prove itself
+      .\Install-Voice.ps1 -ChatRange on   typed chat reaches only the people near
       .\Install-Voice.ps1 -TurnUrl turn:host:3478
                                        offer a relay; its key is turn-key.txt
                                        in -Root on the VPS, put there by hand
@@ -47,13 +48,20 @@ param(
     # for working out whether a problem is the auth check or something else.
     [ValidateSet('on', 'log', 'off')]
     [string]$Auth     = 'log',
+    # Who reads a typed line, entry 150. off is the shipped default and is
+    # every line to everybody, as it has always been. on is the same cell
+    # and 4000 units, the range /ooc uses, and turns on /me, /do, /w and /s;
+    # a number is the range in units. See CHAT_RANGE in voice\voice-server.js.
+    [ValidatePattern('^(off|on|\d+)$')]
+    [string]$ChatRange = 'off',
     # A relay for the pairs that cannot reach each other directly:
     # turn:host:3478, or several joined by commas. It becomes
     # THORNSWOOD_TURN_URL on the service's command line. The relay's key never
     # goes on a command line: it sits in turn-key.txt in -Root on the VPS, put
     # there by hand, and the service reads it from there. Left off, whatever
-    # is running is kept, the same as -Bind and -Auth; -TurnUrl '' takes it
-    # away. With no relay at all, the command line is the one it always was.
+    # is running is kept, the same as -Bind, -Auth and -ChatRange; -TurnUrl ''
+    # takes it away. With no relay at all, the command line is the one it
+    # always was.
     [string]$TurnUrl  = '',
     [string]$TaskName = 'Thornswood Voice',
     [switch]$Restart,
@@ -104,25 +112,32 @@ if ($Restart) {
 #>
 $bindExplicit = $PSBoundParameters.ContainsKey('Bind')
 $authExplicit = $PSBoundParameters.ContainsKey('Auth')
+$chatExplicit = $PSBoundParameters.ContainsKey('ChatRange')
 $turnExplicit = $PSBoundParameters.ContainsKey('TurnUrl')
 # What a relay address may look like, whether it came from -TurnUrl or from
 # what is running. It goes onto a cmd.exe line below, where an & or a quote
 # would start a second command.
 $turnShape = '^turns?:[A-Za-z0-9.-]+(:\d{1,5})?(\?transport=(udp|tcp))?(,turns?:[A-Za-z0-9.-]+(:\d{1,5})?(\?transport=(udp|tcp))?)*$'
 if ($TurnUrl -and $TurnUrl -notmatch $turnShape) { Die "-TurnUrl takes turn:host:port, or several joined by commas, and nothing else." }
-if (-not $bindExplicit -or -not $authExplicit -or -not $turnExplicit) {
+if (-not $bindExplicit -or -not $authExplicit -or -not $chatExplicit -or -not $turnExplicit) {
     # The relay is read off /ice, the list every page is handed, because that
     # is what is actually being served; a relay with no key serves nothing and
     # so is not kept, and /health's turn field is read too so that is said
     # rather than done quietly. On its own try, so a service that cannot
-    # answer /ice still has its bind and auth kept.
+    # answer /ice still has its bind, auth and chat range kept. The relay
+    # comes last in the answer because its address is read to the end.
     $probe = @"
-try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t = ''; try { `$t = @((Invoke-RestMethod 'http://127.0.0.1:$Port/ice' -TimeoutSec 5).iceServers | ForEach-Object { `$_.urls } | Where-Object { "`$_" -match '^turns?:' }) -join ',' } catch { }; 'bind=' + `$h.bind + ';auth=' + `$h.auth + ';relay=' + `$h.turn + ';turn=' + `$t } catch { 'none' }
+try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t = ''; try { `$t = @((Invoke-RestMethod 'http://127.0.0.1:$Port/ice' -TimeoutSec 5).iceServers | ForEach-Object { `$_.urls } | Where-Object { "`$_" -match '^turns?:' }) -join ',' } catch { }; 'bind=' + `$h.bind + ';auth=' + `$h.auth + ';chat=' + `$h.chatRange + ';relay=' + `$h.turn + ';turn=' + `$t } catch { 'none' }
 "@
     $current = & (Join-Path $Here 'Remote.ps1') $probe -VpsHost $VpsHost -VpsUser $VpsUser 2>$null | Select-Object -Last 1
     if ("$current" -match 'bind=([\d.]+);auth=(on|log|off)') {
         if (-not $bindExplicit) { Say "  keeping the current bind, $($Matches[1]), since -Bind was not passed" 'DarkGray'; $Bind = $Matches[1] }
         if (-not $authExplicit) { Say "  keeping the current auth, $($Matches[2]), since -Auth was not passed" 'DarkGray'; $Auth = $Matches[2] }
+    }
+    # A range of 0, or a service older than the setting that reports none, is
+    # off, which is already the default, so only a live range is kept.
+    if (-not $chatExplicit -and "$current" -match ';chat=([1-9]\d*)') {
+        Say "  keeping the current chat range, $($Matches[1]), since -ChatRange was not passed" 'DarkGray'; $ChatRange = $Matches[1]
     }
     if (-not $turnExplicit -and "$current" -match ';turn=(\S+)') {
         $was = $Matches[1]
@@ -217,7 +232,7 @@ if (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
 # Without it on this line -Port drove the firewall rule, the is-it-free check
 # and the health probe, and nothing else, so -Port 7789 opened 7789, checked
 # 7789 was free, and then started a service that bound 7778 on top of live.
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=$Auth&& $turnSet"{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=$Auth&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $turnSet"{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
 
 <#
   Stop the old service, and mean it.

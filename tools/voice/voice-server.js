@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-turn-key-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -241,6 +241,125 @@ function chatPrune() {
 }
 setInterval(chatPrune, 6 * 3600000);
 chatPrune();
+
+/* ------------------------------------------------------ who hears a line ---
+ *
+ * Entry 150 on the To Do List: "Two people robbing a traveller on the
+ * Whiterun road are currently read by a smith in Markarth." Every plain line
+ * went to every socket on the server, and /ooc, the one line that is meant to
+ * step out of the scene, was the only one kept to the people near it.
+ *
+ * THORNSWOOD_CHAT_RANGE decides, and it ships OFF:
+ *
+ *   unset, off, 0   every line to everybody, exactly as before. /me, /do, /w
+ *                   and /s are not caught here and go on to the game server
+ *                   like any other slash
+ *   on              the same cell and 4000 units, the range /ooc already
+ *                   uses (OOC_RANGE in gamemode.js)
+ *   a number        the same cell and that many units
+ *
+ * Off by default because whether plain text is local is Patrick's call and
+ * has not been made, and a setting that ships off can go out in any release
+ * without changing anybody's evening. Anything that is not on or a positive
+ * number counts as off, so a typo leaves the room as it was rather than
+ * silencing it. /health says which it is.
+ *
+ * /ooc and /roll are the same either way. They are slash commands, they are
+ * queued for the game server as before, and the game server works out who is
+ * near from its own positions.
+ */
+function chatRangeOf(v) {
+  const s = String(v == null ? '' : v).trim().toLowerCase();
+  if (s === 'on') return 4000;
+  const n = Number(s);
+  return (s && isFinite(n) && n > 0) ? n : 0;
+}
+const CHAT_RANGE = chatRangeOf(process.env.THORNSWOOD_CHAT_RANGE);
+
+/*
+ * The verbs, which only exist while the range is on, because a whisper and a
+ * shout are ranges. /me and /do are how an attempt gets said as an attempt:
+ * "/me swings at the guard" leaves whether it lands to the other person,
+ * which a plain line cannot. A quarter of the range for a whisper and three
+ * times it for a shout, near enough the same proportions as the voice modes
+ * (7, 30 and 85 metres in thornswood-voice.js).
+ */
+const CHAT_VERBS = {
+  '/me': 'me', '/do': 'do',
+  '/whisper': 'whisper', '/w': 'whisper',
+  '/shout': 'shout', '/s': 'shout', '/yell': 'shout', '/y': 'shout'
+};
+const CHAT_USAGE = {
+  me: 'Say /me and then what your character does, like /me draws a sword.',
+  do: 'Say /do and then what there is to see, like /do The door is barred.',
+  whisper: 'Say /w and then what you whisper.',
+  shout: 'Say /s and then what you shout.'
+};
+
+/* The verb a line starts with and the rest of it, or null for a plain line
+   and for every other slash, which still goes to the game server. */
+function chatVerb(text) {
+  const m = /^(\/[a-z]+)(?:\s+([\s\S]*))?$/i.exec(String(text == null ? '' : text));
+  if (!m) return null;
+  const kind = CHAT_VERBS[m[1].toLowerCase()];
+  if (!kind) return null;
+  return { kind: kind, text: String(m[2] || '').trim() };
+}
+
+function chatReach(kind) {
+  if (kind === 'whisper') return CHAT_RANGE / 4;
+  if (kind === 'shout') return CHAT_RANGE * 3;
+  return CHAT_RANGE;
+}
+
+/*
+ * Who a line reaches: { to, placed }, or null for everybody.
+ *
+ * Measured the way /ooc measures in gamemode.js: the same cell first, because
+ * two people at the same coordinates either side of a loading door are not in
+ * earshot, then a straight line. The positions are the ones the gamemode
+ * posts here five times a second, and one older than STALE_MS does not count,
+ * the same rule voice goes quiet by.
+ *
+ * Two cases nobody has decided yet, so each takes the side that loses least:
+ *
+ *   NO FRESH POSITION FOR ANYBODY, which is the gamemode's feed stopped or not
+ *   installed. Range cannot be judged for anyone, and taking chat off the
+ *   whole server because of a fault somewhere else is worse than an hour of
+ *   the old global chat, so it is everybody, as before.
+ *
+ *   THE SENDER HAS NONE while other people do: at the menu, loading, between
+ *   worlds. The line goes back to them alone, and placed says so, rather than
+ *   to the whole server, which is the thing this exists to stop.
+ *
+ * The sender's own socket always gets the line, because the chat page only
+ * shows what comes back from here.
+ */
+function hearers(myId, me, reach) {
+  const now = Date.now();
+  const fresh = (pid) => {
+    const v = positions.get(Number(pid) || 0);
+    return (v && now - v.at <= STALE_MS && Array.isArray(v.pos)) ? v : null;
+  };
+  let any = false;
+  for (const [, v] of positions) { if (now - v.at <= STALE_MS) { any = true; break; } }
+  if (!any) return null;
+
+  const mine = me ? fresh(me.profileId) : null;
+  const to = [];
+  for (const [id, p] of peers) {
+    if (id === myId) { to.push(p); continue; }
+    if (!mine) continue;
+    const them = fresh(p.profileId);
+    if (!them || them.cell !== mine.cell) continue;
+    const dx = (Number(them.pos[0]) || 0) - (Number(mine.pos[0]) || 0);
+    const dy = (Number(them.pos[1]) || 0) - (Number(mine.pos[1]) || 0);
+    const dz = (Number(them.pos[2]) || 0) - (Number(mine.pos[2]) || 0);
+    if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
+    to.push(p);
+  }
+  return { to: to, placed: !!mine };
+}
 
 /* ----------------------------------------------------------- chat limit ---
  *
@@ -1144,6 +1263,7 @@ const server = http.createServer((req, res) => {
                             startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
                             bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
+                            chatRange: CHAT_RANGE,
                             peers: peers.size, tracked: positions.size,
                             queuedCommands: commands.length }));
     return;
@@ -1214,6 +1334,16 @@ server.on('upgrade', (req, socket, head) => {
       const text = String(msg.text == null ? '' : msg.text).slice(0, 400);
       if (!text) return;
 
+      // /me, /do, /w and /s are caught here rather than queued, and only
+      // while the range is on. With it off they go on to the game server
+      // exactly as they did before. See the note over CHAT_RANGE.
+      const verb = CHAT_RANGE ? chatVerb(text) : null;
+      if (verb && !verb.text) {
+        ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood',
+                  text: CHAT_USAGE[verb.kind], at: Date.now() });
+        return;
+      }
+
       // A line beginning with a slash is for the game server, not for the
       // room, so it is queued rather than broadcast.
       //
@@ -1227,7 +1357,7 @@ server.on('upgrade', (req, socket, head) => {
       // exactly five console commands to the server (additem, equipitem,
       // placeatme, disable, mp) and coc is not one of them, so a coc moves you
       // in your own game and the server puts you straight back.
-      if (text.charAt(0) === '/') {
+      if (!verb && text.charAt(0) === '/') {
         chatWrite('command', myId, me, text);
         // Full: the newest is refused and its sender told, and everything
         // already taken stays. See the note over COMMAND_CAP.
@@ -1274,6 +1404,23 @@ server.on('upgrade', (req, socket, head) => {
         text: text,
         at: Date.now()
       };
+      // With the range off nothing here runs and the line goes to everybody
+      // below, the same object as always. The log above keeps what was typed,
+      // verb and all, so a moderator reads "/me swings at him" as it was sent.
+      if (CHAT_RANGE) {
+        out.kind = verb ? verb.kind : 'say';
+        if (verb) out.text = verb.text;
+        const heard = hearers(myId, me, chatReach(out.kind));
+        if (heard) {
+          for (const p of heard.to) p.ws.send(out);
+          if (heard.to.length <= 1) {
+            ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', at: Date.now(),
+                      text: heard.placed ? 'Nobody near enough to hear that.'
+                                         : 'Your character is not in the world yet, so nobody heard that.' });
+          }
+          return;
+        }
+      }
       for (const [, p] of peers) p.ws.send(out);
       return;
     }

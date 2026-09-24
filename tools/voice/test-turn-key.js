@@ -42,9 +42,10 @@ const TOOLS = path.resolve(__dirname, '..');
 // What /ice answered, to the byte, before any of this. The STUN server the
 // pages had always had typed into them, and nothing else.
 const STUN_ONLY = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}';
-// And /health's fields, in the order it wrote them.
+// And /health's fields, in the order it wrote them. chatRange came in with
+// local chat (tools/voice/test-local-chat.js), separately from the relay key.
 const HEALTH_FIELDS = ['ok', 'build', 'auth', 'uptimeSeconds', 'startedAt', 'bind', 'turn',
-                       'peers', 'tracked', 'queuedCommands'];
+                       'chatRange', 'peers', 'tracked', 'queuedCommands'];
 // The two lines every start wrote, with nothing configured.
 const START_LOG = '[voice] listening on 0.0.0.0:' + PORT + '\n' +
                   '[voice] positions accepted from loopback at POST /positions\n';
