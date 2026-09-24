@@ -2280,6 +2280,82 @@ const SWING_IN_AIR = {};
 */
 function swinging(actorId) { return !!SWING_IN_AIR[actorId]; }
 
+/*
+  ==================== ONE PRESS IS A SPELL OF MINING ======================
+
+  Patrick, in the world on 23 September: "I just mines it's not doing one
+  animation with multiple swings it's doing it one at a time and you have to
+  keep clicking".
+
+  He is describing vanilla, and vanilla is right: you activate a seam, your
+  character works it, and you walk away when you have had enough. One press
+  one swing is a clicking game.
+
+  A SESSION IS A STAMP AND NOTHING ELSE. The person is the key, the stamp is
+  what tells one spell of mining from the next, and every swing checks that
+  the stamp it started under is still the one on the person. Anything that
+  wants it stopped clears the entry; the swing in the air finishes and no
+  other follows it. Nothing has to be cancelled, which matters because the
+  swing itself is a timer on the client and cannot be taken back.
+
+  WHAT STOPS IT, and each of these is a case somebody hit:
+    - pressing again, which is how vanilla stops too
+    - the seam running out, which already says so
+    - the tool breaking, because the next swing has no pick behind it
+    - walking away from the seam, measured rather than assumed
+    - logging out, since nobody is there to swing
+    - MINE_MOST swings, which is a hard stop under any circumstances
+
+  MINE_MOST is well past the twenty a full seam holds. It is not a balance
+  number, it is the thing that stops a bug from being infinite.
+*/
+const MINE_SESSION = {};   // actorId -> the stamp of the spell they are on
+const MINE_GAP_MS = 350;   // between the end of one swing and the next
+const MINE_MOST = 60;      // a hard stop, never reached by a real seam
+const MINE_AWAY = 400;     // how far from the seam is walking away
+
+/** Is this person mining right now? */
+function mining(actorId) { return !!MINE_SESSION[actorId]; }
+
+/*
+  Somebody who has gone is not mining.
+
+  ASKED RATHER THAN TOLD, because there is nothing to tell it. This gamemode
+  has four event hooks, onActivate, onCraft, onDeath and onRespawn, and a
+  disconnect is not one of them, so a spell of mining cannot be ended by
+  somebody leaving. It is ended by the next swing noticing they are not here.
+  A list that cannot be read answers yes: the other five stops still apply and
+  the hard cap is under all of it.
+*/
+function miningGone(actorId) {
+  try {
+    const on = mp.getOnlinePlayers() || [];
+    return on.indexOf(actorId) < 0;
+  } catch (e) { return false; }
+}
+
+/** Stop whatever spell of mining this person is on. The swing in the air finishes. */
+function stopMining(actorId) { delete MINE_SESSION[actorId]; }
+
+/*
+  Still at the seam?
+
+  Both positions come off the server, which has had them for everybody since
+  the first day, so this asks nothing of the client. A reference whose
+  position cannot be read answers yes rather than no: refusing to keep
+  swinging because a lookup failed would stop a spell of mining for a reason
+  nobody could see, and the other five stops still apply.
+*/
+function stillAt(actorId, refrId) {
+  try {
+    const me = mp.get(actorId, 'pos');
+    const it = mp.get(refrId, 'pos');
+    if (!me || !it || me.length < 3 || it.length < 3) { return true; }
+    const dx = me[0] - it[0], dy = me[1] - it[1], dz = me[2] - it[2];
+    return Math.sqrt(dx * dx + dy * dy + dz * dz) <= MINE_AWAY;
+  } catch (e) { return true; }
+}
+
 const DEPOSIT_PROPERTY = 'thornswoodDeposit';
 /* Seams whose last write threw. See takeFromDeposit. */
 const DEPOSIT_UNWRITABLE = {};
@@ -2427,6 +2503,18 @@ function mineOre(actorId, refrId, baseDesc) {
     not a mistake worth a sentence, and the strike they are already taking is
     about to hand them what they came for.
   */
+  /*
+    AND A PRESS WHILE ALREADY MINING PUTS THE PICK DOWN.
+
+    The same button starts and stops it, which is how the seam behaves in the
+    game everybody already knows. Said out loud, because a character who
+    stops swinging with nothing on screen reads as the thing having broken
+    again.
+  */
+  if (mining(actorId)) {
+    stopMining(actorId);
+    return 'You put the pick down.';
+  }
   if (swinging(actorId)) { return ''; }
 
   const backMs = depositBackMs(seam.name);
@@ -2450,6 +2538,42 @@ function mineOre(actorId, refrId, baseDesc) {
     piece of ore lost out of a seam if the server stops inside the 900ms, and
     a seam refills on its own clock anyway.
   */
+  const spell = Date.now();
+  MINE_SESSION[actorId] = spell;
+  let swungThisSpell = 0;
+
+  /*
+    The next swing of the same spell, or the end of it.
+
+    Written as a function so the first swing and every one after it are the
+    same code: the first is this one called immediately, which is why the
+    press still takes from the seam and still refuses everything it used to
+    refuse before a pick ever goes up.
+  */
+  const again = function () {
+    if (MINE_SESSION[actorId] !== spell) { return; }
+    if (miningGone(actorId)) { stopMining(actorId); return; }
+    if (swungThisSpell >= MINE_MOST) { stopMining(actorId); return; }
+    if (!stillAt(actorId, refrId)) {
+      stopMining(actorId);
+      return;
+    }
+    // The tool is asked for again every swing rather than once at the top:
+    // a pick that broke on the last strike is a spell that ends here.
+    if (toolGate(actorId, 'miner')) { stopMining(actorId); return; }
+    const more = takeFromDeposit(refrId, backMs);
+    if (!more) {
+      stopMining(actorId);
+      const done = 'This seam is worked out. ' + depositBackIn(refrId, backMs);
+      notify(actorId, done);
+      say(actorId, done);
+      return;
+    }
+    swungThisSpell++;
+    strike(more);
+  };
+
+  const strike = function (took) {
   swing(actorId, SWING_MINE, function () {
     // One a swing, not the whole pile. The rank still decides WHICH seams are
     // workable at all, which is what seam.yield's pair of zeroes says.
@@ -2485,7 +2609,19 @@ function mineOre(actorId, refrId, baseDesc) {
       notify(actorId, saying);
       say(actorId, saying);
     }
+    if (took === 1) { stopMining(actorId); return; }
+    /*
+      The next swing, once this one has finished and let go of them. Measured
+      from the strike rather than from the press, so the gap is between the
+      pick coming up and going down again rather than a fixed rhythm the
+      animation has to keep up with.
+    */
+    setTimeout(guard('mineAgain', again), (SWING_MS - SWING_LAND_MS) + MINE_GAP_MS);
   });
+  };
+
+  swungThisSpell = 1;
+  strike(took);
   /*
     ONE ANIMATION, AND THIS IS WHY IT IS NOT ALLOW ANY MORE.
 
