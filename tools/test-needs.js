@@ -277,14 +277,33 @@ if (block !== null && smoke) {
     yes('S8 and takes rest off you for it', n.rest < restWas && n.drink > drinkWas);
   }
 
-  // S9: working drains rest faster, and rank pays it back.
+  // S9: working costs rest, and rank pays it back.
   {
+    /*
+      A COST PER SWING, NOT A RATE. This used to check workRest, a multiplier
+      on the drain for the two minutes after each job, and Patrick measured
+      what that is worth: "I didn't get anymore tired while mining or
+      smithing". Four tenths of a point for a whole spell of mining. The
+      multiplier is 1 across the board now and the work itself costs, which
+      is what these hold.
+    */
     const r = rig();
-    const w = r.NEEDS.workRest;
-    yes('S9 working costs more rest than standing still', w.novice > 1);
+    const w = r.NEEDS.work;
+    yes('S9 a swing of work costs rest', w.novice > 0);
     yes('S9 and every rank costs less than the one below it',
         w.novice > w.advanced && w.advanced > w.expert && w.expert > w.master);
-    yes('S9 a master still pays something', w.master > 1);
+    yes('S9 a master still pays something', w.master > 0);
+    yes('S9 and the old multiplier is not charging for the same swing as well',
+        r.NEEDS.workRest.novice === 1);
+
+    // And it is felt: twenty swings is a third of the meter for a novice.
+    const r2 = rig();
+    r2.seed(ME);
+    const before = r2.settle(ME).rest;
+    for (let i = 0; i < 20; i++) { r2.worked(ME); }
+    const after = r2.settle(ME).rest;
+    yes('S9 twenty swings is something anybody would notice',
+        (before - after) > 20 && (before - after) < 45);
   }
 
   // S10: nothing here can kill anybody.
