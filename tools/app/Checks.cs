@@ -10,7 +10,16 @@ namespace Thornswood
     {
         public string Name, Detail;
         public bool Ok;
+        // A row that is shown, and turns amber when it fails, but does not
+        // shut Play. A new row starts this way until it has been seen to be
+        // right on every tester's machine, because a row that blocks and is
+        // wrong locks everybody out on the day it ships.
+        public bool Advisory;
         public Check(string n, bool ok, string d) { Name = n; Ok = ok; Detail = d; }
+        public Check(string n, bool ok, string d, bool advisory) { Name = n; Ok = ok; Detail = d; Advisory = advisory; }
+
+        /// <summary>Whether this row, as it stands, keeps Play shut.</summary>
+        public bool Blocks { get { return !Ok && !Advisory; } }
     }
 
     static class Checks
@@ -28,6 +37,81 @@ namespace Thornswood
                 return System.IO.File.Exists(dll);
             }
             catch { return false; }
+        }
+
+        /// <summary>
+        /// The Address Library row on the Play page.
+        ///
+        /// Script extender plugins look the game's addresses up in this file,
+        /// and one that needs it and cannot find it does not load: EngineFixes
+        /// says "failed to locate an appropriate address library" and stays
+        /// out (see the working directory note in Shell.Play). Until
+        /// 24 September nothing on this page asked, so a missing file read as
+        /// all green while those plugins quietly stayed out of the game.
+        /// Setup-Thornswood.ps1 has checked for it all along; the launcher
+        /// was the one that forgot.
+        ///
+        /// Advisory: it turns amber and does not shut Play. It is a new row,
+        /// and a new row that blocks and is wrong on somebody's machine locks
+        /// them out of the game with nothing they can press.
+        ///
+        /// buildRight is the Game build row's answer. While the exe is the
+        /// wrong build the fix is the downgrade, not Vortex: DrawStatus keeps
+        /// the collection card down until the build is right, so sending
+        /// somebody to Vortex from here would contradict the one card on the
+        /// page that helps them.
+        /// </summary>
+        public static Check AddressLibraryRow(string game, bool buildRight)
+        {
+            string build;
+            string file = AddressLibraryFile(game, out build);
+            bool ok = file.Length > 0 && File.Exists(file);
+            string detail = ok ? "versionlib " + build
+                          : file.Length == 0 ? "cannot tell, SkyrimSE.exe gives no version"
+                          : !buildRight ? "missing for " + build + ", downgrade first"
+                          : "missing for " + build + ", install the collection in Vortex";
+            return new Check("Address Library", ok, detail, true);
+        }
+
+        /// <summary>
+        /// The Address Library file the game in this folder will open, as a
+        /// full path, with the build it is for ("1.6.1170") in build. Both
+        /// are "" when SkyrimSE.exe is missing or carries no version.
+        ///
+        /// Named from the exe's own version rather than from a second copy
+        /// of the pin, because the plugins name it the same way when the game
+        /// starts: the build that actually runs decides which file they open.
+        /// Measured on 24 September: C:\Thornswood\Game\SkyrimSE.exe reads
+        /// 1.6.1170.0, and versionlib-1-6-1170-0.bin is the file beside it
+        /// that Setup-Thornswood.ps1 tests for. So this follows the pin
+        /// wherever it moves without anybody editing it.
+        /// </summary>
+        public static string AddressLibraryFile(string game, out string build)
+        {
+            build = "";
+            try
+            {
+                string exe = Path.Combine(game, "SkyrimSE.exe");
+                if (!File.Exists(exe)) return "";
+                FileVersionInfo v = FileVersionInfo.GetVersionInfo(exe);
+                string name = AddressLibraryName(v.FileMajorPart, v.FileMinorPart, v.FileBuildPart, v.FilePrivatePart);
+                if (name.Length == 0) return "";
+                build = v.FileMajorPart + "." + v.FileMinorPart + "." + v.FileBuildPart;
+                return Path.Combine(game, "Data\\SKSE\\Plugins\\" + name);
+            }
+            catch { build = ""; return ""; }
+        }
+
+        /// <summary>
+        /// Address Library's file name for one build of the game. The mod
+        /// ships one file per build, side by side: version-1-5-97-0.bin for
+        /// the 1.5 builds and versionlib-1-6-1170-0.bin for 1.6 and after.
+        /// </summary>
+        public static string AddressLibraryName(int major, int minor, int build, int rev)
+        {
+            if (major <= 0) return "";
+            string stem = (major == 1 && minor < 6) ? "version-" : "versionlib-";
+            return stem + major + "-" + minor + "-" + build + "-" + rev + ".bin";
         }
 
         /// <summary>
@@ -628,6 +712,8 @@ namespace Thornswood
             var l = new List<Check>();
             l.Add(new Check("Game build", bytes == cfg.ExpectedExeBytes, Downgrade.Describe(cfg)));
             l.Add(new Check("Script Extender", File.Exists(Path.Combine(Paths.Game, "skse64_1_6_1170.dll")), "skse64 2.2.6"));
+            // Advisory, so it warns and never shuts Play. See AddressLibraryRow.
+            l.Add(AddressLibraryRow(Paths.Game, bytes == cfg.ExpectedExeBytes));
             l.Add(new Check("Multiplayer", File.Exists(Paths.MpClient), "SkyMP client"));
             // The other half of the client, and the half that connects.
             // See ClientPatched: every row above this one asks whether a
