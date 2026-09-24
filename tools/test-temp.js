@@ -297,6 +297,87 @@ if (block) {
     yes('but standing in a field is not an emergency', out >= 35);
   }
 
+  // ------------------------------------- the two minutes that read as broken
+  /*
+    PATRICK'S OWN SESSION, 23 September, written down because the numbers he
+    read were right and looked wrong.
+
+    He stood in the creation hall, saw 51, walked outside, saw it move
+    between 53 and 54, and said: "I went outside and it's going between 53
+    and 54 which is backwards inside is supposed to be warmer".
+
+    Both readings are the meter working. Indoors the target is 58 and the
+    meter moves half the remaining distance every three minutes, so a minute
+    indoors from a fresh 50 is about 51. Outdoors on a clear day the target
+    is in the forties, and a meter that had climbed into the fifties comes
+    DOWN through 54 and 53 on its way there. The direction of travel is the
+    opposite of what the number looks like.
+
+    That is why /needs now says where it is heading. These checks hold the
+    shape so nobody re-diagnoses slow as broken, and so nobody 'fixes' it by
+    making the meter snap.
+  */
+  {
+    const api = rig();
+    api.view(7);
+    api.place(7, 'indoors');
+    api.minutes(1);
+    const oneMinuteIn = api.view(7).temp;
+    yes('a minute indoors from fresh is barely off 50, which is what he saw',
+        oneMinuteIn > 50 && oneMinuteIn < 53);
+    api.minutes(29);
+    const settledIn = api.view(7).temp;
+    yes('and half an hour indoors is genuinely warm', settledIn > 55);
+
+    // Now walk outside, warm, on a clear day with no roof.
+    api.place(7, 'outdoors');
+    api.minutes(1);
+    const first = api.view(7).temp;
+    api.minutes(1);
+    const second = api.view(7).temp;
+    yes('stepping outside warm, the number falls rather than rises',
+        first < settledIn && second < first);
+    yes('and it is in the fifties on the way down, which is what looked backwards',
+        first < 58 && first > 50);
+
+    // The report that settles it in one command.
+    const v = api.view(7);
+    yes('the view says where the warmth is heading', typeof v.tempTarget === 'number');
+    yes('and the target outdoors is below the target indoors', v.tempTarget < 50);
+    yes('it says which place the server believes', v.place === 'outdoors');
+    yes('it says whether there is a roof', v.roof === false);
+    yes('it says whether it can see a fire', v.fireAway === -1 && v.fireWorth === 0);
+    yes('and what the weather and the height are worth', typeof v.exposure === 'number');
+    yes('and how much of you is covered', typeof v.cover === 'number');
+  }
+
+  // ------------------------------------------------ naked is colder, dressed is not
+  /*
+    "still spawned in with no clothes on", and then clothes on and off making
+    no difference he could see. On a mild day it genuinely is small: the
+    clothes pull the target toward comfortable, and outdoors on a clear day
+    the target is only a few degrees off comfortable to begin with. In the
+    cold it is the difference between survivable and not, which is the point
+    of the design. Both are held here so that neither gets tuned away.
+  */
+  {
+    const mild = rig();
+    mild.view(8);
+    mild.place(8, 'outdoors');
+    mild.minutes(30);
+    const bareMild = mild.view(8).temp;
+
+    const cold = rig();
+    cold.view(9);
+    cold.place(9, 'snow');
+    cold.minutes(30);
+    const bareCold = cold.view(9).temp;
+    yes('bare skin in the snow is dangerous', bareCold < 25);
+    yes('bare skin on a mild day is not', bareMild > 35);
+    yes('so on a mild day clothes cannot be worth much, which is why they looked dead',
+        Math.abs(50 - bareMild) < 12);
+  }
+
   // ------------------------------------------------------------- the clothes
   {
     const fur = oneOf('fur', 'body');
