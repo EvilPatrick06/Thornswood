@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -241,6 +241,73 @@ function chatPrune() {
 }
 setInterval(chatPrune, 6 * 3600000);
 chatPrune();
+
+/* ----------------------------------------------------------- chat limit ---
+ *
+ * HOW FAST ONE CONNECTION CAN TALK TO THE ROOM. The To Do List, entry 149:
+ * "Chat is server-wide, unfiltered, has no rate limit anywhere". Every plain
+ * line went to every peer the moment it arrived, and the only limit was the
+ * 400 character cap, so one open console could fill every screen in the
+ * world faster than anybody could read it, let alone answer it.
+ *
+ * A TOKEN BUCKET ON THE PEER RECORD. Five lines at once, then one more every
+ * second and a half, which is forty a minute: more than anybody types, and
+ * the five cover a quick back and forth. It lives on the peer that onJoin
+ * writes rather than in the broadcast, because the broadcast is the part
+ * that changes when chat goes local, and a limit written into it would go
+ * with it.
+ *
+ * SAID LINES ONLY. The handler asks after the slash branch, never before.
+ * The plugins report gameplay down this same socket as slash lines: /chopped
+ * on every fall of the axe, /place as somebody walks about, /ate, /burn, the
+ * journal, the party and the trade window. A limit ahead of that branch
+ * would lose somebody's firewood for talking too much.
+ *
+ * DROPPED, AND THE SENDER IS TOLD ONCE. A held line is not queued, because a
+ * flood that is queued is still a flood, only later. The notice goes to the
+ * sender alone, the first time a line of theirs is dropped, and not again
+ * until one of their lines has gone through, so the notice cannot become a
+ * flood of its own. A dropped line is not in the chat log as said, because
+ * it never reached the room; the service log says who was slowed.
+ *
+ * PER CONNECTION, NOT PER ACCOUNT, on purpose while THORNSWOOD_VOICE_AUTH is
+ * log. Until it is on, the profile id on a join is whatever the message
+ * claimed, and a bucket keyed on it would let anybody empty somebody else's.
+ * A reconnect starts with a full bucket; it costs a join and a roster to
+ * everybody, so it slows a flood rather than stopping a determined one.
+ *
+ * Both numbers are settable so they can be tuned on the box without a
+ * release.
+ */
+const CHAT_BURST = Number(process.env.THORNSWOOD_CHAT_BURST) || 5;
+const CHAT_REFILL_MS = Number(process.env.THORNSWOOD_CHAT_REFILL_MS) || 1500;
+const CHAT_SLOW = 'Slow down: lines sent this quickly are not going out. ' +
+                  'Wait a few seconds, then say it again.';
+
+/* Whether this peer's line may go to the room. Tells them the first time it
+   may not. A record without a bucket starts full rather than silenced, and a
+   clock that steps backwards refills nothing rather than locking anybody
+   out. */
+function chatAllow(me, peerId, now) {
+  if (!me) return true;
+  if (typeof me.chatTokens !== 'number') { me.chatTokens = CHAT_BURST; me.chatAt = now; }
+  const since = Math.max(0, now - me.chatAt);
+  me.chatTokens = Math.min(CHAT_BURST, me.chatTokens + since / CHAT_REFILL_MS);
+  me.chatAt = now;
+  if (me.chatTokens >= 1) {
+    me.chatTokens -= 1;
+    me.chatSlowed = false;
+    return true;
+  }
+  if (!me.chatSlowed) {
+    me.chatSlowed = true;
+    console.log('[voice] slowed peer ' + peerId + ' (profile ' + me.profileId + ', ' +
+                (me.name || 'no name') + '): more than ' + CHAT_BURST +
+                ' lines at once, or more than one every ' + CHAT_REFILL_MS + 'ms');
+    me.ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: CHAT_SLOW, at: now });
+  }
+  return false;
+}
 
 // ------------------------------------------------------------ websocket ----
 // RFC 6455, the parts a small JSON relay needs: the handshake, masked text
@@ -468,7 +535,8 @@ function onJoin(ws, msg) {
 
   const id = nextPeer++;
   const name = String(msg.name || '').slice(0, 40);
-  peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode), proven: !!profileId && !why });
+  peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode), proven: !!profileId && !why,
+                  chatTokens: CHAT_BURST, chatAt: Date.now(), chatSlowed: false });
 
   ws.send({ t: 'welcome', peer: id, profileId: profileId });
   announce();
@@ -1134,6 +1202,10 @@ server.on('upgrade', (req, socket, head) => {
         });
         return;
       }
+
+      // After the slash branch and never before it; see the chat limit note
+      // above the websocket code.
+      if (!chatAllow(me, myId, Date.now())) return;
 
       /* Written before it is sent, so a line that reached the room is always
          in the log. The other way round loses the last thing somebody said
