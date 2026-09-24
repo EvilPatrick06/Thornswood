@@ -14616,6 +14616,17 @@ log('gamemode loaded:',
     the thing. A smith cutting a key for their own house holds both and it lands
     in their own pack, which is the same rule and not a special case.
   */
+  /** Every building this profile holds, in the order the claims were made. */
+  function heldBy(profileId) {
+    var mine = [];
+    if (!profileId) { return mine; }
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      if (claims[b] && claims[b].by === profileId) { mine.push(b); }
+    }
+    return mine;
+  }
+
   function cutKey(actorId, profileId, toProfile) {
     if (!isSmith(actorId)) {
       toProfile(profileId, 'Cutting a key is a smith\'s work.');
@@ -14626,9 +14637,56 @@ log('gamemode loaded:',
       return true;
     }
     var building = moldInHand(actorId);
+    /*
+      YOUR OWN DOOR NEEDS NO MOLD, AND WITHOUT THIS NOBODY COULD MAKE A KEY.
+
+      Patrick, 23 September: "Smith's are supposed to be able to make a key",
+      and before that, "A smith can't craft a key it seems so I can't test the
+      property system line properly", and then plainly: "I littarrly said you
+      can't make a fucking key but you're supposed to be able too".
+
+      He was right and the shape of the rule was the reason. Every key in the
+      game came off a mold; a mold is only cut at the door of a building
+      somebody already holds, with that holder standing there. So a smith
+      alone, holding their own house, had no way to a key at all, and neither
+      did anybody else: the ceremony needed two people before it would produce
+      the first one.
+
+      THIS DOES NOT SPEND THE BALANCE HE ASKED FOR. His words when the mold
+      was designed: "I don't want people to make new molds when somone is
+      offline". The mold exists to stop a smith cutting keys to OTHER people's
+      houses behind their backs, and that is untouched: a mold is still the
+      only way to a key for a door you do not hold. A holder cutting a key to
+      their own door is not somebody being robbed while they are offline. They
+      are standing at the forge, and they can already walk through that door
+      without any key at all.
+
+      WHICH DOOR, when they hold more than one: the one they last opened, if
+      it is theirs, because standing at a door is the plainest way to say
+      which you mean. Failing that, one held building is unambiguous. More
+      than one and nothing to choose between them is the only case that still
+      asks for the mold, and it names them rather than refusing blankly.
+    */
     if (!building) {
-      toProfile(profileId, 'You are holding no key mold. A mold is cut at the door it is for, ' +
-                           'with whoever holds the place standing there.');
+      var mine = heldBy(profileId);
+      var at = here(actorId);
+      if (at && mine.indexOf(at) !== -1) {
+        building = at;
+      } else if (mine.length === 1) {
+        building = mine[0];
+      } else if (mine.length > 1) {
+        var names = [];
+        for (var i = 0; i < mine.length; i++) { names.push(nameOf(mine[i])); }
+        toProfile(profileId, 'You hold ' + names.join(', ') + '. Stand at the door of the one ' +
+                             'you mean and open it, then come back and say /key, or bring the ' +
+                             'mold for it.');
+        return true;
+      }
+    }
+    if (!building) {
+      toProfile(profileId, 'You hold nothing with a door, and you are carrying no key mold. ' +
+                           'Claim a place with /claim, or have the holder of one stand at their ' +
+                           'door while you say /mold.');
       return true;
     }
     if (!giveNamed(actorId, KEY, keyLabel(building))) {
