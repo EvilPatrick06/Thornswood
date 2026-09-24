@@ -528,79 +528,12 @@ namespace Thornswood
             get { return Path.Combine(Paths.Game, "Data\\Platform\\Plugins\\skymp5-client.js"); }
         }
 
-        static string clientSeen = "";
-        static bool clientOk = true;
-
-        /// <summary>
-        /// Whether the client bundle is there and still carries this build's
-        /// changes.
-        ///
-        /// Every other row on the Play page asks whether a file exists. That is
-        /// what let two people through to a backdrop that never went anywhere:
-        /// the dll was on disk, the plugin list matched, the button went green,
-        /// and the bundle that does the connecting was either missing or was
-        /// upstream's own, which waits for a character select screen this
-        /// server has no handler for. The game opens, draws our menu, and sits
-        /// there. Nothing in the launcher had anything to say about it.
-        ///
-        /// The bundle is built from the fork now, and every change it carries
-        /// is marked "THORNSWOOD PATCH" in the source it was built from. That
-        /// marker is what is tested. The older "Thornswood:" prefix, which
-        /// Patch-Client.ps1 wrote into another server's bundle by text until
-        /// 20 September, is accepted too, so an install that has not taken the
-        /// new client yet is not blocked on the way to it. A marker rather than
-        /// the exact sentences, because those get reworded, and a launcher that
-        /// refuses to play over a comma is worse than the hole this closes.
-        ///
-        /// Only two things are red. A bundle that is not there, and a bundle
-        /// that was read and does not carry a marker. A bundle that is there
-        /// and cannot be read is green, because this is a new blocking row and
-        /// the likeliest reason a read fails is SkyrimPlatform holding the file
-        /// during a session. Being wrong that way costs somebody a hang they
-        /// already had; being wrong the other way stops everybody playing.
-        ///
-        /// Read once per version of the file. It is a megabyte and this is
-        /// asked every two seconds, so the answer is kept against the file's
-        /// write time and length and only worked out again when those move.
-        /// </summary>
-        public static bool ClientPatched()
-        {
-            FileInfo fi;
-            try
-            {
-                if (!File.Exists(ClientBundle)) { clientSeen = ""; clientOk = false; return false; }
-                fi = new FileInfo(ClientBundle);
-            }
-            catch { clientSeen = ""; clientOk = true; return true; }
-
-            string stamp;
-            try { stamp = fi.Length + "@" + fi.LastWriteTimeUtc.Ticks; }
-            catch { return clientOk; }
-            if (stamp == clientSeen) return clientOk;
-
-            try
-            {
-                // ReadWrite on purpose. SkyrimPlatform has this open while the
-                // game runs, and anything stricter is denied while it does.
-                using (var fs = new FileStream(ClientBundle, FileMode.Open, FileAccess.Read,
-                                               FileShare.ReadWrite | FileShare.Delete))
-                using (var sr = new StreamReader(fs))
-                {
-                    string text = sr.ReadToEnd();
-                    clientOk = text.IndexOf("THORNSWOOD PATCH", StringComparison.Ordinal) >= 0
-                            || text.IndexOf("Thornswood:", StringComparison.Ordinal) >= 0;
-                }
-                clientSeen = stamp;
-                return clientOk;
-            }
-            catch
-            {
-                // There, and unreadable. Not something to stop anybody over.
-                clientSeen = "";
-                clientOk = true;
-                return true;
-            }
-        }
+        // ClientPatched WAS HERE until 24 September: it searched the bundle's
+        // text for "THORNSWOOD PATCH" or "Thornswood:" and called any bundle
+        // carrying either one ours. Nothing had called it since a4acb90 (#108)
+        // moved the Client row to ClientRuntime, which compares all six files
+        // with the recorded sha256, and a test that passes because of
+        // something we wrote into the file is not a test (To Do entry 128).
 
         /// <summary>What the Client row says, green or red.</summary>
         /// <remarks>
@@ -659,7 +592,7 @@ namespace Thornswood
             l.Add(new Check("Script Extender", File.Exists(Path.Combine(Paths.Game, "skse64_1_6_1170.dll")), "skse64 2.2.6"));
             l.Add(new Check("Multiplayer", File.Exists(Paths.MpClient), "SkyMP client"));
             // The other half of the client, and the half that connects.
-            // See ClientPatched: every row above this one asks whether a
+            // See ClientRuntime: every row above this one asks whether a
             // file exists, and a bundle that is present but not ours is
             // what leaves somebody sitting on the backdrop.
             l.Add(new Check("Client", ClientRuntime.Good(), ClientDetail()));

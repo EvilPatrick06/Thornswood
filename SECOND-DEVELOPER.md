@@ -292,8 +292,12 @@ build output into the game folder and refuses any file that is not the
 recorded one; `Go.ps1` runs it beside the overlays and the plugins. Ship runs
 `Sync-Client.ps1 -Check` and refuses a release whose client is not the recorded
 build. `OwnGame.Foreign` never takes those six paths from the Steam copy. The
-launcher's Client row on the Play page tests the bundle for the
-`THORNSWOOD PATCH` marker the fork's source carries.
+launcher's Client row on the Play page compares all six with the same record
+(`ClientRuntime`), and `ClientRuntime.Heal` puts back any that is missing or
+not the recorded build.
+`Ship-Rules.ps1` counts one of them as ours, for a pack or the installer, only
+when its sha256 is the recorded one, and `Package-Thornswood.ps1` stops rather
+than build an installer around any other.
 
 **Links, not copies.** Big files (archives, textures, meshes, plugins) are hard
 links to Vortex's copies, so a collection is not on the disk twice; this needs

@@ -26,6 +26,10 @@
 
   -Tools <folder> runs it against another copy of the three scripts. Pointed
   at c32b820, main just before the lists became one, it fails 29 of its checks.
+  Entry 128 added three client runtime checks that fail there as well, because
+  that code called any file at those paths ours. Run on the machine that ships
+  on 24 September with those three in, it failed 31: the older checks' count
+  moves with this machine's publish baselines, and was 28 that day.
 
   Three parts.
     1. Both scripts use the one list, and nothing else keeps a copy.
@@ -122,10 +126,13 @@ function New-Decider([string]$toolsDir, [string]$which) {
             $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
             $n.Left.Extent.Text -eq '$removed' -and $n.Right.Extent.Text -match 'Test-Machine' }, $true))
         if ($rm.Count -ne 1) { throw ("{0} has {1} removal filters that ask Test-Machine, expected one" -f $file, $rm.Count) }
-        # The main channel: $Dev is false, as it is for a live release.
+        # The main channel: $Dev is false, as it is for a live release. $GameDir
+        # is the folder $prefix was made from, as it is in Publish-Update, and
+        # Ship-Rules hashes the six client runtime files there (entry 128).
         [void]$sb.AppendLine(@'
 function Get-Shipped($files, $collection, $prefix, $optional) {
     $vortexFiles = $collection
+    $GameDir = $prefix.TrimEnd('\')
     $Dev = $false
     $now = @{}
     foreach ($f in $files)
@@ -159,6 +166,7 @@ function Get-Shipped($files, $collection, $prefix, $optional) {
     $ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0
     $collectionBytes = 0; $collectionCount = 0
     $clientShipped = 0
+    $clientWrong = @()
     foreach ($f in $files)
 '@ + $body + @'
 
@@ -335,8 +343,10 @@ $rows = @(
     @('Data\Platform\Plugins\thornswood-front.js',            'ship', 'ship', 'ship'),
     @('Data\Platform\UI\index.html',                          'ship', 'ship', 'ship'),
     @('Data\Thornswood-Content.esp',                          'ship', 'ship', 'ship'),
-    @('Data\SKSE\Plugins\MpClientPlugin.dll',                 'ship', 'ship', 'ship'),
-    @('Data\Scripts\TESModPlatform.pex',                      'ship', 'ship', 'ship'),
+    # MpClientPlugin.dll and TESModPlatform.pex were rows here, ship in both.
+    # The client runtime is ours only when its bytes are the recorded build
+    # now (entry 128), which a made up file cannot be, so they have their own
+    # checks below the removal side.
     # The folder names count only straight under Data, and BStarData only at
     # the top: a folder of the same name deeper down is anybody's.
     @('Data\meshes\tools\anvil.nif',                          'ship', 'ship', 'ship'),
@@ -376,6 +386,19 @@ foreach ($r in $removedNow) { Write-Host ("      would be deleted from every tes
 $real = Invoke-Removed $pack ([string[]]@('Data\Platform\Plugins\thornswood-retired.js', ':profile:plugins.txt'))
 Yes 'a file of ours that left the build is still listed as removed' ($real -contains 'Data\Platform\Plugins\thornswood-retired.js')
 Yes 'and the plugin list is still not' ($real -notcontains ':profile:plugins.txt')
+
+# The client runtime. A made up file at a recorded path is not the recorded
+# build, so neither a pack nor the installer carries it, and no release lists
+# it as removed. This machine's real files are in part 3, and
+# test-client-by-hash.ps1 feeds the recorded bytes and one byte changed.
+$clientPaths = [string[]]@('Data\SKSE\Plugins\MpClientPlugin.dll', 'Data\Scripts\TESModPlatform.pex')
+$clientFakes = New-Fakes $clientPaths
+$packClient = Invoke-Shipped $pack $clientFakes $FakePrefix $fixtureCollection @()
+$instClient = Invoke-Shipped $inst $clientFakes $FakePrefix $fixtureCollection @()
+foreach ($p in $clientPaths) {
+    Yes ("out  both  {0}, made up, so not the recorded build" -f $p) ((Fate $packClient $p) -eq 'out' -and (Fate $instClient $p) -eq 'out')
+}
+Yes 'and neither is listed as removed' ((Invoke-Removed $pack $clientPaths).Count -eq 0)
 
 # ---- the scripts as they were, when asked for ---------------------------------
 $old = $null
