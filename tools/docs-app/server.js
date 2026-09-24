@@ -296,7 +296,7 @@ const BLURB = {
   '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
   '/credits':   ['Credits', 'Everyone whose work Thornswood is built on.'],
   '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
-  '/known':     ['Known issues', 'Permanent limits of how a shared Skyrim works, each with the reason. Read this before reporting anything.'],
+  '/known':     ['Known issues', 'What is limited or broken right now and why, and which of it is on the roadmap. Read this before reporting anything.'],
   '/help':      ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
   '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
   '/roadmap':   ['Roadmap', 'What is being worked on and roughly in what order.'],
@@ -546,8 +546,14 @@ function listFiles() {
     // server's address. Anything with a script extension is hidden whatever
     // files.json says about it.
     const script = /[.](ps1|psm1|cmd|bat|py|sh)$/i.test(name);
+    // The installer's SHA-256, which Publish-Installer writes, so the Downloads
+    // page can print it beside the size and date and link VirusTotal's report
+    // on it (To Do entry 176). Only a well formed hash goes out, in lower case
+    // because Get-FileHash writes upper and the page builds an address from it.
+    const sha256 = String(m.sha256 || '').toLowerCase();
     out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,
-      label: m.label || name, version: m.version || '', note: m.note || '' });
+      label: m.label || name, version: m.version || '', note: m.note || '',
+      sha256: /^[0-9a-f]{64}$/.test(sha256) ? sha256 : '' });
   }
   out.sort((a, b) => b.at - a.at);
   return out;
@@ -2247,6 +2253,27 @@ async function handle(req, res) {
 
     const st = await standing(t.d);
     standCache.delete(String(t.d));
+    /*
+      Could not ask Discord is not the same answer as not in the Discord.
+
+      standing() leaves inGuild false on every failed lookup and sets
+      lookupFailed to say why, because only a 404 means "not in the server".
+      This door tested inGuild alone, so a rate limit or a Discord outage came
+      back as 403 why 'guild', and the launcher writes a 'guild' down as a
+      remembered no, which erased the 72 hour grace it keeps for exactly the
+      day the site cannot vouch for anybody. The restart wave after every
+      release is when Discord rate limits the site, and a stranger told they
+      are not in a Discord they joined ten minutes ago assumes the thing is
+      broken and leaves.
+
+      So it answers 503 with the same why /api/play/owns already uses, and
+      Door.cs treats that like a site that did not answer: a yes from the last
+      few days still opens the door. The hand written admin list is left out
+      of this, because standing() already let them in and it is the way back
+      in on exactly this kind of morning.
+    */
+    if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok:false, why:'could not ask Discord', message:
+      'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
     if (!st.inGuild) return sendJson(res, 403, { ok:false, why:'guild', message:
       'That Discord account is not in the Thornswood Discord.',
       invite: cfg.discord.invite || '' });
@@ -2532,9 +2559,10 @@ async function handle(req, res) {
     the profile ids of everyone currently allowed in. Everyone who has ever
     checked in through the launcher is re-asked of Discord, so leaving the
     server or picking up the Banned role drops their numbers off the list
-    within a refresh. If any lookup failed the answer says so and the door
-    keeps the list it had, because a short list built while Discord was down
-    would turn away everybody missing from it.
+    within a refresh. If any lookup failed the answer says so and names the
+    profiles it could not check in failedProfiles, and the door keeps those
+    as they were, because a short list built while Discord was down would
+    turn away everybody missing from it.
 
     devProfiles rides along in the same answer: the subset of the same people
     who also hold the dev or admin role, whichever server they connect to.
@@ -2553,10 +2581,11 @@ async function handle(req, res) {
       return sendJson(res, 401, { error: 'no' });
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
+    const seenFailed = new Set();
     for (const d of Object.keys(linked)) {
       const row = linked[d] || {};
       const profiles = (Array.isArray(row.profiles) ? row.profiles : [])
@@ -2575,6 +2604,14 @@ async function handle(req, res) {
            enough; a list where every lookup fails fails for one reason. */
         out.lookupFailed = true;
         if (!out.lookupFailedWhy) { out.lookupFailedWhy = String(st.lookupFailed); }
+        /* AND WHOSE. lookupFailed alone makes one rate limited lookup throw
+           the whole list away, so the door kept a stale list for everybody
+           because one person could not be checked. Naming the profiles lets a
+           door that knows this field keep just those as they were and take
+           everybody else's fresh answer. lookupFailed and lookupFailedWhy stay
+           exactly as they were, so a door older than this still keeps the
+           whole list, which is what it did before. */
+        for (const n of profiles) if (!seenFailed.has(n)) { seenFailed.add(n); out.failedProfiles.push(n); }
         continue;
       }
       if (!st.play || st.banned) continue;

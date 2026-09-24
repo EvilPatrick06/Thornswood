@@ -100,6 +100,22 @@ namespace Thornswood
             catch { return ""; }
         }
 
+        /// <summary>
+        /// At or below this many enabled plugins the collection counts as not
+        /// installed. Two things on screen ask it: the Mods row on the checks
+        /// list and the "not installed yet" card above Play, which is
+        /// Shell.CollectionProblem answering "none". Until 24 September each
+        /// had its own 40 written into it, so moving one and not the other
+        /// would have put a green Mods row under a card saying the mods are
+        /// not installed.
+        ///
+        /// Nothing recorded says where 40 came from; it has been the number
+        /// since the first launcher. It sits well under the 94 plugins the
+        /// shipped reference list enables, counted on 24 September, so a full
+        /// install clears it easily and an empty list does not come near it.
+        /// </summary>
+        public const int MostPluginsWithoutCollection = 40;
+
         public static int EnabledPlugins()
         {
             try
@@ -129,14 +145,23 @@ namespace Thornswood
         /// </summary>
         ///
         /// NirnLabUIPlugin.dll WAS on this list and must never go back on it.
-        /// It is not another server's file. It is the browser backend this
-        /// build runs on: Data\SKSE\Plugins\SkyrimPlatform.ini says
-        /// BackendName = nirnlab, and thornswood-front.js reads the backend
-        /// name at startup and logs it. Listing it here meant every press of
-        /// Fix deleted the plugin that draws the whole in game interface, so
+        /// Listing it here meant every press of Fix deleted the plugin that
+        /// drew the whole in game interface on a machine whose
+        /// Data\SKSE\Plugins\SkyrimPlatform.ini said BackendName = nirnlab, so
         /// the overlay never booted and nothing put anybody into the creation
-        /// hall. Its runtime folder, Data\NirnLabUIPlatform, is the same
-        /// thing and is not foreign either.
+        /// hall.
+        ///
+        /// Which browser backend runs is not decided here, and this note does
+        /// not say which one it is. It used to say this build ran on nirnlab;
+        /// on 24 Sep the ini on Patrick's machine read BackendName = tilted and
+        /// his thornswood-front.log from 23 Sep said "browser backend: tilted".
+        /// Chars.WriteBrowserBackend chooses on every Play from what is in the
+        /// game folder, and thornswood-front.js asks SkyrimPlatform at startup
+        /// and writes the answer to Data\Platform\thornswood-front.log. Those
+        /// two are the record. Keeping NirnLab out of Thornswood's own folder
+        /// is OwnGame.Foreign's job: it leaves out Data\NirnLabUIPlatform and
+        /// NirnLabUIPlugin.dll when the folder is built, the same rule as
+        /// Test-ShipOtherServer in tools\Ship-Rules.ps1.
         // Empty since 20 September. It held the file names of another
         // server's client probe, and Thornswood no longer looks for other
         // servers' files at all: its own folder is built from what belongs,
@@ -152,7 +177,8 @@ namespace Thornswood
         /// Skyrim's.
         ///
         /// Data\\NirnLabUIPlatform is deliberately NOT here. See the note on
-        /// ForeignNames above: that folder is this build's own browser.
+        /// ForeignNames above: keeping it out of Thornswood's own folder is
+        /// OwnGame.Foreign's job when the folder is built, not Fix's.
         ///
         /// Exact paths only. Never a pattern, and never the bare word daedric,
         /// which is a vanilla Skyrim material that names thousands of ordinary
@@ -624,7 +650,7 @@ namespace Thornswood
             // file exists, and a bundle that is present but not ours is
             // what leaves somebody sitting on the backdrop.
             l.Add(new Check("Client", ClientRuntime.Good(), ClientDetail()));
-            l.Add(new Check("Mods", plugins > 40, plugins + " plugins"));
+            l.Add(new Check("Mods", plugins > MostPluginsWithoutCollection, plugins + " plugins"));
 
             // The server does not police plugin lists, so this does. A list that
             // does not match the one this build shipped with desyncs everyone,
