@@ -273,6 +273,7 @@ const MUST_NOT = [
   ['Leaks.Clean', 'the leak clean-up'],
   ['ThornIni.Ensure', 'Thornswood.ini written'],
   ['ThornIni.UndoShippedFov', 'the field of view fix'],
+  ['SteamUpdates.Report', 'Steam\'s Updates setting for Skyrim read and reported'],
   ['Display.MatchScreen', 'the game set to the screen'],
   ['Display.ScaleMenus', 'the menus sized'],
   ['Icons.Ensure', 'the shortcut icon'],
@@ -361,7 +362,7 @@ yes('the uninstall is scrolled into view, not focused', /btnUninstall\s*\.\s*Bri
 const play = walk(shell, false);
 const MUST = ['CheckUpdatesBackground', 'StartPing', 'RunScan', 'HealClientBackground', 'BuildModList',
               'RefreshDiscord', 'DrawVoiceState', 'Register.Ensure', 'Voice.Prepare', 'Voice.Start',
-              'Keep.Seed', 'AutoJoin.Ensure', 'Discord.SendPendingLogs'];
+              'Keep.Seed', 'AutoJoin.Ensure', 'Discord.SendPendingLogs', 'SteamUpdates.Report'];
 for (const name of MUST) yes('a normal start still reaches ' + name, play.calls.has(name));
 yes('a normal start still plays the theme', /\bmusic\s*\.\s*Open\s*\(/.test(play.text));
 yes('a normal start still opens on Play', /\bShowPage\s*\(\s*PagePlay\s*\)/.test(play.text));
