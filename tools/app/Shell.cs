@@ -1308,6 +1308,10 @@ namespace Thornswood
                 foreach (string m in said) Log(m);
                 Log("Fix put " + n + " thing" + (n == 1 ? "" : "s") + " right. Restart the game for it to take effect.");
                 RunScan(); BuildModList(); DrawStatus();
+                // Fix pointed the launcher at the folder Vortex really deploys
+                // into. Making Thornswood's own folder from it goes the way
+                // Make it in Settings does. See ShellOwnGame.cs.
+                if (Verify.OwnFolderNext) AskOwnGame(false);
             };
             btnOpenMine.Click += delegate
             {
@@ -1986,6 +1990,10 @@ namespace Thornswood
             Waiting(delegate { issues = Verify.Run(cfg); });
             int blocking = 0;
             foreach (Issue i in issues) if (i.Blocking) blocking++;
+            // Vortex deploys somewhere else, and Fix makes the own folder from
+            // there: the missing mods are in that folder, so Fix does help.
+            bool elsewhere = false;
+            foreach (Issue i in issues) if (i.VortexFolder != null) elsewhere = true;
 
             if (issues.Count == 0)
             {
@@ -2018,7 +2026,7 @@ namespace Thornswood
                 // wrong answer and offering it is worse than not offering it.
                 int absent = 0;
                 foreach (Issue i in issues) if (i.Absent) absent++;
-                if (absent > 0)
+                if (absent > 0 && !elsewhere)
                 {
                     sb.Append("\n\nThese are not installed at all. Fix cannot help. In Vortex, " +
                               "Profiles, press Enable under Thornswood.");
@@ -2033,7 +2041,7 @@ namespace Thornswood
                               "and Vortex writes its own again the next time it deploys.");
 
                 txtVerifyNote.Text = sb.ToString();
-                btnFix.IsEnabled = blocking > 0 && absent == 0;
+                btnFix.IsEnabled = blocking > 0 && (absent == 0 || elsewhere);
             }
             // The count alone read the same after every press: 182, 182, 182.
             // When most of them are mods that are simply not in the game folder,
@@ -2042,7 +2050,7 @@ namespace Thornswood
             int missing = 0;
             foreach (Issue i in issues) if (i.Absent) missing++;
             Log("Scan finished. " + issues.Count + " issue" + (issues.Count == 1 ? "" : "s") + " found." +
-                (missing > 0
+                (missing > 0 && !elsewhere
                     ? " " + missing + " of them are mods that are not in the game folder at all, which Scan and Fix cannot change." +
                       (Paths.Collection ? " Vortex most likely has another profile deployed." : "")
                     : ""));

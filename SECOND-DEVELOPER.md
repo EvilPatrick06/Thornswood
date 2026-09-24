@@ -309,6 +309,21 @@ brings it in by itself. The offer to make the folder is made at startup
 whenever it is possible; it used to wait for another server's files to be
 found, and no longer looks for any.
 
+**When Vortex deploys somewhere else.** Vortex can manage a Skyrim that is not
+the Steam copy: on 24 September a tester's Vortex deployed the collection into
+another SkyMP server's copy of the game, `steamapps\common\Keizaal Online`. The
+launcher finds that folder by itself (`OwnGame.DeploysInto`: any folder
+directly under a Steam library's `steamapps\common` with `SkyrimSE.exe` and
+`Data\vortex.deployment.json`, a Steam copy of Skyrim Special Edition first,
+otherwise the newest record). `VortexGame` in config.json wins over the search;
+Fix and Settings' Choose Vortex's folder set it. Scan names the folder and Fix
+points the launcher at it. Nothing of that folder's own reaches `<Root>\Game`:
+the game itself comes from the Steam copy (`OwnGame.Source`, the one Downgrade
+keeps on the server's build), and the mods are exactly the files Vortex's
+records in that folder list, linked or copied from Vortex's staging folder.
+With no Steam copy on the machine the folder is not made.
+`tools\test-vortex-folder.ps1` proves it.
+
 **The client.** The SkyMP client runtime is built from the fork,
 `C:\Thornswood-Dev\skymp` on `thornswood/engine-changes`: `npx webpack` in
 `skymp5-client` for the bundle and the native build for the rest. After a

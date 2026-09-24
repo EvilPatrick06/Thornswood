@@ -23,6 +23,11 @@ namespace Thornswood
         public long WantSize;
         public int WantCrc;
         public int WantIndex;   // position in the server manifest; the file is served at /plugins/<index>.bin
+        // The folder Vortex really deploys into, when it is not the Skyrim this
+        // install reads. Fix points the launcher at it and Thornswood's own
+        // folder is made from it, so the plugins Run finds missing are not a
+        // reason to grey Fix out while this is on the list.
+        public string VortexFolder;
         public Issue(string t, bool b) { Text = t; Blocking = b; }
         public Issue(string t, bool b, bool absent) { Text = t; Blocking = b; Absent = absent; }
     }
@@ -82,6 +87,39 @@ namespace Thornswood
             {
                 issues.Add(new Issue("Your plugins.txt is missing. Fix will put the shipped one back.", true));
                 return issues;
+            }
+
+            // Vortex deploys the collection somewhere other than the Skyrim this
+            // install reads. 24 September, a tester whose Vortex manages another
+            // SkyMP server's copy of Skyrim, Keizaal Online, and deploys
+            // Thornswood's collection into it: every plugin below then reads as
+            // not installed, and nothing said where the mods actually were.
+            // Patrick: "can we fix it so the launcher can detect and fix this in
+            // scan and fix aswell". First, because the card shows four lines
+            // and this one explains the ninety four after it. Blocking, which
+            // adds no refusal: it only appears on a shared Skyrim, and Play
+            // already refuses to start out of one (Shell.OwnGameRequired).
+            if (Paths.Collection && !OwnGame.Active)
+            {
+                string into = "";
+                try { into = OwnGame.DeploysElsewhere(cfg); }
+                catch (Exception ex) { Swallow.Note("Verify.Run, asking which folder Vortex deploys into", ex); }
+                if (into.Length > 0)
+                {
+                    string game = "";
+                    try { game = OwnGame.Source(cfg); } catch { /* "" reads as apart, which only changes the sentence */ }
+                    bool apart = !string.Equals(game, into, StringComparison.OrdinalIgnoreCase);
+                    // "Vortex deploys into", not "Thornswood's mods": the record
+                    // here says Vortex deployed something, not that it is the
+                    // Thornswood collection. Fix checks that before it builds
+                    // (OwnGame.WhyNot counts Thornswood's plugins) and says to
+                    // enable the Thornswood profile when it is not.
+                    var i = new Issue("Vortex deploys into " + into + ", not into " + Paths.Game +
+                                      ", so Fix will make Thornswood's own Skyrim folder from what Vortex deployed there, once it has checked that is Thornswood's collection" +
+                                      (apart ? ", taking the game itself from the Steam copy and nothing else from that folder." : "."), true);
+                    i.VortexFolder = into;
+                    issues.Add(i);
+                }
             }
 
             List<string> want = Enabled(golden), have = Enabled(live);
@@ -637,10 +675,38 @@ namespace Thornswood
             return n;
         }
 
+        /// <summary>
+        /// Set by Fix when it pointed the launcher at the folder Vortex really
+        /// deploys into. The launcher then makes Thornswood's own folder the
+        /// way Make it in Settings does, which is its job and not this one's:
+        /// it asks, shows what is in the way, and restarts into the folder.
+        /// </summary>
+        public static bool OwnFolderNext;
+
         public static int Fix(Config cfg, Action<string> say)
         {
             if (say == null) say = delegate(string m) { };
             int n = SettleLoadOrder();
+
+            // Run's first issue, when Vortex deploys somewhere else: saved as
+            // VortexGame, so the own folder is made from there (OwnFolderNext).
+            OwnFolderNext = false;
+            if (cfg != null && Paths.Collection && !OwnGame.Active)
+            {
+                string into = "";
+                try { into = OwnGame.DeploysElsewhere(cfg); }
+                catch (Exception ex) { Swallow.Note("Verify.Fix, asking which folder Vortex deploys into", ex); }
+                if (into.Length > 0)
+                {
+                    bool ok;
+                    say(OwnGame.PointAt(cfg, into, out ok));
+                    if (ok)
+                    {
+                        OwnFolderNext = true;
+                        n++;
+                    }
+                }
+            }
 
             // Fix means make this install match what the server expects, and
             // another server's client running the main menu is the furthest
