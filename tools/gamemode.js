@@ -2779,8 +2779,8 @@ function mining(actorId) { return !!MINE_SESSION[actorId]; }
 /*
   Somebody who has gone is not mining.
 
-  ASKED RATHER THAN TOLD, because there is nothing to tell it. This gamemode
-  has four event hooks, onActivate, onCraft, onDeath and onRespawn, and a
+  ASKED RATHER THAN TOLD, because there is nothing to tell it. Every event a
+  handler in this file can answer is listed over mp.onTakeItem, and a
   disconnect is not one of them, so a spell of mining cannot be ended by
   somebody leaving. It is ended by the next swing noticing they are not here.
   A list that cannot be read answers yes: the other five stops still apply and
@@ -4831,9 +4831,9 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
     symptom; the fault is that there was no way for them to climb at all.
 
     THIS IS THE SAME SHAPE THE MAGE HAD and the same answer. The note over
-    treePointsPerRank says it: the server cannot see a spell being cast, so
-    casting cannot be counted, and a mage was stuck holding two novice spells
-    for good until two things the server DOES see were made to count. The
+    treePointsPerRank says it: nothing here counts a spell being cast, and a
+    mage was stuck holding two novice spells for good until two other things
+    the server sees were made to count. The
     server does see a death, with its killer, and that is the warrior's.
 
     THE RULES, and each one is there to stop something.
@@ -11523,11 +11523,12 @@ log('gamemode loaded:',
     /*
       WHAT A SCHOOL CLIMBS ON. NOT IN THE RULEBOOK.
 
-      The server cannot see a spell being cast. This gamemode has four event
-      hooks and that is all there is: onActivate, onCraft, onDeath and
-      onRespawn. There is no cast, no spell-fired and no magic-effect event,
-      and the only magic the server performs itself is Actor.AddSpell. So
-      casting cannot be counted, and until now nothing else counted either:
+      Nothing here counts a spell being cast. The engine does raise one,
+      onPapyrusEvent:OnSpellCast (the list over mp.onTakeItem says what it
+      carries), but no handler in this file listens to it, there is no
+      magic-effect event, and the only magic the server performs itself is
+      Actor.AddSpell. So casting is not counted, and until now nothing else
+      counted either:
       a mage held two novice spells for good, because a spell costs a point,
       a point comes with a rank, and a rank came from work a mage had no way
       to do. That circle is the defect. Two things the server does see break
