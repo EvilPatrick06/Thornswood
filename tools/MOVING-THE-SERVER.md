@@ -192,6 +192,10 @@ and are listed below.
   the file grows until somebody moves it.
 - `.\tools\Get-Logs.ps1` reads only the current file. After a restart, last
   night's crash may be in `.1` beside it.
+- The site's /sessions page reads a session's game server lines out of
+  `server.log` and, when that is shorter than 4 MB, out of the end of
+  `server.log.1` and the older ones behind it, so a session from before a
+  restart, the crash session included, is still on the page.
 - Whether the gamemode can write its log at all is at
   `http://192.135.112.23:3000/thornswood-log.json`, and on 7788 for dev.
   `"ok": false` means thornswood.log has stopped, and `why` says what the

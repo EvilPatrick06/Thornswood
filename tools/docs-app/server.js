@@ -1460,6 +1460,15 @@ function noteTrouble(row, found) {
 
   dev and main are different servers with different logs; the session says
   which it was on.
+
+  ROLLED LOGS ARE READ TOO, entry 220. roll-log.ps1 runs in front of the game
+  server on every start, and a server.log of 4 MB or more becomes server.log.1
+  (an install rolls it whatever the size). Reading server.log alone, a restart
+  after a crash would leave every session before it with no server lines at
+  all, the crash session included, which is the one this page is opened for.
+  So when server.log is shorter than the window, the rest of the window is
+  taken off the end of server.log.1, then .2, and so on, oldest text first,
+  and the read is never more than the 4 MB it always was.
 */
 const SERVER_LOGS = {
   main: 'C:\\Thornswood-Server\\server.log',
@@ -1553,21 +1562,42 @@ function chatSlice(profileId, from, to, channel) {
 
 function serverLogSlice(channel, from, to) {
   const file = SERVER_LOGS[channel === 'dev' ? 'dev' : 'main'];
-  let text = '';
+  /* Only the tail is read, 4 MB across the live file and the rolled ones
+     behind it. These grow, and a session is minutes long. Five rolled ones is
+     what roll-log.ps1 keeps. */
+  const keep = 5;
+  let left = 4 * 1024 * 1024;
+  const parts = [];
+  let found = 0;
   try {
-    if (!fs.existsSync(file)) return { ok: false, why: 'no server log on this box', lines: [] };
-    /* Only the tail is read. These grow, and a session is minutes long. */
-    const size = fs.statSync(file).size;
-    const want = 4 * 1024 * 1024;
-    const fd = fs.openSync(file, 'r');
-    try {
-      const start = Math.max(0, size - want);
-      const buf = Buffer.alloc(Math.min(size, want));
-      fs.readSync(fd, buf, 0, buf.length, start);
-      text = buf.toString('utf8');
-      if (start > 0) text = text.slice(text.indexOf('\n') + 1);
-    } finally { fs.closeSync(fd); }
+    for (let g = 0; g <= keep && left > 0; g++) {
+      const f = g === 0 ? file : file + '.' + g;
+      if (!fs.existsSync(f)) {
+        /* server.log itself can be missing for a moment, between the roll and
+           the server opening a new one, with last night's run in .1. A
+           missing rolled one means there are none older. */
+        if (g === 0) continue;
+        break;
+      }
+      found++;
+      const size = fs.statSync(f).size;
+      const fd = fs.openSync(f, 'r');
+      try {
+        const start = Math.max(0, size - left);
+        const buf = Buffer.alloc(Math.min(size, left));
+        fs.readSync(fd, buf, 0, buf.length, start);
+        let text = buf.toString('utf8');
+        if (start > 0) text = text.slice(text.indexOf('\n') + 1);
+        /* A run killed mid-line leaves no newline at the end of its file, and
+           the next file's first line must not be glued onto it. */
+        if (text.length && !text.endsWith('\n')) text += '\n';
+        parts.unshift(text);
+        left -= buf.length;
+      } finally { fs.closeSync(fd); }
+    }
   } catch (e) { return { ok: false, why: String(e.message || e), lines: [] }; }
+  if (!found) return { ok: false, why: 'no server log on this box', lines: [] };
+  const text = parts.join('');
 
   const out = [];
   let keeping = false;
