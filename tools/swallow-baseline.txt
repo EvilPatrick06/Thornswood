@@ -29,6 +29,13 @@
 # places entry 239 named, Config.Save, Swap.Restore with the DropLink it
 # starts with, Hold.Release and Keep.Unpark, log instead now, which is the ten
 # fewer below: 376.
+#
+# Main brought five more before this list reached it, all with Steam's Updates
+# setting: one in Shell.cs, one in ShellSteamUpdates.cs and three in
+# SteamUpdates.cs. The first two log with Swallow.Note. The three in
+# SteamUpdates.cs say why in a comment instead, because test-steam-updates.ps1
+# compiles that class on its own and it cannot reach Swallow. So the numbers
+# below held at 376 and none was raised.
 Art.cs 1
 Chars.cs 18
 Checks.cs 21

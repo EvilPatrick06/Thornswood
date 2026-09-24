@@ -313,7 +313,7 @@ namespace Thornswood
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch { }
             try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch { }
             // Steam's Updates setting for the Skyrim the downgrade looks after, read only (SteamUpdates).
-            try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) { string upd = SteamUpdates.Report(Downgrade.Target(cfg)); if (upd != null) Log(upd); } } catch { }
+            try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) { string upd = SteamUpdates.Report(Downgrade.Target(cfg)); if (upd != null) Log(upd); } } catch (Exception ex) { Swallow.Note("Shell.Run, reading Steam's Updates setting", ex); }
             {
                 int parked = playing ? 0 : Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");
