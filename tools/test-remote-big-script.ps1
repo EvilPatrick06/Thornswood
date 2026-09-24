@@ -1,34 +1,49 @@
 <#
   test-remote-big-script.ps1
 
-  A 10 KB script reaches the VPS whole and runs there, from every helper that
-  sends one.
+  A 10 KB script is sent whole and runs to its last line, from every helper
+  that sends one to the VPS.
 
-  WHY THIS EXISTS. sshd on Windows hands the command to cmd.exe, which stops
-  at 8,191 characters, and base64 of UTF-16 is about 2.7 times the script. So
-  anything past about 3 KB used to arrive cut in half, and the far end
-  complained about a brace in a script nobody could see. Deploy-Docs.ps1 hit
-  it on 17 September; sixteen scripts were given a guard on 20 September that
-  sends a long script as a file instead. Entry 197 on the To Do List asks for
-  "the remote helper survives a 10 KB script".
+  WHY THIS EXISTS. On the VPS a long command line arrives cut short, and the
+  far end complains about a brace in a script nobody can see. Base64 of
+  UTF-16 is about 2.7 times the script, so it takes only a few KB.
+  Deploy-Docs.ps1 hit it on 17 September and Deploy-DevGamemode.ps1 on 20
+  September, and sixteen scripts were given a guard that night that sends a
+  long script as a file instead. Entry 197 on the To Do List asks for "the
+  remote helper survives a 10 KB script".
 
   test-remote-length.ps1 reads the scripts and measures their blocks. This
   one sends. Each Remote function is lifted out of its script by text and
   called with a 10 KB script, and Remote.ps1, the helper that takes any
   script at all, is run whole with one.
 
-  THE STAND-INS ARE A SMALL SSHD, not a recorder. scp puts the file in a
-  scratch folder that stands for C:/Windows/Temp on the VPS, and ssh hands
-  the command to cmd.exe, the way sshd on the VPS does, with that folder in
-  place of the far one. So what is proved is that the line runs, not that it
-  reads right. The first version of this harness only read the line, and it
-  passed every helper while every helper sent -File '<path>': measured 24
-  September, cmd.exe passes the single quotes on to Windows PowerShell as part
-  of the path, and -File refuses it. Nothing sent as a file had ever run.
+  THE STAND-INS ARE A SMALL SSHD ON THIS MACHINE, NOT THE VPS. scp puts the
+  file in a scratch folder that stands for C:/Windows/Temp, and ssh hands the
+  command to this machine's cmd.exe with that folder in place of the far one.
+  The -File line is then run again under a Windows PowerShell outer shell.
+  Windows sshd uses cmd.exe unless it is set to another shell, and Windows
+  PowerShell is the usual other one. Which of the two the VPS uses has not
+  been measured. So what is proved is the helpers' mechanics: the
+  script is copied up once and whole, runs to its last line, what it printed
+  comes back, it is tidied away, and the exit code survives the tidy up. What
+  the VPS itself does is not proved here.
 
-  It runs only what this harness sent: its own two scripts inline, a file it
-  copied into the scratch folder, or the tidy up of one. Anything else is
-  written down and not run, and fails the check that expected it to.
+  What the two shells showed on this machine on 24 September: the path bare
+  runs under both. The path in single quotes, which every helper sent until
+  then, fails under cmd.exe ("The given path's format is not supported") and
+  runs under Windows PowerShell. It also ran on the VPS: Deploy-DevGamemode
+  printed its settings step's own line from a file sent that way on 20 and 21
+  September. And the 17 September error in Remote.ps1's header, "a
+  positional parameter cannot be found that accepts argument 'Voice'", is
+  what this machine gives for that line under Windows PowerShell, and not
+  under cmd.exe. Both fit a VPS whose sshd hands commands to Windows
+  PowerShell, but nobody has read the setting off the box. A helper here
+  passes only with a line that runs under both shells until somebody does.
+
+  It runs only what this harness sent, in the exact shapes the helpers send:
+  its own two scripts inline, or a file it copied into the scratch folder,
+  run or tidied away. Anything else is written down and not run, and fails
+  the check that expected it to.
 
   NEVER CONNECTS. It checks that ssh and scp resolve to the stand-ins before
   anything is sent, and stops if they do not. Every host it names ends in
@@ -61,7 +76,8 @@ function Done {
     exit 0
 }
 
-# What cmd.exe will carry.
+# What cmd.exe will carry. Where the VPS cuts a line has not been measured;
+# the helpers send anything over 6,000 characters as a file.
 $Limit = 8191
 
 # What the helpers read to know where to send. None of it resolves.
@@ -99,34 +115,36 @@ $global:TsFar = @{
 $global:TsRemoteCalls = New-Object System.Collections.ArrayList
 
 # The far paths go bare, so the stand-in folder has to be as bare as
-# C:/Windows/Temp is, or a space in it would fail a line that works up there.
+# C:/Windows/Temp is, or a space in it would fail a line for a reason the real
+# path cannot have.
 Yes 'the stand-in folder for C:/Windows/Temp has no spaces in its path, as the real one has none' (-not $disk.Contains(' '))
 if ($script:fail) { Done }
 
-function global:Invoke-TsFarEnd([string]$command) {
+function global:Invoke-TsFarEnd([string]$command, [string]$shell) {
     $far = $global:TsFar
     $said = New-Object System.Collections.ArrayList
 
-    # Only what this harness sent. A shape it knows, no cmd.exe operators to
-    # chain anything else on, and every far path named is a file it copied up.
+    # Only what this harness sent, in the exact shapes the helpers send, so
+    # nothing can be chained on for either shell to run. A far path may be in
+    # single quotes, so that the old form still reaches the shell and fails
+    # there in the shell's own words, but it must name a file this harness
+    # copied up.
     $ok = $false
-    if ($command -notmatch '[&|<>^]') {
-        $m = [regex]::Match($command, '^powershell -NoProfile -EncodedCommand (\S+)$')
+    $at = [regex]::Escape($far.Temp) + '[A-Za-z0-9._-]+'
+    $m = [regex]::Match($command, '^powershell -NoProfile -EncodedCommand ([A-Za-z0-9+/=]+)$')
+    if ($m.Success) {
+        $text = ''
+        try { $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value)) } catch { }
+        foreach ($s in $far.Scripts) { if ($text.EndsWith($s)) { $ok = $true } }
+    }
+    else {
+        $m = [regex]::Match($command, '^powershell -NoProfile -ExecutionPolicy Bypass -File (''?)(' + $at + ')\1$')
+        if (-not $m.Success) { $m = [regex]::Match($command, '^powershell -NoProfile -Command Remove-Item -LiteralPath (''?)(' + $at + ')\1 -Force$') }
         if ($m.Success) {
-            $text = ''
-            try { $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value)) } catch { }
-            foreach ($s in $far.Scripts) { if ($text.EndsWith($s)) { $ok = $true } }
-        }
-        elseif ($command -match '^powershell -NoProfile -(ExecutionPolicy Bypass -File|Command Remove-Item -LiteralPath) ') {
-            $named = [regex]::Matches($command, [regex]::Escape($far.Temp) + '[A-Za-z0-9._-]+')
-            $ok = ($named.Count -gt 0)
-            foreach ($p in $named) {
-                $here = Join-Path $far.Disk ($p.Value.Substring($far.Temp.Length))
-                if (-not (Test-Path -LiteralPath $here)) { $ok = $false; continue }
+            $here = Join-Path $far.Disk ($m.Groups[2].Value.Substring($far.Temp.Length))
+            if (Test-Path -LiteralPath $here) {
                 $held = [IO.File]::ReadAllText($here)
-                $ours = $false
-                foreach ($s in $far.Scripts) { if ($held.Contains($s)) { $ours = $true } }
-                if (-not $ours) { $ok = $false }
+                foreach ($s in $far.Scripts) { if ($held.Contains($s)) { $ok = $true } }
             }
         }
     }
@@ -135,13 +153,23 @@ function global:Invoke-TsFarEnd([string]$command) {
         return [pscustomobject]@{ Out = @($said); Code = 1 }
     }
 
-    # cmd.exe /c with the line as it would arrive, the far folder swapped for
-    # the stand-in. /d leaves out this machine's AutoRun, which the VPS does
-    # not share. PSModulePath is dropped so Windows PowerShell builds its own,
-    # as it does under sshd, rather than inheriting pwsh's.
+    # The line as it would arrive, the far folder swapped for the stand-in.
+    # Under cmd.exe, /d leaves out this machine's AutoRun, which belongs to
+    # this machine and not to any server. Under Windows PowerShell the whole
+    # line is its command; the shapes above hold no double quote to break the
+    # one round it. Either way PSModulePath is dropped so the Windows
+    # PowerShell inside builds its own, as a fresh one does, rather than
+    # inheriting pwsh's.
+    $line = $command.Replace($far.Temp, $far.DiskFwd)
     $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = Join-Path $env:SystemRoot 'System32\cmd.exe'
-    $psi.Arguments = '/d /c ' + $command.Replace($far.Temp, $far.DiskFwd)
+    if ($shell -eq 'powershell') {
+        $psi.FileName = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $psi.Arguments = '-NoProfile -NonInteractive -Command "' + $line + '"'
+    }
+    else {
+        $psi.FileName = Join-Path $env:SystemRoot 'System32\cmd.exe'
+        $psi.Arguments = '/d /c ' + $line
+    }
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     $psi.RedirectStandardOutput = $true
@@ -238,14 +266,51 @@ function Show-Why($r) {
     }
 }
 
+# The -File line a helper sent, run again under a Windows PowerShell outer
+# shell, against the file as it was copied up. Its exit code is not compared:
+# powershell -Command hands back 1 for any program that failed, so the 7 the
+# script exits with cannot come through that way. Sixteen helpers send the
+# very same line with the very same file, so that pair is run this way once
+# and not again. Measured 24 September on a busy machine: run for every
+# helper, it took this from 136 seconds to 213; run once a pair, from 126 to
+# 152.
+$script:otherShellRan = @{}
+function Test-OtherShell($r) {
+    $runs = @($r.Ssh | Where-Object { $_.Command -match '-File' })
+    if ($runs.Count -ne 1 -or $r.Scp.Count -ne 1) { return $false }
+    $key = $runs[0].Command + "`n" + $r.Scp[0].Sent
+    if (-not $script:otherShellRan.ContainsKey($key)) {
+        $script:otherShellRan[$key] = (Invoke-OtherShell $runs[0].Command $r.Scp[0].Sent)
+    }
+    return $script:otherShellRan[$key]
+}
+function Invoke-OtherShell([string]$command, [string]$sent) {
+    $m = [regex]::Match($command, [regex]::Escape($global:TsFar.Temp) + '[A-Za-z0-9._-]+')
+    if (-not $m.Success) { return $false }
+    $here = Join-Path $global:TsFar.Disk ($m.Value.Substring($global:TsFar.Temp.Length))
+    $ran = $null
+    try {
+        [IO.File]::WriteAllText($here, $sent, (New-Object Text.UTF8Encoding($true)))
+        $ran = Invoke-TsFarEnd $command 'powershell'
+    }
+    finally { Remove-Item -LiteralPath $here -Force -ErrorAction SilentlyContinue }
+    $out = ($ran.Out -join "`n")
+    if ($out.Contains($lastLine)) { return $true }
+    $first = ($ran.Out | Where-Object { $_ -match 'fail|not|error' } | Select-Object -First 1)
+    if (-not $first) { $first = ($ran.Out | Select-Object -First 1) }
+    Write-Host ('      Windows PowerShell said, exit ' + $ran.Code + ': ' + $first)
+    return $false
+}
+
 function Test-Sends([string]$name, [scriptblock]$sendBig, [scriptblock]$sendShort, [bool]$handsBackCode) {
     $r = Measure-Send $sendBig
     $runs = @($r.Ssh | Where-Object { $_.Command -match '-File' })
     $ran = ($runs.Count -eq 1 -and $runs[0].Code -eq 7 -and $runs[0].Out.Contains($lastLine))
-    Yes "$name sends a 10 KB script on no command line longer than $Limit" ($r.Longest -gt 0 -and $r.Longest -le $Limit)
+    Yes "$name sends a 10 KB script on no command line longer than cmd.exe's $Limit" ($r.Longest -gt 0 -and $r.Longest -le $Limit)
     Yes '  as a file it copies up once' ($r.Scp.Count -eq 1)
     Yes '  holding the whole script' ($r.Scp.Count -eq 1 -and $r.Scp[0].Sent.Contains($big))
-    Yes '  runs that file to its last line when cmd.exe hands it to Windows PowerShell, as sshd on the VPS does' $ran
+    Yes '  runs that file to its last line when cmd.exe on this machine hands the line on' $ran
+    Yes '  and when Windows PowerShell on this machine hands the same line on instead' (Test-OtherShell $r)
     Yes '  and what it printed comes back' ($r.Out.Contains($lastLine))
     Yes '  and removes it afterwards' (@($r.Ssh | Where-Object { $_.Command -match 'Remove-Item' }).Count -eq 1 -and $r.Left -eq 0)
     if ($handsBackCode) {
@@ -274,7 +339,7 @@ if (Test-Path -LiteralPath $remotePs1) {
     try {
         [IO.File]::WriteAllText($bigFile, $big)
         $r = Measure-Send { & $remotePs1 -File $bigFile -VpsHost $VpsHost -VpsUser $VpsUser }
-        Yes "Remote.ps1 -File with a 10 KB script sends no command line longer than $Limit" ($r.Longest -gt 0 -and $r.Longest -le $Limit)
+        Yes "Remote.ps1 -File with a 10 KB script sends no command line longer than cmd.exe's $Limit" ($r.Longest -gt 0 -and $r.Longest -le $Limit)
         Yes '  and copies up the whole script' ($r.Scp.Count -eq 1 -and $r.Scp[0].Sent.Contains($big))
         Yes '  and runs it to its last line' ($r.Out.Contains($lastLine))
         Yes "  and hands back the script's own exit code" ($r.Code -eq 7)
@@ -315,8 +380,11 @@ Yes 'the guarded helpers were found and sent to' ($helpers -ge 10)
 # ---- and the ones that are not a Remote function -------------------------------
 #
 # Install-Voice.ps1 sends its install inline in the script body, so nothing
-# above can call it. What failed in all of them was one shape of line, so
-# every script is read for it: ssh told to run a -File path in single quotes.
+# above can call it. So every script is read for the one shape of line that
+# fails under cmd.exe here: ssh told to run a -File path in single quotes.
+# That shape did run on the VPS on 20 and 21 September, so this is not a
+# claim about the VPS. It keeps every helper on the form that runs under
+# either shell while which one the VPS uses is not known.
 $quoted = @()
 foreach ($f in (Get-ChildItem -Path $ToolsPath -Filter *.ps1 -File | Where-Object { $_.Name -notlike 'test-*' } | Sort-Object Name)) {
     $i = 0
@@ -327,6 +395,6 @@ foreach ($f in (Get-ChildItem -Path $ToolsPath -Filter *.ps1 -File | Where-Objec
 }
 $why = ''
 if ($quoted.Count) { $why = ': ' + ($quoted -join ', ') }
-Yes ('no script has ssh run a -File path in single quotes, which cmd.exe passes on as part of the path' + $why) ($quoted.Count -eq 0)
+Yes ('no script has ssh run a -File path in single quotes, the form that fails under cmd.exe here' + $why) ($quoted.Count -eq 0)
 
 Done

@@ -81,29 +81,34 @@ if ($Show) {
 $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
 
 # A LONG SCRIPT GOES AS A FILE, because a command line cannot hold it and
-# nothing says so. sshd on Windows hands the command to cmd.exe, which stops
-# at 8,191 characters, and base64 of UTF-16 is about 2.7 times the script, so
-# anything past about 3 KB arrives cut in half and the far end complains
-# about a brace in a script nobody can see. Deploy-Docs.ps1 hit it on 17
-# September and sixteen scripts were given this guard on 20 September. This
-# one was not, and it is the one that takes any script at all. Measured 24
-# September: a 10,266 character script made a 27,526 character command line,
-# more than three times what arrives. Entry 197 on the To Do List asked for
-# "the remote helper survives a 10 KB script"; tools\test-remote-big-script.ps1
-# is that.
+# nothing says so. On the VPS a long command line arrives cut short, and the
+# far end complains about a brace in a script nobody can see: Deploy-Docs.ps1
+# hit it on 17 September and Deploy-DevGamemode.ps1 on 20 September, and
+# sixteen scripts were given this guard that night. This one was not, and it
+# is the one that takes any script at all. Base64 of UTF-16 is about 2.7 times
+# the script, so the 6,000 character gate the sixteen use is a script of about
+# 2 KB. Measured 24 September: a 10,266 character script made a 27,526
+# character command line. Where exactly the VPS cuts a line has not been
+# measured. Entry 197 on the To Do List asked for "the remote helper survives
+# a 10 KB script"; tools\test-remote-big-script.ps1 is that.
 #
 # Under the limit nothing changes. Over it, the script is copied up and run
 # from there. A name of its own, so two of these at once cannot run each
 # other's script. Written with a byte order mark so Windows PowerShell on the
 # box reads it as UTF-8 whichever PowerShell sent it. The exit code is the
-# script's, kept across the tidy up.
+# far end's, kept across the tidy up: the script's own number when cmd.exe
+# hands the line on, and 1 for any failure when Windows PowerShell does,
+# because that is what powershell -Command returns for a program that failed.
+# Both measured on this machine, 24 September.
 #
-# The path goes bare, with no quotes round it. cmd.exe passes single quotes on
-# to Windows PowerShell as part of the path, and -File refuses it with "The
-# given path's format is not supported". Measured 24 September, after the
-# first version of this sent -File '<path>' and a review caught it. Bare also
-# reaches ssh the same from Windows PowerShell and from pwsh, which quote an
-# embedded double quote differently. The path is ours and has no spaces.
+# The path goes bare, with no quotes round it; it is ours and has no spaces.
+# Measured on this machine on 24 September, not on the VPS: bare runs whether
+# cmd.exe or Windows PowerShell hands the line on, and the form the sixteen
+# used, the path in single quotes, fails under cmd.exe. That form did run on
+# the VPS on 20 and 21 September, so which shell sshd uses there is not known,
+# and bare is the form that works under either. Bare also reaches ssh the same
+# from Windows PowerShell and from pwsh, which quote an embedded double quote
+# differently.
 $cmd = "powershell -NoProfile -EncodedCommand $encoded"
 if ($cmd.Length -gt 6000) {
     $far = 'C:/Windows/Temp/thornswood-remote-' + [Guid]::NewGuid().ToString('N') + '.ps1'
