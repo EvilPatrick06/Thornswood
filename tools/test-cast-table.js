@@ -38,6 +38,16 @@
 //     the bits from one that always follows the template, and on the live
 //     load order that pass loses 224 traders, 23 carriage and ferry workers
 //     and 361 guards.
+//   - the race bit and the name bit set apart: a fishmonger whose race alone
+//     comes from its template (0x1) and a stall keeper whose name alone does
+//     (0x80), each placed only by a crime faction of its own that its template
+//     does not share. Every other templated person here sets both bits or
+//     neither, so without these two a pass that reads the race through the
+//     name bit, or the name, the unique flag or the crime faction through the
+//     wrong one of the two, passed every check. On the live load order that
+//     slip is not small: reading the race through the name bit loses 221
+//     traders and 287 guards, and reading the crime faction through the race
+//     bit puts 239 more people under no hold.
 //   - a placement switched off by its own flag
 //   - enable parents every way a real one comes: a marker switched off by its
 //     own flag, a marker that follows it, a marker set opposite to it, a
@@ -152,6 +162,12 @@ const TRAITS = 0x1, FACTIONS = 0x4, BASE = 0x80;
 // take race, name, stats, spells, model, script and the rest from theirs, but
 // not factions. Neither sets FACTIONS.
 const CFTO_USES = 0x230, POPULATED_USES = 0xecb;
+// The commonest templated trader on the live load order takes its race from
+// the template and its name and factions from its own record: 221 of the 289
+// templated traders standing on 24 September set the race bit without the
+// name bit. None set the name bit alone, but 17 set it with the factions bit
+// and not the race bit, so the two bits really do come apart both ways.
+const RACE_ONLY_USES = TRAITS, NAME_ONLY_USES = BASE;
 const SQ = 4096;
 
 // Skyrim.esm, the whole world in miniature. Every form id is its own (index 0).
@@ -161,20 +177,22 @@ const L = { whiterunHold: 0x300, whiterun: 0x301, riftHold: 0x302, belethors: 0x
 const F = {
   belethor: 0x400, follower: 0x401, carriage: 0x402, isGuard: 0x403, guardTalk: 0x404,
   guardWhiterun: 0x405, crimeWhiterun: 0x406, mareOwner: 0x407, jobMerchant: 0x408,
-  market: 0x409, riftenMarket: 0x40A,
+  market: 0x409, riftenMarket: 0x40A, crimeRift: 0x40B,
 };
 const N = {
   belethor: 0x500, faendal: 0x501, bjorlam: 0x502, guard: 0x503, thin: 0x504, wolf: 0x505,
   mannequin: 0x506, gjalund: 0x507, aela: 0x508, patron: 0x509, nazeem: 0x50A,
   leveled: 0x50B, hermit: 0x50C, riftTrader: 0x50D, market: 0x50E,
   driverTemplate: 0x50F, sigaar: 0x510, merchantTemplate: 0x511, merchant: 0x512,
+  fishTemplate: 0x513, fishmonger: 0x514, keeperTemplate: 0x515, keeper: 0x516,
 };
-// Where Sigaar and the Riften merchant are placed, so each is found by its
-// reference and not by a name a template could have handed it.
-const SIGAAR = 0x81C, MERCHANT = 0x81D;
+// Where Sigaar, the Riften merchant, the fishmonger and the stall keeper are
+// placed, so each is found by its reference and not by a name a template could
+// have handed it.
+const SIGAAR = 0x81C, MERCHANT = 0x81D, FISHMONGER = 0x81E, STALL_KEEPER = 0x81F;
 const GUARD_AT_HOME = 0x81B;
 const LV = 0x600;
-const C = { shop: 0x700, house: 0x701 };
+const C = { shop: 0x700, house: 0x701, backRoom: 0x702 };
 const W = { tamriel: 0x900, persistent: 0x901, whiterunSq: 0x902, openSq: 0x903, riftSq: 0x904,
   farSq: 0x905, zeroSq: 0x906 };
 // The enable parents, all REFRs. marker is switched off by its own flag. chain
@@ -221,6 +239,7 @@ const skyrim = Buffer.concat([
     rec('FACT', F.jobMerchant, [edid('JobMerchantFaction'), fdata(0)]),
     rec('FACT', F.market, [edid('ServicesWhiterunMarketStall'), fdata(VENDOR), sub('VEND', u32(0))]),
     rec('FACT', F.riftenMarket, [edid('ServicesRiftenMarketStall'), fdata(VENDOR), sub('VEND', u32(0))]),
+    rec('FACT', F.crimeRift, [edid('CrimeFactionRift'), fdata(0)]),
   ]),
   top('NPC_', [
     // Compressed, so nothing about Belethor is known until it is inflated.
@@ -264,6 +283,31 @@ const skyrim = Buffer.concat([
       sub('RNAM', u32(R.nord)), snam(F.jobMerchant, 0), acbs(0, 0)]),
     rec('NPC_', N.merchant, [edid('PCRiftenMerchant'), sub('RNAM', u32(R.wolf)),
       snam(F.riftenMarket, 0), sub('TPLT', u32(N.merchantTemplate)), acbs(UNIQUE, POPULATED_USES)]),
+    // The fishmonger takes its race from the template and nothing else. Its
+    // name, unique flag, vendor faction and CrimeFactionRift are its own, and
+    // the thin record still says wolf. The template has no name, is in no
+    // vendor faction, is not unique and answers to Whiterun, so reading the
+    // name, the flag or the crime faction through the race bit gets each wrong,
+    // and reading the race through the name bit loses the fishmonger to the
+    // wolf.
+    rec('NPC_', N.fishTemplate, [edid('EncTraderTemplate'), sub('RNAM', u32(R.nord)),
+      snam(F.jobMerchant, 0), sub('CRIF', u32(F.crimeWhiterun)), acbs(0, 0)]),
+    rec('NPC_', N.fishmonger, [edid('PCRiftenFishmonger'), full('Fishmonger'), sub('RNAM', u32(R.wolf)),
+      snam(F.riftenMarket, 0), sub('CRIF', u32(F.crimeRift)), sub('TPLT', u32(N.fishTemplate)),
+      acbs(UNIQUE, RACE_ONLY_USES)]),
+    // The stall keeper is the other way round: its name, and with the name the
+    // unique flag, come from the template, and its race, vendor faction and
+    // CrimeFactionRift are its own. It has no name on its own record. The
+    // template is a wolf in a job faction that answers to Whiterun, so a pass
+    // that reads the race through the name bit loses a trader, and one that
+    // reads the name, the flag or the crime faction through the race bit gets
+    // each wrong.
+    rec('NPC_', N.keeperTemplate, [edid('PCStallKeeperTemplate'), full('Stall Keeper'),
+      sub('RNAM', u32(R.wolf)), snam(F.jobMerchant, 0), sub('CRIF', u32(F.crimeWhiterun)),
+      acbs(UNIQUE, 0)]),
+    rec('NPC_', N.keeper, [edid('PCRiftenStallKeeper'), sub('RNAM', u32(R.nord)),
+      snam(F.riftenMarket, 0), sub('CRIF', u32(F.crimeRift)), sub('TPLT', u32(N.keeperTemplate)),
+      acbs(0, NAME_ONLY_USES)]),
   ]),
   // A guard first and a wolf last, so a pass that reads the list through its
   // last entry turns the leveled guard into a wolf and the counts move.
@@ -286,6 +330,10 @@ const skyrim = Buffer.concat([
     // A guard at home. The house names no place and the thin record has no
     // crime faction, so only its template's CrimeFactionWhiterun places it.
     children(C.house, [achr(0x805, N.nazeem), achr(0x806, N.hermit), achr(GUARD_AT_HOME, N.thin)]),
+    // A back room that names no place either, so only the crime faction each
+    // trader in it carries puts it in a hold.
+    rec('CELL', C.backRoom, [edid('RiftenBackRoom'), sub('DATA', Buffer.from([1, 0]))]),
+    children(C.backRoom, [achr(FISHMONGER, N.fishmonger), achr(STALL_KEEPER, N.keeper)]),
   ])])]),
   top('WRLD', [
     rec('WRLD', W.tamriel, [edid('Tamriel')]),
@@ -415,8 +463,8 @@ try {
     yes('nothing was lost to a record that would not inflate', j.counts.failedToInflate === 0);
     yes('six plugins read, though plugins.txt lists Skyrim.esm again as skyrim.esm',
       /^6 plugins,/.test(j.readFrom || ''));
-    yes('30 placements read, 2 of them deleted, one by a patch that kept only the flag',
-      j.counts.placed === 30 && j.counts.deleted === 2);
+    yes('32 placements read, 2 of them deleted, one by a patch that kept only the flag',
+      j.counts.placed === 32 && j.counts.deleted === 2);
     yes('a wolf and a mannequin are counted, not listed as people', j.counts.notPeople === 2);
 
     const bel = named(wr.traders, 'Belethor');
@@ -463,6 +511,26 @@ try {
       !rift.everyoneElse['Carriage Driver'] && !rift.everyoneElse['Riften Merchant'] &&
       !rift.everyoneElse.Sigaar && !rift.everyoneElse.PCRiftenMerchant);
 
+    // The race bit and the name bit apart. Each of these two sets one and not
+    // the other, and stands where only its own crime faction places it, so a
+    // trait read through the wrong bit moves it, renames it or loses it.
+    const fm = atRef(rift.traders, FISHMONGER);
+    yes('a fishmonger whose race alone comes from its template (0x1, the commonest templated trader on the live load order) is a person and a trader by its own faction',
+      fm.length === 1 && fm[0].because.join() === 'ServicesRiftenMarketStall');
+    yes('and keeps its own name and unique flag, since the name bit is not set',
+      fm.length === 1 && fm[0].name === 'Fishmonger' && fm[0].unique === true);
+    yes('and stands in the Rift by its own crime faction, not the Whiterun one its template carries',
+      fm.length === 1 && fm[0].holdFrom === 'whose law it answers to');
+    const sk = atRef(rift.traders, STALL_KEEPER);
+    yes('a stall keeper whose name alone comes from its template (0x80) is a person by its own race, though the template is a wolf',
+      sk.length === 1 && sk[0].because.join() === 'ServicesRiftenMarketStall');
+    yes('and takes its name and unique flag from the template, having no name of its own',
+      sk.length === 1 && sk[0].name === 'Stall Keeper' && sk[0].unique === true);
+    yes('and stands in the Rift by its own crime faction too',
+      sk.length === 1 && sk[0].holdFrom === 'whose law it answers to');
+    yes('the Rift has four traders standing: the peddler, the merchant, the fishmonger and the stall keeper',
+      rift.traders.length === 4);
+
     yes('the guards are counted through their templates: a thin one, a leveled one read through its first entry and not the wolf at its last, one switched on by an opposite parent, and one at home',
       wr.guards['Whiterun Guard'] === 4 && Object.keys(wr.guards).length === 1);
     yes('the guard at home, in a house that names no place, is placed by the crime faction its template carries',
@@ -504,9 +572,9 @@ try {
       named(rift.traders, 'Rift Peddler').length === 1 && named(rift.traders, 'Rift Peddler')[0].holdFrom === 'the nearest named place');
     yes('the persistent cell at 0,0 is not taken for the ground at 0,0', rift.everyoneElse.Hermit === 1);
     yes('and somebody nothing places is under no hold', none.everyoneElse.Hermit === 1);
-    yes('the totals add up: 6 traders, 3 transport, 4 guards, 6 everyone else, 7 off, 26 people',
-      j.counts.traders === 6 && j.counts.transport === 3 && j.counts.guards === 4 &&
-      j.counts.everyoneElse === 6 && j.counts.offAtStart === 7 && j.counts.people === 26);
+    yes('the totals add up: 8 traders, 3 transport, 4 guards, 6 everyone else, 7 off, 28 people',
+      j.counts.traders === 8 && j.counts.transport === 3 && j.counts.guards === 4 &&
+      j.counts.everyoneElse === 6 && j.counts.offAtStart === 7 && j.counts.people === 28);
   }
 } catch (e) {
   yes('the load order built here was driven without throwing: ' + e.message, false);
