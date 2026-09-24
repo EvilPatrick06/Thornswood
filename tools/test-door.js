@@ -69,9 +69,13 @@ function rig(enforce, profiles) {
 
   const pending = [];
   const fakeHttps = {
-    get: function (url, cb) {
+    // The door sends its key in a header since pull request 272, so it calls
+    // get(url, options, cb). The two argument form is still taken, the way
+    // Node's own https.get takes both.
+    get: function (url, opts, cb) {
+      if (typeof opts === 'function') { cb = opts; opts = {}; }
       const req = {
-        cb: cb, handlers: {},
+        cb: cb, opts: opts || {}, handlers: {},
         setTimeout: function () { },
         on: function (ev, fn) { this.handlers[ev] = fn; },
         destroy: function () { }
