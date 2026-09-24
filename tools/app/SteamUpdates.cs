@@ -254,13 +254,30 @@ namespace Thornswood
             }
             catch (Exception ex)
             {
-                try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
-                try { if (readOnly) File.SetAttributes(manifest, attrs); } catch { }
+                // These two cannot go to Swallow.Note: test-steam-updates.ps1
+                // compiles this class on its own, so it reaches nothing else in
+                // the launcher. The line returned below already says the
+                // change failed.
+                try { if (File.Exists(tmp)) File.Delete(tmp); }
+                catch
+                {
+                    // A stray temp file beside the manifest is all this leaves.
+                }
+                try { if (readOnly) File.SetAttributes(manifest, attrs); }
+                catch
+                {
+                    // The manifest is left writable, and nothing else changed.
+                }
                 return "Could not change " + manifest + ": " + ex.Message + " It is as it was. " + How;
             }
             if (readOnly)
             {
-                try { File.SetAttributes(manifest, File.GetAttributes(manifest) | FileAttributes.ReadOnly); } catch { }
+                try { File.SetAttributes(manifest, File.GetAttributes(manifest) | FileAttributes.ReadOnly); }
+                catch
+                {
+                    // The new setting is written, and the file is left writable.
+                    // Nothing here can log it, for the reason above.
+                }
             }
 
             string now = Read(manifest);

@@ -52,46 +52,90 @@
   }
 
   /*
-    The same frame, the same colours and the same 1920x1080 scaling as the
-    skills panel, so the two read as one game rather than two pages. Kept
-    inline rather than shared: a fourth file that all three panels depend on
-    is a fourth thing that can fail to load, and these are small.
+    THE LOOK IS THE K PANEL'S, as the journal's is. Patrick, 23 September,
+    about the journal: "the journal menu works but is ugly asf and doesn't
+    match the theme we use with our other menus". This panel was drawn from
+    the same old template the journal had been: system-ui sans serif, a
+    rounded 12px panel and 7px buttons, flat grey #1b1f26 and #212630 and a
+    brass #d9ab52, which is the To Do List web page's palette and not the
+    game's. Every colour below is one thornswood-skills.js already uses, and
+    the rest follows it as thornswood-journal.js does: the Palatino stack
+    (fonts on the machine, never one off the network, because this is the
+    game's own browser), parchment text, gold hairlines, square corners, the
+    dark vignette behind the panel, uppercase gold buttons with one gold
+    primary, and gold scrollbars. tools/test-party-trade-theme.js fails on a
+    colour here that the K panel does not use.
+
+    Kept inline rather than shared: a file that every panel depends on is
+    one more thing that can fail to load, and these are small. So the
+    journal, this panel and the trade window each carry a copy of the K
+    panel's values, and that harness is what keeps the copies the same.
+
+    Only the look changed. The grid, the sizes, the ids and classes the
+    script reads and every line it sends are as they were. The buttons keep
+    the font size and padding they had and carry the line height the old
+    type gave them, so each is the height it was, 29px, whichever font of
+    the stack the machine has; uppercase and spaced, each is wider than it
+    was (measured in Edge at 1920 by 1080 under the front's reset,
+    24 September).
+
+    No :hover, for the reason the K panel has none (see the head of
+    thornswood-skills.js). The front's own stylesheet, in this same document,
+    sets margin, padding, border and background to nothing on every element,
+    so each rule sets what it needs.
+
+    The strip under the compass, further down, is not this panel and keeps
+    its own look: it is drawn over the world rather than on a panel, and its
+    green and gold are what the note on this panel says they mean.
   */
   var CSS = [
     '#' + ID + '{position:fixed;inset:0;z-index:2147483000;display:none;',
-    '  background:rgba(6,7,9,.72);font-family:Georgia,serif;color:#e9e7e1}',
+    '  background:radial-gradient(ellipse at center,rgba(0,0,0,.50) 0%,rgba(0,0,0,.72) 100%);',
+    '  font-family:"Palatino Linotype",Palatino,Georgia,serif;color:#d9cfb4}',
     '#' + ID + '.on{display:grid;place-items:center}',
     '#' + ID + ' .panel{width:880px;max-width:calc(100vw - 48px);height:620px;',
     '  max-height:calc(100vh - 48px);display:grid;grid-template-rows:auto 1fr auto;',
-    '  background:#1b1f26;border:2px solid #3a424e;border-radius:12px;',
-    '  box-shadow:0 18px 60px rgba(0,0,0,.6);overflow:hidden}',
-    '#' + ID + ' h2{margin:0;padding:18px 24px 14px;font-size:24px;font-weight:600;',
-    '  border-bottom:1px solid #2b313a;display:flex;align-items:baseline;gap:14px}',
-    '#' + ID + ' h2 .sub{font-size:14px;color:#98a2ae;font-family:system-ui,sans-serif}',
+    '  background:rgba(11,10,8,.94);border:1px solid rgba(198,170,109,.42);',
+    '  outline:1px solid rgba(198,170,109,.14);outline-offset:4px;',
+    '  box-shadow:0 24px 80px rgba(0,0,0,.7);overflow:hidden}',
+    '#' + ID + ' h2{margin:0;padding:18px 24px 14px;font-size:26px;font-weight:normal;line-height:1.1;',
+    '  color:#f6e9c8;border-bottom:1px solid rgba(198,170,109,.22);display:flex;align-items:baseline;gap:14px}',
+    '#' + ID + ' h2 .sub{font-size:14px;color:rgba(217,207,180,.6);font-style:italic}',
     '#' + ID + ' .body{overflow:auto;padding:16px 24px;display:grid;gap:18px;',
-    '  align-content:start;font-family:system-ui,sans-serif;font-size:14px}',
-    '#' + ID + ' .foot{padding:12px 24px;border-top:1px solid #2b313a;',
-    '  display:flex;gap:10px;align-items:center;font-family:system-ui,sans-serif;font-size:13px;color:#98a2ae}',
-    '#' + ID + ' h3{margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;',
-    '  color:#79828f;font-family:system-ui,sans-serif;font-weight:600}',
+    '  align-content:start;font-size:14px}',
+    '#' + ID + ' .foot{padding:12px 24px;border-top:1px solid rgba(198,170,109,.22);',
+    '  display:flex;gap:10px;align-items:center;font-size:13.5px;font-style:italic;color:rgba(217,207,180,.7)}',
+    '#' + ID + ' h3{margin:0 0 8px;padding-bottom:6px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;',
+    '  color:rgba(198,170,109,.85);font-weight:normal;border-bottom:1px solid rgba(198,170,109,.22)}',
     '#' + ID + ' .row{display:flex;align-items:center;gap:10px;padding:8px 10px;',
-    '  border:1px solid #2b313a;border-radius:8px;background:#212630;margin-bottom:6px}',
+    '  border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);margin-bottom:6px}',
     '#' + ID + ' .row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-    '#' + ID + ' .dot{width:9px;height:9px;border-radius:50%;background:#4a515c;flex:none}',
-    '#' + ID + ' .dot.on{background:#6fae7e}',
-    '#' + ID + ' button{font:inherit;cursor:pointer;border-radius:7px;border:1px solid #3a424e;',
-    '  background:#1b1f26;color:#e9e7e1;padding:5px 11px;font-size:13px}',
-    '#' + ID + ' button:hover{border-color:#d9ab52;color:#d9ab52}',
-    '#' + ID + ' button.go{background:#d9ab52;border-color:#d9ab52;color:#1a1500;font-weight:600}',
-    '#' + ID + ' .none{color:#79828f;padding:6px 2px}',
-    '#' + ID + ' .ask{border:1px solid #d9ab52;background:rgba(217,171,82,.1);',
-    '  border-radius:9px;padding:12px 14px;display:flex;gap:10px;align-items:center}',
+    // online or not, drawn as the K panel draws a pip: a square with a gold
+    // hairline, lit green (the K panel's colour for what is yours) when on
+    '#' + ID + ' .dot{width:9px;height:9px;border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.2);flex:none}',
+    '#' + ID + ' .dot.on{background:#7fb877;border-color:#9fcf92}',
+    '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
+    '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
+    '  padding:5px 11px;font-size:13px;line-height:17px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
+    '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
+    '#' + ID + ' .none{color:rgba(217,207,180,.6);font-style:italic;padding:6px 2px}',
+    '#' + ID + ' .ask{border:1px solid #e9d19b;background:rgba(201,162,75,.16);',
+    '  padding:12px 14px;display:flex;gap:10px;align-items:center}',
     '#' + ID + ' .ask .who{flex:1}',
-    '#' + ID + ' .note{color:#79828f;font-size:12.5px;line-height:1.5}',
-    '#' + ID + ' .tag{font-size:11px;border:1px solid #3a424e;border-radius:5px;',
-    '  padding:1px 6px;color:#98a2ae}',
-    '#' + ID + ' .tag.p{border-color:#8fb85e;color:#8fb85e}',
-    '#' + ID + ' .tag.m{border-color:#e0645a;color:#e0645a}'
+    '#' + ID + ' .ask b{font-weight:normal;font-size:16.5px;color:#f6e9c8}',
+    '#' + ID + ' .note{color:rgba(217,207,180,.7);font-size:12.5px;line-height:1.5}',
+    '#' + ID + ' .tag{font-size:11px;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap;',
+    '  border:1px solid rgba(198,170,109,.30);padding:1px 6px;color:rgba(217,207,180,.5)}',
+    '#' + ID + ' .tag.p{border-color:rgba(160,205,150,.85);color:#9fcf92}',
+    '#' + ID + ' .tag.m{border-color:#d9a27a;color:#d9a27a}',
+    // The K panel's scrollbars, the same rules scoped to this panel, so it
+    // has them whether or not the K panel's page loaded first.
+    '#' + ID + ' ::-webkit-scrollbar{width:10px;height:10px}',
+    '#' + ID + ' ::-webkit-scrollbar-track{background:rgba(0,0,0,.25)}',
+    '#' + ID + ' ::-webkit-scrollbar-thumb{background:rgba(198,170,109,.35);border:2px solid transparent;',
+    '  background-clip:padding-box;border-radius:6px}',
+    '#' + ID + ' ::-webkit-scrollbar-thumb:active{background:rgba(233,209,155,.55);background-clip:padding-box}',
+    '#' + ID + ' ::-webkit-scrollbar-corner{background:transparent}'
   ].join('\n');
 
   /*

@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -953,7 +953,60 @@ function readToken(raw) {
   do the REST scheme, but the ephemeral one is better and is what to prefer.
 */
 const TURN_URL = String(process.env.THORNSWOOD_TURN_URL || '').trim();
-const TURN_SECRET = String(process.env.THORNSWOOD_TURN_SECRET || '').trim();
+/*
+  AND THE SECRET CAN SIT IN A FILE, turn-key.txt beside this one.
+
+  From the To Do List, "Voice is a full peer-to-peer mesh with no relay": step
+  one is a relay, with its credentials minted here and the secret kept on the
+  VPS, named by location only. Install-Voice.ps1 writes this service's whole
+  environment into the command line of the shell that starts it, which the
+  same script reads back out of the process list, so THORNSWOOD_TURN_SECRET
+  would put the relay's key wherever that line is shown. The join token key
+  already lives in a file here, token-key.txt above, and this is the same
+  idea: the relay's static-auth-secret goes in turn-key.txt in the service's
+  folder on the VPS, put there by hand, and is read once at start. The
+  variable still wins when it is set.
+
+  No file, which is every box today, changes nothing: nothing is logged, /ice
+  answers the same bytes, and /health the same fields, with only the build name
+  moved so an install can tell this copy is the one running.
+  tools/voice/test-turn-key.js holds it to that. The key itself is never logged,
+  only where it was read from.
+
+  Written by hand on Windows, so it may arrive as UTF-16 with a byte order
+  mark, which is what Windows PowerShell's > and Out-File write, or as UTF-8
+  with one, which is what its Set-Content -Encoding UTF8 writes. Read as plain
+  UTF-8 either one is a different key, the relay refuses every credential made
+  from it, and the only symptom is the same pair of people still not hearing
+  each other.
+
+  Not settled by this: which relay, and who may have its credential. /ice
+  answers anybody who asks, so a relay switched on while that is true is a
+  relay for a stranger too.
+*/
+const TURN_KEY_FILE = path.join(HERE, 'turn-key.txt');
+function readTurnKey(file) {
+  let buf;
+  try {
+    buf = fs.readFileSync(file);
+  } catch (e) {
+    // Absent is the ordinary case and says nothing. Anything else is a file
+    // somebody put there on purpose that cannot be read, which is worth a line.
+    if (!e || e.code !== 'ENOENT') {
+      console.log('[voice] could not read ' + file + ' (' + (e && e.code) + '), so there is no relay key');
+    }
+    return '';
+  }
+  const text = (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xFE) ? buf.toString('utf16le') : buf.toString('utf8');
+  // trim takes the byte order mark off too: U+FEFF is white space to it.
+  return text.trim();
+}
+const TURN_SECRET_SET = String(process.env.THORNSWOOD_TURN_SECRET || '').trim();
+const TURN_SECRET = TURN_SECRET_SET || readTurnKey(TURN_KEY_FILE);
+if (TURN_SECRET && !TURN_SECRET_SET) {
+  console.log('[voice] relay key read from ' + TURN_KEY_FILE +
+              (TURN_URL ? '' : ', but THORNSWOOD_TURN_URL is not set, so no relay is offered'));
+}
 const TURN_USER = String(process.env.THORNSWOOD_TURN_USER || '').trim();
 const TURN_PASS = String(process.env.THORNSWOOD_TURN_PASS || '').trim();
 const TURN_TTL = Number(process.env.THORNSWOOD_TURN_TTL || 3600) || 3600;

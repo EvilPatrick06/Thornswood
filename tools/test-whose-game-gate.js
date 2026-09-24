@@ -11,14 +11,15 @@
 // parses, it loads, and it only shows when somebody plays another server from
 // the same Skyrim and one of our plugins wakes up on top of it.
 //
-// Why it is still five copies. The entry's plan was to keep the body in
-// front.js, publish it on globalThis.Thornswood, and have the other four call
+// Why it is still a copy in every plugin (four since entry 127 deleted the
+// retired thornswood-chargen.js). The entry's plan was to keep the body in
+// front.js, publish it on globalThis.Thornswood, and have the others call
 // it and return true when it is not there. That fails open. SkyrimPlatform
 // builds its load list with std::filesystem::directory_iterator (GetPathsToLoad
 // in the fork's skyrim-platform/src/platform_se/skyrim_platform/SkyrimPlatform.cpp),
-// NTFS hands the names back in name order, so thornswood-chargen.js and
-// thornswood-emotes.js load before thornswood-front.js. They would find nothing
-// published and run ungated in another server's session, the one thing the
+// NTFS hands the names back in name order, so thornswood-emotes.js loads
+// before thornswood-front.js. It would find nothing published and run
+// ungated in another server's session, the one thing the
 // gate is for. front.js itself only creates globalThis.Thornswood after its
 // own gate. The gate is settled design, so whether and how it becomes one
 // copy is for Patrick and Djinn in #dev. Until then this holds the copies
@@ -193,8 +194,8 @@ const MAX = sizeMatch ? Number(sizeMatch[1]) * 1024 * 1024 : 0;
 
 // ------------------------------------------------------------- the copies
 const names = fs.readdirSync(PLUGINS).filter(function (n) { return /\.js$/i.test(n); }).sort();
-yes('tools/ts-plugins has the five plugins the entry names, ' + names.length + ' .js in all',
-    ['thornswood-chargen.js', 'thornswood-emotes.js', 'thornswood-front.js', 'thornswood-mark.js', 'thornswood-voice.js']
+yes('tools/ts-plugins has the four plugins left of the five the entry names, ' + names.length + ' .js in all',
+    ['thornswood-emotes.js', 'thornswood-front.js', 'thornswood-mark.js', 'thornswood-voice.js']
       .every(function (n) { return names.indexOf(n) >= 0; }));
 
 const copies = {};
