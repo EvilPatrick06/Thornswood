@@ -13,6 +13,11 @@ UP. A service that will not stay up has a line written about it every five
 minutes for as long as it is down, and a bot that repeats each one is a
 channel nobody reads, which is the same as nobody being told.
 
+And that it does not shut up for good. A fix made by hand leaves nothing in
+the log but a run with no line about the service, and one that falls over
+again must still be said (W16), or the person who fixed it believes it is
+fixed.
+
 The second is that the words it looks for are the words the watchdog writes.
 They live in two files in two languages, so this reads Watch-Services.ps1,
 renders the watchdog's own Note() lines out of it, and feeds those in. Change
@@ -160,8 +165,8 @@ yes('W5 a restart that worked says nothing, because it needed nobody',
 # the watchdog writes it: a restart that fails on each of three runs, then
 # "needs a look" on every run until the hour since the first restart is up,
 # then another restart, and round again. Twenty four lines, and a person needs
-# to hear two things: that it did not come back, and that it has been given up
-# on.
+# to hear three things: that it did not come back, that it has been given up
+# on, and an hour after that, that it still has.
 broken = []
 for m in (0, 5, 10, 60, 65, 70):
     broken += [line(m, 'trying'), line(m + 0.4, 'stuck')]
@@ -169,10 +174,14 @@ for m in list(range(15, 60, 5)) + [75, 80, 85]:
     broken.append(line(m, 'look'))
 broken.sort()
 said = news(broken)
-yes('W6 a service down for ninety minutes is two messages, not %d' % len(broken),
-    len(said) == 2)
+yes('W6 a service down for ninety minutes is three messages, not %d' % len(broken),
+    len(said) == 3)
 yes('W6 in order: it did not come back, then it needs a look',
-    len(said) == 2 and 'did not come back' in said[0] and 'needs a look' in said[1])
+    len(said) == 3 and 'did not come back' in said[0] and 'needs a look' in said[1])
+yes('W6 and an hour after that, that it still needs a look',
+    len(said) == 3 and said[2].startswith('**Game still needs a look')
+    and 'said here 60 minutes ago' in said[2]
+    and line(75, 'look') in said[2])
 
 state = {}
 one_at_a_time = []
@@ -183,15 +192,30 @@ yes('W6 and the same when the lines arrive one read at a time',
 
 # ------------------------------------------------ when an outage is over --
 said = news([line(0, 'stuck'), line(25, 'trying'), line(25.4, 'stuck')])
-yes('W7 twenty minutes with no word about it, and the next one is said again',
+yes('W7 twenty five minutes with no word about it, and the next one is said again',
     len(said) == 2)
+
+# The watchdog runs every five minutes and writes nothing about a service that
+# answers, so ten minutes between lines is one run that found it up.
+said = news([line(0, 'look'), line(10, 'look')])
+yes('W7 one run that found it answering ends the outage', len(said) == 2)
+said = news([line(0, 'look'), line(5, 'look'), line(10, 'look')])
+yes('W7 but one run to the next is the same outage', len(said) == 1)
+# The run before a line can be slow, when it is restarting the services
+# checked ahead of this one, and a restart sleeps before its second line.
+said = news([line(0, 'trying'), line(0.75, 'stuck'), line(7, 'trying'),
+             line(7.75, 'stuck')])
+yes('W7 and so is a run that got to it a couple of minutes late', len(said) == 1)
 
 said = news([line(0, 'stuck'), line(5, 'trying'), line(5.4, 'back'),
              line(10, 'trying'), line(10.4, 'stuck')])
 yes('W8 the watchdog writing that it is back ends the outage', len(said) == 2)
 
-said = news([line(0, 'stuck'), line(15, 'trying'), line(30, 'trying'),
-             line(35, 'stuck')])
+# Fourteen minutes between the two "did not come back", which on their own
+# would be two outages. The "Starting" lines in between are the watchdog
+# writing about it on every run, so it is one.
+said = news([line(0, 'stuck'), line(5, 'trying'), line(10, 'trying'),
+             line(14, 'stuck')])
 yes('W9 a line saying it is being started again counts as more of the same',
     len(said) == 1)
 
@@ -223,7 +247,9 @@ yes('W11 a message is never longer than Discord takes',
 
 # -------------------------------------------------- a restart of the bot --
 state = {}
-news([line(0, 'trying'), line(0.4, 'stuck'), line(15, 'look')], state)
+news([line(0, 'trying'), line(0.4, 'stuck'), line(5, 'trying'),
+      line(5.4, 'stuck'), line(10, 'trying'), line(10.4, 'stuck'),
+      line(15, 'look')], state)
 said = news([line(m, 'look') for m in range(20, 60, 5)]
             + [line(60, 'trying'), line(60.4, 'stuck')], state)
 yes('W12 an outage already in the log when the bot starts stays quiet',
@@ -231,8 +257,15 @@ yes('W12 an outage already in the log when the bot starts stays quiet',
 
 state = {}
 news([line(0, 'stuck')], state)
-said = news([line(15, 'look')], state)
+said = news([line(5, 'look')], state)
 yes('W12 but what it had not reached yet is still said', len(said) == 1)
+
+state = {}
+news([line(0, 'stuck'), line(5, 'look')]
+     + [line(m, 'look') for m in range(10, 60, 5)], state)
+said = news([line(60, 'look'), line(65, 'look')], state)
+yes('W12 and the hourly reminder still comes, timed from the log, not the bot',
+    len(said) == 1 and 'still needs a look' in said[0])
 
 # ------------------------------------------------------ reading the file --
 TMP = tempfile.mkdtemp(prefix='thornswood-watchlog-')
@@ -440,5 +473,70 @@ body = src_bot[src_bot.index('async def watch_services():'):
                src_bot.index('# on_ready fires again on every reconnect')]
 yes('W15 and it speaks only through watch_say, which has no public fallback',
     'watch_say(' in body and '.send(' not in body and 'by_name' not in body)
+
+# ------------------------------------------ a fix by hand that does not hold --
+#
+# Found by a reviewer on 24 September, traced with this function as it was
+# then. The game gets "did not come back" at 11:20, 11:25 and 11:30 and "needs
+# a look" every five minutes to 12:00. A person fixes it by hand at 12:02, the
+# 12:05 run finds it up and writes nothing, and it falls over at 12:08. The
+# watchdog's restart history still holds the three from 11:20 to 11:30, so the
+# 12:10 run writes "needs a look" straight away, then restarts it as those age
+# out, then gives up again. A line every five minutes, and with twenty minutes
+# of quiet needed to end an outage, nothing at all was said for seventy
+# minutes. The person who fixed it believed it was fixed.
+HAND = datetime.datetime(2026, 9, 24, 11, 0, 0)
+
+
+def at(minutes, kind):
+    """A watch.log line about the game, `minutes` after 11:00."""
+    return line((HAND - BASE).total_seconds() / 60 + minutes, kind)
+
+
+def first_outage(state):
+    """11:20 to 12:00: three restarts that fail, then given up on."""
+    said = []
+    for m in (20, 25, 30):
+        said += news([at(m, 'trying'), at(m + 0.4, 'stuck')], state)
+    for m in range(35, 61, 5):
+        said += news([at(m, 'look')], state)
+    return said
+
+
+state = {}
+yes('W16 the first outage is said, twice', len(first_outage(state)) == 2)
+
+again = []
+timeline = [(70, 'look'), (75, 'look'), (80, 'trying'), (80.4, 'stuck'),
+            (85, 'trying'), (85.4, 'stuck'), (90, 'trying'), (90.4, 'stuck'),
+            (95, 'look'), (100, 'look'), (105, 'look'), (110, 'look'),
+            (115, 'look'), (120, 'look'), (125, 'look'), (130, 'look'),
+            (135, 'look'), (140, 'trying'), (140.4, 'stuck')]
+for m, k in timeline:
+    again.append(news([at(m, k)], state))
+yes('W16 A FIX BY HAND THAT HELD ONE RUN AND THEN FELL OVER IS SAID, on the '
+    'first line after the run that found it up',
+    len(again[0]) == 1 and 'needs a look' in again[0][0]
+    and at(70, 'look') in again[0][0])
+said = [t for batch in again for t in batch]
+yes('W16 and it is a few messages across seventy minutes, not none and not '
+    'one for each of the %d lines' % len(timeline),
+    2 <= len(said) <= 4)
+
+# The same fix falling over before the watchdog's next run, so there is no
+# clean run and no gap. Nothing in the log can tell that apart from the
+# service never having come back, so this is what the hourly reminder is for:
+# the person hears it within the hour of the last time it was said.
+state = {}
+first_outage(state)
+quick = {}
+for m in range(65, 100, 5):
+    quick[m] = news([at(m, 'look')], state)
+hits = sorted(m for m in quick if quick[m])
+yes('W16 a fix that falls over before the next run is said within the hour',
+    hits == [95])
+yes('W16 and says it was said before, and how long ago',
+    hits == [95] and len(quick[95]) == 1
+    and 'said here 60 minutes ago' in quick[95][0])
 
 done()

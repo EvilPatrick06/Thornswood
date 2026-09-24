@@ -20,9 +20,14 @@
 
   Somebody is told. The bot on the same box reads watch.log every minute and
   says each "needs a look", "could not be started" and "did not come back" in
-  the staff channel, once per outage (watch_services in tools\discord\bot.py).
-  tools\discord\test-watch-services.py renders the Note() lines below and
-  checks the bot still recognises them, so change the words and that fails.
+  the staff channel, once per outage, and "needs a look" again every hour the
+  service stays down (watch_services in tools\discord\bot.py). An outage is
+  over when this writes "is back", or when one of its runs finds the service
+  answering and so writes nothing about it, which is the only sign a fix made
+  by hand ever leaves. The hourly repeat covers a fix that falls over again
+  before the next run. tools\discord\test-watch-services.py renders the Note()
+  lines below and checks the bot still recognises them, so change the words
+  and that fails.
 
   What it checks:
     caddy     https://thornswood.net answers, which is the only one of these

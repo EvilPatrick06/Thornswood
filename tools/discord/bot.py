@@ -1480,10 +1480,25 @@ async def trouble_say(text):
 
 # How long with no line about a service before its next line is a new outage
 # rather than more of the same one. The watchdog writes at least one line
-# about every service that is down on every run, and it runs every five
-# minutes, so twenty minutes of nothing is several runs in a row that found it
-# up.
-WATCH_LOG_QUIET = 20 * 60
+# about every service that is down on every run, five minutes apart, give or
+# take the minute or so a run spends restarting whatever it checks first. It
+# writes nothing about a service that is up, so a gap of ten minutes is one run
+# that found it answering, and seven and a half sits between the two.
+#
+# ONE CLEAN RUN IS ENOUGH, and it was twenty minutes until 24 September. A
+# reviewer traced a fix made by hand that held for one run and then fell over
+# again: the watchdog wrote "needs a look" ten minutes after its last line, the
+# outage had never ended, and nobody was told for as long as it stayed down.
+# The person who fixed it believed it was fixed. A fix by hand is the one way a
+# service comes back with nothing written, so one run finding it up is all the
+# evidence there will ever be.
+WATCH_LOG_QUIET = int(7.5 * 60)
+
+# How long "needs a look" stays said while the lines keep coming. A fix that
+# falls over again inside five minutes leaves no gap at all, and without this
+# it would be silent for as long as the service stayed down. Once an hour is a
+# reminder, where every five minutes was the noise this whole thing avoids.
+WATCH_LOG_REMIND = 60 * 60
 
 # The watchdog's own words, from its Note() lines in Watch-Services.ps1, tried
 # in this order. test-watch-services.py renders those lines out of that script
@@ -1499,14 +1514,26 @@ _WATCH_KINDS = [
 ]
 
 
-def _watch_log_message(kind, name, hit, line):
-    """What is said for one watchdog line, with the line itself under it."""
+def _watch_log_message(kind, name, hit, line, since=None):
+    """
+    What is said for one watchdog line, with the line itself under it.
+
+    since is how many minutes ago "needs a look" was last said for this
+    service, when this is the hourly reminder of it, and None otherwise.
+    """
     who = name[:1].upper() + name[1:]
-    if kind == 'look':
+    if kind == 'look' and since is not None:
+        head = ('**%s still needs a look.** That was said here %d minutes ago, '
+                'and the watchdog has found it down on every run since and is '
+                'still leaving it. If somebody worked on it in that time, it '
+                'did not stay up. This is said again every hour it stays down.'
+                % (who, since))
+    elif kind == 'look':
         head = ('**%s is down and the watchdog has stopped restarting it.** It '
                 'was restarted %s times this hour and would not stay up, so it '
-                'needs a person. This is said once. The watchdog keeps writing '
-                'it to watch.log every five minutes while it stays down.'
+                'needs a person. The watchdog writes this to watch.log every '
+                'five minutes while it stays down, and it is said here again '
+                'every hour.'
                 % (who, hit.group(2)))
     elif kind == 'refused':
         head = ('**%s could not be started.** The watchdog on the VPS found it '
@@ -1538,10 +1565,17 @@ def watch_log_news(lines, state):
     passes with no line about it at all, because the watchdog writes about a
     service that is down on every run and writes nothing about one that is up.
 
+    AND "NEEDS A LOOK" AGAIN EVERY WATCH_LOG_REMIND while the lines keep
+    coming. A fix made by hand that falls over before the watchdog's next run
+    leaves no gap to end the outage on, so this is what stops that being
+    silence for as long as the service is down.
+
     No file, no Discord, and no clock but the times in the log itself, so the
     harness can drive it one line at a time.
     """
     last = state.setdefault('last', {})
+    # Per service, each kind already said in this outage and the log time it
+    # was said at.
     said = state.setdefault('said', {})
     out = []
     for raw in lines:
@@ -1561,16 +1595,25 @@ def watch_log_news(lines, state):
         name = hit.group(1)
         before = last.get(name)
         last[name] = when
+        # abs, because the only way a line is older than the one before it is
+        # the box's clock going back, and that is better said again than taken
+        # for the same outage with the reminder an hour further off.
         if (kind == 'back' or before is None
-                or (when - before).total_seconds() > WATCH_LOG_QUIET):
-            said[name] = set()
+                or abs((when - before).total_seconds()) > WATCH_LOG_QUIET):
+            said[name] = {}
         if kind not in ('look', 'refused', 'stuck'):
             continue
-        done = said.setdefault(name, set())
+        done = said.setdefault(name, {})
+        since = None
         if kind in done:
-            continue
-        done.add(kind)
-        out.append(_watch_log_message(kind, name, hit, raw.strip()))
+            if kind != 'look':
+                continue
+            gone = (when - done[kind]).total_seconds()
+            if gone < WATCH_LOG_REMIND:
+                continue
+            since = int(gone // 60)
+        done[kind] = when
+        out.append(_watch_log_message(kind, name, hit, raw.strip(), since))
     return out
 
 
