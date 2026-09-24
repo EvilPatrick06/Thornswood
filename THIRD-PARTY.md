@@ -164,9 +164,14 @@ built on 23 September carries every one of them.
 - `Data\Platform\Images\lock.png` and `speaking.png`, dated 12 September 13:40.
   They are not in the fork, and nothing names them.
 - Files from other people's mods (loose textures, meshes, scripts and interface
-  files), and Bethesda's `MarketplaceTextures.bsa`. That is To Do List
-  entry 168. A notices file does not give anybody the right to hand them on,
-  and this one does not try.
+  files). That is To Do List entry 168. A notices file does not give anybody
+  the right to hand them on, and this one does not try. Package-Thornswood.ps1
+  names the loose textures and meshes it is about to ship, a folder at a time
+  with its size (Get-ShipLooseArt in Ship-Rules.ps1), and refuses none of them.
+- Bethesda's `MarketplaceTextures.bsa` went out in every pack and in the
+  23 September installer. Ship-Rules.ps1 now holds it back from both
+  (Test-ShipBethesdaLeftAlone) without deleting anybody's copy, so builds made
+  after that change no longer carry it.
 
 ## Made for Thornswood by somebody else
 
