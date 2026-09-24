@@ -1,0 +1,398 @@
+// test-backpressure.js
+//
+// One connection that stops reading used to grow the voice service's memory
+// without limit.
+//
+// To Do List entry 284: "Check the write return and skip the tick for a
+// backed-up socket, or keep a small bounded queue per connection and drop the
+// oldest. For state that is superseded every tick, dropping is the correct
+// answer and is what unreliable transport means."
+//
+// Every message went through Sock.send, which called socket.write and threw
+// away the boolean it returns. When somebody's link cannot keep up, or their
+// machine stops reading, node does not refuse the write: it keeps the bytes in
+// memory and says false, and nothing here was listening. Measured on 24
+// September with a copy of the service on loopback and one websocket that
+// joined and never read, at 1,500 rows: once the loopback buffers were full,
+// writableLength climbed by about 0.75 MB a second for as long as it ran
+// (15 MB after 20 s) and RSS went from 58 to 87 MB. This harness, run against
+// that code, saw the queue go from 0.85 MB to 4.4 or 4.55 MB in five
+// seconds, the memory the service held grow by 3 to 4 MB, and a second stuck
+// socket reach about 25.8 MB without ever being closed: 11 of 17 checks
+// fail. With the fix the queue sits at 0.14 MB, one position message, and
+// does not move.
+//
+// This spawns the real service in a temp folder on a spare port, loopback
+// only, with a small probe preloaded into it. The probe wraps socket.write
+// from the inside and prints the largest queue and the memory in use four
+// times a second, so the measurement does not depend on anything the service
+// chooses to report about itself.
+//
+// Read only. Nothing outside the temp folder is touched.
+'use strict';
+const fs = require('fs');
+const os = require('os');
+const net = require('net');
+const path = require('path');
+const crypto = require('crypto');
+const { spawn } = require('child_process');
+
+const PORT = 7907;
+const BASE = 'http://127.0.0.1:' + PORT;
+const ROWS = 1500;
+// The ceiling the service promises. A connection whose queue passes it is
+// closed so it can reconnect, rather than held onto at any size.
+const CEILING = 1024 * 1024;
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const MB = (n) => (n / 1048576).toFixed(2) + ' MB';
+
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-backpressure-'));
+fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
+try { fs.mkdirSync(path.join(dir, 'public')); } catch (e) { }
+
+/*
+  The probe, preloaded into the service with -r.
+
+  Written out from a function rather than from a string so nothing in it has
+  to be escaped. It runs in the service's process, with --expose-gc so the
+  memory it reports is what is actually held rather than what the collector
+  has not got round to yet.
+*/
+function probe() {
+  const net = require('net');
+  const socks = new Set();
+  let falses = 0;
+  const write = net.Socket.prototype.write;
+  net.Socket.prototype.write = function () {
+    socks.add(this);
+    const ok = write.apply(this, arguments);
+    if (ok === false) falses++;
+    return ok;
+  };
+  setInterval(() => {
+    let queue = 0;
+    for (const s of socks) {
+      if (s.destroyed) { socks.delete(s); continue; }
+      if (s.writableLength > queue) queue = s.writableLength;
+    }
+    if (global.gc) global.gc();
+    const m = process.memoryUsage();
+    process.stdout.write('PROBE ' + JSON.stringify({
+      at: Date.now(), queue: queue, falses: falses,
+      held: m.heapUsed + m.external, rss: m.rss
+    }) + String.fromCharCode(10));
+  }, 250).unref();
+}
+fs.writeFileSync(path.join(dir, 'probe.js'), '(' + probe.toString() + ')();');
+
+const srv = spawn(process.execPath, ['--expose-gc', '-r', path.join(dir, 'probe.js'), 'voice-server.js'], {
+  cwd: dir,
+  env: Object.assign({}, process.env, {
+    THORNSWOOD_VOICE_PORT: String(PORT),
+    THORNSWOOD_VOICE_BIND: '127.0.0.1',
+    THORNSWOOD_VOICE_AUTH: 'off',
+    THORNSWOOD_SITE: '',
+    THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'),
+  }),
+});
+let log = '';
+const probes = [];
+let partial = '';
+srv.stdout.on('data', (d) => {
+  partial += d;
+  const lines = partial.split(/\r?\n/);
+  partial = lines.pop();
+  for (const line of lines) {
+    if (line.indexOf('PROBE ') === 0) {
+      try { probes.push(JSON.parse(line.slice(6))); } catch (e) { }
+    } else {
+      log += line + '\n';
+    }
+  }
+});
+srv.stderr.on('data', (d) => { log += d; });
+
+let feeding = null;
+// Ended rather than exited; see test-keepalive.js for the crash that taught it.
+function done(code) {
+  process.exitCode = code;
+  if (feeding) clearInterval(feeding);
+  for (const s of opened) { try { s.destroy(); } catch (e) { } }
+  // The folder goes once the service has let go of it. The timer on its own
+  // let node leave first, and every run left a folder behind in %TEMP%.
+  const rm = () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { } };
+  if (srv.exitCode !== null || srv.signalCode !== null) rm();
+  else srv.once('exit', rm);
+  try { srv.kill(); } catch (e) { }
+  setTimeout(rm, 300).unref();
+}
+
+async function health() {
+  return (await fetch(BASE + '/health')).json();
+}
+
+async function ready() {
+  for (let i = 0; i < 60; i++) {
+    try {
+      const r = await fetch(BASE + '/health');
+      if (r.ok) { return await r.json(); }
+    } catch (e) { }
+    await sleep(150);
+  }
+  throw new Error('the service never came up. log:\n' + log);
+}
+
+/* A heavy feed, because the loopback buffers swallow a light one: at 200 rows
+   they absorbed the first 2.4 MB and the queue never moved in 20 s. */
+const BODY = JSON.stringify({ who: Array.from({ length: ROWS }, (_, i) => ({
+  profileId: 100000 + i,
+  pos: [12345.67 + i, -2345.67, 1234.5],
+  angleZ: 123.4,
+  cell: '0x0001a26f',
+  name: 'Tester ' + i
+})) });
+function feed() {
+  return fetch(BASE + '/positions', { method: 'POST', body: BODY }).catch(() => { });
+}
+
+const opened = [];
+/* The handshake by hand, so the frames underneath can be read, and so a
+   socket can be left paused, which is a machine that has stopped reading. */
+function open() {
+  return new Promise((resolve, reject) => {
+    const key = crypto.randomBytes(16).toString('base64');
+    const s = net.connect(PORT, '127.0.0.1', () => {
+      s.write('GET / HTTP/1.1\r\n' +
+              'Host: 127.0.0.1:' + PORT + '\r\n' +
+              'Upgrade: websocket\r\n' +
+              'Connection: Upgrade\r\n' +
+              'Sec-WebSocket-Key: ' + key + '\r\n' +
+              'Sec-WebSocket-Version: 13\r\n\r\n');
+    });
+    opened.push(s);
+    let head = Buffer.alloc(0);
+    const onData = (d) => {
+      head = Buffer.concat([head, d]);
+      const at = head.indexOf('\r\n\r\n');
+      if (at < 0) { return; }
+      s.removeListener('data', onData);
+      s.pause();
+      // Anything that came in the same read as the handshake is kept for
+      // whoever reads this socket next.
+      s.rest = head.slice(at + 4);
+      resolve(s);
+    };
+    s.on('data', onData);
+    s.on('error', () => { });
+    setTimeout(() => reject(new Error('no handshake in four seconds')), 4000);
+  });
+}
+
+/* A masked text frame, the way a browser sends one. */
+function send(s, obj) {
+  const data = Buffer.from(JSON.stringify(obj), 'utf8');
+  const len = data.length;
+  let head;
+  if (len < 126) {
+    head = Buffer.from([0x81, 0x80 | len]);
+  } else {
+    head = Buffer.alloc(4);
+    head[0] = 0x81; head[1] = 0x80 | 126; head.writeUInt16BE(len, 2);
+  }
+  const key = crypto.randomBytes(4);
+  const body = Buffer.alloc(len);
+  for (let i = 0; i < len; i++) body[i] = data[i] ^ key[i & 3];
+  s.write(Buffer.concat([head, key, body]));
+}
+
+/* Read every frame the service sends and hand the JSON ones on. */
+function read(s, onMsg) {
+  let buf = s.rest || Buffer.alloc(0);
+  const drain = () => {
+    for (;;) {
+      if (buf.length < 2) return;
+      const op = buf[0] & 0x0f;
+      let len = buf[1] & 0x7f;
+      let off = 2;
+      if (len === 126) { if (buf.length < 4) return; len = buf.readUInt16BE(2); off = 4; }
+      else if (len === 127) { if (buf.length < 10) return; len = Number(buf.readBigUInt64BE(2)); off = 10; }
+      if (buf.length < off + len) return;
+      const body = buf.slice(off, off + len);
+      buf = buf.slice(off + len);
+      if (op !== 1) continue;
+      let m = null;
+      try { m = JSON.parse(body.toString('utf8')); } catch (e) { }
+      if (m) onMsg(m);
+    }
+  };
+  s.on('data', (d) => { buf = Buffer.concat([buf, d]); drain(); });
+  drain();
+  s.resume();
+}
+
+async function until(what, cond, ms) {
+  const from = Date.now();
+  while (Date.now() - from < ms) {
+    if (await cond()) return true;
+    await sleep(100);
+  }
+  return false;
+}
+
+/*
+  Dropping is right for positions and wrong for everything else. The roster,
+  welcome, chat, signalling and voice modes each say something that is not
+  said again, so the dropping send belongs on the 200 ms tick and nowhere
+  else. Read off the source, because the culling work (entry 282) rewrites
+  that same line and a merge could carry it somewhere it does not belong.
+*/
+const SRC = fs.readFileSync(path.join(__dirname, 'voice-server.js'), 'utf8');
+const TICK = /setInterval\(\(\) => \{\s*if \(peers\.size === 0\) return;[\s\S]*?\}, 200\);/.exec(SRC);
+yes('only the 200 ms position tick uses the dropping send',
+    SRC.split('.sendLossy(').length - 1 === 1 && !!TICK && TICK[0].indexOf('.sendLossy(') !== -1);
+
+(async () => {
+  const h0 = await ready();
+  console.log('service up: build ' + h0.build + ', ' + ROWS + ' rows a tick, ' +
+              Math.round(BODY.length / 1024) + ' KB posted');
+  console.log('');
+
+  await feed();
+  feeding = setInterval(feed, 500);
+
+  /*
+    Everybody here joins as somebody in the feed, standing among the other
+    1,499 in the same cell, so a view culled per person (entry 282) still
+    sends each of them all 1,500 rows. Joined as a profile with no row, a
+    culled tick sends an empty list that never backs anything up, and every
+    check below would be measuring nothing.
+  */
+  // Somebody whose link keeps up.
+  const R = await open();
+  let roster = [];
+  const got = [];
+  read(R, (m) => {
+    if (m.t === 'peers') roster = m.peers;
+    if (m.t === 'pos') got.push(Date.now());
+  });
+  send(R, { t: 'join', profileId: 100000, name: 'keeps up' });
+
+  // Somebody who has stopped reading. Joined, then never read again.
+  const S = await open();
+  send(S, { t: 'join', profileId: 100001, name: 'never reads' });
+
+  /*
+    Wait for it to back up. The loopback buffers take the first couple of MB,
+    so the queue inside node only starts once they are full. Two samples in a
+    row with something queued is a socket that is really stuck, not a big
+    write caught halfway through.
+  */
+  let backedAt = 0;
+  await until('backed up', () => {
+    for (let i = 1; i < probes.length; i++) {
+      if (probes[i].queue > 0 && probes[i - 1].queue > 0) { backedAt = probes[i - 1].at; return true; }
+    }
+    return false;
+  }, 25000);
+  yes('a socket that never reads backs the service up, so the rest of this means something', backedAt > 0);
+  if (!backedAt) { throw new Error('nothing backed up in 25 s. log:\n' + log); }
+
+  // Six seconds of it: thirty ticks the old code would have queued.
+  const gotBefore = got.length;
+  await sleep(6000);
+  const gotDuring = got.length - gotBefore;
+  const hStuck = await health();
+
+  const after = probes.filter((p) => p.at >= backedAt);
+  const from = after.find((p) => p.at >= backedAt + 1000) || after[0];
+  const last = after[after.length - 1];
+  const peak = Math.max.apply(null, after.map((p) => p.queue));
+  console.log('      queue ' + MB(from.queue) + ' a second in, ' + MB(last.queue) + ' at the end, peak ' + MB(peak));
+  console.log('      held ' + MB(from.held) + ' a second in, ' + MB(last.held) + ' at the end');
+
+  yes('the queue behind it stays under the ceiling', peak <= CEILING);
+  yes('and stops growing rather than climbing with every tick',
+      last.queue - from.queue < 64 * 1024);
+  yes('and the memory the service holds stops growing with it',
+      last.held - from.held < 1024 * 1024);
+  yes('a stuck socket is not closed for positions alone, they are dropped instead',
+      hStuck.peers === 2);
+  /* Polled rather than read once: when the kernel does not take a 145 KB
+     message in one go, even the socket that keeps up is backed for the
+     instant between a tick and its drain, and a single read can land in that
+     instant. */
+  yes('health counts it as backed up',
+      await until('one backed', async () => (await health()).backed === 1, 3000));
+  yes('and counts the positions it was not sent', hStuck.droppedPositions > 0);
+  yes('somebody who keeps up is still sent positions every tick (' + gotDuring + ' in 6 s)',
+      gotDuring >= 20);
+
+  /*
+    Then it starts reading again, which is a slow link catching up. The drain
+    listener is what clears the flag, so without it this socket would never be
+    sent a position again.
+  */
+  const resumedAt = Date.now();
+  let fresh = 0;
+  read(S, (m) => { if (m.t === 'pos' && m.at >= resumedAt) fresh++; });
+  const caught = await until('fresh', () => fresh > 0, 5000);
+  yes('once it reads again it is sent current positions again', caught);
+  yes('and health no longer counts it as backed up',
+      await until('none backed', async () => (await health()).backed === 0, 3000));
+
+  /*
+    The ceiling. Positions are dropped, but everything else is reliable: the
+    roster, chat, and the signalling that sets up a call. A socket that never
+    reads keeps collecting those, so past a point it is closed and left to
+    reconnect. Signalling is the heaviest of them, so that is what fills it.
+  */
+  console.log('');
+  const S2 = await open();
+  send(S2, { t: 'join', profileId: 100002, name: 'never reads either' });
+  await until('roster', () => roster.some((p) => p.name === 'never reads either'), 3000);
+  const target = (roster.find((p) => p.name === 'never reads either') || {}).peer;
+  yes('the second stuck socket is in the room', !!target);
+
+  const markB = probes.length;
+  const offer = 'x'.repeat(60000);
+  let sent = 0, closed = false;
+  for (let round = 0; round < 40 && !closed; round++) {
+    for (let i = 0; i < 10; i++) { send(R, { t: 'sdp', to: target, sdp: offer }); sent++; }
+    await sleep(80);
+    closed = (await health()).peers === 2;
+  }
+  await sleep(300);
+  const hB = await health();
+  const peakB = Math.max.apply(null, probes.slice(markB).map((p) => p.queue));
+  console.log('      ' + sent + ' offers of 60 KB relayed to it, peak queue ' + MB(peakB));
+
+  // The probe samples four times a second and can miss the moment, so the
+  // service's own line, written as it closes, says how much was waiting.
+  const said = /queue passed \d+ bytes \((\d+) waiting\)/.exec(log);
+  const atClose = said ? Number(said[1]) : Infinity;
+  console.log('      ' + (said ? MB(atClose) + ' waiting when it was closed' : 'no close in the log'));
+
+  yes('a socket whose queue passes the ceiling is closed', closed && hB.peers === 2);
+  yes('and the log says why', !!said);
+  yes('at the first write past the ceiling, not far beyond it',
+      Math.max(peakB, atClose) <= CEILING + offer.length + 1024);
+  yes('health counts the close', hB.closedBacklogged === 1);
+  const gotAt = got.length;
+  await sleep(1000);
+  yes('the rest of the room carries on', got.length - gotAt >= 3);
+
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed');
+  done(fail ? 1 : 0);
+})().catch((e) => {
+  console.error('FAILED: ' + e.message);
+  console.error(log);
+  console.log(pass + ' passed, ' + (fail + 1) + ' failed');
+  done(1);
+});

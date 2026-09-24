@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'chat-1';
+const BUILD = 'backpressure-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -253,6 +253,38 @@ setInterval(() => {
   }
 }, PING_EVERY);
 
+/*
+  ONE SLOW CONNECTION MUST NOT GROW THIS PROCESS WITHOUT LIMIT.
+
+  Every message went out through send(), which ignored what socket.write
+  returns. When somebody's link cannot keep up, or their machine stops
+  reading, node does not refuse a write: it keeps the bytes in memory and
+  answers false. Nothing listened, so the position feed piled up behind that
+  one socket five times a second. Measured on 24 September with a copy of
+  this service on loopback and one websocket that joined and never read, at
+  1,500 rows: once the loopback buffers were full the queue grew about
+  0.75 MB a second, 15 MB after twenty seconds, and nothing ever gave it back.
+
+  The To Do List entry: "For state that is superseded every tick, dropping is
+  the correct answer and is what unreliable transport means." So a socket that
+  has said false is marked backed until it drains, and the position tick skips
+  it (sendLossy): the next tick carries newer positions anyway. Everything else
+  stays on send, because the roster, welcome, chat, signalling and voice modes
+  each say something that is not said again.
+
+  What is left to grow is that reliable traffic, for a socket that never
+  reads. Past QUEUE_CEILING it is closed and left to reconnect, which all
+  three pages already do: voice.js after five seconds, the launcher's voice
+  host after two, the chat overlay on its own retry. The gamemode's rows come
+  out about the size they went in, so the 200,000 byte /positions limit keeps
+  one position message near 200 KB, a fifth of the ceiling, and a single tick
+  does not trip it; reaching it takes a couple of thousand chat lines, or
+  hundreds of call offers, that nobody has read.
+*/
+const QUEUE_CEILING = 1024 * 1024;
+let droppedPositions = 0;   // ticks not sent to a backed socket, for /health
+let closedBacklogged = 0;   // sockets closed at the ceiling, for /health
+
 class Sock {
   constructor(socket) {
     this.socket = socket;
@@ -260,8 +292,11 @@ class Sock {
     this.onmessage = null;
     this.onclose = null;
     this.closed = false;
+    // True from a write that returned false until the socket drains.
+    this.backed = false;
     live.add(this);
 
+    socket.on('drain', () => { this.backed = false; });
     socket.on('data', (d) => this.feed(d));
     socket.on('error', () => this.close());
     socket.on('close', () => {
@@ -275,12 +310,30 @@ class Sock {
   /* A ping frame: FIN, opcode 9, no body. See the note over `live`. */
   ping() {
     if (this.closed) return;
-    try { this.socket.write(Buffer.from([0x89, 0])); } catch (e) { this.close(); }
+    try { this.write(Buffer.from([0x89, 0])); } catch (e) { this.close(); }
+  }
+
+  /* Where what socket.write says is heard. See the note over QUEUE_CEILING. */
+  write(buf) {
+    if (this.socket.write(buf) === false) this.backed = true;
+    const queued = this.socket.writableLength;
+    if (queued > QUEUE_CEILING) {
+      closedBacklogged++;
+      console.log('[voice] closed a connection whose queue passed ' + QUEUE_CEILING +
+                  ' bytes (' + queued + ' waiting). It can reconnect.');
+      this.close();
+    }
   }
 
   send(obj) {
     if (this.closed) return;
-    try { this.socket.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
+    try { this.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
+  }
+
+  /* For the position tick only: skipped while backed, and counted. */
+  sendLossy(obj) {
+    if (this.backed) { droppedPositions++; return; }
+    this.send(obj);
   }
 
   close() {
@@ -440,7 +493,7 @@ function snapshot() {
 setInterval(() => {
   if (peers.size === 0) return;
   const snap = snapshot();
-  for (const [, p] of peers) p.ws.send({ t: 'pos', at: Date.now(), who: snap });
+  for (const [, p] of peers) p.ws.sendLossy({ t: 'pos', at: Date.now(), who: snap });
 }, 200);
 
 function isLoopback(req) {
@@ -840,6 +893,13 @@ const server = http.createServer((req, res) => {
       with the same counts. A number that resets is the only thing that says
       which.
     */
+    // How far behind the slowest connections are, so a backlog can be seen
+    // from outside rather than only as the process growing.
+    let backed = 0, largestQueue = 0;
+    for (const s of live) {
+      if (s.backed) backed++;
+      if (s.socket.writableLength > largestQueue) largestQueue = s.socket.writableLength;
+    }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: true, build: BUILD, auth: AUTH,
                             uptimeSeconds: Math.round(process.uptime()),
@@ -847,7 +907,10 @@ const server = http.createServer((req, res) => {
                             bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             peers: peers.size, tracked: positions.size,
-                            queuedCommands: commands.length }));
+                            queuedCommands: commands.length,
+                            backed: backed, largestQueueBytes: largestQueue,
+                            droppedPositions: droppedPositions,
+                            closedBacklogged: closedBacklogged }));
     return;
   }
 
