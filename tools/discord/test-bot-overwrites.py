@@ -6,16 +6,19 @@ The bot keeps its channels without Administrator.
 From the To Do List, entry 223: "The bot is invited with Administrator and
 keeps it." Administrator overrides every channel overwrite, and nothing in
 Build-Discord.py ever named the bot, so the only reason it could see the staff
-channels and post in the read only ones was Administrator. Untick it and the
-@everyone deny shuts the bot out along with everybody else: the trouble alerts
-in #staff-general and the site watcher in the staff #news go quiet.
+channels, the channels behind Member and the holds, and post in the read only
+ones was Administrator. Untick it and the @everyone deny shuts the bot out
+along with everybody else: the trouble alerts in #staff-general and the site
+watcher in the staff #news go quiet, and so does the hold panel.
 
 Build-Discord.py is imported for real, under another name so its __main__
 block never runs. Its client is swapped for a stand-in, and every guild, role
 and channel here is a stand-in that records what would have been asked of
 Discord. The live server is modelled as it is today: every role, category and
-channel already there, with the overwrites the builder gave them before this,
-plus a staff #news made by hand in the Staff category.
+channel already there behind the gate set by hand on 23 and 24 September,
+which is what the builder's modes now describe, with nothing naming the bot.
+Plus two channels made by hand: a staff #news in the Staff category, and one
+left open to everybody inside a category that is behind the gate.
 
 The bot's permissions in a channel are worked out in Discord's documented
 order: @everyone's and the member's roles, then Administrator, then the
@@ -68,7 +71,15 @@ SEND_MESSAGES = 1 << 11
 READ_MESSAGE_HISTORY = 1 << 16
 WANT = VIEW_CHANNEL | SEND_MESSAGES | READ_MESSAGE_HISTORY
 
-RESTRICTED = ('read', 'staff', 'pathfind')
+# Every mode that shuts @everyone out of one of the three. Only public does
+# not, and a public channel needs nothing for the bot.
+RESTRICTED = ('read', 'open', 'membersread', 'hold', 'staff', 'pathfind')
+# The hold a hold mode is asked about, where one is needed.
+HOLD = 'Whiterun'
+
+
+def ow_for(guild, mode, roles):
+    return B.overwrites(guild, mode, roles, HOLD if mode == 'hold' else None)
 
 
 # ------------------------------------------------------------ stand-ins --
@@ -96,7 +107,7 @@ class Member(object):
     def __init__(self, mid, roles):
         self.id = mid
         self.roles = list(roles)
-        self.top_role = self.roles[-1]
+        self.top_role = self.roles[-1] if self.roles else None
 
     def __repr__(self):
         return '<member %d>' % self.id
@@ -158,6 +169,9 @@ class Guild(object):
         self.afk_channel = None
         self.features = ['COMMUNITY']
         self.rules_channel = object()
+        # Set by hand to #welcome-travelers on the live server, which the
+        # builder now leaves where it is.
+        self.system_channel = object()
 
     async def _made(self, what, name, **kw):
         self.calls.append((what, name, kw))
@@ -230,13 +244,15 @@ def quiet(coro):
 # ------------------------------------------------------ the live server --
 def live_server():
     """
-    The server as it stands: everything built, before this change.
+    The server as it stands: everything built and behind the gate, before
+    this change.
 
     The overwrites on every channel are what overwrites() makes for a guild
-    with no bot in it, which is exactly what the builder gave every channel
-    before it named the bot. The bot's own role holds the three permissions
-    it needs everywhere, and not Administrator, because that is the state
-    the entry wants to reach.
+    with no bot in it, by the modes the builder now has. Those modes are what
+    the gate set by hand on 23 and 24 September looks like, and nothing on
+    the live server names the bot. The bot's own role holds the three
+    permissions it needs everywhere, and not Administrator, because that is
+    the state the entry wants to reach.
     """
     g = Guild()
     pos = 50
@@ -247,20 +263,24 @@ def live_server():
     g.roles.append(bot_role)
     roles = dict((r.name, r) for r in g.roles)
 
-    bare = types.SimpleNamespace(default_role=g.default_role, me=None)
+    bare = types.SimpleNamespace(default_role=g.default_role, me=None,
+                                 roles=g.roles)
 
     for catname, specs in B.PLAN:
         cat = None
-        cmode = 'staff' if catname == 'Staff' else (
-                'pathfind' if catname == 'Testing' else 'open')
+        # The same modes on_ready gives a category it makes.
+        cmode = {'Staff': 'staff', 'Testing': 'pathfind', 'The Holds': 'hold',
+                 'Applications': 'public'}.get(catname, 'open')
         if catname:
             cat = Channel(g, catname, 'category',
                           ow=B.overwrites(bare, cmode, roles))
+            cat.mode = cmode
             g.categories.append(cat)
         for s in specs:
             want = s['name'].lower().replace(' ', '-') if s['kind'] != 'voice' else s['name']
             ch = Channel(g, want, s['kind'], category=cat, topic=s.get('topic'),
-                         ow=B.overwrites(bare, s.get('mode', 'open'), roles))
+                         ow=B.overwrites(bare, s.get('mode', 'open'), roles,
+                                         s.get('hold')))
             ch.mode = s.get('mode', 'open')
             g.channels.append(ch)
             if cat is not None:
@@ -278,9 +298,19 @@ def live_server():
     g.channels.append(news)
     staff.channels.append(news)
 
+    # One made by hand and left open to everybody, inside a category that is
+    # behind the gate. The category's mode is not the channel's, and the bot
+    # can already get into it, so the build has no business writing to it.
+    around = [c for c in g.categories if c.name == 'Thornswood'][0]
+    loose = Channel(g, 'open-by-hand', 'text', category=around)
+    loose.mode = 'public'
+    g.channels.append(loose)
+    around.channels.append(loose)
+
     g.me = Member(424242, [bot_role])
     somebody = Member(5, [roles['Member']])
-    return g, roles, somebody, news
+    newcomer = Member(6, [])
+    return g, roles, (somebody, newcomer), news, loose
 
 
 def run(g, check):
@@ -305,38 +335,40 @@ try:
     B.WEBHOOK_OUT = os.path.join(TMP, 'news-webhook.txt')
 
     # ---------------------------------------------- overwrites(), new ones --
-    g, roles, somebody, _news = live_server()
+    g, roles, (somebody, newcomer), _news, _loose = live_server()
     me = g.me
 
     for mode in RESTRICTED:
-        out = B.overwrites(g, mode, roles)
+        out = ow_for(g, mode, roles)
         o = out.get(me)
-        yes('a new %s channel gives the bot its own overwrite' % mode, o is not None)
+        yes('a new channel in %s mode gives the bot its own overwrite' % mode, o is not None)
         if o is not None:
             a, d = o.pair()
             yes('  and it allows exactly View Channel, Send Messages and Read '
                 'Message History (%d), denies nothing' % WANT,
                 a.value == WANT and d.value == 0)
 
-    yes('an open channel still has no overwrites at all',
-        B.overwrites(g, 'open', roles) == {})
+    yes('a public channel still has no overwrites at all',
+        B.overwrites(g, 'public', roles) == {})
 
-    bare = types.SimpleNamespace(default_role=g.default_role, me=None)
+    bare = types.SimpleNamespace(default_role=g.default_role, me=None,
+                                 roles=g.roles)
     for mode in RESTRICTED:
-        a = B.overwrites(g, mode, roles)
-        b = B.overwrites(bare, mode, roles)
+        a = ow_for(g, mode, roles)
+        b = ow_for(bare, mode, roles)
         extra = set(a) - set(b)
         same = all(a[k].pair()[0].value == b[k].pair()[0].value and
                    a[k].pair()[1].value == b[k].pair()[1].value for k in b)
-        yes('a %s channel changes nothing for @everyone or staff, and adds only the bot'
-            % mode, same and extra == set([me]))
+        yes('%s mode changes nothing for @everyone, Member, a hold or staff, '
+            'and adds only the bot' % mode, same and extra == set([me]))
 
     for catname, specs in B.PLAN:
         for s in specs:
             mode = s.get('mode', 'open')
             if mode not in RESTRICTED:
                 continue
-            ch = Channel(g, s['name'], s['kind'], ow=B.overwrites(g, mode, roles))
+            ch = Channel(g, s['name'], s['kind'],
+                         ow=B.overwrites(g, mode, roles, s.get('hold')))
             yes('without Administrator the bot sees, posts and reads in a new #%s' % s['name'],
                 gets_in(resolve(g, me, ch)))
 
@@ -350,7 +382,7 @@ try:
 
         ch = Channel(g, 'staff-general', 'text', ow=B.overwrites(bare, 'staff', roles))
         g.calls = []
-        quiet(keep(ch, 'staff'))
+        quiet(keep(ch))
         yes('a staff channel with no bot overwrite is written once',
             [c[0] for c in g.calls] == ['set_permissions'] and g.calls[0][2] is me)
         yes('  and the bot sees, posts and reads there afterwards',
@@ -359,13 +391,13 @@ try:
             not resolve(g, somebody, ch).view_channel)
 
         g.calls = []
-        quiet(keep(ch, 'staff'))
+        quiet(keep(ch))
         yes('the same channel again is not written to at all', g.calls == [])
 
         ch = Channel(g, 'rules', 'text', ow=B.overwrites(bare, 'read', roles))
         ch.ow[me] = discord.PermissionOverwrite(view_channel=True, attach_files=True)
         g.calls = []
-        quiet(keep(ch, 'read'))
+        quiet(keep(ch))
         after = ch.ow[me]
         yes('an overwrite on the bot set by hand keeps what it had',
             after.attach_files is True)
@@ -374,17 +406,42 @@ try:
         yes('  and somebody who is not staff still cannot post there',
             not resolve(g, somebody, ch).send_messages)
 
+        ch = Channel(g, 'choose-your-hold', 'text',
+                     ow=B.overwrites(bare, 'membersread', roles))
+        g.calls = []
+        quiet(keep(ch))
+        yes('a channel behind Member is written, so the hold panel can be posted',
+            [c[0] for c in g.calls] == ['set_permissions'] and gets_in(resolve(g, me, ch)))
+        yes('  and somebody not yet approved still cannot see it',
+            not resolve(g, newcomer, ch).view_channel)
+
+        ch = Channel(g, 'whiterun', 'text',
+                     ow=B.overwrites(bare, 'hold', roles, HOLD))
+        g.calls = []
+        quiet(keep(ch))
+        yes('a hold channel is written, and a Member of no hold still cannot see it',
+            [c[0] for c in g.calls] == ['set_permissions'] and
+            not resolve(g, somebody, ch).view_channel)
+
         ch = Channel(g, 'general', 'text')
         g.calls = []
-        quiet(keep(ch, 'open'))
-        yes('an open channel is never touched', g.calls == [] and me not in ch.ow)
+        quiet(keep(ch))
+        yes('a channel open to everybody is never touched',
+            g.calls == [] and me not in ch.ow)
+
+        ch = Channel(g, 'say-hello', 'text', ow={g.default_role:
+                     discord.PermissionOverwrite(add_reactions=False)})
+        g.calls = []
+        quiet(keep(ch))
+        yes('nor is one whose @everyone overwrite takes away nothing the bot needs',
+            g.calls == [] and me not in ch.ow)
 
         ch = Channel(g, 'deploys', 'text', ow=B.overwrites(bare, 'staff', roles))
         B.CHECK = True
         g.calls = []
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            asyncio.run(keep(ch, 'staff'))
+            asyncio.run(keep(ch))
         B.CHECK = False
         yes('-Check says it would change the channel and changes nothing',
             g.calls == [] and 'would change' in buf.getvalue() and me not in ch.ow)
@@ -392,7 +449,7 @@ try:
         ch.refuse = True
         with contextlib.redirect_stdout(io.StringIO()):
             try:
-                asyncio.run(keep(ch, 'staff'))
+                asyncio.run(keep(ch))
                 raised = False
             except Exception:
                 raised = True
@@ -400,25 +457,32 @@ try:
             not raised and any('#deploys' in f for f in B.failed))
 
         try:
-            asyncio.run(keep(None, 'staff'))
+            asyncio.run(keep(None))
             ok = True
         except Exception:
             ok = False
         yes('a channel -Check never made is passed over', ok)
 
     # ------------------------------------ the whole build, on the live server --
-    g, roles, somebody, news = live_server()
+    g, roles, people, news, loose = live_server()
     me = g.me
     everything = g.categories + g.channels
     before_bot = dict((c, gets_in(resolve(g, me, c))) for c in everything)
-    before_them = dict((c, resolve(g, somebody, c).value) for c in everything)
-    staff_general = [c for c in g.channels if c.name == 'staff-general'][0]
+    before_them = dict(((p, c), resolve(g, p, c).value)
+                       for p in people for c in everything)
+    by_name = dict((c.name, c) for c in everything if c is not news)
 
     yes('as the live server stands, the bot without Administrator is shut out of '
         '#staff-general (the problem, measured)',
-        not before_bot[staff_general])
+        not before_bot[by_name['staff-general']])
     yes('  and out of the staff #news the site watcher speaks in',
         not before_bot[news])
+    yes('  and out of #choose-your-hold, where it posts the hold panel',
+        not before_bot[by_name['choose-your-hold']])
+    yes('  and out of #news, where the release webhook and -Posts write',
+        not before_bot[by_name['news']])
+    yes('  but not out of #say-hello, which is open to everybody',
+        before_bot[by_name['say-hello']])
 
     said = run(g, True)
     yes('-Check writes nothing to any channel',
@@ -435,15 +499,22 @@ try:
         not [c for c in g.calls if c[0].startswith('create_')])
     yes('every write was the bot\'s own overwrite', all(c[2] is me for c in writes))
 
-    shut = [c for c in g.channels if getattr(c, 'mode', 'open') in RESTRICTED]
-    shut += [c for c in g.categories if c.name in ('Staff', 'Testing')]
-    yes('every read only, staff and testing channel, and the Staff and Testing '
-        'categories, was written once (%d of %d)'
-        % (len(set(wrote) & set(shut)), len(shut)),
+    # Exactly the channels and categories the bot could not get into before,
+    # measured off the server rather than off the plan's modes.
+    shut = [c for c in everything if not before_bot[c]]
+    yes('every channel and category that shut the bot out was written once '
+        '(%d of %d)' % (len(set(wrote) & set(shut)), len(shut)),
         sorted(wrote, key=id) == sorted(shut, key=id))
+    yes('  which is every one of them but the public ones (%d of %d)'
+        % (len(shut), len(everything)),
+        sorted(shut, key=id) == sorted(
+            [c for c in everything if getattr(c, 'mode', None) in RESTRICTED],
+            key=id))
     yes('the staff #news made by hand is one of them', news in wrote)
-    yes('no open channel was touched',
-        not [c for c in wrote if getattr(c, 'mode', None) == 'open'])
+    yes('no channel open to everybody was touched: not #say-hello, not the '
+        'Applications category, not the one made by hand behind the gate',
+        not [c for c in wrote if before_bot[c]] and by_name['say-hello'] not in wrote
+        and by_name['Applications'] not in wrote and loose not in wrote)
 
     for c in everything:
         if not gets_in(resolve(g, me, c)):
@@ -451,8 +522,10 @@ try:
     yes('without Administrator the bot sees, posts and reads in every channel and '
         'category (%d)' % len(everything),
         all(gets_in(resolve(g, me, c)) for c in everything))
-    yes('nobody else can do a single thing they could not do before',
-        all(resolve(g, somebody, c).value == before_them[c] for c in everything))
+    yes('nobody else, a Member or somebody not yet approved, can do a single '
+        'thing they could not do before',
+        all(resolve(g, p, c).value == before_them[(p, c)]
+            for p in people for c in everything))
     yes('nothing failed', not B.failed)
 
     said = run(g, False)
