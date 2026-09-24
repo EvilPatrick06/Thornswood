@@ -4569,6 +4569,11 @@
       swallows that throw, so a note here would only ever reach the log again,
       which is the bug entry 159 was about. The quit in the update tick above
       draws the message and the countdown, where game calls work.
+
+      The other way in is a probe that passed PROBE_DEADLINE_MS, which
+      checkServer counts from the update tick, where a note would work. It is
+      left to the same place anyway, so there is one message and one
+      countdown however the outage was noticed.
     */
     say('the server has gone down, going back to the menu');
     log('server unreachable', PROBE_STRIKES, 'times running, quitting to the main menu');
