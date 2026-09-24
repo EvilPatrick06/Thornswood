@@ -959,11 +959,18 @@ const SLOG_DAYS = 365;
 
 /* The names the launcher may send. Anything else is dropped rather than
    written: this is a path coming from outside, and a file name is the shortest
-   way into a folder nobody meant to write. */
+   way into a folder nobody meant to write.
+
+   In the order a set too big for SLOG_ALL keeps them. crash.log is the SKSE
+   crash log from that session, if it crashed, and it goes second because it
+   is the one that settles a crash with no message (entry 105).
+   skyrim-platform.log is the tail of Skyrim Platform's own log, and it goes
+   last because it is the biggest and the noisiest. */
 const SLOG_NAMES = [
-  'launcher.log', 'thornswood-front.log', 'thornswood-voice.log',
+  'launcher.log', 'crash.log', 'thornswood-front.log', 'thornswood-voice.log',
   'thornswood-emotes.log', 'thornswood-input.log', 'thornswood-dress.log',
-  'thornswood-loadorder.txt', 'thornswood-plugins-light.txt'
+  'thornswood-loadorder.txt', 'thornswood-plugins-light.txt',
+  'skyrim-platform.log'
 ];
 
 function slogFile(key) { return path.join(SLOGS, key + '.json'); }
