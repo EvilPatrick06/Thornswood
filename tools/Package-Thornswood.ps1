@@ -415,6 +415,24 @@ if ($collectionCount) {
     Say '  The launcher has to send them to the collection before this goes on the site.' 'Yellow'
     Write-Host ''
 }
+# Loose textures and meshes that are neither ours nor the collection's, named a
+# folder at a time. The installer on the site carried them on 23 September,
+# 539 MB by this machine's record the day after, and no build ever said so.
+# See Get-ShipLooseArt in Ship-Rules.ps1; it reports and stops nothing.
+$loose = Get-ShipLooseArt $ship
+if ($loose.Count) {
+    $looseFiles = 0; $looseBytes = [long]0
+    foreach ($l in $loose) { $looseFiles += $l.Files; $looseBytes += $l.Bytes }
+    Say ("  LOOSE ART THAT IS NOT OURS: {0:n0} file(s), {1:n1} MB, in {2} folder(s)." -f `
+        $looseFiles, ($looseBytes / 1MB), $loose.Count) 'Yellow'
+    Say '  Under Data\textures and Data\meshes, not from the collection, and in this' 'Yellow'
+    Say '  installer for everybody. Take it out of the game folder, or put its mod in' 'Yellow'
+    Say '  the collection, or, if it is ours, in the Thornswood Content mod.' 'Yellow'
+    foreach ($l in $loose) {
+        Say ("    {0,8:n1} MB {1,6:n0} file(s)  {2}" -f ($l.Bytes / 1MB), $l.Files, $l.Folder) 'DarkGray'
+    }
+    Write-Host ''
+}
 if ($optionalCount) {
     Say ("  {0:n0} more ({1:n1} GB) are in optional packs and published separately." -f `
         $optionalCount, ($optionalBytes / 1GB)) 'DarkGray'
