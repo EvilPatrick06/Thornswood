@@ -53,6 +53,9 @@
   var joined = false;
   var timer = null;
   var queue = [];
+  // setName closes a joined socket on purpose. That close is not the server
+  // being lost, so neither it nor the welcome after it is said. See setName.
+  var renaming = false;
 
   // One socket, not two.
   //
@@ -151,7 +154,8 @@
         joined = true;
         peerId = Number(msg.peer) || 0;
         fanout(msg);
-        note('Chat is on. Press enter to talk.', C_SYS);
+        if (!renaming) note('Chat is on. Press enter to talk.', C_SYS);
+        renaming = false;
         // Anything typed while the socket was down goes now rather than being
         // lost, which is what an unacknowledged send would have been.
         while (queue.length) {
@@ -179,7 +183,7 @@
     };
 
     ws.onclose = function () {
-      if (joined) note('Chat lost the server. Trying again.', C_WARN);
+      if (joined && !renaming) note('Chat lost the server. Trying again.', C_WARN);
       joined = false;
       peerId = 0;
       fanout({ t: '__closed' });
@@ -266,7 +270,17 @@
   }
 
   window.thornswoodNet = {
-    say: function (text) {
+    /*
+      auto is true for every line thornswood-front.js sends through
+      tellServer: /place, /ate, /face done, /pick refresh, and the K panel's
+      picks and the look keys too, whose answer comes back on the panel or in
+      chat when they land. Patrick, 24 September, over a tester in the
+      creation hall: "it says mulitple trimes he wasnt connected yet". Nobody
+      there had typed a word. So the notice is for the chat box and the
+      journal, party and trade buttons, and an automatic line is queued and
+      sent exactly the same way without it.
+    */
+    say: function (text, auto) {
       text = String(text == null ? '' : text).trim();
       if (!text) return false;
 
@@ -289,7 +303,7 @@
       // without limit.
       queue.push(text);
       while (queue.length > 20) queue.shift();
-      note('Not connected yet, that is queued.', C_WARN);
+      if (!auto) note('Not connected yet, that is queued.', C_WARN);
       return false;
     },
 
@@ -345,6 +359,9 @@
       NAME = n;
       if (ws && (ws.readyState === 0 || ws.readyState === 1)) {
         tries = 0;
+        // Ours, not an outage. In creation the name lands right after the
+        // race menu, and this close used to say "Chat lost the server" there.
+        if (joined) renaming = true;
         try { ws.close(); } catch (e) { }
       } else {
         connect();
