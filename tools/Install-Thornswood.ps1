@@ -86,6 +86,7 @@ $Skip = @($Skip | ForEach-Object { $_ -split ',' } | Where-Object { $_ } | ForEa
 if ($SkipBody) { $Skip += 'body' }
 
 # ---------------------------------------------------------------- the steps --
+$launcherBuild = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
 $steps = @(
     @{
         Key = 'content'; Name = 'ThornsWood content plugin'
@@ -140,12 +141,24 @@ $steps = @(
         Why = 'proves the menus, the books and the load order all line up before you launch'
         NeedsServer = $true
     },
+    # Two steps under one key since 24 September, when Build-Launcher.ps1
+    # stopped closing anything or touching the Desktop (To Do List entry 243).
+    # The build goes to a folder of its own, so csc never meets a launcher
+    # still open from $Root, and Install-Launcher.ps1 closes it and puts the
+    # exe and the shortcut in place, which is what this step always did.
     @{
         Key = 'launcher'; Name = 'Launcher'
         Script = 'Build-Launcher.ps1'
-        Args = @{}
+        Args = @{ OutDir = $launcherBuild }
         Wants = @()
         Why = 'compiles the exe with the new settings page in it'
+    },
+    @{
+        Key = 'launcher'; Name = 'Launcher in place'
+        Script = 'Install-Launcher.ps1'
+        Args = @{ From = $launcherBuild }
+        Wants = @()
+        Why = 'closes the old one, puts the new exe in and points the shortcut at it'
     }
 )
 
@@ -170,9 +183,12 @@ foreach ($s in $steps) {
     # with "used by another process". One build, done by whoever is going to
     # publish it.
     if ($key -eq 'launcher' -and -not $NoShip -and (Test-Path -LiteralPath (Join-Path $Here 'Ship.ps1'))) {
-        Head 'Launcher'
-        Note 'built as part of publishing, just below'
-        $done += 'Launcher'
+        # Both launcher steps land here, and Ship does both, so it is said once.
+        if ($done -notcontains 'Launcher') {
+            Head 'Launcher'
+            Note 'built as part of publishing, just below'
+            $done += 'Launcher'
+        }
         continue
     }
 
