@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'chat-1';
+const BUILD = 'command-ack-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -117,6 +117,55 @@ function owns(ticket, profileId, then) {
 // Held in memory on purpose: a command nobody was there to run is not worth
 // keeping across a restart.
 const commands = [];
+
+/*
+  A COMMAND STAYS UNTIL THE GAMEMODE SAYS IT RAN.
+
+  GET /commands used to empty this queue in one splice, before the gamemode
+  had read a byte of the answer. Its poll() then parsed the body inside a
+  catch that returned, so a batch that failed to parse, or an answer lost to
+  its two second timeout, was gone from here and never run by anybody, with
+  no word to whoever typed it.
+
+  So a gamemode that asks with ?ack=1 is handed the queue without it being
+  emptied, each command carrying an id, and takes away what it ran with
+  POST /commands/ack. A plain GET /commands still empties the queue exactly
+  as before, because a gamemode from before this change never acknowledges
+  anything and would be handed the same commands on every poll.
+
+  The id is a stamp made when this process starts, then a counter, so an id
+  from before a restart can never be mistaken for one after it. The gamemode
+  remembers the ids it has run and skips one that comes round again, which is
+  what stops a lost acknowledgement turning into a second teleport.
+
+  The retry is bounded: a command offered COMMAND_OFFERS times with no
+  acknowledgement is given up on and logged here, rather than offered on
+  every poll for as long as this process lives.
+*/
+const COMMANDS_BOOT = crypto.randomBytes(4).toString('hex');
+let nextCommand = 1;
+const COMMAND_OFFERS = 5;
+
+/*
+  AND A FULL QUEUE REFUSES THE NEWEST, AND SAYS SO.
+
+  It used to shift the oldest off the front without a word, so a command that
+  had already been taken, and that somebody had every reason to think would
+  run, vanished to make room. Refusing the new one is the only way round that
+  can tell anybody: the sender is still connected to be told. Two hundred is
+  what the cap always was.
+
+  One notice per connection every ten seconds, because the plugins report on
+  this queue too, a swing of the axe once or twice a second, and a full queue
+  would otherwise answer every one of them with a line in the chat.
+*/
+const COMMAND_CAP = 200;
+const COMMAND_REFUSED_EVERY_MS = 10000;
+
+// What the gamemode is handed. The offer count is this service's business.
+function commandOut(c) {
+  return { id: c.id, profileId: c.profileId, name: c.name, text: c.text, at: c.at };
+}
 
 /* ------------------------------------------------------------- chat log ---
  *
@@ -762,13 +811,43 @@ const server = http.createServer((req, res) => {
   // launcher's creation choice, waiting for the gamemode to collect it. Gone
   // with the launcher's selector; the picks ride the command queue below.
 
-  // The gamemode's end of the command queue. Read and emptied in one go: a
-  // command handled twice is a second teleport somebody did not ask for.
+  // The gamemode's end of the command queue. A command handled twice is a
+  // second teleport somebody did not ask for, which is why this was read and
+  // emptied in one go, and why ?ack=1 needs the gamemode to remember what it
+  // ran. See the note over COMMANDS_BOOT.
   if (req.method === 'GET' && route === '/commands') {
     if (!isLoopback(req)) { res.writeHead(403).end('no'); return; }
-    const out = commands.splice(0, commands.length);
+    let out;
+    if (/(^|&)ack=1(&|$)/.test((req.url || '').split('?')[1] || '')) {
+      for (let i = commands.length - 1; i >= 0; i--) {
+        if (commands[i].offers < COMMAND_OFFERS) continue;
+        const c = commands.splice(i, 1)[0];
+        // The id and who, not the text: a journal page can be a command.
+        console.log('[voice] gave up on command ' + c.id + ' from profile ' + c.profileId +
+                    ' after ' + c.offers + ' offers with no acknowledgement');
+      }
+      for (const c of commands) c.offers++;
+      out = commands.map(commandOut);
+    } else {
+      out = commands.splice(0, commands.length).map(commandOut);
+    }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ commands: out }));
+    return;
+  }
+
+  // What the gamemode has run, by id, so it is not offered again.
+  if (req.method === 'POST' && route === '/commands/ack') {
+    if (!isLoopback(req)) { res.writeHead(403).end('no'); return; }
+    readBody(req, res, 20000, (doc) => {
+      const ids = new Set((doc && Array.isArray(doc.ids) ? doc.ids : []).map(String));
+      let removed = 0;
+      for (let i = commands.length - 1; i >= 0; i--) {
+        if (ids.has(commands[i].id)) { commands.splice(i, 1); removed++; }
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ removed: removed }));
+    });
     return;
   }
 
@@ -872,6 +951,8 @@ server.on('upgrade', (req, socket, head) => {
 
   const ws = new Sock(socket);
   let myId = 0;
+  // When this connection was last told the command queue is full.
+  let refusedAt = 0;
 
   ws.onmessage = (msg) => {
     if (msg.t === 'join') { myId = onJoin(ws, msg); return; }
@@ -929,13 +1010,30 @@ server.on('upgrade', (req, socket, head) => {
       // in your own game and the server puts you straight back.
       if (text.charAt(0) === '/') {
         chatWrite('command', myId, me, text);
+        // Full: the newest is refused and its sender told, and everything
+        // already taken stays. See the note over COMMAND_CAP.
+        if (commands.length >= COMMAND_CAP) {
+          const now = Date.now();
+          if (now - refusedAt >= COMMAND_REFUSED_EVERY_MS) {
+            refusedAt = now;
+            console.log('[voice] the command queue is full at ' + COMMAND_CAP +
+                        ', so a command from profile ' + (me ? me.profileId : 0) +
+                        ' was refused and they were told');
+            ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood',
+                      text: 'The server is not taking commands right now, so that one was not run. ' +
+                            'Try again in a minute.',
+                      at: now });
+          }
+          return;
+        }
         commands.push({
+          id: COMMANDS_BOOT + ':' + (nextCommand++),
           profileId: me ? me.profileId : 0,
           name: (me && me.name) || '',
           text: text,
-          at: Date.now()
+          at: Date.now(),
+          offers: 0
         });
-        while (commands.length > 200) commands.shift();
         return;
       }
 

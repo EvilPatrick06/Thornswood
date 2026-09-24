@@ -19730,21 +19730,65 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     }
   }
 
+  /*
+    WHAT HAS RUN, SO A COMMAND OFFERED TWICE RUNS ONCE.
+
+    The voice service used to empty its queue the moment this asked, before a
+    byte of the answer was read, so a batch that failed to parse below was
+    lost with nobody told. Now it is asked with ?ack=1: it keeps every command
+    until this acknowledges it, and offers it again until then. That makes
+    delivery at least once, and a command run twice is a second teleport
+    somebody did not ask for, so every id that has run is remembered here and
+    skipped when it comes round again.
+
+    On globalThis so a hot reload does not forget, and capped, oldest out. The
+    service gives up on a command after five offers, so no id needs keeping
+    for long; two thousand is ten full queues.
+  */
+  if (!g.__thornswoodCommandsRun) {
+    g.__thornswoodCommandsRun = { seen: Object.create(null), order: [] };
+  }
+  var commandsRun = g.__thornswoodCommandsRun;
+  var COMMANDS_RUN_KEEP = 2000;
+
+  function markRun(id) {
+    if (commandsRun.seen[id] === true) { return; }
+    commandsRun.seen[id] = true;
+    commandsRun.order.push(id);
+    while (commandsRun.order.length > COMMANDS_RUN_KEEP) {
+      delete commandsRun.seen[commandsRun.order.shift()];
+    }
+  }
+
   function poll() {
     var http;
     try { http = require('http'); } catch (e) { return; }
     var req = http.request({
-      host: '127.0.0.1', port: VOICE_PORT, path: '/commands', method: 'GET', timeout: 2000
+      // A service from before ?ack=1 reads its routes with the query cut off,
+      // so it answers this as it always did: the queue emptied, no ids on the
+      // commands, and nothing for this to acknowledge.
+      host: '127.0.0.1', port: VOICE_PORT, path: '/commands?ack=1', method: 'GET', timeout: 2000
     }, function (res) {
       var body = '';
       res.on('data', function (d) { body += d; });
       res.on('end', function () {
         var list = [];
+        // Nothing is acknowledged when this fails, so the service offers the
+        // same batch again on the next poll rather than it being lost.
         try { list = (JSON.parse(body) || {}).commands || []; } catch (e) { return; }
+        var ran = [];
         for (var i = 0; i < list.length; i++) {
+          var id = (list[i] && list[i].id) ? String(list[i].id) : '';
+          // Offered again because an acknowledgement went missing. It has
+          // run, so it is acknowledged again and not run a second time.
+          if (id && commandsRun.seen[id] === true) { ran.push(id); continue; }
+          // Marked before it runs and acknowledged even when it throws: one
+          // that threw part way through may already have moved somebody.
+          if (id) { markRun(id); ran.push(id); }
           try { dispatch(list[i]); }
           catch (e) { log('command threw:', e && e.stack ? e.stack : e); }
         }
+        if (ran.length) { post('/commands/ack', { ids: ran }); }
       });
     });
     req.on('error', function () { });
