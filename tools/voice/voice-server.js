@@ -689,8 +689,26 @@ class Sock {
         this.close();
         return;
       }
-      if (op === 0x9) {                                 // ping -> pong
-        try { this.socket.write(Buffer.concat([Buffer.from([0x8a, 0]), Buffer.alloc(0)])); } catch (e) { }
+      /*
+        A ping is answered with a pong, but not while this socket is backed.
+
+        The pong used to be written straight to the socket, past write and
+        so past the ceiling, and each one is a separate two byte write that
+        node holds as its own queued request. On 24 September a socket that
+        never read sent 9 MB of pings in one go: 1.4 million pongs queued,
+        2.8 MB by writableLength, and the service went from 50 MB to 447 MB
+        before the next position tick reached the ceiling and closed it.
+
+        RFC 6455 section 5.5.3 allows answering only the most recent of
+        several pings, and a socket that is backed is not reading its pongs
+        anyway, so while it is backed they are not written. Through write,
+        the first one the kernel refuses marks it backed, which caps what a
+        flood of pings can queue at one buffer's worth.
+      */
+      if (op === 0x9) {
+        if (!this.backed) {
+          try { this.write(Buffer.from([0x8a, 0])); } catch (e) { this.close(); }
+        }
         continue;
       }
       // A pong is the answer to OUR ping. Nothing to do with it: it has

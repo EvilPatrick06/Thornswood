@@ -252,6 +252,7 @@ function read(s, onMsg) {
       if (buf.length < off + len) return;
       const body = buf.slice(off, off + len);
       buf = buf.slice(off + len);
+      if (op === 0xa) s.pongs = (s.pongs || 0) + 1;
       if (op !== 1) continue;
       let m = null;
       try { m = JSON.parse(body.toString('utf8')); } catch (e) { }
@@ -534,6 +535,44 @@ yes('only the roster is sent newest-only',
       gone && fromIt.length <= allowed);
   yes('the chat log says who sent every line and command in it',
       gone && loggedIt > 0 && loggedNobody === 0);
+
+  /*
+    Pings. Every ping is answered with a two byte pong, and those were written
+    straight to the socket, past the ceiling. Node holds each queued write as
+    its own request, so a socket that never read and sent 9 MB of pings took
+    the service from 50 MB to 447 MB on 24 September, 2.8 MB by
+    writableLength, before anything closed it. A backed socket is not
+    answered now, which RFC 6455 section 5.5.3 allows, and one that reads
+    still is.
+  */
+  console.log('');
+  const S4 = await open();
+  send(S4, { t: 'join', profileId: 100004, name: 'pings and never reads' });
+  await until('roster', () => roster.some((p) => p.name === 'pings and never reads'), 3000);
+  const PING = Buffer.from([0x89, 0x80, 0, 0, 0, 0]);   // masked, empty, a zero key
+  const PINGS = 1500000;
+  const flood = Buffer.alloc(PING.length * PINGS);
+  for (let i = 0; i < PINGS; i++) PING.copy(flood, i * PING.length);
+  await sleep(500);
+  const markP = probes.length;
+  const heldBefore = probes[probes.length - 1].held;
+  S4.write(flood);
+  await sleep(4000);
+  const during = probes.slice(markP);
+  const peakHeld = Math.max.apply(null, during.map((p) => p.held));
+  const peakP = Math.max.apply(null, during.map((p) => p.queue));
+  const hP = await health();
+  console.log('      ' + (flood.length / 1048576).toFixed(1) + ' MB of pings from it: held ' + MB(heldBefore) +
+              ' before, peak ' + MB(peakHeld) + ', peak queue ' + MB(peakP));
+  yes('a flood of pings from a socket that never reads is not answered into memory',
+      during.length > 0 && peakHeld - heldBefore < 16 * 1024 * 1024);
+  yes('and its queue stays under the ceiling', during.length > 0 && peakP <= CEILING);
+  yes('nor is it closed for pinging', hP.peers === 3 && hP.closedBacklogged === 2);
+  /* A few, spaced out: the socket that keeps up is backed for the instant
+     between a tick and its drain, and a ping landing then is not answered. */
+  for (let i = 0; i < 5 && !R.pongs; i++) { R.write(PING); await sleep(150); }
+  yes('a socket that reads is still answered',
+      await until('pong', () => (R.pongs || 0) > 0, 3000));
 
   console.log('');
   console.log(pass + ' passed, ' + fail + ' failed');
