@@ -448,29 +448,39 @@
   ].join('\n');
   (document.head || document.documentElement).appendChild(css);
 
-  // And taken out of the document as well as hidden.
+  // Hidden by the sheet above, and the sheet kept in the page.
   //
-  // A stylesheet is the polite way and it depends on this file's <style>
-  // outliving whatever style-loader does with the bundle's own. Removing the
-  // nodes does not depend on anything: React puts them back on the next
-  // render and this takes them out again, which is a few nodes a second at
-  // worst and only while the chat is being redrawn.
-  function trim() {
+  // This used to take the nodes out of the document as well, from a
+  // MutationObserver on the whole document with subtree set, so every change
+  // anywhere in the page ran it: each line of chat, and every other overlay
+  // that redraws, such as the party strip, which thornswood-party.js rewrites
+  // every 200 ms while you are in a party. Each run was six querySelectorAll
+  // over the whole document, and each node it pulled out from under React was
+  // one more change that ran it again. To Do List entry 270: "This is the code
+  // between the person and every frame of the game".
+  //
+  // The removal was there in case this file's <style> did not outlive
+  // whatever style-loader does with the bundle's own. Read out of the fork
+  // (skymp5-front's webpack.config.ts and its chat styles): style-loader runs
+  // with its defaults, which append the bundle's sheets to <head> and take
+  // away only the ones they added, and none of the front's display rules for
+  // these elements is !important, so the rules above hold for as long as this
+  // <style> is in the page. That is the one thing watched now: the children
+  // of <head>, with no subtree, which change when a sheet or an overlay's
+  // script goes in, a handful of times a session. If this one has gone it
+  // goes straight back; otherwise the cost is one property read, and a change
+  // anywhere else in the page runs nothing. The front's nodes stay where
+  // React put them.
+  function keepSheet() {
     try {
-      for (var i = 0; i < HIDE.length; i++) {
-        var found = document.querySelectorAll(HIDE[i]);
-        for (var j = 0; j < found.length; j++) {
-          var el = found[j];
-          if (el.parentNode) { el.parentNode.removeChild(el); }
-        }
-      }
+      if (!css.parentNode && document.head) { document.head.appendChild(css); }
     } catch (e) { }
   }
 
   try {
-    new MutationObserver(trim).observe(document.documentElement, {
-      childList: true, subtree: true
-    });
+    if (document.head) {
+      new MutationObserver(keepSheet).observe(document.head, { childList: true });
+    }
   } catch (e) { }
 
   var shown = false;
@@ -484,7 +494,7 @@
     w.set([WIDGET]);
     setTimeout(function () {
       hideNonRp();
-      trim();
+      keepSheet();
       if (!window.thornswoodTyping) blurInput();
     }, 0);
     return true;
