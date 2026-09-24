@@ -17,7 +17,7 @@
   bundle with one byte changed is classified as foreign or unrecognised, while
   the unmodified bundle is still accepted.
 
-  Four parts.
+  Five parts.
     1. The rule, against a made up game folder and a record written for it.
        The recorded bytes are ours. One byte changed, another launcher's file
        and a missing file are not, and none of those is listed as removed.
@@ -25,7 +25,11 @@
        script by text, over that folder with one byte of the bundle changed.
     3. Package-Thornswood's own listing loop and its refusal, lifted out by the
        PowerShell parser: the altered bundle is not carried and the build stops.
-    4. This machine's game folder, when there is one: the real record against
+    4. Check-Secrets.ps1 over a scratch pack and installer stage that carry
+       the client. It judges the bytes it reads, not the game folder's: the
+       recorded build passes run on its own, and a pack with one byte changed
+       fails even when the caller's $GameDir holds the recorded build.
+    5. This machine's game folder, when there is one: the real record against
        the real files, and a scratch copy of the real bundle with one byte
        changed. The game folder is only read.
   And Checks.ClientPatched, the text search for our own name, is gone.
@@ -34,7 +38,9 @@
   Publish-Update.ps1, Package-Thornswood.ps1, client-build.json and app\*.cs,
   unpacked from git archive. Pointed at 6851ed4, main before this change, it
   fails 15 of its checks on the machine that ships, 14 where there is no game
-  folder.
+  folder. Part 4 is skipped there, since Check-Secrets.ps1 came later. Pointed
+  at 4e72a03, this branch merged with main before Check-Secrets judged the
+  bytes, it fails the four checks of part 4 that need the bytes to decide.
 
   Writes only to a temp folder of its own, and removes it.
 #>
@@ -237,7 +243,53 @@ function Invoke-Listing($all, $prefix) {
         [IO.File]::WriteAllBytes($bundleFull, $goodBundle)
     }
 
-    # ---- 4. this machine's game folder -----------------------------------------
+    # ---- 4. Check-Secrets, over what was built ----------------------------------
+    Write-Host ''
+    Write-Host 'Check-Secrets.ps1: a pack and an installer stage that carry the client' -ForegroundColor Cyan
+
+    $scanSrc = Join-Path $Tools 'Check-Secrets.ps1'
+    if (-not (Test-Path -LiteralPath $scanSrc)) {
+        Write-Host 'SKIP  no Check-Secrets.ps1 in these tools; it arrived with entry 236' -ForegroundColor Yellow
+    } else {
+        # Beside the made up record, so it reads that record through Ship-Rules.
+        $scan = Join-Path $fixTools 'Check-Secrets.ps1'
+        Copy-Item -LiteralPath $scanSrc -Destination $scan
+        $shell = (Get-Process -Id $PID).Path
+        Add-Type -AssemblyName System.IO.Compression
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        # A pack holds the game under game/, the installer's stage under payload\.
+        $packDir  = Join-Path $scratch 'pack'
+        $stageDir = Join-Path $scratch 'stage'
+        foreach ($n in $names) {
+            foreach ($d in (Join-Path $packDir ('game\' + $n)), (Join-Path $stageDir ('payload\' + $n))) {
+                $null = New-Item -ItemType Directory -Force -Path (Split-Path $d -Parent)
+                Copy-Item -LiteralPath (Join-Path $fixGame $n) -Destination $d
+            }
+        }
+        $goodZip = Join-Path $scratch 'pack-recorded.zip'
+        [IO.Compression.ZipFile]::CreateFromDirectory($packDir, $goodZip)
+        Set-OneByteChanged (Join-Path $packDir ('game\' + $bundle)) 7
+        $badZip = Join-Path $scratch 'pack-altered.zip'
+        [IO.Compression.ZipFile]::CreateFromDirectory($packDir, $badZip)
+
+        # On its own, the way a person runs it over a pack: no $GameDir anywhere.
+        $null = & $shell -NoProfile -File $scan -Zip $goodZip
+        Yes 'run on its own, a pack carrying the recorded build passes' ($LASTEXITCODE -eq 0)
+        $null = & $shell -NoProfile -File $scan -Dir $stageDir
+        Yes 'and so does an installer stage carrying it' ($LASTEXITCODE -eq 0)
+        $out = @(& $shell -NoProfile -File $scan -Zip $badZip)
+        Yes 'a pack whose bundle has one byte changed fails' ($LASTEXITCODE -eq 1)
+        Yes 'and the line names the bundle and the rule' (($out -join "`n") -match 'skymp5-client\.js.*client-not-recorded-build')
+
+        # Called with & by a script whose $GameDir holds the recorded build, the
+        # way Publish-Update calls it. The bytes in the zip decide, not the game
+        # folder's.
+        $GameDir = $fixGame
+        $null = & $scan -Zip $badZip 6>$null
+        Yes 'called by a script whose $GameDir holds the recorded build, the altered pack still fails' ($LASTEXITCODE -eq 1)
+    }
+
+    # ---- 5. this machine's game folder -----------------------------------------
     Write-Host ''
     Write-Host 'This machine''s game folder' -ForegroundColor Cyan
 
