@@ -422,7 +422,7 @@ namespace Thornswood
                         // Hold's empty stand-in, still there if the launcher
                         // died before it could take it away. Not theirs, so
                         // not worth keeping.
-                        try { if (File.Exists(home) && new FileInfo(home).Length == 0) File.Delete(home); } catch { }
+                        try { if (File.Exists(home) && new FileInfo(home).Length == 0) File.Delete(home); } catch (Exception ex) { Swallow.Note("Keep.Unpark, removing the stand-in " + home, ex); }
                         if (File.Exists(home))
                         {
                             string bin = Path.Combine(Paths.Isolated,
@@ -437,12 +437,15 @@ namespace Thornswood
                         }
                         n++;
                     }
-                    catch { left.Add(line); }
+                    // Kept on the list for next time, as before, and now also
+                    // written down, because a plugin that stays parked is a
+                    // file that did not go back and nothing said which.
+                    catch (Exception ex) { left.Add(line); Swallow.Note("Keep.Unpark, putting back " + parked, ex); }
                 }
                 if (left.Count == 0) File.Delete(ParkList);
                 else File.WriteAllLines(ParkList, left.ToArray());
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Keep.Unpark", ex); }
             return n;
         }
 

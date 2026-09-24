@@ -139,6 +139,15 @@ jobs:
           if ($bad) { exit 1 }
           Write-Host 'every bot harness passed'
 
+      - name: Count the silent catches in the launcher
+        shell: pwsh
+        run: |
+          # Entry 239. A catch with nothing in it leaves no line in
+          # launcher.log when it fires, and there were 386 of them on 24 Sep.
+          # Red when any file in tools\app has more than
+          # tools\swallow-baseline.txt allows; the script says what to do.
+          .\tools\Check-Swallow.ps1
+
       - name: Build the launcher
         shell: pwsh
         run: |
