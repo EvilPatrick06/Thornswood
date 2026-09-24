@@ -953,48 +953,18 @@ namespace Thornswood
             File.Copy(tmp, neu, true);
             try { File.Delete(tmp); } catch { }
 
-            string bat = Path.Combine(Path.GetTempPath(), "st-update.cmd");
             int me = System.Diagnostics.Process.GetCurrentProcess().Id;
+            // Named for the launcher it waits on. The script stays up for a few
+            // minutes now, watching the new launcher start, and with one fixed
+            // name the dev build updating in that time would write over a
+            // script cmd is still reading.
+            string bat = Path.Combine(Path.GetTempPath(), "st-update-" + me + ".cmd");
 
-            // Waits for this launcher to actually be gone, then keeps trying
-            // the move.
-            //
-            // It used to sleep two seconds and move once. Closing runs
-            // Swap.Restore, Hold.Release, Keep.Unpark and SkyMp.Stop, which
-            // together take longer than that, so the move could hit an exe
-            // that was still running, fail silently, and start would reopen
-            // the old one. The next check then offered the same update again,
-            // and again. This is the tasklist wait Uninstall.Finish uses.
-            //
-            // cmd reads a .cmd file in the console's OEM code page, not the
-            // UTF-8 this is written in, so a path with any character outside
-            // ASCII would reach move and start as different bytes and the new
-            // launcher would never be put in place. chcp tells cmd how to read
-            // the rest of the file.
-            var bs = new StringBuilder();
-            bs.Append("@echo off\r\n");
-            bs.Append("chcp 65001 >nul\r\n");
-            bs.Append("setlocal\r\n");
-            bs.Append(":wait\r\n");
-            bs.Append("tasklist /fi \"PID eq " + me + "\" | find \"" + me + "\" >nul 2>&1\r\n");
-            // ping rather than timeout for the pause: timeout wants a console
-            // of its own and this script is started hidden.
-            bs.Append("if not errorlevel 1 ( ping 127.0.0.1 -n 2 >nul & goto wait )\r\n");
-            bs.Append("set /a tries=0\r\n");
-            bs.Append(":swap\r\n");
-            // Already gone means somebody else finished the job.
-            bs.Append("if not exist \"" + neu + "\" goto run\r\n");
-            bs.Append("move /y \"" + neu + "\" \"" + exe + "\" >nul 2>&1\r\n");
-            bs.Append("if not errorlevel 1 goto run\r\n");
-            // Windows can hold a file open for a moment after the process that
-            // had it has ended. About a minute of trying, then start whatever
-            // is there rather than leave somebody with no launcher at all.
-            bs.Append("set /a tries+=1\r\n");
-            bs.Append("if %tries% lss 30 ( ping 127.0.0.1 -n 2 >nul & goto swap )\r\n");
-            bs.Append(":run\r\n");
-            bs.Append("start \"\" \"" + exe + "\"\r\n");
-            bs.Append("del \"%~f0\"\r\n");
-            File.WriteAllText(bat, bs.ToString());
+            // Waits for this launcher to be gone, keeps it as Thornswood.exe.old,
+            // puts the new one in, and puts the old one back if the new one
+            // does not start. SelfSwap.cs has the script and the failures each
+            // line of it is there for.
+            File.WriteAllText(bat, SelfSwap.Script(exe, neu, me));
 
             var psi = new System.Diagnostics.ProcessStartInfo(bat);
             psi.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;

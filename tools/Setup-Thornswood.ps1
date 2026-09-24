@@ -476,6 +476,15 @@ if ((Test-Path $appliedSrc) -and -not (Test-Path $appliedDst)) {
     Say "  $na updates marked as already in this build" 'Green'
 }
 
+# Where the source of the SkyMP files is. Package-Thornswood.ps1 writes it from
+# the build records. It goes into the install folder because the folder this
+# runs from is the setup program's scratch copy, which the next setup deletes,
+# and entry 170 on the To Do List asked for it "from inside the installed
+# folder". Uninstall.cs names it among the files it removes, or the install
+# folder would never come out empty.
+$srcNote = Join-Path $Here 'SOURCE CODE.txt'
+if (Test-Path -LiteralPath $srcNote) { Copy-Item -LiteralPath $srcNote -Destination $Root -Force }
+
 foreach ($f in 'Thornswood.exe', 'SkyrimTogether.exe') {
     $s = Join-Path $Here $f
     if (Test-Path $s) { Copy-Item $s $LaunchDir -Force }
