@@ -19,40 +19,61 @@ Every mod in Thornswood was made by somebody who gave it away. The full list is
 in the launcher, and each one links to its own page. Go and endorse the ones
 you like.
 
-## What Thornswood hands you that somebody else wrote
+<a id='source'></a>
+
+## Source code
+
+SkyMP is free software, and Thornswood ships part of it. The installer and the
+launcher's updates put SkyMP files into your Skyrim folder, and the server you
+connect to runs on SkyMP as well. Six of those files, and the server's engine,
+are built from Thornswood's public copy of SkyMP, with Thornswood's changes on
+top:
+
+**[github.com/EvilPatrick06/skymp](https://github.com/EvilPatrick06/skymp)**, on
+the branch `thornswood/engine-changes`. Anybody can read it or download it,
+with no account.
+
+The current release is built from commit
+[`c8832519`](https://github.com/EvilPatrick06/skymp/tree/c8832519866e6848b9501039940dc2c6f0508668),
+the six files and the server's engine alike. That commit starts from
+[SkyMP](https://github.com/skyrim-multiplayer/skymp) at `f926944b`, and
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...c8832519)
+is the difference between the two.
+
+| File | Built from | Licence |
+|---|---|---|
+| `skymp5-client.js` | `skymp5-client` | GNU GPL version 3 |
+| `SkyrimPlatform.dll` | `skyrim-platform` | GNU GPL version 3 |
+| `SkyrimPlatformImpl.dll` | `skyrim-platform` | GNU GPL version 3 |
+| `SkyrimPlatformCEF.exe.hidden` | `skyrim-platform` | GNU GPL version 3 |
+| `TESModPlatform.pex` | `skyrim-platform` | GNU GPL version 3 |
+| `MpClientPlugin.dll` | `skymp5-server` | GNU AGPL version 3 |
+| `scam_native.node`, the server's engine | `skymp5-server` | GNU AGPL version 3 |
+
+Each licence is the `LICENSE` file in that folder of the repository.
+
+### SkyMP files Thornswood did not build
+
+The installer carries these too, and the launcher's updates can. Thornswood
+did not build them, and nobody recorded which version of SkyMP they came from,
+so no commit is named for them here. Their source is SkyMP's own, at
+**[github.com/skyrim-multiplayer/skymp](https://github.com/skyrim-multiplayer/skymp)**.
+
+| File | What it is | Its folder in SkyMP, and that folder's licence |
+|---|---|---|
+| `build.js`, with the fonts, pictures and sounds it loads | SkyMP's in-game interface | `skymp5-front`, GNU GPL version 3 |
+| `skyrimPlatform.ts` | Skyrim Platform's type declarations | `skyrim-platform`, GNU GPL version 3 |
+| `MpClientPlugin.pex` | A compiled Papyrus script | `client-deps`, which has no `LICENSE` file and keeps no source for it |
+
+## What else Thornswood hands you that somebody else wrote
 
 **The launcher** carries three files from Microsoft's WebView2 SDK, version
 1.0.2903.40. They give it the browser that voice runs in. Microsoft's licence
 for them is at the bottom of this page.
 
-**The multiplayer client** is six files built from Thornswood's copy of SkyMP.
-Five of them come from skymp5-client and Skyrim Platform, under the GNU General
-Public License version 3 (GPL-3.0). The sixth, MpClientPlugin.dll, comes from
-skymp5-server, under the GNU Affero General Public License version 3
-(AGPL-3.0).
-
-**The game server** runs on skymp5-server from the same copy, under the
-AGPL-3.0.
-
-**SkyMP's in-game interface**, which Thornswood's own panels sit on top of, is
-a build of SkyMP's skymp5-front, under the GPL-3.0. It was not built by
-Thornswood, and which version of SkyMP it came from was not recorded.
-
 **Tavern**, the font Skyrim Platform draws its text in, is Typey McTypeface by
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes
 with SkyMP.
-
-## Where the source is
-
-The source for the client files and the server is public, at the exact version
-Thornswood runs:
-
-https://github.com/EvilPatrick06/skymp/tree/c8832519866e6848b9501039940dc2c6f0508668
-
-That is commit c8832519 on the branch thornswood/engine-changes: SkyMP with
-Thornswood's changes on top. The licence texts are in the same place, in each
-part's LICENSE file. The source of SkyMP's in-game interface is SkyMP's own,
-at https://github.com/skyrim-multiplayer/skymp.
 
 ## Microsoft WebView2 SDK licence
 

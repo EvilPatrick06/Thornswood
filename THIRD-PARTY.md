@@ -221,11 +221,20 @@ That covers what Thornswood built. It does not cover
 https://github.com/skyrim-multiplayer/skymp, but nobody recorded which commit
 it was built from.
 
+The same directions reach people in two places (entry 170). The installer
+carries `SOURCE CODE.txt`, which Package-Thornswood.ps1 writes from the two
+build records and Setup-Thornswood.ps1 copies into the install folder. The
+public credits page has them under "Source code", at
+https://thornswood.net/credits#source, which the download page links beside
+the installer. `tools\test-source-offer.ps1` holds both to the records.
+
 ## What is still missing
 
-- Nothing hands a person the GPL or AGPL text, this list or the WebView2 notice
-  together with the files. The installer's `READ ME FIRST.txt` and the release
-  pages say nothing about source. That is entry 170.
+- The installer now says where the source is (`SOURCE CODE.txt`, above), but
+  nothing hands a person the GPL or AGPL text itself, this list or the
+  WebView2 notice together with the files. The WebView2 notice is on the
+  public credits page only. The launcher's updates and the release pages on
+  GitHub say nothing about source.
 - The vcpkg licence texts do not travel with the client runtime.
 - build.js has no recorded source commit.
 - The Futura PT, DIN Pro and Bankir-Retro fonts, and the files under "Shipped

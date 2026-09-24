@@ -1,16 +1,18 @@
 // ---------------------------------------------------------------------------
 // Thornswood: mark this spot.
 //
-// The arrival coordinates for the nine starting inns were written by hand, and
-// several of them are wrong. Morthal sits at 1824.1, -685.8 and Dawnstar at
-// 1824.3, -683.7: two different buildings, in two different holds, two units
-// apart. Numbers like that were never measured, and a person sent to one of
-// them arrives inside a wall.
+// The arrival coordinates for the nine starting inns were first written by
+// hand, each one the inn's front door moved 110 units along the door's own
+// heading, and seven of those eight were not in the room. 1.1.41 walked five;
+// Solitude, Falkreath and Dawnstar now use the spot the game puts you on when
+// you walk in the front door (the comment above CHARGEN in gamemode.js says
+// how). The old Morthal and Dawnstar points only looked like one spot because
+// the two inns share a layout: interior coordinates belong to their own cell.
 //
-// So they get measured instead. Stand where somebody should arrive, face the
-// way they should face, press the key. This writes the cell, the position and
-// the angle out of the running game, and Mark-Spot.ps1 turns the file into the
-// line the content table wants.
+// So a spot gets measured rather than typed. Stand where somebody should
+// arrive, face the way they should face, press the key. This writes the cell,
+// the position and the angle out of the running game, and Mark-Spot.ps1 turns
+// the file into the line the content table wants.
 //
 // Nothing here touches anything. It reads three values and appends a line.
 // ---------------------------------------------------------------------------

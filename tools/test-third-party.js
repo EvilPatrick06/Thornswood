@@ -255,8 +255,11 @@ cbFiles.forEach(function (rel) {
   yes(leaf + ': the row says it is built from ' + from.sub, row.indexOf(from.sub) >= 0);
   yes(leaf + ': the row gives ' + want, namesLicence(row, want));
 });
+// On the page it is a row of the source table, which entry 170 wrote in words
+// ("GNU AGPL version 3") rather than as the SPDX name, so either counts, as
+// long as it is on the same line as the file.
 yes('the credits page says MpClientPlugin.dll is AGPL-3.0',
-    /MpClientPlugin\.dll[^#]*AGPL-3\.0/.test(C));
+    /MpClientPlugin\.dll[^\n]*(AGPL-3\.0|GNU AGPL version 3)/.test(C));
 // The sentence in THIRD-PARTY.md that gives each subproject its licence, the
 // same four the fork's package.json files declare (checked below where the
 // fork is here).
