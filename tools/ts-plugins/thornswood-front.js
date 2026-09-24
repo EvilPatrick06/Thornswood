@@ -2296,6 +2296,23 @@
   let fireThrew = 0;      // how many threw
   let fireWhy = '';       // the first thing one of them threw
   let fireWalked = 0;     // how many things in the cell were looked at
+  /*
+    WHAT THE CELL SAID ABOUT WATER, for the heartbeat line.
+
+    Patrick, 23 September: "Stood in the water in the temple in Whiterun temp
+    stayed the same". The client reported `indoors` the whole time he was in
+    it, so the server was never told about any water and behaved correctly on
+    what it was told.
+
+    Wading is the cell's water level against where somebody is standing, and
+    that is the only thing Skyrim Platform exposes: an Actor has isSwimming
+    and a Cell has getWaterLevel, and there is no submerged depth and no
+    is-in-water anywhere in the API. So either that pool's cell answers a
+    level nowhere near his feet, or it answers nothing at all, and those are
+    different problems with different answers. Neither can be told apart from
+    out here, so the numbers go in the line.
+  */
+  let waterSaid = '';
   let fireCell = -1;      // the cell the list below was made for
   let fireHere = null;    // where the fires in it are
   let placeBeat = 0;      // when the heartbeat last wrote
@@ -2484,6 +2501,10 @@
         if (isFinite(level)) {
           const deep = level - pz;
           wading = deep > 0 && deep < WADE_DEEP;
+          waterSaid = 'water level ' + Math.round(level) + ', feet at ' +
+                      Math.round(pz) + ', so ' + Math.round(deep) + ' deep';
+        } else {
+          waterSaid = 'the cell has no readable water level';
         }
       }
     } catch (e) { }
@@ -2604,7 +2625,8 @@
       } catch (e) { }
       say('place: ' + line + '  [fire probe: ' + fireBases + ' bases, ' + fireHits +
           ' in this cell of ' + fireWalked + ' looked at, ' + fireThrew + ' threw' +
-          (fireWhy ? ' (' + fireWhy + ')' : '') + ']' + looking);
+          (fireWhy ? ' (' + fireWhy + ')' : '') + ']' +
+          (waterSaid ? '  [' + waterSaid + ']' : '') + looking);
     }
 
     /*

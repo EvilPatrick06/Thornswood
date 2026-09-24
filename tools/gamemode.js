@@ -19254,7 +19254,30 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
       walking into a room nobody has thought about yet.
     */
     comfort: 50,
-    settleMinutes: 3,
+    /*
+      HOW FAST THE METER GOES WHERE IT IS GOING, AND IT IS TWO NUMBERS.
+
+      Patrick, 23 September, standing in the Bannered Mare's fire pit with
+      the client finally reporting it: "Fire is still not changing temp but I
+      do catch on fire now and take damage". The client was right, the server
+      was right, and the meter was moving: at one half life of three minutes,
+      standing in a fire whose target is 84 took a 51 to 52.2 in ten seconds
+      and 54.6 in thirty. Nobody stands in a fire for three minutes to find
+      out whether a number is broken, and while they are walking about it
+      never gets anywhere near the target at all.
+
+      So warming is fast and cooling is not, which is also how it works: a
+      fire warms you in seconds and a cold night takes you slowly. Thirty
+      seconds to close half the gap toward warm puts a fire at 66 in ten
+      seconds from 51, which is legible while you stand there; ninety seconds
+      the other way means stepping back from it cools you visibly without the
+      snow becoming an emergency the moment you walk into it.
+
+      These are the only two numbers that decide whether any of this can be
+      felt, so they are here and named rather than folded into one.
+    */
+    settleMinutes: 1.5,        // cooling toward a colder place
+    settleWarmMinutes: 0.5,    // warming toward a warmer one
     place: {
       // Kept for a client from before the fire became a distance, and for
       // nothing else. See NEEDS.fire.
@@ -19688,8 +19711,18 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
       quite arriving, which is the right shape for something you are supposed
       to be able to endure for a while.
     */
+    /*
+      WARMING IS FAST AND COOLING IS NOT, and which one this is decides the
+      half life. See the two numbers in NEEDS: a fire warms you in seconds and
+      a cold night takes you slowly, and at one shared three minute half life
+      standing in a fire moved the meter barely a point in ten seconds, which
+      is the whole of "fire is still not changing temp".
+    */
     var target = warmthTarget(actorId, n);
-    var k = 1 - Math.pow(0.5, (hours * 60) / NEEDS.settleMinutes);
+    var half = (target > n.temp)
+      ? (NEEDS.settleWarmMinutes || NEEDS.settleMinutes)
+      : NEEDS.settleMinutes;
+    var k = 1 - Math.pow(0.5, (hours * 60) / half);
     if (k > 1) { k = 1; }
     if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
 
