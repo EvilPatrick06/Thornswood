@@ -4705,6 +4705,9 @@ function startChargenTimer() {
 
 // ---------------------------------------------------------------------------
 // event handlers
+//
+// Every event a client can raise, and what this file answers to each, is
+// listed once, over mp.onTakeItem beside mp.onPutItem further down.
 // ---------------------------------------------------------------------------
 
 ensureProperties();
@@ -19666,6 +19669,188 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   var prop = globalThis.__thornswoodProperty;
   if (!prop || !prop.putIn) { return; }
   return prop.putIn(containerRefrId, actorId, baseId, count);
+});
+
+/*
+  WHAT A CLIENT CAN ASK THIS SERVER, AND WHAT IT IS TOLD.
+
+  Written down on 24 September for the To Do List entry "The gamemode
+  registers four event handlers, so nothing server-side watches for
+  griefing", which asked for this before anything else: "Establish what the
+  client is allowed to ask the server to do and block the rest at the handler
+  level, then log what was allowed."
+
+  Read out of the fork (C:\Thornswood-Dev\skymp, thornswood/engine-changes)
+  rather than remembered. PacketParser.cpp is every message a client can
+  send, and server_guest_lib\gamemode_events is every event that reaches a
+  function on mp. tools\test-audit-handlers.js checks the event list below
+  against the fork whenever the fork is on the machine it runs on.
+
+  THE ELEVEN EVENTS A HANDLER HERE CAN ANSWER. The engine calls mp.<name> when
+  it is a function, and ScampServerListener::OnMpApiEvent reads what comes
+  back: undefined and true let it through, false refuses it, and a throw is
+  logged and lets it through. So a handler with no opinion returns nothing at
+  all.
+
+    onActivate    Pressing E on anything. mp.onActivate refuses on named paths
+                  only: a bench that is not theirs, a locked door whose client
+                  lock did not run, the spoils rule, and the stations, crops,
+                  plants, fish, game, veins and bodies this server hands out
+                  itself. Every other door, chest and item falls off the end,
+                  and Skyrim does what it always did.
+    onCraft       A finished craft. mp.onCraft refuses a recipe nobody makes
+                  here, or one the person's trade, rank or race does not
+                  allow, and a refusal keeps their materials.
+    onPutItem     Putting into a container. mp.onPutItem refuses anything but
+                  coin into a hold's box, and says nothing about any other
+                  container.
+    onTakeItem    Taking out of a container or a body. Watched below, never
+                  refused. TakeItemEvent::OnFireSuccess is what removes the
+                  items, so a false here would refuse the take.
+    onDropItem    Dropping from the pack onto the ground. Watched below, never
+                  refused. MpActor::DropItem stops before RemoveItems on a
+                  false. Gold cannot be dropped at all: DropItem returns before
+                  the event is raised for Gold001.
+    onDeath       Anything dying. mp.onDeath never refuses. It logs a person's
+                  death with the killer's id, and that line is the only record
+                  a kill leaves, because a hit raises no event (see below).
+    onRespawn     Logged by mp.onRespawn, never refused.
+    onEatItem     Eating or drinking something in the pack. No handler: the
+                  engine applies a potion's effects. The needs block hears
+                  about eating from the client's /ate line instead.
+    onReadBook    Reading a book. No handler since 21 September, when books
+                  stopped moving anybody's rank. The engine teaches the spell a
+                  spell tome carries.
+    onUpdateAppearanceAttempt
+                  A face sent to the server. No handler. The engine refuses it
+                  by itself unless the server opened the race menu
+                  (ActionListener::OnUpdateAppearance), and its OnFireBlocked
+                  is not written, so nothing here may ever return false to it.
+    onUpdateEquipmentAttempt
+                  What somebody is wearing. No handler, and the same warning
+                  about false. The engine checks it itself, by
+                  equipmentSpellCheckEnabled and equipmentSlotCheckEnabled in
+                  server-settings.json.
+
+  WHAT THE ENGINE ANSWERS AND THIS FILE NEVER SEES. Movement, animation,
+  animation variables, health, magicka and stamina, hits, spell casts, bow
+  shots (one arrow is taken), hosting an NPC nobody connected owns, and the
+  reply to a script the server asked the client to run. None of them raises
+  an event, so no handler here can refuse a hit or a spell. The engine refuses
+  a hit sent for an attacker the sender is not hosting. An UpdateProperty
+  message is parsed and dropped.
+
+  CONSOLE COMMANDS, WHICH IS WHERE ITEM CREATION WOULD COME IN. The client
+  forwards exactly five (consoleCommandsService.ts): additem, equipitem,
+  placeatme, disable and mp. ConsoleCommands::Execute runs EnsureAdmin on
+  every one, which throws unless the actor has consoleCommandsAllowed or
+  server-settings.json sets enableConsoleCommandsForAll. Nothing in this
+  repository sets either, checked with git grep on 24 September, so every one
+  is refused for everybody, and a changed client that sends a sixth name gets
+  "Unknown command name". There is no console event, so no mp.on handler can
+  reach any of this.
+
+  CUSTOM EVENTS AND PACKETS. A custom event reaches mp[name] only when the name
+  starts with an underscore (ActionListener::OnCustomEvent). This file defines
+  no mp._ function, so every one is answered by nothing. A custom packet goes
+  to the server's own systems in skymp5-server\ts, where the login is the one
+  that answers it, and never to this file.
+
+  CHAT. A line starting with a slash rides the voice service's socket and is
+  queued there under the profile its token proves, or under the profile it
+  claims while THORNSWOOD_VOICE_AUTH is not 'on' (voice-server.js defaults it
+  to 'log'). The voice service writes every one to its chat log. handle() in
+  the chat command block answers it, and WORDS is every word it answers. /tp,
+  /goto, /give and /spawn refuse anybody who is not a playtester or an admin,
+  and /give and /spawn log what they made. That is the one way a person can
+  make an item on this server, and it is logged.
+
+  WHAT IS NOT REFUSED YET, AND WHY. The rules page asks for "no griefing", and
+  rule 4 in the world says "You cannot empty someone's house because you found
+  it unlocked while they were offline". Which take the server should refuse
+  to hold that rule, a box inside somebody else's claim or another person's
+  body, is a decision Patrick has not made. A handler that answers false too
+  eagerly shuts every chest in Skyrim for everybody at once, so until he makes
+  it the two handlers below watch and refuse nothing.
+*/
+
+/*
+  WATCHED, NEVER REFUSED: TAKING AND DROPPING.
+
+  Rule 4 goes on: "If you were robbed and it went too far, say so. It gets put
+  back." Putting it back needs a record of what was taken, by whom, out of
+  what and where, and until these two the server kept none: a take and a drop
+  raised an event with nothing on mp to hear it.
+
+  So each one is a line in thornswood.log through log(), the same file as every
+  other line here. It names the person by profile and character name, the item
+  by its descriptor (the name wornName settled on, because it says which
+  plugin a thing came from) and the count, the container or body it came out
+  of, and the cell the person was standing in, which for a house is the house.
+  Grep for "take:" and "drop:".
+
+  THEY NEVER RETURN ANYTHING, and that is the whole of the safety. guard()
+  turns a throw into undefined and every read below has its own try, so the
+  worst a fault here can do is a line with less in it.
+*/
+
+/*
+  A person is a profile above zero. Measured in the fork: an actor's
+  profileId comes out of its change form, and MpChangeForms.h starts it at -1,
+  so an NPC answers -1 and not 0. A body that answers -1 is an NPC's, not a
+  person's.
+*/
+function auditProfile(refrId) {
+  var pid = 0;
+  try { pid = Number(mp.get(refrId, 'profileId')) || 0; } catch (e) { pid = 0; }
+  return pid > 0 ? pid : 0;
+}
+
+function auditPerson(actorId) {
+  var id = Number(actorId) || 0;
+  var name = '';
+  try {
+    var ap = mp.get(id, 'appearance');
+    name = String((ap && ap.name) || '');
+  } catch (e) { name = ''; }
+  var pid = auditProfile(id);
+  if (!pid) { return '0x' + id.toString(16) + (name ? ' (' + name + ')' : ''); }
+  return 'profile ' + pid + ' (' + (name || 'no name') + ', 0x' + id.toString(16) + ')';
+}
+
+function auditItem(baseId) {
+  var id = Number(baseId) || 0;
+  var desc = '';
+  try { desc = String(mp.getDescFromId(id) || ''); } catch (e) { desc = ''; }
+  return desc || ('0x' + id.toString(16));
+}
+
+function auditSource(refrId) {
+  var id = Number(refrId) || 0;
+  var prop = globalThis.__thornswoodProperty;
+  var hold = null;
+  try { hold = (prop && prop.holdOfBox) ? prop.holdOfBox(id) : null; } catch (e) { hold = null; }
+  if (hold) { return hold + '\'s box 0x' + id.toString(16); }
+  if (auditProfile(id)) { return 'the body of ' + auditPerson(id); }
+  var base = '';
+  try { base = String(mp.get(id, 'baseDesc') || ''); } catch (e) { base = ''; }
+  return '0x' + id.toString(16) + (base ? ' (' + base + ')' : '');
+}
+
+function auditCell(actorId) {
+  var cell = '';
+  try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+  return cell || 'a cell the server could not read';
+}
+
+mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, count) {
+  log('take:', auditPerson(actorId), 'took', Number(count) || 0, auditItem(baseId),
+      'from', auditSource(sourceRefrId), 'in', auditCell(actorId));
+});
+
+mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
+  log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
+      'in', auditCell(actorId));
 });
 
 
