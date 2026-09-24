@@ -105,10 +105,15 @@ if (hud) {
         h.indexOf('<path d="') !== -1 && h.indexOf('src=') === -1);
     yes('S2 the percentage is written out', h.indexOf('62%') !== -1 &&
         h.indexOf('41%') !== -1 && h.indexOf('88%') !== -1);
-    yes('S2 all four rows are named, and the fourth says Temp not Heat',
-        h.indexOf('>Food<') !== -1 && h.indexOf('>Water<') !== -1 &&
+    /*
+      HUNGER AND THIRST, NOT FOOD AND WATER. Patrick, 23 September: "also
+      rename to Hunger and Thirst". They are the words the rest of the genre
+      uses and they are what he asked for.
+    */
+    yes('S2 all four rows are named, and they are the words he asked for',
+        h.indexOf('>Hunger<') !== -1 && h.indexOf('>Thirst<') !== -1 &&
         h.indexOf('>Rest<') !== -1 && h.indexOf('>Temp<') !== -1 &&
-        h.indexOf('>Heat<') === -1);
+        h.indexOf('>Heat<') === -1 && h.indexOf('>Water<') === -1);
   }
 
   /*

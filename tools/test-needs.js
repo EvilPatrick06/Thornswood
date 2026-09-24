@@ -97,8 +97,16 @@ if (block !== null && smoke) {
         Math.abs(d.drink / d.food - 2) < 1e-9);
     yes('S1 rest is more than three times the food meter',
         (100 / d.rest) / (100 / d.food) > 3);
-    yes('S1 and food is a long evening rather than an hour',
-        (100 / d.food) >= 4);
+    /*
+      TWO AND A HALF TIMES FASTER, and this check used to hold the old shape
+      down: it wanted four hours or more. Patrick, 23 September, after playing
+      with it: "I think the food, water, and rest go down wayyyyy to slowly
+      like it needs to go down 2.5x this speed". A session is two hours and
+      nothing ever moved far enough to matter. Food is two hours and twenty
+      four minutes now.
+    */
+    yes('S1 and food empties inside a long session rather than an evening',
+        (100 / d.food) > 2 && (100 / d.food) < 3);
   }
 
   // S2: a meter empties on the clock, and stops at nothing.
@@ -107,8 +115,8 @@ if (block !== null && smoke) {
     r.seed(ME);
     r.clock.now += 3 * HOUR;
     let n = r.settle(ME);
-    yes('S2 after three hours drink is empty and food is half gone',
-        Math.round(n.drink) === 0 && Math.abs(n.food - 50) < 1);
+    yes('S2 after three hours drink is long empty and so is food',
+        Math.round(n.drink) === 0 && Math.round(n.food) === 0);
     r.clock.now += 100 * HOUR;
     n = r.settle(ME);
     yes('S2 nothing goes below nothing', n.food === 0 && n.drink === 0 && n.rest === 0);
@@ -156,10 +164,17 @@ if (block !== null && smoke) {
   {
     const r = rig();
     r.seed(ME);
-    r.clock.now += 10 * HOUR;
+    /*
+      FOUR HOURS, NOT TEN. Rest empties in eight hours at the rate Patrick
+      asked for, so ten hours awake is a character who is flat on the floor
+      and the check wanted a number still above zero. Four hours awake is
+      half a night and is what this is actually about: it costs, and it has
+      not bottomed out.
+    */
+    r.clock.now += 4 * HOUR;
     let n = r.settle(ME);
     const tired = n.rest;
-    yes('S5 ten hours awake costs rest', tired < 100 && tired > 0);
+    yes('S5 half a night awake costs rest', tired < 100 && tired > 0);
 
     r.resting(ME, 'bed');
     r.clock.now += 1 * HOUR;
