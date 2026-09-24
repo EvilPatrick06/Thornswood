@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 130 of them, with the one line that says
+Every `.ps1` in this folder, 148 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -28,7 +28,6 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Add-Characters.ps1](Add-Characters.ps1) | Installs Start On Save into the build. |
 | [Add-JContainers.ps1](Add-JContainers.ps1) | Installs JContainers SE and switches on the MCM recording that sets everyone's survival meters up for them. |
 | [Add-McmShortcut.ps1](Add-McmShortcut.ps1) | Installs MCM Shortcut NG, which is what lets Skyrim Unbound open its own config menu. |
-| [Add-NoticeBoards.ps1](Add-NoticeBoards.ps1) | Installs Missives into the isolated build, so the boards in and around towns stop being scenery. |
 | [Add-SkyrimUnbound.ps1](Add-SkyrimUnbound.ps1) | Installs Skyrim Unbound Reborn and PapyrusUtil into the isolated build, so nobody has to sit through the Helgen cart ride. |
 | [Add-TempleRespawn.ps1](Add-TempleRespawn.ps1) | Stops people respawning on the spot where they died. |
 | [Add-VoiceFeed.ps1](Add-VoiceFeed.ps1) | Adds the position feed to gamemode.js and redeploys it. |
@@ -52,12 +51,14 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Check-Balance.ps1](Check-Balance.ps1) | Reads the five generated tables and says whether the ladders line up. |
 | [Check-Build.ps1](Check-Build.ps1) | The server does not check plugin names. It checks size and crc32 of every plugin it names, so the wrong version of a mod is the same to it as not having the mod. |
 | [Check-Chargen.ps1](Check-Chargen.ps1) | Preflight for character creation. Everything it looks at is something that silently produces a broken first join rather than an error message, so it is worth thirty seconds before starting the server. |
+| [Check-CollectionRules.ps1](Check-CollectionRules.ps1) | Whether the plugin rules the Nexus collection carries hold a clean install to a plugin list's order. |
 | [Check-Controls.ps1](Check-Controls.ps1) | Every control in the launcher is found at runtime by name. |
 | [Check-DevRosterSeed.ps1](Check-DevRosterSeed.ps1) | Expand the roster seed here-string exactly as Publish-Server would and parse the text that would actually be sent. |
 | [Check-Editions.ps1](Check-Editions.ps1) | Does anything in the load order need the paid Anniversary upgrade? |
 | [Check-LiveGamemode.ps1](Check-LiveGamemode.ps1) | Says whether the gamemode running on the VPS is the one in this repo. |
 | [Check-Load.ps1](Check-Load.ps1) | Answers the only question worth asking before paying for a bigger server: what is this one actually running out of. |
 | [Check-Manifest.ps1](Check-Manifest.ps1) | Says what load order the game server is actually handing out, and how it compares to the one you play with. |
+| [Check-Outside.ps1](Check-Outside.ps1) | Walks the path a first install takes through the things this project does not run itself, and says which of them is broken or has moved. |
 | [Check-Plugins.ps1](Check-Plugins.ps1) | What is enabled that should not be, and what is missing that should be there. |
 | [Check-Roster.ps1](Check-Roster.ps1) | What is in each server's private folder, by name and size only. |
 | [Check-RosterScript.ps1](Check-RosterScript.ps1) | Expand Check-Roster's here-string exactly as the script does and parse the text that would actually be sent. |
@@ -93,6 +94,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Install-Voice.ps1](Install-Voice.ps1) | Puts the proximity voice service on the VPS beside the game server and opens the one port it needs. |
 | [LoadOrder.ps1](LoadOrder.ps1) | The load order as the game counts it, and how to put a plugin list into the server's order. |
 | [Mark-Spot.ps1](Mark-Spot.ps1) | Reads the spots you marked in game and prints them in the shape the content table wants. |
+| [MaxOnline.ps1](MaxOnline.ps1) | How many people a Thornswood server seats: read from the one place it is written, and put into server-settings.json as the engine's own maxPlayers. |
 | [Measure-Reclaim.ps1](Measure-Reclaim.ps1) | How much disk deleting a folder would ACTUALLY free. |
 | [Move-Install.ps1](Move-Install.ps1) | Moves the build off the old name. Run it once. |
 | [New-Character.ps1](New-Character.ps1) | Throws the test character away so the next connect builds a fresh one. |
@@ -141,12 +143,28 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Start-Thornswood.ps1](Start-Thornswood.ps1) | Launches the game the way the launcher's Play() does, without Skyrim Together. |
 | [Sync-Client.ps1](Sync-Client.ps1) | Puts the client runtime built from the fork into the game folder, and refuses any file that is not the recorded build. |
 | [Sync-LoadOrder.ps1](Sync-LoadOrder.ps1) | Build the server's load order from the client's. |
+| [test-bot-wrapper.ps1](test-bot-wrapper.ps1) | The bot's wrapper on the VPS gives up after three quick exits in a row, instead of starting a bot that cannot start every fifteen seconds for ever. |
+| [test-check-outside.ps1](test-check-outside.ps1) | Check-Outside.ps1 walks what a first install needs that this project does not run: the feed on GitHub, every address in it, the downloads, Steam's public build and the Nexus collection. |
 | [test-collection-newest.ps1](test-collection-newest.ps1) | Which revision of the collection Vortex knows is out, read out of its own state.v2. |
+| [test-collection-rules.ps1](test-collection-rules.ps1) | Check-CollectionRules.ps1, which reads the plugin rules the Nexus collection carries against a plugin list. |
+| [test-dev-deploy-warning.ps1](test-dev-deploy-warning.ps1) | Deploy-DevGamemode.ps1 says who is on the dev server and warns them in the game before it stops anything. |
+| [test-dev-ships-our-plugin.ps1](test-dev-ships-our-plugin.ps1) | A dev release carries our own plugin; a main release leaves it to the Nexus collection; every other file the collection provides stays out of both. |
 | [test-dev-version.ps1](test-dev-version.ps1) | A dev build has to outrank what main has published, or nobody can take it. |
+| [test-door-outage.ps1](test-door-outage.ps1) | The launcher's half of "Discord did not answer is not a no". |
+| [test-feed-notice.ps1](test-feed-notice.ps1) | What the update feed says to everybody, and when it may hold Play. |
+| [test-load-order.ps1](test-load-order.ps1) | The rule the pack's plugin list is put through before it ships, driven with stubs so it needs no game folder, no Data and no server. |
 | [test-master-flag.ps1](test-master-flag.ps1) | The master flag in the plugin header, which the game honours BEFORE the list order, and which Deploy-Gamemode.ps1 never read until 22 September. |
+| [test-max-online.ps1](test-max-online.ps1) | One number for how many a server seats, entry 281. |
+| [test-package-release-dir.ps1](test-package-release-dir.ps1) | The installer has to find the releases feed on whichever machine builds it, and has to stop rather than guess when the feed is not there. |
+| [test-pinned-downloads.ps1](test-pinned-downloads.ps1) | What a fresh VPS downloads is one exact version, checked against the checksum its vendor published for it, and nothing is installed when the download does not match. |
+| [test-public-news.ps1](test-public-news.ps1) | What a stranger reads on the site's News page. |
 | [test-publish-resume.ps1](test-publish-resume.ps1) | Runs the real resume helpers out of Publish-Update.ps1 against a temp folder. |
+| [test-release-prerelease.ps1](test-release-prerelease.ps1) | A dev build goes up to GitHub marked prerelease, on every path the upload can take, and a main build does not. |
 | [test-remote-length.ps1](test-remote-length.ps1) | No script sends the VPS more than a command line can hold. |
 | [test-script-index.ps1](test-script-index.ps1) | Ship.ps1 says every option it takes where Get-Help can read it, and tools\README.md lists every script in this folder exactly as New-ScriptIndex.ps1 writes it. |
+| [test-ship-rules.ps1](test-ship-rules.ps1) | Two rules in Ship-Rules.ps1 that decide what leaves this machine in a pack or the installer. |
+| [test-steam-updates.ps1](test-steam-updates.ps1) | Steam's Updates setting for Skyrim, which nothing in the launcher read or set until 24 September (entry 271 on the To Do List, "Nothing stops Steam putting Skyrim back on the wrong build"). |
+| [test-voice-ticket.ps1](test-voice-ticket.ps1) | The Discord ticket only goes to the voice service over https. |
 | [vps-dev-instance.ps1](vps-dev-instance.ps1) | Runs ON the VPS. Makes the dev game server and the dev voice server beside the live ones, from copies of the live installs, on their own ports, with their own scheduled tasks, firewall rules and watchdog entries. |
 | [vps-nightly-backup.ps1](vps-nightly-backup.ps1) | Runs on the VPS, once a night, as the scheduled task that Install-Backup.ps1 puts there. |
 | [Watch-Foreground.ps1](Watch-Foreground.ps1) | Which window Windows is giving the keyboard to, sampled from outside the game. |
