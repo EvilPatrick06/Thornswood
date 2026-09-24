@@ -126,8 +126,19 @@ new HelpItem("Emotes", "It will not open over a menu",
                 "The two handed start. A battleaxe, firewood and the makings.  Farm clothes and boots, an iron battleaxe, held two handed, a woodcutter's axe.  50 to 150 gold.  Carried: Firewood x5, Charcoal x2, Leather Strips x5, Bread x2.  Plus what everyone gets: a full waterskin, two bottles of water, a torch, a meal or two and something to drink, and two minor potions."),
 
             // ===================================================== parties
-            new HelpItem("Playing together", "There is no party system",
-                "Skyrim Together had parties, a leader, and teleporting to each other. SkyMP does not, and this build's gamemode adds none of it. There is nobody to invite and no leader to hand over: everyone connected is simply in the same world. Meet up by walking, or by starting in the same hold."),
+            // These two used to be one item, "There is no party system", which
+            // compared this server to Skyrim Together. Parties arrived on 23
+            // September (#133), and the green names, map markers and compass
+            // strip the same morning (#139), and the page went on saying there
+            // were none. Every number and command below is checked against the
+            // gamemode and the plugins by tools\test-help-parties.js, so the
+            // next change to parties fails a harness instead of leaving this
+            // page wrong again.
+            new HelpItem("Playing together", "Parties",
+                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, press Enter and type /party and their name, or press Ask to party beside a friend who is online. They have forty five seconds to say /yes or /no, or to press Yes or No on their own P panel. A party holds up to six. /party on its own says who is in yours, and /party leave takes you out. Logging out takes you out too, and every party ends when the server restarts."),
+
+            new HelpItem("Playing together", "Finding your party",
+                "Everybody in your party has their name in green above their head, a marker on your map, and an arrow on a strip under your compass with how far away they are. Green on the strip means the same place as you, gold means somewhere else. The strip is ours rather than Skyrim's own compass, and the marker is for walking to: you cannot fast travel to it. Work done with somebody from your party in the same place counts 15 per cent more. Meet up by walking, or by picking the same town when you make your characters."),
 
             new HelpItem("Playing together", "Quests are the rough edge",
                 "Quest state is per person here, so two people running the same quest are each running their own copy of it. Expect dialogue and stages to disagree. That is what the layer does today rather than a bug worth reporting. Treat quests as something you do alone and the shared world as the thing you do together."),
