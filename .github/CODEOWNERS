@@ -11,13 +11,26 @@
 # Shell.cs in any folder added later.
 #
 # WHAT THIS DOES AND DOES NOT DO. GitHub requests a review from the owner named
-# here when a pull request touches the file. It does not require one until
-# Require review from Code Owners is switched on in branch protection for main,
-# and GitHub never asks a pull request's own author for a code owner review. So
-# a pull request Patrick opens on Shell.cs asks Djinn, and one Djinn opens asks
-# Patrick, which is exactly the intent. Patrick's own work goes straight to
-# main and never becomes a pull request at all, so this binds Djinn's branches
-# and the occasional pull request Patrick does open.
+# here when a pull request touches the file, and never asks a pull request's
+# own author. So a pull request Patrick opens on Shell.cs asks Djinn, and one
+# Djinn opens asks Patrick, which is exactly the intent.
+#
+# It is a request and nothing more. Branch protection on main, read off GitHub
+# on 23 September: enforce_admins is on, so every change, Patrick's included,
+# reaches main through a pull request and nobody pushes there; the one
+# required check is "Launcher builds"; required approving reviews is 0; and
+# Require review from Code Owners is off. So a pull request can be merged by
+# its own author as soon as its build is green, whether or not anybody named
+# here has read it.
+#
+# Switching the code owner review on is Patrick's decision, and it is not
+# free. With enforce_admins on, a pull request of his that touches /.github/
+# could never merge, because he is its only owner and GitHub does not let an
+# author approve their own. Every one of his that touches the shared files
+# below would wait for Djinn. The settings change without a commit, so read
+# them rather than this comment:
+#
+#     gh api repos/EvilPatrick06/Thornswood/branches/main/protection
 #
 # A mistyped path or a handle without push access is ignored in silence, which
 # is why the check is worth running after any edit here:
