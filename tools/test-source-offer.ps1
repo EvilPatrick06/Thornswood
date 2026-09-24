@@ -21,15 +21,27 @@
   both records name, and the tree, compare and upstream links on the page all
   answer 200 signed out.
 
+  NOT ALL OF IT IS OURS. The 23 September installer stage also carried
+  Data\Platform\UI\build.js (a webpack build of skymp5-front, GPL v3, dated
+  13 September, before the fork), Data\Platform\Modules\skyrimPlatform.ts and
+  Data\Scripts\MpClientPlugin.pex, none of them built here and none with a
+  recorded commit. The first version of the page and the note said "All of
+  it is built from" the fork, which was false. Both now name those files as
+  their own group, say the gap, and point at upstream, and this checks that
+  they do and that the old sentence does not come back.
+
   What this checks:
     - Get-SourceNotice, lifted out of the shipped Package-Thornswood.ps1 by
       text, writes SOURCE CODE.txt from the two records, names every recorded
       file, follows the records when they change, and stops on a file it has
-      no source folder for.
-    - Setup-Thornswood.ps1 copies that note into the install folder.
+      no source folder for. Given a payload, it names the SkyMP files there
+      that were not built here, as their own group, and only those present.
+    - Setup-Thornswood.ps1 copies that note into the install folder, and
+      Uninstall.cs takes it out again.
     - credits.md names the fork, the branch, the recorded commits and every
       shipped file, and carries no commit that is not in a record, so a
       rebuild that moves client-build.json fails here until the page moves too.
+      It names the files not built here apart, with the gap said.
     - the download page points at it.
     - with the fork on this machine, every licence and every file to folder
       pair both notices state is read off the fork itself at the recorded
@@ -129,8 +141,11 @@ if ($fn) {
     Yes 'every commit in the note is one a record names' ($stray.Count -eq 0)
     Yes 'the note is plain ASCII, for Notepad' (-not ($note -match '[^\x09\x0A\x0D\x20-\x7E]'))
     Yes 'the note has no em dash and never says player' (Test-Words $note)
+    Yes 'the note does not claim all of it is built from the fork' (-not ($note -match '(?i)All of it'))
+    Yes 'with no payload to look in, the note names no files it did not build' (-not $note.Contains('did not build'))
 
-    # The table, as "  file  folder  licence".
+    # The table, as "  file  folder  licence". Only the files Thornswood built:
+    # the group it did not build has its own heading and is checked below.
     foreach ($l in ($note -split "`r?`n")) {
         $m = [regex]::Match($l, '^\s{2}(\S+)(?: \(the server\))?\s{2,}(skymp5-client|skyrim-platform|skymp5-server)\s{2,}(GNU A?GPL version 3)\s*$')
         if ($m.Success) { $rows += [pscustomobject]@{ File = $m.Groups[1].Value; Folder = $m.Groups[2].Value; Licence = $m.Groups[3].Value; Where = 'note' } }
@@ -187,6 +202,48 @@ if ($fn) {
         $n5 = Get-SourceNotice $cp $serverPath
         Yes 'an upstream base the record does not know is said as a gap, not printed as a commit' `
             ($n5.Contains('a commit the build record does not name') -and -not $n5.Contains('unknown, fetch'))
+
+        # The SkyMP files the payload carries that were not built here. A
+        # payload shaped like the 23 September stage gets all three named, as
+        # their own group, with the gap said and no commit claimed for them.
+        $pl = Join-Path $tmp 'payload'
+        $extraFiles = @('Data\Platform\UI\build.js', 'Data\Platform\Modules\skyrimPlatform.ts', 'Data\Scripts\MpClientPlugin.pex')
+        foreach ($rel in $extraFiles) {
+            $p = Join-Path $pl $rel
+            $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $p)
+            [IO.File]::WriteAllText($p, 'x')
+        }
+        $n6 = Get-SourceNotice $clientPath $serverPath $pl
+        $cut = $n6.IndexOf('did not build')
+        Yes 'a payload with build.js and the rest gets a group for what Thornswood did not build' ($cut -gt 0)
+        $tail = if ($cut -gt 0) { $n6.Substring($cut) } else { '' }
+        $head6 = if ($cut -gt 0) { $n6.Substring(0, $cut) } else { $n6 }
+        Yes 'that group names build.js as skymp5-front under the GNU GPL version 3' `
+            ($tail -match '(?m)^\s{2}build\.js\s{2,}skymp5-front\s{2,}GNU GPL version 3\s*$')
+        Yes 'that group names skyrimPlatform.ts as skyrim-platform under the GNU GPL version 3' `
+            ($tail -match '(?m)^\s{2}skyrimPlatform\.ts\s{2,}skyrim-platform\s{2,}GNU GPL version 3\s*$')
+        Yes 'that group names MpClientPlugin.pex and says its folder has no LICENSE' `
+            ($tail -match '(?m)^\s{2}MpClientPlugin\.pex\s{2,}client-deps\s{2,}no LICENSE file in that folder\s*$')
+        Yes 'that group says nobody recorded their version' ($tail.Contains('Nobody recorded which version of SkyMP'))
+        Yes 'the built group does not list them' `
+            (-not ($head6 -match '(?m)^\s{2}(build\.js|skyrimPlatform\.ts|MpClientPlugin\.pex)\s'))
+        $stray6 = @([regex]::Matches($n6, '\b[0-9a-f]{7,40}\b') | ForEach-Object { $_.Value } | Where-Object { -not (Test-Known $_) })
+        Yes 'the note with that group still carries no commit a record does not name' ($stray6.Count -eq 0)
+        Yes 'the note with that group is plain ASCII and in the house words' `
+            (-not ($n6 -match '[^\x09\x0A\x0D\x20-\x7E]') -and (Test-Words $n6))
+
+        # Only what is there. A payload with build.js alone names build.js alone.
+        Remove-Item -LiteralPath (Join-Path $pl 'Data\Platform\Modules') -Recurse -Force
+        Remove-Item -LiteralPath (Join-Path $pl 'Data\Scripts') -Recurse -Force
+        $n7 = Get-SourceNotice $clientPath $serverPath $pl
+        Yes 'a payload with only build.js names build.js and not the two it does not hold' `
+            ($n7.Contains('skymp5-front') -and -not ($n7 -match 'skyrimPlatform\.ts|MpClientPlugin\.pex'))
+
+        # A payload with none of them says nothing about them.
+        Remove-Item -LiteralPath (Join-Path $pl 'Data') -Recurse -Force
+        $null = New-Item -ItemType Directory -Force -Path $pl
+        $n8 = Get-SourceNotice $clientPath $serverPath $pl
+        Yes 'a payload with none of them gets no such group' (-not $n8.Contains('did not build'))
     }
     finally {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
@@ -196,12 +253,22 @@ if ($fn) {
 # Written into the stage, which 7-Zip archives whole, and stopped on failure.
 Yes 'Package-Thornswood.ps1 writes SOURCE CODE.txt into the stage from the records' `
     ($package -match "Join-Path \`$stage 'SOURCE CODE\.txt'" -and $package -match 'Get-SourceNotice \$clientRecordPath')
+# And hands it the payload, or the files it did not build are never named.
+Yes 'Package-Thornswood.ps1 hands Get-SourceNotice the payload it staged' `
+    ($package -match "Get-SourceNotice \`$clientRecordPath \(Join-Path \`$PSScriptRoot 'server-build\.json'\) \`$payloadDir")
 
 # The setup program unpacks into a scratch folder, so the note has to be put
 # where a person keeps things.
 $setup = Get-Content -LiteralPath $setupPath -Raw
 Yes 'Setup-Thornswood.ps1 copies SOURCE CODE.txt into the install folder' `
     ($setup -match "Join-Path \`$Here 'SOURCE CODE\.txt'" -and $setup -match 'Copy-Item -LiteralPath \$srcNote -Destination \$Root')
+
+# And the uninstall takes it out again. Finish ends with a plain rmdir of the
+# install folder, which only works on an empty one, and the farewell calls
+# anything it does not know "not Thornswood's".
+$uninstall = Get-Content -LiteralPath (Join-Path $Here 'app\Uninstall.cs') -Raw
+Yes 'Uninstall.cs removes SOURCE CODE.txt from the install folder' `
+    ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "SOURCE CODE\.txt"\)\)')
 
 # ---- the credits page ------------------------------------------------------
 $credits = Get-Content -LiteralPath $creditsPath -Raw
@@ -225,7 +292,21 @@ Yes 'the page names the server binary' ($section.Contains([string]$server.binary
 $stray = @([regex]::Matches($section, '\b[0-9a-f]{7,40}\b') | ForEach-Object { $_.Value } | Where-Object { -not (Test-Known $_) })
 Yes ('every commit on the page is one a record names' + $(if ($stray.Count) { ', stale: ' + ($stray -join ', ') } else { '' })) ($stray.Count -eq 0)
 Yes 'the page has no em dash and never says player' (Test-Words $credits)
-foreach ($l in ($section -split "`r?`n")) {
+Yes 'the page does not claim all of it is built from the fork' (-not ($section -match '(?i)All of it'))
+
+# The files Thornswood did not build, as their own group under their own
+# heading, with the gap said and upstream linked.
+$nbAt = $section.IndexOf('### SkyMP files Thornswood did not build')
+Yes 'the page has a group for the SkyMP files Thornswood did not build' ($nbAt -gt 0)
+$built = if ($nbAt -gt 0) { $section.Substring(0, $nbAt) } else { $section }
+$notBuiltText = if ($nbAt -gt 0) { $section.Substring($nbAt) } else { '' }
+Yes 'that group names build.js as skymp5-front under the GNU GPL version 3' `
+    ($notBuiltText -match '(?m)^\|\s*`build\.js`[^|]*\|[^|]*\|\s*`skymp5-front`, GNU GPL version 3\s*\|')
+Yes 'that group names skyrimPlatform.ts and MpClientPlugin.pex' `
+    ($notBuiltText.Contains('`skyrimPlatform.ts`') -and $notBuiltText.Contains('`MpClientPlugin.pex`'))
+Yes 'that group says nobody recorded their version' ($notBuiltText.Contains('nobody recorded which version of SkyMP'))
+Yes 'that group links upstream SkyMP for their source' ($notBuiltText.Contains('(https://github.com/skyrim-multiplayer/skymp)'))
+foreach ($l in ($built -split "`r?`n")) {
     $m = [regex]::Match($l, '^\|\s*`([^`]+)`[^|]*\|\s*`(skymp5-client|skyrim-platform|skymp5-server)`\s*\|\s*(GNU A?GPL version 3)\s*\|')
     if ($m.Success) { $rows += [pscustomobject]@{ File = $m.Groups[1].Value; Folder = $m.Groups[2].Value; Licence = $m.Groups[3].Value; Where = 'page' } }
 }
@@ -288,6 +369,24 @@ if (-not ((Test-ForkHas $cCommit) -and (Test-ForkHas $sCommit))) {
     }
     Yes ('every licence named matches that folder''s LICENSE at the recorded commit' + $(if ($wrongLicence.Count) { ', wrong: ' + ($wrongLicence -join ', ') } else { '' })) ($rows.Count -gt 0 -and $wrongLicence.Count -eq 0)
     Yes ('every file is built by the folder named for it' + $(if ($wrongFolder.Count) { ', wrong: ' + ($wrongFolder -join ', ') } else { '' })) ($rows.Count -gt 0 -and $wrongFolder.Count -eq 0)
+
+    # The group Thornswood did not build. Its folders and licences are claims
+    # too: skymp5-front's LICENSE is the GPL version 3, skymp5-front is the
+    # package webpack names ui_webpack (the name inside build.js), and
+    # client-deps has the .pex and no LICENSE and no .psc for it.
+    $frontLic = ((Show-AtCommit $cCommit 'skymp5-front/LICENSE') -split "`n" | Where-Object { $_.Trim() } | Select-Object -First 2) -join ' '
+    Yes 'skymp5-front''s LICENSE is the GNU GPL version 3 at the recorded commit' `
+        ($frontLic -match 'GNU GENERAL PUBLIC LICENSE' -and $frontLic -match 'Version 3' -and -not ($frontLic -match 'AFFERO'))
+    Yes 'skymp5-front is the ui_webpack package build.js is built from' `
+        ((Show-AtCommit $cCommit 'skymp5-front/package.json').Contains('"name": "ui_webpack"'))
+    $tree = @()
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try { $tree = @(& git -C $Fork ls-tree -r --name-only $cCommit -- client-deps 2>$null) }
+    finally { $ErrorActionPreference = $old }
+    Yes 'client-deps holds MpClientPlugin.pex, with no LICENSE and no source for it' `
+        (($tree -contains 'client-deps/common/Data/Scripts/MpClientPlugin.pex') -and
+         -not ($tree | Where-Object { $_ -match '^client-deps/LICENSE' }) -and
+         -not ($tree | Where-Object { $_ -match '(?i)/MpClientPlugin\.psc$' }))
 }
 
 Write-Host ''

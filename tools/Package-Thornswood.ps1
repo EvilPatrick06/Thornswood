@@ -581,7 +581,7 @@ foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRS
 #
 # The six files in client-build.json are SkyMP, built from the fork, and so is
 # the server's engine. SkyMP's folders carry the GNU GPL and AGPL version 3,
-# each in its own LICENSE file, and this installer hands six of those files to
+# each in its own LICENSE file, and this installer hands those files to
 # people. Entry 170 on the To Do List asked for the source to be reachable
 # "from the download page and from inside the installed folder", and nothing
 # in the installer said where it was.
@@ -597,7 +597,18 @@ foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRS
 # credentials, answers c8832519866e for thornswood/engine-changes, the commit
 # both records name. Which folder builds which file was read off the fork's own
 # build files at that commit, and each licence off that folder's LICENSE.
-function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord) {
+#
+# The six are not all the SkyMP the installer carries. The 23 September stage
+# also had Data\Platform\UI\build.js (a webpack build of skymp5-front, GPL v3,
+# dated 13 September, before the fork existed), Data\Platform\Modules\
+# skyrimPlatform.ts (skyrim-platform's declarations, an older copy than the
+# fork builds) and Data\Scripts\MpClientPlugin.pex (byte for byte the fork's
+# client-deps copy, a folder with no LICENSE). Nobody built those here or
+# recorded which SkyMP they came from. The first version of this note said
+# "All of it is built from" the fork, which was false for build.js, so the
+# note now lists whichever of them the payload holds as their own group, with
+# the gap said and upstream named, rather than claiming a commit for them.
+function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]$PayloadDir) {
     # A file the record gains that is not here stops the package, because a
     # person has to look at where it comes from before a notice names it.
     $from = @{
@@ -631,6 +642,33 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord) {
     if (-not $from.ContainsKey($bin)) { throw "server-build.json names $bin, which has no known source folder" }
     $table += ('  {0,-34}{1,-18}{2}' -f ($bin + ' (the server)'), $from[$bin][0], $from[$bin][1])
 
+    # SkyMP files the payload carries that Thornswood did not build. Only the
+    # ones actually in the payload are named, and one the client record takes
+    # over later (built from the fork and recorded) moves to the table above
+    # by leaving this list.
+    $notBuilt = @(
+        @{ Path = 'Data\Platform\UI\build.js'; Folder = 'skymp5-front'; Licence = 'GNU GPL version 3'
+           Says = @('build.js is SkyMP''s in-game interface. It loads fonts, pictures and',
+                    'sounds that sit beside it in Data\Platform\UI.') },
+        @{ Path = 'Data\Platform\Modules\skyrimPlatform.ts'; Folder = 'skyrim-platform'; Licence = 'GNU GPL version 3'
+           Says = @('skyrimPlatform.ts is Skyrim Platform''s type declarations.') },
+        @{ Path = 'Data\Scripts\MpClientPlugin.pex'; Folder = 'client-deps'; Licence = 'no LICENSE file in that folder'
+           Says = @('MpClientPlugin.pex is a compiled Papyrus script from SkyMP''s client-deps',
+                    'folder, which keeps no source for it.') }
+    )
+    $recorded = @($c.files.PSObject.Properties.Name)
+    $extra = @()
+    $says = @()
+    if ($PayloadDir) {
+        foreach ($nb in $notBuilt) {
+            if ($recorded -contains $nb.Path) { continue }
+            if (-not (Test-Path -LiteralPath (Join-Path $PayloadDir $nb.Path))) { continue }
+            $leaf = $nb.Path.Substring($nb.Path.LastIndexOf('\') + 1)
+            $extra += ('  {0,-34}{1,-18}{2}' -f $leaf, $nb.Folder, $nb.Licence)
+            $says += $nb.Says
+        }
+    }
+
     function Base([string]$b) {
         if ($b -match '^[0-9a-f]{7,40}$') { return ('SkyMP commit ' + $b) }
         return 'SkyMP, at a commit the build record does not name'
@@ -641,12 +679,12 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord) {
         '====================================',
         '',
         'SkyMP is free software, and Thornswood ships part of it. This installer put',
-        'the SkyMP files listed below into your Skyrim folder, and the server you',
-        'connect to runs on SkyMP as well. All of it is built from Thornswood''s',
-        'public copy of SkyMP, with Thornswood''s changes on top. Anybody can read it',
-        'or download it, with no account.',
+        'SkyMP files into your Skyrim folder, and the server you connect to runs on',
+        'SkyMP as well. The files in the first list below, and the server''s engine,',
+        'are built from Thornswood''s public copy of SkyMP, with Thornswood''s changes',
+        'on top. Anybody can read it or download it, with no account.',
         '',
-        'The files this installer carried',
+        'The files Thornswood built',
         ('  commit    ' + $c.forkCommit + ', branch ' + $c.forkBranch),
         ('  source    ' + $fork + '/tree/' + $c.forkCommit),
         ('  based on  ' + (Base ([string]$c.upstreamBase))),
@@ -658,10 +696,21 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord) {
         '',
         ('SkyMP itself is ' + $upstream),
         '',
-        'Each file, the folder of SkyMP it is built from, and the licence in that',
-        'folder''s LICENSE file:',
+        'Each file Thornswood built, the folder of SkyMP it is built from, and the',
+        'licence in that folder''s LICENSE file:',
         ''
-    ) + $table + @(
+    ) + $table
+    if ($extra.Count) {
+        $lines += @(
+            '',
+            'SkyMP files this installer also carried that Thornswood did not build.',
+            'Nobody recorded which version of SkyMP they came from, so no commit is',
+            'named for them here. Their source is SkyMP''s own, at the address above.',
+            'Each file, the folder of SkyMP it belongs to, and that folder''s licence:',
+            ''
+        ) + $extra + @('') + $says
+    }
+    $lines += @(
         '',
         'The launcher''s updates can bring newer builds of these files, so this note',
         'names the build this installer brought. https://thornswood.net/credits',
@@ -672,7 +721,7 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord) {
 }
 $srcNote = Join-Path $stage 'SOURCE CODE.txt'
 try {
-    $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot 'server-build.json')
+    $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot 'server-build.json') $payloadDir
     [IO.File]::WriteAllText($srcNote, $noteText, (New-Object Text.UTF8Encoding($false)))
     Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
 } catch {

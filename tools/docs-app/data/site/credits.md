@@ -24,9 +24,10 @@ you like.
 ## Source code
 
 SkyMP is free software, and Thornswood ships part of it. The installer and the
-launcher's updates put six SkyMP files into your Skyrim folder, and the server
-you connect to runs on SkyMP as well. All of it is built from Thornswood's
-public copy of SkyMP, with Thornswood's changes on top:
+launcher's updates put SkyMP files into your Skyrim folder, and the server you
+connect to runs on SkyMP as well. Six of those files, and the server's engine,
+are built from Thornswood's public copy of SkyMP, with Thornswood's changes on
+top:
 
 **[github.com/EvilPatrick06/skymp](https://github.com/EvilPatrick06/skymp)**, on
 the branch `thornswood/engine-changes`. Anybody can read it or download it,
@@ -50,3 +51,16 @@ is the difference between the two.
 | `scam_native.node`, the server's engine | `skymp5-server` | GNU AGPL version 3 |
 
 Each licence is the `LICENSE` file in that folder of the repository.
+
+### SkyMP files Thornswood did not build
+
+The installer carries these too, and the launcher's updates can. Thornswood
+did not build them, and nobody recorded which version of SkyMP they came from,
+so no commit is named for them here. Their source is SkyMP's own, at
+**[github.com/skyrim-multiplayer/skymp](https://github.com/skyrim-multiplayer/skymp)**.
+
+| File | What it is | Its folder in SkyMP, and that folder's licence |
+|---|---|---|
+| `build.js`, with the fonts, pictures and sounds it loads | SkyMP's in-game interface | `skymp5-front`, GNU GPL version 3 |
+| `skyrimPlatform.ts` | Skyrim Platform's type declarations | `skyrim-platform`, GNU GPL version 3 |
+| `MpClientPlugin.pex` | A compiled Papyrus script | `client-deps`, which has no `LICENSE` file and keeps no source for it |
