@@ -4380,6 +4380,35 @@
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
     if (e.code === MOLD_KEY && moldPress()) { return; }
+    /*
+      The five social keys work in the open world, and P and J can always
+      close their own panel. Djinn on dev, 24 September: "The party menu
+      actually opens when hitting shift P during character creation while
+      naming your character." Unlike K below, these had no guard at all, so
+      a letter typed into the name box, or pressed over the inventory or the
+      map, opened one of our panels on top of the game's menu.
+
+      Asked of the game at the press rather than through busyMenuOpen's
+      quarter second cache, so a menu that closed a moment ago cannot
+      swallow the key. The Journal Menu does not count against J: J is the
+      game's own journal key as well, the game may have opened its book
+      before this runs, and shutting that book is the J block's job
+      (JOURNAL_MENU above).
+    */
+    if (e.code === FRIEND_KEY || e.code === TRADE_KEY || e.code === MUTE_KEY ||
+        e.code === PARTY_KEY || e.code === JOURNAL_KEY) {
+      if (claims.chat) { return; }
+      const closing = (e.code === PARTY_KEY && T.hasFocus('party')) ||
+                      (e.code === JOURNAL_KEY && T.hasFocus('journal'));
+      if (!closing) {
+        for (const name of KEYBOARD_MENUS) {
+          if (e.code === JOURNAL_KEY && name === JOURNAL_MENU) { continue; }
+          let up = false;
+          try { up = !!sp.Ui.isMenuOpen(name); } catch (err) { up = false; }
+          if (up) { say('key ' + e.code + ' seen, but ' + name + ' is open'); return; }
+        }
+      }
+    }
     if (e.code === FRIEND_KEY) { lookVerb('friend'); return; }
     if (e.code === TRADE_KEY) { lookVerb('trade'); return; }
     if (e.code === MUTE_KEY) { lookVerb('mute'); return; }
