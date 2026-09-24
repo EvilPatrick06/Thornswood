@@ -2130,6 +2130,27 @@ async function handle(req, res) {
 
     const st = await standing(t.d);
     standCache.delete(String(t.d));
+    /*
+      Could not ask Discord is not the same answer as not in the Discord.
+
+      standing() leaves inGuild false on every failed lookup and sets
+      lookupFailed to say why, because only a 404 means "not in the server".
+      This door tested inGuild alone, so a rate limit or a Discord outage came
+      back as 403 why 'guild', and the launcher writes a 'guild' down as a
+      remembered no, which erased the 72 hour grace it keeps for exactly the
+      day the site cannot vouch for anybody. The restart wave after every
+      release is when Discord rate limits the site, and a stranger told they
+      are not in a Discord they joined ten minutes ago assumes the thing is
+      broken and leaves.
+
+      So it answers 503 with the same why /api/play/owns already uses, and
+      Door.cs treats that like a site that did not answer: a yes from the last
+      few days still opens the door. The hand written admin list is left out
+      of this, because standing() already let them in and it is the way back
+      in on exactly this kind of morning.
+    */
+    if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok:false, why:'could not ask Discord', message:
+      'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
     if (!st.inGuild) return sendJson(res, 403, { ok:false, why:'guild', message:
       'That Discord account is not in the Thornswood Discord.',
       invite: cfg.discord.invite || '' });
