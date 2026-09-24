@@ -112,6 +112,12 @@ namespace Thornswood
         static Border downgradeBar;
         static TextBlock txtDowngradeNote, txtDowngradeTitle;
         static Button btnDowngrade;
+        // The feed's word to everybody and whether it holds Play (entry 262).
+        // Empty until a document has actually been read, so nothing here can
+        // hold Play on a check that failed. See FeedNotice.cs.
+        static Border noticeBar;
+        static TextBlock txtNoticeTitle, txtNoticeNote;
+        static FeedNotice feedNotice = new FeedNotice();
         static Grid titleBar;
         static Button buttonDiscord, buttonDiscordForget;
         static TextBlock labelDiscord, noteDiscord;
@@ -306,6 +312,8 @@ namespace Thornswood
             try { string leak = Leaks.Clean(cfg); if (leak != null) Log(leak); } catch { }
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch { }
             try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch { }
+            // Steam's Updates setting for the Skyrim the downgrade looks after, read only (SteamUpdates).
+            try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) { string upd = SteamUpdates.Report(Downgrade.Target(cfg)); if (upd != null) Log(upd); } } catch { }
             {
                 int parked = playing ? 0 : Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");
@@ -516,6 +524,7 @@ namespace Thornswood
             updateBar = F<Border>("UpdateBar"); titleBar = F<Grid>("TitleBar");
             downgradeBar = F<Border>("DowngradeBar"); txtDowngradeNote = F<TextBlock>("TxtDowngradeNote"); btnDowngrade = F<Button>("BtnDowngrade");
             txtDowngradeTitle = F<TextBlock>("TxtDowngradeTitle");
+            noticeBar = F<Border>("NoticeBar"); txtNoticeTitle = F<TextBlock>("TxtNoticeTitle"); txtNoticeNote = F<TextBlock>("TxtNoticeNote");
 
             btnPlay = F<Button>("BtnPlay"); btnRecheck = F<Button>("BtnRecheck"); btnCopy = F<Button>("BtnCopy");
             btnUpdate = F<Button>("BtnUpdate"); btnMin = F<Button>("BtnMin"); btnMax = F<Button>("BtnMax");
@@ -1792,7 +1801,7 @@ namespace Thornswood
                     txtDowngradeTitle.Text = steamCopyWrong ? "The Steam copy of Skyrim is on the wrong build" : "Skyrim is on the wrong build";
             }
 
-            btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy;
+            btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy && feedNotice.Hold == null;
             // Only worth offering while there is something to quit, and it is
             // the one control on this page that stays live during a session.
             if (btnQuitGame != null)
@@ -1823,6 +1832,16 @@ namespace Thornswood
                     : updateAnswered
                     ? "There is an update waiting. Install it and Play comes back."
                     : "Checking for updates before letting anybody in. A moment.";
+            }
+            // The feed holds Play (entry 262). Below the three above because
+            // each of those is something to do or already under way, and the
+            // bar above Play says why it is held either way. Above the two
+            // below because they label a button that stays live, and this one
+            // is not.
+            else if (feedNotice.Hold != null && !playing)
+            {
+                btnPlay.Content = feedNotice.Button;
+                btnPlay.ToolTip = feedNotice.Hold;
             }
             else if (wrongBuild && !playing && !collectionBarUp)
             {
@@ -1910,6 +1929,7 @@ namespace Thornswood
                             if (ok && OwnGame.Active) StartOwnGame(false, true);
                             DrawStatus();
                             DrawBuildLine();
+                            if (ok) AskToHoldSteamUpdates();
                         }));
                     }
                     catch { }
@@ -3720,6 +3740,7 @@ namespace Thornswood
                 if (updatePending) { Log("An update is going in. Play comes back when it is done."); return; }
                 if (collectionBarUp) { Log("The collection is not installed yet. Open it from the card above Play, then come back."); return; }
                 if (ownGameBusy) { Log("Thornswood's own Skyrim folder is being prepared. Play comes back when it is done."); return; }
+                if (feedNotice.Hold != null) { Log(feedNotice.Hold); return; }
 
                 if (!File.Exists(Paths.Loader)) { Log("skse64_loader.exe is missing from this build."); return; }
                 if (!File.Exists(Paths.MpClient)) { Log("MpClientPlugin.dll is missing, so this build has no multiplayer in it."); return; }
@@ -4340,6 +4361,38 @@ namespace Thornswood
             DrawStatus();
         }
 
+        /// <summary>
+        /// The feed's message in the bar above Play, and the hold on Play when
+        /// the feed asks for one. Entry 262: until this the message was one
+        /// Log line that scrolled away, so there was no way to say anything to
+        /// everybody when something outside the build broke.
+        ///
+        /// Only ever called with a document that was read, which is what keeps
+        /// the hold from coming out of a failed check. Every call replaces the
+        /// last answer, so a feed that drops the message or the maintenance
+        /// flag takes the bar and the hold away with it. DrawStatus, which
+        /// every path through OnVersionDoc reaches, puts the button right.
+        /// </summary>
+        static void ShowNotice(VersionDoc v)
+        {
+            FeedNotice was = feedNotice;
+            feedNotice = FeedNotice.From(v, Updater.Version);
+            if (noticeBar != null)
+            {
+                noticeBar.Visibility = feedNotice.Title == null ? Visibility.Collapsed : Visibility.Visible;
+                noticeBar.BorderBrush = Res(feedNotice.Hold != null ? "Bad" : "Accent");
+            }
+            if (txtNoticeTitle != null) txtNoticeTitle.Text = feedNotice.Title == null ? "" : feedNotice.Title;
+            if (txtNoticeNote != null) txtNoticeNote.Text = feedNotice.Text;
+
+            // Once in the log when it changes, so a report still shows what the
+            // bar said, without a line on every check.
+            if (feedNotice.Title != null && (feedNotice.Title != was.Title || feedNotice.Text != was.Text))
+                Log(feedNotice.Title + ". " + feedNotice.Text);
+            if (was.Hold != null && feedNotice.Hold == null)
+                Log("The update feed no longer holds Play.");
+        }
+
         static void OnVersionDoc(VersionDoc v, bool loud)
         {
             checkFailed = false;
@@ -4393,7 +4446,7 @@ namespace Thornswood
                 if (txtUpdateSource != null) txtUpdateSource.Text = Updater.WhyDisabled(cfg);
                 DrawVoiceState();
             }
-            if (!string.IsNullOrEmpty(v.message)) Log(v.message);
+            ShowNotice(v);
             BuildNews();
 
             // The add-ons tab is drawn straight from this document, so redraw
@@ -4565,39 +4618,33 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// No mods, and a collection to point at.
-        ///
-        /// Everything downstream reads differently when this is true. An update
-        /// cannot succeed against a build with no mods in it, so the bar above
-        /// Play said "Update failed" over the top of the one message somebody
-        /// in that state actually needs, and blamed Thornswood for the thing it
-        /// was trying to send them off to fix.
-        /// </summary>
-        /// <summary>
         /// Whether the card above Play should be the collection card, and if
-        /// so which of the two things is wrong.
+        /// so which thing is wrong.
         ///
-        /// A plugin count alone only catches somebody who has never installed
-        /// the collection. It does not catch somebody sitting on an older
-        /// revision, because an old revision still deploys 96 plugins and
-        /// looks perfect by that measure.
+        /// Returns "none" for never installed, which is no more than
+        /// Checks.MostPluginsWithoutCollection plugins enabled; "stale" when
+        /// the revision Vortex installed is behind the one the server was
+        /// built against; "ahead" when it is in front of it. Otherwise "",
+        /// which includes having no collection address and either revision
+        /// reading as 0.
         ///
-        /// That mattered the moment a revision added a mod with no plugin of
-        /// its own. Start On Save arrived in revision 3 and ships no esp, so
-        /// an out of date install counts 96, passes this, shows no card, and
-        /// the person is left with a greyed out Play button and one red row
-        /// naming a file they have never heard of. The one click that fixes it
-        /// is updating the collection, and nothing on screen said so.
+        /// Two tests because a plugin count alone only catches somebody who
+        /// has never installed the collection. An older revision still
+        /// deploys a full list of plugins and looks perfect by that measure,
+        /// so behind and ahead come from the revision numbers.
         ///
-        /// Returns "" when nothing is wrong, "none" for never installed,
-        /// "stale" for installed but behind.
+        /// ModsMissing is this answering anything but "", and while it does
+        /// the mod updates wait. An update cannot succeed against a build
+        /// with no mods in it, and the bar above Play used to say "Update
+        /// failed" over the top of the one message somebody in that state
+        /// actually needs.
         /// </summary>
         static string CollectionProblem()
         {
             if (string.IsNullOrEmpty(cfg.CollectionUrl)) return "";
             try
             {
-                if (Checks.EnabledPlugins() <= 40) return "none";
+                if (Checks.EnabledPlugins() <= Checks.MostPluginsWithoutCollection) return "none";
 
                 // THE REVISION, NOT A NAMED FILE.
                 //
