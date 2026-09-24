@@ -44,6 +44,13 @@ outside which copy is running, so change it whenever behaviour changes. The
 harnesses run the real file in a temporary folder on a spare port and need
 nothing else: `node tools\voice\test-auth.js` and the rest.
 
+A TURN relay, for the pairs of people who cannot reach each other directly,
+is `THORNSWOOD_TURN_URL`. Its key is `THORNSWOOD_TURN_SECRET` or, so it stays
+off the command line `Install-Voice.ps1` builds, `turn-key.txt` beside the
+service, put there by hand. Unless both are there, `/ice` offers STUN only; with
+neither, `/health` says `turn: none`, which is how every box runs today.
+`Install-Voice.ps1 -TurnUrl` sets the address. `test-turn-key.js` covers it.
+
 ## Where it runs
 
 On the VPS beside the game servers: the live service in `C:\Thornswood-Voice`

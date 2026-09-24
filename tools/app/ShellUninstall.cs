@@ -67,7 +67,7 @@ namespace Thornswood
             // focused, because then Enter would press it.
             win.ContentRendered += delegate
             {
-                try { if (btnUninstall != null) btnUninstall.BringIntoView(); } catch { }
+                try { if (btnUninstall != null) btnUninstall.BringIntoView(); } catch (Exception ex) { Swallow.Note("Shell.OpenForUninstall, scrolling to Uninstall", ex); }
             };
 
             CentreOnMainScreen();
@@ -81,8 +81,13 @@ namespace Thornswood
             app.DispatcherUnhandledException += delegate (object faultSender,
                 System.Windows.Threading.DispatcherUnhandledExceptionEventArgs fault)
             {
-                try { Log("Fault on the launcher's own thread: " + fault.Exception.GetType().Name + ": " + fault.Exception.Message); } catch { }
-                try { File.AppendAllText(Paths.LogFile, fault.Exception.ToString() + Environment.NewLine); } catch { }
+                try { Log("Fault on the launcher's own thread: " + fault.Exception.GetType().Name + ": " + fault.Exception.Message); } catch (Exception ex) { Swallow.Note("Shell.OpenForUninstall, writing a fault to the status line", ex); }
+                try { File.AppendAllText(Paths.LogFile, fault.Exception.ToString() + Environment.NewLine); }
+                catch
+                {
+                    // The log is the one place this could have gone, and it is
+                    // the log that failed, so there is nowhere left to say so.
+                }
                 fault.Handled = true;
             };
             StartStallWatch();
