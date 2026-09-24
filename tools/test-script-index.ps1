@@ -114,6 +114,27 @@ Yes 'and says to say so in #dev' ($channel -match '#dev')
 $examples = (@($h.examples.example) | ForEach-Object { $_.code }) -join "`n"
 Yes 'there is an example of a dev release' ($examples -match '-Channel dev')
 
+# The help has to agree with what the code does, not merely be there. On
+# 24 Sep #253 made a main release refuse -Version and refuse a file under
+# tools that git does not know, while this branch's help still said -Version
+# wrote the number into Updater.cs for any release. Every check above passed
+# on that, because each parameter had some text. So the two refusals a person
+# is most likely to walk into are read off the code, and the help has to say
+# each one exactly when the code does it, either way round.
+$shipText = [IO.File]::ReadAllText($Ship, $Utf8)
+$versionHelp = ''
+try { $versionHelp = (Get-Help $Ship -Parameter Version -ErrorAction Stop | Out-String) } catch { $versionHelp = '' }
+$versionHelp = $versionHelp -replace '\s+', ' '
+$channelFlat = $channel -replace '\s+', ' '
+$refusesVersion = $shipText -match '-not \$Dev -and \$Version -ne \$current'
+$saysVersion = ($versionHelp -match '(?i)a main release refuses it') -and ($versionHelp -match 'Bump-Version\.ps1 -To')
+Yes ('Get-Help -Parameter Version says a main release refuses it, exactly when the code does' +
+     ' (code refuses: ' + $refusesVersion + ', help says: ' + $saysVersion + ')') ($refusesVersion -eq $saysVersion)
+$refusesLoose = $shipText -match 'ls-files --others --exclude-standard -- tools'
+$saysLoose = $channelFlat -match '(?i)a file under tools git does not know'
+Yes ('Get-Help -Parameter Channel names the refusal of a file under tools git does not know, exactly when the code does' +
+     ' (code refuses: ' + $refusesLoose + ', help says: ' + $saysLoose + ')') ($refusesLoose -eq $saysLoose)
+
 # Nothing about how Ship is called moved. Notes is mandatory at position 0,
 # and every recorded command, CLAUDE.md's included, gives it first unnamed.
 $cmd = Get-Command -Name $Ship
