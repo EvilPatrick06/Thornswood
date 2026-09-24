@@ -30,6 +30,10 @@
     bot       a python process is alive with the bot script in its command line
     dev game  answers on 7788, the dev server's resources port
     dev voice answers on 7789
+    disk      free space on C:, which every one of the above shares. Under
+              twenty percent it writes DISK LOW, under ten DISK CRITICAL,
+              once when the line is crossed and once when it comes back. It
+              restarts nothing for it, because a restart frees nothing.
 
   The two dev ones are here because the box has been watching them since 16
   September and this file did not know. vps-dev-instance.ps1, which runs ON
@@ -225,6 +229,77 @@ foreach ($c in $checks) {
 
 if ($fresh.Count -gt 0) { Add-Content -LiteralPath $hist -Value $fresh }
 
+# Free space. Everything on this box shares one volume: both game servers, the
+# site and its uploads, voice, the bot, every log and every payload.
+# MOVING-THE-SERVER.md has it at 80 GB with 81 percent free, read off the box
+# on 15 September, and all of those only grow. A full disk is not one service
+# down, it is every service at once. From the To Do List: "Free space is a
+# first-class alert, usually at twenty percent and again at ten, because it is
+# the one resource whose exhaustion is total rather than partial."
+#
+# It is its own check and not a line in $checks because restarting a service
+# frees nothing, so nothing here restarts anything. It is said once when a
+# line is crossed and once when it comes back, not on every five minute run:
+# disk.txt beside restarts.txt holds which side of the lines the last run saw.
+$diskState    = Join-Path $root 'disk.txt'
+$diskLow      = 20
+$diskCritical = 10
+
+# The same two numbers Get-PSDrive C shows by hand on the box, so a person
+# checking reads what this read. $null when the drive cannot be read, and then
+# nothing is said and nothing is remembered rather than a guess.
+function DiskNow() {
+  try {
+    $d = Get-PSDrive -Name $root.Substring(0, 1) -PSProvider FileSystem -EA Stop
+    $free = [double]$d.Free
+    $size = [double]$d.Used + $free
+    if ($size -le 0) { return $null }
+    return @{ Free = $free; Size = $size }
+  } catch { return $null }
+}
+
+# Which side of the lines a free percentage is on. On the way back up it has
+# to clear a line by a whole point before it counts, so a disk sitting right
+# on twenty percent, a log trimmed and then growing again, is one line in
+# watch.log and not one every five minutes.
+function DiskLevel($pct, $was) {
+  if ($pct -lt $diskCritical) { return 'critical' }
+  if ($was -eq 'critical' -and $pct -lt ($diskCritical + 1)) { return 'critical' }
+  if ($pct -lt $diskLow) { return 'low' }
+  if (($was -eq 'low' -or $was -eq 'critical') -and $pct -lt ($diskLow + 1)) { return 'low' }
+  return 'ok'
+}
+
+function DiskCheck($free, $size) {
+  $pct   = [math]::Round(100.0 * $free / $size, 1)
+  $where = $root.Substring(0, 2)
+  $room  = '' + [math]::Round($free / 1GB, 1) + ' GB of ' + [math]::Round($size / 1GB, 1) + ' GB'
+  $was = ''
+  if (Test-Path -LiteralPath $diskState) {
+    $was = ('' + (Get-Content -LiteralPath $diskState -TotalCount 1 -EA SilentlyContinue)).Trim()
+  }
+  if (@('ok', 'low', 'critical') -notcontains $was) { $was = '' }
+  $now = DiskLevel $pct $was
+  if ($now -ne $was) {
+    if ($now -eq 'critical') {
+      Note ('DISK CRITICAL: ' + $pct + '% free on ' + $where + ', ' + $room + '. Under ' + $diskCritical + '%. When it fills, every service on this box stops at once. Clear old logs, uploads or payloads now. Nothing was restarted, because a restart frees nothing.')
+    } elseif ($now -eq 'low' -and $was -eq 'critical') {
+      Note ('disk up to ' + $pct + '% free on ' + $where + ', ' + $room + '. Out of critical, still under ' + $diskLow + '%.')
+    } elseif ($now -eq 'low') {
+      Note ('DISK LOW: ' + $pct + '% free on ' + $where + ', ' + $room + '. Under ' + $diskLow + '%. Everything on this box shares this one volume, so this is the whole box and not one service. Nothing was restarted, because a restart frees nothing.')
+    } elseif ($was -ne '') {
+      Note ('disk back to ' + $pct + '% free on ' + $where + ', ' + $room + '.')
+    }
+    Set-Content -LiteralPath $diskState -Value $now -Encoding ASCII
+  }
+  return ('disk      ' + $pct + '% free on ' + $where + ', ' + $room + ' (' + $now + ')')
+}
+
+# Printed, so the file run by hand on the box shows what it read.
+$space = DiskNow
+if ($space) { DiskCheck $space.Free $space.Size }
+else { 'disk      could not be read' }
+
 # Keep the two files from growing forever.
 foreach ($f in @($log, $hist)) {
   if (Test-Path $f) {
@@ -331,12 +406,20 @@ foreach (`$p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA
 'bot       ' + `$(if (`$bot) { 'up' } else { 'DOWN' })
 'dev game  ' + `$(if (Answers 7788) { 'up' } else { 'DOWN' })
 'dev voice ' + `$(if (Answers 7789) { 'up' } else { 'DOWN' })
+# Free space right now, and LOW or CRITICAL when the watcher's last run found
+# it under a line. The twenty and the ten are kept in the watcher only, so
+# this reads its verdict from disk.txt rather than holding a second copy.
+`$d = Get-PSDrive -Name '$($Root.Substring(0, 1))' -PSProvider FileSystem -EA SilentlyContinue
+`$lvl = ''
+if (Test-Path '$Root\disk.txt') { `$lvl = ('' + (Get-Content '$Root\disk.txt' -TotalCount 1 -EA SilentlyContinue)).Trim() }
+if (`$d -and ([double]`$d.Used + `$d.Free) -gt 0) { 'disk      ' + [math]::Round(100.0 * `$d.Free / ([double]`$d.Used + `$d.Free), 1) + '% free, ' + [math]::Round(`$d.Free / 1GB, 1) + ' GB' + `$(if (`$lvl -eq 'low' -or `$lvl -eq 'critical') { ', ' + `$lvl.ToUpper() } else { '' }) }
+else { 'disk      could not be read' }
 `$t = & schtasks /query /tn '$Task' /fo list 2>`$null
 if (`$LASTEXITCODE -eq 0) { 'watcher   installed' } else { 'watcher   NOT installed. Run this with -Install' }
 "@
 foreach ($l in $out) {
   $c = 'Gray'
-  if ("$l" -match 'DOWN|NOT installed') { $c = 'Red' }
+  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$') { $c = 'Red' }
   if ("$l" -match '\bup$|installed$') { $c = 'Green' }
   Say "  $l" $c
 }

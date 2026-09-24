@@ -22,7 +22,7 @@ namespace Thornswood
         static void AskToHoldSteamUpdates()
         {
             string manifest = "";
-            try { manifest = SteamUpdates.ManifestFor(Downgrade.Target(cfg)); } catch { }
+            try { manifest = SteamUpdates.ManifestFor(Downgrade.Target(cfg)); } catch (Exception ex) { Swallow.Note("Shell.AskToHoldSteamUpdates, finding Steam's file for Skyrim", ex); }
             if (!SteamUpdates.NeedsHolding(manifest)) return;
 
             string ask =

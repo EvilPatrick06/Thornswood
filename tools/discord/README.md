@@ -30,13 +30,22 @@ grows by adding to a category rather than by rebuilding.
 Downloads, known issues and credits are all pages on the website. A copy in
 Discord is a copy that goes stale, so the welcome post links to them instead.
 
+### Applications
+
+| Channel | Who reads | What it is |
+|---|---|---|
+| `#tickets-and-applications` | everybody | The bot's ticket panel: applying for any job, reporting somebody, cannot install or connect. Each ticket opens a private thread only the person and staff can read |
+| `#tickets` | staff only | Every closed ticket, with a link back to it, and the whole of any ticket whose private thread would not open |
+
+`#tickets` has to stay staff only, because a report about somebody lands there
+when its thread fails. The bot checks the channel's permissions rather than
+its name, and passes over a `#tickets` anybody else can read.
+
 ### Help
 
 | Channel | What it is |
 |---|---|
-| `#tickets` | Cannot install, cannot connect, a problem with somebody, anything private |
 | `Support` (voice) | Where a ticket goes when typing is slower than talking |
-| `#applications` | Playtester, gamemaster, loremaster, content creator, dev |
 | `#bugs` | A forum, one post per problem |
 | `#suggestions` | A forum, mods and features, Nexus link included |
 | `#logs-and-crashes` | Drag the file straight in |
@@ -80,8 +89,7 @@ whoever is not in the world. AFK is set as the server's real AFK channel, so
 Discord moves people into it after five minutes of silence rather than hoping
 they remember to move themselves.
 
-The support voice channel sits in Help, next to the tickets, because that is
-what it is for.
+The support voice channel sits in Help, because that is what it is for.
 
 ### Testing
 
@@ -204,7 +212,7 @@ a server full of announcement channels fails the check.
 The ones everybody lands in:
 
 `#welcome` `#rules` `#start-here` `#general` `#screenshots`
-`#character-introductions` `#clips` `#logs-and-crashes` `#tickets`
+`#character-introductions` `#clips` `#logs-and-crashes` `#tickets-and-applications`
 
 Nine, six of which anybody can post in, so it passes with room to spare.
 
@@ -242,7 +250,7 @@ Set it to **pick as many as you like**, and optional.
 |---|---|
 | Roleplay | `#character-introductions`, `#tales` |
 | Just playing | `#general`, your hold's channel |
-| I want to help test | `#bugs`, `#tickets` |
+| I want to help test | `#bugs`, `#tickets-and-applications` |
 | I make videos | `#clips`, `#screenshots` |
 
 None of these grant a role. Playtester, Loremaster and Content Creator are
