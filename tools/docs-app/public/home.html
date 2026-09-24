@@ -17,11 +17,15 @@
      expects. No tracker reaches out from this page now, so neither is
      needed for that reason.
 
-     WHAT STILL LEAVES, said plainly rather than left for somebody to
-     find: the fonts come from fonts.googleapis.com and the markdown
-     renderer from cdnjs, so a visitor's address reaches those two by
-     the fact of loading the page. That is not tracking and it is not
-     advertising, but a privacy page still has to say it.
+     NOTHING ELSE LEAVES EITHER, since entry 247. The fonts came from
+     Google and the markdown renderer from Cloudflare's library CDN, so
+     a visitor's address reached those two by the fact of loading the
+     page, and the privacy page had to say so. The fonts are files in
+     this folder now (fonts.css and the woff2 files beside it), and the
+     written pages are rendered by server.js before they are sent, so
+     this page loads nothing from anywhere but this site. Keep it that
+     way: tools/test-site-render.js fails on any address from another
+     site in a src, a url(), a stylesheet link or a preconnect here.
 
      If anything like it comes back, it comes back with the privacy
      page and the consent gate in the same change, not after it. -->
@@ -47,10 +51,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Spectral:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap">
+<link rel="stylesheet" href="/fonts.css">
 <style>
 /*
   The public front. Nothing here is behind a password, because a server nobody
@@ -764,11 +765,20 @@ function show(html) {
     : 'Thornswood';
 }
 
-if (PAGES[here]) {
+if (PAGES[here] && document.getElementById('pagebody').children.length) {
+  /* The server sent this page with its words already in it (entry 247), so
+     there is nothing to fetch. The browser finds /world#accord on its own
+     now; this is for the reflow once the fonts land. */
+  jumpToHash();
+} else if (PAGES[here]) {
+  /* Only for a page that came without its body, which is a server.js that
+     has not been restarted since this file went up. html is the server's
+     render; one that old sends only the markdown, and the words are still
+     worth showing unformatted for the minute that lasts. */
   fetch('/api/page/' + here.slice(1))
     .then(function (r) { if (!r.ok) throw 0; return r.json(); })
     .then(function (d) {
-      show(marked.parse(d.md));
+      show(d.html || '<pre style="white-space:pre-wrap">' + esc(d.md) + '</pre>');
       /* /world#accord is linked from the footer and from the world page
          itself. The anchor it points at is inside the markdown, which is
          fetched after the browser has already given up looking for it, so the
@@ -780,7 +790,9 @@ if (PAGES[here]) {
 } else if (here === '/roadmap') {
   fetch('/api/roadmap').then(function (r) { return r.json(); }).then(function (b) {
     var out = '<h1>Roadmap</h1>';
-    if (b.intro) out += marked.parse(b.intro);
+    // Rendered by the server, like the written pages.
+    if (b.introHtml) out += b.introHtml;
+    else if (b.intro) out += '<p>' + esc(b.intro) + '</p>';
     // Finished work is not a roadmap. The Done column stays on the board in
     // the hub so the record is kept, it just does not belong on the public
     // page, where the only question anybody has is what is coming next.

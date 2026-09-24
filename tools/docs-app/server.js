@@ -310,6 +310,144 @@ const escAttr = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+// ==== thornswood page render ====
+//
+// THE WRITTEN PAGES GO OUT AS HTML. Until entry 247 the rules, the world, how
+// to join and the rest were an empty page that the browser filled in: it
+// fetched the markdown and turned it into HTML with marked, loaded from
+// cdnjs.cloudflare.com with no integrity check, in fonts from Google. So the
+// rules page was blank to anything that does not run the page's script (a
+// search engine, a link preview), it was blank whenever cdnjs could not be
+// reached, and every visitor's address went to two other companies for
+// opening it. The same marked, 12.0.2, now sits in public/ and runs here, and
+// the page leaves this server with its words already in it.
+//
+// NO HTML THROUGH, BY CONSTRUCTION. Help is edited in the hub and the rest are
+// files anybody with the box can change. Rendered in the browser, a line of
+// HTML in one of them ran on the page; rendered here it would be written into
+// the public front as served. So the renderer never recognises HTML at all: a
+// tag in the markdown is text and comes out escaped, a link or a picture only
+// goes somewhere if its address is http, https, mailto or on this site, and
+// every attribute it writes is one it built and escaped itself. That is an
+// allowlist in the renderer rather than a regex over its output afterwards,
+// and it needs no package: the site has no package.json and Deploy-Docs sends
+// files, not node_modules.
+//
+// The one piece of HTML any page used is the empty anchor world.md puts above
+// the Accord, which the footer's /world#accord points at. An empty anchor with
+// an id and nothing else is the one shape let through.
+function makePageRenderer(lib) {
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  // marked escapes a title and a picture's words while it reads them, so this
+  // leaves a finished entity alone rather than showing "&amp;quot;".
+  const escOnce = (s) => String(s == null ? '' : s)
+    .replace(/&(?!#\d{1,7};|#[Xx][0-9A-Fa-f]{1,6};|\w+;)/g, '&amp;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  // An address as it goes into href or src, or null when it is not one this
+  // site hands out. encodeURI is what marked itself does to it. After that
+  // anything before a colon, with no slash, ? or # ahead of it, is a scheme,
+  // and only three are allowed. The & is escaped on the way out, so
+  // javascript&#58; reaches the browser as those characters and not as a
+  // colon.
+  function address(href) {
+    let h;
+    try { h = encodeURI(String(href == null ? '' : href)).replace(/%25/g, '%'); }
+    catch (e) { return null; }
+    const scheme = /^([^:/?#]*):/.exec(h);
+    if (scheme && !/^(https?|mailto)$/i.test(scheme[1])) return null;
+    return esc(h);
+  }
+  const m = new lib.Marked({ gfm: true, breaks: false });
+  m.use({
+    // Undefined is "not this", so marked goes on to read it as text, which it
+    // escapes. A tag never becomes an html token and never switches marked
+    // into the raw mode that stops it escaping what follows.
+    tokenizer: {
+      html() { return undefined; },
+      tag() { return undefined; }
+    },
+    extensions: [{
+      name: 'emptyAnchor',
+      level: 'inline',
+      start(src) { const i = src.indexOf('<a id='); return i < 0 ? undefined : i; },
+      tokenizer(src) {
+        const a = /^<a id=(["'])([A-Za-z][A-Za-z0-9_-]{0,63})\1\s*><\/a>/.exec(src);
+        return a ? { type: 'emptyAnchor', raw: a[0], id: a[2] } : undefined;
+      },
+      renderer(t) { return '<a id="' + t.id + '"></a>'; }
+    }],
+    renderer: {
+      // Nothing above produces one. Escaped anyway, so a later marked that
+      // does is still safe.
+      html(text, block) { return block ? '<p>' + esc(text) + '</p>\n' : esc(text); },
+      link(href, title, text) {
+        const to = address(href);
+        if (to === null) return text;
+        return '<a href="' + to + '"' + (title ? ' title="' + escOnce(title) + '"' : '') +
+               '>' + text + '</a>';
+      },
+      image(href, title, text) {
+        const to = address(href);
+        if (to === null) return escOnce(text);
+        return '<img src="' + to + '" alt="' + escOnce(text) + '"' +
+               (title ? ' title="' + escOnce(title) + '"' : '') + '>';
+      }
+    }
+  });
+  return (md) => m.parse(String(md == null ? '' : md));
+}
+
+// home.html with a written page put into it: the page shown, the front hidden,
+// and the tab named after the page's first heading. Each marker is replaced
+// once with a function, so a $ in somebody's text is a dollar and not a
+// replacement pattern. A home.html without the markers comes back unchanged,
+// and its own script fetches the page instead.
+function fillPage(html, body) {
+  const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(body);
+  const name = h1 ? h1[1].replace(/<[^>]*>/g, '').trim() : '';
+  return html
+    .replace('<div id="landing">', () => '<div id="landing" hidden>')
+    .replace('<div class="page" id="page" hidden><div class="wrap" id="pagebody"></div></div>',
+             () => '<div class="page" id="page"><div class="wrap" id="pagebody">' + body + '</div></div>')
+    .replace('<title>Thornswood</title>',
+             () => '<title>' + (name ? name + ' · Thornswood' : 'Thornswood') + '</title>');
+}
+// ==== end thornswood page render ====
+
+/* The addresses that are a markdown page. The same list as PAGES in
+   home.html, and tools/test-site-render.js checks that the two agree. */
+const MD_PAGES = ['/world', '/rules', '/join', '/credits', '/classes',
+                  '/known', '/help', '/privacy', '/terms'];
+const MARKED = 'marked-12.0.2.min.js';
+let renderMd = null;
+try { renderMd = makePageRenderer(require(path.join(PUBLIC, MARKED))); }
+catch (e) {
+  console.error('[thornswood-docs] ' + MARKED + ' did not load, so the written ' +
+                'pages go out as plain text until it does: ' + e.message);
+}
+// Plain text rather than no page, if the library is missing or a page will
+// not render, so one bad edit to Help cannot turn /help into an error.
+function pageHtml(md) {
+  if (renderMd) {
+    try { return renderMd(md); }
+    catch (e) {
+      console.error('[thornswood-docs] a page would not render, sent as plain text: ' + e.message);
+    }
+  }
+  return '<pre style="white-space:pre-wrap">' + escAttr(md) + '</pre>';
+}
+// A written page's markdown, or null. Known Issues and Help live in the data
+// folder with the other documents (Help is edited in the hub), not under site.
+function pageMarkdown(name) {
+  const dir = PUBLIC_DOCS.indexOf(name) >= 0 ? DATA : SITE;
+  const file = path.join(dir, name + '.md');
+  if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) return null;
+  try { return fs.readFileSync(file, 'utf8'); } catch (e) { return null; }
+}
+
 const PAGES = {
   '/hub':         'home',
   '/hub/help':    'help',
@@ -1929,6 +2067,14 @@ async function handle(req, res) {
           html = html.replace(re, '$1' + escAttr(blurb[1]) + '$2');
         }
       }
+      // A written page goes out with its words in it. After the invite link
+      // above, so nothing anybody typed is mistaken for DISCORD_URL.
+      if (MD_PAGES.indexOf(route) >= 0) {
+        const md = pageMarkdown(route.slice(1));
+        html = fillPage(html, md === null
+          ? '<h1>Not here</h1><p>That page does not exist yet.</p>'
+          : pageHtml(md));
+      }
       return send(res, 200, html, TYPES['.html']);
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
   }
@@ -2069,7 +2215,11 @@ async function handle(req, res) {
 
   if (route === '/api/roadmap' && req.method === 'GET') {
     const all = readBoard();
-    return sendJson(res, 200, all.roadmap || { intro:'', sections:[] });
+    // The intro is markdown, and it is rendered here like the written pages
+    // so the front page needs no markdown library of its own.
+    const rm = all.roadmap || { intro:'', sections:[] };
+    return sendJson(res, 200, Object.assign({}, rm,
+      { introHtml: rm.intro ? pageHtml(rm.intro) : '' }));
   }
 
   if (route === '/api/releases' && req.method === 'GET') {
@@ -2093,14 +2243,11 @@ async function handle(req, res) {
 
   const pg = route.match(/^\/api\/page\/([a-z-]+)$/);
   if (pg && req.method === 'GET') {
-    // Known Issues and Help live in the data folder with the other documents
-    // (Help is edited in the hub), not under site. Same read, other folder.
-    const dir = PUBLIC_DOCS.indexOf(pg[1]) >= 0 ? DATA : SITE;
-    const file = path.join(dir, pg[1] + '.md');
-    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
-      return sendJson(res, 404, { error: 'no such page' });
-    }
-    return sendJson(res, 200, { md: fs.readFileSync(file, 'utf8') });
+    // The same page the front route renders, for a home.html that was served
+    // without it. html is the one to show; md is kept for anything reading it.
+    const md = pageMarkdown(pg[1]);
+    if (md === null) return sendJson(res, 404, { error: 'no such page' });
+    return sendJson(res, 200, { md: md, html: pageHtml(md) });
   }
 
   // Pictures chosen for the gallery are public. Everything else in uploads is
