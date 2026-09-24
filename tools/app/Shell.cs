@@ -1724,7 +1724,9 @@ namespace Thornswood
             bool all = true;
             foreach (Check c in Checks.All(cfg))
             {
-                if (!c.Ok) all = false;
+                // An advisory row that fails is drawn amber and leaves Play
+                // alone. See Check.Advisory.
+                if (c.Blocks) all = false;
                 var row = new Grid();
                 row.Margin = new Thickness(0, 0, 0, 1);
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1742,7 +1744,7 @@ namespace Thornswood
                 dot.Width = 7; dot.Height = 7;
                 dot.Margin = new Thickness(0, 0, 12, 0);
                 dot.VerticalAlignment = VerticalAlignment.Center;
-                dot.Fill = Res(c.Ok ? "Ok" : "Bad");
+                dot.Fill = Res(c.Ok ? "Ok" : c.Advisory ? "Warn" : "Bad");
                 Grid.SetColumn(dot, 0); row.Children.Add(dot);
 
                 var t1 = new TextBlock();
@@ -1753,7 +1755,7 @@ namespace Thornswood
                 var t2 = new TextBlock();
                 t2.Text = c.Detail; t2.FontSize = 11.5;
                 t2.VerticalAlignment = VerticalAlignment.Center;
-                t2.Foreground = Res(c.Ok ? "Muted" : "Bad");
+                t2.Foreground = Res(c.Ok ? "Muted" : c.Advisory ? "Warn" : "Bad");
                 Grid.SetColumn(t2, 2); row.Children.Add(t2);
 
                 back.Child = row;
