@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Windows;
@@ -722,6 +723,7 @@ namespace SkyrimTogetherSetup
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
 
             string name, url;
+            string sha = "";
             long size = 0;
             try
             {
@@ -736,6 +738,11 @@ namespace SkyrimTogetherSetup
                 string sz = Between(doc, "\"size\":", ",");
                 if (sz.Length == 0) sz = Between(doc, "\"size\":", "}");
                 long.TryParse(sz.Trim(), out size);
+                // What Publish-Installer measured on the zip it sent.
+                // A site from before this carries no such field and the string
+                // search comes back empty, which PayloadMatches reads as
+                // nothing to check.
+                sha = Between(doc, "\"sha256\":\"", "\"").Trim();
             }
             catch (Exception e)
             {
@@ -749,7 +756,18 @@ namespace SkyrimTogetherSetup
             string target = Path.Combine(intoDir, name);
             long have = 0;
             try { if (File.Exists(target)) have = new FileInfo(target).Length; } catch { }
-            if (size > 0 && have == size) { Say("Already got Thornswood's files"); return target; }
+            // The right length is not proof of the right bytes. A zip that
+            // finished under an installer from before this check was never
+            // measured, and a resume stitches whatever was already here onto
+            // what the site sends now. One that does not match is fetched again
+            // rather than trusted for its size.
+            if (size > 0 && have == size)
+            {
+                if (sha.Length > 0) Say("Checking Thornswood's files");
+                if (PayloadMatches(target, sha)) { Say("Already got Thornswood's files"); return target; }
+                try { File.Delete(target); } catch { }
+                have = 0;
+            }
             if (size > 0 && have > size) { try { File.Delete(target); } catch { } have = 0; }
 
             Say("Getting Thornswood's own files");
@@ -808,7 +826,48 @@ namespace SkyrimTogetherSetup
                 throw new Exception("The download stopped early, " + (got / 1048576) + " MB of " +
                                     (size / 1048576) + " MB. Run this again and it carries on from there.");
             Progress(-1);
+            // Length was the only test here, and Work unpacks this and starts
+            // the Setup.bat inside it. The launcher holds every pack it fetches
+            // to a SHA-256 and deletes one that does not match (Updater.cs
+            // Download); the installer, which is the first thing a stranger
+            // runs, did not. Same standard now.
+            if (sha.Length > 0) Say("Checking Thornswood's files");
+            CheckPayload(target, sha);
             return target;
+        }
+
+        /// <summary>
+        /// Whether the file is the one the site published. An empty hash
+        /// means the site did not say, which is an older site, and that
+        /// passes, so a new installer against an old site still installs.
+        /// </summary>
+        static bool PayloadMatches(string file, string sha)
+        {
+            if (string.IsNullOrEmpty(sha)) return true;
+            // Streamed, never read whole. The payload is over half a gigabyte.
+            using (var s = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20))
+            using (var h = SHA256.Create())
+            {
+                byte[] d = h.ComputeHash(s);
+                var sb = new StringBuilder();
+                foreach (byte b in d) sb.Append(b.ToString("x2"));
+                // Get-FileHash writes upper case and this writes lower, so
+                // the case is not part of the comparison.
+                return string.Equals(sb.ToString(), sha, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>
+        /// Deletes a payload that is not the published one and stops, so the
+        /// Setup.bat inside it never runs and the next run downloads it fresh
+        /// rather than carrying on from bad bytes.
+        /// </summary>
+        static void CheckPayload(string file, string sha)
+        {
+            if (PayloadMatches(file, sha)) return;
+            try { File.Delete(file); } catch { }
+            throw new Exception("What came down is not the file the site published, so it has been deleted " +
+                                "and nothing in it was run. Run this again to download it fresh.");
         }
 
         static string Between(string s, string a, string b)
