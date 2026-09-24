@@ -4,8 +4,6 @@ Work down in order. Mark PASS, FAIL or SKIP under each one, put what happened in
 
 If it fails, write what you saw in plain words. Do not work out why. Drop any file the test names into the Drive folder.
 
-Build 1.0.193 and up. The version is at the bottom of the launcher.
-
 Logs, all wiped at every game start so copy them before launching again:
 
 ```
@@ -29,7 +27,8 @@ everybody else's, and every fault you see after that is a guess.
 
 If Scan says everything checks out and the game still shows the error, that is
 worth reporting on its own. Send `thornswood-loadorder.txt` from the list at
-the top of this page with the report, and say which build you are on.
+the top of this page with the report, and say which build you are on. It is at
+the bottom of the launcher, under Settings.
 
 A report filed from a session showing that message costs an evening to chase
 and cannot be trusted. On 17 September a mining fault was reported from one,
