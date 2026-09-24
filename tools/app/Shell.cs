@@ -99,6 +99,7 @@ namespace Thornswood
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
         static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
+        static StackPanel chatFadeRow; static TextBlock txtChatFadeNote; static CheckBox chkNeedsBars;
         static CheckBox chkKeepSaves;
         static CheckBox chkDeleteMods;
         static Button btnVoiceTest;
@@ -250,6 +251,7 @@ namespace Thornswood
             Wire();
             BuildThemeRow();
             BuildDisplay();
+            BuildChat();
             BuildStatRow();
             BuildPathRows();
             BuildHelp();
@@ -526,6 +528,8 @@ namespace Thornswood
             displayModeRow = F<StackPanel>("DisplayModeRow");
             boxResolution = F<TextBox>("BoxResolution"); boxFrameLimit = F<TextBox>("BoxFrameLimit");
             boxFov = F<TextBox>("BoxFov");
+            chatFadeRow = F<StackPanel>("ChatFadeRow"); txtChatFadeNote = F<TextBlock>("TxtChatFadeNote");
+            chkNeedsBars = F<CheckBox>("ChkNeedsBars");
             chkVSync = F<CheckBox>("ChkVSync"); chkKeepOpen = F<CheckBox>("ChkKeepOpen");
             btnBackupSaves = F<Button>("BtnBackupSaves"); btnOpenSaveFolder = F<Button>("BtnOpenSaveFolder");
             btnCopyCrash = F<Button>("BtnCopyCrash"); btnOpenLogFolder = F<Button>("BtnOpenLogFolder");
@@ -1277,6 +1281,19 @@ namespace Thornswood
                 Log(cfg.LockResolution
                     ? "Resolution locked. Play will leave it exactly as you set it."
                     : "Resolution unlocked. Play will match it to your screen.");
+            };
+            chkNeedsBars.Click += delegate
+            {
+                bool shown = chkNeedsBars.IsChecked == true;
+                if (!NeedsBars.Set(shown))
+                {
+                    Log("Could not save the needs bars setting to Thornswood.ini.");
+                    BuildChat();
+                    return;
+                }
+                Log(shown
+                    ? "The needs bars are shown. It applies next time the game starts."
+                    : "The needs bars are hidden. Type /needs in chat to see them. It applies next time the game starts.");
             };
 
             tabPlugins.Click += delegate { modTab = 0; BuildModList(); };
@@ -2727,7 +2744,7 @@ namespace Thornswood
         static void Redraw()
         {
             BuildThemeRow(); BuildModList(); DrawStatus(); BuildPathRows(); BuildHelp();
-            BuildStatRow(); BuildNews(); BuildLogs(); BuildDisplay();
+            BuildStatRow(); BuildNews(); BuildLogs(); BuildDisplay(); BuildChat();
             BuildServer(); BuildInstalled(); BuildControls(); BuildDiag(); RefreshDiscord();
             boxSearch.Foreground = Res(boxSearch.Text == SearchHint ? "Faint" : "Ink");
         }
@@ -3296,6 +3313,44 @@ namespace Thornswood
             boxFrameLimit.Text = Display.GetInt("FramerateLimit", 0).ToString();
             chkVSync.IsChecked = Display.GetBool("EnableVSync", true);
             chkLockRes.IsChecked = cfg.LockResolution;
+        }
+
+        /// <summary>
+        /// How long the chat stays up after a line, and whether the needs bars
+        /// are drawn. Both live in Thornswood.ini beside the field of view and
+        /// are read by the game plugin when the game starts. See ChatFade and
+        /// NeedsBars in Display.cs.
+        /// </summary>
+        static void BuildChat()
+        {
+            chatFadeRow.Children.Clear();
+            int current = ChatFade.Get();
+            foreach (int seconds in ChatFade.Choices)
+            {
+                int captured = seconds;
+                var b = new Button();
+                b.Content = seconds == 0 ? "Never" : seconds + " s";
+                b.Style = (Style)win.Resources["Ghost"];
+                b.Margin = new Thickness(0, 0, 8, 0);
+                if (seconds == current) b.Background = Res("CardHover");
+                b.Click += delegate
+                {
+                    if (!ChatFade.Set(captured))
+                    {
+                        Log("Could not save the chat setting to Thornswood.ini.");
+                        return;
+                    }
+                    BuildChat();
+                    Log(captured == 0
+                        ? "The chat stays on screen all the time. It applies next time the game starts."
+                        : "The chat hides " + captured + " seconds after its last line and comes back with a new line or Enter. It applies next time the game starts.");
+                };
+                chatFadeRow.Children.Add(b);
+            }
+            txtChatFadeNote.Text = current == 0
+                ? "Never: the chat stays on screen all the time, as it used to."
+                : "The chat hides " + current + " seconds after its last line, whoever sent it. A new line brings it back, and so does Enter.";
+            chkNeedsBars.IsChecked = NeedsBars.Shown();
         }
 
         static void SaveDisplay()
