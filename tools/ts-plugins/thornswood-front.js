@@ -2170,7 +2170,7 @@
 
         node tools\Build-FireTable.js
 
-    and tools\test-fires.js fails if this list and that file have drifted
+    and tools\test-temp.js fails if this list and that file have drifted
     apart, which is the only thing keeping a hand edit here honest.
   */
   const FIRE_BASES = [
