@@ -529,6 +529,108 @@ foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRS
     if (Test-Path $s) { Copy-Item $s $stage -Force } else { Say "  $f missing next to this script" 'Yellow' }
 }
 
+# ---- where the source is ---------------------------------------------------
+#
+# The six files in client-build.json are SkyMP, built from the fork, and so is
+# the server's engine. SkyMP's folders carry the GNU GPL and AGPL version 3,
+# each in its own LICENSE file, and this installer hands six of those files to
+# people. Entry 170 on the To Do List asked for the source to be reachable
+# "from the download page and from inside the installed folder", and nothing
+# in the installer said where it was.
+#
+# So the installer carries SOURCE CODE.txt, written here from the two build
+# records rather than typed, so it names the commit this payload was built
+# from and no other. Setup-Thornswood.ps1 copies it into the install folder,
+# because the folder the setup program unpacks into is scratch. The same facts
+# are on thornswood.net/credits, and tools\test-source-offer.ps1 fails when
+# the page, this note and the records disagree.
+#
+# Measured 24 September: git ls-remote against the public fork, with no
+# credentials, answers c8832519866e for thornswood/engine-changes, the commit
+# both records name. Which folder builds which file was read off the fork's own
+# build files at that commit, and each licence off that folder's LICENSE.
+function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord) {
+    # A file the record gains that is not here stops the package, because a
+    # person has to look at where it comes from before a notice names it.
+    $from = @{
+        'skymp5-client.js'             = @('skymp5-client',   'GNU GPL version 3')
+        'SkyrimPlatform.dll'           = @('skyrim-platform', 'GNU GPL version 3')
+        'SkyrimPlatformImpl.dll'       = @('skyrim-platform', 'GNU GPL version 3')
+        'SkyrimPlatformCEF.exe.hidden' = @('skyrim-platform', 'GNU GPL version 3')
+        'TESModPlatform.pex'           = @('skyrim-platform', 'GNU GPL version 3')
+        'MpClientPlugin.dll'           = @('skymp5-server',   'GNU AGPL version 3')
+        'scam_native.node'             = @('skymp5-server',   'GNU AGPL version 3')
+    }
+    foreach ($p in @($ClientRecord, $ServerRecord)) {
+        if (-not (Test-Path -LiteralPath $p)) { throw "$p is missing" }
+    }
+    $c = (Get-Content -LiteralPath $ClientRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $s = (Get-Content -LiteralPath $ServerRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $fork  = ([string]$c.fork).TrimEnd('/')
+    $sRepo = ([string]$s.source.repo) -replace '\.git$', ''
+    if (-not $fork -or -not $c.forkCommit) { throw 'client-build.json names no fork or no commit' }
+    if (-not $sRepo -or -not $s.source.commit -or -not $s.binary) { throw 'server-build.json names no repository, commit or binary' }
+    $upstream = 'https://github.com/skyrim-multiplayer/skymp'
+    if ($s.source.upstream) { $upstream = ([string]$s.source.upstream) -replace '\.git$', '' }
+
+    $table = @()
+    foreach ($rel in @($c.files.PSObject.Properties.Name)) {
+        $leaf = $rel.Substring($rel.LastIndexOf('\') + 1)
+        if (-not $from.ContainsKey($leaf)) { throw "client-build.json lists $leaf, which has no known source folder" }
+        $table += ('  {0,-34}{1,-18}{2}' -f $leaf, $from[$leaf][0], $from[$leaf][1])
+    }
+    $bin = [string]$s.binary
+    if (-not $from.ContainsKey($bin)) { throw "server-build.json names $bin, which has no known source folder" }
+    $table += ('  {0,-34}{1,-18}{2}' -f ($bin + ' (the server)'), $from[$bin][0], $from[$bin][1])
+
+    function Base([string]$b) {
+        if ($b -match '^[0-9a-f]{7,40}$') { return ('SkyMP commit ' + $b) }
+        return 'SkyMP, at a commit the build record does not name'
+    }
+
+    $lines = @(
+        'THORNSWOOD: WHERE THE SOURCE CODE IS',
+        '====================================',
+        '',
+        'SkyMP is free software, and Thornswood ships part of it. This installer put',
+        'the SkyMP files listed below into your Skyrim folder, and the server you',
+        'connect to runs on SkyMP as well. All of it is built from Thornswood''s',
+        'public copy of SkyMP, with Thornswood''s changes on top. Anybody can read it',
+        'or download it, with no account.',
+        '',
+        'The files this installer carried',
+        ('  commit    ' + $c.forkCommit + ', branch ' + $c.forkBranch),
+        ('  source    ' + $fork + '/tree/' + $c.forkCommit),
+        ('  based on  ' + (Base ([string]$c.upstreamBase))),
+        '',
+        ('The server''s engine, ' + $bin),
+        ('  commit    ' + $s.source.commit + ', branch ' + $s.source.branch),
+        ('  source    ' + $sRepo + '/tree/' + $s.source.commit),
+        ('  based on  ' + (Base ([string]$s.source.upstreamBase))),
+        '',
+        ('SkyMP itself is ' + $upstream),
+        '',
+        'Each file, the folder of SkyMP it is built from, and the licence in that',
+        'folder''s LICENSE file:',
+        ''
+    ) + $table + @(
+        '',
+        'The launcher''s updates can bring newer builds of these files, so this note',
+        'names the build this installer brought. https://thornswood.net/credits',
+        'names the build in the current release.',
+        ''
+    )
+    return ($lines -join "`r`n")
+}
+$srcNote = Join-Path $stage 'SOURCE CODE.txt'
+try {
+    $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot 'server-build.json')
+    [IO.File]::WriteAllText($srcNote, $noteText, (New-Object Text.UTF8Encoding($false)))
+    Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
+} catch {
+    Die ("SOURCE CODE.txt could not be written: " + $_.Exception.Message + ". This installer carries SkyMP's GPL and AGPL files and has to say where their source is.")
+}
+
 $cfgSrc = Join-Path $Root 'config.json'
 if (Test-Path $cfgSrc) { Copy-Item $cfgSrc $stage -Force }
 
