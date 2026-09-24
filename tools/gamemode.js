@@ -2100,6 +2100,38 @@ function wearScript() {
 }
 
 /*
+  PUT BACK ON WHATEVER THE SERVER BELIEVES IS WORN.
+
+  Dressing at creation is not enough, and that is its own entry on the list:
+  "You come back undressed from a session you left dressed". The server's
+  inventory keeps the worn flags across a session; the client rebuilds
+  itself from the equipment record, and anything that empties or misses that
+  record leaves somebody standing in their skin with a full pack.
+
+  So on arrival, every worn thing in the server's own inventory is sent back
+  as an ask. Somebody already wearing them is asked to equip what they are
+  already wearing, which the engine does nothing with, so the cost of being
+  wrong here is nothing at all.
+
+  ONLY WHAT THE SERVER ALREADY HAS. Nothing is granted and nothing is
+  invented: an item the server has no record of cannot be worn by this, the
+  same way it cannot be counted for warmth.
+*/
+function wearWhatIsWorn(actorId) {
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
+  const entries = (inv && inv.entries) || [];
+  const ids = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (e && e.worn && e.baseId) { ids.push(e.baseId); }
+  }
+  if (!ids.length) { return 0; }
+  wearThese(actorId, ids);
+  return ids.length;
+}
+
+/*
   Ask somebody to put something on, and take the ask back afterwards.
 
   Cleared for the same reason the swing is: a property left on a character is
@@ -3939,6 +3971,21 @@ function chargenTick() {
         if (c && c.grantKnown) { c.grantKnown(actorId); }
       } catch (e) {
         log('login', actorId.toString(16), 'could not put the known spells back:', e);
+      }
+
+      /*
+        AND PUT THEIR CLOTHES BACK ON. See wearWhatIsWorn: the pack survives
+        a session and the equipment record does not always, which is how
+        somebody comes back from an evening fully packed and undressed.
+        Said in the log with a count, because "nobody is wearing anything"
+        and "the server thinks nobody is wearing anything" are different
+        faults and this is the line that tells them apart.
+      */
+      try {
+        const put = wearWhatIsWorn(actorId);
+        log('login', actorId.toString(16), 'asked to put back on', put, 'worn thing(s)');
+      } catch (e) {
+        log('login', actorId.toString(16), 'could not ask for the clothes back:', e);
       }
     }
     if (now - firstSeen.get(actorId) < SETTLE_MS) {
