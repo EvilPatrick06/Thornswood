@@ -166,77 +166,6 @@ Head 'Packaging'
 # hashing them, which is how a package ends up half one version.
 $null = Stop-Game -Root $Root
 
-# ---- what never ships: Bethesda's own files ------------------------------
-$vanillaDataFiles = @(
-    'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm',
-    '_ResourcePack.esl', '_ResourcePack.bsa'
-)
-$vanillaDataPatterns = @('Skyrim - *.bsa', 'cc*.esm', 'cc*.esl', 'cc*.esp', 'cc*.bsa')
-$vanillaDataDirs     = @('Video', 'Strings')
-
-# ---- what never ships: other people's frameworks and modding tools --------
-#
-# Vortex's manifest answers "did Vortex put this here", which is not the same
-# question as "does Thornswood need this". These folders answered no to the
-# first and were shipped to everybody as though they were ours.
-#
-# NirnLabUIPlatform is another roleplay server's user interface framework and
-# on its own it is 356 MB. Nemesis, FNIS, BodySlide and xEdit are tools that
-# belong on the machine of somebody who builds mods, not in a folder handed to
-# somebody who plays. Source is Papyrus script sources, which the game never
-# reads. The rest is documentation, installer leftovers and a shader cache
-# that rebuilds itself on first launch.
-#
-# All of them stay where they are on this machine. This only decides what goes
-# into the installer.
-$foreignDataDirs = @(
-    'NirnLabUIPlatform',
-    'Nemesis_Engine', 'FNIS Behavior SE 7.6', 'CalienteTools', 'tools',
-    'Source', 'ModderResource', 'FOMod',
-    'Docs', 'Docs and Screenshots', 'readmes',
-    'ShaderCache'
-)
-
-$vanillaRootFiles = @(
-    'SkyrimSE.exe', 'SkyrimSELauncher.exe', 'steam_api64.dll', 'bink2w64.dll',
-    'Skyrim.ccc', 'installscript.vdf', 'Skyrim_Default.ini',
-    'High.ini', 'Low.ini', 'Medium.ini', 'Ultra.ini',
-
-    # Only ever seen when this is building out of the Steam copy rather than
-    # out of a game folder we built ourselves.
-    #
-    # The script extender is not ours to hand out and it is in the collection
-    # now, so shipping it again would be redistributing somebody's mod and
-    # doing it twice. VERSION and steam_appid.txt belong to Steam and the
-    # downgrader. imgui.ini and the d3dx9 log are written at runtime by
-    # whatever was last run against this install.
-    'skse64_loader.exe', 'skse64_1_6_1170.dll',
-    'skse64_readme.txt', 'skse64_whatsnew.txt',
-    'VERSION', 'steam_appid.txt', 'imgui.ini', 'd3dx9_42.log'
-)
-$vanillaRootDirs = @(
-    '_DowngraderBackups', 'Creations', 'Mods', 'Skyrim', 'src',
-
-    # Bethesda's launcher keeps its own folder. Not ours, not in an installer.
-    'BStarData'
-)
-
-function Test-Vanilla([string]$rel) {
-    $parts = $rel -split '\\'
-    $top   = $parts[0]
-    if ($vanillaRootDirs -contains $top) { return $true }
-    if ($parts.Count -eq 1) { return ($vanillaRootFiles -contains $top) }
-    if ($top -ne 'Data') { return $false }
-    if ($parts.Count -ge 3 -and ($vanillaDataDirs -contains $parts[1])) { return $true }
-    if ($parts.Count -ge 2 -and ($foreignDataDirs -contains $parts[1])) { return $true }
-    if ($parts.Count -eq 2) {
-        $leaf = $parts[1]
-        if ($vanillaDataFiles -contains $leaf) { return $true }
-        foreach ($p in $vanillaDataPatterns) { if ($leaf -like $p) { return $true } }
-    }
-    return $false
-}
-
 # ---- stage ----------------------------------------------------------------
 # The multiplayer client's menu is a Chromium window, and it keeps a browser
 # profile beside itself: caches, cookie databases, shader blobs, its own logs.
@@ -250,6 +179,11 @@ function Test-Vanilla([string]$rel) {
 # installer built on 16 Sep did carry.
 . (Join-Path $Here 'Ship-Rules.ps1')
 $runtimeDirs = $ShipRuntimeDirs
+# Bethesda's own files, and other people's frameworks and modding tools. The
+# lists were here, and a shorter copy of them in Publish-Update.ps1, until
+# 24 September, when packs were found carrying 90 files this left out. They
+# are one list in Ship-Rules.ps1 now.
+function Test-Vanilla([string]$rel) { return ((Test-ShipVanilla $rel) -or (Test-ShipForeignFramework $rel)) }
 function Test-Runtime([string]$rel) { return (Test-ShipRuntime $rel) }
 
 # ---- what ships separately: the optional packs ----------------------------
@@ -308,7 +242,7 @@ if ($optionalPrefixes.Count) {
 # ends.
 #
 # This is a KEEP list, not a leave-out list: whatever the Vortex record or the
-# vanilla patterns below decide, a path in the record ships.
+# vanilla patterns in Ship-Rules.ps1 decide, a path in the record ships.
 $clientRecordPath = Join-Path $PSScriptRoot 'client-build.json'
 $shipClientFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
 try {
@@ -575,6 +509,157 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRST.txt') {
     $s = Join-Path $here $f
     if (Test-Path $s) { Copy-Item $s $stage -Force } else { Say "  $f missing next to this script" 'Yellow' }
+}
+
+# ---- where the source is ---------------------------------------------------
+#
+# The six files in client-build.json are SkyMP, built from the fork, and so is
+# the server's engine. SkyMP's folders carry the GNU GPL and AGPL version 3,
+# each in its own LICENSE file, and this installer hands those files to
+# people. Entry 170 on the To Do List asked for the source to be reachable
+# "from the download page and from inside the installed folder", and nothing
+# in the installer said where it was.
+#
+# So the installer carries SOURCE CODE.txt, written here from the two build
+# records rather than typed, so it names the commit this payload was built
+# from and no other. Setup-Thornswood.ps1 copies it into the install folder,
+# because the folder the setup program unpacks into is scratch. The same facts
+# are on thornswood.net/credits, and tools\test-source-offer.ps1 fails when
+# the page, this note and the records disagree.
+#
+# Measured 24 September: git ls-remote against the public fork, with no
+# credentials, answers c8832519866e for thornswood/engine-changes, the commit
+# both records name. Which folder builds which file was read off the fork's own
+# build files at that commit, and each licence off that folder's LICENSE.
+#
+# The six are not all the SkyMP the installer carries. The 23 September stage
+# also had Data\Platform\UI\build.js (a webpack build of skymp5-front, GPL v3,
+# dated 13 September, before the fork existed), Data\Platform\Modules\
+# skyrimPlatform.ts (skyrim-platform's declarations, an older copy than the
+# fork builds) and Data\Scripts\MpClientPlugin.pex (byte for byte the fork's
+# client-deps copy, a folder with no LICENSE). Nobody built those here or
+# recorded which SkyMP they came from. The first version of this note said
+# "All of it is built from" the fork, which was false for build.js, so the
+# note now lists whichever of them the payload holds as their own group, with
+# the gap said and upstream named, rather than claiming a commit for them.
+function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]$PayloadDir) {
+    # A file the record gains that is not here stops the package, because a
+    # person has to look at where it comes from before a notice names it.
+    $from = @{
+        'skymp5-client.js'             = @('skymp5-client',   'GNU GPL version 3')
+        'SkyrimPlatform.dll'           = @('skyrim-platform', 'GNU GPL version 3')
+        'SkyrimPlatformImpl.dll'       = @('skyrim-platform', 'GNU GPL version 3')
+        'SkyrimPlatformCEF.exe.hidden' = @('skyrim-platform', 'GNU GPL version 3')
+        'TESModPlatform.pex'           = @('skyrim-platform', 'GNU GPL version 3')
+        'MpClientPlugin.dll'           = @('skymp5-server',   'GNU AGPL version 3')
+        'scam_native.node'             = @('skymp5-server',   'GNU AGPL version 3')
+    }
+    foreach ($p in @($ClientRecord, $ServerRecord)) {
+        if (-not (Test-Path -LiteralPath $p)) { throw "$p is missing" }
+    }
+    $c = (Get-Content -LiteralPath $ClientRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $s = (Get-Content -LiteralPath $ServerRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $fork  = ([string]$c.fork).TrimEnd('/')
+    $sRepo = ([string]$s.source.repo) -replace '\.git$', ''
+    if (-not $fork -or -not $c.forkCommit) { throw 'client-build.json names no fork or no commit' }
+    if (-not $sRepo -or -not $s.source.commit -or -not $s.binary) { throw 'server-build.json names no repository, commit or binary' }
+    $upstream = 'https://github.com/skyrim-multiplayer/skymp'
+    if ($s.source.upstream) { $upstream = ([string]$s.source.upstream) -replace '\.git$', '' }
+
+    $table = @()
+    foreach ($rel in @($c.files.PSObject.Properties.Name)) {
+        $leaf = $rel.Substring($rel.LastIndexOf('\') + 1)
+        if (-not $from.ContainsKey($leaf)) { throw "client-build.json lists $leaf, which has no known source folder" }
+        $table += ('  {0,-34}{1,-18}{2}' -f $leaf, $from[$leaf][0], $from[$leaf][1])
+    }
+    $bin = [string]$s.binary
+    if (-not $from.ContainsKey($bin)) { throw "server-build.json names $bin, which has no known source folder" }
+    $table += ('  {0,-34}{1,-18}{2}' -f ($bin + ' (the server)'), $from[$bin][0], $from[$bin][1])
+
+    # SkyMP files the payload carries that Thornswood did not build. Only the
+    # ones actually in the payload are named, and one the client record takes
+    # over later (built from the fork and recorded) moves to the table above
+    # by leaving this list.
+    $notBuilt = @(
+        @{ Path = 'Data\Platform\UI\build.js'; Folder = 'skymp5-front'; Licence = 'GNU GPL version 3'
+           Says = @('build.js is SkyMP''s in-game interface. It loads fonts, pictures and',
+                    'sounds that sit beside it in Data\Platform\UI.') },
+        @{ Path = 'Data\Platform\Modules\skyrimPlatform.ts'; Folder = 'skyrim-platform'; Licence = 'GNU GPL version 3'
+           Says = @('skyrimPlatform.ts is Skyrim Platform''s type declarations.') },
+        @{ Path = 'Data\Scripts\MpClientPlugin.pex'; Folder = 'client-deps'; Licence = 'no LICENSE file in that folder'
+           Says = @('MpClientPlugin.pex is a compiled Papyrus script from SkyMP''s client-deps',
+                    'folder, which keeps no source for it.') }
+    )
+    $recorded = @($c.files.PSObject.Properties.Name)
+    $extra = @()
+    $says = @()
+    if ($PayloadDir) {
+        foreach ($nb in $notBuilt) {
+            if ($recorded -contains $nb.Path) { continue }
+            if (-not (Test-Path -LiteralPath (Join-Path $PayloadDir $nb.Path))) { continue }
+            $leaf = $nb.Path.Substring($nb.Path.LastIndexOf('\') + 1)
+            $extra += ('  {0,-34}{1,-18}{2}' -f $leaf, $nb.Folder, $nb.Licence)
+            $says += $nb.Says
+        }
+    }
+
+    function Base([string]$b) {
+        if ($b -match '^[0-9a-f]{7,40}$') { return ('SkyMP commit ' + $b) }
+        return 'SkyMP, at a commit the build record does not name'
+    }
+
+    $lines = @(
+        'THORNSWOOD: WHERE THE SOURCE CODE IS',
+        '====================================',
+        '',
+        'SkyMP is free software, and Thornswood ships part of it. This installer put',
+        'SkyMP files into your Skyrim folder, and the server you connect to runs on',
+        'SkyMP as well. The files in the first list below, and the server''s engine,',
+        'are built from Thornswood''s public copy of SkyMP, with Thornswood''s changes',
+        'on top. Anybody can read it or download it, with no account.',
+        '',
+        'The files Thornswood built',
+        ('  commit    ' + $c.forkCommit + ', branch ' + $c.forkBranch),
+        ('  source    ' + $fork + '/tree/' + $c.forkCommit),
+        ('  based on  ' + (Base ([string]$c.upstreamBase))),
+        '',
+        ('The server''s engine, ' + $bin),
+        ('  commit    ' + $s.source.commit + ', branch ' + $s.source.branch),
+        ('  source    ' + $sRepo + '/tree/' + $s.source.commit),
+        ('  based on  ' + (Base ([string]$s.source.upstreamBase))),
+        '',
+        ('SkyMP itself is ' + $upstream),
+        '',
+        'Each file Thornswood built, the folder of SkyMP it is built from, and the',
+        'licence in that folder''s LICENSE file:',
+        ''
+    ) + $table
+    if ($extra.Count) {
+        $lines += @(
+            '',
+            'SkyMP files this installer also carried that Thornswood did not build.',
+            'Nobody recorded which version of SkyMP they came from, so no commit is',
+            'named for them here. Their source is SkyMP''s own, at the address above.',
+            'Each file, the folder of SkyMP it belongs to, and that folder''s licence:',
+            ''
+        ) + $extra + @('') + $says
+    }
+    $lines += @(
+        '',
+        'The launcher''s updates can bring newer builds of these files, so this note',
+        'names the build this installer brought. https://thornswood.net/credits',
+        'names the build in the current release.',
+        ''
+    )
+    return ($lines -join "`r`n")
+}
+$srcNote = Join-Path $stage 'SOURCE CODE.txt'
+try {
+    $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot 'server-build.json') $payloadDir
+    [IO.File]::WriteAllText($srcNote, $noteText, (New-Object Text.UTF8Encoding($false)))
+    Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
+} catch {
+    Die ("SOURCE CODE.txt could not be written: " + $_.Exception.Message + ". This installer carries SkyMP's GPL and AGPL files and has to say where their source is.")
 }
 
 $cfgSrc = Join-Path $Root 'config.json'

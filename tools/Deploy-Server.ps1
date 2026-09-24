@@ -148,6 +148,22 @@ foreach ($f in $files) {
   '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
 }
 
+# The build stamp Deploy-Gamemode.ps1 left beside gamemode.js goes up with it,
+# so the box can say which gamemode it runs. It is made again here when it does
+# not describe the gamemode about to be sent, which is what happens when the
+# copy above took the one in tools, because a stamp naming a different
+# gamemode is worse than none. From tools when that is the same file, so git
+# can say whether the commit holds it. See BuildStamp.ps1.
+. (Join-Path $Here 'BuildStamp.ps1')
+$stampPath = Join-Path $Dist 'thornswood-build.json'
+if (-not (Test-ThornswoodBuildStamp -Path $stampPath -Gamemode $built)) {
+  $stampFrom = $built
+  if ((Test-Path -LiteralPath $src) -and
+      (Get-FileHash -LiteralPath $src).Hash -eq (Get-FileHash -LiteralPath $built).Hash) { $stampFrom = $src }
+  $null = Save-ThornswoodBuildStamp -Gamemode $stampFrom -Channel main -RepoDir (Split-Path -Parent $Here) -Path $stampPath
+}
+'{0,-22} {1}' -f 'thornswood-build.json', (Format-ThornswoodBuildStamp (Get-Content -LiteralPath $stampPath -Raw | ConvertFrom-Json)) | Write-Host
+
 # ---------------------------------------------------------- which build is this
 #
 # The binaries have always been copied rather than rebuilt here, and until
@@ -405,6 +421,11 @@ if (Test-Path -LiteralPath $recordPath) {
   if ($LASTEXITCODE -ne 0) { throw 'scp failed for server-build.json' }
   Write-Host '  server-build.json'
 }
+# A warning and not a stop: the server is stopped here and nothing reads this
+# file yet, so it is not worth leaving the server down for.
+& scp @ssh $stampPath "$User@${Vps}:$Root/thornswood-build.json"
+if ($LASTEXITCODE -ne 0) { Write-Host '  thornswood-build.json did not go up, carrying on' -ForegroundColor Yellow }
+else { Write-Host '  thornswood-build.json' }
 
 Write-Host ''
 Write-Host 'Starting...'
