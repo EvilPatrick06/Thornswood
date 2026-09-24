@@ -56,7 +56,6 @@ namespace Thornswood
             "Data\\Platform\\UI\\thornswood-emotes.js",
             "Data\\Platform\\UI\\thornswood-voice.js",
             "Data\\Platform\\Plugins\\skymp5-client.js",
-            "Data\\Platform\\Plugins\\thornswood-chargen.js",
             "Data\\Platform\\Plugins\\thornswood-emotes.js",
             "Data\\Platform\\Plugins\\thornswood-front.js",
             "Data\\Platform\\Plugins\\thornswood-mark.js",

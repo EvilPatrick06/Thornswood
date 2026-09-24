@@ -102,14 +102,13 @@ $steps = @(
         Why = 'the multiplayer layer itself'
     },
     @{
-        Key = 'emotes'; Name = 'Emote wheel and creation menus'
+        Key = 'emotes'; Name = 'Emote wheel'
         Script = 'Install-Emotes.ps1'
         Args = @{}
         Wants = @('Platform\Plugins\thornswood-emotes.js',
-                  'Platform\Plugins\thornswood-chargen.js',
                   'Platform\UI\thornswood-emotes.html',
                   'SKSE\Plugins\Thornswood.ini')
-        Why = 'the wheel, and the trade and town questions during creation'
+        Why = 'the wheel'
     },
     @{
         Key = 'body'; Name = 'Male body fix'
