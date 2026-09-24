@@ -213,6 +213,11 @@ function Test-ShipOtherServer([string]$rel) {
     $leaf = Split-Path $rel -Leaf
     if ($rel.StartsWith('Data\Platform\PluginsNoLoad\', 'OrdinalIgnoreCase')) { return $true }
     if ($leaf -like '*.bak') { return $true }
+    # The retired dresser, To Do List entry 127. It is deleted from the repo
+    # and never ships again, and it is on $ShipDeleteAlways below so every
+    # pack takes it off the machines that have it. OwnGame.Foreign carries the
+    # same rule; change the two together.
+    if ($rel -ieq 'Data\Platform\Plugins\thornswood-chargen.js') { return $true }
     # In Plugins only our overlays belong. The bundle is ours by record above.
     if ($rel -like 'Data\Platform\Plugins\*.js') {
         if ($leaf -like 'thornswood-*.js') { return $false }
@@ -595,7 +600,24 @@ $ShipDeleteAlways = @(
     # pack: a launcher that took the old one would fail its checksum and stop.
     # Breaking the feed to remove an expired token is a worse trade than
     # leaving nine dead tokens in nine old zips.
-    'Data\Platform\voice-token.txt'
+    'Data\Platform\voice-token.txt',
+
+    # THE RETIRED DRESSER, To Do List entry 127. It put the best armour it
+    # could find into every empty slot, which is Patrick's "it is auto
+    # equipping things sometimes, like a hat", and it is deleted from the repo.
+    #
+    # Test-ShipOtherServer above calls it not ours, which keeps it out of
+    # packs and the installer and, on its own, out of the removal diff as well.
+    # So it goes here, the way map.swf did, and every pack deletes it whether
+    # or not this machine's baseline still carries it.
+    #
+    # The launcher's own folder is why that is not enough by itself. A Steam
+    # copy that took packs before its machine had a folder of its own still
+    # has the old dresser (11,654 bytes, 16 Sep, on Patrick's machine), and a
+    # refresh copies whatever the Steam copy has and the folder lacks straight
+    # back in. OwnGame.Foreign refuses it, which is what makes the deletion
+    # stick. The name is never used again, so nothing legitimate is lost.
+    'Data\Platform\Plugins\thornswood-chargen.js'
 )
 
 function Get-ShipDeleteAlways { return $ShipDeleteAlways }

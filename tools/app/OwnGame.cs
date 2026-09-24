@@ -421,8 +421,11 @@ namespace Thornswood
         ///    UnwantedCreation.
         /// 3: Data\SkyrimTogetherReborn is another server's and is left out,
         ///    all of it rather than the two subfolders Ship-Rules named.
+        /// 4: the retired dresser, thornswood-chargen.js, is left out, so a
+        ///    refresh cannot copy the Steam copy's old one back in after a
+        ///    pack deletes it. See Foreign.
         /// </summary>
-        const int Rules = 3;
+        const int Rules = 4;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -986,6 +989,19 @@ namespace Thornswood
 
             if (!rel.StartsWith("Data\\Platform\\", StringComparison.OrdinalIgnoreCase)) return false;
             if (leaf.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)) return true;
+            // The retired dresser, To Do List entry 127: it put the best armour
+            // it could find into every empty slot, which is Patrick's "it is
+            // auto equipping things sometimes, like a hat", and it is deleted
+            // from the repo. A Steam copy that took packs before its machine had
+            // a folder of its own still has the old one; on Patrick's machine on
+            // 24 Sep that is 11,654 bytes dated 16 Sep, with its equipItem call.
+            // Packs delete it here and Keep.Forget drops the kept copy, and
+            // without this line the next refresh finds the name missing, copies
+            // that file back in with its 16 Sep time, and Keep.Seed takes it for
+            // a kept copy because the old pack records list it. Ship-Rules.ps1
+            // carries the same rule and puts the path on $ShipDeleteAlways;
+            // change them together.
+            if (rel.Equals("Data\\Platform\\Plugins\\thornswood-chargen.js", StringComparison.OrdinalIgnoreCase)) return true;
             // The bundle is on ClientFiles and answered above in WhyLeft, so
             // here it is simply not ours to take from the Steam copy either.
             if (Regex.IsMatch(rel, @"^Data\\Platform\\Plugins\\[^\\]+\.js$", I))

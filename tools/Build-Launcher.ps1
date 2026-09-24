@@ -14,11 +14,25 @@
 
   Ship.ps1 passes -Root itself, so a real release still builds where it should.
   Pass -Root 'C:\Thornswood' if you genuinely mean the one you play on.
+
+  IT BUILDS AND DOES NOTHING ELSE. It writes Thornswood.exe into -OutDir, which
+  is <Root>\Launcher unless told otherwise, and the setup stub beside this
+  script. It closes no game and no launcher, and it does not touch the Desktop,
+  the icon cache or Explorer. Those are Install-Launcher.ps1, which Ship.ps1
+  runs after a build that worked. Until 24 September this script did both, so
+  every compile check and every hand build closed whatever Skyrim was running
+  on the machine, matched by name whichever folder it ran from, before csc had
+  even started. That was To Do List entry 243: "A build produces files in an
+  output folder and does not kill processes or write to the Desktop."
 #>
 [CmdletBinding()]
 param(
     [string]$Src,
     [string]$Root = 'C:\Thornswood-DevBuild',
+    # Where Thornswood.exe goes. Ship builds into a folder of its own and lets
+    # Install-Launcher put the exe in place, so csc never meets a launcher that
+    # is still running from the install.
+    [string]$OutDir,
     [switch]$NoPause
 )
 
@@ -30,14 +44,14 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Src)  { $Src  = Join-Path $Here 'app' }
-. (Join-Path $Here 'Close-Launcher.ps1')
+if (-not $OutDir) { $OutDir = Join-Path $Root 'Launcher' }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 Head 'Thornswood - launcher build'
-Say ("  building into $Root") 'DarkGray'
+Say ("  building into $OutDir") 'DarkGray'
 if ($Root.TrimEnd('\\') -ieq 'C:\Thornswood') {
     Say '  this is the install you play on, not the dev one' 'Yellow'
 }
@@ -162,7 +176,6 @@ $headerVideo = Join-Path $Here 'launcher-header.mp4'
 if (-not (Test-Path $headerVideo)) { Say '  launcher-header.mp4 is missing, the title band will keep the still picture' 'Yellow' }
 Say "  $($cs.Count) source files" 'Green'
 
-$outDir = Join-Path $Root 'Launcher'
 $null = New-Item -ItemType Directory -Force -Path $outDir
 # Thornswood.exe since the move off Skyrim Together. An install made before the
 # rename still has the old name, because the launcher replaces itself in place
@@ -171,11 +184,15 @@ $null = New-Item -ItemType Directory -Force -Path $outDir
 $exe = Join-Path $outDir 'Thornswood.exe'
 $oldExe = Join-Path $outDir 'SkyrimTogether.exe'
 
-# Shared with the other scripts that write into the build. Both match on the
-# full path, because the multiplayer client carries the same file name as the
-# launcher and killing by name would take the game down with it.
-$null = Stop-Game -Root $Root
-$null = Stop-Launcher -Root $Root
+# Nothing is closed here any more; Install-Launcher.ps1 does that, after a
+# build that worked. So a launcher still running from this folder holds its own
+# exe and csc cannot replace it. That is said plainly here, before any work,
+# rather than left to csc's CS0016 at the end of a compile.
+if (Test-Path -LiteralPath $exe) {
+    try { $held = [IO.File]::Open($exe, 'Open', 'ReadWrite', 'None'); $held.Close() }
+    catch { Die ("$exe is in use, most likely by the launcher running from that folder. A build closes nothing. " +
+                 "Close it, or build somewhere else with -OutDir. Ship builds into a folder of its own and closes it for you.") }
+}
 
 # ------------------------------------------------------- what Windows shows
 # csc gives an exe no version resource at all, so Windows has nothing to read
@@ -376,156 +393,10 @@ if (Test-Path -LiteralPath $signer) {
     if ($LASTEXITCODE -ne 0) { Die 'Signing failed. Nothing was published.' }
 }
 
-# ------------------------------------------------------------ shortcut
-Head 'Shortcut'
-
-# Windows caches the bitmap it once drew for an icon against the path it came
-# from. Point every build at one fixed "exe,0" and that cache key never
-# changes, so a new icon inside the exe can go on being ignored for days, and
-# a reboot does not clear it. Giving the icon its own file, named after its
-# own contents, changes the key the moment the artwork changes and leaves it
-# alone when it has not.
-$iconHash = (Get-FileHash -Path $icon -Algorithm SHA256).Hash.Substring(0, 8).ToLower()
-$iconFile = Join-Path $outDir ("icon-$iconHash.ico")
-if (-not (Test-Path $iconFile)) { Copy-Item $icon $iconFile -Force }
-foreach ($old in @(Get-ChildItem $outDir -Filter 'icon-*.ico' -ErrorAction SilentlyContinue)) {
-    if ($old.Name -ne "icon-$iconHash.ico") { Remove-Item $old.FullName -Force -ErrorAction SilentlyContinue }
-}
-Say ("  icon-$iconHash.ico") 'DarkGray'
-
-# A build names its shortcut after the build it is.
-#
-# MEASURED 22 SEPTEMBER on Patrick's machine. This block wrote Thornswood.lnk
-# to the Desktop pointing at whatever -Root was, and -Root defaults to
-# C:\Thornswood-DevBuild. So every compile, including the compile check a
-# Claude runs and the one inside Ship, silently repointed the Desktop icon
-# called "Thornswood" at the DEV launcher, which joins the dev server on
-# 7787. The icon read 9/21 23:47:03, the minute the dev build was last
-# compiled, and it had been pointing at the dev build ever since. Nothing
-# said so, because the shortcut still had the right name and the right
-# artwork. The Start menu entries were correct the whole time, which is why
-# it went unnoticed: Thornswood.lnk there points at C:\Thornswood and
-# Thornswood Dev.lnk at the dev build.
-#
-# The dev build gets its own name, so the two can never overwrite each other,
-# and a dev build never touches the Desktop icon the play install owns.
-$isDevRoot = $Root.TrimEnd('\') -match '-DevBuild$'
-$lnkName   = if ($isDevRoot) { 'Thornswood Dev.lnk' } else { 'Thornswood.lnk' }
-
-# AND A SCRATCH BUILD TOUCHES THE DESKTOP AT ALL.
-#
-# The 22 September fix above told the dev build apart from the play install and
-# stopped there, and there is a third kind of root: a throwaway one. A compile
-# check, the build step in .github/workflows/build.yml which builds into
-# $RUNNER_TEMP, or a Claude proving that Keys.cs still compiles. None of those
-# match -DevBuild, so every one of them wrote Thornswood.lnk to the Desktop
-# pointing into a temporary folder, and then the folder was deleted.
-#
-# MEASURED 23 SEPTEMBER by doing exactly that for the fourth time: a compile
-# into %TEMP%\ts-keycheck repointed the real Desktop icon at
-# %TEMP%\ts-keycheck\Launcher\Thornswood.exe and restarted Explorer to be
-# sure the change took. It has happened often enough to have its own entry on
-# the To Do List.
-#
-# So a root that is neither of the two real installs gets its shortcut inside
-# its own folder and nowhere else. It still builds and it still gets an icon;
-# nothing outside that folder changes.
-$playRoot  = $Root.TrimEnd('\') -ieq 'C:\Thornswood'
-$isScratch = -not ($isDevRoot -or $playRoot)
-
-$ws = New-Object -ComObject WScript.Shell
-$places = if ($isScratch) { @($Root) } else { @([Environment]::GetFolderPath('Desktop'), $Root) }
-foreach ($dest in $places) {
-    # The old name, tidied away so nobody ends up with two shortcuts to the
-    # same launcher after the rename.
-    $was = Join-Path $dest 'Skyrim Together.lnk'
-    if (Test-Path $was) { Remove-Item $was -Force -ErrorAction SilentlyContinue }
-
-    # A dev build that previously wrote the play install's name here left a
-    # shortcut behind pointing at the dev exe. Take it away rather than leave
-    # it lying, but only when it really does point into this dev root: a
-    # correct Thornswood.lnk aimed at the play install is not ours to remove.
-    if ($isDevRoot) {
-        $stale = Join-Path $dest 'Thornswood.lnk'
-        if (Test-Path -LiteralPath $stale) {
-            try {
-                $old = $ws.CreateShortcut($stale)
-                if ($old.TargetPath -and $old.TargetPath.StartsWith($Root.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) {
-                    Remove-Item -LiteralPath $stale -Force -ErrorAction SilentlyContinue
-                    Say "  removed a Thornswood.lnk in $dest that pointed at the dev build" 'Yellow'
-                }
-            } catch { }
-        }
-    }
-
-    $sc = $ws.CreateShortcut((Join-Path $dest $lnkName))
-    $sc.TargetPath       = $exe
-    $sc.Arguments        = ''
-    $sc.WorkingDirectory = $outDir
-    $sc.IconLocation     = "$iconFile,0"
-    $sc.Description      = if ($isDevRoot) { 'Thornswood Dev' } else { 'Thornswood' }
-    $sc.Save()
-}
-Say ("  $lnkName points at the exe now, no PowerShell in the chain") 'Green'
-if ($isDevRoot) { Say '  the play install''s own Thornswood.lnk is left alone' 'DarkGray' }
-if ($isScratch) { Say '  a throwaway build, so the Desktop is left alone entirely' 'DarkGray' }
-
-# Telling the shell an association changed is what actually makes Explorer
-# redraw, and unlike clearing the cache it costs nothing and interrupts
-# nobody. ie4uinit stays as a second opinion.
-try {
-    if (-not ([System.Management.Automation.PSTypeName]'Thornswood.Shell32').Type) {
-        Add-Type -Namespace Thornswood -Name Shell32 -MemberDefinition @'
-[System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
-public static extern void SHChangeNotify(int eventId, uint flags, System.IntPtr item1, System.IntPtr item2);
-'@
-    }
-    [Thornswood.Shell32]::SHChangeNotify(0x08000000, 0x0000, [IntPtr]::Zero, [IntPtr]::Zero)
-    Say '  Explorer told to redraw' 'DarkGray'
-} catch { }
-
-try {
-    $ie4 = Join-Path $env:SystemRoot 'System32\ie4uinit.exe'
-    if (Test-Path $ie4) {
-        $global:LASTEXITCODE = 0
-        & $ie4 -show 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { & $ie4 -ClearIconCache 2>&1 | Out-Null }
-        Say '  Icon cache asked to refresh' 'DarkGray'
-    }
-} catch { }
-
-# The belt and braces pass, only when the artwork itself is new. Clearing the
-# cache means closing Explorer for a second, which is too rude to do on every
-# build but exactly right on the one build where the icon changed.
-$stamp    = Join-Path $outDir '.iconstamp'
-$lastIcon = ''
-if (Test-Path $stamp) { $lastIcon = (Get-Content $stamp -Raw -ErrorAction SilentlyContinue).Trim() }
-# AND NOT ON A THROWAWAY BUILD EITHER. Killing and restarting Explorer is
-# already described below as too rude to do on every build; doing it because a
-# compile check ran is ruder still, and a scratch build's icon is not on
-# anybody's Desktop to be stale. A compile check on 23 September restarted
-# Explorer twice in as many minutes.
-if ($lastIcon -ne $iconHash -and -not $isScratch) {
-    Say '  New artwork, clearing the cache properly' 'Yellow'
-    try {
-        taskkill /f /im explorer.exe 2>&1 | Out-Null
-        $caches = @(
-            (Join-Path $env:LocalAppData 'IconCache.db'),
-            (Join-Path $env:LocalAppData 'Microsoft\Windows\Explorer\iconcache_*.db')
-        )
-        foreach ($c in $caches) {
-            foreach ($f in @(Get-ChildItem $c -Force -ErrorAction SilentlyContinue)) {
-                Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
-            }
-        }
-    } catch { }
-    try { Start-Process explorer.exe } catch { }
-    Set-Content -Path $stamp -Value $iconHash -Encoding ASCII
-    Say '  Explorer restarted, icon is the new one' 'Green'
-}
-
-$stale = Join-Path $outDir 'SkyrimTogether-Launcher.ps1'
-if (Test-Path $stale) { Remove-Item $stale -Force; Say '  Removed the old script launcher' 'DarkGray' }
+# The shortcut, the icon file beside the exe, Explorer's redraw and its icon
+# cache used to follow here. They are Install-Launcher.ps1 now, with the
+# closing of a running game and launcher, because they are what an install
+# does and a build has no business doing them.
 
 Head 'Done'
 Say $exe 'Green'
