@@ -219,4 +219,4 @@ Make a fresh character and wait two minutes after logging in. It used to freeze 
 
 ## Do not report these
 
-Typing in another window still moves your character. Bard instruments look wrong. Mod settings menus reset every session. NPCs stand still when nobody is near them. You cannot save.
+Typing in another window still moves your character. Bard instruments look wrong. Mod settings menus reset every session. NPCs stand still when nobody is near them. That is on the roadmap rather than a bug, so report an NPC only for something the Known Issues page does not already describe. You cannot save.

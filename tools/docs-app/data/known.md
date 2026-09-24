@@ -4,14 +4,16 @@ What is limited or broken right now, and why. Worth reading before you report
 something, because a lot of what looks like a bug is how a shared Skyrim has
 to work.
 
-Not all of it is permanent. The first group follows from SkyMP itself and is
-not going to change. Everything after it is where things stand today, and some
-of that is being worked on.
+Not all of it is permanent. The first group follows from SkyMP itself, and
+none of it is settled for good. Everything after it is where things stand
+today, and some of that is being worked on.
 
 ## Limits of a shared Skyrim
 
 These follow from the server owning the world instead of your own machine.
-They are not going to change.
+What NPCs do is on the roadmap: **Thinning the crowd** and
+**NPCs with their own work**. The rest of this table is being looked at.
+Report one of these only if it does something this table does not describe.
 
 | Behaviour | Reason |
 |---|---|
