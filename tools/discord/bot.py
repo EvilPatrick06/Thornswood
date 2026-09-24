@@ -10,6 +10,8 @@ What it does:
            looking at Discord
   Watch    asks the site every five minutes over its public name, and says so
            in #dev when it stops answering and when it comes back
+  Reports  says each thing sent in on the site's public report page in the
+           staff channel, the day it arrives
 
 Everything it needs is in env:
 
@@ -175,6 +177,15 @@ TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
 TROUBLE_FILE = os.environ.get(
     'TROUBLE_FILE', r'C:\Thornswood-Docs\data\trouble.json')
 TROUBLE_EVERY = _int_env('TROUBLE_EVERY', 120)
+
+# Where the site writes what people send in on its public report page, read
+# the same way as trouble.json and said in the same staff channel.
+REPORTS_FILE = os.environ.get(
+    'REPORTS_FILE', r'C:\Thornswood-Docs\data\inbox.json')
+REPORTS_EVERY = _int_env('REPORTS_EVERY', 120)
+# More than this many in one look is a script, not five people, because the
+# site takes five an hour from any one place. Then one line says how many.
+REPORTS_AT_ONCE = 5
 
 
 WATCH_EVERY = _int_env('WATCH_EVERY', 300)
@@ -1217,6 +1228,112 @@ async def trouble_say(text):
             + traceback.format_exc())
 
 
+def report_text(row):
+    """
+    One report from the public page, as the staff channel reads it.
+
+    Every word of it was typed by a stranger with no account, so it is escaped
+    before it goes anywhere near Discord: an @everyone in a title is text, not
+    a ping, and a masked link is shown as what it is.
+    """
+    def clean(v, n):
+        v = str(v or '').strip()[:n]
+        return discord.utils.escape_mentions(discord.utils.escape_markdown(v))
+
+    kind = 'An idea' if row.get('kind') == 'idea' else 'A problem'
+    by = clean(row.get('by'), 40)
+    detail = clean(row.get('detail'), 400)
+    return ('**%s sent in on the public report page**, %s.\n%s%s'
+            % (kind,
+               ('from ' + by) if by else 'with no name left',
+               clean(row.get('title'), 200) or '(no title)',
+               ('\n' + detail) if detail else ''))
+
+
+async def report_say(text):
+    """Same channel as trouble_say, with every mention switched off."""
+    ch = _trouble_channel()
+    if ch is None:
+        return
+    try:
+        await ch.send(text[:1900], suppress_embeds=True,
+                      allowed_mentions=discord.AllowedMentions.none())
+    except Exception:
+        log('reports: could not post in #%s:\n' % getattr(ch, 'name', '?')
+            + traceback.format_exc())
+
+
+async def watch_reports():
+    """
+    Say in the staff channel when somebody sends something in on the public
+    report page.
+
+    The page tells them "Somebody will read it", and until this the only place
+    it could be read was the inbox on the hub, which nobody opens unless they
+    already know something is there, and the To Do List has the hub going
+    altogether. The site writes inbox.json on this same box, so this reads it
+    the way watch_trouble reads trouble.json.
+
+    Tickets are in that file as well and are left alone: they came from
+    Discord, and their thread is already where staff read them.
+
+    The ids already there when this starts are treated as said, for the same
+    reason as watch_trouble. A file that is on disk but will not parse, which
+    is what a read in the middle of the site writing it looks like, is waited
+    out rather than read as empty, because empty would make every row in it
+    new on the next look.
+    """
+    await client.wait_until_ready()
+
+    def read_all():
+        try:
+            with open(REPORTS_FILE, encoding='utf-8') as f:
+                rows = json.load(f)
+        except FileNotFoundError:
+            return []
+        except Exception:
+            return None
+        return rows if isinstance(rows, list) else None
+
+    def public(row):
+        return (isinstance(row, dict) and bool(row.get('id'))
+                and row.get('kind') != 'ticket')
+
+    loop = asyncio.get_running_loop()
+    rows = await loop.run_in_executor(None, read_all)
+    while rows is None:
+        await asyncio.sleep(5)
+        rows = await loop.run_in_executor(None, read_all)
+    said = set(row['id'] for row in rows if public(row))
+    ch = _trouble_channel()
+    log('reports: watching %s every %ds, speaking in %s, %d already there and '
+        'treated as said'
+        % (REPORTS_FILE, REPORTS_EVERY,
+           ('#' + ch.name) if ch is not None else 'NOWHERE, see above',
+           len(said)))
+
+    while not client.is_closed():
+        try:
+            rows = await loop.run_in_executor(None, read_all)
+            fresh = [r for r in (rows or []) if public(r) and r['id'] not in said]
+            for r in fresh:
+                said.add(r['id'])
+            if len(fresh) > REPORTS_AT_ONCE:
+                await report_say(
+                    '**%d reports came in on the public report page** since the '
+                    'last look, which is more than people send and more than '
+                    'this channel should carry one at a time. They are in the '
+                    'inbox on the site.' % len(fresh))
+            else:
+                # The file is newest first; the channel reads oldest first.
+                for r in reversed(fresh):
+                    await report_say(report_text(r))
+        except Exception:
+            log('reports: the check itself failed, carrying on:\n'
+                + traceback.format_exc())
+        await asyncio.sleep(REPORTS_EVERY)
+
+
 # on_ready fires again on every reconnect, and a second loop would double every
 # message this ever sends.
 _watching = False
@@ -1317,6 +1434,7 @@ async def on_ready():
         _watching = True
         asyncio.create_task(watch_site())
         asyncio.create_task(watch_trouble())
+        asyncio.create_task(watch_reports())
 
     log('up as %s' % client.user)
 
