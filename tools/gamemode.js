@@ -2214,8 +2214,24 @@ function wearScript() {
   it is handed is a different fault, and a server that keeps at it forever
   is a server nobody can read the log of.
 */
-const DRESS_EVERY = 15000;    // how often somebody undressed is looked at
-const DRESS_TRIES = 3;        // then it stops, for the session
+/*
+  ONCE, AND NOT AGAIN FOR TEN MINUTES.
+
+  This was three goes a quarter of a minute apart, and Patrick found what
+  that costs the moment the client would not take the clothes: "I heard the
+  noise of things equipping and the right hand side of my screen showed
+  things going into my inventory that already were". An equip ask the client
+  cannot satisfy is an ask that will not be satisfied by being repeated, and
+  repeating it is noise on somebody's screen while they are trying to play.
+
+  So it is one ask, and then nothing for ten minutes. The arrival ask is
+  still there for the case this exists for, and if the client genuinely
+  cannot equip what the server believes it is wearing, that is a different
+  fault and a quiet log line is the right way to find it rather than an
+  equip storm.
+*/
+const DRESS_EVERY = 600000;   // ten minutes between looks
+const DRESS_TRIES = 1;        // and one ask, then it stops for the session
 const dressAt = {};           // actorId -> when they were last asked
 const dressTried = {};        // actorId -> how many times
 
