@@ -57,11 +57,9 @@ const SLOGS = path.join(TMP, 'session-logs');
 const SLOG_ONE = 256 * 1024;
 const SLOG_ALL = 1024 * 1024;
 const SLOG_DAYS = 365;
-const SLOG_NAMES = [
-  'launcher.log', 'thornswood-front.log', 'thornswood-voice.log',
-  'thornswood-emotes.log', 'thornswood-input.log', 'thornswood-dress.log',
-  'thornswood-loadorder.txt', 'thornswood-plugins-light.txt'
-];
+/* The list itself is lifted, not copied: a copy here kept passing on 24
+   September while the site had no place for the crash log at all. */
+const SLOG_NAMES = eval(grabConst('SLOG_NAMES'));
 const SERVER_LOGS = {
   main: path.join(TMP, 'server.log'),
   dev:  path.join(TMP, 'server-dev.log')
@@ -221,6 +219,90 @@ yes('no logs at all is neither', readTrouble({}) === null);
    lines match it. The word "error" appears in healthy logs all the time. */
 yes('the word error on its own does not colour a session',
     readTrouble({ 'launcher.log': 'checked for errors, found none\n' }) === null);
+
+// ---- the crash evidence (entry 105) ----------------------------------------
+/*
+  Entry 105: the game went down with the creation panel open and an alt tab,
+  and left no message. What settles a native crash is the SKSE crash log and
+  Skyrim Platform's own log. Until 24 September the launcher sent neither and
+  the site would have dropped both. These check that the two ends agree, by
+  reading the launcher's list out of Discord.cs rather than keeping a copy of
+  it here. The launcher's own half is test-log-upload.ps1.
+*/
+const CS = fs.readFileSync(path.join(__dirname, 'app', 'Discord.cs'), 'utf8');
+const sends = (function () {
+  const at = CS.indexOf('public static void SessionLogs()');
+  const end = at < 0 ? -1 : CS.indexOf('};', at);
+  const block = end < 0 ? '' : CS.slice(at, end);
+  const out = [];
+  const re = /new string\[\] \{ "([^"]+)",/g;
+  let m;
+  while ((m = re.exec(block))) out.push(m[1]);
+  return out;
+})();
+yes('the launcher list reads out of Discord.cs', sends.length >= 8);
+yes('the launcher sends the SKSE crash log', sends.indexOf('crash.log') >= 0);
+yes("the launcher sends Skyrim Platform's own log", sends.indexOf('skyrim-platform.log') >= 0);
+yes('every log the launcher sends is one the site keeps',
+    sends.length > 0 && sends.every(n => SLOG_NAMES.indexOf(n) >= 0));
+yes('in the same order, so both ends leave out the same ones first',
+    JSON.stringify(sends) === JSON.stringify(SLOG_NAMES));
+
+/* The launcher leaves a log out rather than send a body the site cuts off,
+   because a body past the cap is dropped whole, every log in it. */
+const product = s => s.split('*').reduce((a, b) => a * Number(b.trim()), 1);
+const lm = /const int LogBodyMax = ([0-9 *]+);/.exec(CS);
+const bm = /body\(req, SLOG_ALL \+ ([0-9 *]+)\)/.exec(src);
+yes('the launcher never sends a body bigger than the site reads',
+    !!lm && !!bm && product(lm[1]) > 0 && product(lm[1]) <= SLOG_ALL + product(bm[1]));
+
+/* The head of a real CrashLogger file, Patrick's machine, 22 September, cut
+   to the lines that matter here. */
+const CRASH = [
+  'CRASH TIME: 2026-09-22 20:48:59',
+  'Skyrim SSE v1.6.1170',
+  'CrashLoggerSSE v1-24-0-0 Jun 28 2026 00:14:22',
+  '',
+  'Unhandled exception "EXCEPTION_ACCESS_VIOLATION" at 0x7FF7C52AF7EF SkyrimSE.exe+01AF7EF\tcmp [rdi], eax',
+  'Exception Flags: 0x00000000 (Continuable)',
+  ''
+].join('\n');
+/* Ordinary lines out of skyrim-platform.log from a clean session on the same
+   machine, 23 September. */
+const PLATFORM = [
+  '[10:19:48:897] platform_se v2.9.0',
+  '[10:19:49:178] Failed to register messaging listener for NirnLabUIPlatform',
+  '[10:20:30:775] [Script] Trace in ServerJsVerificationService: Empty server JS, skipping verification',
+  '[10:21:31:854] [Script] Trace in AuthService: onBrowserMessage: ["thornswood-front","skills:closed"]',
+  '[10:21:37:330] onResult called',
+  '[10:21:37:341] Latent callback called',
+  '[10:22:03:307] [Script] [front] 10:22:03.306 the Console Native UI Menu opened on its own and has been shut',
+  ''
+].join('\n');
+
+yes('a set carrying both is saved',
+    putSessionLogs('crash105crash105', '444', { 'crash.log': CRASH, 'skyrim-platform.log': PLATFORM }) === 'saved');
+const readSet = key => fs.existsSync(slogFile(key))
+  ? JSON.parse(fs.readFileSync(slogFile(key), 'utf8')) : { logs: {}, sha256: {} };
+const ev = readSet('crash105crash105');
+yes('the crash log is kept whole', ev.logs['crash.log'] === CRASH);
+yes('the platform log is kept', ev.logs['skyrim-platform.log'] === PLATFORM);
+yes('each with its sha256', !!ev.sha256['crash.log'] && !!ev.sha256['skyrim-platform.log']);
+
+const big = {};
+for (const n of SLOG_NAMES) big[n] = 'z'.repeat(SLOG_ONE);
+big['crash.log'] = CRASH;
+putSessionLogs('crash106crash106', '444', big);
+const kept = readSet('crash106crash106');
+yes('in a set too big for the site, the crash log is still kept', kept.logs['crash.log'] === CRASH);
+yes('and the platform log, last on the list, is what goes', !('skyrim-platform.log' in kept.logs));
+
+const cr = readTrouble({ 'launcher.log': 'started\nclosed\n', 'crash.log': CRASH });
+yes('a session that sent a crash log is red', !!cr && cr.level === 'bad' && cr.file === 'crash.log');
+yes('and the line it points at is the exception',
+    !!cr && cr.line.indexOf('EXCEPTION_ACCESS_VIOLATION') >= 0);
+yes('the ordinary platform log of a clean session does not colour it',
+    readTrouble({ 'launcher.log': 'started\nclosed\n', 'skyrim-platform.log': PLATFORM }) === null);
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
