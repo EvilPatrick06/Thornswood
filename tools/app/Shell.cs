@@ -306,6 +306,8 @@ namespace Thornswood
             try { string leak = Leaks.Clean(cfg); if (leak != null) Log(leak); } catch { }
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch { }
             try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch { }
+            // Steam's Updates setting for the Skyrim the downgrade looks after, read only (SteamUpdates).
+            try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) { string upd = SteamUpdates.Report(Downgrade.Target(cfg)); if (upd != null) Log(upd); } } catch { }
             {
                 int parked = playing ? 0 : Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");
@@ -1900,6 +1902,7 @@ namespace Thornswood
                             if (ok && OwnGame.Active) StartOwnGame(false, true);
                             DrawStatus();
                             DrawBuildLine();
+                            if (ok) AskToHoldSteamUpdates();
                         }));
                     }
                     catch { }
