@@ -559,6 +559,26 @@ namespace Thornswood
 
             // Through Caddy when one is configured, the raw port otherwise.
             string url = (conf == null ? ("http://" + host + ":" + port) : conf.VoiceBase()) + "/token";
+
+            // The ticket only ever goes over https (To Do 144). It is a thirty
+            // day credential, as good as this person's Discord account to the
+            // site, and it sits under DPAPI on disk; every other place that
+            // sends it goes to Discord.Site, which is https. This one follows
+            // VoiceBase, and VoiceBase falls back to http://address:port
+            // whenever VoiceUrl is empty: a new install until its first
+            // update check has filled it in, and the rollback the feed can
+            // order by sending voiceUrl empty. Both posted the ticket here in
+            // the clear. No token means an unproven join, which the service
+            // lets through while THORNSWOOD_VOICE_AUTH is log and refuses
+            // when it is on. A failed fetch is retried by the renewal five minutes later, so
+            // a session that started before the update check gets its token
+            // once the feed has filled the https address in.
+            if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                if (log != null) log("Voice: no join token, because the voice address is not https and the Discord ticket only goes over https. Voice may be refused.");
+                return "";
+            }
+
             string body = "{\"profileId\":" + profile.ToString(CultureInfo.InvariantCulture) +
                           ",\"ticket\":\"" + JsonEscape(ticket) + "\"}";
             try
