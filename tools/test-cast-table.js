@@ -24,6 +24,16 @@
 //   - IsGuardFaction alone, which the Companions carry and are not the watch
 //   - a thin guard whose own race is a wolf and whose name, race and factions
 //     all come from its template, and one whose template is a leveled list
+//   - templates that give some traits and not others, which the ACBS use bits
+//     decide one trait at a time: a carriage driver whose template gives him
+//     nothing he is checked on (0x230, the way CFTO.esp builds Bjorlam), and a
+//     merchant whose race and name come from the template and whose factions
+//     are its own (0xecb, the way Populated Cities builds its merchants). Both
+//     are checked by reference. The thin guards above take all three traits
+//     from the template, so on their own they cannot tell a pass that reads
+//     the bits from one that always follows the template, and on the live
+//     load order that pass loses 224 traders, 23 carriage and ferry workers
+//     and 361 guards.
 //   - a placement switched off by its own flag
 //   - enable parents every way a real one comes: a marker switched off by its
 //     own flag, a marker that follows it, a marker set opposite to it, a
@@ -130,6 +140,12 @@ function children(cell, kids) { return grup(u32(cell), 6, [grup(u32(cell), 8, ki
 const VENDOR = 0x4000, DISABLED = 0x800, DELETED = 0x20;
 const UNIQUE = 0x20;
 const TRAITS = 0x1, FACTIONS = 0x4, BASE = 0x80;
+// Two sets of use bits read off the live load order on 24 September. CFTO's
+// Bjorlam (6ae98:CFTO.esp) takes AI data, AI packages and his script from
+// KmodCarriageDriverTemplate and nothing else. The Populated Cities merchants
+// take race, name, stats, spells, model, script and the rest from theirs, but
+// not factions. Neither sets FACTIONS.
+const CFTO_USES = 0x230, POPULATED_USES = 0xecb;
 const SQ = 4096;
 
 // Skyrim.esm, the whole world in miniature. Every form id is its own (index 0).
@@ -139,13 +155,17 @@ const L = { whiterunHold: 0x300, whiterun: 0x301, riftHold: 0x302, belethors: 0x
 const F = {
   belethor: 0x400, follower: 0x401, carriage: 0x402, isGuard: 0x403, guardTalk: 0x404,
   guardWhiterun: 0x405, crimeWhiterun: 0x406, mareOwner: 0x407, jobMerchant: 0x408,
-  market: 0x409,
+  market: 0x409, riftenMarket: 0x40A,
 };
 const N = {
   belethor: 0x500, faendal: 0x501, bjorlam: 0x502, guard: 0x503, thin: 0x504, wolf: 0x505,
   mannequin: 0x506, gjalund: 0x507, aela: 0x508, patron: 0x509, nazeem: 0x50A,
   leveled: 0x50B, hermit: 0x50C, riftTrader: 0x50D, market: 0x50E,
+  driverTemplate: 0x50F, sigaar: 0x510, merchantTemplate: 0x511, merchant: 0x512,
 };
+// Where Sigaar and the Riften merchant are placed, so each is found by its
+// reference and not by a name a template could have handed it.
+const SIGAAR = 0x81C, MERCHANT = 0x81D;
 const LV = 0x600;
 const C = { shop: 0x700, house: 0x701 };
 const W = { tamriel: 0x900, persistent: 0x901, whiterunSq: 0x902, openSq: 0x903, riftSq: 0x904,
@@ -193,6 +213,7 @@ const skyrim = Buffer.concat([
     rec('FACT', F.mareOwner, [edid('WhiterunBanneredMareFaction'), fdata(VENDOR)]),
     rec('FACT', F.jobMerchant, [edid('JobMerchantFaction'), fdata(0)]),
     rec('FACT', F.market, [edid('ServicesWhiterunMarketStall'), fdata(VENDOR), sub('VEND', u32(0))]),
+    rec('FACT', F.riftenMarket, [edid('ServicesRiftenMarketStall'), fdata(VENDOR), sub('VEND', u32(0))]),
   ]),
   top('NPC_', [
     // Compressed, so nothing about Belethor is known until it is inflated.
@@ -217,6 +238,24 @@ const skyrim = Buffer.concat([
     npc(N.hermit, 'Hermit', R.nord),
     npc(N.riftTrader, 'Rift Peddler', R.nord, [snam(F.belethor, 0)]),
     npc(N.market, 'Market Trader', R.nord, [snam(F.market, 0)]),
+    // Sigaar is built the way CFTO builds Bjorlam. His name, race and carriage
+    // faction are his own and the use bits take none of them from the
+    // template, which is in no faction and has a name of its own. A pass that
+    // always follows a template makes him a stranger called Carriage Driver.
+    rec('NPC_', N.driverTemplate, [edid('KmodCarriageDriverTemplate'), full('Carriage Driver'),
+      sub('RNAM', u32(R.nord)), acbs(0, 0)]),
+    rec('NPC_', N.sigaar, [edid('KmodSigaar'), full('Sigaar'), sub('RNAM', u32(R.nord)),
+      snam(F.carriage, 0), sub('TPLT', u32(N.driverTemplate)), acbs(UNIQUE, CFTO_USES)]),
+    // The Riften merchant is built the way Populated Cities builds its
+    // merchants: race and name come from the template, and with the name the
+    // unique flag, but the factions are its own. The thin record still says
+    // wolf and unique, leftovers nothing should read. The template is in a job
+    // faction and sells nothing, so a pass that takes factions through the
+    // template, or through the race or name bit, loses a trader.
+    rec('NPC_', N.merchantTemplate, [edid('PCMerchantTemplate'), full('Riften Merchant'),
+      sub('RNAM', u32(R.nord)), snam(F.jobMerchant, 0), acbs(0, 0)]),
+    rec('NPC_', N.merchant, [edid('PCRiftenMerchant'), sub('RNAM', u32(R.wolf)),
+      snam(F.riftenMarket, 0), sub('TPLT', u32(N.merchantTemplate)), acbs(UNIQUE, POPULATED_USES)]),
   ]),
   top('LVLN', [rec('LVLN', LV, [edid('LvlGuard'),
     sub('LVLO', Buffer.concat([Buffer.from([1, 0, 0, 0]), u32(N.guard), Buffer.from([1, 0, 0, 0])]))])]),
@@ -246,12 +285,16 @@ const skyrim = Buffer.concat([
         rec('CELL', W.riftSq, [sub('DATA', Buffer.from([0, 0])), xclc(22, -20), sub('XLCN', u32(L.riftHold))]),
         rec('CELL', W.farSq, [sub('DATA', Buffer.from([0, 0])), xclc(25, -20), sub('XLCN', u32(L.whiterun))]),
         rec('CELL', W.zeroSq, [sub('DATA', Buffer.from([0, 0])), xclc(0, 0), sub('XLCN', u32(L.riftHold))]),
-        children(W.openSq, [achr(0x817, N.riftTrader, [pos(20 * SQ + 5, -20 * SQ + 5)])]),
+        children(W.openSq, [
+          achr(0x817, N.riftTrader, [pos(20 * SQ + 5, -20 * SQ + 5)]),
+          achr(MERCHANT, N.merchant, [pos(20 * SQ + 6, -20 * SQ + 6)]),
+        ]),
       ])]),
       rec('CELL', W.persistent, [sub('DATA', Buffer.from([0, 0])), xclc(0, 0)]),
       children(W.persistent, [
         achr(0x810, N.bjorlam, [pos(6 * SQ + 10, -1 * SQ + 10)]),
         achr(0x811, N.gjalund, [pos(-9000, 9000), sub('XLCN', u32(L.riftHold))]),
+        achr(SIGAAR, N.sigaar, [pos(22 * SQ + 10, -20 * SQ + 10)]),
         achr(0x812, N.thin, [pos(6 * SQ + 20, -1 * SQ + 20)]),
         achr(0x813, N.leveled, [pos(6 * SQ + 30, -1 * SQ + 30)]),
         achr(0x814, N.wolf, [pos(6 * SQ + 40, -1 * SQ + 40)]),
@@ -353,8 +396,8 @@ try {
     };
 
     yes('nothing was lost to a record that would not inflate', j.counts.failedToInflate === 0);
-    yes('27 placements read, 2 of them deleted, one by a patch that kept only the flag',
-      j.counts.placed === 27 && j.counts.deleted === 2);
+    yes('29 placements read, 2 of them deleted, one by a patch that kept only the flag',
+      j.counts.placed === 29 && j.counts.deleted === 2);
     yes('a wolf and a mannequin are counted, not listed as people', j.counts.notPeople === 2);
 
     const bel = named(wr.traders, 'Belethor');
@@ -382,6 +425,24 @@ try {
     const gj = named(rift.transport, 'Gjalund Salt-Sage');
     yes('Gjalund, the Solstheim ferry in no faction, is transport by his record',
       gj.length === 1 && gj[0].because.join() === 'DLC2RRGjalundSaltSageWindhelm' && gj[0].holdFrom === 'its own location');
+
+    // The template use bits, one trait at a time. Each is found by its
+    // reference, because a template that wrongly hands over a name also hands
+    // over a column, and a name search would miss both.
+    const atRef = function (rows, fid) { return rows.filter(function (r) { return r.ref === refOf(fid); }); };
+    const sg = atRef(rift.transport, SIGAAR);
+    yes('Sigaar, whose use bits take nothing he is checked on from his template (0x230, as CFTO builds Bjorlam), drives a carriage by his own faction',
+      sg.length === 1 && sg[0].name === 'Sigaar' && sg[0].because.join() === 'CarriageSystemFaction');
+    yes('and keeps his own unique flag, since the name and the flag are his own too',
+      sg.length === 1 && sg[0].unique === true);
+    const pc = atRef(rift.traders, MERCHANT);
+    yes('a merchant whose race and name come from its template and whose factions are its own (0xecb, as Populated Cities builds them) is a trader',
+      pc.length === 1 && pc[0].name === 'Riften Merchant' && pc[0].because.join() === 'ServicesRiftenMarketStall');
+    yes('and takes its unique flag from the template with its name, not the leftover on the thin record',
+      pc.length === 1 && pc[0].unique === false);
+    yes('neither template walks the Rift as a stranger in their place',
+      !rift.everyoneElse['Carriage Driver'] && !rift.everyoneElse['Riften Merchant'] &&
+      !rift.everyoneElse.Sigaar && !rift.everyoneElse.PCRiftenMerchant);
 
     yes('the guards are counted through their templates: a thin one, a leveled one, and one switched on by an opposite parent',
       wr.guards['Whiterun Guard'] === 3 && Object.keys(wr.guards).length === 1);
@@ -422,9 +483,9 @@ try {
       named(rift.traders, 'Rift Peddler').length === 1 && named(rift.traders, 'Rift Peddler')[0].holdFrom === 'the nearest named place');
     yes('the persistent cell at 0,0 is not taken for the ground at 0,0', rift.everyoneElse.Hermit === 1);
     yes('and somebody nothing places is under no hold', none.everyoneElse.Hermit === 1);
-    yes('the totals add up: 5 traders, 2 transport, 3 guards, 6 everyone else, 7 off, 23 people',
-      j.counts.traders === 5 && j.counts.transport === 2 && j.counts.guards === 3 &&
-      j.counts.everyoneElse === 6 && j.counts.offAtStart === 7 && j.counts.people === 23);
+    yes('the totals add up: 6 traders, 3 transport, 3 guards, 6 everyone else, 7 off, 25 people',
+      j.counts.traders === 6 && j.counts.transport === 3 && j.counts.guards === 3 &&
+      j.counts.everyoneElse === 6 && j.counts.offAtStart === 7 && j.counts.people === 25);
   }
 } catch (e) {
   yes('the load order built here was driven without throwing: ' + e.message, false);
