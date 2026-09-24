@@ -69,6 +69,10 @@ param(
   # voice service on 7778, pushes its positions over the live ones and
   # drains the live command and choice queues.
   [int]$VoicePort = 7789,
+  # The launcher whose config.json holds MaxOnline for the dev server: the
+  # dev launcher, whose file the dev feed is published from. Empty means the
+  # one Publish-Update.ps1 -Channel dev would find. See MaxOnline.ps1.
+  [string]$LauncherRoot = '',
   [string]$Gamemode,
   # Bring the dev server's load order and plugins up to what the built server
   # has. Off by default: a code-only gamemode change does not need it, and the
@@ -137,6 +141,16 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
 } else {
   Write-Host '  node is not on this machine, so the syntax check was skipped' -ForegroundColor Yellow
 }
+
+# How many the dev server seats, read here so a number the engine would refuse
+# stops this while the dev server is still up. MaxOnline.ps1 says where it
+# lives and why there.
+. (Join-Path $Here 'MaxOnline.ps1')
+if (-not $LauncherRoot) { $LauncherRoot = (Find-LauncherRoot) + '-DevBuild' }
+$got = Get-MaxOnline $LauncherRoot
+$maxOnline = $got.Value
+if ($maxOnline -gt 0) { Write-Host ('  most online: {0}, from MaxOnline in {1}' -f $maxOnline, $got.From) }
+else { Write-Host ('  most online: {0} gave no number ({1}), so the dev server keeps the one it has' -f $got.From, $got.Why) -ForegroundColor Yellow }
 
 # --------------------------------------------------------- the load order ---
 #
@@ -306,6 +320,11 @@ Write-Host 'Pointing the dev server at the dev voice service...'
 # Deploy-Gamemode.ps1 computes the same thing the same way for the live
 # server, which is why live was right and dev was not.
 #
+# AND HOW MANY IT SEATS, added 24 September for entry 281. maxPlayers is the
+# engine's own slot count, and it is set to the dev launcher's MaxOnline, read
+# above, so the dev feed and the dev server say one number. With no number it
+# is left as the box has it and does not count as a reason to rewrite.
+#
 # This comment is HERE and not inside the here-string below on purpose. Anything
 # in that string is base64 encoded and sent as an ssh command line, where it
 # counts double and the far end truncates at about 8191 characters. Ten lines of
@@ -365,6 +384,11 @@ if (`$pt -and `$unb -ge 0) {
   }
 } elseif (-not `$pt) { 'no startPoints in the dev settings, leaving that alone' }
 elseif (`$unb -lt 0) { 'Skyrim Unbound.esp is not in this load order, leaving the start point alone' }
+`$wantMax = `$false
+if ($maxOnline -gt 0 -and [int]`$s.maxPlayers -ne $maxOnline) {
+  `$wantMax = `$true
+  'the most online moves from ' + `$s.maxPlayers + ' to $maxOnline'
+}
 
 # A byte order mark counts as needing a rewrite even when the number is
 # already right. The run on 18 September set the value AND wrote a mark, so
@@ -373,7 +397,7 @@ elseif (`$unb -lt 0) { 'Skyrim Unbound.esp is not in this load order, leaving th
 `$bom = `$false
 try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
-if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart) {
+if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax) {
   'thornswoodVoicePort is already $VoicePort, both equipment checks are already off, and the load order is already right'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
@@ -383,6 +407,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
     `$s | Add-Member -NotePropertyName startPoints -NotePropertyValue @(`$pt) -Force
     'start point moved to 0x{0:X8}, index {1}' -f `$startWant, `$unb
   }
+  if (`$wantMax) { `$s | Add-Member -NotePropertyName maxPlayers -NotePropertyValue $maxOnline -Force }
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
@@ -418,6 +443,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
             ', spell strip ' + `$back.equipmentSpellCheckEnabled +
             ', unknown item vetoes ' + `$back.equipmentInventoryCheckEnabled +
             ', load order ' + @(`$back.loadOrder).Count + ' plugins' +
+            ', most online ' + `$back.maxPlayers +
             ', start point ' + @(`$back.startPoints)[0].worldOrCell }
   } catch {
     'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
