@@ -7176,7 +7176,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 */
   // ==== RECIPES_BY_ID ====
   /* Built by tools\Build-RecipeTable.ps1 out of the game's own records. Do not hand edit.
-     1877 crafting recipes, out of 4527 in tools\recipes.json.
+     1886 crafting recipes, out of 4523 in tools\recipes.json.
 
      Recipe desc -> what it makes, what kind of record that is, how many it
      makes, which profession and which half of it owns the recipe, and which
@@ -7203,7 +7203,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
      reached. Where part of the list is produced by nobody, that is a floor
      and what the output sells for can hold the row higher; where none of it
      is, the price ranks it inside its own half. On this build that is
-     1411 row(s) by what their inputs cost, 175 by price and 291 by how long
+     1415 row(s) by what their inputs cost, 176 by price and 291 by how long
      the shopping list is. That last rule is used for a whole half at a time
      and only where the first two leave a rung with nothing on it, which here
      is Cook/Confectioner, Enchanter/Bladebinder, Tailor/Liverywright. A rank there means how long the list is and
@@ -7221,7 +7221,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
      food type keyword. An output naming two kinds names none and falls to
      its record type with the ones naming none at all. tools\recipes.json
      carries familyFrom on every row saying which reading answered, and
-     this build has 34 families across the whole table.
+     this build has 35 families across the whole table.
 
      open is true when the recipe carries no condition of its own. A row
      with open false needs something first, an item, a spell or a vanilla
@@ -8937,6 +8937,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "94b:YokuWeapons.esp": { "out": "f29:YokuWeapons.esp", "name": "Yokudan Lion-Robes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "redguard", "rank": "master", "family": "Body armour", "open": false },
     "94d:YokuWeapons.esp": { "out": "f3e:YokuWeapons.esp", "name": "Yokudan Brave-Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "redguard", "rank": "expert", "family": "Helmets", "open": false },
     "92d4:FishingInSkyrim.esp": { "out": "92d3:FishingInSkyrim.esp", "name": "Dwemer Fire Paste", "type": "INGR", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "master", "family": "Ingredients", "open": true },
+    "1f24f:FishingInSkyrim.esp": { "out": "20d45:FishingInSkyrim.esp", "name": "Fishing Pole - Crude", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
+    "2180d:FishingInSkyrim.esp": { "out": "207e2:FishingInSkyrim.esp", "name": "Fishing Pole - Fine", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "expert", "family": "Other goods", "open": true },
+    "1f252:FishingInSkyrim.esp": { "out": "1f253:FishingInSkyrim.esp", "name": "Fishing Pole - Master", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "master", "family": "Other goods", "open": true },
     "800:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "12c7:Cloaks&Capes.esp", "name": "Linen Cape (Red)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
     "801:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2887:Cloaks&Capes.esp", "name": "Linen Cape (Blue)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
     "802:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2888:Cloaks&Capes.esp", "name": "Linen Cape (Green)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
@@ -9107,10 +9110,16 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "bff07:Playable Rieklings.esp": { "out": "bfe43:Playable Rieklings.esp", "name": "Riekling Prisoner's Cuffs", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Other armour and clothing", "open": true },
     "bff08:Playable Rieklings.esp": { "out": "bfd64:Playable Rieklings.esp", "name": "Riekling Ancient Nord Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Body armour", "open": true },
     "bff0a:Playable Rieklings.esp": { "out": "bfd65:Playable Rieklings.esp", "name": "Riekling Ancient Nord Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Gauntlets", "open": true },
+    "bff26:Playable Rieklings.esp": { "out": "bff20:Playable Rieklings.esp", "name": "Spell Tome: Riekling Spear Spray", "type": "BOOK", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "riekling", "rank": "novice", "family": "Books", "open": true },
+    "bff27:Playable Rieklings.esp": { "out": "bff21:Playable Rieklings.esp", "name": "Spell Tome: Riekling Spear Missle", "type": "BOOK", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "riekling", "rank": "novice", "family": "Books", "open": true },
     "bff32:Playable Rieklings.esp": { "out": "bff2e:Playable Rieklings.esp", "name": "Riekling Bandit Fur Armor Sleeves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Body armour", "open": true },
     "bff34:Playable Rieklings.esp": { "out": "bff30:Playable Rieklings.esp", "name": "Riekling Bandit Fur Kilt&Cloak", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Body armour", "open": true },
     "bff38:Playable Rieklings.esp": { "out": "bff36:Playable Rieklings.esp", "name": "Riekling Bandit Fur Shoes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Armoured boots", "open": true },
-    "c0374:Playable Rieklings.esp": { "out": "c0372:Playable Rieklings.esp", "name": "Riekling Shrouded Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Shoes and light boots", "open": true }
+    "c0374:Playable Rieklings.esp": { "out": "c0372:Playable Rieklings.esp", "name": "Riekling Shrouded Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "306f:HearthFires.esm": { "out": "3012:HearthFires.esm", "name": "Lock", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "a lock, and locks are not made at a forge here. A door takes the key its holder cut from a mold." },
+    "306e:HearthFires.esm": { "out": "3011:HearthFires.esm", "name": "Hinge", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "a hinge, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold." },
+    "306d:HearthFires.esm": { "out": "300f:HearthFires.esm", "name": "Nails", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "a nail, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold." },
+    "3036:HearthFires.esm": { "out": "3035:HearthFires.esm", "name": "Iron Fittings", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "house fittings, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold." }
   };
 
   // ==== end RECIPES_BY_ID ====
@@ -9443,7 +9452,34 @@ function craftAnswer(actorId, row) {
   const out = { refusal: null, note: null, credit: null };
 
   /*
-    A RACE'S OWN GEAR IS THEIRS, AND IT IS ASKED FIRST.
+    SOME THINGS NOBODY MAKES, AND THAT IS ASKED BEFORE ANYTHING ELSE.
+
+    Patrick, 23 September: "Remove all of the house pars except for a key", and
+    asked which: "I mean the craftable stuff in the forge hinges, locks, nails,
+    iron fittings, etc". Separately, about the same menu: "Locks shouldn't be
+    craftable".
+
+    These are HearthFires house building stock, and nobody builds a HearthFires
+    house here: property is claimed with a deed and a door takes the key its
+    holder cut from a mold. So a nail is a thing you can make and then do
+    nothing whatever with.
+
+    It is first because there is no rank at which a nail becomes useful and no
+    profession that wants one. Answering "you are not a smith yet" to somebody
+    reaching for a hinge would be a promise that one day they can have it.
+
+    The row carries the sentence, out of $NOBODY_MAKES in the generator, so the
+    reason a thing is refused is written beside the decision to refuse it
+    rather than here. The menu entry stays: a bench is the BNAM keyword on the
+    record and no server code moves it.
+  */
+  if (row && row.nobody) {
+    out.refusal = 'Nobody makes that here. ' + String(row.nobody);
+    return out;
+  }
+
+  /*
+    A RACE'S OWN GEAR IS THEIRS, AND IT IS ASKED BEFORE ANY OF THE LEARNING.
 
     Before the profession, the half and the rank, because those three are
     about what somebody has learned and this one is about what they are. A
