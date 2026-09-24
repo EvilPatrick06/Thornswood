@@ -4,11 +4,13 @@
   Reads the spots you marked in game and prints them in the shape the content
   table wants.
 
-  Why this exists: the arrival coordinates for the nine inns were written by
-  hand and several of them are wrong. Morthal is 1824.1, -685.8 and Dawnstar is
-  1824.3, -683.7, which are two different buildings in two different holds
-  sitting two units apart. That is not a measurement, and somebody starting at
-  one of them ends up inside a wall.
+  Why this exists: the arrival coordinates for the nine inns were first
+  written by hand, each one the inn's front door moved 110 units along the
+  door's own heading, and seven of those eight were not in the room. 1.1.41
+  walked five; Solitude, Falkreath and Dawnstar now use the spot the game puts
+  you on when you walk in the front door. The old Morthal and Dawnstar points
+  only looked like one spot because the two inns share a layout: interior
+  coordinates belong to their own cell.
 
   So they get measured. Walk into an inn, stand where a person should arrive,
   face the way they should be facing, and press the mark key. The plugin writes
