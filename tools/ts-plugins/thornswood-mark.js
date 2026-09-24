@@ -9,10 +9,10 @@
 // how). The old Morthal and Dawnstar points only looked like one spot because
 // the two inns share a layout: interior coordinates belong to their own cell.
 //
-// So a spot gets measured rather than typed. Stand where somebody should arrive, face the
-// way they should face, press the key. This writes the cell, the position and
-// the angle out of the running game, and Mark-Spot.ps1 turns the file into the
-// line the content table wants.
+// So a spot gets measured rather than typed. Stand where somebody should
+// arrive, face the way they should face, press the key. This writes the cell,
+// the position and the angle out of the running game, and Mark-Spot.ps1 turns
+// the file into the line the content table wants.
 //
 // Nothing here touches anything. It reads three values and appends a line.
 // ---------------------------------------------------------------------------
