@@ -96,6 +96,62 @@ function log() {
 }
 
 /*
+  Which gamemode.js this is.
+
+  From the To Do List, entry 254: "A version and commit logged at load." Until
+  this, nothing the server wrote said which gamemode.js it was running.
+  Check-LiveGamemode.ps1 can say over ssh whether the file up there matches
+  the repo right now, but a line in last night's thornswood.log could not be
+  tied to any commit, and 28 commits changed this file on 23 September alone.
+
+  So at load the file names itself the way git names it: SHA-1 over
+  "blob <length>", a NUL, and the bytes. That is the id
+      git hash-object tools\gamemode.js
+  prints on the machine that shipped it, and
+      git log --all --oneline --find-object=<id>
+  names the commit that made gamemode.js exactly this file. Nothing is stamped
+  into the file at deploy time instead: Check-LiveGamemode.ps1 compares the two
+  copies byte for byte and a stamp would make them differ, and a file cannot
+  hold the id of the commit it is in.
+
+  The bytes are read from __filename. requireTemp() in skymp5-server copies
+  gamemode.js to a temp file, requires that, and deletes it afterwards, so this
+  hashes the text that is actually loading, even if gamemode.js on disk is
+  replaced a moment later. The copy goes through a string, and gives back the
+  same bytes because the file is valid UTF-8.
+
+  A carriage return before a line feed is dropped before hashing, which is what
+  git does to this file on the way in when core.autocrlf is on, as it is on the
+  machine that ships. Measured on 24 September, before this block went in: the
+  checkout had 22,774 CRLF line ends in 2,147,089 bytes, and those bytes hashed
+  as they are give an id no git command knows. Without the carriage returns it
+  is 2,124,315 bytes and the id git hash-object printed. The size logged is the
+  one on disk, the number Check-LiveGamemode.ps1 prints for both ends.
+
+  Once per load, so a hot reload logs the new id. Anything that goes wrong is
+  logged and the load carries on: the server runs the same without this line.
+*/
+function gamemodeId(bytes) {
+  const lf = Buffer.alloc(bytes.length);
+  let n = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 13 && bytes[i + 1] === 10) { continue; }
+    lf[n++] = bytes[i];
+  }
+  const sha = require('crypto').createHash('sha1');
+  sha.update('blob ' + n + '\0');
+  sha.update(lf.subarray(0, n));
+  return { blob: sha.digest('hex'), size: bytes.length };
+}
+
+try {
+  const me = gamemodeId(require('fs').readFileSync(__filename));
+  log('gamemode.js is git blob ' + me.blob + ', ' + me.size + ' bytes');
+} catch (e) {
+  log('could not name this gamemode.js: ' + e);
+}
+
+/*
   Which voice service this server talks to.
 
   It used to be the number 7778 written out in five places, which was fine
