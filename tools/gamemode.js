@@ -10020,6 +10020,23 @@ log('gamemode loaded:',
     req.end(body);
   }
 
+  /*
+    Which party somebody is in, or '' for none.
+
+    The voice service only tells each person about the people near enough to
+    hear and about their own party, wherever they are, because the party
+    strip draws an arrow to every member off this feed (entry 282). It cannot
+    know the parties itself, so each row carries one. Read at tick time, not
+    once here, because the social block that keeps the parties loads further
+    down this file.
+  */
+  function partyFor(profileId) {
+    try {
+      var soc = globalThis.__thornswoodSocial;
+      return String((soc && soc.inParty && soc.inParty[profileId]) || '');
+    } catch (e) { return ''; }
+  }
+
   // Stored and cleared like the chargen timers, so a hot reload replaces
   // this feed rather than adding a second one that never stops.
   if (globalThis.__thornswoodVoiceFeed) {
@@ -10043,7 +10060,8 @@ log('gamemode loaded:',
             // side of a loading door do not, which is exactly the line voice
             // should stop at.
             cell: String(mp.get(id, 'worldOrCellDesc') || ''),
-            name: String(mp.get(id, 'appearance') && mp.get(id, 'appearance').name || '')
+            name: String(mp.get(id, 'appearance') && mp.get(id, 'appearance').name || ''),
+            party: partyFor(mp.get(id, 'profileId'))
           });
         } catch (e) { }
       }

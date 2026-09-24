@@ -5,7 +5,7 @@
   Runs next to the SkyMP server. Two jobs and nothing else:
 
     1. Take position snapshots from the gamemode over plain HTTP on loopback,
-       and fan them out to everyone connected.
+       and tell each person connected where the people they could hear are.
     2. Relay WebRTC signalling between people so their browsers can talk to
        each other directly. The audio never comes through here.
 
@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'command-ack-1';
+const BUILD = 'cull-1-command-ack-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -66,7 +66,7 @@ const BUILD = 'command-ack-1';
 const STALE_MS = 3000;
 
 // ---------------------------------------------------------------- state ----
-let positions = new Map();   // profileId -> {pos:[x,y,z], angleZ, cell, name, at}
+let positions = new Map();   // profileId -> {pos:[x,y,z], angleZ, cell, name, party, at}
 let nextPeer = 1;
 const peers = new Map();     // peerId -> {ws, profileId, name}
 
@@ -486,10 +486,105 @@ function snapshot() {
   return out;
 }
 
+/*
+  WHO IS TOLD ABOUT WHOM.
+
+  Every peer used to be sent the whole snapshot five times a second: every
+  person's coordinates, facing, cell and name, wherever they were. That is two
+  faults in one, and it is entry 282 on the To Do List. Anybody holding a
+  socket learned where everybody in the world was standing. And the traffic
+  grew with the square of the room, against a box that measured 93 Mbit/s and
+  an 8 TB monthly cap. tools/voice/test-cull.js measures it on the wire with
+  two hundred people across ten cells: 5,284,000 bytes a tick, 26 MB a
+  second, 380 GB over a four hour evening, sent whole; 492,203 bytes a tick,
+  2.5 MB a second, culled. Nine of those ten cells are interiors where all
+  twenty can hear each other, so that is close to the floor voice needs.
+
+  So each person is told about three kinds of people and nobody else:
+
+    themselves, because every client places everybody against its own row
+      and does nothing at all without it;
+    anybody in the same cell within HEAR_UNITS, which is everybody any
+      speaking mode on any client could reach;
+    their own party, wherever they are, because the party strip draws an
+      arrow and a distance to every member anywhere in the world off this
+      same feed (ts-ui/thornswood-party.js), and gold on it means "somewhere
+      else". The gamemode sends the party id with each row for this.
+
+  A missing row is already silence on every client. The overlay
+  (ts-ui/thornswood-voice.js), the launcher's voice host and the plain
+  browser page all replace their table with each message and set the gain to
+  nothing for a person with no row, exactly as for another cell. So no client
+  changes, and nobody needs a "you left their range" message: the next view
+  simply does not have them in it. Connections are still opened and closed by
+  the roster, as they always were.
+
+  NEVER TIGHTER THAN A CLIENT, because that cuts people off mid sentence.
+  Another cell is silence on every client, and the longest reach any client
+  has is the overlay's yell at 85 metres (thornswood-voice.js MODES).
+  HEAR_UNITS is 100 metres, so a yell fading out at its edge is never cut
+  before the client's own falloff reaches nothing. Raise this before raising
+  a range there: tools/voice/test-cull.js reads the client range tables and
+  fails when one outgrows it.
+*/
+const UNITS_PER_METRE = 70;
+const HEAR_UNITS = 100 * UNITS_PER_METRE;
+
+// The same straight line in three dimensions that the clients measure.
+function inReach(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  const dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+  return dx * dx + dy * dy + dz * dz <= HEAR_UNITS * HEAR_UNITS;
+}
+
+/*
+  Every person's view of one snapshot, as a function of their profile id.
+
+  Grouped by cell first, so distance is only ever worked out between people
+  who share one: two hundred people across ten cells is two hundred times
+  twenty comparisons a tick, not two hundred times two hundred. Kept per
+  profile for the tick, because the same person can be connected twice, the
+  chat window and the launcher's voice host, and the answer is the same.
+*/
+function viewsOf(snap) {
+  const byCell = new Map();
+  const byParty = new Map();
+  for (const pid of Object.keys(snap)) {
+    const cell = snap[pid].cell;
+    if (!byCell.has(cell)) byCell.set(cell, []);
+    byCell.get(cell).push(pid);
+    const v = positions.get(Number(pid));
+    const party = v ? v.party : '';
+    if (!party) continue;
+    if (!byParty.has(party)) byParty.set(party, []);
+    byParty.get(party).push(pid);
+  }
+  const made = new Map();
+  return function (profileId) {
+    const key = String(profileId);
+    if (made.has(key)) return made.get(key);
+    const out = {};
+    const me = snap[key];
+    // Nobody with no row of their own is told about anybody: there is
+    // nothing to measure a distance from, and no client could use it.
+    if (me) {
+      out[key] = me;
+      for (const pid of byCell.get(me.cell)) {
+        if (pid !== key && inReach(me.pos, snap[pid].pos)) out[pid] = snap[pid];
+      }
+      const v = positions.get(Number(key));
+      const party = v ? v.party : '';
+      for (const pid of (party && byParty.get(party)) || []) out[pid] = snap[pid];
+    }
+    made.set(key, out);
+    return out;
+  };
+}
+
 setInterval(() => {
   if (peers.size === 0) return;
-  const snap = snapshot();
-  for (const [, p] of peers) p.ws.send({ t: 'pos', at: Date.now(), who: snap });
+  const viewOf = viewsOf(snapshot());
+  for (const [, p] of peers) p.ws.send({ t: 'pos', at: Date.now(), who: viewOf(p.profileId) });
 }, 200);
 
 function isLoopback(req) {
@@ -754,7 +849,10 @@ const server = http.createServer((req, res) => {
           seen.add(pid);
           positions.set(pid, {
             pos: row.pos, angleZ: Number(row.angleZ) || 0,
-            cell: String(row.cell || ''), name: String(row.name || ''), at: now
+            cell: String(row.cell || ''), name: String(row.name || ''),
+            // Kept here and never sent on: it only decides who is told about
+            // whom. See WHO IS TOLD ABOUT WHOM.
+            party: String(row.party || ''), at: now
           });
         }
         for (const pid of Array.from(positions.keys())) if (!seen.has(pid)) positions.delete(pid);
