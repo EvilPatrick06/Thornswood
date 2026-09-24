@@ -330,7 +330,7 @@ $ownCollection = if ($IsCollection) { $null } else { Get-ShipOwnGameCollection $
 
 # No record, no release.
 #
-# Get-ShipOwnGameCollection reads Profile\OwnGameiles.txt, which is the only
+# Get-ShipOwnGameCollection reads Profile\OwnGame\files.txt, which is the only
 # thing that knows which files in a launcher made Game folder came from Vortex
 # and which are ours. Missing, it returns nothing, and every one of the
 # collection's thirty thousand files then looks like ours to publish.
@@ -345,7 +345,7 @@ $ownCollection = if ($IsCollection) { $null } else { Get-ShipOwnGameCollection $
 # so the record must exist too. When it does not, something has been deleted,
 # and guessing is the one thing that must not happen.
 if (-not $IsCollection -and $null -eq $ownCollection) {
-    Die ("$ProfileDir\OwnGameiles.txt is missing, and that is the only record of " +
+    Die ("$ProfileDir\OwnGame\files.txt is missing, and that is the only record of " +
          "which files in $GameDir came from Vortex." + [Environment]::NewLine + [Environment]::NewLine +
          "Without it every file the collection provides looks like one of ours and the " +
          "release would carry the whole collection." + [Environment]::NewLine + [Environment]::NewLine +
