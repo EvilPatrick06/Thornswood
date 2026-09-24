@@ -8,12 +8,22 @@
   putting Skyrim back on the wrong build").
 
   WHY IT MATTERS. The downgrade puts the 1.6.1170 files in place, and Steam
-  still believes the game is on the newest build. With its setting on
-  "Always keep this game updated" the next Skyrim update Steam takes undoes
-  the downgrade by itself. The only protection was a log line asking people
-  not to start Skyrim through Steam. The setting is "AutoUpdateBehavior" in
-  steamapps\appmanifest_489830.acf; 1 is "Only update this game when I launch
-  it", which is what Steam's own Properties, Updates menu writes.
+  still believes the game is on the newest build. Unless its setting says to
+  wait for a launch, the next Skyrim update Steam takes by itself undoes the
+  downgrade. The only protection was a log line asking people not to start
+  Skyrim through Steam. The setting is "AutoUpdateBehavior" in
+  steamapps\appmanifest_489830.acf; 1 is "Wait until I launch the game" in
+  the Automatic Updates list on Steam's own Properties, Updates page.
+
+  STEAM'S OWN WORDS. The first version named choices Steam no longer shows
+  ("Only update this game when I launch it", "Always keep this game
+  updated"), and a review caught it. Measured on Patrick's machine on 24
+  September: steamui\localization\steamui_english-json.js (8 August) names
+  the four choices "Use global setting", "Wait until I launch the game",
+  "Immediately download updates" and "Let Steam decide when to update", and
+  the UI bundle, steamui\chunk~2dcc5aaf7.js, numbers them 0, 1, 2 and 3.
+  Where this machine has Steam, the names and numbers are checked against
+  those two files, so a rename in a later Steam shows up here.
 
   MEASURED 24 SEPTEMBER on Patrick's machine, read only: that file is 1156
   bytes of Valve's KeyValues text, tabs and LF, "AutoUpdateBehavior" "0", and
@@ -90,6 +100,7 @@ $mRead     = Method 'Read' @([string])
 $mReport   = Method 'Report' @([string])
 $mNeeds    = Method 'NeedsHolding' @([string])
 $mHold     = Method 'Hold' @([string], [bool])
+$mSetting  = Method 'Setting' @([string])
 function Value([string]$s)  { return $mValue.Invoke($null, [object[]]@($s)) }
 function Held([string]$s)   { return $mHeld.Invoke($null, [object[]]@($s)) }
 function ManifestFor([string]$s) { return $mManifest.Invoke($null, [object[]]@($s)) }
@@ -97,6 +108,7 @@ function ReadValue([string]$s) { return $mRead.Invoke($null, [object[]]@($s)) }
 function Report([string]$s) { return $mReport.Invoke($null, [object[]]@($s)) }
 function Needs([string]$s)  { return [bool]$mNeeds.Invoke($null, [object[]]@($s)) }
 function Hold([string]$m, [bool]$running) { return $mHold.Invoke($null, [object[]]@($m, $running)) }
+function Setting([string]$s) { return $mSetting.Invoke($null, [object[]]@($s)) }
 
 $Latin = [Text.Encoding]::GetEncoding(28591)
 
@@ -181,7 +193,9 @@ try {
     Yes 'and exactly one character of the file changed' ((Differ $a0 $h0) -eq 1)
     Yes 'and it is the value' ($h0 -ceq $a0.Replace('"AutoUpdateBehavior"' + "`t`t" + '"0"', '"AutoUpdateBehavior"' + "`t`t" + '"1"'))
     $a2 = Acf '2'
-    Yes 'High Priority (2) becomes 1 too' (((Held $a2) -ceq $a2.Replace("`t`t`"2`"`n`t`"AllowOther", "`t`t`"1`"`n`t`"AllowOther")) -and ((Differ $a2 (Held $a2)) -eq 1))
+    Yes 'Immediately download updates (2) becomes 1 too' (((Held $a2) -ceq $a2.Replace("`t`t`"2`"`n`t`"AllowOther", "`t`t`"1`"`n`t`"AllowOther")) -and ((Differ $a2 (Held $a2)) -eq 1))
+    $a3 = Acf '3'
+    Yes 'and so does Let Steam decide when to update (3)' (((Held $a3) -ceq $a3.Replace("`t`t`"3`"`n`t`"AllowOther", "`t`t`"1`"`n`t`"AllowOther")) -and ((Differ $a3 (Held $a3)) -eq 1))
     $a1 = Acf '1'
     Yes 'already 1 comes back unchanged' ((Held $a1) -ceq $a1)
 
@@ -229,6 +243,29 @@ try {
     $oneLine = '"AppState" { "appid" "489830" }'
     Yes 'a closing brace that is not on its own line is not written next to' ($null -eq (Held $oneLine))
 
+    # ---- Steam's own words -----------------------------------------------------
+    #
+    # As the Automatic Updates list on the game's Properties, Updates page names
+    # them. The first version named two choices Steam does not have, so the
+    # line people get when they press No sent them looking for a menu item
+    # that is not there, and a tester checking the list would have judged a
+    # write that worked as failed.
+    Yes 'Steam''s words for 1 are "Wait until I launch the game"' ((Setting '1') -ceq 'Wait until I launch the game')
+    Yes 'for 0, "Use global setting"' ((Setting '0') -ceq 'Use global setting')
+    Yes 'no key at all is taken as 0' ((Setting '') -ceq 'Use global setting')
+    Yes 'for 2, "Immediately download updates"' ((Setting '2') -ceq 'Immediately download updates')
+    Yes 'for 3, "Let Steam decide when to update"' ((Setting '3') -ceq 'Let Steam decide when to update')
+    Yes 'a number Steam has no choice for is given as the number' ((Setting '7') -ceq 'AutoUpdateBehavior 7')
+    $How = [string]$T.GetField('How', $flags).GetValue($null)
+    Yes 'the way to do it by hand names that choice, under Automatic Updates on the Updates page' (($How -like '*Properties, Updates*') -and ($How -like '*Automatic Updates*') -and ($How -like ('*"' + (Setting '1') + '"*')))
+    Yes 'and names the game the way Steam''s library does' ($How -like '*The Elder Scrolls V: Skyrim Special Edition*')
+    $gone = @('Only update this game when I launch it', 'Always keep this game updated')
+    $named = @(Get-ChildItem -LiteralPath $AppPath -Filter *.cs -File | Where-Object {
+        $code = (Get-Content -LiteralPath $_.FullName | Where-Object { $_ -notmatch '^\s*//' }) -join "`n"
+        @($gone | Where-Object { $code.Contains($_) }).Count -gt 0
+    })
+    Yes ('no launcher code names a choice Steam no longer has' + $(if ($named.Count) { ' (' + (($named | ForEach-Object { $_.Name }) -join ', ') + ')' } else { '' })) ($named.Count -eq 0)
+
     # ---- which file ------------------------------------------------------------
     Yes 'the manifest sits two folders up from the game, in that library' ((ManifestFor 'D:\SteamLibrary\steamapps\common\Skyrim Special Edition') -ceq 'D:\SteamLibrary\steamapps\appmanifest_489830.acf')
     Yes 'with or without a trailing backslash' ((ManifestFor 'D:\SteamLibrary\steamapps\common\Skyrim Special Edition\') -ceq 'D:\SteamLibrary\steamapps\appmanifest_489830.acf')
@@ -254,7 +291,7 @@ try {
     Yes 'no file: says so and makes none' (($r -like '*was not found*') -and -not (Test-Path -LiteralPath $m))
 
     Put (Acf '0')
-    Yes 'the start line names Steam''s own words for 0' ((Report $game) -like '*"Always keep this game updated"*')
+    Yes 'the start line names Steam''s own words for 0' ((Report $game) -like '*"Use global setting"*')
     Yes 'and says how to change it in Steam' ((Report $game) -like '*Properties, Updates*')
     Yes 'the question is asked on 0' (Needs $m)
 
@@ -269,8 +306,8 @@ try {
     Yes 'Steam closed: the file now says 1' ((ReadValue $m) -ceq '1')
     Yes 'one byte changed and no other' (($was.Length -eq $now.Length) -and ((Differ $Latin.GetString($was) $Latin.GetString($now)) -eq 1))
     Yes 'no temporary file is left beside it' (-not (Test-Path -LiteralPath $tmp))
-    Yes 'and the log line says what changed and where' (($r -like '*is now "Only update this game when I launch it"*') -and ($r -like ('*' + $m + '*')))
-    Yes 'the start line then reads it back as held' ((Report $game) -like '*"Only update this game when I launch it"*')
+    Yes 'and the log line says what changed and where' (($r -like '*is now "Wait until I launch the game"*') -and ($r -like ('*' + $m + '*')))
+    Yes 'the start line then reads it back as held' ((Report $game) -like '*"Wait until I launch the game"*')
     Yes 'and the question is not asked again' (-not (Needs $m))
 
     [IO.File]::SetLastWriteTimeUtc($m, [DateTime]::new(2026, 1, 1, 0, 0, 0, [DateTimeKind]::Utc))
@@ -348,6 +385,7 @@ try {
     Yes 'the write comes after the person pressed Yes' (($yesAt -ge 0) -and ($holdAt -gt $yesAt))
     Yes 'and after Steam is seen to be closed' (($runAt -ge 0) -and ($holdAt -gt $runAt))
     Yes 'the question says what Yes changes' ($ask -like '*Yes changes Steam''s Updates setting for Skyrim*')
+    Yes 'in Steam''s own words for 1, the same ones the log uses' (($ask -like '*SteamUpdates.OnLaunchWords*') -and ($ask -like '*Automatic Updates*'))
     Yes 'and No leaves it' ($ask -like '*No leaves it as it is*')
     $down = Body $shell 'static void RunDowngrade()'
     Yes 'the question comes only after a downgrade that worked' ($down -match 'if \(ok\) AskToHoldSteamUpdates\(\);')
@@ -391,6 +429,73 @@ try {
         elseif ($v.Length -eq 1) { $ok = ((Differ $text $h) -eq 1) }
         else { $ok = ((Value $h) -ceq '1') }
         Yes 'and changing it would touch that value and nothing else (worked out in memory, not written)' $ok
+    }
+
+    # ---- Steam's own words, against the Steam on this machine, read only ---------
+    #
+    # The names come from Steam's English strings. The numbers come from its UI
+    # bundle, which builds the list as {value:X.name,title:...
+    # "#AppProperties_AutoUpdate..."}, where X is a module whose exports are
+    # plain numbers (T=0,j=1,k=2,D=3 on 24 September). The bundle is minified
+    # and renamed with every Steam update, so a shape this cannot find is a
+    # SKIP, not a pass. Steam's key for "Let Steam decide when to update" is
+    # still called Always.
+    $steamDir = ''
+    try { $steamDir = ([string](Get-ItemProperty -Path 'HKCU:\Software\Valve\Steam' -Name SteamPath -ErrorAction Stop).SteamPath).Replace('/', '\') } catch { }
+    $locFile = if ($steamDir) { Join-Path $steamDir 'steamui\localization\steamui_english-json.js' } else { '' }
+    if (-not $locFile -or -not (Test-Path -LiteralPath $locFile)) {
+        Write-Host 'SKIP  no Steam on this machine, so its own names for the choices are not read'
+    } else {
+        $loc = [IO.File]::ReadAllText($locFile)
+        $words = @{}
+        foreach ($mm in [regex]::Matches($loc, '"AppProperties_AutoUpdate(UseDefault|OnLaunch|Always|HighPriority)":"([^"]*)"')) { $words[$mm.Groups[1].Value] = $mm.Groups[2].Value }
+        Yes ('this Steam names four choices: ' + ((@('UseDefault', 'OnLaunch', 'HighPriority', 'Always') | ForEach-Object { '"' + $words[$_] + '"' }) -join ', ')) ($words.Count -eq 4)
+        Yes 'and what the launcher calls 1 is its name for waiting for a launch, word for word' ($words['OnLaunch'] -ceq (Setting '1'))
+        foreach ($old in $gone) { Yes ('"' + $old + '" is not among them') (-not $loc.Contains($old)) }
+
+        $bundle = $null
+        foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $steamDir 'steamui') -Filter 'chunk*.js' -File -ErrorAction SilentlyContinue)) {
+            $s = [IO.File]::ReadAllText($f.FullName)
+            if ($s.Contains('"#AppProperties_AutoUpdateOnLaunch"')) { $bundle = $s; break }
+        }
+        $nums = @{}
+        if ($bundle) {
+            $exp = @{}
+            foreach ($mm in [regex]::Matches($bundle, '\{value:[\w$]+\.([\w$]+),title:[^}]*?"#AppProperties_AutoUpdate(UseDefault|OnLaunch|Always|HighPriority)[_"]')) { $exp[$mm.Groups[2].Value] = $mm.Groups[1].Value }
+            if ($exp.Count -eq 4) {
+                $at = 0
+                while ($nums.Count -lt 4) {
+                    $at = $bundle.IndexOf($exp['OnLaunch'] + ':()=>', $at, [StringComparison]::Ordinal)
+                    if ($at -lt 0) { break }
+                    $open = $bundle.LastIndexOf('{', $at)
+                    $shut = $bundle.IndexOf('}', $at)
+                    $at++
+                    if ($open -lt 0 -or $shut -lt 0) { continue }
+                    $map = $bundle.Substring($open, $shut - $open + 1)
+                    $local = @{}
+                    foreach ($k in $exp.Keys) {
+                        $e = [regex]::Match($map, '[{,]' + [regex]::Escape($exp[$k]) + ':\(\)=>([\w$]+)[,}]')
+                        if ($e.Success) { $local[$k] = $e.Groups[1].Value }
+                    }
+                    if ($local.Count -ne 4) { continue }
+                    $window = $bundle.Substring($shut, [Math]::Min(60000, $bundle.Length - $shut))
+                    $nums = @{}
+                    foreach ($k in $local.Keys) {
+                        $d = [regex]::Match($window, '[,;{\s]' + [regex]::Escape($local[$k]) + '=(\d+)[,;]')
+                        if ($d.Success) { $nums[$k] = $d.Groups[1].Value }
+                    }
+                }
+            }
+        }
+        if ($nums.Count -ne 4 -or @($nums.Values | Sort-Object -Unique).Count -ne 4) {
+            Write-Host 'SKIP  this Steam''s UI bundle is not in a shape this can read, so its numbers for the choices are not checked'
+        } else {
+            Yes ('this Steam numbers them ' + ((@('UseDefault', 'OnLaunch', 'HighPriority', 'Always') | ForEach-Object { $words[$_] + ' ' + $nums[$_] }) -join ', ')) $true
+            Yes 'waiting for a launch is 1, the value the launcher writes' ($nums['OnLaunch'] -ceq $T.GetField('OnLaunchOnly', $flags).GetValue($null))
+            foreach ($k in @('UseDefault', 'OnLaunch', 'HighPriority', 'Always')) {
+                Yes ('the launcher calls ' + $nums[$k] + ' "' + $words[$k] + '", as this Steam does') ((Setting $nums[$k]) -ceq $words[$k])
+            }
+        }
     }
 }
 finally {

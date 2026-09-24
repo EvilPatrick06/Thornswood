@@ -12,20 +12,33 @@ namespace Thornswood
     /// says what the change is.
     ///
     /// Why it matters. The downgrade puts the 1.6.1170 files in place, but
-    /// Steam still believes the game is on the newest build, and with the
-    /// setting on "Always keep this game updated" the next Skyrim update Steam
-    /// takes undoes the whole downgrade with nobody pressing anything. Until
-    /// this, the only protection was a line in the log asking people not to
-    /// start Skyrim through Steam.
+    /// Steam still believes the game is on the newest build, and unless the
+    /// setting tells it to wait for a launch, the next Skyrim update Steam
+    /// takes by itself undoes the whole downgrade with nobody pressing
+    /// anything. Until this, the only protection was a line in the log asking
+    /// people not to start Skyrim through Steam.
     ///
     /// The setting lives in Steam's own file for the game,
     /// steamapps\appmanifest_489830.acf in the library that holds Skyrim, as
-    /// "AutoUpdateBehavior". 0 is "Always keep this game updated", 1 is "Only
-    /// update this game when I launch it", 2 is "High Priority". 1 is what
-    /// Steam's own Properties, Updates menu writes, and what every downgrade
-    /// guide sets. It is a mitigation, not a lock: Steam still updates the game
-    /// when it is started from Steam, which is what the downgrade's last log
-    /// line already asks people not to do.
+    /// "AutoUpdateBehavior". In Steam it is the Automatic Updates list on the
+    /// game's Properties, Updates page: 0 is "Use global setting" (whatever
+    /// Settings, Downloads says for every game), 1 is "Wait until I launch the
+    /// game", 2 is "Immediately download updates", 3 is "Let Steam decide when
+    /// to update". 1 is what picking "Wait until I launch the game" writes, and
+    /// what every downgrade guide sets. It is a mitigation, not a lock: Steam
+    /// still updates the game when it is started from Steam, which is what the
+    /// downgrade's last log line already asks people not to do.
+    ///
+    /// Those names and numbers are read off the installed Steam, not from
+    /// memory, because Steam has renamed them. The first version of this class
+    /// told people to pick "Only update this game when I launch it", and a
+    /// review found that no such choice is in Steam any more. On Patrick's
+    /// machine on 24 September, steamui\localization\steamui_english-json.js
+    /// (8 August) holds the four names above, neither old name is anywhere
+    /// under steamui or resource, and the UI bundle, steamui\chunk~2dcc5aaf7.js,
+    /// gives use global 0, wait for launch 1, immediately 2 and let Steam
+    /// decide 3. test-steam-updates.ps1 checks the names and numbers against
+    /// the installed Steam wherever there is one.
     ///
     /// Measured on Patrick's machine on 24 September, read only: the file is
     /// 1156 bytes of Valve's KeyValues text, tab separated, LF line endings,
@@ -50,10 +63,12 @@ namespace Thornswood
         const string AppId = "489830";
         public const string Key = "AutoUpdateBehavior";
         public const string OnLaunchOnly = "1";
+        /// <summary>What Steam's Automatic Updates list calls 1, word for word.</summary>
+        public const string OnLaunchWords = "Wait until I launch the game";
 
         /// <summary>The same change made by hand, for every message that leaves the file alone.</summary>
         public const string How =
-            "To change it in Steam yourself: right click Skyrim Special Edition in the library, Properties, Updates, and pick \"Only update this game when I launch it\".";
+            "To change it in Steam yourself: right click The Elder Scrolls V: Skyrim Special Edition in the library, Properties, Updates, and under Automatic Updates pick \"" + OnLaunchWords + "\".";
 
         // Every byte maps to one char and back, so whatever else is in the
         // file, a UTF-8 path or a byte order mark, is written back exactly as
@@ -82,13 +97,20 @@ namespace Thornswood
             catch { return ""; }
         }
 
-        /// <summary>Steam's own words for a value, as its Updates menu shows them.</summary>
+        /// <summary>
+        /// Steam's own words for a value, as the Automatic Updates list on the
+        /// game's Properties, Updates page shows them. A number that is not one
+        /// of Steam's four comes back as the number, so the log never names a
+        /// choice Steam does not have.
+        /// </summary>
         public static string Setting(string value)
         {
-            if (value == OnLaunchOnly) return "Only update this game when I launch it";
-            if (value == "2") return "High Priority";
-            // 0, and no value at all, which Steam reads as its default.
-            return "Always keep this game updated";
+            if (value == OnLaunchOnly) return OnLaunchWords;
+            if (value == "2") return "Immediately download updates";
+            if (value == "3") return "Let Steam decide when to update";
+            // 0, and no key at all, which is taken as 0.
+            if (string.IsNullOrEmpty(value) || value == "0") return "Use global setting";
+            return "AutoUpdateBehavior " + value;
         }
 
         /// <summary>
@@ -172,7 +194,7 @@ namespace Thornswood
             if (v == null) return null;
             if (v == OnLaunchOnly)
                 return "Steam's Updates setting for Skyrim is \"" + Setting(v) + "\", so Steam leaves it on 1.6.1170 unless Skyrim is started from Steam.";
-            return "Steam's Updates setting for Skyrim is \"" + Setting(v) + "\", so the next Skyrim update Steam takes moves it off 1.6.1170 and it has to be downgraded again. " + How;
+            return "Steam's Updates setting for Skyrim is \"" + Setting(v) + "\", so Steam can update it by itself, and the next Skyrim update Steam takes moves it off 1.6.1170 and it has to be downgraded again. " + How;
         }
 
         /// <summary>True when the file is there, readable, and not already on 1. What the question after a downgrade is asked on.</summary>
@@ -195,8 +217,8 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Sets Skyrim's Updates setting to "Only update this game when I launch
-        /// it" in Steam's file. Only ever called after a person has said yes.
+        /// Sets Skyrim's Updates setting to "Wait until I launch the game" in
+        /// Steam's file. Only ever called after a person has said yes.
         /// Returns one line for the log saying what happened.
         /// </summary>
         public static string Hold(string manifest) { return Hold(manifest, SteamRunning()); }
@@ -246,7 +268,7 @@ namespace Thornswood
                 return "Wrote " + manifest + " but it " + (now == null ? "could not be read back" : "reads back as \"" + Setting(now) + "\"") + ". " + How;
             return "Steam's Updates setting for Skyrim is now \"" + Setting(OnLaunchOnly) + "\". Only that one value in " + manifest +
                    " changed" + (readOnly ? ", and the file is read-only again, as it was." : ".") +
-                   " Steam's own Properties, Updates menu shows it the next time Steam starts.";
+                   " Steam's own Properties, Updates page shows it under Automatic Updates the next time Steam starts.";
         }
 
         // ------------------------------------------------------------ reading

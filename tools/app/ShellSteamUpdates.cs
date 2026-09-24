@@ -7,8 +7,8 @@ namespace Thornswood
     {
         /// <summary>
         /// Asked once a downgrade has worked, and only then: whether the
-        /// launcher should set Steam's Updates setting for Skyrim to "Only
-        /// update this game when I launch it" (SteamUpdates). Nothing is
+        /// launcher should set Steam's Updates setting for Skyrim to "Wait
+        /// until I launch the game" (SteamUpdates). Nothing is
         /// written unless the person presses Yes, and the question says what
         /// Yes changes and where.
         ///
@@ -26,8 +26,8 @@ namespace Thornswood
             if (!SteamUpdates.NeedsHolding(manifest)) return;
 
             string ask =
-                "Skyrim is on 1.6.1170 now, but Steam is set to keep it updated by itself, and the next update Steam takes puts it back on the newer build.\n\n" +
-                "Yes changes Steam's Updates setting for Skyrim to \"Only update this game when I launch it\", the same as picking it in Steam's own Properties, Updates menu. " +
+                "Skyrim is on 1.6.1170 now, but Steam can still update it by itself, and the next update Steam takes puts it back on the newer build.\n\n" +
+                "Yes changes Steam's Updates setting for Skyrim to \"" + SteamUpdates.OnLaunchWords + "\", the same as picking it under Automatic Updates on Steam's own Properties, Updates page. " +
                 "It changes that one value in Steam's file for Skyrim and nothing else:\n\n    " + manifest + "\n\n" +
                 "Steam has to be closed first, or it writes the old setting back when it closes. Exit Steam from its own menu (Steam, Exit), then press Yes.\n\n" +
                 "No leaves it as it is.";
