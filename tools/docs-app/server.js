@@ -42,6 +42,104 @@ const PUBLIC = path.join(ROOT, 'public');
 const FILES  = path.join(ROOT, 'files');
 const UP     = path.join(ROOT, 'uploads');
 
+// ==== thornswood site log ====
+//
+// EVERYTHING THIS PROCESS WORKED OUT USED TO GO NOWHERE. The scheduled task
+// ran node with no redirect at all, so stdout and stderr went into a handle
+// nobody held and there was no file anywhere on the box. discordGet works out
+// a plain sentence for every failure, because a dead bot token, a rate limit
+// and somebody genuinely not in the Discord used to look identical and the
+// site told all three of them the same wrong thing. Not one of those
+// sentences had ever been readable. It cost most of an evening on 22
+// September, and two wrong conclusions, to work out from outside what the
+// site already knew.
+//
+// IN PROCESS RATHER THAN A REDIRECT ON THE TASK, and that is the whole
+// design decision. The other three services are launched through cmd with
+// >> log 2>&1, and a log held open that way cannot be rolled: Windows
+// refuses to move or truncate a file another process has open for append,
+// measured rather than assumed. A redirect would have fixed 'there is no
+// log' and created 'the log grows until the disk goes', which is another
+// entry on the list. Writing it here means this process owns the handle and
+// can close, roll and reopen it whenever it likes.
+//
+// WHAT IS NOT IN IT: addresses. The privacy page says the sign-in log is the
+// only thing here that holds one and that it is deleted after thirty days. A
+// request log carrying addresses would quietly make that untrue, so this
+// holds what the site says about itself and the method and path of anything
+// that failed, and never who asked.
+function makeLog(dir, name, maxBytes, keep) {
+  const file = path.join(dir, name);
+  let broken = false;
+
+  function two(n) { return n < 10 ? '0' + n : String(n); }
+  function stamp() {
+    const d = new Date();
+    return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) +
+           ' ' + two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds());
+  }
+
+  // Oldest first, so nothing is overwritten on the way. site.log.5 goes,
+  // site.log.4 becomes .5, and site.log becomes .1. Rolled, never deleted:
+  // deleting a log is how the evidence for the last crash disappeared in the
+  // first place.
+  function roll() {
+    try {
+      const oldest = file + '.' + keep;
+      if (fs.existsSync(oldest)) { fs.unlinkSync(oldest); }
+      for (let i = keep - 1; i >= 1; i--) {
+        const from = file + '.' + i;
+        if (fs.existsSync(from)) { fs.renameSync(from, file + '.' + (i + 1)); }
+      }
+      if (fs.existsSync(file)) { fs.renameSync(file, file + '.1'); }
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function write(line) {
+    if (broken) { return false; }
+    try {
+      let big = false;
+      try { big = fs.statSync(file).size >= maxBytes; } catch (e) { big = false; }
+      if (big) { roll(); }
+      fs.appendFileSync(file, stamp() + '  ' + line + '\n');
+      return true;
+    } catch (e) {
+      // Once, and out loud. A log that throws on every line is worse than no
+      // log, and one that goes quiet with no trace is worse than both.
+      broken = true;
+      try {
+        process.stdout.write('[thornswood-docs] could not write ' + file +
+                             ', carrying on with the console only: ' + e.message + '\n');
+      } catch (e2) { }
+      return false;
+    }
+  }
+
+  return { file: file, write: write, roll: roll, broken: function () { return broken; } };
+}
+
+// Four megabytes is a few days of a closed playtest and opens in anything.
+// Five kept, so a crash on Saturday night is still readable on Monday.
+const siteLog = makeLog(ROOT, 'site.log', 4 * 1024 * 1024, 5);
+
+// Said through the console as well, so running the site by hand is unchanged
+// and so a person watching a deploy sees what they always saw. The console
+// keeps its own arguments; the file gets one line.
+['log', 'error', 'warn'].forEach(function (k) {
+  const was = console[k].bind(console);
+  console[k] = function () {
+    const parts = Array.prototype.slice.call(arguments).map(function (a) {
+      if (typeof a === 'string') { return a; }
+      if (a instanceof Error) { return a.stack || a.message; }
+      try { return JSON.stringify(a); } catch (e) { return String(a); }
+    });
+    siteLog.write((k === 'log' ? '' : k.toUpperCase() + ' ') + parts.join(' '));
+    was.apply(null, arguments);
+  };
+});
+// ==== end thornswood site log ====
+
 const CFGFILE = path.join(ROOT, 'config.json');
 let cfg = {
   password: 'thornswood',
@@ -2661,6 +2759,8 @@ http.createServer((req, res) => {
   }
 }).listen(PORT, BIND, () => {
   console.log('[thornswood-docs] listening on ' + BIND + ':' + PORT);
+  console.log('[thornswood-docs] writing this to ' + siteLog.file +
+              ', rolled at 4 MB, five kept');
   console.log('[thornswood-docs] documents in ' + DATA);
   console.log('[thornswood-docs] downloads in ' + FILES);
   console.log('[thornswood-docs] uploads in ' + UP);
