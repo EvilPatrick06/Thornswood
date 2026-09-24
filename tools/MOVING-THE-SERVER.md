@@ -166,9 +166,11 @@ landing there. When that is zero for a few days, cancel it.
 
 ## The logs on the box, and how big they get
 
-Each service writes its log in its own folder, and each one is rolled: at
-4 MB `x.log` becomes `x.log.1`, what was `.1` becomes `.2`, and five are kept.
-The oldest past five is the only thing that is ever removed.
+Each service writes its log in its own folder, and each service's log is
+rolled: at 4 MB `x.log` becomes `x.log.1`, what was `.1` becomes `.2`, and five
+are kept. The oldest past five is the only thing that is ever removed. The
+watchdog's files and the door's log are kept a different way, or not at all,
+and are listed below.
 
 - `server.log` (game server, live and dev), `voice.log` (live and dev) and
   `bot.log` are written by cmd's `>>` from the scheduled task, and Windows
@@ -179,8 +181,15 @@ The oldest past five is the only thing that is ever removed.
   so the run it starts has a file of its own and the one before is `.1`.
 - `thornswood.log` (the gamemode) and `site.log` (the website) roll
   themselves.
-- `C:\Thornswood-Watch\watch.log` is not rolled. Past 2,000 lines the watcher
-  keeps the last 1,000 and the rest is gone.
+- `C:\Thornswood-Watch\watch.log` and `restarts.txt` beside it are not
+  rolled. Past 2,000 lines the watcher keeps the last 1,000 of each and the
+  rest is gone.
+- `load.csv` in the same folder, the five minute load record, rolls itself to
+  `load.1.csv` at 4 MB, one kept, which is about five weeks. Its `load.log`
+  keeps the last 500 lines once it passes 256 KB.
+- `private\door.log` in the game server's folder is not rolled or trimmed.
+  The gamemode appends a line each time the door decides about somebody, and
+  the file grows until somebody moves it.
 - `.\tools\Get-Logs.ps1` reads only the current file. After a restart, last
   night's crash may be in `.1` beside it.
 - Whether the gamemode can write its log at all is at
