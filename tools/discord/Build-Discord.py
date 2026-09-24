@@ -305,6 +305,88 @@ def say(mark, what):
     print('  %-9s %s' % (mark, what))
 
 
+# THE BOT'S OWN WAY IN, in every channel that shuts everybody else out.
+#
+# To Do List 223, "The bot is invited with Administrator and keeps it".
+# Administrator overrides every channel overwrite, and that is the only
+# reason the bot can see the staff channels, the channels behind Member and
+# the holds, and post in the read only ones: nothing below ever named it.
+# Untick Administrator and the @everyone deny lands on the bot too, since
+# nothing here gives it Member, a staff role or a hold. The trouble alerts
+# in #staff-general and the site watcher in the staff #news (bot.py,
+# _trouble_channel and WATCH_ID) go quiet, the hold panel cannot be posted
+# in #choose-your-hold, and -Posts can no longer write the rules, welcome,
+# news and faq posts.
+#
+# So the bot gets an overwrite for itself as a member, the way bot.py's
+# log_channel already makes #ticket-log. Discord applies a member's own
+# overwrite last, after @everyone and every role, so it wins over the deny.
+# Three permissions and no more: see the channel, post in it, and read
+# back what is there, which is how post() finds its old messages to delete.
+# The build itself still wants Administrator, because it makes the Owner and
+# Dev roles with Administrator on them and Discord refuses that from a bot
+# which does not hold it.
+BOT_NEEDS = ('view_channel', 'send_messages', 'read_message_history')
+
+
+def with_bot(guild, out):
+    me = getattr(guild, 'me', None)
+    if me is not None:
+        out[me] = discord.PermissionOverwrite(**dict((n, True) for n in BOT_NEEDS))
+    return out
+
+
+def shuts_out(ch):
+    """Whether @everyone's overwrite on this channel takes away one of the
+       three the bot needs.
+
+       Read off the channel as it stands rather than off its mode in PLAN.
+       The gate on the live server was set by hand, and the modes only say
+       what a channel this makes gets, so a mode can be wrong about a channel
+       that is already there in either direction. Nothing this makes names the
+       bot's own role, so without Administrator this deny is what keeps the
+       bot out, and where there is none the bot's role already lets it in."""
+    ev = getattr(getattr(ch, 'guild', None), 'default_role', None)
+    if ev is None:
+        return False
+    have = ch.overwrites_for(ev)
+    return any(getattr(have, n) is False for n in BOT_NEEDS)
+
+
+async def keep_bot(ch):
+    """Give the bot its own overwrite in a channel that is already there.
+
+       overwrites() only reaches a channel when it is made, and every channel
+       on the live server was made, or gated by hand, before this existed, so
+       without this a re-run would let the bot into nothing. Only a channel
+       that shuts @everyone out is touched, and only the bot's own overwrite
+       on it. Only the three it needs are set, anything else already on it
+       stays as it is, and a channel that already has all three is not written
+       to at all, so running this again after Administrator is gone changes
+       nothing and asks Discord for nothing."""
+    if ch is None or not shuts_out(ch):
+        return
+    me = getattr(getattr(ch, 'guild', None), 'me', None)
+    if me is None:
+        return
+    have = ch.overwrites_for(me)
+    need = dict((n, True) for n in BOT_NEEDS if getattr(have, n) is not True)
+    if not need:
+        return
+    what = '#' + ch.name + ' lets the bot in without Administrator'
+    if CHECK:
+        say('would change', what)
+        return
+    have.update(**need)
+    try:
+        await ch.set_permissions(me, overwrite=have,
+                                 reason='Thornswood setup, the bot keeps its '
+                                        'channels without Administrator')
+        say('bot', what)
+    except discord.HTTPException:
+        failed.append(what + ' (Discord refused it)')
+
+
 # Who can see every hold. Wider than STAFF: the gamemaster ranks and the
 # Loremaster run things in the holds too. Looked up by name, because only some
 # of these are in ROLES.
@@ -326,6 +408,8 @@ def overwrites(guild, mode, roles, hold=None):
     talk      = discord.PermissionOverwrite(view_channel=True,
                                             send_messages=True,
                                             read_message_history=True)
+    # Every mode but public shuts @everyone out of something the bot needs,
+    # so every one of them names the bot as well.
     if mode == 'public':
         return {}
     if mode in ('open', 'membersread'):
@@ -337,7 +421,7 @@ def overwrites(guild, mode, roles, hold=None):
         for r in STAFF:
             if roles.get(r):
                 out[roles[r]] = talk
-        return out
+        return with_bot(guild, out)
     if mode == 'hold':
         out = {ev: deny_all}
         names = list(HOLD_STAFF)
@@ -347,26 +431,26 @@ def overwrites(guild, mode, roles, hold=None):
             r = _named(guild, roles, n)
             if r is not None:
                 out[r] = talk
-        return out
+        return with_bot(guild, out)
     if mode == 'read':
         out = {ev: read_only}
         for r in STAFF:
             if roles.get(r):
                 out[roles[r]] = discord.PermissionOverwrite(send_messages=True,
                                                             manage_messages=True)
-        return out
+        return with_bot(guild, out)
     if mode == 'staff':
         out = {ev: deny_all}
         for r in STAFF:
             if roles.get(r):
                 out[roles[r]] = talk
-        return out
+        return with_bot(guild, out)
     if mode == 'pathfind':
         out = {ev: deny_all}
         for r in list(STAFF) + ['Playtester']:
             if roles.get(r):
                 out[roles[r]] = talk
-        return out
+        return with_bot(guild, out)
     return {}
 
 
@@ -475,6 +559,7 @@ async def ensure_channel(guild, cat, spec, roles, found):
                     await existing.edit(topic=spec['topic'])
         except Exception:
             pass
+        await keep_bot(existing)
 
     if kind == 'announce' and isinstance(existing, discord.TextChannel):
         try:
@@ -580,10 +665,24 @@ async def on_ready():
                     say('category', catname)
                 else:
                     kept.append(catname)
+                    await keep_bot(cat)
+            done = []
             for spec in specs:
                 ch = await ensure_channel(guild, cat, spec, roles, found)
+                done.append(ch)
                 if spec.get('post'):
                     posts.append((ch, spec['post']))
+            # A channel somebody made by hand inside one of these categories
+            # is shut to @everyone like the gate around it, and the bot only
+            # saw it because of Administrator. The staff #news the site
+            # watcher speaks in is one: bot.py says it sits in Staff, and the
+            # plan does not name it. keep_bot only writes where @everyone is
+            # shut out, so this keeps what the bot can see today and widens
+            # nothing, and a channel open to everybody is left alone.
+            if cat is not None:
+                for ch in list(getattr(cat, 'channels', None) or []):
+                    if ch not in done:
+                        await keep_bot(ch)
 
         # ------------------------------------------------------- pruning --
         # Only inside the categories this script manages, and only names it
