@@ -784,7 +784,21 @@ namespace Thornswood
         /// screen, and a stopped one next to nothing. If it will not play (Windows
         /// N without the Media Feature Pack, a file that will not open) it is
         /// hidden and the still picture shows exactly as before.
+        ///
+        /// Stopped while the game runs as well, the way the music is. With Keep
+        /// Launcher Open ticked the window is never minimised, so until 24
+        /// September the video went on decoding behind the game for the whole
+        /// session, 3 to 14% of one core that the game could have had. The one
+        /// time it failed on Patrick's machine, in 42 game starts since 19
+        /// September, came one second after a start: "Starting the game" at
+        /// 20:47:59 on 21 September, then "Title band: the video did not play
+        /// (MILAVERR_UNEXPECTEDWMPFAILURE ...)" at 20:48:00, and a failure keeps
+        /// the still picture until the launcher is restarted. Every place that
+        /// changes playing calls headerVideoDecide straight after, except the
+        /// check at startup, which runs before the window is shown; showing it
+        /// decides then.
         /// </summary>
+        static Action headerVideoDecide = delegate { };
         static void StartHeaderVideo()
         {
             string file = Art.HeaderVideo();
@@ -809,7 +823,7 @@ namespace Thornswood
             Action decide = delegate
             {
                 if (gone || clock == null) return;
-                bool seen = page.IsVisible && win.WindowState != WindowState.Minimized;
+                bool seen = page.IsVisible && win.WindowState != WindowState.Minimized && !playing;
                 if (seen && heldAt != null)
                 {
                     TimeSpan at = heldAt.Value;
@@ -859,6 +873,7 @@ namespace Thornswood
             decide();
             win.StateChanged += delegate { decide(); };
             page.IsVisibleChanged += delegate { decide(); };
+            headerVideoDecide = decide;
         }
 
         /// <summary>
@@ -1459,6 +1474,7 @@ namespace Thornswood
                 playing = false;
                 inPlayTicks = 0;
                 MusicDecide();
+                headerVideoDecide();
                 // An update was seen during the session and they quit before
                 // the five minutes were up. The clock goes, the fact does not:
                 // it is fetched now, the same as it would have been had the
@@ -3863,6 +3879,7 @@ namespace Thornswood
                 Swap.Apply();
                 playing = true;
                 MusicDecide();
+                headerVideoDecide();
                 btnPlay.IsEnabled = false;
                 btnPlay.Content = "RUNNING";
                 btnQuitGame.Visibility = Visibility.Visible;
@@ -3962,6 +3979,7 @@ namespace Thornswood
                 try { Presence.Stop(); } catch { }
                 Keep.TakeNote();
                 playing = false;
+                headerVideoDecide();
                 btnPlay.Content = "PLAY";
                 DrawStatus();
 
