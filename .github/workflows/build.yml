@@ -24,6 +24,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Scan the tree for secrets
+        shell: pwsh
+        run: |
+          # Entry 236. Every tracked file, by the rules in tools\Check-Secrets.ps1.
+          # A hit names the file, the line and the rule and never the value,
+          # because anybody on the repository can read this log. A known
+          # non-secret goes in tools\Check-Secrets.allow.txt with its reason.
+          .\tools\Check-Secrets.ps1
+          exit $LASTEXITCODE
+
       - name: Parse every PowerShell script
         shell: pwsh
         run: |
@@ -47,6 +57,17 @@ jobs:
           # down since the start and never checked, and on 24 September eleven
           # hits had gone out in those files. Each hit is marked on its line.
           .\tools\Check-Words.ps1
+
+      - name: Check the launcher window
+        shell: powershell
+        run: |
+          # The launcher builds its window from ui.xaml at startup and finds
+          # every control by name, so a renamed control or a window that does
+          # not parse compiles clean and is found by the person using it. This
+          # fails on either. Windows PowerShell on purpose: it parses with the
+          # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
+          & powershell -NoProfile -File tools\Check-Controls.ps1 -NoPause
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tools/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
 
       - name: Parse every game script
         shell: pwsh
@@ -138,6 +159,15 @@ jobs:
           if ($bad) { exit 1 }
           Write-Host 'every bot harness passed'
 
+      - name: Count the silent catches in the launcher
+        shell: pwsh
+        run: |
+          # Entry 239. A catch with nothing in it leaves no line in
+          # launcher.log when it fires, and there were 386 of them on 24 Sep.
+          # Red when any file in tools\app has more than
+          # tools\swallow-baseline.txt allows; the script says what to do.
+          .\tools\Check-Swallow.ps1
+
       - name: Build the launcher
         shell: pwsh
         run: |
@@ -145,6 +175,17 @@ jobs:
           New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
           .\tools\Build-Launcher.ps1 -Root $root -NoPause
           if (-not (Test-Path (Join-Path $root 'Launcher\Thornswood.exe'))) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
+
+      - name: Scan the built launcher for secrets
+        shell: pwsh
+        run: |
+          # The secrets that shipped were in built artefacts, not in the source,
+          # so what this build made is read too, byte by byte: the launcher with
+          # everything Build-Launcher embeds in it, and the setup stub.
+          $built = @(Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe')
+          if (Test-Path tools\setup-stub.exe) { $built += (Resolve-Path tools\setup-stub.exe).Path }
+          .\tools\Check-Secrets.ps1 -Binary $built
+          exit $LASTEXITCODE
 
       - name: Keep the exe from this build
         uses: actions/upload-artifact@v7

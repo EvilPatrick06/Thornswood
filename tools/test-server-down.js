@@ -18,6 +18,10 @@
 // say() in onStrike into a note() would have looked right, passed a parse, and
 // still put nothing on anybody's screen.
 //
+// A probe that never answers is the other way the outage is noticed: once it
+// is past PROBE_DEADLINE_MS, checkServer counts it from the update tick. S7
+// holds that path to the same message and countdown.
+//
 // So this runs the real code, lifted out of thornswood-front.js, against a
 // SkyrimPlatform that refuses game calls outside update exactly the way the
 // fork does, and looks at what reached the corner of the screen.
@@ -113,15 +117,22 @@ function harness(opts) {
     sayFn + '\n' + noteFn + '\n' + consts + '\n' + server +
     '\nfunction frame(now) {\n' + tick + '\n}\n' +
     'return { frame: frame, strikesToLeave: PROBE_STRIKES, every: PROBE_MS,' +
-    '  grace: RESTART_GRACE_MS };');
+    '  grace: RESTART_GRACE_MS,' +
+    // typeof, so FRONT can point at a plugin from before the deadline and S7
+    // fails there rather than the whole file throwing.
+    '  deadline: typeof PROBE_DEADLINE_MS === "undefined" ? 15000 : PROBE_DEADLINE_MS };');
   const api = fn(sp, log, guard, probe, world, clockDate, function () { });
 
   const h = {
     clock: clock, screen: screen, refused: refused, logs: logs, quits: quits,
     world: world, strikesToLeave: api.strikesToLeave, every: api.every,
-    grace: api.grace,
+    grace: api.grace, deadline: api.deadline,
     /* How the server answers the next probe. Up until a scenario says not. */
     answer: function () { return { status: 200, body: '{"online":3}' }; },
+    /* True: every probe is lost and its callback never comes. */
+    silent: false,
+    /* How many probes went out, answered or not. */
+    asked: 0,
     /* Extra time before the first update after the outage is called. */
     stall: 0,
     left: function () { return logs.join('\n').indexOf('server unreachable') !== -1; },
@@ -136,6 +147,8 @@ function harness(opts) {
         if (pending) {
           const cb = pending;
           pending = null;
+          h.asked++;
+          if (h.silent) { continue; }
           const wasLeaving = h.left();
           ctx.where = 'tick';
           try { cb(h.answer()); } finally { ctx.where = 'update'; }
@@ -282,6 +295,42 @@ if (ready) {
     h.run(h.every * (h.strikesToLeave + 1) + 6000, 4);
     yes('S6 at two hundred and fifty frames a second it is still five lines',
         h.screen.length === 5);
+  }
+
+  // S7: a server that takes the connection and never answers. No callback
+  //     comes, so every strike is a deadline counted in the update tick, and
+  //     the person still gets the same line and the same countdown.
+  {
+    const h = harness();
+    h.run(30000);
+    const before = h.asked;
+    const quiet = h.clock.t;
+    h.silent = true;
+    h.run(h.deadline * (h.strikesToLeave + 1) + 6000);
+    const lost = h.asked - before;
+    yes('S7 a server that never answers is left', h.left());
+    yes('S7 after twelve lost asks, and not one more', lost === h.strikesToLeave);
+    yes('S7 each one counted by its deadline',
+        h.logs.filter(function (l) {
+          return l.indexOf('has not answered in') !== -1;
+        }).length === h.strikesToLeave);
+    yes('S7 and it went back to the main menu exactly once',
+        h.quits.length === 1);
+    yes('S7 within twelve deadlines of the silence, plus the five seconds',
+        h.quits.length === 1 &&
+        h.quits[0] - quiet <= h.every +
+          h.strikesToLeave * (h.deadline + 16) + 5100);
+    const counts = h.screen.map(function (s) {
+      const m = s.text.match(/in (\d+)$/);
+      return m ? Number(m[1]) : -1;
+    });
+    yes('S7 the first line says the connection to the server was lost',
+        h.screen.length > 0 &&
+        h.screen[0].text.indexOf('connection to the server was lost') !== -1);
+    yes('S7 it counts down five, four, three, two, one',
+        counts.join(',') === '5,4,3,2,1');
+    yes('S7 and nothing was refused, because all of it ran in update',
+        h.refused.length === 0);
   }
 }
 

@@ -30,10 +30,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $From) { $From = Join-Path $Here 'emotes' }
 
 $plugin  = Join-Path $From 'thornswood-emotes.js'
-$chargen = Join-Path $From 'thornswood-chargen.js'
 $page    = Join-Path $From 'thornswood-emotes.html'
 $ini     = Join-Path $From 'Thornswood.ini'
-foreach ($f in @($plugin, $chargen, $page, $ini)) {
+foreach ($f in @($plugin, $page, $ini)) {
     if (-not (Test-Path -LiteralPath $f)) { throw "not found: $f" }
 }
 
@@ -49,7 +48,6 @@ if (-not (Test-Path -LiteralPath $uiDir)) {
 }
 
 Copy-Item -LiteralPath $plugin  -Destination (Join-Path $pluginDir 'thornswood-emotes.js')  -Force
-Copy-Item -LiteralPath $chargen -Destination (Join-Path $pluginDir 'thornswood-chargen.js') -Force
 Copy-Item -LiteralPath $page    -Destination (Join-Path $uiDir 'thornswood-emotes.html')    -Force
 
 # SkyrimPlatform watches its plugin folders and reloads every plugin whenever
@@ -80,7 +78,6 @@ if (Test-Path -LiteralPath $iniDest) {
 }
 Write-Host 'client plugins installed' -ForegroundColor Cyan
 Write-Host ("  emote wheel      {0}" -f (Join-Path $pluginDir 'thornswood-emotes.js')) -ForegroundColor DarkGray
-Write-Host ("  creation menus   {0}" -f (Join-Path $pluginDir 'thornswood-chargen.js')) -ForegroundColor DarkGray
 Write-Host ("  wheel page       {0}" -f (Join-Path $uiDir 'thornswood-emotes.html')) -ForegroundColor DarkGray
 
 # The browser has to be on, or loadUrl throws and the plugin logs and gives up.

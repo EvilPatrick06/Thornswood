@@ -11,17 +11,29 @@ today, and some of that is being worked on.
 ## Limits of a shared Skyrim
 
 These follow from the server owning the world instead of your own machine.
-What NPCs do is on the roadmap: **Thinning the crowd** and
-**NPCs with their own work**. The rest of this table is being looked at.
+This table is being looked at.
 Report one of these only if it does something this table does not describe.
+
+| Behaviour | Reason |
+|---|---|
+| Mod settings menus reset every session | Your character lives on the server rather than in a save file, so there is no co-save for a mod to write its settings into |
+| Most mod scripts never fire | All Papyrus events except OnUpdate are blocked. Records still work, scripted behaviour does not |
+| Killmoves and stagger do not show on other people | Those animation events are blanked |
+
+## What is decided about NPCs
+
+There are going to be fewer of them. The ones who stay are the traders you
+buy from and sell to, and the people who work the carriages and ferries.
+Every other NPC is to be taken out or remade for Thornswood. The roadmap
+lists this under **Thinning the crowd** and
+**NPCs with their own work**, and neither has a date. Until then, this table
+is how NPCs behave. Report one of these only if it does something this table
+does not describe.
 
 | Behaviour | Reason |
 |---|---|
 | NPCs stand still when nobody is nearby | SkyMP has no server side AI. An NPC is simulated by a nearby machine or not at all |
 | NPC behaviour differs between people near the same enemy | Hosting changes every 2 seconds, so whoever is simulating decides the outcome |
-| Mod settings menus reset every session | Your character lives on the server rather than in a save file, so there is no co-save for a mod to write its settings into |
-| Most mod scripts never fire | All Papyrus events except OnUpdate are blocked. Records still work, scripted behaviour does not |
-| Killmoves and stagger do not show on other people | Those animation events are blanked |
 
 ## What the collection took out
 
@@ -37,8 +49,8 @@ than revision 5. Update it in Vortex.
 
 | Mod | Plugin file | Where it stands |
 |---|---|---|
-| SunHelm Survival | SunHelmSurvival.esp | Out. It polled on a timer, the one script type still running, and wrote health, stamina, magicka and carry weight against a server that crops and corrects them |
-| SunHelm Diseases | SunHelmDiseases.esp | Out. Same, and it depends on SunHelm |
+| SunHelm Survival | SunHelmSurvival.esp | Out. It polled on a timer, the one script type still running, and wrote health, stamina, magicka and carry weight against a server that crops and corrects them. Hunger, thirst, rest and warmth run on the server instead: they are the four bars in the bottom left corner, and /needs gives the numbers |
+| SunHelm Diseases | SunHelmDiseases.esp | Out. It did the same as SunHelm Survival, and it depends on SunHelm. Diseases have not been rebuilt on the server |
 | Embers XD, SunHelm patch | Embers XD - Patch - SunHelm Survival.esp | Out. It patches SunHelm and cannot load without it. Embers XD itself stays |
 | Respawn - Death Overhaul | Respawn - Death Overhaul.esp | Out. It set you essential and ran its own death handler. Death cannot complete on your own machine and the server owns respawn, so it could only fight the server |
 | Tavern Games | TavernGames.esp | Out. It created gold on your own machine, which the server does not accept. The games ran and the coin never arrived |

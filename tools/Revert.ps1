@@ -66,34 +66,13 @@ foreach ($n in @('thornswood-front.js', 'thornswood-voice.js', 'thornswood-probe
   if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force; Note "removed $n" }
 }
 
-foreach ($n in @('thornswood-emotes.js', 'thornswood-chargen.js')) {
+foreach ($n in @('thornswood-emotes.js')) {
   $s = Join-Path $src $n
   if (Test-Path -LiteralPath $s) {
     Copy-Item -LiteralPath $s -Destination (Join-Path $plugins $n) -Force
     Note "restored $n"
   } else {
     Bad "$n is not in the emotes folder, cannot restore it"
-  }
-}
-
-# The one that actually froze the machine. SkyrimPlatform watches its plugin
-# folders and reloads every plugin when anything in one changes, so a log file
-# written there looks exactly like somebody editing a plugin: every line logged
-# triggers a full reload, the reload logs again, and the game spends its life
-# reloading instead of drawing. Black screen, dead keyboard, nothing answers.
-#
-# Checked here rather than trusted, because this was fixed once already and came
-# back when a later edit took its source from the wrong copy.
-$cg = Join-Path $plugins 'thornswood-chargen.js'
-if (Test-Path -LiteralPath $cg) {
-  $t = [IO.File]::ReadAllText($cg)
-  if ($t -match "Data/Platform/Plugins/thornswood-chargen\.log") {
-    $t = $t.Replace('Data/Platform/Plugins/thornswood-chargen.log',
-                    'Data/Platform/thornswood-chargen.log')
-    [IO.File]::WriteAllText($cg, $t, (New-Object Text.UTF8Encoding($false)))
-    Bad 'chargen was logging into the watched plugins folder. Fixed.'
-  } else {
-    Note 'chargen logs outside the watched folder, good'
   }
 }
 

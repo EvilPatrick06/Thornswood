@@ -35,6 +35,11 @@ __pycache__/
 # to commit the whole working tree, which is the other reason this stays out.
 tools/discord/announced.json
 
+# Which ticket each person has open, written by the bot beside itself on the
+# VPS. It is a list of the Discord ids of everybody waiting on staff, so it
+# stays out of the repo if the bot is ever run from a checkout.
+tools/discord/open-tickets.json
+
 # The dev build's own news webhook, for the dev updates channel. Same rule as
 # news-webhook.txt above: anyone holding the URL can post as the bot.
 tools/discord/dev-webhook.txt
@@ -62,6 +67,9 @@ thornswood-backup-key.txt
 # 23 September by running the service locally to prove a header, which left a
 # signing key sitting untracked in tools\voice.
 tools/voice/token-key.txt
+# Not made by the service: the TURN relay's key, put beside it by hand. Ignored
+# here so a copy made to try the relay out of a checkout never reaches git.
+tools/voice/turn-key.txt
 tools/voice/secret.txt
 tools/voice/owners.json
 tools/voice/owners.json.tmp

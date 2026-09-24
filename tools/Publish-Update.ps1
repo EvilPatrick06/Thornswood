@@ -440,29 +440,12 @@ $null = Stop-Game -Root $Root
 Head 'Thornswood - publish'
 
 # ------------------------------------------------------------ what is ours
-$vanillaDataFiles = @('Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm','_ResourcePack.esl','_ResourcePack.bsa')
-$vanillaDataPatterns = @('Skyrim - *.bsa','cc*.esm','cc*.esl','cc*.esp','cc*.bsa')
-$vanillaDataDirs = @('Video','Strings')
-$vanillaRootFiles = @('SkyrimSE.exe','SkyrimSELauncher.exe','steam_api64.dll','bink2w64.dll','Skyrim.ccc','installscript.vdf','Skyrim_Default.ini','High.ini','Low.ini','Medium.ini','Ultra.ini')
-$vanillaRootDirs = @('_DowngraderBackups','Creations','Mods','Skyrim','src')
-
-function Test-Vanilla([string]$rel) {
-    $parts = $rel -split '\\'
-    $top = $parts[0]
-    if ($vanillaRootDirs -contains $top) { return $true }
-    if ($parts.Count -eq 1) { return ($vanillaRootFiles -contains $top) }
-    if ($top -ne 'Data') { return $false }
-    if ($parts.Count -ge 3 -and ($vanillaDataDirs -contains $parts[1])) { return $true }
-    if ($parts.Count -eq 2) {
-        $leaf = $parts[1]
-        if ($vanillaDataFiles -contains $leaf) { return $true }
-        foreach ($p in $vanillaDataPatterns) { if ($leaf -like $p) { return $true } }
-    }
-    return $false
-}
-
-# The rules themselves are in Ship-Rules.ps1, dot-sourced above.
+# The rules themselves are in Ship-Rules.ps1, dot-sourced above. Bethesda's
+# files and other people's frameworks were the last list this file kept for
+# itself, a shorter copy of the installer's, and on 24 September packs were
+# carrying 90 files the installer left out. That list is in Ship-Rules too now.
 $runtimeDirs = $ShipRuntimeDirs
+function Test-Vanilla([string]$rel) { return ((Test-ShipVanilla $rel) -or (Test-ShipForeignFramework $rel)) }
 function Test-Runtime([string]$rel) { return (Test-ShipRuntime $rel) }
 function Test-OtherServer([string]$rel) { return (Test-ShipOtherServer $rel) }
 function Test-Machine([string]$rel) { return (Test-ShipMachine $rel) }
@@ -904,6 +887,18 @@ if (-not $Repo) {
 if (-not $Repo) { Die 'Could not work out which repo to publish to. Pass -Repo owner/name.' }
 Say "  repo: $Repo" 'DarkGray'
 
+# Packs go only into the repository launchers read this feed from, because it
+# is the one they can download from with no token. On 24 September 164 packs
+# on the feed pointed at the private source repository and answered 404 to
+# every launcher; see Feed-Rules.ps1. Refused here, before a byte is uploaded
+# to the wrong place.
+. (Join-Path $Here 'Feed-Rules.ps1')
+$feedRepo = Get-FeedRepo $doc
+if (-not [string]::Equals($Repo, $feedRepo, [StringComparison]::OrdinalIgnoreCase)) {
+    Die ("This would upload to $Repo, but launchers read this feed from $feedRepo and cannot download a pack from anywhere else. " +
+         "Nothing was uploaded and version.json has not been touched. Pass -Repo $feedRepo, or point the origin of $ReleaseDir at it.")
+}
+
 $gh = Get-Command gh -EA SilentlyContinue
 $exeUrl = ''
 
@@ -977,6 +972,28 @@ try {
     $clientRel = $null
 }
 
+# ---- nothing that must never ship, read off what was built ----------------
+#
+# Entry 236. Ship-Rules decides what goes into a pack, and twice a secret got
+# past it because nobody had listed the file yet: the SkyMP sign in in the
+# installer, and voice-token.txt in nine main packs from 18 to 20 September.
+# Check-Secrets reads what was actually built, every pack, the launcher and the
+# client runtime, and stops the release here, before anything is uploaded, on a
+# credential by name or by shape or on a file Ship-Rules says never ships.
+# It prints the file, the line and the rule, never the value. Measured on 24
+# September over the 54 packs and 2 client runtimes on Patrick's machine: the
+# two dev packs that carried a token and the 16 September one that carried
+# five files the rules keep out now fail, and the other 53 pass.
+$scanZips = @($chunks | ForEach-Object { $_.Path })
+if ($clientRel) { $scanZips += $clientRel.path }
+$scanExes = @()
+if ($Launcher -and (Test-Path -LiteralPath $exePath)) { $scanExes += $exePath }
+if ($scanZips.Count -or $scanExes.Count) {
+    Head 'Checking for secrets'
+    & (Join-Path $Here 'Check-Secrets.ps1') -Zip $scanZips -Binary $scanExes
+    if ($LASTEXITCODE -ne 0) { Die 'Something that must never ship is in what was just built. The lines above name each file and rule. Nothing was uploaded.' }
+}
+
 if (-not $NoUpload -and $gh) {
     Head 'Uploading'
     $assets = @()
@@ -986,6 +1003,17 @@ if (-not $NoUpload -and $gh) {
 
     $repoArg = @(); if ($Repo) { $repoArg = @('--repo', $Repo) }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+
+    # ==== thornswood release upload ====
+    # A dev build goes up marked prerelease, so Latest on the public releases
+    # page is always a build everybody gets. Measured 24 Sep with gh release
+    # list on Thornswood-Releases: 156 releases, 59 of them dev, not one marked
+    # prerelease, and Latest was 20260923-2246-dev while the newest main
+    # release was 20260923-2137. Nothing that updates anybody reads Latest:
+    # the launcher, the site and the bot go by version.json and asset ids,
+    # which this does not change. It is what a person browsing the page is
+    # told is current.
+    $pre = @(); if ($Dev) { $pre = @('--prerelease') }
 
     # Tried three times, because GitHub answers HTTP 500 to the release call
     # often enough to be a nuisance rather than an event: it happened on 1.0.133
@@ -998,12 +1026,24 @@ if (-not $NoUpload -and $gh) {
     # the fallback, and it gets the same treatment.
     $tries = 3
     for ($try = 1; $try -le $tries; $try++) {
-        & gh release create $Id @assets @repoArg --title "Update $Id" --notes $(if ($Notes) { $Notes } else { "Update $Id" }) 2>&1 | Out-Host
+        & gh release create $Id @assets @repoArg @pre --title "Update $Id" --notes $(if ($Notes) { $Notes } else { "Update $Id" }) 2>&1 | Out-Host
         if ($LASTEXITCODE -eq 0) { break }
 
         Say '  Release exists, uploading into it instead.' 'DarkGray'
         & gh release upload $Id @assets @repoArg --clobber 2>&1 | Out-Host
-        if ($LASTEXITCODE -eq 0) { break }
+        if ($LASTEXITCODE -eq 0) {
+            # gh release upload has no --prerelease. Given one, gh 2.100.0
+            # stops with "unknown flag: --prerelease" and uploads nothing, so
+            # the flag goes on with an edit instead. This is the path a
+            # resumed release takes, and a create GitHub answered 500 after it
+            # had in fact made the release. A failed edit is said and passed:
+            # the assets are up, and the flag changes nothing a launcher reads.
+            if ($Dev) {
+                & gh release edit $Id @repoArg --prerelease 2>&1 | Out-Host
+                if ($LASTEXITCODE -ne 0) { Say "  $Id is up but could not be marked prerelease; mark it on GitHub." 'Yellow' }
+            }
+            break
+        }
 
         if ($try -lt $tries) {
             $wait = 5 * $try
@@ -1011,6 +1051,7 @@ if (-not $NoUpload -and $gh) {
             Start-Sleep -Seconds $wait
         }
     }
+    # ==== end thornswood release upload ====
 
     $json = & gh api ("repos/{0}/releases/tags/{1}" -f $Repo, $Id) 2>$null
     $ErrorActionPreference = $old
@@ -1098,9 +1139,33 @@ if (-not $NoPush -and (Test-Path (Join-Path $ReleaseDir '.git'))) {
     } finally { $ErrorActionPreference = $old }
 }
 Head 'version.json'
+# ==== thornswood feed append ====
+# tools\test-feed-rules.ps1 runs this block on its own. If the markers move,
+# it stops rather than quietly testing nothing.
+#
+# The feed as pulled, before anything is added to it. What is already there is
+# not rewritten by a publish: taking packs off the feed is Repair-Manifest's
+# job. It is said on every publish until it is done, so it cannot be forgotten.
+$feedRepo = Get-FeedRepo $doc
+$stale = @()
+if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $stale = @((Split-FeedPacks $doc.packs $feedRepo).Drop) }
+if ($stale.Count) {
+    Say ("  {0} pack(s) already on the feed cannot be downloaded by a launcher, {1} to {2}:" -f
+         $stale.Count, (Val $stale[0].Pack 'id'), (Val $stale[$stale.Count - 1].Pack 'id')) 'Yellow'
+    foreach ($why in @($stale | ForEach-Object { $_.Why } | Sort-Object -Unique)) { Say "    $why" 'Yellow' }
+    Say ("  .\tools\Repair-Manifest.ps1{0} -DryRun lists them, and without -DryRun takes them out and pushes." -f $(if ($Dev) { ' -Channel dev' } else { '' })) 'Yellow'
+}
 if ($chunks.Count) {
     $packs = @()
     if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $packs = @($doc.packs) }
+    # Every new pack must download from the repository launchers read this
+    # feed from (Feed-Rules.ps1). An empty url is left to the check further
+    # down, which says what that means.
+    $wrongHost = @($chunks | Where-Object { $_.Url -and -not (Test-FeedPackUrl $_.Url $feedRepo) })
+    if ($wrongHost.Count) {
+        foreach ($w in $wrongHost) { Say "  pack-$($w.Id).zip is at $($w.Url)" 'Red' }
+        Die "Launchers read this feed from $feedRepo and cannot download a pack from anywhere else, so version.json has not been touched. Nobody has been sent a pack they cannot fetch."
+    }
     # In order. The launcher applies whatever it has not seen, in the order it
     # finds them, so part one has to be listed before part two.
     foreach ($c in $chunks) {
@@ -1114,6 +1179,7 @@ if ($chunks.Count) {
     }
     Set-Prop $doc 'packs' $packs
 }
+# ==== end thornswood feed append ====
 # The client runtime's address, so a launcher missing one of those six files
 # asks for it by name instead of searching the packs for it.
 if ($clientRel -and $clientRel.url) {
@@ -1500,7 +1566,7 @@ if ($blank.Count) {
     Write-Host ''
     Say 'version.json has been written but NOT pushed. Nobody has this yet.' 'Yellow'
     Say 'The upload is what failed, usually the token or the release. Fix that and run Ship again.' 'Yellow'
-    Say 'If a bad one did go out, .\tools\Repair-Manifest.ps1 takes it back out and pushes.' 'Yellow'
+    Say ("If a bad one did go out, .\tools\Repair-Manifest.ps1{0} takes it back out and pushes." -f $(if ($Dev) { ' -Channel dev' } else { '' })) 'Yellow'
     Write-Host ''
     [void](Read-Host 'Enter to exit')
     exit 1

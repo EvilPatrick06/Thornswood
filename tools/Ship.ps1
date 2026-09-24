@@ -4,14 +4,15 @@
   One command. Builds the launcher and publishes everything that changed,
   launcher and mods both, in a single release.
 
-  THE VERSION IS BUMPED BEFOREHAND, not here, by Bump-Version.ps1. Ship only
-  reads this repository now and writes nothing back to it, which is what lets
-  branch protection apply to everybody including the owner. A main release is
-  refused if anything is uncommitted or unpushed, so what ships and what is
-  written down are the same thing.
+  THE VERSION IS BUMPED BEFOREHAND, not here, by Bump-Version.ps1, and the bump
+  reaches main through a pull request like any other change: main refuses a
+  push from everybody, the owner included. Ship only reads this repository and
+  writes nothing back to it. A main release is refused if anything is
+  uncommitted or unpushed, or if a file under tools is one git does not know,
+  so what ships and what is written down are the same thing.
 
-      .\tools\Bump-Version.ps1
-      git push
+      .\tools\Bump-Version.ps1        then the branch and pull request it prints
+      git checkout main; git pull     once that pull request is merged
       .\tools\Ship.ps1 "..."
 
   THE NOTE IS WHAT CUSTOMERS READ, in the launcher's News tab, on the site and
@@ -30,7 +31,8 @@
   Options:
       -NoBump          kept for anything that passes it; every main release
                        now keeps the version number, so it changes nothing
-      -Version 1.2.0   set it explicitly
+      -Version 1.2.0   a dev build's number; a main release refuses it, and
+                       .\tools\Bump-Version.ps1 -To 1.2.0 is how main moves
       -ModsOnly        skip the launcher, publish only changed mod files
       -DryRun          build and diff, but upload nothing
       -Package         also rebuild the two installer files for new people
@@ -215,6 +217,12 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
     $oldEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $branch = (& git -C $RepoDir rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()
     $dirty = @(& git -C $RepoDir status --porcelain --untracked-files=no 2>$null | Where-Object { $_ })
+    # And the files under tools that git has never been told about, which the
+    # line above leaves out. Ignored ones are not counted: measured 24 Sep, all
+    # 14 files under tools on Patrick's machine that git does not track are
+    # ignored (the webhooks, signing.json, __pycache__, a log, the front's zip),
+    # and counting them would stop every main release.
+    $loose = @(& git -C $RepoDir ls-files --others --exclude-standard -- tools 2>$null | Where-Object { $_ })
     & git -C $RepoDir fetch --quiet origin 2>$null | Out-Null
     $behind = 0
     $ahead = 0
@@ -227,7 +235,7 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
         if ($behind -gt 0) { Die "main is $behind commit(s) behind origin/main. Run git pull first, so the other machine's work is in this release." }
 
         # A MAIN RELEASE NOW SHIPS ONLY WHAT IS ALREADY ON GITHUB, and these
-        # two refusals are the whole of that rule.
+        # three refusals are the whole of that rule.
         #
         # Ship used to build from the working tree and then commit and push it
         # afterwards, so a release could go out carrying code that existed on
@@ -241,12 +249,34 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
         if ($dirty.Count) {
             foreach ($d in $dirty | Select-Object -First 10) { Say "    $d" 'Yellow' }
             Die ("There are $($dirty.Count) uncommitted change(s). A release ships what is on GitHub, and " +
-                 "Ship no longer commits anything itself, so these would not travel. Commit them, push them, " +
-                 "then Ship.")
+                 "Ship no longer commits anything itself, so these would not travel. Put them on a branch " +
+                 "and through a pull request, or put them back, then Ship.")
+        }
+        # The uncommitted count above never saw a NEW file, and a new file
+        # ships all the same: Go.ps1 copies every tools\ts-plugins\*.js into
+        # the game folder and the build compiles every tools\app\*.cs, whether
+        # git knows them or not. So a scratch plugin would pass this gate and go
+        # out in the pack while GitHub had never seen it, which is where the
+        # entry's worry, "a scratch file with something private in it lands
+        # next", had moved to once Ship stopped committing. Found in the
+        # review of entry 205 on 24 Sep.
+        #
+        # One ignored file does ship and is not counted: tools\thornswood-
+        # front.zip, which Go.ps1 unpacks into Data\Platform\UI. *.zip keeps it
+        # out of git and it has never been committed. Whether it should be is
+        # not a question this gate can settle.
+        if ($loose.Count) {
+            foreach ($d in $loose | Select-Object -First 10) { Say "    $d" 'Yellow' }
+            Die ("There are $($loose.Count) file(s) under tools that git does not know about. The build " +
+                 "and Go.ps1 take them anyway, so they would go out in this release without being on GitHub. " +
+                 "Put them through a pull request, delete them, or add them to .gitignore, then Ship.")
         }
         if ($ahead -gt 0) {
-            Die ("main is $ahead commit(s) ahead of origin/main. Run git push first: a release has to be " +
-                 "buildable from what everybody else can see, and Ship no longer pushes anything itself.")
+            # Not "git push": main refuses a push from everybody since
+            # enforce_admins went on, so that advice sent people into a refusal.
+            Die ("main is $ahead commit(s) ahead of origin/main. A release has to be buildable from what " +
+                 "everybody else can see, and main takes commits only through a pull request: move them to " +
+                 "a branch, push that, merge its pull request, git pull, then Ship.")
         }
     } elseif ($behind -gt 0) {
         Say "  this branch is $behind commit(s) behind origin; the dev build will not carry them" 'Yellow'
@@ -266,6 +296,17 @@ if ($ModsOnly) {
     $target = $current
 }
 elseif ($Version) {
+    # A main release ships the number already on main, like everything else in
+    # it. -Version used to write a new one into Updater.cs here, and on a
+    # release that went out nothing committed it or put it back, so every
+    # launcher would be told a version main had never heard of and the next
+    # main Ship would find Updater.cs uncommitted. Found in the review of
+    # entry 205 on 24 Sep. A dev build still takes it: its source is put back
+    # after the build and the number only ever lives in the dev feed.
+    if (-not $Dev -and $Version -ne $current) {
+        Die ("A main release ships the version already on main, $current. Move it first with " +
+             ".\tools\Bump-Version.ps1 -To $Version and its pull request, then Ship without -Version.")
+    }
     $target = $Version
 }
 elseif ($Dev) {
@@ -383,7 +424,7 @@ function Unbump([string]$why) {
 # ------------------------------------------------------------ build
 if (-not $ModsOnly) {
     Head 'Building the launcher'
-    # Resolved twice on purpose. The build writes Thornswood.exe and removes a
+    # Resolved twice on purpose. The install writes Thornswood.exe and removes a
     # SkyrimTogether.exe left over from before the rename, so the path that
     # existed going in is not necessarily the path that exists coming out.
     # Holding on to the first answer makes a build that worked look like a
@@ -398,7 +439,13 @@ if (-not $ModsOnly) {
         }
     }
 
-    & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -NoPause
+    # The build and the install are two scripts since 24 September (To Do List
+    # entry 243). The build compiles into a folder of its own, so csc never
+    # meets the launcher still running from the install, and Install-Launcher
+    # then closes the game and the launcher, puts the exe in place and does
+    # the shortcut and the icon, which is everything the build used to do.
+    $buildOut = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
+    & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause
     $buildCode = $LASTEXITCODE
 
     <#
@@ -420,6 +467,14 @@ if (-not $ModsOnly) {
     if ($buildCode -ne 0) {
         Unbump 'the launcher build failed'
         Die ('The launcher build stopped with exit code ' + $buildCode +
+             '. Nothing was published. The errors are above.')
+    }
+
+    & (Join-Path $Here 'Install-Launcher.ps1') -Root $Root -From $buildOut -NoPause
+    $installCode = $LASTEXITCODE
+    if ($installCode -ne 0) {
+        Unbump 'the launcher could not be put in place'
+        Die ('Putting the new launcher into ' + $launchDir + ' stopped with exit code ' + $installCode +
              '. Nothing was published. The errors are above.')
     }
 
