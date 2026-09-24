@@ -28,6 +28,17 @@ param(
   [string]$User = 'Administrator',
   [string]$Root = 'C:/Thornswood-Docs',
   [string]$CaddyDir = 'C:/Thornswood-Caddy',
+  # One Caddy release, and the SHA-512 Caddy publishes for its Windows zip in
+  # caddy_<version>_checksums.txt on the release page. This used to fetch from
+  # the download API on caddyserver.com, which is whatever build Caddy serves
+  # that day, checked against nothing, so the next fresh box could have come up
+  # on a new major nobody had tried. Bump both together, on purpose, from
+  # https://github.com/caddyserver/caddy/releases. 2.11.4 is the newest release
+  # as of 24 Sep and so the build the old URL was handing out; its zip was
+  # downloaded and hashed that day and matched both the value here and the
+  # SHA-256 GitHub shows beside the asset.
+  [string]$CaddyVersion = '2.11.4',
+  [string]$CaddySha512  = 'cd5ccfd86a4b40732cf715890d0dca5bf3f63adefec5a7914de85adf240c60ce7e5d2791631b88ef9758e46b23bb1730e020b9c5d696889740b284ffd4788e35',
   [switch]$SkipDnsCheck,
   # Only register the Thornswood Web task and restart Caddy. Nothing is
   # downloaded, no Caddyfile is written, no firewall rule is touched and the
@@ -132,13 +143,32 @@ Remote @"
 if (-not (Test-Path `$dir)) { New-Item -ItemType Directory -Path `$dir -Force | Out-Null }
 
 if (-not (Test-Path (Join-Path `$dir 'caddy.exe'))) {
-  'downloading caddy'
+  'downloading caddy $CaddyVersion'
   [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  `$zip = Join-Path `$dir 'caddy_${CaddyVersion}_windows_amd64.zip'
   Invoke-WebRequest -UseBasicParsing ``
-    -Uri 'https://caddyserver.com/api/download?os=windows&arch=amd64' ``
-    -OutFile (Join-Path `$dir 'caddy.exe')
-  'downloaded'
-} else { 'caddy already here' }
+    -Uri 'https://github.com/caddyserver/caddy/releases/download/v$CaddyVersion/caddy_${CaddyVersion}_windows_amd64.zip' ``
+    -OutFile `$zip
+  # Checked before anything is unpacked. A zip that does not match is deleted
+  # and nothing is installed, rather than a caddy.exe nobody can vouch for.
+  `$got = (Get-FileHash -LiteralPath `$zip -Algorithm SHA512).Hash
+  if (`$got -ne '$CaddySha512') {
+    Remove-Item -LiteralPath `$zip -Force -EA SilentlyContinue
+    throw ('caddy $CaddyVersion does not match the checksum Caddy published for it, so it was not installed. Got ' + `$got)
+  }
+  # The zip also carries LICENSE and README.md. Only caddy.exe is wanted.
+  `$unpack = Join-Path `$dir 'caddy-unpack'
+  Expand-Archive -LiteralPath `$zip -DestinationPath `$unpack -Force
+  Move-Item -LiteralPath (Join-Path `$unpack 'caddy.exe') -Destination (Join-Path `$dir 'caddy.exe')
+  Remove-Item -LiteralPath `$unpack, `$zip -Recurse -Force
+  'downloaded caddy $CaddyVersion, checksum matched'
+} else {
+  # The pin is for a fresh box. One that already has caddy keeps it, and says
+  # which it is, so a box on some other version is plain to see.
+  `$have = 'a version it would not say'
+  try { `$have = ((& (Join-Path `$dir 'caddy.exe') version) -join ' ').Trim() } catch { }
+  'caddy already here, ' + `$have + '. A fresh box gets $CaddyVersion.'
+}
 
 [IO.File]::WriteAllBytes((Join-Path `$dir 'Caddyfile'),
                          [Convert]::FromBase64String('$cfg64'))
