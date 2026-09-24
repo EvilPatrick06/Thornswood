@@ -23,7 +23,8 @@
 // that broke an id or a class the script reads fails this too.
 //
 // thornswood-party.js and thornswood-trade.js were drawn from the same old
-// template and are not held to anything here: Patrick named the journal.
+// template and now wear the same theme; tools/test-party-trade-theme.js holds
+// them to it.
 //
 // Read only.
 const fs = require('fs');
