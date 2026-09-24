@@ -227,6 +227,16 @@ Copy-Item -LiteralPath $Gamemode -Destination (Join-Path $Dist 'gamemode.js') -F
 $kb = [math]::Round((Get-Item (Join-Path $Dist 'gamemode.js')).Length / 1KB)
 Write-Host "gamemode.js -> $Dist  ($kb KB)" -ForegroundColor Cyan
 
+# What this gamemode is, written beside it, so the server can say which build it
+# runs instead of a person hashing files to find out. Deploy-Server.ps1 carries
+# it up with gamemode.js. Written straight after the copy and from the same
+# source, so the two always agree even if something below stops this run. The
+# fields and the reasons are in BuildStamp.ps1.
+. (Join-Path $Here 'BuildStamp.ps1')
+$buildStamp = Save-ThornswoodBuildStamp -Gamemode $Gamemode -Channel main -RepoDir (Split-Path -Parent $Here) `
+                -Path (Join-Path $Dist 'thornswood-build.json')
+Write-Host ("thornswood-build.json  {0}" -f (Format-ThornswoodBuildStamp $buildStamp)) -ForegroundColor DarkGray
+
 function Read-PluginHeader([string]$path) {
     $fs = [IO.File]::OpenRead($path)
     $len = [Math]::Min(16384, $fs.Length)
