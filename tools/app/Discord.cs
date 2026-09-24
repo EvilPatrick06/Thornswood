@@ -28,6 +28,7 @@ using System.IO;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace Thornswood
@@ -500,13 +501,28 @@ namespace Thornswood
                 string plat = Path.Combine(Paths.Game, "Data\\Platform");
                 string[][] want = new string[][] {
                     new string[] { "launcher.log",               Path.Combine(Folder, "launcher.log") },
+                    // The SKSE crash log, for a game that went down with no
+                    // message (entry 105, Djinn on 20 September: "I was on the
+                    // menu and alt tabbed to respond and the dev in game on K
+                    // menu crashed"). Only the one this session wrote, because
+                    // that folder keeps every crash there has ever been. Second
+                    // in the list, so a set too big for the site loses the
+                    // everyday logs before it loses this one.
+                    new string[] { "crash.log",                  CrashLogSince(Files.SkseLogDir, PendingSince(PendingFile, session)) },
                     new string[] { "thornswood-front.log",       Path.Combine(plat, "thornswood-front.log") },
                     new string[] { "thornswood-voice.log",       Path.Combine(plat, "thornswood-voice.log") },
                     new string[] { "thornswood-emotes.log",      Path.Combine(plat, "thornswood-emotes.log") },
                     new string[] { "thornswood-input.log",       Path.Combine(plat, "thornswood-input.log") },
                     new string[] { "thornswood-dress.log",       Path.Combine(plat, "thornswood-dress.log") },
                     new string[] { "thornswood-loadorder.txt",   Path.Combine(plat, "thornswood-loadorder.txt") },
-                    new string[] { "thornswood-plugins-light.txt", Path.Combine(plat, "thornswood-plugins-light.txt") }
+                    new string[] { "thornswood-plugins-light.txt", Path.Combine(plat, "thornswood-plugins-light.txt") },
+                    // Skyrim Platform's own log: the browser, the native calls
+                    // the plugins make, and any script that threw. The game
+                    // starts it afresh each run, so it is this session's. Last,
+                    // because it is the biggest: 1.3 MB for a session of under
+                    // three minutes on Patrick's machine on 23 September, of
+                    // which the tail is sent.
+                    new string[] { "skyrim-platform.log",        Path.Combine(Files.SkseLogDir, "skyrim-platform.log") }
                 };
 
                 var sb = new StringBuilder();
@@ -518,10 +534,15 @@ namespace Thornswood
                 int n = 0;
                 for (int i = 0; i < want.Length; i++)
                 {
-                    string text = ReadLogTail(want[i][1]);
+                    string text = Scrub(ReadLogTail(want[i][1]));
                     if (text.Length == 0) continue;
+                    string one = "\"" + Escape(want[i][0]) + "\":\"" + Escape(text) + "\"";
+                    // Past what the site reads it drops the connection, and
+                    // every log in the body with it. The one that would tip it
+                    // over is left out instead, so the rest still arrive.
+                    if (sb.Length + one.Length + 3 > LogBodyMax) continue;
                     if (n > 0) sb.Append(",");
-                    sb.Append("\"").Append(Escape(want[i][0])).Append("\":\"").Append(Escape(text)).Append("\"");
+                    sb.Append(one);
                     n++;
                 }
                 sb.Append("}}");
@@ -667,6 +688,85 @@ namespace Thornswood
             catch { return ""; }
         }
 
+        /// <summary>
+        /// The most one set of logs may come to. The site reads a body of at
+        /// most 1 MB and 64 KB (server.js, /api/play/logs: SLOG_ALL plus
+        /// 64 KB) and drops the connection past that, and it keeps no more
+        /// than 1 MB of logs from a set anyway.
+        /// </summary>
+        const int LogBodyMax = 1024 * 1024;
+
+        /// <summary>
+        /// When the session being sent began, or MinValue when that is not
+        /// known.
+        ///
+        /// Read off the pending marker, which SessionStart writes as the game
+        /// starts, so it is the same answer at the end of the session and at
+        /// the next launcher start after a session that took the launcher down
+        /// with it. Only when the marker names this session: a marker left by
+        /// another one would date the wrong window.
+        /// </summary>
+        static DateTime PendingSince(string pendingFile, string id)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(id) || !File.Exists(pendingFile)) return DateTime.MinValue;
+                if ((File.ReadAllText(pendingFile) ?? "").Trim() != id) return DateTime.MinValue;
+                return File.GetLastWriteTimeUtc(pendingFile);
+            }
+            catch { return DateTime.MinValue; }
+        }
+
+        /// <summary>
+        /// The newest SKSE crash log written at or after sinceUtc, or "".
+        ///
+        /// CrashLogger names them crash-YYYY-MM-DD-HH-MM-SS.log and never
+        /// deletes one, so an older crash is always sitting there, and sending
+        /// it against this session would blame this session for it. With no
+        /// start to measure from, none is sent. Whole, in practice: the two on
+        /// Patrick's machine (19 and 22 September) are 45 KB and 48 KB, well
+        /// under the tail ReadLogTail takes.
+        /// </summary>
+        static string CrashLogSince(string dir, DateTime sinceUtc)
+        {
+            try
+            {
+                if (sinceUtc == DateTime.MinValue || !Directory.Exists(dir)) return "";
+                string best = "";
+                DateTime bestAt = DateTime.MinValue;
+                foreach (string f in Directory.GetFiles(dir, "crash-*.log"))
+                {
+                    DateTime at = File.GetLastWriteTimeUtc(f);
+                    if (at < sinceUtc || at <= bestAt) continue;
+                    best = f;
+                    bestAt = at;
+                }
+                return best;
+            }
+            catch { return ""; }
+        }
+
+        /// <summary>
+        /// A log with anything shaped like a voice join token or a Discord
+        /// ticket taken out, before it leaves this machine.
+        ///
+        /// The game holds the join token (thornswood-front.js hands it to the
+        /// browser page), and a crash log dumps what was on the stack, so a
+        /// crash at the wrong moment could carry one, although the plugins
+        /// take care never to log it. Matched by shape rather than by the
+        /// current value, because the token is renewed every few minutes and
+        /// the one in a crash is whichever was live then:
+        /// "v1.profile.until.signature" from voice-server.js signToken, and
+        /// "tk1.body.signature" from the site.
+        /// </summary>
+        static string Scrub(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            string s = Regex.Replace(text, @"\bv1\.[0-9]+\.[0-9]+\.[A-Za-z0-9_-]{16,}", "v1.[join token removed]");
+            s = Regex.Replace(s, @"\btk1\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", "tk1.[ticket removed]");
+            return s;
+        }
+
         /// <summary>Everything both ends send, without the closing brace.</summary>
         static string Head(int profileId)
         {
@@ -795,9 +895,34 @@ namespace Thornswood
             return json.Substring(i, end - i).Trim();
         }
 
+        /// <summary>
+        /// A string as it goes inside quotes in JSON.
+        ///
+        /// Line breaks and every other control character too, not just the
+        /// backslash and the quote. JSON does not allow a raw line break in a
+        /// string, and the site's JSON.parse refuses the whole body over one.
+        /// Every log is nothing but line breaks, so until this, every set of
+        /// session logs reached the site as an empty object with no ticket in
+        /// it, and the site answered 401. Measured in Profile\launcher.log on
+        /// Patrick's machine on 24 September: 27 uploads since 22 September,
+        /// 27 answered 401, none sent. The start and the end of each session,
+        /// which carry no line break, were recorded all along.
+        /// </summary>
         public static string Escape(string s)
         {
-            return (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new StringBuilder(s.Length + 64);
+            foreach (char c in s)
+            {
+                if (c == '\\') sb.Append("\\\\");
+                else if (c == '"') sb.Append("\\\"");
+                else if (c == '\n') sb.Append("\\n");
+                else if (c == '\r') sb.Append("\\r");
+                else if (c == '\t') sb.Append("\\t");
+                else if (c < ' ') sb.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
+                else sb.Append(c);
+            }
+            return sb.ToString();
         }
     }
 }

@@ -1,70 +1,66 @@
-SKYRIM TOGETHER
-===============
+THORNSWOOD
+==========
 
-Run SkyrimTogether-Setup.exe, with SkyrimTogether-Setup.zip sitting in the same
-folder. Do not unzip it yourself, the exe does that.
+Thornswood is a co-op Skyrim roleplay server, in closed playtest and for
+people eighteen and over. You apply in the Discord first:
+https://thornswood.net/discord
 
-Windows will probably say "Windows protected your PC" because the file is not
-signed. Click "More info", then "Run anyway". That warning appears for any
-program without a code-signing certificate.
-
-
-What it does
-------------
-Builds a complete, self-contained Skyrim on the drive you pick, with our whole
-mod list already set up. You do not install mods. You do not run Nemesis. You
-do not need a Nexus account, Vortex, or Mod Organizer.
-
-Your Steam copy of Skyrim is only READ. Nothing there is renamed, patched or
-deleted. If you play another server or anything else, it keeps working exactly
-as it does now.
+The full guide is https://thornswood.net/join. It is kept up to date, so if
+it and this file ever disagree, the site is right.
 
 
 What you need
 -------------
-- Skyrim Special Edition installed on Steam, on this PC
-- About 32 GB free on whichever drive you choose
-- Steam signed in and running
+- Skyrim Special Edition on Steam, on this PC. Anniversary Edition is not
+  required.
+- Vortex, with a free Nexus Mods account. The mods come from a collection on
+  Nexus, and only Vortex can install a collection.
+- Steam signed in and running.
+
+Thornswood goes into the Skyrim you already have. It does not make a second
+copy of the game.
 
 
-One thing it may ask you to do
-------------------------------
-Our server runs game build 1.6.1170 and Steam ships a newer one. If your copy
-is newer, the installer stops and shows three download_depot commands, already
-on your clipboard. Paste them into the Steam console ONE AT A TIME and wait for
-each to print Done. There is no progress bar. Then press Enter in the installer
-window.
+Installing
+----------
+1. Run Thornswood-Setup.exe. Do not unzip anything yourself, it does that.
+   If Windows says "Windows protected your PC", press "More info", then
+   "Run anyway". It fetches Thornswood's own content while you watch and puts
+   the launcher and that content into your Skyrim.
 
-That is Steam handing you an older build of a game you already own. It
-downloads into Steam's own folder and does not change your installed game.
+2. Open Thornswood from the desktop shortcut. The server runs Skyrim build
+   1.6.1170 and most copies are newer. If yours is, a card on the launcher's
+   front page says so. Press Downgrade and Steam downloads that build under
+   your own account. It is a few gigabytes, so give it a while.
+
+3. Install the collection in Vortex. The link is on
+   https://thornswood.net/downloads and on the launcher's Add-ons page. This
+   is not optional: without it you have a launcher and no mods, and the
+   server turns you away when you press Play.
+
+4. Press Connect Discord on the launcher's front page. Your browser opens,
+   you say yes, and it closes itself. You only do this once.
 
 
 Playing
 -------
-You get a "Thornswood" shortcut on your desktop. Open it and press PLAY.
+Always start from the Thornswood shortcut. Not Skyrim, not Steam, not SKSE.
+The launcher takes any waiting update before it lets you play, because
+everybody has to run the same files or nobody can connect. There is no
+address to type and no password to remember.
 
-First time only:
-- Make a new character and NAME IT AFTER YOURSELF. That name is what the rest
-  of us see over your head in game.
-- Save once before you connect.
+Voice runs in the launcher, not the game, so leave the launcher open while
+you play.
 
-Then connect to the address shown in the launcher. Ask in the Discord for the password.
-
-
-While you play
---------------
-The launcher points Skyrim's settings and saves folders at this build while the
-game is running, and puts them back the second you quit. If the game crashes
-hard, just open the launcher again and it cleans that up by itself. The "Unlink"
-button does it on demand.
+Do not run Steam's "Verify Integrity of Game Files" on Skyrim. It moves your
+copy to the newest build, and the server runs 1.6.1170.
 
 
 If something goes wrong
 -----------------------
-The launcher shows five checks. Any red row is the problem. "Repair" puts the
-settings files back to the ones that shipped. Screenshot the launcher and send
-it to the Discord.
+Look at https://thornswood.net/known and https://thornswood.net/help first.
+If it is not there, say so in the Discord with what you were doing, what you
+expected and what happened instead, or use https://thornswood.net/report.
 
-Do not run Steam's "Verify Integrity of Game Files" on Skyrim. It drags your
-Steam copy to the newest build. It cannot hurt our folder, but it is a bad
-habit while any of this is set up.
+The launcher's Logs page lists its own log and any crash logs, and opens
+them. Drag either straight into the Discord channel.
