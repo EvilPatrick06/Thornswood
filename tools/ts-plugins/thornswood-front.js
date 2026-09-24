@@ -2437,7 +2437,10 @@
     }
     fireHere = out;
     fireHits = out.length;
-    log('fires: ' + out.length + ' of ours in this cell, out of ' + walked +
+    // fireWalked, not walked: that one lives inside refsInCell. Naming it here
+    // threw on every cell change from #184 on, 80 times in the dev log of
+    // 23 September, and the place report for that tick never went.
+    log('fires: ' + out.length + ' of ours in this cell, out of ' + fireWalked +
         ' thing(s) looked at');
     return fireHere;
   }
@@ -4310,6 +4313,31 @@
 
     // Five seconds between saying so and doing it, so the line is readable and
     // so a server that comes straight back up is not made into an outage.
+    /*
+      AND THE LINE IS ON THE SCREEN, WITH THE COUNTDOWN.
+
+      Entry 159 on the To Do List: "Connection to the server was lost,
+      returning to the main menu, on screen, with the countdown. Every online
+      game does this." Until now the five seconds were a bare delay with
+      nothing drawn, and the one sentence explaining them went to the log.
+
+      Drawn here, in update, and not where the outage is noticed: onStrike
+      says why a note there never reaches the screen.
+
+      One line for each whole second, not one per frame, because
+      Debug.notification queues every call and a frame's worth would still be
+      scrolling past long after the quit. The first line carries the reason
+      whichever second it lands on, so a slow first frame cannot leave
+      somebody looking at a bare number.
+    */
+    if (leaving && now - leaving >= 0 && now - leaving <= 5000) {
+      const left = Math.max(1, Math.ceil((5000 - (now - leaving)) / 1000));
+      if (left !== leavingSaid) {
+        note((leavingSaid ? '' : 'the connection to the server was lost, ') +
+             'returning to the main menu in ' + left);
+        leavingSaid = left;
+      }
+    }
     if (leaving && now - leaving > 5000) {
       leaving = now + 3600000;   // never twice
       // No longer in the world, and said so before the quit rather than after,
@@ -4319,7 +4347,9 @@
         sp.Game.quitToMainMenu();
       } catch (e) {
         log('could not quit to the main menu:', e);
-        say('the server is down. Close the game and press Play again.');
+        // On screen, because this is the one path where the person is left
+        // standing in a world with no server behind it.
+        note('the server is down. Close the game and press Play again.');
       }
     }
 
@@ -4428,6 +4458,9 @@
   let probing = false;
   let lastProbe = 0;
   let leaving = 0;
+  /* The last whole second the way-out countdown put on screen, 0 before the
+     first. See the quit in the tick above, the only place that can draw it. */
+  let leavingSaid = 0;
   /* When the server last said a countdown was running. See PROBE_STRIKES. */
   let toldRestarting = 0;
 
@@ -4482,6 +4515,17 @@
       return;
     }
     leaving = Date.now();
+    /*
+      A LOG LINE, NOT A NOTE, AND ON PURPOSE.
+
+      This runs inside the probe's HttpClient callback, and SkyrimPlatform
+      delivers those from its tick (TickImpl in SkyrimPlatform.cpp, in the
+      fork), where there is no Papyrus VM. CallNativeApi.cpp throws "can't be
+      called in this context" for any game call without one, and note()
+      swallows that throw, so a note here would only ever reach the log again,
+      which is the bug entry 159 was about. The quit in the update tick above
+      draws the message and the countdown, where game calls work.
+    */
     say('the server has gone down, going back to the menu');
     log('server unreachable', PROBE_STRIKES, 'times running, quitting to the main menu');
   }

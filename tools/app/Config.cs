@@ -526,6 +526,26 @@ namespace Thornswood
         [DataMember] public string presenceImage = "";
 
         [DataMember] public string message = "";
+
+        // Entry 262: hold Play for maintenance, or below a launcher version.
+        // Set by hand in the releases repo and read by FeedNotice, which says
+        // what each one does.
+        //
+        // maintenance is a string although it means yes or no. Measured on 24
+        // September with this serializer on the .NET Framework: a bool field
+        // given "yes" or null throws, and a throw here is not one field lost,
+        // it is the whole document unread. Every launcher then says there was
+        // no answer from the update source and shuts Play, which would turn a
+        // typo in a switch meant for one afternoon into a lockout for
+        // everybody. As a string, true, "true", 1, null and "yes" all read
+        // without a word, and FeedNotice.On decides what counts as on.
+        //
+        // Both are null on a feed written before this existed: the serializer
+        // does not run field initialisers, which the same measurement showed
+        // for message too.
+        [DataMember] public string maintenance;
+        [DataMember] public string minLauncher;
+
         [DataMember] public Pack[] packs = new Pack[0];
 
         // Packs nobody has to have. These are never applied on their own: they
