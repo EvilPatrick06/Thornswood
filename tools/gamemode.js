@@ -16765,10 +16765,52 @@ log('gamemode loaded:',
     return Object.prototype.hasOwnProperty.call(toolIds, baseId);
   }
 
+  /*
+    COIN PURSES ARE GOLD, THOUGH NOT ONE OF THEM IS A COIN.
+
+    Patrick, 24 September, after a playtest: "people can pick up coin pocuhes
+    off the ground that was supposed to be included in no gold lol".
+
+    A purse is a FLOR, flora, whose produce is a leveled list of Gold001. The
+    press goes to the engine, and MpObjectReference::ProcessActivateNormal in
+    the fork treats a FLOR as something to pick: GivePickupItemsToActivationSource
+    rolls the list and AddItems the coin straight into the pack. No gold ever
+    lies on the ground and nothing in here is asked what it is, so isSpoil
+    looked at a FLOR, said no, and the purse paid out. And again an hour later,
+    since the fork puts flora back after an hour.
+
+    These six are every FLOR in the load order whose produce is coin, read off
+    tools\harvests.json 'unranked', which Build-HarvestTable.ps1 fills from all
+    of the collection's plugins: the three purses and the three the Thieves
+    Guild's jobs use. The other leveled-list produce there is fish and horker
+    meat. test-spoils.js fails if a rebuilt table has a coin purse that is not
+    on this list.
+  */
+  var PURSES = [
+    'd790c:Skyrim.esm',    // CoinPurseSmall
+    'd8e7f:Skyrim.esm',    // CoinPurseMedium
+    'd8e80:Skyrim.esm',    // CoinPurseLarge
+    'd8e8a:Skyrim.esm',    // TGCoinPurseLargeNEW
+    'd8e8b:Skyrim.esm',    // TGCoinPurseMediumNEW
+    'd8e8c:Skyrim.esm'     // TGCoinPurseSmallNEW
+  ];
+  var purseIds = null;
+  function isPurse(baseId) {
+    if (!purseIds) {
+      purseIds = {};
+      for (var i = 0; i < PURSES.length; i++) {
+        var id = idOf(PURSES[i]);
+        if (id) { purseIds[id] = true; }
+      }
+    }
+    return Object.prototype.hasOwnProperty.call(purseIds, baseId);
+  }
+
   /** True when the world must not hand this over. */
   function isSpoil(baseId) {
     if (!baseId) { return false; }
     if (baseId === GOLD) { return true; }
+    if (isPurse(baseId)) { return true; }
     if (isTool(baseId)) { return true; }
     return Object.prototype.hasOwnProperty.call(SPOIL_TYPES, kindOf(baseId));
   }
@@ -16899,6 +16941,20 @@ log('gamemode loaded:',
       }
       return null;
     }
+    /*
+      A purse before the dropped-thing test, since nobody can drop a purse:
+      it is a piece of the world, and the coin in it is never somebody's.
+      And it is put back, the way a refused plant is (PUT THAT PLANT BACK),
+      because the person's own game empties a FLOR before this answers and
+      would otherwise show every refused purse as taken.
+    */
+    if (isPurse(baseId)) {
+      if (typeof putBack === 'function') {
+        try { putBack(actorId, refrId); } catch (e) { slog('could not put purse', refrId.toString(16), 'back:', e); }
+      }
+      return 'That coin purse was left here by nobody. Coin comes from people ' +
+             'in this world, not off the ground.';
+    }
     // Made at runtime rather than placed by a plugin, so somebody put it there.
     if (refrId >= 0xff000000) { return null; }
     if (!isSpoil(baseId)) { return null; }
@@ -16982,7 +17038,7 @@ log('gamemode loaded:',
   g.__thornswoodSpoils = {
     purse: purse, PURSE: PURSE, PURSE_PROPERTY: PURSE_PROPERTY,
     activate: activate, strip: strip, isSpoil: isSpoil, kindOf: kindOf,
-    isTool: isTool, alreadyStripped: alreadyStripped,
+    isTool: isTool, isPurse: isPurse, PURSES: PURSES, alreadyStripped: alreadyStripped,
     SPOIL_TYPES: SPOIL_TYPES, GOLD: GOLD, STRIPPED_PROPERTY: STRIPPED_PROPERTY
   };
   slog('ready');
