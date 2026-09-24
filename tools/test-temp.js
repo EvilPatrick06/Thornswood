@@ -816,6 +816,19 @@ if (block) {
     yes('standing IN a fire burns you', /damageActorValue\('Health'/.test(FRONT));
     yes('and you are visibly on fire while it happens',
         /EffectShader\.from/.test(FRONT) && /shader\.play\(/.test(FRONT));
+  /*
+    AND THEY STAY ON. Patrick, 23 September: "when I am on fire the fire on me
+    goes away after awhile even if I am still in the fire but OI still
+    correctly keep taking damage its just visibly wrong though". An effect
+    shader runs for as long as the shader says, which is a few seconds,
+    because it was written for a spell landing rather than for standing in a
+    fire pit. It is played again on a clock now.
+  */
+  yes('the flames are put back on for as long as it burns',
+      /BURN_FX_EVERY/.test(FRONT) &&
+      /if \(!burnTold \|\| \(now - burnFxAt\) >= BURN_FX_EVERY\)/.test(FRONT));
+  yes('and the clock resets when the fire goes out, so the next one lights at once',
+      /burnFxAt = 0;/.test(FRONT));
     yes('it stops when you step out', /shader\.stop\(/.test(FRONT));
     const inside = /const FIRE_INSIDE = (\d+)/.exec(FRONT);
     const reach = /const FIRE_REACH = (\d+)/.exec(FRONT);
