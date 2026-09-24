@@ -17762,6 +17762,122 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     return 0;
   }
 
+  /*
+    A LINE TYPED WHILE THE CHARACTER IS ON ITS WAY BACK WAITS FOR IT.
+
+    Patrick, 23 September: "Tried to do /give key so I could atleast test that
+    way and it said it couldn't find my chacther". He was coming back from a
+    deploy at the time.
+
+    The remembered actor above was never going to help, and not because it
+    was wrong. A deploy is a new process, so there is nothing remembered to
+    fall back on. Measured in the dev server log for that evening: the
+    gamemode loaded at 20:39:00.541 and his character came in at 20:39:47.177;
+    loaded at 20:44:04.992, in at 20:44:52.111. About 47 seconds both times.
+    The voice service is its own process and keeps every slash line typed
+    while the server is down, and the polls in those 47 seconds hand them over
+    along with anything typed since, before there is a character to run them
+    on. So each one was told "cannot find your character" by a server that was
+    about to find it.
+
+    So a line that needs a character and has none waits for one. Every tick
+    the waiting lines are tried again, and the moment the sweep finds the
+    character they run in the order they were typed. A new line from somebody
+    who still has lines waiting goes behind them, so a /give then a /tp cannot
+    swap places.
+
+    NOTHING HERE WIDENS THE FALLBACK. A waiting line holds the text and never
+    an actor, and it runs through handle() like any other line, which does the
+    sweep again at that moment. A line kept with the actor it arrived with
+    would be kept with exactly the character that no longer exists.
+
+    BOUNDED BOTH WAYS, so nothing grows. A line waits at most HOLD_FOR, twice
+    the 47 seconds measured, and is then answered exactly as it always was.
+    One person can have HOLD_MAX lines waiting and the server HOLD_ALL, and a
+    line past either is answered at once, the old way. The profile id is a
+    claim the page makes about itself, so a page sending lines under a hundred
+    made up ids is held to HOLD_ALL as well.
+
+    What never waits: /help, and /tp with nothing after it, which need no
+    character; a word this server does not answer, which gets its answer now;
+    and the client's reports of a moment, /place, /burn and /chopped, because
+    a minute later they describe a moment that has passed.
+  */
+  // On globalThis, so a hot reload keeps what was waiting. It is plain data,
+  // the line and when it began to wait, so the reloaded handle() runs it.
+  if (!g.__thornswoodHeld) { g.__thornswoodHeld = {}; }
+  var held = g.__thornswoodHeld;
+  var HOLD_FOR = 90000;
+  var HOLD_MAX = 20;
+  var HOLD_ALL = 200;
+
+  function runsNow(word, parts) {
+    if (word === '/help' || word === '/commands' ||
+        word === '/restart' || word === '/shutdown') { return true; }
+    if ((word === '/tp' || word === '/goto') && !parts.slice(1).join(' ').trim()) { return true; }
+    if (word === '/place' || word === '/burn' || word === '/chopped') { return true; }
+    return WORDS.indexOf(word) === -1;
+  }
+
+  function heldCount() {
+    var n = 0;
+    for (var k in held) {
+      if (Object.prototype.hasOwnProperty.call(held, k)) { n += held[k].lines.length; }
+    }
+    return n;
+  }
+
+  /** Every line from the voice service, on its way to handle(). */
+  function dispatch(cmd) {
+    var profileId = Number(cmd && cmd.profileId) || 0;
+    var parts = String((cmd && cmd.text) || '').trim().split(/\s+/);
+    var word = parts[0].toLowerCase();
+    if (!profileId || runsNow(word, parts)) { handle(cmd); return; }
+
+    var q = held[profileId];
+    if (!q && actorOf(profileId)) { handle(cmd); return; }
+    if ((q && q.lines.length >= HOLD_MAX) || heldCount() >= HOLD_ALL) { handle(cmd); return; }
+
+    if (!q) {
+      q = held[profileId] = { lines: [], told: false };
+      log('holding', word, 'for profile', profileId, 'until the character is in the world');
+    }
+    q.lines.push({ cmd: cmd, at: Date.now() });
+    // Said once, and never for the client's own lines: /face, /ate and a
+    // broken lockpick are not things anybody typed.
+    if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks') {
+      q.told = true;
+      toProfile(profileId, 'Your character is not back in the world yet. That will run ' +
+                           'as soon as you arrive.');
+    }
+  }
+
+  /** Once a tick: run what can run now, and answer what has waited too long. */
+  function drainHeld() {
+    var now = Date.now();
+    for (var key in held) {
+      if (!Object.prototype.hasOwnProperty.call(held, key)) { continue; }
+      var q = held[key];
+      var run = [];
+      if (actorOf(Number(key))) {
+        run = q.lines;
+        delete held[key];
+        log('running', run.length, 'held line(s) for profile', key, 'after',
+            Math.round((now - run[0].at) / 1000) + 's');
+      } else {
+        while (q.lines.length && now - q.lines[0].at >= HOLD_FOR) { run.push(q.lines.shift()); }
+        if (!q.lines.length) { delete held[key]; }
+        if (run.length) { log('gave up on', run.length, 'held line(s) for profile', key); }
+      }
+      // Out of the queue before it runs, so a line that throws is not run
+      // again on the next tick.
+      for (var i = 0; i < run.length; i++) {
+        try { handle(run[i].cmd); }
+        catch (e) { log('held command threw:', e && e.stack ? e.stack : e); }
+      }
+    }
+  }
+
   /** key -> the arrival point the launcher would have used. */
   function places() {
     var out = {};
@@ -19626,7 +19742,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var list = [];
         try { list = (JSON.parse(body) || {}).commands || []; } catch (e) { return; }
         for (var i = 0; i < list.length; i++) {
-          try { handle(list[i]); }
+          try { dispatch(list[i]); }
           catch (e) { log('command threw:', e && e.stack ? e.stack : e); }
         }
       });
@@ -19638,6 +19754,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
 
   if (g.__thornswoodCommandTimer) { clearInterval(g.__thornswoodCommandTimer); }
   g.__thornswoodCommandTimer = setInterval(function () {
+    // Every tick, whatever the poll brings back, so a waiting line runs within
+    // a second and a half of its character arriving. See dispatch.
+    try { drainHeld(); } catch (e) { log('held commands threw:', e); }
     try { poll(); } catch (e) { }
     try { restartTick(); } catch (e) { log('restart tick threw:', e); }
   }, 1500);
