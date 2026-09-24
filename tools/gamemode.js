@@ -1340,6 +1340,56 @@ const MINE_COOLDOWN_MS = {
 
 const lastUse = new Map();   // "actorId:refrId" -> timestamp
 
+/*
+  WHAT TAKES A ROW BACK OUT OF lastUse.
+
+  From the To Do List: "Any cache keyed by something unbounded gets an eviction
+  rule: a size cap, an age sweep, or removal when the session ends." Every press
+  that gives something adds a row here, one per character and per reference:
+  the quarry, the kiln, every plant, every river, the hanging game and every
+  carcass. Nothing ever took one out, so the map was bounded only by how long
+  the server had been up. Measured on 24 September: about 140 bytes a row.
+
+  A row older than the longest wait anybody asks about gives the answer a
+  missing row gives, which is ready, because cooldownLeft reads a missing row
+  as a stamp at time zero. So dropping those rows changes no answer anybody
+  gets, and that is the whole rule. It is not removal when somebody leaves: a
+  four hour wait on a master fishing spot has to outlast logging out and back.
+
+  The longest wait is read off the tables rather than typed here. A number
+  typed here that ever fell below one of them would hand a spot back early,
+  and those four hours are the only limit on it. A new table of waits that
+  stamps this map goes in longestWaitMs, and test-cooldown-sweep.js fails
+  until it does.
+
+  The sweep runs when a stamp takes the map past a mark, not on a timer. A
+  stamp is the only way a row gets in, so this bounds the map without another
+  interval to lose on a hot reload. After a sweep the mark moves to twice what
+  is left, so a map full of rows that are all still waiting is walked once per
+  doubling rather than on every press.
+*/
+const LAST_USE_SWEEP_FROM = 5000;
+let lastUseSweepAt = LAST_USE_SWEEP_FROM;
+
+function longestWaitMs() {
+  let most = Math.max(COOLDOWN_MS, HARVEST_COOLDOWN_MS);
+  const tables = [MINE_COOLDOWN_MS, FISH_TUNING.cooldownMs,
+                  GAME_TUNING.cooldownMs, HUNT_TUNING.cooldownMs];
+  for (const t of tables) {
+    for (const k of Object.keys(t)) most = Math.max(most, Number(t[k]) || 0);
+  }
+  return most;
+}
+
+/** Drops every row older than the longest wait, and moves the mark. */
+function forgetOldUses(now) {
+  const keep = longestWaitMs();
+  lastUse.forEach(function (at, key) {
+    if (now - at > keep) lastUse.delete(key);
+  });
+  lastUseSweepAt = Math.max(LAST_USE_SWEEP_FROM, lastUse.size * 2);
+}
+
 /** Seconds still to wait, 0 if ready. Read only: a refused action must not
  *  start a cooldown, or walking up to a kiln without firewood locks you out.
  *  spanMs is how long this source stays worked out and defaults to the twenty
@@ -1352,9 +1402,14 @@ function cooldownLeft(actorId, refrId, spanMs) {
   return left > 0 ? Math.ceil(left / 1000) : 0;
 }
 
-/** Start the cooldown. Call this only once the yield has actually been given. */
+/** Start the cooldown. Call this only once the yield has actually been given.
+ *  Every row goes in through here, so the sweep above sees every one. */
 function stampCooldown(actorId, refrId) {
-  lastUse.set(actorId + ':' + refrId, Date.now());
+  const now = Date.now();
+  lastUse.set(actorId + ':' + refrId, now);
+  if (lastUse.size >= lastUseSweepAt) {
+    try { forgetOldUses(now); } catch (e) { lastUseSweepAt = lastUse.size * 2; }
+  }
 }
 
 /**
@@ -2853,8 +2908,8 @@ function mining(actorId) { return !!MINE_SESSION[actorId]; }
 /*
   Somebody who has gone is not mining.
 
-  ASKED RATHER THAN TOLD, because there is nothing to tell it. This gamemode
-  has four event hooks, onActivate, onCraft, onDeath and onRespawn, and a
+  ASKED RATHER THAN TOLD, because there is nothing to tell it. Every event a
+  handler in this file can answer is listed over mp.onTakeItem, and a
   disconnect is not one of them, so a spell of mining cannot be ended by
   somebody leaving. It is ended by the next swing noticing they are not here.
   A list that cannot be read answers yes: the other five stops still apply and
@@ -4877,6 +4932,9 @@ function startChargenTimer() {
 
 // ---------------------------------------------------------------------------
 // event handlers
+//
+// Every event a client can raise, and what this file answers to each, is
+// listed once, over mp.onTakeItem beside mp.onPutItem further down.
 // ---------------------------------------------------------------------------
 
 ensureProperties();
@@ -4944,9 +5002,9 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
     symptom; the fault is that there was no way for them to climb at all.
 
     THIS IS THE SAME SHAPE THE MAGE HAD and the same answer. The note over
-    treePointsPerRank says it: the server cannot see a spell being cast, so
-    casting cannot be counted, and a mage was stuck holding two novice spells
-    for good until two things the server DOES see were made to count. The
+    treePointsPerRank says it: nothing here counts a spell being cast, and a
+    mage was stuck holding two novice spells for good until two other things
+    the server sees were made to count. The
     server does see a death, with its killer, and that is the warrior's.
 
     THE RULES, and each one is there to stop something.
@@ -6013,7 +6071,7 @@ function harvest(actorId, refrId, baseDesc) {
     return 'This one has already been picked.';
   }
   if (!addItem(actorId, plant.produce, 1)) return null;
-  lastUse.set(actorId + ':' + refrId, Date.now());
+  stampCooldown(actorId, refrId);
   const rank = creditWork(actorId, 'harvest');
   return 'You pick the ' + plant.name + '.' + (rank ? ' ' + rank : '');
 }
@@ -10651,9 +10709,36 @@ log('gamemode loaded:',
     return out;
   }
 
+  /*
+    Into a file beside it and then renamed over it, never written in place.
+
+    writeFileSync empties the file before it writes it. A server stopped in
+    between left a half written book, the load above could not parse it, and
+    it started again from nothing: every row for somebody offline was gone
+    from the server's own copy. The site merges what it is sent and kept its
+    rows, but this file is the one a restart reads.
+
+    Still synchronous, on purpose. Measured on 24 September on Patrick's
+    machine, a book of 8 to 167 kilobytes, three runs of two hundred writes:
+    0.8 to 2.1 ms in place, 2.3 to 4.7 ms through the rename, and this runs at
+    most once every four seconds and only when a row changed. An asynchronous
+    write could still be running when a hot reload starts the next copy of
+    this block writing the same two files.
+
+    If the rename is refused, which Windows does while something else holds
+    the file open, the book is written in place the way it always was.
+  */
   function write() {
+    var text = JSON.stringify({ at: Date.now(), who: book });
+    var tmp = FILE + '.tmp';
     try {
-      fs.writeFileSync(FILE, JSON.stringify({ at: Date.now(), who: book }));
+      fs.writeFileSync(tmp, text);
+      try {
+        fs.renameSync(tmp, FILE);
+      } catch (e) {
+        fs.writeFileSync(FILE, text);
+        try { fs.unlinkSync(tmp); } catch (e2) { }
+      }
     } catch (e) { }
     push();
   }
@@ -10951,6 +11036,26 @@ log('gamemode loaded:',
   var askedAt = 0;
   var seenAt = {};
 
+  /*
+    Who was let in, with the profile they came in on and the list that let
+    them in, so a list that lands without them judges them again.
+
+    From the To Do List, entry 143: "an active session is severed when the ban
+    is written". judged above is cleared only when somebody leaves, so a ban
+    that took a profile off the list at the next refresh reached nobody who
+    was already in the world. They stayed until they logged out.
+
+    ONLY A LIST THAT LANDED DOES THIS. A refresh that failed, was rate limited
+    or could not reach Discord for anybody returns before it moves listAt, and
+    one that came back empty carries nobody, so neither touches anybody already
+    in. One that reached Discord for some people and not others does land, but
+    the ones it could not check keep the standing they had (keepWhatFailed
+    below), so they are left alone too. A Discord hiccup that throws the whole
+    server out at once is the outage the watch-only start above was written to
+    avoid.
+  */
+  var letIn = {};
+
   function tick() {
     var conf = load();
     if (!conf) return;                       // no allowed.json, door is off
@@ -10964,10 +11069,19 @@ log('gamemode loaded:',
     for (var i = 0; i < online.length; i++) here[online[i]] = true;
     for (var k in judged) { if (!here[k]) delete judged[k]; }
     for (var k2 in seenAt) { if (!here[k2]) delete seenAt[k2]; }
+    for (var k3 in letIn) { if (!here[k3]) delete letIn[k3]; }
 
     for (var j = 0; j < online.length; j++) {
       var actorId = online[j];
-      if (judged[actorId]) continue;
+      if (judged[actorId]) {
+        var was = letIn[actorId];
+        if (!was || was.at >= listAt || !conf.count) continue;
+        if (conf.ids[was.pid]) { was.at = listAt; continue; }
+        delete judged[actorId];
+        delete letIn[actorId];
+        note('profile ' + was.pid + ' dropped off the list while in the world (actor ' +
+             actorId.toString(16) + '), judging them again');
+      }
       if (!seenAt[actorId]) seenAt[actorId] = now;
 
       var pid = 0;
@@ -10984,6 +11098,7 @@ log('gamemode loaded:',
       }
       judged[actorId] = true;
       if (ok) {
+        letIn[actorId] = { pid: pid, at: listAt };
         note('let in profile ' + pid + ' (actor ' + actorId.toString(16) + ')');
         continue;
       }
@@ -11744,11 +11859,12 @@ log('gamemode loaded:',
     /*
       WHAT A SCHOOL CLIMBS ON. NOT IN THE RULEBOOK.
 
-      The server cannot see a spell being cast. This gamemode has four event
-      hooks and that is all there is: onActivate, onCraft, onDeath and
-      onRespawn. There is no cast, no spell-fired and no magic-effect event,
-      and the only magic the server performs itself is Actor.AddSpell. So
-      casting cannot be counted, and until now nothing else counted either:
+      Nothing here counts a spell being cast. The engine does raise one,
+      onPapyrusEvent:OnSpellCast (the list over mp.onTakeItem says what it
+      carries), but no handler in this file listens to it, there is no
+      magic-effect event, and the only magic the server performs itself is
+      Actor.AddSpell. So casting is not counted, and until now nothing else
+      counted either:
       a mage held two novice spells for good, because a spell costs a point,
       a point comes with a rank, and a rank came from work a mage had no way
       to do. That circle is the defect. Two things the server does see break
@@ -15114,6 +15230,142 @@ log('gamemode loaded:',
   }
 
   /*
+    A BLANK PRESSED INTO THE LOCK, ON A KEY, AT THE DOOR ITSELF.
+
+    Patrick, 24 September, in order: "you should press e on a un molded door
+    to fill the mold", then "not type" /mold, then "actually can we make it a
+    different key that is unused in tis scenario and include a prompt when
+    loooking at a door to press that key to set a mold". So the plugin draws a
+    line while somebody carrying a Key Mold looks at a door, and the mold key
+    (U unless it was rebound) sends /moldhere and that door's form id in hex.
+
+    THE CLIENT'S WORD ABOUT WHICH DOOR IS A HINT. Anybody can type /moldhere
+    with any number after it. So the number has to be a door of a building
+    this block knows, and the person has to be standing at that very door by
+    the server's own reckoning of where the two of them are, in the same cell
+    or world. The prompt and the key are conveniences; this is the gate.
+
+    MOLD_REACH IS 400 UNITS. Skyrim's default reach for pressing something is
+    180 (fActivatePickLength), measured from the camera, which in third person
+    sits behind the character; a door's position is its own origin, which on
+    a wide or double door is off to one side; and the position the server holds
+    is a moment behind the client's. 400 covers all three and is still under
+    six metres at the seventy units to a metre the party strip uses, which is
+    standing at the door and not across the street from it. It is also the
+    number the plugin's door rescue uses for "still within reach of the door".
+
+    THE RULES ARE /mold's, LESS THE SMITH. The blank has to exist in this
+    build and be in the pack, the building has to be held, its holder has to
+    be the one pressing or be standing there, which is Patrick's own balance
+    for molds, "I don't want people to make new molds when somone is
+    offline", and there must not already be a mold for it in either pack.
+    Pressing is not a smith's work: the smith's part is forging the blank and
+    cutting the keys. The typed /mold stays exactly as it was.
+  */
+  var MOLD_REACH = 400;
+
+  /** Is there a BLANK mold in this pack: a Key Mold with no name on it. */
+  function carriesBlankMold(actorId) {
+    var baseId = idOf(MOLD);
+    if (!baseId) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.count > 0 && e.baseId === baseId && !e.name) { return true; }
+    }
+    return false;
+  }
+
+  /*
+    How far this person stands from a placed reference, or -1 when the server
+    cannot say: either position unreadable, or the two in different cells or
+    worlds, where one position means nothing against the other.
+  */
+  function distanceTo(actorId, refrId) {
+    var mine = '', its = '', a = null, b = null;
+    try {
+      mine = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      its = String(mp.get(refrId, 'worldOrCellDesc') || '');
+      a = mp.get(actorId, 'pos');
+      b = mp.get(refrId, 'pos');
+    } catch (e) { return -1; }
+    if (!mine || mine !== its || !a || !b) { return -1; }
+    var dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  function moldHere(parts, actorId, profileId, toProfile) {
+    // A form id in hex and nothing else, the way the plugin writes it.
+    var raw = String((parts && parts[1]) || '');
+    var refrId = /^[0-9a-f]{1,8}$/i.test(raw) ? parseInt(raw, 16) : 0;
+    var desc = '';
+    if (refrId) {
+      try { desc = String(mp.getDescFromId(refrId) || ''); } catch (e) { desc = ''; }
+    }
+    var building = desc ? buildingOf(desc) : null;
+    if (!building) {
+      toProfile(profileId, 'That door does not belong to a building anybody can hold, so ' +
+                           'there is no lock on it to take a mold of.');
+      return true;
+    }
+    var far = distanceTo(actorId, refrId);
+    if (far < 0 || far > MOLD_REACH) {
+      toProfile(profileId, 'You are too far from the door of ' + nameOf(building) + '. Stand ' +
+                           'at it, look at it and press the key again.');
+      return true;
+    }
+    if (!blankMoldsExist()) {
+      toProfile(profileId, 'There are no blank key molds on this server yet. Until there are, ' +
+                           'a smith makes the mold at the door with /mold.');
+      return true;
+    }
+    if (!carriesBlankMold(actorId)) {
+      toProfile(profileId, 'You are carrying no blank key mold. A smith forges one at a forge ' +
+                           'out of one iron ingot.');
+      return true;
+    }
+    var held = holderOf(building);
+    if (!held) {
+      toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is no lock to take ' +
+                           'a mold of. It can be claimed for nothing.');
+      return true;
+    }
+    var owner = holderNearby(actorId, building, held);
+    if (!owner) {
+      toProfile(profileId, 'Whoever holds ' + nameOf(building) + ' has to be here for its lock ' +
+                           'to be taken. A mold is not pressed on somebody else\'s say so.');
+      return true;
+    }
+    if (holdsMold(owner.actorId, building) || holdsMold(actorId, building)) {
+      toProfile(profileId, 'There is already a mold for ' + nameOf(building) + '. Cut the keys ' +
+                           'from that one.');
+      return true;
+    }
+    if (!takeBlankMold(actorId)) {
+      toProfile(profileId, 'You are carrying no blank key mold. A smith forges one at a forge ' +
+                           'out of one iron ingot.');
+      return true;
+    }
+    if (!giveNamed(owner.actorId, MOLD, moldLabel(building))) {
+      toProfile(profileId, 'The mold could not be handed over. Say so in the dev channel.');
+      return true;
+    }
+    plog('a mold for', nameOf(building), 'was pressed at the door for', held.name);
+    var yours = owner.actorId === actorId;
+    toProfile(profileId, 'You press the blank into the lock of ' + nameOf(building) + '. It is ' +
+                         'the mold for it now' + (yours ? ' and it is in your pack' :
+                         ', and it goes to the holder standing with you') +
+                         '. Keys come off it at a forge, as many as you want.');
+    if (!yours && owner.profileId && owner.profileId !== profileId) {
+      toProfile(owner.profileId, 'The mold for ' + nameOf(building) + ' is yours. Bring it to ' +
+                                 'a smith at a forge for as many keys as you want.');
+    }
+    return true;
+  }
+
+  /*
     A key off the mold, at a forge, by a smith.
 
     Whoever is holding the mold is who the key is for, which is the same shape as
@@ -15346,11 +15598,38 @@ log('gamemode loaded:',
     'Near' is the engine's own answer: getNeighborsByPosition is what the server
     uses everywhere else to mean 'people who can see each other'. Somebody who is
     not online is not in it, which is the whole point.
+
+    IT WAS NEVER ASKED PROPERLY, so until 24 September nobody but the person
+    pressing could ever count as the holder standing there. Read in the fork:
+    ScampServer::GetNeighborsByPosition takes a cell or world descriptor and a
+    position, and NapiHelper::ExtractString throws on anything that is not a
+    string. This passed the actor's form id alone, so every call threw into
+    its own catch and the list was always empty, so a smith cutting a mold for
+    somebody else was told the holder was not there with the holder standing
+    beside them: test-mold-key.js runs the old body against an engine that
+    answers the way the fork does, and that is what it says. The farming
+    block's nearestPlot asks it the right way, and so does this now.
+
+    PEOPLE ONLY. The engine hands back everything in the squares around a
+    position, chests and NPCs with it, and a chest with the deed in it is not
+    a householder at the door. So only the people online are looked at. The
+    same filter steps over the empty slots the list starts with: the fork
+    makes the array at its full length and then appends, so the ids come after
+    as many holes as there are ids.
   */
   function holderNearby(actorId, building, held) {
     var near = [];
-    try { near = mp.getNeighborsByPosition(actorId) || []; } catch (e) { near = []; }
-    var all = near.slice();
+    try {
+      var cell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      var pos = mp.get(actorId, 'pos');
+      if (cell && pos) { near = mp.getNeighborsByPosition(cell, pos) || []; }
+    } catch (e) { near = []; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var all = [];
+    for (var n = 0; n < near.length; n++) {
+      if (near[n] !== actorId && online.indexOf(near[n]) !== -1) { all.push(near[n]); }
+    }
     all.push(actorId);
     for (var i = 0; i < all.length; i++) {
       var id = all[i];
@@ -16253,6 +16532,7 @@ log('gamemode loaded:',
     if (word === '/lock') { return setLock(actorId, profileId, toProfile, true); }
     if (word === '/unlock') { return setLock(actorId, profileId, toProfile, false); }
     if (word === '/mold') { return mold(actorId, profileId, toProfile); }
+    if (word === '/moldhere') { return moldHere(parts, actorId, profileId, toProfile); }
     if (word === '/key') { return cutKey(actorId, profileId, toProfile); }
     if (word === '/claim') {
       // Only when they are actually at a door. Otherwise this is farming's word
@@ -17746,7 +18026,7 @@ log('gamemode loaded:',
     */
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
-        word === '/unlock' || word === '/mold' || word === '/key' ||
+        word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
         word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
@@ -18088,6 +18368,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
                '/place', '/burn', '/ate',
+               // The mold key: a blank pressed into the door under the
+               // crosshair. Sent by the plugin, not typed; see moldHere.
+               '/moldhere',
                // Friends, parties, mutes, trade and journals. See the
                // social block at the end of this file.
                '/friend', '/party', '/mute', '/trade', '/journal',
@@ -20316,6 +20599,271 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   var prop = globalThis.__thornswoodProperty;
   if (!prop || !prop.putIn) { return; }
   return prop.putIn(containerRefrId, actorId, baseId, count);
+});
+
+/*
+  WHAT A CLIENT CAN ASK THIS SERVER, AND WHAT IT IS TOLD.
+
+  Written down on 24 September for the To Do List entry "The gamemode
+  registers four event handlers, so nothing server-side watches for
+  griefing", which asked for this before anything else: "Establish what the
+  client is allowed to ask the server to do and block the rest at the handler
+  level, then log what was allowed."
+
+  Read out of the fork (C:\Thornswood-Dev\skymp, thornswood/engine-changes)
+  rather than remembered. PacketParser.cpp is every message a client can
+  send, and server_guest_lib\gamemode_events is every event that reaches a
+  function on mp. tools\test-audit-handlers.js checks the events and the
+  Papyrus names below against the fork whenever the fork is on the machine it
+  runs on.
+
+  EVERY EVENT A HANDLER HERE CAN ANSWER. The engine calls mp[name] when it is
+  a function, and ScampServerListener::OnMpApiEvent reads what comes back:
+  undefined and true let it through, false refuses it (except in the Papyrus
+  family, where it refuses nothing), and a throw is logged and lets it
+  through. So a handler with no opinion returns nothing at all.
+  Eleven events have a fixed name, and they come first. Two families build
+  their name when they fire: the Papyrus family, onPapyrusEvent:<Name>, which
+  is the one that hears hits and spells and has its own heading below, and
+  custom events, whose name is whatever the client sent (CUSTOM EVENTS AND
+  PACKETS).
+
+  THE ELEVEN WITH A FIXED NAME.
+
+    onActivate    Pressing E on anything. mp.onActivate refuses on named paths
+                  only: a bench that is not theirs, a locked door whose client
+                  lock did not run (never a door that is a way out, WAY_OUT),
+                  the spoils rule, and the stations, crops, plants, fish,
+                  game, veins and bodies this server hands out itself. Every
+                  other door, chest and item falls off the end, and Skyrim
+                  does what it always did.
+    onCraft       A finished craft. mp.onCraft refuses a recipe nobody makes
+                  here, or one the person's trade, rank or race does not
+                  allow; a key with no stamped mold; a hafted thing with no
+                  handle in the pack; a brew or an enchantment by somebody
+                  whose trade is not that bench's; and a craft that matched no
+                  recipe but makes an item a recipe here owns, asked the same
+                  race, profession and rank question (tempering still comes
+                  through). A refusal keeps their materials.
+    onPutItem     Putting into a container. mp.onPutItem refuses anything but
+                  coin into a hold's box, and says nothing about any other
+                  container.
+    onTakeItem    Taking out of a container or a body. Watched below, never
+                  refused. TakeItemEvent::OnFireSuccess is what removes the
+                  items, so a false here would refuse the take.
+    onDropItem    Dropping from the pack onto the ground. Watched below, never
+                  refused. MpActor::DropItem stops before RemoveItems on a
+                  false. Gold cannot be dropped at all: DropItem returns before
+                  the event is raised for Gold001.
+    onDeath       Anything dying. mp.onDeath never refuses. It logs a person's
+                  death with the killer's id, and that line is the only record
+                  of a fight this file keeps. The hits before it do raise an
+                  event, onPapyrusEvent:OnHit, but nothing here listens to it
+                  yet (THE PAPYRUS FAMILY, below).
+    onRespawn     Logged by mp.onRespawn, never refused.
+    onEatItem     Eating or drinking something in the pack. No handler: the
+                  engine applies a potion's effects. The needs block hears
+                  about eating from the client's /ate line instead.
+    onReadBook    Reading a book. No handler since 21 September, when books
+                  stopped moving anybody's rank. The engine teaches the spell a
+                  spell tome carries.
+    onUpdateAppearanceAttempt
+                  A face sent to the server. No handler. The engine refuses it
+                  by itself unless the server opened the race menu
+                  (ActionListener::OnUpdateAppearance), and its OnFireBlocked
+                  is not written, so nothing here may ever return false to it.
+    onUpdateEquipmentAttempt
+                  What somebody is wearing. No handler, and the same warning
+                  about false. The engine checks it itself, by
+                  equipmentSpellCheckEnabled and equipmentSlotCheckEnabled in
+                  server-settings.json.
+
+  THE PAPYRUS FAMILY, mp['onPapyrusEvent:<Name>']. Every Papyrus event the
+  engine sends goes through MpForm::SendPapyrusEvent, which wraps it in a
+  PapyrusEventEvent and fires it the way the eleven above are fired, under
+  the name "onPapyrusEvent:" followed by the Papyrus name. A handler is called
+  with the id of the form the event is sent on, then the Papyrus arguments
+  (PapyrusUtils::GetJsValueFromPapyrusValue): a form as { type: 'form', desc },
+  a record as { type: 'espm', desc }, None as null, and numbers and flags as
+  themselves. These are the names the fork sends:
+
+    OnHit         A hit from a client: (target, aggressor, weapon or spell,
+                  null, power, sneak, bash, blocked). ActionListener::OnHit
+                  raises it once it has checked that the aggressor is the
+                  sender or an actor the sender hosts, that the target is in
+                  the same cell or world and, unless it is a bow or crossbow
+                  shot, within 4096 units, that the aggressor is alive, and
+                  that the weapon or spell is one it has equipped, or a bare
+                  fist. It fires before the attack speed and splash checks and
+                  before the damage, so a hit those checks then throw away was
+                  still raised. The blocked flag is the one the client sent,
+                  because the engine works out a block after the event.
+    OnSpellCast   A cast of a spell the caster has equipped, by the sender or
+                  an actor it hosts: (caster, spell). Raised after the cast has
+                  already gone out to everybody nearby, and not for the second
+                  message that interrupts a cast.
+    OnObjectEquipped
+                  A client's equip message for a weapon, armour, ammunition,
+                  a torch, a scroll, a potion, an ingredient or a book the
+                  actor holds, or a spell it has learned (MpActor::OnEquip):
+                  (actor, item, null).
+    OnItemAdded   One kind of item added to a pack or a container by
+                  MpObjectReference::AddItem: (the pack or container, item,
+                  count, null, null). AddItems, which adds several kinds at
+                  once, raises nothing.
+    OnActivate    An activation mp.onActivate did not refuse: (the thing, who
+                  pressed it).
+    SkympOnActivateClose
+                  The second press that closes a container the presser had
+                  open: (the container, who pressed it).
+    OnTriggerEnter, OnTriggerLeave, OnTrigger
+                  Something moving into, out of, or about inside a trigger
+                  box: (the box, what moved). OnTrigger is raised on every
+                  position update while it stays inside.
+    OnInit, OnCellLoad, OnLoad
+                  A reference the first time a person comes near it: (the
+                  reference).
+    OnUpdate      A form's registered update coming due: (the form).
+
+  A FALSE HERE REFUSES NOTHING. MpForm::SendPapyrusEvent does not read what
+  Fire returns, and PapyrusEventEvent::OnFireSuccess only hands the event to
+  the world's Papyrus scripts. So on a false the hit still lands, the spell
+  was already cast and the item was already added, and all that is stopped is
+  the event reaching a lever's or a quest's own script. That is why nothing
+  here may ever return false to this family. Nothing here listens to any of
+  it yet, and the engine does not build the arguments for a name mp has no
+  function for, so the family costs this file nothing today.
+
+  WHAT THE ENGINE ANSWERS WITH NO EVENT AT ALL. Movement, animation, animation
+  variables, health, magicka and stamina, bow shots (one arrow is taken),
+  hosting an NPC nobody connected owns, and the reply to a script the server
+  asked the client to run. None of them raises anything a handler here could
+  hear. An UpdateProperty message is parsed and dropped.
+
+  HITS AND SPELLS are answered by the engine too, and they do raise an event,
+  onPapyrusEvent:OnHit and onPapyrusEvent:OnSpellCast, but only once the
+  engine has already let them through and, for a cast, sent it on. So a
+  handler here can hear one person hit another and cannot refuse a hit or a
+  spell. The engine itself refuses a hit or a cast sent for an actor the
+  sender is not hosting.
+
+  CONSOLE COMMANDS, WHICH IS WHERE ITEM CREATION WOULD COME IN. The client
+  forwards exactly five (consoleCommandsService.ts): additem, equipitem,
+  placeatme, disable and mp. ConsoleCommands::Execute runs EnsureAdmin on
+  every one, which throws unless the actor has consoleCommandsAllowed or
+  server-settings.json sets enableConsoleCommandsForAll. Nothing in this
+  repository sets either, checked with git grep on 24 September, so every one
+  is refused for everybody, and a changed client that sends a sixth name gets
+  "Unknown command name". There is no console event, so no mp.on handler can
+  reach any of this.
+
+  CUSTOM EVENTS AND PACKETS. A custom event reaches mp[name] only when the name
+  starts with an underscore (ActionListener::OnCustomEvent). This file defines
+  no mp._ function, so every one is answered by nothing. A custom packet goes
+  to the server's own systems in skymp5-server\ts, where the login is the one
+  that answers it, and never to this file.
+
+  CHAT. A line starting with a slash rides the voice service's socket and is
+  queued there under the profile its token proves, or under the profile it
+  claims while THORNSWOOD_VOICE_AUTH is not 'on' (voice-server.js defaults it
+  to 'log'). The voice service writes every one to its chat log. handle() in
+  the chat command block answers it, and WORDS is every word it answers. /tp,
+  /goto, /give and /spawn refuse anybody who is not a playtester or an admin,
+  and /give and /spawn log what they made. That is the one way a person can
+  make an item on this server, and it is logged.
+
+  WHAT IS NOT REFUSED YET, AND WHY. The rules page asks for "no griefing", and
+  rule 4 in the world says "You cannot empty someone's house because you found
+  it unlocked while they were offline". Which take the server should refuse
+  to hold that rule, a box inside somebody else's claim or another person's
+  body, is a decision Patrick has not made. A handler that answers false too
+  eagerly shuts every chest in Skyrim for everybody at once, so until he makes
+  it the two handlers below watch and refuse nothing.
+
+  Hits are a different case: nothing here can refuse one, only hear it,
+  through onPapyrusEvent:OnHit. Nothing listens to it yet. It is raised for
+  every blow the engine takes, a hosted bandit's as much as a person's, so
+  which blows are worth a line, one person hitting another being the obvious
+  one, belongs to the same decision.
+*/
+
+/*
+  WATCHED, NEVER REFUSED: TAKING AND DROPPING.
+
+  Rule 4 goes on: "If you were robbed and it went too far, say so. It gets put
+  back." Putting it back needs a record of what was taken, by whom, out of
+  what and where, and until these two the server kept none: a take and a drop
+  raised an event with nothing on mp to hear it.
+
+  So each one is a line in thornswood.log through log(), the same file as every
+  other line here. It names the person by profile and character name, the item
+  by its descriptor (the name wornName settled on, because it says which
+  plugin a thing came from) and the count, the container or body it came out
+  of, and the cell the person was standing in, which for a house is the house.
+  Grep for "take:" and "drop:".
+
+  THEY NEVER RETURN ANYTHING, and that is the whole of the safety. guard()
+  turns a throw into undefined and every read below has its own try, so the
+  worst a fault here can do is a line with less in it.
+*/
+
+/*
+  A person is a profile above zero. Measured in the fork: an actor's
+  profileId comes out of its change form, and MpChangeForms.h starts it at -1,
+  so an NPC answers -1 and not 0. A body that answers -1 is an NPC's, not a
+  person's.
+*/
+function auditProfile(refrId) {
+  var pid = 0;
+  try { pid = Number(mp.get(refrId, 'profileId')) || 0; } catch (e) { pid = 0; }
+  return pid > 0 ? pid : 0;
+}
+
+function auditPerson(actorId) {
+  var id = Number(actorId) || 0;
+  var name = '';
+  try {
+    var ap = mp.get(id, 'appearance');
+    name = String((ap && ap.name) || '');
+  } catch (e) { name = ''; }
+  var pid = auditProfile(id);
+  if (!pid) { return '0x' + id.toString(16) + (name ? ' (' + name + ')' : ''); }
+  return 'profile ' + pid + ' (' + (name || 'no name') + ', 0x' + id.toString(16) + ')';
+}
+
+function auditItem(baseId) {
+  var id = Number(baseId) || 0;
+  var desc = '';
+  try { desc = String(mp.getDescFromId(id) || ''); } catch (e) { desc = ''; }
+  return desc || ('0x' + id.toString(16));
+}
+
+function auditSource(refrId) {
+  var id = Number(refrId) || 0;
+  var prop = globalThis.__thornswoodProperty;
+  var hold = null;
+  try { hold = (prop && prop.holdOfBox) ? prop.holdOfBox(id) : null; } catch (e) { hold = null; }
+  if (hold) { return hold + '\'s box 0x' + id.toString(16); }
+  if (auditProfile(id)) { return 'the body of ' + auditPerson(id); }
+  var base = '';
+  try { base = String(mp.get(id, 'baseDesc') || ''); } catch (e) { base = ''; }
+  return '0x' + id.toString(16) + (base ? ' (' + base + ')' : '');
+}
+
+function auditCell(actorId) {
+  var cell = '';
+  try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+  return cell || 'a cell the server could not read';
+}
+
+mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, count) {
+  log('take:', auditPerson(actorId), 'took', Number(count) || 0, auditItem(baseId),
+      'from', auditSource(sourceRefrId), 'in', auditCell(actorId));
+});
+
+mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
+  log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
+      'in', auditCell(actorId));
 });
 
 
