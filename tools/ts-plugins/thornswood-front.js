@@ -613,6 +613,11 @@
     if (!chooseAtMenu) { return; }
     const now = Date.now();
 
+    // The choice holds the keyboard by name, the way every panel does, for as
+    // long as it is up and not a tick longer, whichever path below ended it.
+    // First, so nothing that throws further down can leave it held.
+    T.claimFocus('select', choiceUp());
+
     // Before the phase check, because menuChose parks the phase at 9 and this
     // has to go on running after it.
     if (menuChosenId) { keepSayingChoice(now); }
@@ -769,6 +774,7 @@
       log('menu: could not write the choice for the launcher:', e);
     }
     menuPhase = 9;
+    T.claimFocus('select', false);
     try { sp.browser.setFocused(false); } catch (e) { }
     // The page repeats its pick every two seconds until this says it heard,
     // because the page can be up long before this plugin is. Acking stops
@@ -799,6 +805,55 @@
     // reload in the world (phase 0 below) does not bring the choice back.
     try { require('fs').unlinkSync('Data/Platform/UI/thornswood-characters.js'); } catch (e) { }
     log('menu: chosen profile', id);
+  }
+
+  /* The choice is on screen and this block is holding it up: asking the page
+     where it is (1) or watching it (2). */
+  function choiceUp() { return menuPhase === 1 || menuPhase === 2; }
+
+  /*
+    THE WORLD ARRIVED WITH THE CHOICE STILL UP AND NOTHING PICKED.
+
+    Djinn on dev, 24 September: "Sitting on the character select window for
+    too long causes you to lose your cursor, pressing F6 doesn't work, and you
+    have to esc to quit".
+
+    Too long is three minutes. Our fork of skymp5-client waits at the menu for
+    the page's pick and, after menuChoiceFallbackMs (180000, authService.ts),
+    logs in as the settings' profileId, the last character played. The world
+    then loads under a choice nobody made. menuChose never ran, so the page
+    was never acked and never hid itself, and the list the launcher wrote was
+    still on disk. The update tick then did what it always does when the
+    world is up: stopped this block, dropped focus and reloaded the page, and
+    the reload drew the choice again from that list. A full screen choice
+    over the world with no cursor, and a click the client no longer listens
+    for. The game had the keyboard, so Escape reached the System page. F6 did
+    raise focus, and applyFocus put it back down on its next pass, because a
+    focus nothing claimed is only held inside character creation.
+
+    It was never the two minute F6 cap. Update does not fire at the main
+    menu, so applyFocus never runs there: the two logs on this machine from
+    23 September (the dev build's at 20:07, the live one's at 10:20) have no
+    pulse, no frame line and no F6 line between the choice going up and the
+    pick, and the 20:07 one had the choice up for 57 seconds.
+
+    So the page goes the way a pick takes it: the claim is let go, the page
+    is told to close, and the list is removed so the reload in the world
+    cannot bring it back. The person is in the world as the character the
+    client chose for them, with their keyboard.
+  */
+  function menuGone() {
+    T.claimFocus('select', false);
+    T.js('try{window.thornswoodSelect&&window.thornswoodSelect.close();}catch(e){}');
+    try { require('fs').unlinkSync('Data/Platform/UI/thornswood-characters.js'); } catch (e) { }
+    // The uncaused load count tells the client's three minute fallback apart
+    // from a save something else loaded, which is a different fault.
+    let uncaused = '?';
+    try { uncaused = String(Number(globalThis.__thornswoodUncausedLoad) || 0); } catch (e) { }
+    log('menu: the world loaded with the choice still up and nothing picked here',
+        '(the client logs in as the last character, profile ' + PROFILE + ', after three minutes',
+        'without a pick; uncausedLoads=' + uncaused + '). Taking the choice down so it does not',
+        'sit over the world with no cursor');
   }
 
   // ---------------------------------------------------------------- focus --
@@ -1022,6 +1077,25 @@
     Found by the audit of 21 September.
   */
   const claimedAt = {};
+
+  /*
+    WHICH WINDOW EACH CLAIM BELONGS TO, so the cap below closes that one.
+
+    Until 24 September the cap closed something only for the skills claim,
+    and then it closed the party and journal windows along with it. A party,
+    journal or trade claim was released with its window left drawn and no
+    cursor, the same trap the cap was written to end. Found by the review of
+    the J journal.
+
+    The trade window's close hides it and leaves the trade to the server: the
+    next change to either pile draws it again, and /trade cancel in the chat
+    still walks away. The wheel's name is the one it has always had here. The
+    select window is only ever capped once its choice is no longer up.
+  */
+  const CAP_CLOSES = {
+    skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
+    trade: 'thornswoodTrade', select: 'thornswoodSelect', wheel: 'thornswoodEmotes'
+  };
 
   T.claimFocus = function (who, on) {
     if (!!claims[who] === !!on) return;
@@ -4525,6 +4599,8 @@
       // The world is up, so the main menu block above stands down for
       // good; it used to stand down on the first update instead, which is
       // not the same moment and is not a moment this file can be sure of.
+      // A choice still up here was never made: see menuGone.
+      if (choiceUp()) { menuGone(); }
       menuPhase = 9;
       phase = 1; at = now;
       try {
@@ -4708,16 +4784,15 @@
     */
     for (const who in claimedAt) {
       if (who === 'chat') { continue; }
+      // Sitting at the character choice is not a stuck keyboard, it is the one
+      // thing to do there. Only while it is up: see menuGone.
+      if (who === 'select' && choiceUp()) { continue; }
       if (!claims[who] || !claimedAt[who]) { continue; }
       if (now - claimedAt[who] > 120000) {
         log('the ' + who + ' claim has held the keyboard for two minutes, closing it and taking it back');
-        if (who === 'skills') {
-          T.js('try{window.thornswoodSkills&&window.thornswoodSkills.close();}catch(e){}');
-          T.js('try{window.thornswoodParty&&window.thornswoodParty.close();}catch(e){}');
-          T.js('try{window.thornswoodJournal&&window.thornswoodJournal.close();}catch(e){}');
-        } else if (who === 'wheel') {
-          T.js('try{window.thornswoodEmotes&&window.thornswoodEmotes.close();}catch(e){}');
-        }
+        // Each window by its own name, and only that one: see CAP_CLOSES.
+        const win = CAP_CLOSES[who];
+        if (win) { T.js('try{window.' + win + '&&window.' + win + '.close();}catch(e){}'); }
         T.claimFocus(who, false);
       }
     }
