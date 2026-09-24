@@ -17,11 +17,13 @@ namespace Thornswood
     /// console: there is no URL or command line for it. So this opens that
     /// console (steam://open/console), makes sure Steam's window is the one
     /// in front, types the command into it the way a person would, and then
-    /// watches Steam's own content_log.txt for "Depot download complete".
-    /// Three depots make up the game; they go one at a time, as Steam wants.
-    /// When all three are down, the files are copied over the Steam copy,
-    /// the exe is checked against the size 1.6.1170 has, and the downloaded
-    /// copies are removed so eleven gigabytes do not stay behind.
+    /// watches Steam's console_log.txt for "Depot download complete" (see
+    /// SteamLog for why that file). Three depots make up the game; they go
+    /// one at a time, as Steam wants. When all three are down, the downloaded
+    /// exe is checked against the size 1.6.1170 has before anything is
+    /// replaced, the files are copied over the Steam copy, the exe there is
+    /// checked again, and the downloaded copies are removed so eleven
+    /// gigabytes do not stay behind.
     ///
     /// Nothing is typed unless Steam's window is confirmed to be the one in
     /// the foreground. If it cannot be brought there, the command goes on the
@@ -194,7 +196,6 @@ namespace Thornswood
                 return false;
             }
             string content = Path.Combine(steam, "steamapps\\content\\app_" + AppId);
-            string logFile = Path.Combine(steam, "logs\\content_log.txt");
 
             if (Checks.GameRunning())
             {
@@ -245,8 +246,8 @@ namespace Thornswood
                     continue;
                 }
 
-                long logStart = 0;
-                try { if (File.Exists(logFile)) logStart = new FileInfo(logFile).Length; } catch { }
+                SteamLog steamLog = new SteamLog(steam);
+                bool hadFolder = Directory.Exists(folder);
 
                 status("Part " + (i + 1) + " of 3: asking Steam for depot " + depot + "...");
                 log("Part " + (i + 1) + " of 3, depot " + depot + ": " + cmd);
@@ -261,14 +262,17 @@ namespace Thornswood
                 // The folder and the log are kept apart from here on. A folder
                 // an aborted attempt left behind is there before Steam has been
                 // asked anything, which is enough to carry on watching but is
-                // no proof that this run's download ever started. Only the log
-                // is that proof, and the fallback below needs it.
+                // no proof that this run's download ever started. The log is
+                // that proof, and so is a folder that was not there before the
+                // command and is now; the fallback below needs one of them.
                 DateTime askedAt = DateTime.Now;
                 bool started = false;
                 bool sawStart = false;
                 while ((DateTime.Now - askedAt).TotalSeconds < 45)
                 {
-                    if (LogSays(logFile, logStart, "depot_" + depot)) sawStart = true;
+                    string said = steamLog.Since();
+                    if (Refused(said, depot, i + 1, cmd, log, status)) return false;
+                    if (LogStarted(said, depot) || (!hadFolder && Directory.Exists(folder))) sawStart = true;
                     if (Directory.Exists(folder) || sawStart) { started = true; break; }
                     Thread.Sleep(1000);
                 }
@@ -284,19 +288,21 @@ namespace Thornswood
                     askedAt = DateTime.Now;
                     while ((DateTime.Now - askedAt).TotalSeconds < 30)
                     {
-                        if (LogSays(logFile, logStart, "depot_" + depot)) sawStart = true;
+                        string said = steamLog.Since();
+                        if (Refused(said, depot, i + 1, cmd, log, status)) return false;
+                        if (LogStarted(said, depot) || (!hadFolder && Directory.Exists(folder))) sawStart = true;
                         if (Directory.Exists(folder) || sawStart) { started = true; break; }
                         Thread.Sleep(1000);
                     }
                     if (!started)
                     {
-                        // Whatever Steam put in its own content log since the
-                        // command. A real refusal ("No connection", a manifest
-                        // error) shows here; nothing here means the command
-                        // never reached the console's command line at all.
-                        string tail = NewLog(logFile, logStart);
-                        if (tail.Length > 0) log("Steam's content log since the command:" + Environment.NewLine + tail);
-                        else log("Steam wrote nothing to its content log, so the command did not reach the console's command line. Steam's console has to be the window in front with its command line clicked.");
+                        // Whatever Steam put in its logs since the command. A
+                        // real refusal ("No connection", a manifest error) shows
+                        // here; nothing here means the command never reached
+                        // the console's command line at all.
+                        string tail = steamLog.Tail(12);
+                        if (tail.Length > 0) log("Steam's log since the command:" + Environment.NewLine + tail);
+                        else log("Steam wrote nothing to its logs, so the command did not reach the console's command line. Steam's console has to be the window in front with its command line clicked.");
                         OnClipboard(cmd, i + 1, "", log, status);
                         pasted = true;
                     }
@@ -310,7 +316,9 @@ namespace Thornswood
                 string downloading = Path.Combine(steam, "steamapps\\downloading\\" + AppId);
                 while (true)
                 {
-                    if (LogHasCompletion(logFile, logStart, depot)) break;
+                    string said = steamLog.Since();
+                    if (LogHasCompletion(said, depot)) break;
+                    if (Refused(said, depot, i + 1, cmd, log, status)) return false;
                     long size = FolderSize(folder);
                     if (size != lastSize) { lastSize = size; lastGrowth = DateTime.Now; warned = false; }
                     status(ProgressLine(i + 1, Depots.Length, size, pasted));
@@ -332,7 +340,7 @@ namespace Thornswood
                     // skips the depot as already downloaded.
                     if (size > 0 && quiet > 20 && !Directory.Exists(downloading))
                     {
-                        if (!sawStart && LogSays(logFile, logStart, "depot_" + depot)) sawStart = true;
+                        if (!sawStart && LogStarted(said, depot)) sawStart = true;
                         if (sawStart)
                         {
                             log("Steam's log never said the download finished, but the folder has been complete and still for twenty minutes, so it is taken as done.");
@@ -368,7 +376,7 @@ namespace Thornswood
                         log("Steam has done nothing for " + GiveUpMinutes + " minutes and this part is still " + (size / 1048576).ToString("n0") + " MB, so it is being given up on rather than waited on for ever.");
                         if (size == 0)
                             log("Nothing was downloaded at all, which usually means Steam refused the command. Its console window says why: look for a line about a manifest, a licence or no connection.");
-                        log("To do it by hand: open Steam, press Ctrl+Shift+D or start it with -console, click the console's command line, and paste " + cmd);
+                        log(ByHand(cmd));
                         status("Steam did not answer. See the log for what to do by hand.");
                         return false;
                     }
@@ -384,6 +392,30 @@ namespace Thornswood
                 log("Skyrim started while the files were coming down. Close it and press the button again; the downloads are kept.");
                 return false;
             }
+
+            // The downloaded exe is checked before a single file of the Steam
+            // copy is replaced. This used to be checked only after the copy,
+            // by which point a wrong download had already gone over the game.
+            // The Downgrader Tool on Nexus checks first, and that is right.
+            string gotExe = DownloadedExe(content);
+            if (gotExe.Length == 0 || Wrong(cfg, gotExe))
+            {
+                if (gotExe.Length == 0)
+                    log("None of the three downloads has SkyrimSE.exe in it, so they are not the 1.6.1170 build. Nothing in " + target + " has been replaced.");
+                else
+                    log("The SkyrimSE.exe Steam downloaded is " + Describe(cfg, gotExe) + ", not the 1.6.1170 build. Nothing in " + target + " has been replaced.");
+                // The next press asks Steam again rather than trusting these.
+                foreach (string[] d in Depots)
+                {
+                    string folder = Path.Combine(content, "depot_" + d[0]);
+                    if (gotExe.Length > 0 && !SameFolder(Path.GetDirectoryName(gotExe), folder)) continue;
+                    try { File.Delete(Path.Combine(folder, ".thornswood-complete")); } catch (Exception ex) { Swallow.Note("Downgrade, dropping the marker in " + folder, ex); }
+                }
+                log("Press the button again and Steam is asked for the files once more. If it ends here again, send your launcher log to the Discord.");
+                status("The download was not the 1.6.1170 build. Nothing was replaced; see the log.");
+                return false;
+            }
+
             status("Putting the 1.6.1170 files in place...");
             // A file a mod replaces is the collection's, and in the Steam copy it
             // is a hard link to Vortex's own copy: writing the vanilla file over
@@ -823,72 +855,199 @@ namespace Thornswood
 
         // ---------------------------------------------------------- watching
 
-        /// <summary>The last few lines Steam wrote to its content log since <paramref name="from"/>, for the launcher log when a depot will not start.</summary>
-        static string NewLog(string logFile, long from)
+        /// <summary>
+        /// Steam's logs from the moment a command was given. What
+        /// download_depot does is written by Steam's console to
+        /// logs\console_log.txt, a line for each step:
+        ///
+        ///   Downloading depot 489832 (26 files, 7260 MB) ...
+        ///   Depot download complete : "C:\...\app_489830\depot_489832" (manifest 8042843504692938467)
+        ///   Depot download failed : Failed updating depot 489831 while downloading chunk "..." (Failure) (Content unavailable)
+        ///
+        /// Those three are real lines, recorded on 24 August by the author of
+        /// a Skyrim downgrader for RP servers (Mosalah992/Skyrim-downgrader,
+        /// logwatch.py) running these same three depots, and
+        /// JackifyGameDowngrader reads the same file for the same words.
+        ///
+        /// Until 24 September this read content_log.txt alone, and took
+        /// "depot_489831" as the sign a download had started, which the start
+        /// line does not say. So a download that finished was never seen to
+        /// finish: the next part was never asked for, which is what a tester
+        /// on 1.1.91 got ("it only give you the fiurst one", Patrick), and
+        /// twenty minutes on the person was told to delete the folder Steam
+        /// had just filled. Both logs are read now, so whichever of them Steam
+        /// writes to counts.
+        /// </summary>
+        sealed class SteamLog
         {
-            try
+            readonly string[] files;
+            readonly long[] from;
+
+            public SteamLog(string steam)
             {
-                if (!File.Exists(logFile)) return "";
-                using (var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                files = new[] {
+                    Path.Combine(steam, "logs\\console_log.txt"),
+                    Path.Combine(steam, "logs\\content_log.txt"),
+                };
+                from = new long[files.Length];
+                for (int i = 0; i < files.Length; i++)
                 {
-                    if (fs.Length <= from) return "";
-                    fs.Seek(from, SeekOrigin.Begin);
-                    var buf = new byte[fs.Length - from];
-                    int n = fs.Read(buf, 0, buf.Length);
-                    string[] lines = Encoding.UTF8.GetString(buf, 0, n).Replace("\r", "").Trim().Split('\n');
-                    int take = Math.Min(lines.Length, 12);
-                    return string.Join(Environment.NewLine, lines, lines.Length - take, take).Trim();
+                    try { if (File.Exists(files[i])) from[i] = new FileInfo(files[i]).Length; }
+                    catch (Exception ex) { Swallow.Note("Downgrade, measuring " + files[i], ex); }
                 }
             }
-            catch { return ""; }
+
+            /// <summary>
+            /// What Steam wrote to one log since the command. A log shorter
+            /// than it was then has been started again, which Steam does when
+            /// it restarts (the old one becomes .previous), so that one is read
+            /// from the top.
+            /// </summary>
+            string Read(int i)
+            {
+                try
+                {
+                    if (!File.Exists(files[i])) return "";
+                    using (var fs = new FileStream(files[i], FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    {
+                        long start = fs.Length < from[i] ? 0 : from[i];
+                        if (fs.Length <= start) return "";
+                        fs.Seek(start, SeekOrigin.Begin);
+                        var buf = new byte[fs.Length - start];
+                        int n = fs.Read(buf, 0, buf.Length);
+                        return Encoding.UTF8.GetString(buf, 0, n);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Steam holds these open and rotates them; the next turn
+                    // of the loop reads again.
+                    Swallow.Note("Downgrade, reading " + files[i], ex);
+                    return "";
+                }
+            }
+
+            /// <summary>Everything Steam wrote to either log since the command.</summary>
+            public string Since()
+            {
+                var sb = new StringBuilder();
+                for (int i = 0; i < files.Length; i++) sb.Append(Read(i)).Append('\n');
+                return sb.ToString();
+            }
+
+            /// <summary>
+            /// The last few lines of each log since the command, under the
+            /// log's name, for the launcher log when a depot will not start.
+            /// Each log gets its own lines because one of them can be full of
+            /// something else: on Patrick's machine content_log.txt says it
+            /// could not write Skyrim's appmanifest every six seconds.
+            /// </summary>
+            public string Tail(int lines)
+            {
+                var sb = new StringBuilder();
+                for (int i = 0; i < files.Length; i++)
+                {
+                    var kept = new List<string>();
+                    foreach (string line in Read(i).Replace("\r", "").Split('\n'))
+                        if (line.Trim().Length > 0) kept.Add(line.Trim());
+                    if (kept.Count == 0) continue;
+                    int take = Math.Min(kept.Count, lines);
+                    if (sb.Length > 0) sb.Append(Environment.NewLine);
+                    sb.Append(Path.GetFileName(files[i])).Append(':').Append(Environment.NewLine);
+                    sb.Append(string.Join(Environment.NewLine, kept.GetRange(kept.Count - take, take).ToArray()));
+                }
+                return sb.ToString();
+            }
         }
 
-        static bool LogSays(string logFile, long from, string needle)
+        /// <summary>
+        /// True once Steam has said it is downloading this depot
+        /// ("Downloading depot 489832 (26 files, 7260 MB) ..."), or has
+        /// written any line naming its folder.
+        /// </summary>
+        static bool LogStarted(string said, string depot)
         {
-            try
-            {
-                if (!File.Exists(logFile)) return false;
-                using (var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                {
-                    if (fs.Length <= from) return false;
-                    fs.Seek(from, SeekOrigin.Begin);
-                    var buf = new byte[fs.Length - from];
-                    int n = fs.Read(buf, 0, buf.Length);
-                    string s = Encoding.UTF8.GetString(buf, 0, n);
-                    return s.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
-                }
-            }
-            catch { return false; }
+            return said.IndexOf("Downloading depot " + depot, StringComparison.OrdinalIgnoreCase) >= 0
+                || said.IndexOf("depot_" + depot, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>
         /// True once Steam has logged this depot's download as complete, after
-        /// the point in the log where the command was given. The line Steam
-        /// writes names the folder, so both the words and the depot have to be
-        /// on the same line.
+        /// the point where the command was given. The line Steam writes names
+        /// the folder, so both the words and the depot have to be on the same
+        /// line.
         /// </summary>
-        static bool LogHasCompletion(string logFile, long from, string depot)
+        static bool LogHasCompletion(string said, string depot)
         {
-            try
+            foreach (string line in said.Split('\n'))
             {
-                if (!File.Exists(logFile)) return false;
-                using (var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                {
-                    if (fs.Length <= from) return false;
-                    fs.Seek(from, SeekOrigin.Begin);
-                    var buf = new byte[fs.Length - from];
-                    int n = fs.Read(buf, 0, buf.Length);
-                    string s = Encoding.UTF8.GetString(buf, 0, n);
-                    foreach (string line in s.Split('\n'))
-                    {
-                        if (line.IndexOf("Depot download complete", StringComparison.OrdinalIgnoreCase) < 0) continue;
-                        if (line.IndexOf("depot_" + depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-                        if (line.IndexOf(depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-                    }
-                }
+                if (line.IndexOf("Depot download complete", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (line.IndexOf("depot_" + depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                if (line.IndexOf(depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
             }
-            catch { }
             return false;
+        }
+
+        /// <summary>
+        /// Steam's line saying this depot's download failed, or "" when there
+        /// is none. A failure line that names none of the three depots counts
+        /// as this one's, since this one is the only download asked for since
+        /// the command; one naming another depot does not.
+        /// </summary>
+        static string FailedLine(string said, string depot)
+        {
+            foreach (string raw in said.Split('\n'))
+            {
+                string line = raw.Trim();
+                if (line.IndexOf("Depot download failed", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (line.IndexOf(depot, StringComparison.Ordinal) >= 0) return line;
+                bool other = false;
+                foreach (string[] d in Depots)
+                    if (d[0] != depot && line.IndexOf(d[0], StringComparison.Ordinal) >= 0) other = true;
+                if (!other) return line;
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// When Steam has said this depot's download failed, says so with
+        /// Steam's own line and returns true. Until 24 September a refusal was
+        /// only noticed after GiveUpMinutes with nothing moving.
+        /// </summary>
+        static bool Refused(string said, string depot, int part, string cmd, Action<string> log, Action<string> status)
+        {
+            string line = FailedLine(said, depot);
+            if (line.Length == 0) return false;
+            log("Steam could not download part " + part + " of 3 (depot " + depot + "). Steam's log says: " + line);
+            log("Nothing in the game folder has been replaced. Press the button again in a few minutes to ask Steam once more. If it fails the same way twice, send your launcher log to the Discord.");
+            log(ByHand(cmd));
+            status("Steam could not download part " + part + " of 3. See the log.");
+            return true;
+        }
+
+        /// <summary>
+        /// The way to do one part by hand. steam://open/console is what this
+        /// opens too, and the Downgrader Tool on Nexus gives the same way in:
+        /// it works whether Steam is already running or not.
+        /// </summary>
+        static string ByHand(string cmd)
+        {
+            return "To do it by hand: press Windows+R, type steam://open/console and press Enter, click the command line at the bottom of Steam's console, paste " + cmd + " and press Enter, then wait for Steam to say Depot download complete before the next part.";
+        }
+
+        /// <summary>
+        /// The SkyrimSE.exe among the downloaded depots, or "" when none of
+        /// them has one. It sits at the top of its depot, as it does in the
+        /// game folder.
+        /// </summary>
+        static string DownloadedExe(string content)
+        {
+            foreach (string[] d in Depots)
+            {
+                string exe = Path.Combine(Path.Combine(content, "depot_" + d[0]), "SkyrimSE.exe");
+                if (File.Exists(exe)) return exe;
+            }
+            return "";
         }
 
         /// <summary>
