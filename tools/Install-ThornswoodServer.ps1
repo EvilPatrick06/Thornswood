@@ -139,7 +139,15 @@ if (Test-Path -LiteralPath $privDir) {
 
   THREE, say which file it was if it still will not go, because "access to the
   path is denied" without a process name is the start of a long evening.
+
+  AND THE LOGS GO ASIDE FIRST, entry 220. server.log and thornswood.log sat in
+  this folder and went with it, so every publish deleted the evidence for
+  whatever the server did before it. They are moved out ahead of the delete,
+  on each try, and the folder is not deleted while one of them is still held,
+  because it would go with the folder. roll-log.ps1 keeps them from growing
+  now, so there is nothing left to gain by throwing them away.
 #>
+$logBak = $null
 if (Test-Path -LiteralPath $Root) {
     $rootMatch = $Root.TrimEnd('\') + '\*'
     try {
@@ -151,9 +159,19 @@ if (Test-Path -LiteralPath $Root) {
         }
     } catch { }
 
+    $logBak = Join-Path $env:TEMP ("serverlogs-" + $stamp)
     $gone = $false
     for ($i = 1; $i -le 10; $i++) {
+        $held = 0
+        foreach ($f in @(Get-ChildItem -LiteralPath $Root -File -Force -EA SilentlyContinue |
+                         Where-Object { $_.Name -match '\.log(\.\d+)?$' })) {
+            try {
+                New-Item -ItemType Directory -Path $logBak -Force | Out-Null
+                Move-Item -LiteralPath $f.FullName -Destination (Join-Path $logBak $f.Name) -Force -EA Stop
+            } catch { $held++ }
+        }
         try {
+            if ($held -gt 0) { throw 'a log is still held' }
             Remove-Item -LiteralPath $Root -Recurse -Force -EA Stop
             $gone = $true
             break
@@ -174,8 +192,8 @@ if (Test-Path -LiteralPath $Root) {
                    } | Select-Object -First 5)
         foreach ($f in $stuck) { Write-Host ("still open: {0}" -f $f.FullName) -ForegroundColor Red }
         throw ("could not clear $Root after ten tries. Something outside this " +
-               "script is holding those files; the world, the data folder and " +
-               "the roster are all still set aside in $env:TEMP.")
+               "script is holding those files; the world, the data folder, " +
+               "the roster and the logs are all still set aside in $env:TEMP.")
     }
 }
 New-Item -ItemType Directory -Path $Root -Force | Out-Null
@@ -223,6 +241,34 @@ if ($dataBak) {
     }
 }
 
+# The logs, back where the task writes them. Only what the build did not
+# bring, the same rule as data, and the folder is left behind rather than
+# deleted if anything in it could not go back.
+if ($logBak -and (Test-Path -LiteralPath $logBak)) {
+    foreach ($f in @(Get-ChildItem -LiteralPath $logBak -File -Force -EA SilentlyContinue)) {
+        $to = Join-Path $Root $f.Name
+        if (-not (Test-Path -LiteralPath $to)) { Move-Item -LiteralPath $f.FullName -Destination $to -Force }
+    }
+    if (@(Get-ChildItem -LiteralPath $logBak -Force -EA SilentlyContinue).Count -eq 0) {
+        Remove-Item -LiteralPath $logBak -Force -EA SilentlyContinue
+    }
+    Write-Host 'logs kept, to be rolled rather than deleted' -ForegroundColor Cyan
+}
+
+# The roller the task runs in front of the server, from beside this script:
+# Publish-Server sends the two together, and run by hand from tools they are
+# already side by side. Without it the server still starts, the log just is
+# not rolled, so it is said here rather than stopped over.
+$here = $PSScriptRoot
+if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$rollSrc = Join-Path $here 'Roll-Log.ps1'
+$roller  = Join-Path $Root 'roll-log.ps1'
+if (Test-Path -LiteralPath $rollSrc) {
+    Copy-Item -LiteralPath $rollSrc -Destination $roller -Force
+} else {
+    Write-Host "Roll-Log.ps1 is not beside this installer, so server.log will not be rolled at start." -ForegroundColor Yellow
+}
+
 # ---- check the load order resolves before trusting it ----------------------
 # A byte order mark on this file is fatal and says nothing useful when it
 # happens: node stops on the first character with "Unexpected token" and the
@@ -262,8 +308,14 @@ if (-not $NoTask) {
     # ran, the port never opens, and there is no way to find out why without
     # sitting in an ssh session running it by hand. Redirecting is the whole
     # reason cmd is in the chain.
+    #
+    # roll-log.ps1 goes first, because cmd holds server.log open for as long
+    # as node runs and nothing can move it until then (see Roll-Log.ps1). &
+    # rather than &&, so a roll that fails, or a roller that is not there,
+    # still starts the server.
     $log = Join-Path $Root 'server.log'
-    $cmd = ('/c ""{0}" dist_back/skymp5-server.js >> "{1}" 2>&1"' -f $node.Source, $log)
+    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $cmd = ('/c ""{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" dist_back/skymp5-server.js >> "{1}" 2>&1"' -f $node.Source, $log, $psExe, $roller)
     $action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" `
                                       -Argument $cmd `
                                       -WorkingDirectory $Root
@@ -282,8 +334,14 @@ if (-not $NoTask) {
 }
 
 if ($StartNow -and -not $NoTask) {
+    # Rolled whatever its size rather than deleted, so the run before this
+    # install is server.log.1 and the tail below reads only this one.
+    # Deleting it is how the evidence for the last crash disappeared.
     $log = Join-Path $Root 'server.log'
-    if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $roller) {
+        try { & $roller -Path $log -Force | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray } }
+        catch { Write-Host ("could not roll server.log: {0}" -f $_.Exception.Message) -ForegroundColor Yellow }
+    }
 
     Start-ScheduledTask -TaskName $TaskName
 
@@ -346,4 +404,4 @@ if ($StartNow -and -not $NoTask) {
 
 Write-Host ''
 Write-Host ''
-Write-Host ("the task appends everything it prints to {0}\server.log" -f $Root) -ForegroundColor DarkGray
+Write-Host ("the task appends everything it prints to {0}\server.log, rolled at 4 MB before each start, five kept" -f $Root) -ForegroundColor DarkGray

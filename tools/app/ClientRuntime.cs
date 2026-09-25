@@ -25,9 +25,9 @@ namespace Thornswood
     ///
     /// It should, and it already had everything it needed to. A pack carries
     /// all six of these files: Ship-Rules.ps1 reads client-build.json into
-    /// $ShipClientFiles and a path in that record ships whatever else the
-    /// filters say. What was missing was anything on this side that noticed
-    /// the file was gone and went and got it.
+    /// $ShipClientFiles and the recorded build at a path in that record ships
+    /// whatever else the filters say. What was missing was anything on this
+    /// side that noticed the file was gone and went and got it.
     ///
     /// WHY THE OLD CHECK COULD NOT DO IT. Checks.ClientPatched opened the
     /// bundle and searched the TEXT for "THORNSWOOD PATCH". That is the check

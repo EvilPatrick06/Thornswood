@@ -164,6 +164,114 @@ const missing = serverLogSlice('dev', from, to);
 yes('a server log that is not on this box says so rather than throwing',
     missing.ok === false && missing.lines.length === 0 && String(missing.why).length > 0);
 
+// ---- the server log slice after a roll (entry 220) -------------------------
+/*
+  roll-log.ps1 runs in front of the game server on every start, and moves a
+  server.log of 4 MB or more to server.log.1. Found in review, measured: a
+  crash with the log past 4 MB, the watcher's restart rolled it, and the page
+  then showed nothing for the crash session, because the slice read
+  server.log and nothing else. So this builds that log, rolls it with the
+  real Roll-Log.ps1 the way the task line runs it, and asks again.
+*/
+const { spawnSync } = require('child_process');
+const ROLLER = path.join(__dirname, 'Roll-Log.ps1');
+const WINPS = path.join(process.env.SystemRoot || 'C:\\Windows',
+                        'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+let rolledBy = 'Roll-Log.ps1';
+function rollLog(file, force) {
+  if (fs.existsSync(WINPS)) {
+    const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+                  '-File', ROLLER, '-Path', file];
+    if (force) args.push('-Force');
+    const r = spawnSync(WINPS, args, { encoding: 'utf8' });
+    return String(r.stdout || '') + String(r.stderr || '');
+  }
+  /* No Windows PowerShell here, so the roll is done the way the roller does
+     it, and the run says so rather than passing as if the real one ran. */
+  rolledBy = 'a stand-in for Roll-Log.ps1';
+  if (!force && fs.statSync(file).size < 4 * 1024 * 1024) return '';
+  if (fs.existsSync(file + '.5')) fs.unlinkSync(file + '.5');
+  for (let i = 4; i >= 1; i--) {
+    if (fs.existsSync(file + '.' + i)) fs.renameSync(file + '.' + i, file + '.' + (i + 1));
+  }
+  fs.renameSync(file, file + '.1');
+  return 'rolled';
+}
+const has = (s, what) => s.lines.some(l => l.indexOf(what) >= 0);
+const at = (h, m) => new Date(2026, 8, 22, h, m, 0).getTime();
+
+const ROLLDIR = path.join(TMP, 'rolled');
+fs.mkdirSync(path.join(ROLLDIR, 'dev'), { recursive: true });
+SERVER_LOGS.main = path.join(ROLLDIR, 'server.log');
+SERVER_LOGS.dev = path.join(ROLLDIR, 'dev', 'server.log');
+
+/* A day's run past 4 MB, the crash at the end of it. */
+const filler = '[2026-09-22 09:00:00.000] [console] [info] an ordinary line of engine noise\n';
+const CRASHED =
+  filler.repeat(Math.ceil((4 * 1024 * 1024 + 4096) / filler.length)) +
+  '[2026-09-22 22:00:00.000] [console] [info] the crash session begins\n' +
+  '[2026-09-22 22:05:00.000] [console] [error] FATAL the server went down\n' +
+  '    at a stack line carrying no stamp of its own\n';
+fs.writeFileSync(SERVER_LOGS.main, CRASHED);
+
+const crashFrom = at(21, 59), crashTo = at(22, 6);
+yes('before the restart, the crash session is on the page',
+    has(serverLogSlice('main', crashFrom, crashTo), 'FATAL the server went down'));
+
+const said = rollLog(SERVER_LOGS.main, false);
+yes('the roller moved the 4 MB log aside, as it does in front of every start',
+    said.indexOf('rolled') >= 0 && !fs.existsSync(SERVER_LOGS.main) &&
+    fs.existsSync(SERVER_LOGS.main + '.1'));
+
+const between = serverLogSlice('main', crashFrom, crashTo);
+yes('in the moment before the server opens a new server.log, the crash session is still found',
+    between.ok && has(between, 'FATAL the server went down'));
+
+/* The restart, writing a fresh server.log the way cmd's >> does. */
+fs.writeFileSync(SERVER_LOGS.main,
+  '[2026-09-22 22:07:00.000] [console] [info] the server is up again\n' +
+  '[2026-09-22 22:30:00.000] [console] [info] a session after the restart\n');
+
+const after = serverLogSlice('main', crashFrom, crashTo);
+yes('after the restart, the crash session is still on the page', after.ok && has(after, 'FATAL the server went down'));
+yes('with the stack line under it', has(after, 'a stack line carrying no stamp'));
+yes('and without the restart, which is outside its window', !has(after, 'the server is up again'));
+
+const later = serverLogSlice('main', at(22, 29), at(22, 31));
+yes('a session after the restart comes out of the new server.log',
+    has(later, 'a session after the restart') && !has(later, 'FATAL'));
+
+const across = serverLogSlice('main', at(22, 4), at(22, 8));
+const fi = across.lines.findIndex(l => l.indexOf('FATAL') >= 0);
+const ui = across.lines.findIndex(l => l.indexOf('the server is up again') >= 0);
+yes('a session across the restart has both halves, oldest first', fi >= 0 && ui > fi);
+
+/* An install rolls whatever the size, so the run before it can be a small .1
+   with the crash a generation further back in .2. */
+rollLog(SERVER_LOGS.main, true);
+fs.writeFileSync(SERVER_LOGS.main, '[2026-09-22 23:00:00.000] [console] [info] installed\n');
+yes('an install roll put the crash in server.log.2', fs.existsSync(SERVER_LOGS.main + '.2'));
+yes('and the crash session is still found there',
+    has(serverLogSlice('main', crashFrom, crashTo), 'FATAL the server went down'));
+
+/* The read stays the 4 MB it always was: a server.log that fills the window
+   is all that is read, so a busy week cannot make the page read five files. */
+fs.writeFileSync(SERVER_LOGS.main, CRASHED.replace(/FATAL the server went down/, 'a later crash'));
+const capped2 = serverLogSlice('main', crashFrom, crashTo);
+yes('a server.log that fills the 4 MB window is read alone',
+    has(capped2, 'a later crash') && !has(capped2, 'FATAL the server went down'));
+
+/* dev is its own server with its own rolled logs, and a dev session reads
+   only those. */
+fs.writeFileSync(SERVER_LOGS.dev + '.1',
+  '[2026-09-22 22:05:00.000] [console] [error] only on dev\n');
+fs.writeFileSync(SERVER_LOGS.dev, '[2026-09-22 22:40:00.000] [console] [info] dev up again\n');
+yes('a dev session reads the dev server\'s rolled log',
+    has(serverLogSlice('dev', crashFrom, crashTo), 'only on dev'));
+yes('and a live session never does',
+    !has(serverLogSlice('main', crashFrom, crashTo), 'only on dev'));
+console.log('       (rolled by ' + rolledBy + ')');
+
 // ---- red against yellow ----------------------------------------------------
 /*
   Two levels, because they want two different things done about them. Red is a

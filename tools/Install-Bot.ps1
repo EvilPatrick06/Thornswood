@@ -100,7 +100,13 @@ function Remote($script) {
     # The path goes across as it is. Windows PowerShell takes forward
     # slashes, and converting them was how this shipped with the slashes
     # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'" 2>&1
+    # And bare, with no quotes round it; the path above is ours and has no
+    # spaces. Measured on this machine on 24 September, not on the VPS: bare
+    # runs whether cmd.exe or Windows PowerShell hands the line on, and the
+    # old form, the path in single quotes, fails under cmd.exe. The old form
+    # did run on the VPS on 20 and 21 September, so which shell sshd uses
+    # there is not known, and bare is the form that works under either.
+    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
     & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
   }
   finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
@@ -180,6 +186,12 @@ foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
   & scp @ssh $src "${User}@${Vps}:$Root/$f" | Out-Null
   Say "  $f" 'Green'
 }
+# The roller run.ps1 calls before each start of the bot. See Roll-Log.ps1 for
+# why a log cmd holds open can only be rolled then.
+$roll = Join-Path $Here 'Roll-Log.ps1'
+if (-not (Test-Path $roll)) { Die "missing: $roll" }
+& scp @ssh $roll "${User}@${Vps}:$Root/roll-log.ps1" | Out-Null
+Say '  roll-log.ps1' 'Green'
 
 # staff-channel.txt the same way, when there is one. It holds the id of the
 # channel a session that went wrong is announced in. Unlike the file above it
@@ -233,12 +245,15 @@ Start-Sleep -Seconds 12
 if (`$p) { 'bot up, pid ' + (`$p | Select-Object -First 1).ProcessId } else { 'BOT DID NOT START' }
 
 # Only what this start wrote. The file is held open by the bot, so it is read
-# with FileShare ReadWrite or not at all.
+# with FileShare ReadWrite or not at all. Shorter than before means run.ps1
+# rolled it on the way up, so all of it is this start.
 `$fs = `$null
 try {
   `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
-  if (`$fs.Length -gt `$before) {
-    [void]`$fs.Seek(`$before, 'Begin')
+  `$from = `$before
+  if (`$fs.Length -lt `$from) { `$from = 0 }
+  if (`$fs.Length -gt `$from) {
+    [void]`$fs.Seek(`$from, 'Begin')
     `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
     (`$sr.ReadToEnd()) -split "\r?\n" | Where-Object { `$_ } | Select-Object -Last 12
     `$sr.Close()
@@ -440,6 +455,10 @@ if (-not `$env:PYTHONIOENCODING) { `$env:PYTHONIOENCODING = 'utf-8' }
 `$fastSeconds = 30
 `$fastRuns = 0
 while (`$true) {
+  # Rolled here, between runs, because this is the one moment nothing holds
+  # bot.log: cmd opens it for the >> below and keeps it until python exits.
+  # At 4 MB, five kept, and it never stops the bot starting. Roll-Log.ps1.
+  try { & '$rootWin\roll-log.ps1' -Path '$rootWin\bot.log' | Out-Null } catch { }
   # Python writes the log itself, through cmd's redirection, the same way the
   # game server and the voice server are run. Piping every line through
   # PowerShell and Out-File, which this did until 2026-09-16, re-encoded the
@@ -495,14 +514,17 @@ Start-Sleep -Seconds 5
 if (`$p) { 'bot up, pid ' + `$p.ProcessId } else { 'BOT DID NOT START' }
 
 # Opened with FileShare ReadWrite, because the bot has it open for writing and
-# anything less strict than that is denied while it does.
+# anything less strict than that is denied while it does. Shorter than before
+# means run.ps1 rolled it on the way up, so all of it is this start.
 function Fresh {
   `$out = @()
   `$fs = `$null
   try {
     `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
-    if (`$fs.Length -gt `$before) {
-      [void]`$fs.Seek(`$before, 'Begin')
+    `$from = `$before
+    if (`$fs.Length -lt `$from) { `$from = 0 }
+    if (`$fs.Length -gt `$from) {
+      [void]`$fs.Seek(`$from, 'Begin')
       `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
       `$out = @((`$sr.ReadToEnd()) -split "\r?\n")
       `$sr.Close()

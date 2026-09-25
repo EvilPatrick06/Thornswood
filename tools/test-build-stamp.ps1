@@ -135,10 +135,21 @@ Yes 'Deploy-Server.ps1 checks the stamp describes the gamemode it is about to se
     $tests.Count -eq 1 -and (Arg $tests[0] 'Gamemode') -eq '$built')
 Yes 'Deploy-Server.ps1 makes it again, on the main channel, when it does not' (
     $saves.Count -eq 1 -and (Arg $saves[0] 'Channel') -eq 'main')
-Yes 'Deploy-Server.ps1 settles the stamp before the server is stopped' (
-    $tests.Count -eq 1 -and $tests[0].Extent.StartOffset -lt (At $ds "Write-Host 'Stopping the server...'"))
-$st = @(Commands $ds 'scp' | Where-Object { $_.Extent.Text -match '\$stampPath' -and $_.Extent.Text -match '\$Root/thornswood-build\.json' })
-Yes 'Deploy-Server.ps1 sends thornswood-build.json beside gamemode.js' ($st.Count -eq 1)
+# Deploy-Server stages every file beside the live folder, checks it there and
+# only then stops the server and swaps the stage in (entry 209). So the stamp
+# is settled before anything is staged, and it goes up as one of the staged
+# files, which tools\test-deploy-server-swap.ps1 proves land beside
+# gamemode.js on a good deploy and go back with it on a rollback.
+$staging = At $ds 'Write-Host "Staging in'
+Yes 'Deploy-Server.ps1 settles the stamp before anything is staged, so before the server is stopped' (
+    $tests.Count -eq 1 -and $staging -ge 0 -and $tests[0].Extent.StartOffset -lt $staging -and
+    $staging -lt (At $ds "Write-Host 'Stopping, swapping in and starting...'"))
+$st = @($ds.FindAll({ param($n)
+    $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+    $n.Left.Extent.Text -eq "`$send['thornswood-build.json']" -and $n.Right.Extent.Text -eq '$stampPath'
+}, $true))
+Yes 'Deploy-Server.ps1 stages thornswood-build.json with gamemode.js, so it is swapped in beside it' (
+    $st.Count -eq 1 -and $st[0].Extent.StartOffset -lt (At $ds '$hashes = [ordered]@{}'))
 
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper

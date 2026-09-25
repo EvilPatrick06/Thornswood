@@ -164,6 +164,11 @@ if ($LASTEXITCODE -ne 0) { Die "ssh exited with $LASTEXITCODE" }
 & scp (Join-Path $src 'voice-server.js') "${target}:$($Root -replace '\\','/')/voice-server.js"
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
 
+# The roller the task runs in front of the service. See Roll-Log.ps1 for why a
+# log cmd holds open can only be rolled at start.
+& scp (Join-Path $Here 'Roll-Log.ps1') "${target}:$($Root -replace '\\','/')/roll-log.ps1"
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+
 # THE CHARACTER REGISTER IS GONE, 23 September, and so is the secret it used.
 #
 # The three routes it guarded, /whoami, /claim and /owners, refused every real
@@ -232,7 +237,15 @@ if (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
 # Without it on this line -Port drove the firewall rule, the is-it-free check
 # and the health probe, and nothing else, so -Port 7789 opened 7789, checked
 # 7789 was free, and then started a service that bound 7778 on top of live.
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=$Auth&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $turnSet"{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log)
+#
+# roll-log.ps1 runs in front of node, because cmd holds voice.log open for as
+# long as node runs and nothing can move it until then. & rather than &&, so
+# a roll that fails still starts voice. The relay line, when there is one,
+# sits with the other settings ahead of the roll, so it is set in this cmd
+# before node starts whatever the roll does.
+`$roll = Join-Path '$Root' 'roll-log.ps1'
+`$psExe = Join-Path `$env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=$Auth&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log, `$psExe, `$roll)
 
 <#
   Stop the old service, and mean it.
@@ -331,7 +344,10 @@ if (-not `$free) { throw 'something is still holding port $Port up here and woul
 `$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 Register-ScheduledTask -TaskName '$TaskName' -Action `$action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings `$settings -Principal `$principal | Out-Null
 
-if (Test-Path -LiteralPath `$log) { Remove-Item -LiteralPath `$log -Force -EA SilentlyContinue }
+# Rolled whatever its size rather than deleted, so the run before this install
+# is voice.log.1 and the tails below read only this one. Deleting it is how
+# the evidence for the last crash disappeared.
+try { & `$roll -Path `$log -Force } catch { 'could not roll voice.log: ' + `$_.Exception.Message }
 Start-ScheduledTask -TaskName '$TaskName'
 
 `$up = `$false
@@ -401,8 +417,14 @@ else {
         if ($LASTEXITCODE -ne 0) { Die "could not send the install script to $VpsHost" }
         # The path goes across as it is: Windows PowerShell takes forward
         # slashes, and converting them is how a sister script once shipped
-        # with the slashes stripped out entirely.
-        & ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'"
+        # with the slashes stripped out entirely. And bare, with no quotes
+        # round it; the path above is ours and has no spaces. Measured on this
+        # machine on 24 September, not on the VPS: bare runs whether cmd.exe
+        # or Windows PowerShell hands the line on, and the old form, the path
+        # in single quotes, fails under cmd.exe. The old form did run on the
+        # VPS on 20 and 21 September, so which shell sshd uses there is not
+        # known, and bare is the form that works under either.
+        & ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far"
         $rc = $LASTEXITCODE
         & ssh $target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" | Out-Null
         $global:LASTEXITCODE = $rc

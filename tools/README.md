@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 178 of them, with the one line that says
+Every `.ps1` in this folder, 193 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -68,6 +68,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Check-Site.ps1](Check-Site.ps1) | Asks whether thornswood.net is actually working: from the outside first, the way a visitor or an uptime monitor sees it, and then from the box, the way the site sees Discord. |
 | [Check-Swallow.ps1](Check-Swallow.ps1) | Counts the silent catches in the launcher, file by file, and fails when any file has more than tools\swallow-baseline.txt allows. |
 | [Check-VoiceInstall.ps1](Check-VoiceInstall.ps1) | Expand Install-Voice's here-string exactly as the script does and look at the text that would actually be sent. |
+| [Check-Words.ps1](Check-Words.ps1) | The Words section of CLAUDE.md, checked instead of hoped for: no em dashes anywhere written for people, never the word player, and the owner is Patrick. |
 | [Clean-Downloads.ps1](Clean-Downloads.ps1) | Moves known-safe clutter out of Downloads into a quarantine folder. |
 | [Clean-Everything.ps1](Clean-Everything.ps1) | Finds the old installers, build leftovers, temp files, stale backups and old GitHub release assets across this machine, the server and both repositories, adds up what they are costing, and prints it. |
 | [Clean-Leftovers.ps1](Clean-Leftovers.ps1) | The other half of Audit-Leftovers.ps1. That one measures and never touches anything; this one removes what it found. |
@@ -127,6 +128,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Restart-Server.ps1](Restart-Server.ps1) | Restarts a Thornswood service on the VPS. Nothing is copied and nothing is built: this only stops it and starts it again. |
 | [Restore-Backup.ps1](Restore-Backup.ps1) | Opens one of the nightly backups: checks it has not been tampered with, decrypts it, and unpacks it into a folder you name. |
 | [Revert.ps1](Revert.ps1) | Put the game back to the state it was working in. |
+| [Roll-Log.ps1](Roll-Log.ps1) | Rolls a log just before the service that writes it starts. |
 | [Rotate-ServerPassword.ps1](Rotate-ServerPassword.ps1) | Changes the server password and hands the new one to the site, so the launcher can fetch it after checking Discord. |
 | [Run-Everything.ps1](Run-Everything.ps1) | One run that installs everything waiting, checks each piece actually landed, and publishes once at the end instead of once per mod. |
 | [Set-Collection.ps1](Set-Collection.ps1) | Asks for the collection address and publishes it, in the two places that decide it, the same two Set-Server.ps1 uses. |
@@ -155,17 +157,23 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-build-vs-install.ps1](test-build-vs-install.ps1) | Build-Launcher.ps1 builds and Install-Launcher.ps1 installs, and every caller of the build does what it did before apart from that split. |
 | [test-chargen-gone.ps1](test-chargen-gone.ps1) | The retired dresser, thornswood-chargen.js, is out of the repo, nothing that installs or ships the game names it except the rules that keep it out, every pack deletes it from the machines that already have it, and the launcher's own game folder does not copy it back in from the Steam copy afterwards. |
 | [test-chat-range-install.ps1](test-chat-range-install.ps1) | Install-Voice.ps1 can turn local chat on, and leaves it off unless told to. |
+| [test-chat-settings.ps1](test-chat-settings.ps1) | The launcher's Chat and needs settings write Thornswood.ini the way the game plugin reads it: ChatFade=5, 15, 20 or 0 (10 is the default and is not written), and NeedsBars=0 when the bars are off (on is no line at all). |
 | [test-check-controls.ps1](test-check-controls.ps1) | Check-Controls.ps1 has to fail when the launcher's window has drifted or broken, or the build check that runs it proves nothing. |
 | [test-check-outside.ps1](test-check-outside.ps1) | Check-Outside.ps1 walks what a first install needs that this project does not run: the feed on GitHub, every address in it, the downloads, Steam's public build and the Nexus collection. |
 | [test-check-secrets.ps1](test-check-secrets.ps1) | Drives tools\Check-Secrets.ps1 over scratch trees, zips, folders and programs with obviously fake values planted in them, and over this repository as it is. |
+| [test-check-words.ps1](test-check-words.ps1) | The writing rules in CLAUDE.md are checked, and the check itself works. |
+| [test-client-by-hash.ps1](test-client-by-hash.ps1) | Whether the six client runtime files in client-build.json leave this machine as ours only when their bytes are the recorded build. |
 | [test-collection-newest.ps1](test-collection-newest.ps1) | Which revision of the collection Vortex knows is out, read out of its own state.v2. |
 | [test-collection-rules.ps1](test-collection-rules.ps1) | Check-CollectionRules.ps1, which reads the plugin rules the Nexus collection carries against a plugin list. |
+| [test-deploy-server-swap.ps1](test-deploy-server-swap.ps1) | Deploy-Server.ps1 stages and checks before it stops anything, and puts the old files back when the new server does not answer. |
 | [test-dev-deploy-warning.ps1](test-dev-deploy-warning.ps1) | Deploy-DevGamemode.ps1 says who is on the dev server and warns them in the game before it stops anything. |
 | [test-dev-ships-our-plugin.ps1](test-dev-ships-our-plugin.ps1) | A dev release carries our own plugin; a main release leaves it to the Nexus collection; every other file the collection provides stays out of both. |
 | [test-dev-version.ps1](test-dev-version.ps1) | A dev build has to outrank what main has published, or nobody can take it. |
 | [test-docs-backup.ps1](test-docs-backup.ps1) | Deploy-Docs.ps1 -Docs, -Boards and -SeedDocs overwrite documents people type into on the site, and each one promises a .bak beside every document first. |
 | [test-docs-password.ps1](test-docs-password.ps1) | Deploy-Docs.ps1 -Password changes the site's password and nothing else in its config.json. |
 | [test-door-outage.ps1](test-door-outage.ps1) | The launcher's half of "Discord did not answer is not a no". |
+| [test-downgrade-steam-log.ps1](test-downgrade-steam-log.ps1) | The Downgrade button hears Steam say a part has started, finished or failed, and checks the downloaded SkyrimSE.exe before it replaces anything. |
+| [test-downgrade-steam-window.ps1](test-downgrade-steam-window.ps1) | The Downgrade button finds Steam's window when steamwebhelper draws it, and the clipboard fallback says which part of three is on the clipboard. |
 | [test-feed-notice.ps1](test-feed-notice.ps1) | What the update feed says to everybody, and when it may hold Play. |
 | [test-feed-rules.ps1](test-feed-rules.ps1) | No pack goes onto the update feed that a launcher cannot download, and the ones already there can be taken off. |
 | [test-load-order.ps1](test-load-order.ps1) | The rule the pack's plugin list is put through before it ships, driven with stubs so it needs no game folder, no Data and no server. |
@@ -176,18 +184,25 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-payload-hash.ps1](test-payload-hash.ps1) | The setup program checks the payload it downloads against a hash the site publishes, and deletes one that does not match instead of running it. |
 | [test-pinned-downloads.ps1](test-pinned-downloads.ps1) | What a fresh VPS downloads is one exact version, checked against the checksum its vendor published for it, and nothing is installed when the download does not match. |
 | [test-public-news.ps1](test-public-news.ps1) | What a stranger reads on the site's News page. |
+| [test-publish-refusals.ps1](test-publish-refusals.ps1) | The publisher refuses, whole and for real, the releases it exists to refuse. |
 | [test-publish-resume.ps1](test-publish-resume.ps1) | Runs the real resume helpers out of Publish-Update.ps1 against a temp folder. |
 | [test-release-prerelease.ps1](test-release-prerelease.ps1) | A dev build goes up to GitHub marked prerelease, on every path the upload can take, and a main build does not. |
+| [test-release-size.ps1](test-release-size.ps1) | A release the size of the mod collection is refused before anything is zipped. |
+| [test-remote-big-script.ps1](test-remote-big-script.ps1) | A 10 KB script is sent whole and runs to its last line, from every helper that sends one to the VPS. |
 | [test-remote-length.ps1](test-remote-length.ps1) | No script sends the VPS more than a command line can hold. |
+| [test-roll-log.ps1](test-roll-log.ps1) | Roll-Log.ps1, and every command line that runs it, driven for real in a temp folder. |
 | [test-script-index.ps1](test-script-index.ps1) | Ship.ps1 says every option it takes where Get-Help can read it, and tools\README.md lists every script in this folder exactly as New-ScriptIndex.ps1 writes it. |
 | [test-self-update.ps1](test-self-update.ps1) | The launcher's self update keeps the old exe until the new one has started, and puts it back when the new one does not. |
 | [test-ship-gate.ps1](test-ship-gate.ps1) | A main release ships what is on GitHub, and nothing else. |
+| [test-ship-guards.ps1](test-ship-guards.ps1) | The two Ship.ps1 guards that came out of 17 September, run for real. |
 | [test-ship-lists.ps1](test-ship-lists.ps1) | Whether a pack and the installer leave out the same files. |
-| [test-ship-rules.ps1](test-ship-rules.ps1) | Two rules in Ship-Rules.ps1 that decide what leaves this machine in a pack or the installer. |
+| [test-ship-rules.ps1](test-ship-rules.ps1) | Every file that has ever leaked in a pack or an installer stays out, and the rules that decide what leaves this machine still say what they mean. |
 | [test-show-botlog.ps1](test-show-botlog.ps1) | Show-BotLog.ps1 reads bot.log.1 before bot.log, so the lines just before a roll are not hidden by it, and with no bot.log.1 it reads bot.log exactly as it did before. |
+| [test-site-account.ps1](test-site-account.ps1) | Deploy-Docs.ps1 -RunAs chooses the account the site's scheduled task runs as. |
 | [test-source-offer.ps1](test-source-offer.ps1) | Where the source of the SkyMP files Thornswood ships is, said on the site and in the installed folder, and said truthfully. |
 | [test-steam-updates.ps1](test-steam-updates.ps1) | Steam's Updates setting for Skyrim, which nothing in the launcher read or set until 24 September (entry 271 on the To Do List, "Nothing stops Steam putting Skyrim back on the wrong build"). |
 | [test-swallow.ps1](test-swallow.ps1) | The silent catches in the launcher, entry 239 on the To Do List, and the rule that stops their number growing. |
+| [test-updater.ps1](test-updater.ps1) | The launcher's updater, asked its own questions. |
 | [test-voice-ticket.ps1](test-voice-ticket.ps1) | The Discord ticket only goes to the voice service over https. |
 | [test-voice-turn-url.ps1](test-voice-turn-url.ps1) | Install-Voice.ps1 can hand the voice service a relay address, keeps it on the next install the way it keeps -Bind and -Auth, says so when it drops one that has no key, and with no relay sends the service the command line it always sent. |
 | [test-vortex-folder.ps1](test-vortex-folder.ps1) | Scan finds the Skyrim folder Vortex really deploys into, Fix builds Thornswood's own folder from it, and nothing of another server's install comes with it. |
