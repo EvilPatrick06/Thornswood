@@ -658,7 +658,8 @@
       gets a loadUrl as a last resort and the wait that comes with it.
     */
     if (menuPhase === 0) {
-      if (now - loadedAt < 600) { return; }
+      // 100 ms, was 600 (Djinn, 25 September: the still before the loop was up too long).
+      if (now - loadedAt < 100) { return; }
       if (chosenOnDisk()) { menuPhase = 9; log('menu: a choice is already on disk for this session'); return; }
       try {
         sp.browser.setVisible(true);

@@ -600,7 +600,13 @@ namespace Thornswood
                 var extra = new StringBuilder();
                 if (File.Exists(Path.Combine(ui, "thornswood-theme.mp3")))
                     extra.Append(",\"music\":\"thornswood-theme.mp3\"");
-                if (File.Exists(Path.Combine(ui, "thornswood-menu.mp4")))
+                // WebM first, Djinn, 25 September: the game's browser (CEF in
+                // Skyrim Platform) has no H.264, so the .mp4 never played and
+                // the still stood in for the loop. The .mp4 stays as the
+                // fallback for a game folder from before the .webm.
+                if (File.Exists(Path.Combine(ui, "thornswood-menu.webm")))
+                    extra.Append(",\"video\":\"thornswood-menu.webm\"");
+                else if (File.Exists(Path.Combine(ui, "thornswood-menu.mp4")))
                     extra.Append(",\"video\":\"thornswood-menu.mp4\"");
                 if (File.Exists(Path.Combine(ui, "thornswood-menu.jpg")))
                     extra.Append(",\"still\":\"thornswood-menu.jpg\"");

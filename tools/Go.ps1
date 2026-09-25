@@ -211,7 +211,7 @@ if (Test-Path -LiteralPath $uiSrc) {
   # banner, the loop and its first frame, copied under the page's names so
   # the one file in the repo is the site's. Ours, flat under UI, so it ships.
   $siteArt = Join-Path $Here 'docs-app\public'
-  foreach ($pair in @(@('banner.mp4', 'thornswood-menu.mp4'), @('banner.jpg', 'thornswood-menu.jpg'))) {
+  foreach ($pair in @(@('banner.webm', 'thornswood-menu.webm'), @('banner.mp4', 'thornswood-menu.mp4'), @('banner.jpg', 'thornswood-menu.jpg'))) {
     $src = Join-Path $siteArt $pair[0]
     if (Test-Path -LiteralPath $src) {
       Copy-Item -LiteralPath $src -Destination (Join-Path $ui $pair[1]) -Force

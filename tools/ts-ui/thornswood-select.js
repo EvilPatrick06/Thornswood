@@ -164,9 +164,24 @@
     '#ts-select .intro .words{position:absolute;left:17%;right:17%;top:20%;bottom:18%;display:flex;flex-direction:column;',
     'align-items:center;justify-content:center;text-align:center;opacity:0}',
     '#ts-select .intro .said{font-style:italic;font-size:1.6vw;line-height:1.45;color:#2c1e10}',
-    '#ts-select .intro .skip{margin-top:1.1vw;font-size:1vw;color:#2c1e10;display:flex;align-items:center;gap:.5vw}',
-    '#ts-select .intro .skip input{width:1.1vw;height:1.1vw;margin:0}',
-    '#ts-select .intro .go{margin-top:1vw;background:rgba(20,14,8,.85)}',
+    /*
+      What is written on the open scroll, Djinn, 25 September: it has to read
+      as ink on the parchment, not as a page's form. The tick box is a small
+      square ruled in the same brown ink with a quill stroke for the tick, and
+      Continue is lettered between two ink flourishes instead of sitting in a
+      dark button. Still no hover, cursor or transition rules, as above.
+    */
+    '#ts-select .intro .skip{margin-top:1.3vw;font-size:1.05vw;font-style:italic;color:#3a2714;display:flex;align-items:center;gap:.6vw;',
+    'text-shadow:0 1px 0 rgba(255,236,190,.35)}',
+    '#ts-select .intro .skip input{-webkit-appearance:none;appearance:none;flex:none;width:1.15vw;height:1.15vw;margin:0;position:relative;',
+    'border:.13vw solid rgba(44,30,16,.78);border-radius:.12vw .22vw .1vw .25vw;background:rgba(255,238,196,.18);',
+    'box-shadow:inset 0 0 .25vw rgba(90,60,25,.35),0 1px 0 rgba(255,236,190,.35)}',
+    '#ts-select .intro .skip input:checked{background:rgba(255,238,196,.18) url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 20 20\'><path d=\'M3.5 10.5 C5.5 11.5 7 13.5 8.2 16 C10.5 10.5 13.5 6 17.5 2.5\' fill=\'none\' stroke=\'%232c1e10\' stroke-width=\'2.4\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/></svg>") center/135% no-repeat}',
+    '#ts-select .intro .go{margin-top:1.3vw;padding:.35vw 0;border:0;background:none;display:flex;align-items:center;gap:.9vw;',
+    'font-size:1.2vw;letter-spacing:.32em;text-transform:uppercase;color:#2c1e10;text-shadow:0 1px 0 rgba(255,236,190,.4)}',
+    '#ts-select .intro .go::before,#ts-select .intro .go::after{content:"";width:3.2vw;height:.12vw;',
+    'background:linear-gradient(90deg,transparent,rgba(44,30,16,.8))}',
+    '#ts-select .intro .go::after{background:linear-gradient(270deg,transparent,rgba(44,30,16,.8))}',
     '#ts-select .intro.opening .flash{animation:tsFlash .7s ease-out forwards}',
     '#ts-select .intro.opening .closed{animation:tsFade .5s ease .35s forwards}',
     '#ts-select .intro.opening .open{pointer-events:auto;animation:tsRise 1.1s cubic-bezier(.22,.9,.25,1) .35s forwards}',
@@ -296,7 +311,17 @@
       introImgs[ii].onerror = function () { introEnd('a scroll picture is missing, straight to the slots'); };
     }
     elIntro.querySelector('.closed').onclick = introOpen;
-    elIntro.querySelector('.go').onclick = function () { introEnd(''); };
+    /*
+      Continue is when the choice really starts, Djinn, 25 September: the
+      client's fallback to the last character is meant to count from here
+      and not from the game reaching the menu, so time on the scroll is not
+      time taken from choosing. Told to the client as 'thornswood',
+      'choosing'; a client from before that change ignores it.
+    */
+    elIntro.querySelector('.go').onclick = function () {
+      try { window.skyrimPlatform.sendMessage('thornswood', 'choosing'); } catch (e) { }
+      introEnd('continue clicked, the choice starts now');
+    };
     tell('intro: the scroll is up');
   } else if (LIST.intro === false) {
     var introBack = el('div', 'hint', 'The scroll at the start is off. Click here to have it back next time.');
