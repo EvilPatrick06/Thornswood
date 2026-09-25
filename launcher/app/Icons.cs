@@ -77,8 +77,14 @@ namespace Thornswood
             {
                 Assembly asm = Assembly.GetExecutingAssembly();
                 string pick = null;
-                foreach (string n in asm.GetManifestResourceNames())
-                    if (n.EndsWith("app.ico", StringComparison.OrdinalIgnoreCase)) { pick = n; break; }
+                // The dev build's shortcuts get the dev icon, app-dev.ico; the
+                // main build keeps app.ico. A dev build without it uses app.ico.
+                if (Art.Dev)
+                    foreach (string n in asm.GetManifestResourceNames())
+                        if (n.EndsWith("app-dev.ico", StringComparison.OrdinalIgnoreCase)) { pick = n; break; }
+                if (pick == null)
+                    foreach (string n in asm.GetManifestResourceNames())
+                        if (n.EndsWith("app.ico", StringComparison.OrdinalIgnoreCase)) { pick = n; break; }
                 if (pick == null) return null;
 
                 byte[] bytes;

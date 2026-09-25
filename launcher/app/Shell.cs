@@ -254,6 +254,7 @@ namespace Thornswood
             Stats.Load();
             Keep.BuildName = cfg.BuildName;
             Icons.BuildName = cfg.BuildName;
+            Art.Dev = cfg.IsDev;
             Discord.Channel = cfg.Channel;
 
             string xaml;
