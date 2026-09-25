@@ -419,6 +419,16 @@ if (Test-Path -LiteralPath $src) {
   }
 }
 
+# The file about to go up must parse, or the live server stops at start. The
+# same check Deploy-DevGamemode.ps1 and Deploy-Gamemode.ps1 make, made again
+# here on the copy that is actually sent, before anything leaves the machine.
+if (Test-Path -LiteralPath $built) {
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'node is not on this machine, so gamemode.js cannot be checked before it goes live. Nothing was sent.' }
+  & node --check $built
+  if ($LASTEXITCODE -ne 0) { throw 'gamemode.js does not parse. Nothing was sent.' }
+  Write-Host '  gamemode.js parses'
+}
+
 $files = 'scam_native.node', 'gamemode.js', 'server-settings.json'
 foreach ($f in $files) {
   $p = Join-Path $Dist $f
