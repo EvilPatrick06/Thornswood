@@ -824,7 +824,7 @@ $STATION_VERBS = @(
     # unsupplied input in the table, 79 entries, and until chopWood existed
     # nothing in this world produced a single stick of it.
     @{ Fn = 'chopWood';     Who = 'woodworker';
-       What = 'the three chopping blocks in Skyrim.esm, which are the Woodwright half''s: halfGate(actorId, ''woodwright''). Bethesda''s records are untouched and the verb is answered server side, because Patrick said on 21 September that a chopping block is "just for getting the firewood and not usable by non woodworkers".' }
+       What = 'the chopping blocks, three in Skyrim.esm and Solstheim''s ash one in Dragonborn.esm, which are the Woodwright half''s: halfGate(actorId, ''woodwright''). Bethesda''s records are untouched and the verb is answered server side, because Patrick said on 21 September that a chopping block is "just for getting the firewood and not usable by non woodworkers".' }
 )
 
 # WHERE THE STATIONS ARE READ FROM. The shipped gamemode, in this folder, which

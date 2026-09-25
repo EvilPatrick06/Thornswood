@@ -686,7 +686,7 @@ if ($recipes) {
         Say ('    {0,5} entries  {1}' -f $loose[$nm], $nm)
     }
     Say '  Firewood came off this list on 21 September: chopWood in gamemode.js gives it to a'
-    Say '  woodworker at the three chopping blocks, and Build-RecipeTable reads that verb out of'
+    Say '  woodworker at the four chopping blocks, and Build-RecipeTable reads that verb out of'
     Say '  the shipped file the same way it reads the kiln. A churn would do the same for Butter,'
     Say '  so the shape of that work is known.'
 }
