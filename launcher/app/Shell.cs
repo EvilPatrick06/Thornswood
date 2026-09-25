@@ -627,6 +627,32 @@ namespace Thornswood
             if (navButtons[PageSaves] != null)
                 navButtons[PageSaves].Visibility = Visibility.Collapsed;
 
+            /*
+              Server, What is installed and Logs are gone too, issue #607, in
+              the same way and for the same reason as Saves above: the nav
+              button is collapsed so the page cannot be reached, the arrays and
+              the dead Grids are left where they are so nothing is renumbered,
+              and each can be cut properly whenever the xaml is next opened.
+
+              Server and What is installed only ever told you things: the
+              server address is on Play beside Copy address, and the build
+              figures were a page nobody needed open. The newest crash log that
+              Logs copied is in the Diagnostics report, which gathers it with
+              everything else worth sending.
+
+              Mods is NOT collapsed here, though the same list asked for it:
+              its Fix is the only way to mend a mod list the server would
+              refuse, and Play sends people to it when the check fails
+              (ShowPage(PageMods)). It waits until Scan and Fix have a home on
+              Diagnostics and a Recheck on Play, which is the rest of that item.
+            */
+            if (navButtons[PageServer] != null)
+                navButtons[PageServer].Visibility = Visibility.Collapsed;
+            if (navButtons[PageBuild] != null)
+                navButtons[PageBuild].Visibility = Visibility.Collapsed;
+            if (navButtons[PageLogs] != null)
+                navButtons[PageLogs].Visibility = Visibility.Collapsed;
+
             buttonDiscord       = F<Button>("ButtonDiscord");
             buttonDiscordForget = F<Button>("ButtonDiscordForget");
             labelDiscord        = F<TextBlock>("LabelDiscord");
