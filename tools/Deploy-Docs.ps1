@@ -24,6 +24,13 @@
                                replaces just the named documents with the
                                repo copy, .bak first. For a page rewritten
                                here on purpose, when -SeedDocs is too much.
+    .\Deploy-Docs.ps1 -RunAs 'LOCAL SERVICE'
+                               runs the site as LOCAL SERVICE instead of
+                               SYSTEM, with its own folder and nothing else
+                               to write in, and one privilege, the one for
+                               walking folders. It stays that way: a deploy
+                               without -RunAs keeps the account the task
+                               already has. -RunAs SYSTEM puts it back.
 
   The password crosses the wire in clear, because this is plain HTTP on an IP.
   Do not reuse one that matters. That improves the day a real domain and a
@@ -51,7 +58,20 @@ param(
   # Named documents under data, by name with or without .md: help, known.
   # Only those are replaced, each after a .bak of the live copy, so a page
   # rewritten in the repo can go up without -SeedDocs flattening the rest.
-  [string[]]$Docs
+  [string[]]$Docs,
+  # The account the site's scheduled task runs as. Entry 219 on the To Do
+  # List: the site has run as SYSTEM since it was first installed, which is
+  # every right on the box for a node process that answers the internet.
+  # LOCAL SERVICE is built in and needs no password kept anywhere, which a
+  # named local user would.
+  #
+  # No default on purpose. Left out, the task keeps the account it already
+  # runs as, and a task made for the first time is SYSTEM, as it always was.
+  # A default of SYSTEM put the site back on SYSTEM at the next plain deploy
+  # or -Site after the switch, which is what CLAUDE.md, Install-Bot and
+  # Set-Vps all tell people to run, and the read-back said nothing about it.
+  [ValidateSet('SYSTEM', 'LOCAL SERVICE')]
+  [string]$RunAs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -110,7 +130,13 @@ function Remote($script) {
     # The path goes across as it is. Windows PowerShell takes forward
     # slashes, and converting them was how this shipped with the slashes
     # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'" 2>&1
+    # And bare, with no quotes round it; the path above is ours and has no
+    # spaces. Measured on this machine on 24 September, not on the VPS: bare
+    # runs whether cmd.exe or Windows PowerShell hands the line on, and the
+    # old form, the path in single quotes, fails under cmd.exe. The old form
+    # did run on the VPS on 20 and 21 September, so which shell sshd uses
+    # there is not known, and bare is the form that works under either.
+    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
     & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
   }
   finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
@@ -282,6 +308,85 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
   'firewall opened on $Port'
 } else { 'firewall rule already there' }
 
+# ==== thornswood site account ====
+# Who the site runs as, from -RunAs. Worked out before anything is stopped,
+# so an account that does not resolve leaves the running site alone.
+#
+# Without -RunAs it is the account the task already runs as, read off the
+# task, so the switch survives every plain deploy and -Site after it. A box
+# with no task yet gets SYSTEM, as it always did. An account this script did
+# not make, set on the task by hand, is handed back to the task as it is and
+# granted nothing, because nothing here knows what it was set up to reach.
+#
+# SYSTEM is registered exactly as it always was, Highest and no grants.
+#
+# LOCAL SERVICE is cut down to one privilege. -RunLevel Limited alone takes
+# nothing away from a built-in service account, because it has no split
+# token to lower. Windows gives LOCAL SERVICE "Impersonate a client" and
+# "Replace a process level token" by default, and public tools turn either
+# of those into SYSTEM from inside whatever holds them. A task given no
+# privilege list is not kept from starting with them, so -RequiredPrivilege
+# names the one node needs, SeChangeNotifyPrivilege, which lets it reach a
+# file through folders it has no rights on. -ProcessTokenSidType
+# Unrestricted, in Microsoft's words, adds a SID made from the task name to
+# the process token and changes the token's default DACL "to allow only the
+# task SID and local system full control and the account SID read control",
+# which leaves every other service on the box that runs as LOCAL SERVICE
+# able to read the site's own objects and not change them. The account is
+# still the token's user, so the grants below still apply. Neither was tried
+# on a registered task here, and the read-back after registering says what
+# the box kept.
+#
+# It is also given what the site touches and no more: Modify on its own
+# folder, where it writes config.json, data, uploads and site.log, and Read
+# on the five places outside it that server.js reads, measured on 24 Sep:
+# onlineFile, the main and dev SERVER_LOGS, and the main and dev CHAT_DIRS.
+# Granted on the folder rather than the file, because server.log is deleted
+# and made again at every server start and a grant on the file would go with
+# it. (NP) keeps each one to the files directly in that folder and out of the
+# world data below it. In C:\Thornswood-Server that still includes
+# server-settings.json. Given again at every deploy while the site is not
+# SYSTEM, which icacls adds to the rule already there rather than doubling,
+# so a dev folder made after the switch is reached at the next deploy.
+`$runAs = '$RunAs'
+`$principal = `$null
+`$sid = ''
+if (-not `$runAs) {
+  `$runAs = 'SYSTEM'
+  `$was = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Principal
+  if (`$was) {
+    try { `$sid = (New-Object Security.Principal.NTAccount([string]`$was.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+    if (`$sid -eq 'S-1-5-19') { `$runAs = 'LOCAL SERVICE' }
+    elseif (`$sid -ne 'S-1-5-18') { `$runAs = [string]`$was.UserId; `$principal = `$was }
+  }
+  'no -RunAs, so the task keeps the account it has: ' + `$runAs
+}
+if (`$principal) {
+  'an account this script did not set up: left as it is, nothing granted'
+} elseif (`$runAs -eq 'SYSTEM') {
+  `$sid = 'S-1-5-18'
+  `$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+} else {
+  `$sid = ''
+  try { `$sid = (New-Object Security.Principal.NTAccount('NT AUTHORITY', `$runAs)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+  if (-not `$sid) { 'NO SUCH ACCOUNT HERE: ' + `$runAs + '. Nothing was stopped or changed.'; return }
+  `$principal = New-ScheduledTaskPrincipal -UserId ('NT AUTHORITY\' + `$runAs) -LogonType ServiceAccount -RunLevel Limited ``
+    -RequiredPrivilege 'SeChangeNotifyPrivilege' -ProcessTokenSidType Unrestricted
+  foreach (`$g in @(
+      @('$rootWin', '(OI)(CI)M'),
+      @('C:\Thornswood-Server\data', '(OI)(NP)R'),
+      @('C:\Thornswood-Server', '(OI)(NP)R'),
+      @('C:\Thornswood-Server-Dev', '(OI)(NP)R'),
+      @('C:\Thornswood-Voice\chat', '(OI)(NP)R'),
+      @('C:\Thornswood-Voice-Dev\chat', '(OI)(NP)R'))) {
+    if (-not (Test-Path -LiteralPath `$g[0])) { 'not here, nothing granted: ' + `$g[0]; continue }
+    `$said = & icacls `$g[0] /grant ('*' + `$sid + ':' + `$g[1]) 2>&1
+    if (`$LASTEXITCODE -eq 0) { 'granted ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] }
+    else { 'COULD NOT GRANT ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] + ': ' + ((`$said | Out-String).Trim()) }
+  }
+}
+# ==== end thornswood site account ====
+
 Get-CimInstance Win32_Process |
   Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*Thornswood-Docs*' } |
   ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
@@ -313,17 +418,42 @@ if (-not `$node) { 'NODE NOT FOUND ON THIS MACHINE'; return }
 `$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ``
       -DontStopIfGoingOnBatteries -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 1) ``
       -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable
-if (-not (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue)) {
+`$have = Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
+if (-not `$have) {
   `$t = New-ScheduledTaskTrigger -AtStartup
   Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$t -Settings `$s ``
-    -RunLevel Highest -User 'SYSTEM' | Out-Null
+    -Principal `$principal | Out-Null
   'scheduled task created'
 } else {
-  # -Settings as well as -Action. Without it an existing task keeps whatever
-  # it was first registered with, which is how the three restart cap survived
-  # every deploy that was meant to change it.
-  Set-ScheduledTask -TaskName '$Task' -Action `$a -Settings `$s | Out-Null
-  'scheduled task updated'
+  # The settings as well as the action. Without them an existing task keeps
+  # whatever it was first registered with, which is how the three restart cap
+  # survived every deploy that was meant to change it. The principal for the
+  # same reason: without it -RunAs would never reach the task already on the
+  # box, and nor would going back to SYSTEM. Without -RunAs the principal is
+  # the account the task already had, so this keeps it rather than resetting
+  # it.
+  #
+  # On the task object and handed back whole, not as Set-ScheduledTask
+  # -Principal. That parameter merges the new principal into the old one and
+  # keeps the old privilege list, and a SYSTEM principal carrying one is not
+  # a valid task. So -RunAs SYSTEM on a task that had been LOCAL SERVICE
+  # failed with "The task XML contains an unexpected node ...
+  # Privilege:SeChangeNotifyPrivilege" (0x80041316), the task stayed LOCAL
+  # SERVICE, and this deploy's action and settings were lost with it. Found in
+  # review on 24 Sep and measured the same day on a scratch task under Windows
+  # PowerShell 5.1 and pwsh 7: the object replaces the principal outright, in
+  # both directions, and leaves the trigger alone.
+  `$have.Actions = `$a
+  `$have.Settings = `$s
+  `$have.Principal = `$principal
+  # Said in capitals when it fails. This script runs with Continue, so the
+  # line after a failed update used to say "scheduled task updated" anyway.
+  try {
+    `$have | Set-ScheduledTask -ErrorAction Stop | Out-Null
+    'scheduled task updated'
+  } catch {
+    'COULD NOT UPDATE THE SCHEDULED TASK, it keeps what it had: ' + `$_.Exception.Message
+  }
 }
 
 # Read back rather than assumed. Set-ScheduledTask is quiet about settings
@@ -332,6 +462,31 @@ if (-not (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue)) {
 if (`$chk) {
   'task settings: restart count ' + `$chk.RestartCount +
   ', execution time limit ' + (`$(if (`$chk.ExecutionTimeLimit -eq 'PT0S') { 'none' } else { `$chk.ExecutionTimeLimit }))
+}
+# And the account, compared by SID, because the task says SYSTEM or LOCAL
+# SERVICE where -RunAs may have said it with NT AUTHORITY in front.
+`$who = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Principal
+if (`$who) {
+  `$got = ''
+  try { `$got = (New-Object Security.Principal.NTAccount(`$who.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+  if (`$got -eq `$sid) { 'task runs as ' + `$who.UserId + ', run level ' + `$who.RunLevel }
+  else { 'THE TASK RUNS AS ' + `$who.UserId + ', NOT ' + `$runAs }
+  # The privilege cut too, because the account alone is not what makes it low
+  # privilege, and a box that dropped the list would otherwise pass as done.
+  if (`$runAs -ne 'SYSTEM') {
+    `$privs = (@(`$who.RequiredPrivilege) | Where-Object { `$_ }) -join ','
+    `$sidType = [string]`$who.ProcessTokenSidType
+    if (`$privs -eq 'SeChangeNotifyPrivilege' -and `$sidType -eq 'Unrestricted') {
+      'task privileges: ' + `$privs + ' only, token SID type ' + `$sidType
+    } else {
+      # No list at all is the worst case: the task starts with every
+      # privilege the account has, which is what this block is here to stop.
+      `$shown = `$privs
+      if (-not `$shown) { `$shown = 'every one ' + `$runAs + ' has' }
+      'THE TASK KEEPS MORE THAN IT SHOULD: privileges ' + `$shown + ', token SID type ' + `$sidType +
+      '. It should be SeChangeNotifyPrivilege only, Unrestricted.'
+    }
+  }
 }
 
 Start-ScheduledTask -TaskName '$Task'
@@ -352,6 +507,7 @@ if (`$listen) {
   Start-Sleep -Seconds 4
   if (`$h -and -not `$h.HasExited) {
     'it runs fine by hand, so the scheduled task is what is wrong'
+    if (`$runAs -ne 'SYSTEM') { 'it runs as ' + `$runAs + ' now, so look first for a file that account cannot reach. -RunAs SYSTEM puts it back.' }
     Stop-Process -Id `$h.Id -Force -EA SilentlyContinue
   }
   Get-Content `$o,`$e -EA SilentlyContinue | Select-Object -First 25

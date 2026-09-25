@@ -263,15 +263,44 @@ function Test-Name([string]$where, [string]$key, [string]$leaf, [bool]$tree) {
     if ($hit) { Write-Hit $where $key '0' 'credential-file-name' $false }
 }
 
+# Whether a zip entry or a staged file at one of the six client runtime paths
+# is the recorded build, by its own bytes. $source is the zip entry, or the
+# staged file's full path.
+function Test-ClientBytes([string]$rel, $source) {
+    if ($source -is [string]) { return (Test-ShipClientRecorded $rel $source) }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $s = $source.Open()
+        try { $have = ([BitConverter]::ToString($sha.ComputeHash($s))).Replace('-', '').ToLowerInvariant() }
+        finally { $s.Dispose() }
+    }
+    finally { $sha.Dispose() }
+    return ($have -eq $ShipClientHashes[$rel])
+}
+
 # A path inside a pack (game/...) or the installer (payload/...), asked of
 # Ship-Rules the same way Publish-Update and Package-Thornswood ask it before
 # they pack a file. Anything it says never ships and that is here anyway is
 # the failure this whole script is for.
-function Test-ShipPath([string]$where, [string]$key, [string]$inner) {
+#
+# The six client runtime files are asked by the bytes in hand, not through
+# Test-ShipMachine (entry 128). Ship-Rules calls one of them ours only when its
+# sha256 is the recorded build, and given just a path it hashes the file under
+# the caller's $GameDir. Here that is the wrong file: the game folder a pack
+# was built from, not the zip or stage being read. Measured 24 September on
+# scratch copies of the real bundle: run on its own, with no $GameDir, this
+# failed a pack and a stage that carried the recorded build as never-ship;
+# called with & from a script that had one, the way Publish-Update calls it, it
+# passed a pack whose bundle had one byte changed.
+function Test-ShipPath([string]$where, [string]$key, [string]$inner, $source) {
     $m = [regex]::Match($inner, '^(?:game|payload)[/\\](.+)$', 'IgnoreCase')
     if (-not $m.Success) { return }
     $rel = $m.Groups[1].Value -replace '/', '\'
     if (Test-ShipRuntime $rel) { Write-Hit $where $key '0' 'never-ship-runtime' $false; return }
+    if ($ShipClientFiles.Contains($rel)) {
+        if (-not (Test-ClientBytes $rel $source)) { Write-Hit $where $key '0' 'client-not-recorded-build' $false }
+        return
+    }
     if (Test-ShipMachine $rel) { Write-Hit $where $key '0' 'never-ship-machine' $false; return }
     if ($rel -like '*.log') { Write-Hit $where $key '0' 'never-ship-log' $false }
 }
@@ -337,7 +366,7 @@ function Invoke-Zip([string]$path) {
             $where = $leaf + '!' + $inner
             $name = Split-Path $inner -Leaf
             Test-Name $where $inner $name $false
-            Test-ShipPath $where $inner $inner
+            Test-ShipPath $where $inner $inner $e
             $ext = [IO.Path]::GetExtension($name).ToLowerInvariant()
             # The launcher at the top of the installer is ours and built here,
             # so it is read byte by byte. Every other program is somebody's mod.
@@ -363,7 +392,7 @@ function Invoke-Dir([string]$dir) {
         $rel = $f.FullName.Substring($base.Length)
         $key = $rel -replace '\\', '/'
         Test-Name $rel $key $f.Name $false
-        Test-ShipPath $rel $key $key
+        Test-ShipPath $rel $key $key $f.FullName
         $ext = $f.Extension.ToLowerInvariant()
         if ($ext -eq '.exe' -and $rel.IndexOf('\') -lt 0) {
             Test-Bytes $rel $key ([IO.File]::ReadAllBytes($f.FullName))

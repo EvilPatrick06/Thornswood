@@ -276,6 +276,20 @@
   const SKILLS_KEY = iniNumber(ini, 'SkillsKey', 37);   // K
   const VOICE_PORT = iniNumber(ini, 'VoicePort', 7778);
   /*
+    How long the chat stays up after its last line, and whether the needs bars
+    are drawn, from the launcher's Settings (ChatFade and NeedsBars in
+    Display.cs). Both go to the page in window.THORNSWOOD, which is where the
+    chat and the bars live. Not iniNumber, because 0 is a real answer here:
+    it is the chat staying up for good, and iniNumber turns 0 into its
+    fallback. Anything that is not one of the launcher's choices is ten.
+  */
+  const CHAT_FADE = (function () {
+    const m = ini.match(/^\s*ChatFade\s*=\s*(\d+)\s*$/im);
+    const v = m ? Number(m[1]) : 10;
+    return [0, 5, 10, 15, 20].indexOf(v) >= 0 ? v : 10;
+  })();
+  const NEEDS_BARS = !/^\s*NeedsBars\s*=\s*0\s*$/im.test(ini);
+  /*
     Where voice lives when it is not just a port on the server address.
     Written by the launcher at every Play, the same way VoicePort is.
     Empty is the normal case and means the raw port, which is how this
@@ -613,6 +627,11 @@
     if (!chooseAtMenu) { return; }
     const now = Date.now();
 
+    // The choice holds the keyboard by name, the way every panel does, for as
+    // long as it is up and not a tick longer, whichever path below ended it.
+    // First, so nothing that throws further down can leave it held.
+    T.claimFocus('select', choiceUp());
+
     // Before the phase check, because menuChose parks the phase at 9 and this
     // has to go on running after it.
     if (menuChosenId) { keepSayingChoice(now); }
@@ -769,6 +788,7 @@
       log('menu: could not write the choice for the launcher:', e);
     }
     menuPhase = 9;
+    T.claimFocus('select', false);
     try { sp.browser.setFocused(false); } catch (e) { }
     // The page repeats its pick every two seconds until this says it heard,
     // because the page can be up long before this plugin is. Acking stops
@@ -799,6 +819,55 @@
     // reload in the world (phase 0 below) does not bring the choice back.
     try { require('fs').unlinkSync('Data/Platform/UI/thornswood-characters.js'); } catch (e) { }
     log('menu: chosen profile', id);
+  }
+
+  /* The choice is on screen and this block is holding it up: asking the page
+     where it is (1) or watching it (2). */
+  function choiceUp() { return menuPhase === 1 || menuPhase === 2; }
+
+  /*
+    THE WORLD ARRIVED WITH THE CHOICE STILL UP AND NOTHING PICKED.
+
+    Djinn on dev, 24 September: "Sitting on the character select window for
+    too long causes you to lose your cursor, pressing F6 doesn't work, and you
+    have to esc to quit".
+
+    Too long is three minutes. Our fork of skymp5-client waits at the menu for
+    the page's pick and, after menuChoiceFallbackMs (180000, authService.ts),
+    logs in as the settings' profileId, the last character played. The world
+    then loads under a choice nobody made. menuChose never ran, so the page
+    was never acked and never hid itself, and the list the launcher wrote was
+    still on disk. The update tick then did what it always does when the
+    world is up: stopped this block, dropped focus and reloaded the page, and
+    the reload drew the choice again from that list. A full screen choice
+    over the world with no cursor, and a click the client no longer listens
+    for. The game had the keyboard, so Escape reached the System page. F6 did
+    raise focus, and applyFocus put it back down on its next pass, because a
+    focus nothing claimed is only held inside character creation.
+
+    It was never the two minute F6 cap. Update does not fire at the main
+    menu, so applyFocus never runs there: the two logs on this machine from
+    23 September (the dev build's at 20:07, the live one's at 10:20) have no
+    pulse, no frame line and no F6 line between the choice going up and the
+    pick, and the 20:07 one had the choice up for 57 seconds.
+
+    So the page goes the way a pick takes it: the claim is let go, the page
+    is told to close, and the list is removed so the reload in the world
+    cannot bring it back. The person is in the world as the character the
+    client chose for them, with their keyboard.
+  */
+  function menuGone() {
+    T.claimFocus('select', false);
+    T.js('try{window.thornswoodSelect&&window.thornswoodSelect.close();}catch(e){}');
+    try { require('fs').unlinkSync('Data/Platform/UI/thornswood-characters.js'); } catch (e) { }
+    // The uncaused load count tells the client's three minute fallback apart
+    // from a save something else loaded, which is a different fault.
+    let uncaused = '?';
+    try { uncaused = String(Number(globalThis.__thornswoodUncausedLoad) || 0); } catch (e) { }
+    log('menu: the world loaded with the choice still up and nothing picked here',
+        '(the client logs in as the last character, profile ' + PROFILE + ', after three minutes',
+        'without a pick; uncausedLoads=' + uncaused + '). Taking the choice down so it does not',
+        'sit over the world with no cursor');
   }
 
   // ---------------------------------------------------------------- focus --
@@ -948,48 +1017,50 @@
   function applyFocus() {
     let up;
     try { up = !!sp.browser.isFocused(); } catch (e) { return; }
-    const want = anyClaim();
+    /*
+      F6 IS A PERSON, NOT A STRAY, AND NOW IT IS ASKED FOR BY NAME.
+
+      skymp5-client binds F6 to toggling browser focus. Somebody looking at a
+      panel with no claim behind it presses F6, focus goes up, and this
+      function put it straight back down on the very next frame, for ever. No
+      cursor, and with focus down the browser is sent no keys and no clicks
+      either, so the panel's own Escape and Close are unreachable: Task
+      Manager was the only way out, which is exactly what Djinn reported on
+      22 September.
+
+      THE FIRST ANSWER TO THAT DID NOT WORK, AND THIS IS WHY. It held an
+      unexplained focus once it had been up 1.2 seconds. Outside the race menu
+      nothing ever got to 1.2 seconds: the first frame fell through to the put
+      down below, so F6 at a panel still did nothing. tools\test-f6-focus.js
+      run against that text has the focus down again on the first frame.
+      Inside the race menu it did hold, for two minutes, with the browser
+      hidden because a menu was open and nothing claimed: a keyboard taken
+      from the race menu and given to a page nobody could see.
+
+      AND THE PUT DOWN ON THE FIRST FRAME HAS TO STAY. skymp5-client binds
+      Enter to raise focus as well (browserService.ts in the fork, at the
+      commit client-build.json records), and that put down is the only thing
+      that stops an Enter pressed in the world leaving somebody unable to
+      move. So the two keys are told apart at the key rather than guessed at
+      here: F6 is watched for by watchFocusKeys below, and the focus it asks
+      for counts as a claim until F6 or Escape gives it back, a claim comes
+      along and takes over, a menu opens by itself, or MANUAL_FOCUS_MS runs
+      out. Every other focus nothing asked for, Enter's included, goes back
+      down exactly as it did before.
+    */
+    const claimed = anyClaim();
+    if (claimed) { manualFocusSince = 0; }
+    const want = claimed || manualFocusHeld();
 
     if (up === want) { strayFocusSince = 0; return; }
 
     if (!want) {
-      /*
-        F6 IS A PERSON, NOT A STRAY, and treating it as one is what made a
-        panel unescapable.
-
-        skymp5-client binds F6 to toggling browser focus. Somebody looking at
-        a panel with no claim behind it presses F6, focus goes up, and this
-        function used to put it straight back down on the very next frame, for
-        ever. No cursor, and with focus down the browser is sent no keys and
-        no clicks either, so the panel's own Escape and Close are unreachable:
-        Task Manager was the only way out, which is exactly what Djinn
-        reported on 22 September.
-
-        So an unexplained focus is held rather than fought. It still cannot
-        last: manualFocusSince below caps it the same way every claim is
-        capped, so a focus nobody ever puts down still comes back on its own.
-        What is gone is the frame-by-frame fight that made F6 do nothing.
-
-        The race menu case below is unchanged and still comes first: that one
-        really is something else taking the keyboard.
-      */
       if (!strayFocusSince) { strayFocusSince = Date.now(); }
       const waited = Date.now() - strayFocusSince;
       if (raceMenuOpen() && waited < 1200) { return; }
       if (waited >= 1200) {
-        if (!manualFocusSince) {
-          manualFocusSince = Date.now();
-          say('the keyboard was taken and nothing here asked for it. ' +
-              'Treating it as F6 and leaving it up; press F6 again to give it back.');
-        }
-        // Held, not taken back, until the cap below says otherwise.
-        if (Date.now() - manualFocusSince < MANUAL_FOCUS_MS) { return; }
-        say('F6 focus has been up for ' + Math.round(MANUAL_FOCUS_MS / 60000) +
-            ' minutes with nothing using it, taking it back');
-        manualFocusSince = 0;
+        say('something took the keyboard and nothing here asked for it, taking it back');
       }
-    } else {
-      manualFocusSince = 0;
     }
 
     try { sp.browser.setFocused(want); } catch (e) { }
@@ -1008,6 +1079,111 @@
   let manualFocusSince = 0;
   const MANUAL_FOCUS_MS = 120000;
 
+  /** Whether an F6 focus still stands, ending it when it should end. */
+  function manualFocusHeld() {
+    if (!manualFocusSince) { return false; }
+    // A load screen, a message box or somebody talking to you needs the
+    // keyboard the page is holding, the same reason the chat box is shut.
+    const over = interrupted();
+    if (over) {
+      say('F6 focus given back, ' + over + ' opened');
+      manualFocusSince = 0;
+      return false;
+    }
+    if (Date.now() - manualFocusSince < MANUAL_FOCUS_MS) { return true; }
+    say('F6 focus has been up for ' + Math.round(MANUAL_FOCUS_MS / 60000) +
+        ' minutes, taking it back');
+    manualFocusSince = 0;
+    return false;
+  }
+
+  /*
+    F6, AND THE ESCAPE THAT ENDS IT, ARE ASKED OF THE KEYBOARD, NOT WAITED FOR
+    AS KEY EVENTS. 0x40 is F6's DirectInput scan code, the code
+    skymp5-client's own binding asks for (DxScanCode.F6).
+
+    buttonEvent cannot hear the F6 that gives the keyboard back. It is built
+    from the game's own input events (the kButton case in EventHandler.cpp in
+    the fork), and while focus is up DInputHook.cpp hands the game an empty
+    keyboard buffer. The snapshot it reads first goes to the browser and
+    nowhere else: OnKeyStateChange in the fork's main.cpp returns at once
+    unless the browser has focus, and then only injects the key into it.
+    This machine's platform log for 23 September agrees: the K panel held
+    focus from 10:21:04 to 10:21:31, a class, a profession and a town were
+    picked in it with the mouse, and every five second line in between says
+    "input: 0 keys in 5s, browser focus yes". Not one button event of any
+    kind reached this file while focus was up. An F6 caught there would
+    raise focus, and the F6 meant to lower it would never arrive:
+    skymp5-client would lower it and applyFocus would raise it again, for two
+    minutes.
+
+    skymp5-client hears F6 with focus up because it asks Input.isKeyPressed
+    whenever the number of keys held changes (keyboardEventsService.ts in the
+    fork). This asks the same question the same way, so the two see the same
+    presses, for one call a frame, the same one skymp5-client already makes.
+    Both codes are keyboard codes to Input.isKeyPressed, so the left stick
+    click (0x40 from a pad) and the right mouse button (1 from a mouse) are
+    neither of them.
+
+    Set outright rather than toggled, because skymp5-client toggles on the
+    same press and two toggles cancel: whichever of the two runs first, the
+    arbiter above ends up where this says. Nothing while a claim holds the
+    keyboard, since focus is already up and the claim decides when it comes
+    down. Nothing in a menu that owns the keyboard either, which is
+    skymp5-client's own list of menus it refuses F6 in plus the few that take
+    text (KEYBOARD_MENUS above): in the race menu a raised focus is a keyboard
+    taken from the race menu and handed to a page that is hidden.
+
+    Escape ends it too, the way skymp5-client's own Escape binding lowers
+    focus.
+  */
+  const F6_KEY = 0x40;
+  let f6Was = false;
+  let escWas = false;
+  let keysHeldWas = -1;
+
+  function watchFocusKeys() {
+    if (!T.ready) { return; }
+    let held;
+    try { held = sp.Input.getNumKeysPressed(); } catch (e) { return; }
+    if (held === keysHeldWas) { return; }
+    keysHeldWas = held;
+    let f6 = false;
+    let esc = false;
+    try {
+      f6 = !!sp.Input.isKeyPressed(F6_KEY);
+      esc = !!sp.Input.isKeyPressed(ESC);
+    } catch (e) { return; }
+    const f6Down = f6 && !f6Was;
+    const escDown = esc && !escWas;
+    f6Was = f6;
+    escWas = esc;
+    if (escDown && manualFocusSince) {
+      manualFocusSince = 0;
+      say('Escape, the F6 keyboard goes back to the game');
+    }
+    if (f6Down) { f6Pressed(); }
+  }
+
+  function f6Pressed() {
+    if (anyClaim()) { return; }
+    if (manualFocusSince) {
+      manualFocusSince = 0;
+      say('F6 again, the keyboard goes back to the game');
+      applyFocus();
+      return;
+    }
+    const busy = busyMenuOpen();
+    if (busy) {
+      say('F6 seen, but ' + busy + ' is open');
+      return;
+    }
+    manualFocusSince = Date.now();
+    say('F6: the cursor is on the overlay until F6 or Escape, or ' +
+        Math.round(MANUAL_FOCUS_MS / 60000) + ' minutes');
+    applyFocus();
+  }
+
   /*
     WHEN EACH CLAIM WENT UP, so the cap below can cover all of them.
 
@@ -1022,6 +1198,25 @@
     Found by the audit of 21 September.
   */
   const claimedAt = {};
+
+  /*
+    WHICH WINDOW EACH CLAIM BELONGS TO, so the cap below closes that one.
+
+    Until 24 September the cap closed something only for the skills claim,
+    and then it closed the party and journal windows along with it. A party,
+    journal or trade claim was released with its window left drawn and no
+    cursor, the same trap the cap was written to end. Found by the review of
+    the J journal.
+
+    The trade window's close hides it and leaves the trade to the server: the
+    next change to either pile draws it again, and /trade cancel in the chat
+    still walks away. The wheel's name is the one it has always had here. The
+    select window is only ever capped once its choice is no longer up.
+  */
+  const CAP_CLOSES = {
+    skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
+    trade: 'thornswoodTrade', select: 'thornswoodSelect', wheel: 'thornswoodEmotes'
+  };
 
   T.claimFocus = function (who, on) {
     if (!!claims[who] === !!on) return;
@@ -1582,13 +1777,20 @@
   const LOCKPICK = 0xa;
   const toServer = [];
 
+  /*
+    The true after the line marks it as the plugin's own, so the chat page
+    queues it without saying "Not connected yet" over it. Patrick, 24
+    September, over a tester in the creation hall who had typed nothing: "it
+    says mulitple trimes he wasnt connected yet". A page from before the
+    marker ignores it and says what it always said.
+  */
   function tellServer(line) {
     if (line) { toServer.push(line); }
     if (toServer.length > 20) { toServer.splice(0, toServer.length - 20); }
     if (!T.ready) { return; }
     while (toServer.length) {
       const sent = T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' +
-                        JSON.stringify(toServer[0]) + ');}catch(e){}');
+                        JSON.stringify(toServer[0]) + ',true);}catch(e){}');
       if (!sent) { return; }
       toServer.shift();
     }
@@ -1815,12 +2017,34 @@
     walked. The menu closing is the fact itself, and this is the one place
     that can see it.
   */
+  /*
+    AND THE RACE MENU BEING UP, told as /racemenu when it opens and once a
+    minute while it stays.
+
+    Djinn, 22 September: "Sitting in the selector window, it automatically
+    timed me out to name choice without any input commands". The server's five
+    minute give up could not tell somebody making a face from a race menu that
+    never opened, fired on him at 300 seconds exactly, and pushed the K panel
+    over a race menu the client cannot close. This is the one place that can
+    see the menu, so it says so, and the server holds the give up while the
+    reports keep coming (FACE_SEEN_MS in the gamemode). Only once the overlays
+    are in: a line queued before then would arrive late and say something
+    that is no longer true.
+  */
   let raceWasOpen = false;
+  let raceToldAt = 0;
+  const RACE_BEAT_MS = 60000;
   sp.on('update', guard('race', () => {
     const open = raceMenuOpen();
+    if (open && T.ready && Date.now() - raceToldAt >= RACE_BEAT_MS) {
+      if (!raceToldAt) { log('the race menu is up, telling the server once a minute while it is'); }
+      raceToldAt = Date.now();
+      tellServer('/racemenu');
+    }
     if (open === raceWasOpen) { return; }
     raceWasOpen = open;
     if (!open) {
+      raceToldAt = 0;
       // Not when the menu went because the game is being closed: a face
       // left half made is not a face done. See closeGame.
       if (closingGame) { log('the race menu closed with the game closing, not telling the server'); return; }
@@ -2163,16 +2387,54 @@
     takes out of the world. Every person running this plugin stops seeing them,
     which is everybody.
 
-    BY BASE AND POSITION, because CHOPPING_BLOCKS is three BASE records shared
-    by every block in Skyrim: the cell is walked for those bases and only a
-    reference within a short radius of one of Djinn's three points is touched,
-    so nothing else can be caught. The radius is small for the same reason the
-    server's is.
+    BY FORM ID, MEASURED FROM THE PLUGINS. Djinn, 24 September, on dev, with
+    three screenshots of a Wood Chopping Block and "E Use" under the
+    crosshair: "The ones I gave you coords for are not removed". So every
+    placed reference in the load order was read (99 plugins, last one wins)
+    for what stands at each of his points:
 
-    ONCE PER SITE PER SESSION, and only when somebody is near enough for the
-    reference to be loaded at all. A disable on an unloaded cell finds
-    nothing, so this waits until they are close rather than firing at startup
-    and reporting three failures.
+      Solitude          d6ae9:Skyrim.esm, 103 units from the point, in
+                        SolitudeWorld. Skyrim.esm files it in the cell at
+                        -16,25; Populated Cities Towns Villages
+                        Legendary.esp overrides it into a PERSISTENT
+                        reference in that worldspace's persistent cell.
+      Solitude Stables  a9ee1:Skyrim.esm, 61 units away, Tamriel, an
+                        ordinary reference in the cell at -19,23.
+      Dragon Bridge     abf83:Skyrim.esm, 132 units away, Tamriel, a
+                        PERSISTENT reference in Tamriel's persistent cell,
+                        standing in the cell at -25,19.
+
+    All three are base 7022e, WoodChoppingBlock. No other of the 128 placed
+    blocks on the three chopping block bases is within 400 units of any
+    point; the nearest is 4,638 units from Dragon Bridge.
+
+    So the walk of the cell somebody stands in was the wrong question twice
+    over. Two of the three are filed under a persistent cell rather than
+    the cell they stand in, and the third could only be found from inside
+    its own cell, not from the one next to it. Asking for the three by form id
+    finds each one wherever the person stands and cannot catch a fourth.
+    Whether the engine also lists a persistent reference under its exterior
+    cell at run time was not measured, because that needs the game running;
+    asking by form id does not depend on it. The base and the position are
+    still checked, once, so an override that moved one or made it something
+    else leaves it alone and says so.
+
+    AGAIN WHENEVER IT COMES BACK, which is the other half of the report.
+    SkyMP's own client puts it back. Every time the server streams a
+    Skyrim.esm reference to this machine (walking into range, coming back
+    after leaving, reconnecting), the fork's skymp5-client remoteServer.ts
+    onCreateActorMessage calls ModelApplyUtils.applyModelIsDisabled(refr,
+    !!msg.props['disabled']), and the server writes that flag as
+    "isDisabled" (skymp5-server CreateActorMessage.h), so it always reads
+    false and the client calls refr.enable(true). The old code marked a
+    site done after its first disable and never looked again. Now each
+    site is checked every four seconds while somebody is near it, and
+    taken out again when it is back, with one line each time.
+
+    ONLY WHEN SOMEBODY IS NEAR. An ordinary reference is not in memory until
+    its cell loads, and nothing is asked of the game from anywhere else, so
+    away from these three places the cost is one distance sum per site every
+    four seconds.
   */
   /*
     ======================= WALKING A CELL FOR A BASE =======================
@@ -2191,7 +2453,8 @@
 
     Neither was a table problem or a radius problem. Cell.getNumRefs and
     getNthRef see everything in the cell, temporary references included, so
-    that is what both use now.
+    that is what the fire probe uses now. The chopping blocks moved on again,
+    to their own form ids: see the note above this one.
 
     THE FORM TYPES ARE THE FILTER AND THEY MATTER: walking every reference in
     an exterior cell is thousands of native calls. Activator 24, static 34,
@@ -2234,14 +2497,20 @@
   }
 
   const BLOCK_BASES = [0x7022e, 0xa91bf, 0x10f575];
+  // ref is the placed reference at the point, read out of the plugins on
+  // 24 September (see "three chopping blocks, taken away" above). All three
+  // are Skyrim.esm's own, which is always load index 00, so the local id is
+  // the id the game uses.
   const BLOCKS_GONE = [
-    { where: 'Solitude', pos: [-64263, 106003.5, -8377.8] },
-    { where: 'Solitude Stables', pos: [-76193.3, 96600.6, -11435] },
-    { where: 'Dragon Bridge', pos: [-101780.7, 80484.5, -12522.7] }
+    { where: 'Solitude', pos: [-64263, 106003.5, -8377.8], ref: 0xd6ae9 },
+    { where: 'Solitude Stables', pos: [-76193.3, 96600.6, -11435], ref: 0xa9ee1 },
+    { where: 'Dragon Bridge', pos: [-101780.7, 80484.5, -12522.7], ref: 0xabf83 }
   ];
   const BLOCK_FIND = 400;      // how close to the point the block has to be
   const BLOCK_NEAR = 6000;     // how close YOU have to be for it to be loaded
-  const blockDone = {};
+  const blockDone = {};        // never again this session: not ours, or it threw
+  const blockChecked = {};     // base and position read once and right
+  const blockTook = {};        // how many times each has been taken out
   let blockAt = 0;
 
   sp.on('update', guard('blocksgone', () => {
@@ -2263,42 +2532,63 @@
       if (Math.sqrt(dx * dx + dy * dy + dz * dz) > BLOCK_NEAR) { continue; }
 
       /*
-        WALKED, NOT ASKED FOR. This used findClosestReferenceOfType and never
-        removed a single block: not one "took the chopping block out of the
-        world" line exists in any log on this machine. See the note over
-        refsInCell. The position test is kept exactly as it was, because
-        these three bases are shared by every chopping block in Skyrim and
-        only the ones at Djinn's three points are ours to remove.
+        ASKED FOR BY FORM ID, NOT WALKED FOR. A walk of the parent cell can
+        only find a block filed under the cell the person stands in, and two
+        of these three are filed under a persistent cell instead. See the
+        note over BLOCKS_GONE. Nothing back is an ordinary reference whose
+        cell has not loaded yet, which is not a failure: it is asked for
+        again in four seconds.
       */
-      {
-        const want = {};
-        for (let b = 0; b < BLOCK_BASES.length; b++) {
-          try {
-            const base = sp.Form.from(sp.Game.getFormEx(BLOCK_BASES[b]));
-            if (base) { want[base.getFormID()] = true; }
-          } catch (e) { }
-        }
-        let cell = null;
-        try { cell = pc.getParentCell(); } catch (e) { cell = null; }
-        const found = refsInCell(cell, want, null, null);
-        for (let k = 0; k < found.length; k++) {
-          const dx2 = found[k].x - site.pos[0];
-          const dy2 = found[k].y - site.pos[1];
-          const dz2 = found[k].z - site.pos[2];
-          if (Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2) > BLOCK_FIND) { continue; }
-          try {
-            // disable answers a promise. Nothing waits on it: the block either
-            // goes or it does not, and a failure is worth one line, not a stall.
-            const p = found[k].ref.disable(false);
-            if (p && typeof p.then === 'function') { p.then(function () { }, function () { }); }
-            blockDone[i] = true;
-            say('took the chopping block at ' + site.where + ' out of the world');
-          } catch (e) {
-            say('could not take the ' + site.where + ' chopping block out: ' + e);
-            blockDone[i] = true;   // do not try it every four seconds forever
+      let ref = null;
+      try { ref = sp.ObjectReference.from(sp.Game.getFormEx(site.ref)); } catch (e) { ref = null; }
+      if (!ref) { continue; }
+
+      // Checked once: the id was measured, and a load order that changes
+      // what stands there must leave it alone rather than take something
+      // else out of the world.
+      if (!blockChecked[i]) {
+        let why = '';
+        try {
+          const base = ref.getBaseObject();
+          const id = base ? base.getFormID() : 0;
+          const dx2 = ref.getPositionX() - site.pos[0];
+          const dy2 = ref.getPositionY() - site.pos[1];
+          const dz2 = ref.getPositionZ() - site.pos[2];
+          const off = Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2);
+          if (BLOCK_BASES.indexOf(id) < 0) {
+            why = 'its base is ' + id.toString(16) + ', which is not a chopping block';
+          } else if (off > BLOCK_FIND) {
+            why = 'it stands ' + Math.round(off) + ' units from the point';
           }
-          break;
+        } catch (e) {
+          why = 'it could not be read: ' + e;
         }
+        if (why) {
+          say('left the ' + site.where + ' reference ' + site.ref.toString(16) + ' alone: ' + why);
+          blockDone[i] = true;
+          continue;
+        }
+        blockChecked[i] = true;
+      }
+
+      let gone = false;
+      try { gone = ref.isDisabled(); } catch (e) { gone = false; }
+      if (gone) { continue; }
+      try {
+        // disable answers a promise. Nothing waits on it: the block either
+        // goes or it does not, and a failure is worth one line, not a stall.
+        const p = ref.disable(false);
+        if (p && typeof p.then === 'function') { p.then(function () { }, function () { }); }
+        blockTook[i] = (blockTook[i] || 0) + 1;
+        if (blockTook[i] === 1) {
+          say('took the chopping block at ' + site.where + ' out of the world');
+        } else {
+          say('the ' + site.where + ' chopping block came back and was taken out again (' +
+              blockTook[i] + ' times this session)');
+        }
+      } catch (e) {
+        say('could not take the ' + site.where + ' chopping block out: ' + e);
+        blockDone[i] = true;   // do not try it every four seconds forever
       }
     }
   }));
@@ -4675,6 +4965,8 @@
       // The world is up, so the main menu block above stands down for
       // good; it used to stand down on the first update instead, which is
       // not the same moment and is not a moment this file can be sure of.
+      // A choice still up here was never made: see menuGone.
+      if (choiceUp()) { menuGone(); }
       menuPhase = 9;
       phase = 1; at = now;
       try {
@@ -4710,6 +5002,8 @@
       the keyboard.
     */
     if (phase >= 2) {
+      // F6 and Escape first, so the focus they ask for is settled this frame.
+      watchFocusKeys();
       applyFocus();
     }
 
@@ -4721,7 +5015,8 @@
       lastToken = joinToken();
       T.js('window.THORNSWOOD=' + JSON.stringify({
         host: HOST, port: VOICE_PORT, profileId: PROFILE, name: sentName,
-        token: lastToken, base: VOICE_URL
+        token: lastToken, base: VOICE_URL,
+        chatFade: CHAT_FADE, needsBars: NEEDS_BARS
       }) + ';');
       OVERLAYS.forEach(inject);
       // The token itself is never logged. It is what somebody would need to
@@ -4764,7 +5059,11 @@
       // input while the render handler reports itself visible, every letter
       // typed after that goes nowhere. That is the chat that draws, takes the
       // cursor, and then will not accept a word.
-      const hide = !anyClaim() && gameMenuOpen();
+      //
+      // An F6 focus is the same case with no claim behind it. Without the
+      // middle test its CursorMenu turns this answer to hide, and the cursor F6
+      // asked for would come up over a page no longer drawn or sent a click.
+      const hide = !anyClaim() && !manualFocusSince && gameMenuOpen();
       if (sp.browser.isVisible() === hide) { sp.browser.setVisible(!hide); }
 
       // A menu opening while the chat box has the keyboard would leave the
@@ -4858,16 +5157,15 @@
     */
     for (const who in claimedAt) {
       if (who === 'chat') { continue; }
+      // Sitting at the character choice is not a stuck keyboard, it is the one
+      // thing to do there. Only while it is up: see menuGone.
+      if (who === 'select' && choiceUp()) { continue; }
       if (!claims[who] || !claimedAt[who]) { continue; }
       if (now - claimedAt[who] > 120000) {
         log('the ' + who + ' claim has held the keyboard for two minutes, closing it and taking it back');
-        if (who === 'skills') {
-          T.js('try{window.thornswoodSkills&&window.thornswoodSkills.close();}catch(e){}');
-          T.js('try{window.thornswoodParty&&window.thornswoodParty.close();}catch(e){}');
-          T.js('try{window.thornswoodJournal&&window.thornswoodJournal.close();}catch(e){}');
-        } else if (who === 'wheel') {
-          T.js('try{window.thornswoodEmotes&&window.thornswoodEmotes.close();}catch(e){}');
-        }
+        // Each window by its own name, and only that one: see CAP_CLOSES.
+        const win = CAP_CLOSES[who];
+        if (win) { T.js('try{window.' + win + '&&window.' + win + '.close();}catch(e){}'); }
         T.claimFocus(who, false);
       }
     }

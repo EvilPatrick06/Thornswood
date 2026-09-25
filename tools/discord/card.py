@@ -268,8 +268,8 @@ def render(name, avatar_bytes, number=None, line=None, alt=None):
         base = Image.new('RGBA', (1000, 360), (11, 14, 10, 255))
     W, H = base.size
 
-    # A soft dark wash behind the text side only, so a pale aurora cannot eat
-    # the words.
+    # A soft dark wash behind the text side only, so the art cannot eat the
+    # words. make-join-card.py darkens the banner under them as well.
     wash = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(wash).rectangle([300, 0, W, H], fill=(6, 8, 7, 120))
     wash = wash.filter(ImageFilter.GaussianBlur(40))

@@ -108,6 +108,140 @@ namespace Thornswood
         }
     }
 
+    /// <summary>
+    /// How long the chat stays on screen after its last line, in seconds, or
+    /// 0 for always.
+    ///
+    /// Patrick, 24 September: "can you make the default for the chat to hide
+    /// after 10 seconds if the server sends a message or someone else or if
+    /// you do and it come back when you hit enter and add an option in the
+    /// launcher settings to make it 5, 10, 15, 20 or permeant like it is now."
+    ///
+    /// Kept in Thornswood.ini as ChatFade, beside the field of view and for
+    /// the same reason: the game plugin reads that file and hands the number
+    /// to the chat page. Ten is the default and is not written, so an install
+    /// that never opens Settings gets ten with nothing in the file.
+    /// </summary>
+    static class ChatFade
+    {
+        public const int Default = 10;
+
+        /// <summary>The choices in Settings, in the order they are shown. 0 is always on screen.</summary>
+        public static readonly int[] Choices = { 5, 10, 15, 20, 0 };
+
+        static string IniPath
+        {
+            get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\Thornswood.ini"); }
+        }
+
+        /// <summary>The set value, or the default when nothing, or nothing it could be, is set.</summary>
+        public static int Get()
+        {
+            try
+            {
+                if (!File.Exists(IniPath)) return Default;
+                var rx = new Regex(@"^\s*ChatFade\s*=\s*(\d+)\s*$", RegexOptions.IgnoreCase);
+                foreach (string line in File.ReadAllLines(IniPath))
+                {
+                    Match m = rx.Match(line);
+                    if (!m.Success) continue;
+                    int n;
+                    if (int.TryParse(m.Groups[1].Value, out n) && Array.IndexOf(Choices, n) >= 0) return n;
+                    return Default;
+                }
+            }
+            catch (Exception ex) { Swallow.Note("ChatFade.Get, reading " + IniPath, ex); }
+            return Default;
+        }
+
+        /// <summary>
+        /// Writes the choice. The default takes the line out rather than
+        /// writing it, and a number that is not one of the choices is refused.
+        /// </summary>
+        public static bool Set(int seconds)
+        {
+            if (Array.IndexOf(Choices, seconds) < 0) return false;
+            try
+            {
+                if (!File.Exists(IniPath))
+                {
+                    if (seconds == Default) return true;   // nothing to record
+                    Directory.CreateDirectory(Path.GetDirectoryName(IniPath));
+                    File.WriteAllLines(IniPath, new string[] { "ChatFade=" + seconds });
+                    return true;
+                }
+                var lines = new List<string>(File.ReadAllLines(IniPath));
+                var rx = new Regex(@"^\s*ChatFade\s*=", RegexOptions.IgnoreCase);
+                for (int i = lines.Count - 1; i >= 0; i--)
+                    if (rx.IsMatch(lines[i])) lines.RemoveAt(i);
+                if (seconds != Default) lines.Add("ChatFade=" + seconds);
+                File.WriteAllLines(IniPath, lines);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("ChatFade.Set, writing " + IniPath, ex);
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether the needs bars (Hunger, Thirst, Rest, Temp) are drawn on screen.
+    ///
+    /// Patrick, 24 September: "also add an option in settings to hide the
+    /// needs menu on the screen so it doesnt show and they can do /needs to
+    /// find it all". Hidden is NeedsBars=0 in Thornswood.ini; shown is no line
+    /// at all, so an install that never opens Settings keeps the bars. The
+    /// needs themselves carry on either way, and /needs in chat says them.
+    /// </summary>
+    static class NeedsBars
+    {
+        static string IniPath
+        {
+            get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\Thornswood.ini"); }
+        }
+
+        public static bool Shown()
+        {
+            try
+            {
+                if (!File.Exists(IniPath)) return true;
+                var rx = new Regex(@"^\s*NeedsBars\s*=\s*0\s*$", RegexOptions.IgnoreCase);
+                foreach (string line in File.ReadAllLines(IniPath))
+                    if (rx.IsMatch(line)) return false;
+            }
+            catch (Exception ex) { Swallow.Note("NeedsBars.Shown, reading " + IniPath, ex); }
+            return true;
+        }
+
+        public static bool Set(bool shown)
+        {
+            try
+            {
+                if (!File.Exists(IniPath))
+                {
+                    if (shown) return true;   // nothing to record
+                    Directory.CreateDirectory(Path.GetDirectoryName(IniPath));
+                    File.WriteAllLines(IniPath, new string[] { "NeedsBars=0" });
+                    return true;
+                }
+                var lines = new List<string>(File.ReadAllLines(IniPath));
+                var rx = new Regex(@"^\s*NeedsBars\s*=", RegexOptions.IgnoreCase);
+                for (int i = lines.Count - 1; i >= 0; i--)
+                    if (rx.IsMatch(lines[i])) lines.RemoveAt(i);
+                if (!shown) lines.Add("NeedsBars=0");
+                File.WriteAllLines(IniPath, lines);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("NeedsBars.Set, writing " + IniPath, ex);
+                return false;
+            }
+        }
+    }
+
     static class Display
     {
         public static string IniPath

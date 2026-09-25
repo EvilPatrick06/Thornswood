@@ -18,6 +18,17 @@
   look, because a thing that crashes on startup restarted forever is a thing
   nobody ever finds out about.
 
+  Somebody is told. The bot on the same box reads watch.log every minute and
+  says each "needs a look", "could not be started" and "did not come back" in
+  the staff channel, once per outage, and "needs a look" again every hour the
+  service stays down (watch_services in tools\discord\bot.py). An outage is
+  over when this writes "is back", or when one of its runs finds the service
+  answering and so writes nothing about it, which is the only sign a fix made
+  by hand ever leaves. The hourly repeat covers a fix that falls over again
+  before the next run. tools\discord\test-watch-services.py renders the Note()
+  lines below and checks the bot still recognises them, so change the words
+  and that fails.
+
   What it checks:
     caddy     https://thornswood.net answers, which is the only one of these
               a visitor actually touches. Asked over the public name and the
@@ -103,7 +114,13 @@ function Remote($script) {
     # The path goes across as it is. Windows PowerShell takes forward
     # slashes, and converting them was how this shipped with the slashes
     # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'" 2>&1
+    # And bare, with no quotes round it; the path above is ours and has no
+    # spaces. Measured on this machine on 24 September, not on the VPS: bare
+    # runs whether cmd.exe or Windows PowerShell hands the line on, and the
+    # old form, the path in single quotes, fails under cmd.exe. The old form
+    # did run on the VPS on 20 and 21 September, so which shell sshd uses
+    # there is not known, and bare is the form that works under either.
+    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
     & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
   }
   finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
