@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 193 of them, with the one line that says
+Every `.ps1` in this folder, 194 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -176,6 +176,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-downgrade-steam-window.ps1](test-downgrade-steam-window.ps1) | The Downgrade button finds Steam's window when steamwebhelper draws it, and the clipboard fallback says which part of three is on the clipboard. |
 | [test-feed-notice.ps1](test-feed-notice.ps1) | What the update feed says to everybody, and when it may hold Play. |
 | [test-feed-rules.ps1](test-feed-rules.ps1) | No pack goes onto the update feed that a launcher cannot download, and the ones already there can be taken off. |
+| [test-installer-own-payload.ps1](test-installer-own-payload.ps1) | The installer unpacks its own payload or the site's, never a zip it finds lying about. |
 | [test-load-order.ps1](test-load-order.ps1) | The rule the pack's plugin list is put through before it ships, driven with stubs so it needs no game folder, no Data and no server. |
 | [test-log-upload.ps1](test-log-upload.ps1) | The launcher's half of the session logs: which files it picks, what it takes out of them, and whether the site can read what it sends. |
 | [test-master-flag.ps1](test-master-flag.ps1) | The master flag in the plugin header, which the game honours BEFORE the list order, and which Deploy-Gamemode.ps1 never read until 22 September. |
