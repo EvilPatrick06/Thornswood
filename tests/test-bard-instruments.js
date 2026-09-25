@@ -30,9 +30,9 @@ const read = (p) => fs.readFileSync(p, 'utf8').split(CR).join('');
 
 const TESTS = process.env.TESTS_MD || path.join(TOOLS_DIR, '..', 'site', 'data', 'tests.md');
 const KNOWN = path.join(TOOLS_DIR, '..', 'site', 'data', 'known.md');
-const EMOTES = path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-emotes.js');
+const EMOTES = path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-emotes.js');
 const INI = path.join(TOOLS_DIR, 'emotes', 'Thornswood.ini');
-const GM = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const GM = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const DATA = process.env.GAME_DATA || 'C:\\Thornswood\\Game\\Data';
 const PLUGIN = 'PlayFluteLuteDrum.esp';
 

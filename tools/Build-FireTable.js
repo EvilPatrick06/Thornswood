@@ -1,6 +1,6 @@
 // Build-FireTable.js
 //
-// Builds tools\fires.json: every base record in the load order that is a LIT
+// Builds game\data\fires.json: every base record in the load order that is a LIT
 // FIRE, so the client can ask "is one of those near me" and the server can
 // warm somebody up.
 //
@@ -69,7 +69,7 @@ function opt(name, def) {
   return i >= 0 && args[i + 1] ? args[i + 1] : def;
 }
 const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
-const OUT = opt('out', path.join(__dirname, 'fires.json'));
+const OUT = opt('out', path.join(__dirname, '..', 'game', 'data', 'fires.json'));
 const PRINT = args.indexOf('--print') !== -1;
 
 /*

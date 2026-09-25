@@ -108,7 +108,7 @@ foreach ($t in 'ssh', 'scp') {
 #
 # Copied here rather than left to a separate script somebody has to remember.
 $gamemodeMoved = $false
-$gmSrc = Join-Path $Here 'gamemode.js'
+$gmSrc = Join-Path $Here '..\game\gamemode.js'
 $gmDst = Join-Path $Dist 'gamemode.js'
 if ((Test-Path -LiteralPath $gmSrc) -and (Test-Path -LiteralPath $Dist)) {
     $srcHash = (Get-FileHash -LiteralPath $gmSrc -Algorithm SHA256).Hash
@@ -119,7 +119,7 @@ if ((Test-Path -LiteralPath $gmSrc) -and (Test-Path -LiteralPath $Dist)) {
         Head 'Gamemode'
         Copy-Item -LiteralPath $gmSrc -Destination $gmDst -Force
         $gamemodeMoved = $true
-        Say ("copied tools\gamemode.js into the build ({0:N0} bytes)" -f (Get-Item -LiteralPath $gmDst).Length) 'Green'
+        Say ("copied game\gamemode.js into the build ({0:N0} bytes)" -f (Get-Item -LiteralPath $gmDst).Length) 'Green'
     }
 }
 

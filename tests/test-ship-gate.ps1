@@ -12,7 +12,7 @@
 
   1. A file git has never been told about. The gate counted with
      `git status --untracked-files=no`, so a new file was invisible to it, and
-     Go.ps1 copies every tools\ts-plugins\*.js into the game folder whether
+     Go.ps1 copies every game\plugins\*.js into the game folder whether
      git knows it or not. A scratch plugin would pass the gate and go out in
      the pack, which is where the entry's worry ("a scratch file with
      something private in it lands next") had moved to.
@@ -125,7 +125,7 @@ try {
     }
     # The same ignore rules that matter here: the front's zip and the logs.
     Put '.gitignore' "*.zip`n*.log`n"
-    Put 'tools/ts-plugins/thornswood-front.js' "// ours`n"
+    Put 'game/plugins/thornswood-front.js' "// ours`n"
     Put 'tools/app/Updater.cs' "class Updater { const string Version = ""1.1.92""; }`n"
     $ok = $ok -and ((Run-Git -C $work add -A) -eq 0)
     $ok = $ok -and ((Run-Git -C $work commit -q -m 'start') -eq 0)
@@ -139,9 +139,9 @@ try {
     Yes "G1 main, clean and in step with origin, goes through: '$r'" ($r -eq '')
 
     # G2: THE HOLE. A plugin git has never been told about.
-    Put 'tools/ts-plugins/scratch.js' "// something private`n"
+    Put 'game/plugins/scratch.js' "// something private`n"
     $r = Gate $work $false
-    Yes "G2 an untracked tools\ts-plugins\scratch.js stops a main release" ($r -ne '')
+    Yes "G2 an untracked game\plugins\scratch.js stops a main release" ($r -ne '')
     Yes "G2 and says it is a file git does not know: '$r'" ($r -match 'git does not know')
     Yes 'G2 and counts it' ($r -match '\b1 file')
 
@@ -149,7 +149,7 @@ try {
     #     file does not stop a dev release.
     $r = Gate $work $true
     Yes "G3 the same file does not stop a dev release: '$r'" ($r -eq '')
-    Drop 'tools/ts-plugins/scratch.js'
+    Drop 'game/plugins/scratch.js'
 
     # G4: the launcher compiles every tools\app\*.cs, tracked or not.
     Put 'tools/app/Scratch.cs' "class Scratch { }`n"
@@ -174,12 +174,12 @@ try {
     Yes "G6 untracked files outside tools do not stop a main release: '$r'" ($r -eq '')
 
     # G7: the refusals that were already there still stand.
-    Put 'tools/ts-plugins/thornswood-front.js' "// changed`n"
+    Put 'game/plugins/thornswood-front.js' "// changed`n"
     $r = Gate $work $false
     Yes "G7 a changed tracked file still stops it: '$r'" ($r -match 'uncommitted')
-    [void](Run-Git -C $work checkout -q -- tools/ts-plugins/thornswood-front.js)
-    Put 'tools/ts-plugins/thornswood-more.js' "// more`n"
-    [void](Run-Git -C $work add -- tools/ts-plugins/thornswood-more.js)
+    [void](Run-Git -C $work checkout -q -- game/plugins/thornswood-front.js)
+    Put 'game/plugins/thornswood-more.js' "// more`n"
+    [void](Run-Git -C $work add -- game/plugins/thornswood-more.js)
     [void](Run-Git -C $work commit -q -m 'more')
     $r = Gate $work $false
     Yes "G7 a commit not yet pushed still stops it: '$r'" ($r -match 'ahead of origin')

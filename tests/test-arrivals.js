@@ -18,7 +18,7 @@
 // front doors two units apart), and the game's own door teleport points face
 // exactly 0 degrees. So this checks the thing itself instead.
 //
-// WHAT IT CHECKS, for every town in CHARGEN.towns in tools/gamemode.js:
+// WHAT IT CHECKS, for every town in CHARGEN.towns in game/gamemode.js:
 //   the arrival is in the cell the inn's front door stands in;
 //   it is on the room side of that door by at least half a pace, where the
 //   room side is the side the game's own landing point for that door is on;
@@ -38,7 +38,7 @@ const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests a
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -200,7 +200,7 @@ Object.keys(HAND).forEach(function (k) {
 // 1.1.41 had already made untrue and which was never a collision anyway.
 [
   path.join(TOOLS_DIR, 'emotes', 'Thornswood.ini'),
-  path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-mark.js'),
+  path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-mark.js'),
   path.join(TOOLS_DIR, 'Mark-Spot.ps1')
 ].forEach(function (f) {
   let text = '';

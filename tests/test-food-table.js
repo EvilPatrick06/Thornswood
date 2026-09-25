@@ -20,7 +20,7 @@
 //      harness writes, so it runs on any machine: one line per record, keyed
 //      by the plugin that made it, worth what the last plugin says.
 //
-//   B. The table that ships, the FOODS line in tools/gamemode.js, through the
+//   B. The table that ships, the FOODS line in game/gamemode.js, through the
 //      REAL lookup in the needs block, with the form ids the game reports for
 //      Nord Mead, Honningbrew Mead, Alto Wine, Ale and Black-Briar Mead.
 //
@@ -33,7 +33,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const HERE = TOOLS_DIR;
-const SRC = process.env.GM || path.join(HERE, 'gamemode.js');
+const SRC = process.env.GM || path.join(HERE, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -104,6 +104,8 @@ const DATA = path.join(TMP, 'Game', 'Data');
 const TOOLS = path.join(TMP, 'tools');
 fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(TOOLS, { recursive: true });
+// The gamemode and its tables sit in game\ beside tools\ since phase 6 (issue #440).
+fs.mkdirSync(path.join(TMP, 'game', 'data'), { recursive: true });
 fs.mkdirSync(path.join(TMP, 'Profile', 'Default'), { recursive: true });
 
 /*
@@ -146,7 +148,7 @@ fs.writeFileSync(path.join(DATA, 'Gourmet.esp'), plugin(0x200, FIVE, [
 fs.writeFileSync(path.join(TMP, 'Profile', 'Default', 'plugins.txt'),
   ['*LowerCase.esp', '*Gourmet.esp', ''].join(String.fromCharCode(13, 10)));
 fs.copyFileSync(path.join(HERE, 'Build-FoodTable.js'), path.join(TOOLS, 'Build-FoodTable.js'));
-fs.writeFileSync(path.join(TOOLS, 'gamemode.js'),
+fs.writeFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'),
   ['const WARMTH = {"items":{}};', 'const FOODS = {"items":{}};', ''].join(String.fromCharCode(10)));
 
 function build() {
@@ -154,7 +156,7 @@ function build() {
                    { encoding: 'utf8' });
 }
 function installed() {
-  const m = /^const FOODS = (.*);$/m.exec(fs.readFileSync(path.join(TOOLS, 'gamemode.js'), 'utf8'));
+  const m = /^const FOODS = (.*);$/m.exec(fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8'));
   try { return m ? JSON.parse(m[1]).items : null; } catch (e) { return null; }
 }
 
@@ -163,7 +165,7 @@ if (run1.status !== 0) { console.log(run1.stdout + run1.stderr); }
 yes('A1 the builder runs on a load order of four plugins and exits 0', run1.status === 0);
 const got = installed() || {};
 const built = (function () {
-  try { return JSON.parse(fs.readFileSync(path.join(TOOLS, 'food.json'), 'utf8')).items; }
+  try { return JSON.parse(fs.readFileSync(path.join(TOOLS, '..', 'game', 'data', 'food.json'), 'utf8')).items; }
   catch (e) { return {}; }
 })();
 function linesFor(local) {
@@ -208,9 +210,9 @@ yes('A8 twenty one versions of eleven records make eleven lines (' + Object.keys
   which is what it did before 24 September whenever nothing had changed.
 */
 {
-  const before = fs.readFileSync(path.join(TOOLS, 'gamemode.js'), 'utf8');
+  const before = fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8');
   const run2 = build();
-  const after = fs.readFileSync(path.join(TOOLS, 'gamemode.js'), 'utf8');
+  const after = fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8');
   yes('A9 run again on the same plugins, it exits 0 and leaves the same line',
       run2.status === 0 && before === after);
 }
@@ -373,7 +375,7 @@ if (block !== null && idOfSrc && FOODS) {
     of them was either food or a potion at the id the game reports.
   */
   let food = null;
-  try { food = JSON.parse(fs.readFileSync(path.join(HERE, 'food.json'), 'utf8')); } catch (e) { food = null; }
+  try { food = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'game', 'data', 'food.json'), 'utf8')); } catch (e) { food = null; }
   const rows = (food && food.items) || {};
   const taken = Object.keys(rows).filter(function (d) {
     const r = rows[d];

@@ -34,7 +34,7 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const UI = path.join(TOOLS_DIR, 'ts-ui');
+const UI = path.join(TOOLS_DIR, '..', 'game', 'ui');
 const overlay = fs.readFileSync(path.join(UI, 'thornswood-voice.js'), 'utf8');
 const chat = fs.readFileSync(path.join(UI, 'thornswood-chat.js'), 'utf8');
 const plain = fs.readFileSync(path.join(TOOLS_DIR, '..', 'voice', 'public', 'voice.js'), 'utf8');

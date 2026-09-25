@@ -8,7 +8,7 @@ and the overlays drawn into it, plain JavaScript and HTML with nothing built.
 from `tools\thornswood-front.zip`, plus `thornswood-bridge.js`, which supplies
 what that page expects from a browser this one is not, and the character
 choice at the main menu, `thornswood-select.js`, which draws itself before any
-plugin runs. `thornswood-front.js` in `tools\ts-plugins` then fetches the
+plugin runs. `thornswood-front.js` in `game\plugins` then fetches the
 overlays into that one page: the chat (`thornswood-chat.js`, which holds the
 one socket to the voice service), the emote wheel, voice, the character panel
 and character creation behind K (`thornswood-skills.js`), the party menu

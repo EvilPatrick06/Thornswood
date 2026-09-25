@@ -39,9 +39,9 @@ const vm = require('vm');
 
 const CR = String.fromCharCode(13);
 function read(p) { return fs.readFileSync(p, 'utf8').split(CR).join(''); }
-const GM = read(process.env.GM || path.join(TOOLS_DIR, 'gamemode.js'));
-const FRONT = read(process.env.FRONT || path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-front.js'));
-const CHAT = read(process.env.CHAT || path.join(TOOLS_DIR, 'ts-ui', 'thornswood-chat.js'));
+const GM = read(process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js'));
+const FRONT = read(process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js'));
+const CHAT = read(process.env.CHAT || path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-chat.js'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -402,7 +402,7 @@ if (TELL) {
 {
   // The bridge sends what was typed into the chat box. It must stay a typed
   // line, so it passes the text and nothing else.
-  const bridge = read(path.join(TOOLS_DIR, 'ts-ui', 'thornswood-bridge.js'));
+  const bridge = read(path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-bridge.js'));
   yes('3 the chat box still sends a typed line as a typed line',
       /window\.thornswoodNet\.say\(text\);/.test(bridge) &&
       /window\.thornswoodNet\.say\(held\.shift\(\)\);/.test(bridge));
@@ -410,7 +410,7 @@ if (TELL) {
   const panels = ['thornswood-journal.js', 'thornswood-party.js', 'thornswood-trade.js'];
   yes('3 and the journal, party and trade buttons still say so when they are queued',
       panels.every(function (f) {
-        return /window\.thornswoodNet\.say\(line\);/.test(read(path.join(TOOLS_DIR, 'ts-ui', f)));
+        return /window\.thornswoodNet\.say\(line\);/.test(read(path.join(TOOLS_DIR, '..', 'game', 'ui', f)));
       }));
 }
 

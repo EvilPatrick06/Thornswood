@@ -26,7 +26,7 @@ const path = require('path');
 
 const HERE = __dirname;
 const VERBOSE = process.argv.indexOf('-v') !== -1;
-const SRC = process.env.GM || path.join(HERE, 'gamemode.js');
+const SRC = process.env.GM || path.join(HERE, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -412,7 +412,7 @@ if (src.indexOf('function benchGate') !== -1) {
   BAD('benchGate is missing, so any bench opens for anybody');
 }
 const front = (function () {
-  try { return fs.readFileSync(path.join(HERE, 'ts-plugins', 'thornswood-front.js'), 'utf8'); }
+  try { return fs.readFileSync(path.join(HERE, '..', 'game', 'plugins', 'thornswood-front.js'), 'utf8'); }
   catch (e) { return ''; }
 })();
 if (front.indexOf('lockChanged') !== -1) {

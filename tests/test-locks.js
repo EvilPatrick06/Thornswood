@@ -27,7 +27,7 @@
 const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -359,7 +359,7 @@ function liftFn(name) {
       !!wayM && src.indexOf('// ==== WAY_OUT, generated ====') >= 0 &&
       src.indexOf('// ==== end WAY_OUT ====') >= 0);
   let doorsJson = null;
-  try { doorsJson = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, 'doors.json'), 'utf8')); }
+  try { doorsJson = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'data', 'doors.json'), 'utf8')); }
   catch (e) { doorsJson = null; }
   yes('doors.json is readable', !!doorsJson);
   if (wayM && byM && nameM && doorsJson) {

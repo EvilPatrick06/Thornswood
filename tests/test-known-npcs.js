@@ -29,7 +29,7 @@
 // WHAT IS NOT PROMISED. The roadmap's NPCs with their own work reads "Jobs,
 // routines and errands of their own, then quests", and home.html's feature
 // card says "getting jobs, routines and errands". None of that has any code
-// in tools/gamemode.js, and the routine half of entry 324 waits on entry 320's
+// in game/gamemode.js, and the routine half of entry 324 waits on entry 320's
 // cast list. So nothing the page says about NPCs may mention routines,
 // errands, schedules, jobs or quests, or give a date.
 //

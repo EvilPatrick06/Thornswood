@@ -546,7 +546,7 @@ function Get-ShipOwnGameCollection([string]$ProfileDir) {
 # refusal would stop every installer build until the folders are gone.
 #
 # Ours is the main menu backdrop: the three files Go.ps1 writes from
-# tools\art\menu ($menuPairs there; change the two together). Anything else
+# game\menu ($menuPairs there; change the two together). Anything else
 # here is somebody else's until it is traced to a mod page and put in the
 # collection, or moved into the Thornswood Content mod, and either way it then
 # leaves the installer by itself.

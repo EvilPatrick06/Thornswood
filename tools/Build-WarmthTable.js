@@ -1,6 +1,6 @@
 // Build-WarmthTable.js
 //
-// Builds tools\warmth.json: what every wearable in the load order is made of
+// Builds game\data\warmth.json: what every wearable in the load order is made of
 // and what it covers, so the temperature meter can tell a fur cloak from a
 // steel cuirass from bare skin.
 //
@@ -54,7 +54,7 @@ function opt(name, def) {
 }
 const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
 const PLUGINS_TXT = opt('plugins', 'C:\\Thornswood\\Profile\\Default\\plugins.txt');
-const OUT = opt('out', path.join(__dirname, 'warmth.json'));
+const OUT = opt('out', path.join(__dirname, '..', 'game', 'data', 'warmth.json'));
 const PRINT = args.indexOf('--print') !== -1;
 
 const BETHESDA = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm',
@@ -389,7 +389,7 @@ if (PRINT) {
   else, and the json beside it stays the record of where each row came from.
 */
 function install() {
-  const gm = path.join(__dirname, 'gamemode.js');
+  const gm = path.join(__dirname, '..', 'game', 'gamemode.js');
   let src;
   try { src = fs.readFileSync(gm, 'utf8'); } catch (e) { fail('no gamemode.js to install into'); return; }
   const thin = {};
@@ -402,7 +402,7 @@ function install() {
     : src.replace(/^(const ITEMS = .*;)$/m, '$1\n' + line);
   if (next === src) { fail('could not find anywhere in gamemode.js to put the table'); return; }
   fs.writeFileSync(gm, next);
-  console.log('installed ' + keys.length + ' rows into tools\\gamemode.js');
+  console.log('installed ' + keys.length + ' rows into game\\gamemode.js');
 }
 
 if (process.exitCode === 1) {

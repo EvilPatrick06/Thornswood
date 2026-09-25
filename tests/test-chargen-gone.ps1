@@ -16,7 +16,7 @@
   (Install-Emotes, Install-Thornswood, Revert, Check-Chargen), which is a small
   tidy".
 
-  There were two copies, not one. tools\ts-plugins is where Ship takes the
+  There were two copies, not one. game\plugins is where Ship takes the
   plugins from. tools\emotes is where Install-Emotes.ps1 and Revert.ps1 took it
   from, and that copy was the dresser from BEFORE it was retired, with no
   whose-game gate and its equipItem call intact, so running either script put
@@ -95,7 +95,7 @@ $name = 'thornswood-chargen.js'
 $rel  = 'Data\Platform\Plugins\' + $name
 
 # ---- 1. the file and every name of it ------------------------------------------
-Yes 'tools\ts-plugins no longer holds the retired dresser' (-not (Test-Path -LiteralPath (Join-Path $Here "ts-plugins\$name")))
+Yes 'game\plugins no longer holds the retired dresser' (-not (Test-Path -LiteralPath (Join-Path $Here "..\game\plugins\$name")))
 Yes 'and tools\emotes no longer holds the unretired copy Install-Emotes and Revert installed' (-not (Test-Path -LiteralPath (Join-Path $Here "emotes\$name")))
 
 # The two files that name it to keep it out. Sections 3 and 4 check what they
@@ -103,7 +103,7 @@ Yes 'and tools\emotes no longer holds the unretired copy Install-Emotes and Reve
 $keepsItOut = @('app\OwnGame.cs', 'Ship-Rules.ps1')
 $sources = @()
 $sources += @(Get-ChildItem -LiteralPath $Here -File | Where-Object { $_.Extension -in '.ps1', '.js', '.cs', '.xaml' })
-foreach ($d in 'app', 'ts-plugins', 'ts-ui', 'emotes', 'launcher') {
+foreach ($d in 'app', '..\game\plugins', '..\game\ui', 'emotes', 'launcher') {
     $p = Join-Path $Here $d
     if (Test-Path -LiteralPath $p) {
         $sources += @(Get-ChildItem -LiteralPath $p -File -Recurse | Where-Object { $_.Extension -in '.ps1', '.js', '.cs', '.xaml', '.html' })
@@ -123,17 +123,17 @@ Yes 'Keep.cs still calls any thornswood-*.js in the plugin folder ours, so a cop
 # ---- 2. Go.ps1 takes a leftover copy out of the game folder ---------------------
 $go = [IO.File]::ReadAllText((Join-Path $Here 'Go.ps1'))
 $sweep = [regex]::Match($go, '(?ms)^\$keep = @\(''skymp5-client\.js''.*?^\}\r?$')
-Yes 'Go.ps1 still builds its keep list from tools\ts-plugins and sweeps the plugin folder against it' ($sweep.Success -and $sweep.Value.Contains('Remove-Item -LiteralPath $s.FullName'))
+Yes 'Go.ps1 still builds its keep list from game\plugins and sweeps the plugin folder against it' ($sweep.Success -and $sweep.Value.Contains('Remove-Item -LiteralPath $s.FullName'))
 
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('ts-chargen-gone-' + [Diagnostics.Process]::GetCurrentProcess().Id)
-$ours = @(Get-ChildItem -LiteralPath (Join-Path $Here 'ts-plugins') -Filter *.js -File | ForEach-Object { $_.Name })
+$ours = @(Get-ChildItem -LiteralPath (Join-Path $Here '..\game\plugins') -Filter *.js -File | ForEach-Object { $_.Name })
 try {
     if ($sweep.Success) {
         $plugins = Join-Path $scratch 'Data\Platform\Plugins'
         New-Item -ItemType Directory -Force -Path $plugins | Out-Null
         $there = @('skymp5-client.js', 'skymp5-client-settings.txt', $name) + $ours
         foreach ($n in ($there | Select-Object -Unique)) { [IO.File]::WriteAllText((Join-Path $plugins $n), 'x') }
-        $plSrc = Join-Path $Here 'ts-plugins'
+        $plSrc = Join-Path $Here '..\game\plugins'
         function Bad($t) { }
         . ([scriptblock]::Create($sweep.Value))
         $left = @(Get-ChildItem -LiteralPath $plugins -File | ForEach-Object { $_.Name })

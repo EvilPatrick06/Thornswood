@@ -76,7 +76,7 @@ measured, names a second person.
   `tools\signing.json`, `C:\tools\metadata.json`, `server-secret.txt`,
   `Documents\thornswood-backup-key.txt`, and both baselines.
 - The door's key file is `private\door.json`, not `data\door.json`:
-  `tools\Set-Door.ps1` writes it there and `tools\gamemode.js` reads it from
+  `tools\Set-Door.ps1` writes it there and `game\gamemode.js` reads it from
   there. The secrets table in DEVELOPING.md said `data` that morning;
   its rewrite the same day says `private`.
 

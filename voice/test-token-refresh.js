@@ -2,7 +2,7 @@
   Proves setToken does what entry 6's gap needed: it changes what the NEXT
   socket sends, and changes nothing about the one already open.
 
-  Runs the shipped tools/ts-ui/thornswood-chat.js in a sandboxed `window`,
+  Runs the shipped game/ui/thornswood-chat.js in a sandboxed `window`,
   with a fake WebSocket that records what gets sent. Nothing here is a stand-in
   for the file under test.
 */
@@ -10,7 +10,7 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'tools', 'ts-ui', 'thornswood-chat.js'), 'utf8');
+const SRC = fs.readFileSync(path.join(__dirname, '..', 'game', 'ui', 'thornswood-chat.js'), 'utf8');
 
 let pass = 0, fail = 0;
 function check(what, got, want) {

@@ -245,7 +245,7 @@ files, read in Vortex's copy on 24 September:
 
 - `Thornswood-Content.esp`, Thornswood's own plugin, 141,234 bytes, sha256
   `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.
-  `tools\Thornswood-Content.esp` has changed since it was uploaded: it was
+  `game\content\Thornswood-Content.esp` has changed since it was uploaded: it was
   141,442 bytes on 24 September.
 - `SKSE\Plugins\SkyrimSoulsRE.ini`: Skyrim Souls RE's own settings file (mod
   27859, in the collection) with one line changed, `bTweenMenu = false`. The
@@ -291,7 +291,7 @@ built on 23 September carries every one of them.
 ## Made for Thornswood by somebody else
 
 - `Data\Platform\UI\thornswood-theme.mp3` (in the repo as
-  `tools\ts-ui\thornswood-theme.mp3`) is the theme. It was made for Thornswood
+  `game\ui\thornswood-theme.mp3`) is the theme. It was made for Thornswood
   by an artist this repository does not name, and it went to everybody on
   Patrick's word of 22 September (commit ec8d113). The terms are between
   Patrick and the artist and are not written down here.

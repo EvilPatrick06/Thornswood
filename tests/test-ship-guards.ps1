@@ -22,7 +22,7 @@
   THE PLUGINS. Ship never copied the in game plugins from the repo into the
   game folder, so on 17 September a dev build went out with day old plugins
   from a machine where the source had changed and nobody had run Go.ps1. Ship
-  now compares every plugin in tools\ts-plugins with the copy in the game
+  now compares every plugin in game\plugins with the copy in the game
   folder and stops the release on any difference. Here a day old copy, a
   missing one and an empty source folder each have to stop it.
 
@@ -82,7 +82,7 @@ function Find-If([string]$condition, [int]$after, [string]$mark) {
 
 $script:dryBefore = Find-If '$DryRun' $src.IndexOf('$dryKeep = @()') '$dryKeep +='
 $script:dryAfter  = Find-If '$DryRun' $src.IndexOf("& (Join-Path `$Here 'Publish-Update.ps1') @pubArgs") 'foreach ($k in $dryKeep)'
-$script:guard     = Find-If '$GameDir' 0 "Join-Path `$Here 'ts-plugins'"
+$script:guard     = Find-If '$GameDir' 0 "Join-Path `$Here '..\game\plugins'"
 $unbump = ''
 foreach ($fn in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
     if ($fn.Name -eq 'Unbump') { $unbump = $fn.Extent.Text; break }
@@ -189,7 +189,7 @@ try {
         catch { return [string]$_.Exception.Message }
     }
     $repoTools = Join-Path $work 'tools'
-    $plugins = Join-Path $repoTools 'ts-plugins'
+    $plugins = Join-Path $work 'game\plugins'
     $game = Join-Path $work 'Game'
     $live = Join-Path $game 'Data\Platform\Plugins'
     New-Item -ItemType Directory -Path $plugins, $live -Force | Out-Null

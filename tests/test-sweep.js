@@ -39,9 +39,9 @@ function read(...bits) {
   return fs.readFileSync(path.join(TOOLS_DIR, ...bits), 'utf8').split(CR).join('');
 }
 
-const gm = read('gamemode.js');
-const chat = read('ts-ui', 'thornswood-chat.js');
-const voice = read('ts-ui', 'thornswood-voice.js');
+const gm = read('..', 'game', 'gamemode.js');
+const chat = read('..', 'game', 'ui', 'thornswood-chat.js');
+const voice = read('..', 'game', 'ui', 'thornswood-voice.js');
 const svc = read('..', 'voice', 'voice-server.js');
 
 /* Comments in this repo quote old code on purpose, so a check that reads them

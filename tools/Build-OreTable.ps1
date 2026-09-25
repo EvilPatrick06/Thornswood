@@ -1,7 +1,7 @@
 <#
   Build-OreTable.ps1
 
-  Builds tools\ores.json: the table the server needs to answer an ore vein.
+  Builds game\data\ores.json: the table the server needs to answer an ore vein.
   Nothing in it is typed from memory. It is read out of the plugins of the
   build on this machine.
 
@@ -29,7 +29,7 @@
 
   Nothing here falls back to matching a vein's name against an ore's name.
   VMAD reads, and every row says where it came from: readFrom in
-  tools\ores.json names the property that row was read out of. What this build
+  game\data\ores.json names the property that row was read out of. What this build
   holds, measured on 20 September: 586 records carry the script, 581 of them
   name an ore, and the five that do not are Blackreach seams that hand out a
   levelled list of gems rather than one item. Those five are listed in the
@@ -59,7 +59,7 @@ param(
     [string[]] $Plugins    = @(),
     [string]   $Out        = '',
     [string]   $JsOut      = '',
-    # Print the table and leave tools\gamemode.js alone.
+    # Print the table and leave game\gamemode.js alone.
     [switch]   $NoInstall
 )
 
@@ -132,7 +132,7 @@ $RANK_ORDER    = @('novice', 'advanced', 'expert', 'master')
 
 $ErrorActionPreference = 'Stop'
 
-if (-not $Out) { $Out = Join-Path $PSScriptRoot 'ores.json' }
+if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\game\data\ores.json' }
 
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
@@ -881,7 +881,7 @@ $literal = $lines -join [Environment]::NewLine
 # gamemode.js that has no markers yet: this never invents a place to put it.
 #
 if (-not $NoInstall -and $fail -eq 0) {
-    $gm = Join-Path $PSScriptRoot 'gamemode.js'
+    $gm = Join-Path $PSScriptRoot '..\game\gamemode.js'
     $open  = '  var ORES_BY_BASE = {'
     $close = '  // ==== end ORES_BY_BASE ===='
     if (-not (Test-Path -LiteralPath $gm)) {

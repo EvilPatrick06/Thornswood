@@ -24,7 +24,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.join(TOOLS_DIR, '..');
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const LF = String.fromCharCode(10);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');

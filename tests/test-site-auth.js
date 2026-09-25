@@ -36,7 +36,7 @@ const os = require('os');
 const path = require('path');
 
 const SITE_SRC = process.argv[2] || path.join(TOOLS_DIR, '..', 'site', 'server.js');
-const GAME_SRC = process.argv[3] || path.join(TOOLS_DIR, 'gamemode.js');
+const GAME_SRC = process.argv[3] || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

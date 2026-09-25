@@ -17,7 +17,7 @@ const page = fs.readFileSync(R + '/tools/launcher/voice-host.html', 'utf8');
 const pageFns = new Function('cfg', lift(page, 'voiceBase') + '\n' + lift(page, 'voiceSocket') +
   '; return { base: voiceBase, socket: voiceSocket };');
 
-const chat = fs.readFileSync(R + '/tools/ts-ui/thornswood-chat.js', 'utf8');
+const chat = fs.readFileSync(R + '/game/ui/thornswood-chat.js', 'utf8');
 const chatUrl = new Function('CFG', 'HOST', 'PORT', lift(chat, 'url') + '; return url;');
 
 let fail = 0;

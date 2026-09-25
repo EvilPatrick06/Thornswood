@@ -19,7 +19,7 @@ const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests a
 const fs = require('fs');
 const path = require('path');
 
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -121,7 +121,7 @@ yes('and the mold that names it is craftable too', !!theMold && theMold.owner ==
 
 // ----------------------------------------------------- and the file beside it
 let recipes = null;
-try { recipes = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, 'recipes.json'), 'utf8')); }
+try { recipes = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'data', 'recipes.json'), 'utf8')); }
 catch (e) { recipes = null; }
 if (recipes) {
   yes('recipes.json carries the refused rows with their reason',

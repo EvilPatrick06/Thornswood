@@ -12,9 +12,9 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `tools/launcher`: not the launcher's code, only the voice page it opens in
   a hidden window.
 - `tools/setup`: the small setup program people download.
-- `tools/ts-plugins`: the game plugins, in Skyrim Platform JavaScript.
-- `tools/ts-ui`: the overlays inside the game.
-- `tools/gamemode.js`: the server's gamemode.
+- `game/plugins`: the game plugins, in Skyrim Platform JavaScript.
+- `game/ui`: the overlays inside the game.
+- `game/gamemode.js`: the server's gamemode.
 - `site`: the site. Its public pages are `site/data/site`.
 - `voice`: proximity voice.
 - `bot`: the Discord bot, in Python.
@@ -30,7 +30,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `lore/`: the world.
 
 `bot`, `site`, `tests`, `tools/launcher`, `tools/setup`,
-`tools/signing`, `tools/ts-plugins`, `tools/ts-ui` and `voice` each have
+`tools/signing`, `game/plugins`, `game/ui` and `voice` each have
 a README of their own, which says what the folder is and how to change it.
 
 ## Before changing anything

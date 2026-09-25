@@ -30,7 +30,7 @@ ON THE WAY IN. A lock keeps people out of a building, and a mine whose veins
 are two rooms down is shut just as well by a lock on the first room. So for
 every building with a vein, and every worldspace with one behind a building,
 this also names the buildings that every road from open ground to it goes
-through. The roads come from tools\\doors.json, the table BUILDING_BY_DOOR was
+through. The roads come from game\\data\\doors.json, the table BUILDING_BY_DOOR was
 generated from, so a building here is the same building /claim would take.
 
 WHAT OPEN GROUND IS. Tamriel and Solstheim, unless --open names others.
@@ -60,7 +60,7 @@ changes no rule and touches neither the gamemode nor the claim.
 
 Usage:
     python tools/Measure-MineBuildings.py
-    python tools/Measure-MineBuildings.py --out tools/mine-buildings.json
+    python tools/Measure-MineBuildings.py --out game/data/mine-buildings.json
 """
 
 import argparse
@@ -202,8 +202,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default=r'C:\Thornswood\Game\Data')
     ap.add_argument('--plugins', default=r'C:\Thornswood\Profile\Default\plugins.txt')
-    ap.add_argument('--gamemode', default=os.path.join(HERE, 'gamemode.js'))
-    ap.add_argument('--doors', default=os.path.join(HERE, 'doors.json'))
+    ap.add_argument('--gamemode', default=os.path.join(HERE, '..', 'game', 'gamemode.js'))
+    ap.add_argument('--doors', default=os.path.join(HERE, '..', 'game', 'data', 'doors.json'))
     ap.add_argument('--out', default=None, help='write the measurement as JSON to this file')
     ap.add_argument('--open', default='Tamriel,DLC2SolstheimWorld',
                     help='editor ids of the worldspaces that are open ground, comma separated')

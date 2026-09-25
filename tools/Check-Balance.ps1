@@ -38,7 +38,7 @@
   with a measured reason fails this script.
 
   It also follows a recipe to the class that produces its inputs, which it
-  could not do until 21 September. tools\recipes.json records WHICH items each
+  could not do until 21 September. game\data\recipes.json records WHICH items each
   recipe wants now and not just how many: Build-RecipeTable.ps1 read the CNTO
   subrecords to count them and dropped the form ids, and it keeps them. Every
   owned row carries inputItems, each with the class that produces that item and
@@ -103,7 +103,7 @@ function Load($name) {
 # The gatherer is the one that needs it: bb947 Tundra Cotton and bb953 Wheat sit
 # in the harvests map and in the crops map at once, because their produce is an
 # INGR and the food rule that moved the other crops out of the plant table never
-# touched them. tools\gamemode.js harvest() opens with `if (isCrop(baseDesc))
+# touched them. game\gamemode.js harvest() opens with `if (isCrop(baseDesc))
 # return null;` and onActivate sends a crop base to farmActivate, so a gatherer
 # gets nothing at either plant at any rank. Counting them on the gatherer's
 # ladder is counting work nobody can do. It is 2 of 109 rows on this build and
@@ -161,7 +161,7 @@ if ($harvests -and $harvests.PSObject.Properties.Name -contains 'fish') {
 # THE HUNTER HAS TWO LADDERS AND THIS SCRIPT READ ONE. The food split of
 # 21 September invented harvests.json's game map, seven hanging-game rows taken
 # off the gatherer because a gatherer gathers reagents, and gated in
-# tools\gamemode.js game() on the hunter's own rank. It was the only producing
+# game\gamemode.js game() on the hunter's own rank. It was the only producing
 # map in the repository with no empty-rung rule anywhere over it:
 # tools\Build-HarvestTable.ps1 covers its novice rung the way it covers the
 # fish, and the fish are laddered here while the game was not.
@@ -257,7 +257,7 @@ if ($recipes) {
         # This line used to take the requirement off the FIRST row that failed
         # and print it as 'every one wanting X', which was a claim of uniformity
         # nothing had measured, and it reported the nearest wall rather than the
-        # worst. Measured against the committed tools\recipes.json: the novice
+        # worst. Measured against the committed game\data\recipes.json: the novice
         # Confectioner rung is 7 rows, 5 of them wanting advanced work from a
         # gatherer and 2 of them, both named Apple Dumpling, wanting expert work
         # from a farmer. The old line said the rung was one rung and one class
@@ -441,7 +441,7 @@ if ($recipes) {
     if ($far.Count -gt 0) {
         Note ("{0} recipe(s) are more than one rung away from what their inputs cost" -f $far.Count)
         foreach ($f in ($far | Select-Object -First 10)) { Note ('  ' + $f) }
-        if ($far.Count -gt 10) { Note ("  ... and {0} more, every one of them in tools\recipes.json with its inputItems" -f ($far.Count - 10)) }
+        if ($far.Count -gt 10) { Note ("  ... and {0} more, every one of them in game\data\recipes.json with its inputItems" -f ($far.Count - 10)) }
     } else {
         Ok 'no recipe is more than one rung away from what its inputs cost'
     }
@@ -649,7 +649,7 @@ if ($recipes) {
         foreach ($pair in ($cross.Keys | Sort-Object { -$cross[$_] })) { Note ('  {0,5}  {1}' -f $cross[$pair], $pair) }
         foreach ($s in $crossSaid) { Note ('  ' + $s) }
         if ($crossRows -gt $crossSaid.Count) {
-            Note ("  ... and {0} more, every one of them in tools\recipes.json under alsoProducedBy" -f ($crossRows - $crossSaid.Count))
+            Note ("  ... and {0} more, every one of them in game\data\recipes.json under alsoProducedBy" -f ($crossRows - $crossSaid.Count))
         }
     }
 }

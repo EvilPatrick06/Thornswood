@@ -41,13 +41,13 @@ const path = require('path');
 const CR = String.fromCharCode(13);
 const read = function (p) { return fs.readFileSync(p, 'utf8').split(CR).join(''); };
 
-const SKILLS_PATH = process.env.SKILLS || path.join(TOOLS_DIR, 'ts-ui', 'thornswood-skills.js');
-const FRONT_PATH = process.env.FRONT || path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-front.js');
+const SKILLS_PATH = process.env.SKILLS || path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-skills.js');
+const FRONT_PATH = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
 const INI_PATH = process.env.INI || path.join(TOOLS_DIR, 'emotes', 'Thornswood.ini');
 const page = read(SKILLS_PATH);
 const front = read(FRONT_PATH);
 const ini = read(INI_PATH);
-const gm = read(path.join(TOOLS_DIR, 'gamemode.js'));
+const gm = read(path.join(TOOLS_DIR, '..', 'game', 'gamemode.js'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -504,13 +504,13 @@ yes('the shipped Thornswood.ini carries CloseGameKey = 68', !!iniM && Number(ini
   while ((m = rxFront.exec(front)) !== null) {
     if (m[1] !== 'CloseGameKey' && m[1] !== 'VoicePort') { take(Number(m[2]), 'front ' + m[1]); }
   }
-  const emotes = read(path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-emotes.js'));
+  const emotes = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-emotes.js'));
   const rxEm = /key\('(\w+)', (\d+)\)/g;
   while ((m = rxEm.exec(emotes)) !== null) { take(Number(m[2]), 'emotes ' + m[1]); }
-  const voice = read(path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-voice.js'));
+  const voice = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-voice.js'));
   const rxVo = /^let (\w+_KEY) = (\d+);/gm;
   while ((m = rxVo.exec(voice)) !== null) { take(Number(m[2]), 'voice ' + m[1]); }
-  const mark = read(path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-mark.js'));
+  const mark = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-mark.js'));
   const rxMk = /^let (\w+Key) = (\d+);/gm;
   while ((m = rxMk.exec(mark)) !== null) { take(Number(m[2]), 'mark ' + m[1]); }
   const rxIni = /^\s*(\w+)\s*=\s*(\d+)\s*$/gm;

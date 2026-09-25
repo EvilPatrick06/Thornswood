@@ -26,12 +26,12 @@ const CR = String.fromCharCode(13);
 function read(...bits) {
   return fs.readFileSync(path.join(TOOLS_DIR, ...bits), 'utf8').split(CR).join('');
 }
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 const helpCs = read('app', 'Help.cs');
 const keysCs = read('app', 'Keys.cs');
-const front = read('ts-plugins', 'thornswood-front.js');
-const panel = read('ts-ui', 'thornswood-party.js');
+const front = read('..', 'game', 'plugins', 'thornswood-front.js');
+const panel = read('..', 'game', 'ui', 'thornswood-party.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

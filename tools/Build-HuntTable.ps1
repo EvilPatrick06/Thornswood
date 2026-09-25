@@ -1,7 +1,7 @@
 <#
   Build-HuntTable.ps1
 
-  Builds tools\hunts.json: the table the server needs to answer a carcass.
+  Builds game\data\hunts.json: the table the server needs to answer a carcass.
   Nothing in it is typed from memory. It is read out of the NPC_ records of
   this build on this machine.
 
@@ -231,7 +231,7 @@ param(
     [string] $PluginList = 'C:\Thornswood\Profile\OwnGame\plugins.txt',
     [string] $Out        = '',
     [string] $JsOut      = '',
-    # Print the table and leave tools\gamemode.js alone.
+    # Print the table and leave game\gamemode.js alone.
     [switch] $NoInstall
 )
 
@@ -338,7 +338,7 @@ $RANK_ORDER     = @('novice', 'advanced', 'expert', 'master')
 
 $ErrorActionPreference = 'Stop'
 
-if (-not $Out) { $Out = Join-Path $PSScriptRoot 'hunts.json' }
+if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\game\data\hunts.json' }
 
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
@@ -1600,7 +1600,7 @@ $literal = $lines -join [Environment]::NewLine
 # const the block is written with, and whatever indent it sits at, is kept.
 #
 if (-not $NoInstall -and $fail -eq 0) {
-    $gm = Join-Path $PSScriptRoot 'gamemode.js'
+    $gm = Join-Path $PSScriptRoot '..\game\gamemode.js'
     if (-not (Test-Path -LiteralPath $gm)) {
         Note "no gamemode.js beside this script, so the table was not installed"
     } else {

@@ -8,13 +8,13 @@ launcher's install folder (`C:\Thornswood` on most machines), `Profile` is
 
 | Term | What it is | Where it lives |
 |---|---|---|
-| Allowed list | The profile ids let into the game server. The site builds it from Discord roles, and the server's door fetches it every five minutes. | `private\allowed.json` on the game server; `tools\gamemode.js:11059`; DEVELOPING.md "Who gets into the game" |
+| Allowed list | The profile ids let into the game server. The site builds it from Discord roles, and the server's door fetches it every five minutes. | `private\allowed.json` on the game server; `game\gamemode.js:11059`; DEVELOPING.md "Who gets into the game" |
 | Arrival | Where a new character first stands: the inn of the town picked at the end of creation. Respawn uses the same points. | `CHARGEN.towns` (`gamemode.js:3881`) and `arriveAt` (`gamemode.js:4039`); `tests\test-arrivals.js` |
 | Baseline | This machine's record of what its last release shipped. Publish-Update packs only the difference, so a machine that did not ship the last release ships those files again once. | `%LOCALAPPDATA%\Thornswood\published.json` (`published-dev.json` for dev); `Publish-Update.ps1 -Baseline` makes one |
 | Board, the | The Thornswood To Do board, the one record of outstanding work. Each piece of work is an issue; Order is the do-order. | https://github.com/users/EvilPatrick06/projects/1; CONTRIBUTING.md "Everything we need to do goes on the board" |
 | Bump-Version | Moves `Version` in `Updater.cs` as its own commit and pull request, before a main Ship. | `tools\Bump-Version.ps1`; DEVELOPING.md "How a release goes out" |
 | Channel | Which feed an install follows and a Ship publishes to: `main` (live) or `dev`. | `Channel` in `<Root>\config.json`; `Ship.ps1 -Channel dev` |
-| Chargen | Character creation on the server: the hall, the face, the choice on K, then the trip to the inn. | `tools\gamemode.js:3618` "character creation"; `thornswoodChargen` in `server-settings.json` switches it off |
+| Chargen | Character creation on the server: the hall, the face, the choice on K, then the trip to the inn. | `game\gamemode.js:3618` "character creation"; `thornswoodChargen` in `server-settings.json` switches it off |
 | Client build record | The sha256 and size of the six client runtime files and the fork commit they came from. Sync-Client, Ship and the launcher refuse any other build. | `tools\client-build.json`, written by `tools\New-ClientBuildRecord.ps1` |
 | Client runtime | The six SkyMP client files built from the fork: `MpClientPlugin.dll`, both SkyrimPlatform DLLs, the CEF host, `skymp5-client.js`, `TESModPlatform.pex`. | `ClientRuntime.cs`; engine/README.md |
 | Collection | The Nexus collection of mods Thornswood runs on, curated in Vortex and deployed into the Steam copy. | `Collection` in `Config.cs`; `docs\COLLECTION-METHOD.md`; `tools\Set-Collection.ps1` |
@@ -22,11 +22,11 @@ launcher's install folder (`C:\Thornswood` on most machines), `Profile` is
 | #staff-general | The team's Discord channel. A change to settled design or to one of the six shared files starts there, and whoever takes the dev feed says so there. | CONTRIBUTING.md "Settled design" and "How work moves" |
 | Dev build | A second launcher beside the main one, on the dev channel, dev ports (game 7787, voice 7789) and its own Profile and Game. Every change is tried here first. | `<Root>-DevBuild`; `DevBuild.cs`; installed from Settings, Maintenance |
 | Dev server | The game server the dev build joins: a copy of the live install with a fresh world, open to Owner and Dev roles. | VPS `C:\Thornswood-Server-Dev`, port 7787, resources 7788; `tools\Deploy-DevGamemode.ps1` |
-| Door | Who is let in. The launcher asks the site at Play (`Door.cs`, `/api/play/join`); the game server compares each connection with the allowed list, and turns people away only when enforcing. | `Door.cs:106 Check()`; `tools\gamemode.js:10994`; `tools\Set-Door.ps1` |
+| Door | Who is let in. The launcher asks the site at Play (`Door.cs`, `/api/play/join`); the game server compares each connection with the allowed list, and turns people away only when enforcing. | `Door.cs:106 Check()`; `game\gamemode.js:10994`; `tools\Set-Door.ps1` |
 | Downgrade | Puts the Steam copy back on Skyrim 1.6.1170 through Steam's own console, after asking, when Steam has updated it. | `Downgrade.cs:39`; the Downgrade button on the Play page |
 | Feed | `version.json` in the releases repository, one per branch (main, dev): the latest version, its packs, the server's address, and optional `message`, `maintenance` and `minLauncher`. | github.com/EvilPatrick06/Thornswood-Releases; `Updater.cs`, `FeedNotice.cs` |
 | Fix | The button that repairs what a scan found: the reference plugin list, a plugin fetched from the server, other servers' files moved to `Profile\Isolated`, or the launcher pointed at Vortex's folder. | `Verify.cs`; ARCHITECTURE.md "Verify and LoadOrder" |
-| Gamemode | The server's own rules, one JavaScript file loaded by skymp5-server. | `tools\gamemode.js`; GAMEMODE.md |
+| Gamemode | The server's own rules, one JavaScript file loaded by skymp5-server. | `game\gamemode.js`; GAMEMODE.md |
 | Go.ps1 | Installs the front, the overlays, the plugins and the recorded client into the game folder and makes them the kept copies. Ship runs it. | `tools\Go.ps1` |
 | Hold | Read-only handles on every kept file and the client settings while the game runs, so nothing can change them under it. | `Hold.cs:56 Take()`, `Hold.cs:105 Release()` |
 | Hotfix | The one live release not built from main: a `hotfix/...` branch from the live release's commit carrying one fix and its version bump. Patrick's call. | CONTRIBUTING.md "How work moves" |

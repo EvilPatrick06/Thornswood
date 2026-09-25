@@ -1,7 +1,7 @@
 <#
   Build-HarvestTable.ps1
 
-  Builds tools\harvests.json: the table the server needs to say who may pick
+  Builds game\data\harvests.json: the table the server needs to say who may pick
   which plant. Nothing in it is typed from memory. It is read out of the
   plugins of this build on this machine.
 
@@ -83,11 +83,11 @@
   would supply the cook, gatherer would supply tailor and alchemist, miner
   smith, hunter tailor and smith and so on.'
 
-  He is right and the table said otherwise. Measured in tools\harvests.json on
+  He is right and the table said otherwise. Measured in game\data\harvests.json on
   21 September, over the 131 rows of the harvests map, which is the gatherer's
   table: 106 of them produce an INGR, which is an alchemy reagent and is the
   gatherer's work exactly as he describes it. 24 produce an ALCH and 1 a MISC.
-  Counted the same day over tools\recipes.json, the gatherer supplied the Cook
+  Counted the same day over game\data\recipes.json, the gatherer supplied the Cook
   225 of that profession's inputs and the farmer supplied the Cook none at all,
   and the biggest of them were Butter 46, Leek 12, Potato 8, Cabbage 6, Carrot
   6, Gourd 4, Tomato 4, Ash Yam 4, Red Apple 4, Green Apple 4 and Pheasant
@@ -135,7 +135,7 @@
     before that was refused. They grow in the Soul Cairn, a plane of Oblivion
     behind the Dawnguard questline, so nobody sows them and nothing bled for
     them, and a farmer's crop list with a plot in Oblivion on it is a worse
-    answer than the one being fixed. And searched across tools\recipes.json the
+    answer than the one being fixed. And searched across game\data\recipes.json the
     same day, Soul Husk is an input to no recipe in this build at all, so the
     thing Patrick is complaining about, the gatherer handing the Cook their
     shopping list, does not touch it. It is named in FOOD_STAYS_THE_GATHERERS
@@ -184,7 +184,7 @@
       its produce is worth (see the knobs below)
     - runs the crops pass over the rows it routed to the farmer, gives each one
       the rank the farm ladder names and a grow time worked out from the price
-    - writes tools\harvests.json, the crops, the fish and the game beside the
+    - writes game\data\harvests.json, the crops, the fish and the game beside the
       harvests in it, and prints all four tables as JavaScript object literals,
       because the server ships as one file and cannot read the json
 
@@ -192,7 +192,7 @@
 
   Skyrim's own fishing is a Creation Club system this build does not have, so
   the fisher's verb looked like a thing somebody had to place records for.
-  Measured in tools\harvests.json on 20 September, before any of this was
+  Measured in game\data\harvests.json on 20 September, before any of this was
   written: sixteen records already standing in every river and on every shore
   are water produce, and every one of them was a row in the plant table, gated
   on the Gatherer. The salmon, the clams, the pearl oysters, the butchered
@@ -233,7 +233,7 @@ param(
     [string] $PluginList = 'C:\Thornswood\Profile\OwnGame\plugins.txt',
     [string] $Out        = '',
     [string] $JsOut      = '',
-    # Print the table and leave tools\gamemode.js alone.
+    # Print the table and leave game\gamemode.js alone.
     [switch] $NoInstall
 )
 
@@ -387,7 +387,7 @@ $PRODUCE_A_SCRIPT_MUST_OPEN = ' \(\d+\)$'
 # Thornswood placed for them. Nobody decided that. This is the check that stops
 # the next FLOR or TREE this server places from being reclassified the same
 # quiet way.
-$STATIONS_FILE = Join-Path $PSScriptRoot 'stations.json'
+$STATIONS_FILE = Join-Path $PSScriptRoot '..\game\data\stations.json'
 #
 # ------------------------------------------------------ the fish knobs ------
 #
@@ -399,7 +399,7 @@ $STATIONS_FILE = Join-Path $PSScriptRoot 'stations.json'
 # WHY THERE IS A RULE HERE AT ALL, AND WHY IT IS A LIST OF NAMES. Skyrim's own
 # fishing is a Creation Club system this build does not have, so the fisher's
 # verb looked like a thing somebody had to place records for. Measured in
-# tools\harvests.json on 20 September: sixteen records already standing in
+# game\data\harvests.json on 20 September: sixteen records already standing in
 # every river and on every shore are water produce, and every one of them was
 # in the plant table gated on the Gatherer. So the fisher's verb needs no new
 # record and no Creation Kit work at all.
@@ -479,12 +479,12 @@ $FISH_RANK_BY_EDITOR_ID = @{
 # build and a name nothing carries stops the run.
 #
 # GAME_BY_EDITOR_ID: hanging game, which is the hunter's. Seven records on this
-# build, read out of tools\harvests.json on 21 September rather than listed from
+# build, read out of game\data\harvests.json on 21 September rather than listed from
 # memory: every row in the harvests map whose produce carried the food bit and
 # was an animal. Two pheasants hanging by the feet, two rabbits, two charred
 # skeevers on a giant's skewer and a third charred skeever on its own.
 #
-# WHY THEY ARE NOT ROWS IN tools\hunts.json, which was the other place they
+# WHY THEY ARE NOT ROWS IN game\data\hunts.json, which was the other place they
 # could have gone. That table is built by tools\Build-HuntTable.ps1 out of NPC_
 # records and the death item levelled lists they point at, and loot() in the
 # gamemode answers it only after reading the reference itself: mp.get type must
@@ -495,7 +495,7 @@ $FISH_RANK_BY_EDITOR_ID = @{
 #
 # What they are is a press on a FLOR whose produce the engine hands over, which
 # is the same shape as the water produce, and the fish pass on 20 September
-# solved that problem once already: its own map in tools\harvests.json, its own
+# solved that problem once already: its own map in game\data\harvests.json, its own
 # generated block in the gamemode, its own verb gated on its own class. This
 # follows it line for line rather than inventing a second arrangement.
 $GAME_BY_EDITOR_ID = @(
@@ -554,7 +554,7 @@ $GAME_RANK_BY_EDITOR_ID = @{
 # Oar's Rest do, rather than being dropped without a trace.
 #
 # SAY THIS OUT LOUD WHEN IT COSTS SOMETHING, AND HERE IT DOES. Counted over
-# tools\recipes.json on 21 September, Butter is 46 of the Cook's inputs, the
+# game\data\recipes.json on 21 September, Butter is 46 of the Cook's inputs, the
 # single biggest of them, and after this change nothing in the world produces
 # it. That is the honest answer rather than a wrong one: a churn is not a crop
 # and handing it to a farmer here would be this script deciding a station on its
@@ -573,7 +573,7 @@ $FOOD_PROP_BY_EDITOR_ID = @('MammothCheese01', 'BYOHButterChurn')
 # plane of Oblivion reached through the Dawnguard questline: nobody sows one,
 # nothing bled for one, and a novice farmer's crop list with a plot in Oblivion
 # on it is a worse answer than the one this change is fixing. And Soul Husk is
-# an input to no recipe in this build at all, searched across tools\recipes.json
+# an input to no recipe in this build at all, searched across game\data\recipes.json
 # the same day, so the thing Patrick is correcting, the gatherer handing the
 # Cook their shopping list, does not touch it either way.
 #
@@ -681,10 +681,10 @@ $CROP_NOT_A_PLOT_PREFIX = @('BYOHHouseFlora', 'BYOHHouseIngrd')
 # A crop this list does not name falls back to the gold rule, so a mod adding a
 # crop still gets a rank rather than an error, and the fallback is reported.
 #
-# THE SERVER DOES NOT READ THIS. tools\gamemode.js carries its own CROP_RULES
+# THE SERVER DOES NOT READ THIS. game\gamemode.js carries its own CROP_RULES
 # and that is what gates a plot, because the generated block in that file is
 # overwritten by this script and a judgement written into it would be lost. This
-# list exists so that tools\harvests.json does not sit there stating a different
+# list exists so that game\data\harvests.json does not sit there stating a different
 # rank from the one the server enforces. THE TWO MUST AGREE: change one, change
 # the other, and the names on each rung are the same names in both.
 #
@@ -693,7 +693,7 @@ $CROP_NOT_A_PLOT_PREFIX = @('BYOHHouseFlora', 'BYOHHouseIngrd')
 # XJKcarrotplant and go on the same rung, and XJKWOTreeAppleRed and
 # XJKWOTreeAppleGreen are the same orchard as the two JKs Skyrim apple trees and
 # go on theirs. Every one of the four is already ranked exactly that way in
-# CROP_RULES in tools\gamemode.js, which is the list the server actually gates a
+# CROP_RULES in game\gamemode.js, which is the list the server actually gates a
 # plot on, so this is the two lists being made to agree rather than a new
 # judgement: they were written there by hand when the pass could not reach them.
 $CROP_RANK_BY_EDITOR_ID = @{
@@ -720,7 +720,7 @@ $CROP_GROW_MINUTES_MAX      = 360
 
 $ErrorActionPreference = 'Stop'
 
-if (-not $Out) { $Out = Join-Path $PSScriptRoot 'harvests.json' }
+if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\game\data\harvests.json' }
 
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
@@ -1583,7 +1583,7 @@ foreach ($e in $FISH_RANK_BY_EDITOR_ID.Keys) {
     }
 }
 # AND THE RANK HAS TO BE ONE OF THE FOUR. Added 20 September, after a read of
-# fish() in tools\gamemode.js showed that a rank it does not know used to take
+# fish() in game\gamemode.js showed that a rank it does not know used to take
 # the gate away instead of closing it: the ladder test there is
 # RANK_LADDER.indexOf(rank), which answers -1 for anything that is not one of
 # the four, and -1 is not greater than 0, so the test was skipped and the record
@@ -2119,7 +2119,7 @@ $docLines.Add('  },')
 # this file should be able to see at a glance which records are the hunter's
 # press-E work, and the gamemode reads this map into a table of its own.
 $docLines.Add('  "gameAre": ' + (JsonStr ('the plants whose produce is food and which are named in GAME_BY_EDITOR_ID at the top of the script: hanging game, ' +
-    'which is the hunter''s work rather than the gatherer''s. They are not in tools\hunts.json because that table is built out of NPC_ records and ' +
+    'which is the hunter''s work rather than the gatherer''s. They are not in game\data\hunts.json because that table is built out of NPC_ records and ' +
     'loot() only answers a reference the engine says is a dead actor, and a hanging pheasant is a FLOR standing in a camp')) + ',')
 $docLines.Add('  "gameRankedBy": ' + (JsonStr ('the Hunter rank named one at a time in GAME_RANK_BY_EDITOR_ID at the top of the script, ' +
     'because the three produce records are priced at 2, 3 and 4 gold and the gold rule that ranks a plant puts all of them on one rung')) + ',')
@@ -2265,7 +2265,7 @@ $gameLines.Add('     ' + $game.Count + ' hanging game records, the same table as
 $gameLines.Add('     These are the hunter''s and not the gatherer''s. A plant whose produce is food is')
 $gameLines.Add('     not a thing a gatherer gathers, and these seven are the food rows that are an')
 $gameLines.Add('     animal somebody hung up rather than a crop somebody grew. They are not rows in')
-$gameLines.Add('     tools\hunts.json because that table is NPC_ records and loot() reads the')
+$gameLines.Add('     game\data\hunts.json because that table is NPC_ records and loot() reads the')
 $gameLines.Add('     reference itself: a hanging pheasant is a FLOR and was never an actor.')
 $gameLines.Add('     "from" is what hangs in the world, "name" is what it gives.')
 $gameLines.Add('     The rank is named one at a time in GAME_RANK_BY_EDITOR_ID in the script: the')
@@ -2299,7 +2299,7 @@ $gameLiteral = $gameLines -join [Environment]::NewLine
 # const the block is written with, and whatever indent it sits at, is kept.
 #
 if (-not $NoInstall -and $fail -eq 0) {
-    $gm = Join-Path $PSScriptRoot 'gamemode.js'
+    $gm = Join-Path $PSScriptRoot '..\game\gamemode.js'
     if (-not (Test-Path -LiteralPath $gm)) {
         Note "no gamemode.js beside this script, so the table was not installed"
     } else {
@@ -2354,7 +2354,7 @@ if (-not $NoInstall -and $fail -eq 0) {
 # would put the server's crop rule in a spot nobody agreed on.
 #
 if (-not $NoInstall -and $fail -eq 0) {
-    $gm = Join-Path $PSScriptRoot 'gamemode.js'
+    $gm = Join-Path $PSScriptRoot '..\game\gamemode.js'
     if (-not (Test-Path -LiteralPath $gm)) {
         Note "no gamemode.js beside this script, so the crops were not installed"
     } else {
@@ -2410,7 +2410,7 @@ if (-not $NoInstall -and $fail -eq 0) {
 # each reads the file fresh so the writes above it are already in it.
 #
 if (-not $NoInstall -and $fail -eq 0) {
-    $gm = Join-Path $PSScriptRoot 'gamemode.js'
+    $gm = Join-Path $PSScriptRoot '..\game\gamemode.js'
     if (-not (Test-Path -LiteralPath $gm)) {
         Note "no gamemode.js beside this script, so the fish were not installed"
     } else {
@@ -2460,7 +2460,7 @@ if (-not $NoInstall -and $fail -eq 0) {
 # exactly as it was. Writing a table into a spot this script chose by itself
 # would put the hunter's second verb somewhere nobody agreed on.
 if (-not $NoInstall -and $fail -eq 0) {
-    $gm = Join-Path $PSScriptRoot 'gamemode.js'
+    $gm = Join-Path $PSScriptRoot '..\game\gamemode.js'
     if (-not (Test-Path -LiteralPath $gm)) {
         Note "no gamemode.js beside this script, so the game was not installed"
     } else {

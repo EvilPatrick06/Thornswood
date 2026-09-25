@@ -107,7 +107,7 @@ function csStrings(src) {
 }
 
 // ---------------------------------------------------------- the gamemode
-const GM = read(['gamemode.js']);
+const GM = read(['..', 'game', 'gamemode.js']);
 const nA = GM.indexOf('// ==== thornswood needs');
 const nB = GM.indexOf('// ==== end thornswood needs ====');
 const needs = (nA >= 0 && nB > nA) ? GM.slice(nA, nB) : '';

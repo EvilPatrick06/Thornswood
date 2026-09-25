@@ -599,10 +599,10 @@ try {
 
 // ------------------------------------------------ the committed list, by eye
 {
-  const CAST = path.join(TOOLS_DIR, 'cast.json');
+  const CAST = path.join(TOOLS_DIR, '..', 'game', 'data', 'cast.json');
   let j = null;
   try { j = JSON.parse(fs.readFileSync(CAST, 'utf8')); } catch (e) { j = null; }
-  yes('tools/cast.json is in the repo, written by the script', j !== null && j.builtBy === 'tools/Build-CastTable.py');
+  yes('game/data/cast.json is in the repo, written by the script', j !== null && j.builtBy === 'tools/Build-CastTable.py');
   j = j || { holds: {}, counts: {} };
   const rows = function (h, col) { return ((j.holds[h] || {})[col]) || []; };
   const bel = rows('Whiterun', 'traders').filter(function (r) { return r.name === 'Belethor'; });

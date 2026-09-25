@@ -1,6 +1,6 @@
 // Build-WaterTable.js
 //
-// Builds tools\waters.json: what kind of water is in every cell and every
+// Builds game\data\waters.json: what kind of water is in every cell and every
 // worldspace of the load order.
 //
 // WHY THERE IS ANYTHING TO BUILD
@@ -43,7 +43,7 @@
 // WHAT EACH CLASS IS WORTH is balance and lives in NEEDS.water in
 // gamemode.js, the same split as the warmth and weather tables.
 //
-// Read only. It opens the plugins of the build, writes tools\waters.json and
+// Read only. It opens the plugins of the build, writes game\data\waters.json and
 // installs the compact table into tools\gamemode.js.
 //
 // Usage:
@@ -64,7 +64,7 @@ function opt(name, def) {
 }
 const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
 const PLUGINS_TXT = opt('plugins', 'C:\\Thornswood\\Profile\\Default\\plugins.txt');
-const OUT = opt('out', path.join(__dirname, 'waters.json'));
+const OUT = opt('out', path.join(__dirname, '..', 'game', 'data', 'waters.json'));
 const PRINT = args.indexOf('--print') !== -1;
 
 const BETHESDA = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm',
@@ -254,7 +254,7 @@ if (PRINT) {
 }
 
 function install() {
-  const gm = path.join(__dirname, 'gamemode.js');
+  const gm = path.join(__dirname, '..', 'game', 'gamemode.js');
   let src;
   try { src = fs.readFileSync(gm, 'utf8'); } catch (e) { fail('no gamemode.js to install into'); return; }
   // Flattened on the way in: the server only ever asks "what class of water is
@@ -273,7 +273,7 @@ function install() {
   if (next === src) { fail('could not find anywhere in gamemode.js to put the table'); return; }
   fs.writeFileSync(gm, next);
   console.log('installed ' + Object.keys(thin).length +
-              ' places into tools\\gamemode.js (deep is the default and is left out)');
+              ' places into game\\gamemode.js (deep is the default and is left out)');
 }
 
 if (process.exitCode === 1) {

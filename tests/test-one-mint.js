@@ -36,15 +36,15 @@
 // WHAT THIS CANNOT SEE. A mod that hands out gold on somebody's own machine
 // loses the gold, which known.md says for Tavern Games; that is the engine's
 // business and not this file's. And a recipe added to the collection after
-// tools/recipes.json was last built is not in it until Build-RecipeTable.ps1
+// game/data/recipes.json was last built is not in it until Build-RecipeTable.ps1
 // runs again.
 //
 // Read only.
 const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
-const RECIPES = process.env.RECIPES || path.join(TOOLS_DIR, 'recipes.json');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const RECIPES = process.env.RECIPES || path.join(TOOLS_DIR, '..', 'game', 'data', 'recipes.json');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -646,7 +646,7 @@ if (tradeBlock !== null) {
   /*
     CRAFTING IS THE ENGINE'S, AND IT IS THE ONE WAY IN THIS FILE CANNOT SEE.
     A recipe hands over its output without the gamemode writing anything, and
-    a recipe nobody owns may be made by anybody. tools/recipes.json is every
+    a recipe nobody owns may be made by anybody. game/data/recipes.json is every
     COBJ record in the load order, so a recipe that made gold would be a mint
     open to everybody. None does. Twenty one take gold as an input, measured
     on 24 September, Immersive Armors and Immersive Weapons, and that is coin
@@ -654,7 +654,7 @@ if (tradeBlock !== null) {
   */
   let book = null;
   try { book = JSON.parse(fs.readFileSync(RECIPES, 'utf8')); } catch (e) { book = null; }
-  yes('tools/recipes.json is there to read', book !== null);
+  yes('game/data/recipes.json is there to read', book !== null);
   if (book !== null) {
     let rows = 0;
     const makes = [];

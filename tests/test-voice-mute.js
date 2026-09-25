@@ -209,7 +209,7 @@ function joined(others) {
   file on disk is not touched.
 */
 function gamePage() {
-  let src = read('ts-ui/thornswood-voice.js');
+  let src = read('../game/ui/thornswood-voice.js');
   const end = src.lastIndexOf('})();');
   const hook = '  window.__t = { conns: conns, setWho: function (w) { lastWho = w; }, ' +
                'cfg: cfg, place: place, setCtx: function (c) { ctx = c; } };\n';
@@ -318,7 +318,7 @@ function plugin() {
     Math: Math, Array: Array, Object: Object, RegExp: RegExp, isFinite: isFinite
   };
   vm.createContext(sandbox);
-  vm.runInContext(read('ts-plugins/thornswood-voice.js'), sandbox);
+  vm.runInContext(read('../game/plugins/thornswood-voice.js'), sandbox);
   function page() {
     const args = [].slice.call(arguments);
     (handlers.browserMessage || []).forEach(function (fn) { fn({ arguments: args }); });

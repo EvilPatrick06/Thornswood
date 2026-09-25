@@ -32,7 +32,7 @@ const path = require('path');
 const CR = String.fromCharCode(13);
 
 const SITE = process.env.SITE || path.join(TOOLS_DIR, '..', 'site', 'server.js');
-const GAME = process.env.GAMEMODE || path.join(TOOLS_DIR, 'gamemode.js');
+const GAME = process.env.GAMEMODE || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const site = fs.readFileSync(SITE, 'utf8').split(CR).join('');
 const game = fs.readFileSync(GAME, 'utf8').split(CR).join('');
 

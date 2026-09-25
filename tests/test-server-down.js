@@ -31,7 +31,7 @@ const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests a
 const fs = require('fs');
 const path = require('path');
 const SRC = process.env.FRONT ||
-            path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-front.js');
+            path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 

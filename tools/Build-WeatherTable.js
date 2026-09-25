@@ -1,6 +1,6 @@
 // Build-WeatherTable.js
 //
-// Builds tools\weather.json: how hard the wind blows in every weather in the
+// Builds game\data\weather.json: how hard the wind blows in every weather in the
 // load order, and what kind of weather it is.
 //
 // WHY THERE IS ANYTHING TO BUILD
@@ -27,7 +27,7 @@
 // WHAT IT IS WORTH is balance and lives in NEEDS.weather in gamemode.js, the
 // same split as the warmth table.
 //
-// Read only. It opens the plugins of the build and writes tools\weather.json,
+// Read only. It opens the plugins of the build and writes game\data\weather.json,
 // and installs the compact table into tools\gamemode.js.
 //
 // Usage:
@@ -48,7 +48,7 @@ function opt(name, def) {
 }
 const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
 const PLUGINS_TXT = opt('plugins', 'C:\\Thornswood\\Profile\\Default\\plugins.txt');
-const OUT = opt('out', path.join(__dirname, 'weather.json'));
+const OUT = opt('out', path.join(__dirname, '..', 'game', 'data', 'weather.json'));
 const PRINT = args.indexOf('--print') !== -1;
 
 const BETHESDA = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm',
@@ -209,7 +209,7 @@ if (PRINT) {
 }
 
 function install() {
-  const gm = path.join(__dirname, 'gamemode.js');
+  const gm = path.join(__dirname, '..', 'game', 'gamemode.js');
   let src;
   try { src = fs.readFileSync(gm, 'utf8'); } catch (e) { fail('no gamemode.js to install into'); return; }
   const thin = {};
@@ -221,7 +221,7 @@ function install() {
     : src.replace(/^(const ITEMS = .*;)$/m, '$1\n' + line);
   if (next === src) { fail('could not find anywhere in gamemode.js to put the table'); return; }
   fs.writeFileSync(gm, next);
-  console.log('installed ' + Object.keys(thin).length + ' rows into tools\\gamemode.js');
+  console.log('installed ' + Object.keys(thin).length + ' rows into game\\gamemode.js');
 }
 
 if (process.exitCode === 1) {

@@ -27,7 +27,7 @@ const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests a
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
-const GM = process.env.GAMEMODE || path.join(TOOLS_DIR, 'gamemode.js');
+const GM = process.env.GAMEMODE || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const src = fs.readFileSync(GM, 'utf8').split(CR).join('');
 
 let pass = 0, fail = 0;

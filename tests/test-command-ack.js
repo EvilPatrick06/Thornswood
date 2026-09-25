@@ -42,7 +42,7 @@ const http = require('http');
 const { spawn } = require('child_process');
 
 const CR = String.fromCharCode(13);
-const GM = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const GM = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const VOICE = process.env.VOICE || path.join(TOOLS_DIR, '..', 'voice', 'voice-server.js');
 const gm = fs.readFileSync(GM, 'utf8').split(CR).join('');
 const voiceSrc = fs.readFileSync(VOICE, 'utf8').split(CR).join('');

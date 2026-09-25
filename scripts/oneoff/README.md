@@ -25,6 +25,6 @@ set up today. Read the header before running anything.
 | `Add-JContainers.ps1` | Installed JContainers for SunHelm's meters. | SunHelm is out. |
 | `Remove-BodyMods.ps1`, `Remove-FomodLeftovers.ps1` | Cleaned up after the 13 September body mod install. | Done. |
 | `Fix-PluginProblems.ps1` | Removed CFTO-JK-Patch.esp and RaceMenuPlugin.esp. | **Do not run it.** The JK's patch went into the collection on 15 September, so this would now take out a plugin that belongs. |
-| `Install-Emotes.ps1` | Copied the emote wheel from `tools\emotes` into a game folder. | The wheel is `tools\ts-plugins` and `tools\ts-ui` now, and `Go.ps1` installs it; the copies it read were 13 September's and are deleted. |
+| `Install-Emotes.ps1` | Copied the emote wheel from `tools\emotes` into a game folder. | The wheel is `game\plugins` and `game\ui` now, and `Go.ps1` installs it; the copies it read were 13 September's and are deleted. |
 | `Revert.ps1` | Put one day's game folder back after MCMHelper.esp shifted the load order. | Done, and it read the same deleted copies. |
 | `GourmetFishingVanilla.pas` | The xEdit script that repointed Gourmet's fishing ingredients at vanilla ones (docs\GOURMET-FISHING-PATCH.md). | Applied once; the patched plugin is what ships. |

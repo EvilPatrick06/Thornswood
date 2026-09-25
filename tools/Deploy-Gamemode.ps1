@@ -192,7 +192,7 @@ if ($Vortex) {
 # turns every one of these into a broken command the first time it does.
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $Gamemode) { $Gamemode = Join-Path $Here 'gamemode.js' }
+if (-not $Gamemode) { $Gamemode = Join-Path $Here '..\game\gamemode.js' }
 
 if (-not (Test-Path -LiteralPath $Gamemode)) { throw "not found: $Gamemode" }
 
@@ -599,7 +599,7 @@ $s | Add-Member -NotePropertyName npcEnabled  -NotePropertyValue ($Npcs -ne 'off
 
   WHICH TYPES, AND THE MEASUREMENT THAT MADE THE EXCEPTION SAFE. Every
   harvestable this server knows about was looked up by record type on
-  21 September, all 146 of them across the four tables in tools\harvests.json:
+  21 September, all 146 of them across the four tables in game\data\harvests.json:
 
       the hanging game     7 bases, every one FLOR
       plants and harvests  109 bases, 69 FLOR and 40 TREE

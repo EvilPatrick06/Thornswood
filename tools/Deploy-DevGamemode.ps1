@@ -1,7 +1,7 @@
 ﻿<#
   Deploy-DevGamemode.ps1
 
-  Sends tools\gamemode.js to the dev server on the VPS and restarts only that
+  Sends game\gamemode.js to the dev server on the VPS and restarts only that
   server. The dev server is a copy of the live install on its own ports
   (vps-dev-instance.ps1: C:\Thornswood-Server-Dev, UDP/TCP 7787, resources
   7788, task 'Thornswood Dev Server').
@@ -140,7 +140,7 @@ $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $Gamemode) { $Gamemode = Join-Path $Here 'gamemode.js' }
+if (-not $Gamemode) { $Gamemode = Join-Path $Here '..\game\gamemode.js' }
 if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $Gamemode" }
 
 function Remote($script) {
@@ -237,7 +237,7 @@ if ($LoadOrder) {
   $built = Get-Content -LiteralPath $settingsSrc -Raw | ConvertFrom-Json
   if (-not $built.loadOrder) { throw "$settingsSrc has no loadOrder" }
   $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
-  $ours = Join-Path $Here 'Thornswood-Content.esp'
+  $ours = Join-Path $Here '..\game\content\Thornswood-Content.esp'
 
   # Name and size, the same question Deploy-Server.ps1 asks of the live box and
   # for the same reason: a plugin already there by name may not be the same

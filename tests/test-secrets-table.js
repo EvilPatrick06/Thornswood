@@ -115,7 +115,7 @@ yes('the join password row names the script that still rotates it', /Rotate-Serv
 // And the code still agrees with it. If any of these stops being true, the
 // game server has grown a password and the row has to be rewritten.
 const deployGm = read('tools/Deploy-Gamemode.ps1');
-const gamemode = read('tools/gamemode.js');
+const gamemode = read('game/gamemode.js');
 const site = read('site/server.js');
 const rotate = read('tools/Rotate-ServerPassword.ps1');
 const publish = read('tools/Publish-Update.ps1');

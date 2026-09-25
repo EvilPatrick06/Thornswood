@@ -21,7 +21,7 @@ const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests a
 const fs = require('fs');
 const path = require('path');
 
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 const code = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
@@ -38,7 +38,7 @@ function body(fn, span) {
 
 // ------------------------------------------------- 1. a smith makes the blank
 let recipes = null;
-try { recipes = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, 'recipes.json'), 'utf8')); }
+try { recipes = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'data', 'recipes.json'), 'utf8')); }
 catch (e) { recipes = null; }
 yes('recipes.json is readable', !!recipes);
 

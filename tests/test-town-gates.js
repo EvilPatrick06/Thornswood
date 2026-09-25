@@ -24,8 +24,8 @@ const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests a
 const fs = require('fs');
 const path = require('path');
 const FRONT = process.env.FRONT ||
-              path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-front.js');
-const TABLE = process.env.DOORS || path.join(TOOLS_DIR, 'doors.json');
+              path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
+const TABLE = process.env.DOORS || path.join(TOOLS_DIR, '..', 'game', 'data', 'doors.json');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(FRONT, 'utf8').split(CR).join('');
 

@@ -23,8 +23,8 @@ else does.
 | `/api/play/start`, `/api/play/end`, `/api/play/logs` | POST | the launcher, as a session starts, as it ends, and with the logs after (`tools\app\Discord.cs`) |
 | `/api/play/roster` | POST | the launcher, for the names on the character cards (`tools\app\Roster.cs`) |
 | `/auth/discord` | GET | the launcher's link button, through the browser; Discord sends the browser back to `/auth/discord/callback` (`tools\app\Discord.cs`) |
-| `/api/allowed`, `/dev/api/allowed` | GET | each game server's door, every five minutes, with the bot's key; the dev server's `door.json` names the site with `/dev` on the end (`tools\gamemode.js`) |
-| `/api/roster` | POST | the game server, with the bot's key, when its book of characters changes (`tools\gamemode.js`) |
+| `/api/allowed`, `/dev/api/allowed` | GET | each game server's door, every five minutes, with the bot's key; the dev server's `door.json` names the site with `/dev` on the end (`game\gamemode.js`) |
+| `/api/roster` | POST | the game server, with the bot's key, when its book of characters changes (`game\gamemode.js`) |
 | `/api/play/owns` | POST | the voice service, before it keeps a character creation choice (`voice\voice-server.js`) |
 | `/api/payload` | GET | the installer, which then downloads the zip it names from `/file/` (`tools\setup\Bootstrap.cs`) |
 | `/api/ticket` | POST | the Discord bot, for a support ticket (`bot\bot.py`) |

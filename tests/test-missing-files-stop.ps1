@@ -51,7 +51,7 @@ Yes '  and no longer only warns' ($p -notmatch 'missing next to this script'' ''
 # ---- Go.ps1 ----------------------------------------------------------------------
 $g = Read 'Go.ps1'
 Yes 'Go.ps1 has a Gone for tracked files that are not found' ($g -match 'function Gone\(\$t\)')
-foreach ($what in 'ts-ui\\index.html is missing', 'is not in site\\public', 'the ts-ui folder is not next', 'is not in tools\\art\\menu', 'the ts-plugins folder is not next', 'Sync-Client.ps1 is not next') {
+foreach ($what in 'game\\ui\\index.html is missing', 'is not in site\\public', 'game\\ui is not beside tools', 'is not in game\\menu', 'game\\plugins is not beside tools', 'Sync-Client.ps1 is not next') {
     Yes "  $($what -replace '\\\\', '\') is a Gone" ($g -match ('Gone [^\r\n]*' + $what))
 }
 Yes '  and exits 1 when anything is Gone' ($g -match 'if \(\$script:gone\.Count\) \{[^}]*exit 1' -and $g -match '(?m)^exit 0\s*$')
@@ -69,8 +69,8 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
     $tracked = @(& git -C $repo ls-files 2>$null)
     foreach ($f in 'tools/logo.png', 'tools/launcher-header.jpg', 'tools/launcher-header.mp4', 'tools/emotes/Thornswood.ini',
                    'tools/client-build.json', 'tools/Setup-Thornswood.ps1', 'tools/Install.bat', 'tools/Setup.bat', 'tools/READ ME FIRST.txt',
-                   'tools/ts-ui/index.html', 'site/public/banner.webm', 'site/public/banner.mp4', 'site/public/banner.jpg',
-                   'tools/art/menu/logo.nif', 'tools/art/menu/logo01ae.nif', 'tools/art/menu/Mainmenuwallpaper.dds', 'tools/Sync-Client.ps1') {
+                   'game/ui/index.html', 'site/public/banner.webm', 'site/public/banner.mp4', 'site/public/banner.jpg',
+                   'game/menu/logo.nif', 'game/menu/logo01ae.nif', 'game/menu/Mainmenuwallpaper.dds', 'tools/Sync-Client.ps1') {
         Yes "$f is tracked, so its absence is a wrong path" ($tracked -contains $f)
     }
 }

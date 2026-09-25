@@ -180,7 +180,7 @@ if (Test-Path -LiteralPath $oldWheel) {
 
 # ---------------------------------------------------------------- overlays --
 Head 'Overlays'
-$uiSrc = Join-Path $Here 'ts-ui'
+$uiSrc = Join-Path $Here '..\game\ui'
 if (Test-Path -LiteralPath $uiSrc) {
   foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.js) {
     Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
@@ -198,7 +198,7 @@ if (Test-Path -LiteralPath $uiSrc) {
     $script:installed.Add((Join-Path $ui 'index.html'))
     Note 'index.html (ours, over the front''s)'
   } else {
-    Gone 'ts-ui\index.html is missing, so the menu choice cannot draw before the plugin runs'
+    Gone 'game\ui\index.html is missing, so the menu choice cannot draw before the plugin runs'
   }
   # The dev test track lives beside the overlays. It goes into the game
   # folder like them; whether it leaves the machine is Ship-Rules' call, and
@@ -229,18 +229,18 @@ if (Test-Path -LiteralPath $uiSrc) {
     }
   }
 } else {
-  Gone 'the ts-ui folder is not next to this script'
+  Gone 'game\ui is not beside tools'
 }
 
 # ------------------------------------------------------ the menu backdrop --
 # The two logo meshes and the wallpaper texture behind Skyrim's main menu,
-# from tools\art\menu (entry 83: the second mesh used to be a copy of the
+# from game\menu (entry 83: the second mesh used to be a copy of the
 # first, so the menu drew the backdrop twice, and the texture had one mip
 # level of the old art). The destination is removed before the copy: in an
 # own game folder these can be hard links into the Steam copy, and writing
 # through a link would change the Steam copy too.
 Head 'Menu backdrop'
-$menuSrc = Join-Path $Here 'art\menu'
+$menuSrc = Join-Path $Here '..\game\menu'
 $menuPairs = @(
   @('logo.nif',               'Data\meshes\interface\logo\logo.nif'),
   @('logo01ae.nif',           'Data\meshes\interface\logo\logo01ae.nif'),
@@ -249,7 +249,7 @@ $menuPairs = @(
 foreach ($pair in $menuPairs) {
   $src = Join-Path $menuSrc $pair[0]
   $dst = Join-Path $Game $pair[1]
-  if (-not (Test-Path -LiteralPath $src)) { Gone ($pair[0] + ' is not in tools\art\menu'); continue }
+  if (-not (Test-Path -LiteralPath $src)) { Gone ($pair[0] + ' is not in game\menu'); continue }
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
   if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
   Copy-Item -LiteralPath $src -Destination $dst -Force
@@ -258,7 +258,7 @@ foreach ($pair in $menuPairs) {
 
 # ----------------------------------------------------------------- plugins --
 Head 'Plugins'
-$plSrc = Join-Path $Here 'ts-plugins'
+$plSrc = Join-Path $Here '..\game\plugins'
 New-Item -ItemType Directory -Force -Path $plugins | Out-Null
 if (Test-Path -LiteralPath $plSrc) {
   foreach ($f in Get-ChildItem -LiteralPath $plSrc -Filter *.js) {
@@ -267,7 +267,7 @@ if (Test-Path -LiteralPath $plSrc) {
     Note $f.Name
   }
 } else {
-  Gone 'the ts-plugins folder is not next to this script'
+  Gone 'game\plugins is not beside tools'
 }
 
 # ------------------------------------------------------------------ client --

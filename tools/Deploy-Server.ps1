@@ -384,7 +384,7 @@ function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [stri
 }
 # ==== end deploy-server remote blocks ====
 
-# tools\gamemode.js is the source. The build output has a copy of it that cmake
+# game\gamemode.js is the source. The build output has a copy of it that cmake
 # writes during configure, and that copy is stale the moment the source is
 # edited without a reconfigure. Deploying the stale one is how a change gets
 # written, committed, shipped, and then quietly not happen.
@@ -407,7 +407,7 @@ if (-not (Test-Path -LiteralPath $Dist)) {
   )
 }
 
-$src = Join-Path $Here 'gamemode.js'
+$src = Join-Path $Here '..\game\gamemode.js'
 $built = Join-Path $Dist 'gamemode.js'
 if (Test-Path -LiteralPath $src) {
   $a = (Get-Item $src).Length
@@ -560,7 +560,7 @@ $there = @($thereSize.Keys)
 # with the deed, the key and the mold in it. Chasing that around by hand is how
 # an evening goes missing, so the question is settled here instead. The repo is
 # where this plugin is made and the repo is what goes up.
-$ours = Join-Path $Here 'Thornswood-Content.esp'
+$ours = Join-Path $Here '..\game\content\Thornswood-Content.esp'
 
 $sendPlugins = @()
 $changed = @()

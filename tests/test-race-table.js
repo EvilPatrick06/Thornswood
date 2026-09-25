@@ -24,7 +24,7 @@
 //      harness writes, so it runs on any machine: one line per record, keyed
 //      by the plugin that made it, worth what the last plugin says.
 //
-//   B. The table that ships, the RACES line in tools/gamemode.js, through the
+//   B. The table that ships, the RACES line in game/gamemode.js, through the
 //      REAL raceOf and raceGate, with the race ids the game reports.
 //
 // Read only. The builder runs on a copy in a temporary folder and writes only
@@ -36,7 +36,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const HERE = TOOLS_DIR;
-const SRC = process.env.GM || path.join(HERE, 'gamemode.js');
+const SRC = process.env.GM || path.join(HERE, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -107,6 +107,8 @@ const DATA = path.join(TMP, 'Game', 'Data');
 const TOOLS = path.join(TMP, 'tools');
 fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(TOOLS, { recursive: true });
+// The gamemode and its tables sit in game\ beside tools\ since phase 6 (issue #440).
+fs.mkdirSync(path.join(TMP, 'game', 'data'), { recursive: true });
 fs.mkdirSync(path.join(TMP, 'Profile', 'Default'), { recursive: true });
 
 /*
@@ -149,7 +151,7 @@ fs.writeFileSync(path.join(DATA, 'LowerCase.esp'), plugin(0, ['skyrim.esm'], [
 fs.writeFileSync(path.join(TMP, 'Profile', 'Default', 'plugins.txt'),
   ['*RaceMod.esp', '*LowerCase.esp', ''].join(String.fromCharCode(13, 10)));
 fs.copyFileSync(path.join(HERE, 'Build-RaceTable.js'), path.join(TOOLS, 'Build-RaceTable.js'));
-fs.writeFileSync(path.join(TOOLS, 'gamemode.js'),
+fs.writeFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'),
   ['const FOODS = {"items":{}};', 'const RACES = {"items":{}};', ''].join(String.fromCharCode(10)));
 
 function build() {
@@ -157,7 +159,7 @@ function build() {
                    { encoding: 'utf8' });
 }
 function installed() {
-  const m = /^const RACES = (.*);$/m.exec(fs.readFileSync(path.join(TOOLS, 'gamemode.js'), 'utf8'));
+  const m = /^const RACES = (.*);$/m.exec(fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8'));
   try { return m ? JSON.parse(m[1]).items : null; } catch (e) { return null; }
 }
 
@@ -166,7 +168,7 @@ if (run1.status !== 0) { console.log(run1.stdout + run1.stderr); }
 yes('A1 the builder runs on a load order of six plugins and exits 0', run1.status === 0);
 const got = installed() || {};
 const built = (function () {
-  try { return JSON.parse(fs.readFileSync(path.join(TOOLS, 'races.json'), 'utf8')).items; }
+  try { return JSON.parse(fs.readFileSync(path.join(TOOLS, '..', 'game', 'data', 'races.json'), 'utf8')).items; }
   catch (e) { return {}; }
 })();
 function linesFor(local) {
@@ -217,9 +219,9 @@ yes('A8 and races.json has the same seven',
   which it did before 24 September whenever nothing had changed.
 */
 {
-  const before = fs.readFileSync(path.join(TOOLS, 'gamemode.js'), 'utf8');
+  const before = fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8');
   const run2 = build();
-  const after = fs.readFileSync(path.join(TOOLS, 'gamemode.js'), 'utf8');
+  const after = fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8');
   yes('A9 run again on the same plugins, it exits 0 and leaves the same line',
       run2.status === 0 && before === after);
 }
@@ -235,10 +237,10 @@ const RACES = (function () {
 yes('B0 the RACES line is in the gamemode and parses', !!(RACES && RACES.items));
 const items = (RACES && RACES.items) || {};
 const json = (function () {
-  try { return JSON.parse(fs.readFileSync(path.join(HERE, 'races.json'), 'utf8')).items; }
+  try { return JSON.parse(fs.readFileSync(path.join(HERE, '..', 'game', 'data', 'races.json'), 'utf8')).items; }
   catch (e) { return null; }
 })();
-yes('B0 tools/races.json parses', !!json);
+yes('B0 game/data/races.json parses', !!json);
 
 /*
   The line and the json come out of the same run. Build-RecipeTable.ps1 reads

@@ -7,7 +7,7 @@ Skyrim Platform runs every `.js` in the game folder's `Data\Platform\Plugins`
 in the game's own node, and reloads one the moment its file changes. Nothing
 here is built or bundled: the file in the repo is the file that runs.
 `thornswood-front.js` is the one plugin that owns the game's browser: it loads
-the page from `tools\ts-ui` once, mounts the overlays into it and does most of
+the page from `game\ui` once, mounts the overlays into it and does most of
 the client's own work. `thornswood-emotes.js` is the game side of the emote
 wheel, `thornswood-voice.js` the game side of proximity voice (who you are,
 where to call, push to talk), and `thornswood-mark.js` writes down the spot
@@ -25,7 +25,7 @@ From the repo folder, with the game closed:
 
 copies every `.js` here into `C:\Thornswood\Game\Data\Platform\Plugins`
 (`-Game` names another game folder, such as the dev build's), puts the page
-and the overlays from `tools\ts-ui` beside them, and removes anything in that
+and the overlays from `game\ui` beside them, and removes anything in that
 folder that is not ours. It also puts the menu art and the recorded client in
 place. `-SkipServer` matters: without it Go.ps1 also copies
 `voice\voice-server.js` over the live voice service on the VPS and

@@ -1,6 +1,6 @@
 # How gamemode.js is put together
 
-This page is for somebody opening `tools\gamemode.js` for the first time. It
+This page is for somebody opening `game\gamemode.js` for the first time. It
 is the whole of Thornswood's server side: about 24,000 lines in one file,
 loaded by skymp5-server. It says where each system lives, which generated
 table each script writes into it, how it reaches the server, how it talks to
@@ -226,7 +226,7 @@ because each reads the one before.
 
 `DATA`, `STATIONS`, `ITEMS` (lines 23-25) and `CHARGEN` (line 3881) have no
 generator in this repository. The comments name `respawn-holds.json`
-(`gamemode.js:339`) and `tools\stations.json` (`gamemode.js:5742`); the old
+(`gamemode.js:339`) and `game\data\stations.json` (`gamemode.js:5742`); the old
 `tools\thornswood-src` pipeline that wrote them is gone. `fires.json` is not
 in the gamemode: it goes into `thornswood-front.js`.
 

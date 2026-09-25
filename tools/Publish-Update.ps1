@@ -462,7 +462,7 @@ function Test-Machine([string]$rel) { return (Test-ShipMachine $rel) }
 # Ours is the one that loads thornswood-bridge.js, and it lives in the repo,
 # so it is put back here, in the game and in the kept copy, before the scan.
 $menuRel  = 'Data\Platform\UI\index.html'
-$menuSrc  = Join-Path $RepoDir 'tools\ts-ui\index.html'
+$menuSrc  = Join-Path $RepoDir 'game\ui\index.html'
 $menuLive = Join-Path $GameDir $menuRel
 if ((Test-Path -LiteralPath $menuLive) -and (Test-Path -LiteralPath $menuSrc)) {
     if (-not ([IO.File]::ReadAllText($menuLive) -like '*thornswood-bridge.js*')) {

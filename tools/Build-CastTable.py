@@ -3,7 +3,7 @@ Build-CastTable.py
 
 Walks every placed actor in the load order and sorts the people into four:
 traders, transport, guards and everyone else, hold by hold. It writes that down
-as tools\\cast.json, which is the surviving cast written as a list before
+as game\\data\\cast.json, which is the surviving cast written as a list before
 anything is deleted.
 
 WHY
@@ -92,7 +92,7 @@ same file, so masters are matched to the load order without case: without
 that, CFTO's override of a Hearthfire carriage driver reads as a second
 driver.
 
-WHAT IT WRITES. tools\\cast.json, and nothing else.
+WHAT IT WRITES. game\\data\\cast.json, and nothing else.
 
 Usage:
     python tools/Build-CastTable.py --check
@@ -604,7 +604,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default=r'C:\Thornswood\Game\Data')
     ap.add_argument('--plugins', default=r'C:\Thornswood\Profile\Default\plugins.txt')
-    ap.add_argument('--out', default=os.path.join(HERE, 'cast.json'))
+    ap.add_argument('--out', default=os.path.join(HERE, '..', 'game', 'data', 'cast.json'))
     ap.add_argument('--check', action='store_true', help='say what it found, write nothing')
     args = ap.parse_args()
 

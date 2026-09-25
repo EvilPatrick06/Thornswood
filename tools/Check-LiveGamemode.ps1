@@ -3,7 +3,7 @@
   Says whether the gamemode running on the VPS is the one in this repo.
 
 .DESCRIPTION
-  Read only. It hashes tools\gamemode.js here, hashes C:\Thornswood-Server\gamemode.js
+  Read only. It hashes game\gamemode.js here, hashes C:\Thornswood-Server\gamemode.js
   up there, and compares them. Nothing is copied and nothing is restarted.
 
   It exists because this question came up three times on 20 September and was
@@ -43,13 +43,13 @@ function Head($m) {
 }
 
 $Here = $PSScriptRoot
-$local = Join-Path $Here 'gamemode.js'
+$local = Join-Path $Here '..\game\gamemode.js'
 if (-not (Test-Path -LiteralPath $local)) { throw "not found: $local" }
 
 Head 'Here'
 $localHash = (Get-FileHash -LiteralPath $local -Algorithm SHA256).Hash.ToLowerInvariant()
 $localSize = (Get-Item -LiteralPath $local).Length
-Say ("  tools\gamemode.js  {0:N0} bytes" -f $localSize)
+Say ("  game\gamemode.js  {0:N0} bytes" -f $localSize)
 Say "  $localHash"
 
 Head 'There'
@@ -97,7 +97,7 @@ if ($remoteHash -eq $localHash) {
 }
 
 Say '  DIFFERENT. The server is running an older gamemode than this repo has.' 'Yellow'
-Say '  Anything committed to tools\gamemode.js since then is not live, however' 'Yellow'
+Say '  Anything committed to game\gamemode.js since then is not live, however' 'Yellow'
 Say '  many launcher releases have gone out: Ship.ps1 does not carry it.' 'Yellow'
 Say ''
 Say '  Put it right with, in this order:' 'Yellow'

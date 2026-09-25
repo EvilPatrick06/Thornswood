@@ -25,10 +25,10 @@
 const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const FRONT = fs.readFileSync(path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-front.js'), 'utf8');
+const FRONT = fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js'), 'utf8');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -208,7 +208,7 @@ if (block) {
   // ------------------------------------------------------ the fire table
   {
     let fires = null;
-    try { fires = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, 'fires.json'), 'utf8')); }
+    try { fires = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'data', 'fires.json'), 'utf8')); }
     catch (e) { fires = null; }
     yes('the fire table has been built', !!fires && Array.isArray(fires.fires));
     if (fires) {
@@ -614,7 +614,7 @@ if (block) {
   // --------------------------------------------- wind, night and altitude
   {
     let sky = null;
-    try { sky = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, 'weather.json'), 'utf8')); }
+    try { sky = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'data', 'weather.json'), 'utf8')); }
     catch (e) { sky = null; }
     yes('the weather table has been built', !!sky && !!sky.items);
     yes('and is installed in the gamemode', !!skyLine);
@@ -705,7 +705,7 @@ if (block) {
   // ---------------------------------------------------------- water types
   {
     let wet = null;
-    try { wet = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, 'waters.json'), 'utf8')); }
+    try { wet = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'data', 'waters.json'), 'utf8')); }
     catch (e) { wet = null; }
     yes('the water table has been built', !!wet && !!wet.waters);
     yes('and is installed in the gamemode', !!wetLine);

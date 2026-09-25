@@ -29,7 +29,7 @@
 const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -200,11 +200,11 @@ if (block) {
 
   /*
     The list is every FLOR in the load order whose produce is coin, as
-    tools\harvests.json has them. A rebuilt table with a purse this list lacks
+    game\data\harvests.json has them. A rebuilt table with a purse this list lacks
     is a purse that pays out again, so that fails here.
   */
   {
-    const hv = path.join(path.dirname(SRC), 'harvests.json');
+    const hv = path.join(path.dirname(SRC), 'data', 'harvests.json');
     if (fs.existsSync(hv)) {
       const h = JSON.parse(fs.readFileSync(hv, 'utf8'));
       const un = h.unranked || {};
@@ -217,7 +217,7 @@ if (block) {
           coin.length > 0 && coin.every(k => listed.indexOf(k) >= 0));
       yes('and every purse on the list is in harvests.json', listed.length > 0 && listed.every(k => coin.indexOf(k) >= 0));
     } else {
-      yes('tools\\harvests.json is there to check the purse list against', false);
+      yes('game\\data\\harvests.json is there to check the purse list against', false);
     }
   }
 
