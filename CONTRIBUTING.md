@@ -160,18 +160,20 @@ the team before code; nobody settles it alone, and a Claude never does.
   pull request. This replaces the 18 Sep decision that his own work went
   straight to main, which held while `enforce_admins` was off and stopped
   holding the moment it went on.
-- What branch protection on main actually enforces, read off GitHub on
-  23 Sep and not off this file: `enforce_admins` is **on**, the one required
-  check is `Launcher builds`, required approving reviews is **0**, and the
-  code owner review is **off**. So a pull request from either of them can be
-  merged by its own author once the build goes green, and neither of them can
-  push to main at all. Force pushes are refused.
-  The three things that changed since 22 Sep: the review requirement was one
+- What branch protection on main actually enforces, since 25 Sep:
+  `enforce_admins` is **off**, there is no required check, required
+  approving reviews is **0**, and the code owner review is **off**. Patrick
+  removed the required check (`Launcher builds`) that day, when the build
+  check on GitHub was turned off: "remove the label since we arent using
+  it". So a pull request can be merged by its own author as soon as it is
+  opened, and nothing on GitHub checks it first; run the harnesses you
+  touched before you merge. Force pushes are refused.
+  What changed on 23 Sep, since 22 Sep: the review requirement was one
   approving review, which Patrick could not give himself and had to override
   with `--admin` on every one of his own pull requests, and it is now zero.
   The code owner review on `.github/CODEOWNERS` is off. And `enforce_admins`,
   which had to stay off while `Ship.ps1` pushed its own version commit
-  straight to main, is on, because Ship writes nothing to the repository now:
+  straight to main, went on, because Ship writes nothing to the repository now:
   `Bump-Version.ps1` moves the number first, as an ordinary commit on a
   branch, and Ship reads it.
   Check which it is rather than assuming, because this paragraph was wrong
@@ -210,8 +212,8 @@ the team before code; nobody settles it alone, and a Claude never does.
   the harnesses you touched yourself before asking for a read.
   It is set to run on the VPS, on a runner `.\scripts\deploy\Install-Runner.ps1`
   puts there (issue #437): GitHub's own runners were blocked on billing from
-  25 Sep. `enforce_admins` was turned off that day so Patrick could merge;
-  turning the check and `enforce_admins` back on is his call.
+  25 Sep. `enforce_admins` was turned off that day so Patrick could merge,
+  and the required check removed; turning any of them back on is his call.
   `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
