@@ -264,7 +264,7 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
 
     # ---- D: -DryRun -Package on main ------------------------------------------------
     $was = @{ feed = (Hash $feed); dev = (Hash $devFeed); base = (Hash $base) }
-    $d = Invoke-Ship @('The map marker points at the right door', '-DryRun', '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    $d = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-DryRun', '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("D a main -DryRun -Package runs to the end (exit {0})" -f $d.Code) ($d.Code -eq 0 -and $d.Out -match 'Dry run finished')
     $pub = Called $d 'Publish-Update'
     Yes 'D the publisher ran, told not to upload and not to push' ($pub.Count -eq 1 -and $pub[0] -match ' -NoUpload\b' -and $pub[0] -match ' -NoPush\b')
@@ -287,7 +287,7 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
 
     # ---- V: -DryRun -Package on dev -------------------------------------------------
     $was = @{ dev = (Hash $devFeed); devBase = (Hash $devBase); feed = (Hash $feed) }
-    $v = Invoke-Ship @('The map marker points at the right door', '-Channel', 'dev', '-DryRun', '-Package', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+    $v = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Package', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
     Yes ("V a dev -DryRun -Package runs to the end (exit {0})" -f $v.Code) ($v.Code -eq 0 -and $v.Out -match 'Dry run finished')
     $pub = Called $v 'Publish-Update'
     Yes 'V the publisher ran on dev, told not to upload and not to push' ($pub.Count -eq 1 -and $pub[0] -match ' -Channel dev\b' -and $pub[0] -match ' -NoUpload\b' -and $pub[0] -match ' -NoPush\b')
@@ -302,7 +302,7 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
 
     # ---- R: a real Ship -Package on main ----------------------------------------------
-    $r = Invoke-Ship @('The map marker points at the right door', '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    $r = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("R a real main Ship -Package runs to the end (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'Everyone in the world has')
     $pub = Called $r 'Publish-Update'
     Yes 'R the publisher ran, and was not told to hold anything back' ($pub.Count -eq 1 -and $pub[0] -notmatch ' -NoUpload\b' -and $pub[0] -notmatch ' -NoPush\b')
@@ -319,7 +319,7 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
 
     # ---- E: a dev dry run with no dev worktree and no dev branch to see ---------------
     Remove-Item -LiteralPath $relDev -Recurse -Force
-    $e = Invoke-Ship @('The map marker points at the right door', '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+    $e = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
     $gits = @($e.Calls | Where-Object { $_ -match '^git( |$)' })
     Yes ('E the stand-in git was asked, so the next lines measure something (' + ($gits -join '; ') + ')') ($gits.Count -ge 1)
     Yes 'E nothing is pushed to the releases repository' (@($gits | Where-Object { $_ -match '\bpush\b' }).Count -eq 0)
