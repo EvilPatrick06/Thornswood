@@ -5,7 +5,7 @@
   rule that stops their number growing.
 
   WHY THIS EXISTS. Measured 24 Sep: 386 of the 618 catch clauses in
-  tools\app\*.cs had nothing between their braces. A failure in any of them
+  launcher\app\*.cs had nothing between their braces. A failure in any of them
   leaves no line in launcher.log, so a tester says the Save button did nothing
   and there is nothing to read. The entry counted 367, then 373, then 386
   while it waited, so the count is held by Check-Swallow.ps1 against
@@ -13,7 +13,7 @@
 
   What this drives, all of it the real code:
 
-    1. Check-Swallow.ps1 against the real tools\app and the checked in
+    1. Check-Swallow.ps1 against the real launcher\app and the checked in
        baseline, which has to pass.
     2. Check-Swallow.ps1 against a copy in a temp folder, with one empty catch
        planted in each shape the rule counts. Each one has to go red and name
@@ -52,12 +52,12 @@ function Yes([string]$what, [bool]$cond) {
 
 $Checker  = Join-Path $ToolsPath 'Check-Swallow.ps1'
 $Baseline = Join-Path $ToolsPath 'swallow-baseline.txt'
-$AppDir   = Join-Path $ToolsPath 'app'
+$AppDir   = Join-Path $ToolsPath '..\launcher\app'
 $SwallowCs = Join-Path $AppDir 'Swallow.cs'
 
 Yes 'Check-Swallow.ps1 is there' (Test-Path -LiteralPath $Checker)
 Yes 'swallow-baseline.txt is there' (Test-Path -LiteralPath $Baseline)
-Yes 'tools\app\Swallow.cs is there' (Test-Path -LiteralPath $SwallowCs)
+Yes 'launcher\app\Swallow.cs is there' (Test-Path -LiteralPath $SwallowCs)
 if (-not ((Test-Path -LiteralPath $Checker) -and (Test-Path -LiteralPath $Baseline) -and (Test-Path -LiteralPath $SwallowCs))) {
     Write-Host ''
     Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)

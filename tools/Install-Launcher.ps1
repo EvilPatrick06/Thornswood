@@ -51,7 +51,7 @@ $built = Join-Path $From 'Thornswood.exe'
 # Checked before anything is closed, so a build that produced nothing never
 # costs anybody their game or their launcher.
 if (-not (Test-Path -LiteralPath $built)) { Die "There is no Thornswood.exe in $From. Run Build-Launcher.ps1 first." }
-$icon = @((Join-Path $Here 'app.ico'), (Join-Path $Here 'app\app.ico')) | Where-Object { Test-Path $_ } | Select-Object -First 1
+$icon = @((Join-Path $Here '..\launcher\app.ico'), (Join-Path $Here '..\launcher\app\app.ico')) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $icon) { Die 'app.ico was not found next to this script or in app' }
 
 $null = New-Item -ItemType Directory -Force -Path $outDir

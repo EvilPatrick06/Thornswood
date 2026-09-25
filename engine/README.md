@@ -132,7 +132,7 @@ Then, in order:
 
 The launcher carries `tools\client-build.json` inside it
 (`Build-Launcher.ps1:306-310`) and checks the same six by hash
-(`tools\app\ARCHITECTURE.md:301-304`).
+(`launcher\app\ARCHITECTURE.md:301-304`).
 
 ## Rebuilding the same commit
 

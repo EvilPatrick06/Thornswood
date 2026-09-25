@@ -63,7 +63,7 @@ Write-Host ''
 Write-Host '  THORNSWOOD  -  move to a different box' -ForegroundColor White
 
 # ------------------------------------------------------- what it is now ---
-$ConfigCs = Join-Path $Here 'app\Config.cs'
+$ConfigCs = Join-Path $Here '..\launcher\app\Config.cs'
 if (-not (Test-Path -LiteralPath $ConfigCs)) { Die "not found: $ConfigCs" }
 
 $cs = ReadText $ConfigCs

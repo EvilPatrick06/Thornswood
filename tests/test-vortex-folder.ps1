@@ -37,7 +37,7 @@
     6. The nothing-deployed sentence says how to find Vortex's folder.
     7. No Steam copy at all: refused in one sentence, nothing built.
 
-  HOW. It compiles the shipped tools\app\Steam.cs, OwnGame.cs and Verify.cs,
+  HOW. It compiles the shipped launcher\app\Steam.cs, OwnGame.cs and Verify.cs,
   with Paths.cs, Config.cs, Secrets.cs and LoadOrder.cs, using the same .NET
   Framework csc Build-Launcher.ps1 uses (C# 5), with small stand-ins for the
   classes they call that touch the machine (Checks, Keep, Junction, Downgrade,
@@ -58,7 +58,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here 'app' }
+if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
 
 $script:pass = 0
 $script:fail = 0
@@ -96,7 +96,7 @@ $real = @('Steam.cs', 'OwnGame.cs', 'Verify.cs', 'Paths.cs', 'Config.cs', 'Secre
 $swallow = Join-Path $AppPath 'Swallow.cs'
 if (Test-Path -LiteralPath $swallow) { $real += $swallow }
 foreach ($f in $real) {
-    Yes "tools\app\$([IO.Path]::GetFileName($f)) is there" (Test-Path -LiteralPath $f)
+    Yes "launcher\app\$([IO.Path]::GetFileName($f)) is there" (Test-Path -LiteralPath $f)
     if (-not (Test-Path -LiteralPath $f)) { Done }
 }
 

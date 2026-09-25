@@ -5,7 +5,7 @@
   server's order. Dot-sourced by Publish-Update.ps1, so the reference plugin
   list that goes into a pack ships in the order the server actually runs.
 
-  The same rule as tools\app\LoadOrder.cs in the launcher, function for
+  The same rule as launcher\app\LoadOrder.cs in the launcher, function for
   function, and the two are held to identical output by a test. Change one,
   change the other.
 

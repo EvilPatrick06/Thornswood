@@ -26,10 +26,10 @@ const CR = String.fromCharCode(13);
 function read(rel) {
   return fs.readFileSync(path.join(TOOLS_DIR, rel), 'utf8').split(CR).join('');
 }
-const xaml = read('ui.xaml');
-const help = read(path.join('app', 'Help.cs'));
+const xaml = read('../launcher/ui.xaml');
+const help = read(path.join('..', 'launcher', 'app', 'Help.cs'));
 const site = read(path.join('..', 'site', 'data', 'help.md'));
-const shell = read(path.join('app', 'Shell.cs'));
+const shell = read(path.join('..', 'launcher', 'app', 'Shell.cs'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

@@ -18,7 +18,7 @@
   runtime" and exited 0. It never parsed the file at all, so a window WPF
   refuses passed it clean.
 
-  This runs the shipped script against copies of ui.xaml and tools\app with one
+  This runs the shipped script against copies of ui.xaml and launcher\app with one
   thing wrong in each, and reads the exit code a build step would read.
 
   Read only apart from files under its own temp folder.
@@ -32,8 +32,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
 if (-not $CheckPath) { $CheckPath = Join-Path $Here 'Check-Controls.ps1' }
-$RealXaml = Join-Path $Here 'ui.xaml'
-$RealApp  = Join-Path $Here 'app'
+$RealXaml = Join-Path $Here '..\launcher\ui.xaml'
+$RealApp  = Join-Path $Here '..\launcher\app'
 
 $script:pass = 0
 $script:fail = 0
@@ -68,7 +68,7 @@ try {
 
     # ---- as things stand ------------------------------------------------------
     $r = Run-Check $RealXaml $RealApp
-    Yes 'the real ui.xaml and tools\app exit 0' ($r.Code -eq 0)
+    Yes 'the real ui.xaml and launcher\app exit 0' ($r.Code -eq 0)
     Yes 'nothing is NEW' ($r.Out -notmatch '\bNEW\b')
     $known = @([regex]::Matches($r.Out, '(?m)^\s*known\s+\S+')).Count
     Yes ("the baseline names are reported as known ({0})" -f $known) ($known -ge 1)
@@ -103,7 +103,7 @@ try {
 
     # ---- a baseline line that covers nothing any more -------------------------
     #
-    # A copy of tools\app with the BoxAddress lookup taken out, the way the
+    # A copy of launcher\app with the BoxAddress lookup taken out, the way the
     # guarded C# behind the baseline would be deleted. The line is now stale,
     # which is information and not a failure.
     $app = Join-Path $Tmp 'app'

@@ -9,7 +9,7 @@
 // collection in Vortex is required, told people the password was in Discord
 // when the build carries it, described an F2 party menu that no plugin binds,
 // sent problems to one named person, and broke the repo's own rule against em
-// dashes five times. tools\READ ME FIRST.txt was worse, because it is not a
+// dashes five times. installer\READ ME FIRST.txt was worse, because it is not a
 // leftover: Package-Thornswood.ps1 copies it into every installer, and it
 // opened with "SKYRIM TOGETHER", named SkyrimTogether-Setup.exe and told a new
 // customer to ask in the Discord for a password. config.example.json still
@@ -96,7 +96,7 @@ if (readme !== null) {
 // Shipped, so it is rewritten and never deleted. Package-Thornswood.ps1 only
 // prints a yellow line when it is missing and carries on, which is an
 // installer with no read me that nobody notices.
-const RMF = 'tools/READ ME FIRST.txt';
+const RMF = 'installer/READ ME FIRST.txt';
 const pkg = read('tools/Package-Thornswood.ps1');
 yes('Package-Thornswood.ps1 still copies READ ME FIRST.txt into the installer',
     pkg !== null && /foreach\s*\(\$f in [^)]*'READ ME FIRST\.txt'/.test(pkg));
@@ -136,7 +136,7 @@ if (cfgText === null) {
   let cfg = null;
   try { cfg = JSON.parse(cfgText); } catch (e) { cfg = null; }
   yes('config.example.json is valid JSON', cfg !== null);
-  const cs = read('tools/app/Config.cs') || '';
+  const cs = read('launcher/app/Config.cs') || '';
   const m1 = /public string ServerAddress = "([^"]+)"/.exec(cs);
   const m2 = /public string ServerPort = "([^"]+)"/.exec(cs);
   const m3 = /if \(string\.IsNullOrEmpty\(UpdateRepo\)\) UpdateRepo = "([^"]+)"/.exec(cs);

@@ -338,7 +338,7 @@ yes('the word error on its own does not colour a session',
   reading the launcher's list out of Discord.cs rather than keeping a copy of
   it here. The launcher's own half is test-log-upload.ps1.
 */
-const CS = fs.readFileSync(path.join(TOOLS_DIR, 'app', 'Discord.cs'), 'utf8');
+const CS = fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Discord.cs'), 'utf8');
 const sends = (function () {
   const at = CS.indexOf('public static void SessionLogs()');
   const end = at < 0 ? -1 : CS.indexOf('};', at);

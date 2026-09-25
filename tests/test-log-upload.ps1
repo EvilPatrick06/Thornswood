@@ -25,7 +25,7 @@
      only from the session being sent, because that folder keeps every crash
      there has ever been.
 
-  This lifts the real methods out of tools\app\Discord.cs by text and compiles
+  This lifts the real methods out of launcher\app\Discord.cs by text and compiles
   them, so what is under test is the shipped code rather than a copy of it,
   and a rename fails loudly. The JSON is read by node's JSON.parse, which is
   what the site reads it with.
@@ -40,7 +40,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$src = [IO.File]::ReadAllText((Join-Path $Here 'app\Discord.cs'))
+$src = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\Discord.cs'))
 
 $script:pass = 0; $script:fail = 0
 function Yes($what, $cond) {

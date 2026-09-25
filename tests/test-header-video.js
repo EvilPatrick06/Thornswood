@@ -22,13 +22,13 @@
       the window is up tells the video straight after, and the one at startup
       runs before the window is shown.
 
-  Read only. It reads tools\app\*.cs and nothing else.
+  Read only. It reads launcher\app\*.cs and nothing else.
 */
 const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
 const fs = require('fs');
 const path = require('path');
 
-const APP = path.join(TOOLS_DIR, 'app');
+const APP = path.join(TOOLS_DIR, '..', 'launcher', 'app');
 const CR = String.fromCharCode(13);
 function read(f) { return fs.readFileSync(path.join(APP, f), 'utf8').split(CR).join(''); }
 const SHELL = read('Shell.cs');

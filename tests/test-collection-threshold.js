@@ -30,7 +30,7 @@ const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests a
 const fs = require('fs');
 const path = require('path');
 
-const APP = path.join(TOOLS_DIR, 'app');
+const APP = path.join(TOOLS_DIR, '..', 'launcher', 'app');
 const CHECKS = fs.readFileSync(path.join(APP, 'Checks.cs'), 'utf8');
 const SHELL = fs.readFileSync(path.join(APP, 'Shell.cs'), 'utf8');
 

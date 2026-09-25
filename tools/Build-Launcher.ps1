@@ -43,7 +43,7 @@ $ErrorActionPreference = 'Stop'
 # is worked out here instead.
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $Src)  { $Src  = Join-Path $Here 'app' }
+if (-not $Src)  { $Src  = Join-Path $Here '..\launcher\app' }
 if (-not $OutDir) { $OutDir = Join-Path $Root 'Launcher' }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -135,7 +135,7 @@ if ($missing.Count) { Die ("Could not find these assemblies: " + ($missing -join
 # replaces exactly one file. Sidecar DLLs would need the publisher, the
 # version document and the updater changed together, and would leave every
 # launcher broken in between.
-$wv2Dir = Join-Path $Here 'lib\webview2'
+$wv2Dir = Join-Path $Here '..\launcher\lib\webview2'
 $wv2Managed = @('Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.Wpf.dll')
 $wv2Loader  = 'WebView2Loader.dll'
 $wv2Missing = @()
@@ -143,7 +143,7 @@ foreach ($n in ($wv2Managed + $wv2Loader)) {
     if (-not (Test-Path -LiteralPath (Join-Path $wv2Dir $n))) { $wv2Missing += $n }
 }
 if ($wv2Missing.Count) {
-    Die ("WebView2 files are missing from tools\lib\webview2: " + ($wv2Missing -join ', '))
+    Die ("WebView2 files are missing from launcher\lib\webview2: " + ($wv2Missing -join ', '))
 }
 foreach ($n in $wv2Managed) { $refs += (Join-Path $wv2Dir $n) }
 
@@ -153,8 +153,8 @@ foreach ($r in $refs) { Say "    $r" 'DarkGray' }
 # ------------------------------------------------------------ sources
 $cs = @(Get-ChildItem (Join-Path $Src '*.cs') -File)
 if (-not $cs.Count) { Die "No .cs files under $Src" }
-$xaml = @((Join-Path $Here 'ui.xaml'), (Join-Path $Src 'ui.xaml')) | Where-Object { Test-Path $_ } | Select-Object -First 1
-$icon = @((Join-Path $Here 'app.ico'), (Join-Path $Src 'app.ico')) | Where-Object { Test-Path $_ } | Select-Object -First 1
+$xaml = @((Join-Path $Here '..\launcher\ui.xaml'), (Join-Path $Src 'ui.xaml')) | Where-Object { Test-Path $_ } | Select-Object -First 1
+$icon = @((Join-Path $Here '..\launcher\app.ico'), (Join-Path $Src 'app.ico')) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $xaml) { Die "ui.xaml was not found next to this script or in $Src" }
 if (-not $icon) { Die "app.ico was not found next to this script or in $Src" }
 
@@ -162,8 +162,8 @@ if (-not $icon) { Die "app.ico was not found next to this script or in $Src" }
 # that replaces the launcher brings its own artwork and there is no second file
 # to go missing. Both are optional: without them the launcher falls back to the
 # game's own icon and simply does not draw an emblem.
-$logo    = Join-Path $Here 'logo.png'
-$logoSml = Join-Path $Here 'logo-192.png'
+$logo    = Join-Path $Here '..\launcher\logo.png'
+$logoSml = Join-Path $Here '..\launcher\logo-192.png'
 # Optional to the launcher, not to the build: every one of these is tracked in
 # the repository, so a missing one is a path that went wrong in a move, and a
 # warning here would ship a launcher without it (issue #440, phase 0).
@@ -171,11 +171,11 @@ if (-not (Test-Path $logo))    { Die "logo.png is not at $logo. It is in the rep
 if (-not (Test-Path $logoSml)) { $logoSml = $logo }
 # The landscape behind the title on the Play page. Optional the same way:
 # without it the band keeps its pattern.
-$headerArt = Join-Path $Here 'launcher-header.jpg'
+$headerArt = Join-Path $Here '..\launcher\launcher-header.jpg'
 if (-not (Test-Path $headerArt)) { Die "launcher-header.jpg is not at $headerArt. It is in the repository, so the path is wrong." }
 # The same strip moving, over the picture. Optional too: without it the band
 # keeps the still picture.
-$headerVideo = Join-Path $Here 'launcher-header.mp4'
+$headerVideo = Join-Path $Here '..\launcher\launcher-header.mp4'
 if (-not (Test-Path $headerVideo)) { Die "launcher-header.mp4 is not at $headerVideo. It is in the repository, so the path is wrong." }
 Say "  $($cs.Count) source files" 'Green'
 
@@ -279,15 +279,15 @@ foreach ($n in ($wv2Managed + $wv2Loader)) {
 }
 
 # The voice page rides along too, for the same reason: one published asset.
-$voicePage = Join-Path $Here 'launcher\voice-host.html'
-if (-not (Test-Path -LiteralPath $voicePage)) { Die "Missing tools\launcher\voice-host.html" }
+$voicePage = Join-Path $Here '..\launcher\voice-host.html'
+if (-not (Test-Path -LiteralPath $voicePage)) { Die "Missing launcher\voice-host.html" }
 $cscArgs += "/resource:$((Resolve-Path $voicePage).Path),voice-host.html"
 
 # The template Thornswood.ini, for a machine that has none. The launcher
 # writes it when it is missing
 # (ThornIni.Ensure), so the ini never has to travel in a pack, which is how
 # one machine's binds and field of view landed on everybody on 16 Sep.
-$iniTemplate = Join-Path $Here 'emotes\Thornswood.ini'
+$iniTemplate = Join-Path $Here '..\launcher\Thornswood.ini'
 if (Test-Path -LiteralPath $iniTemplate) {
     $cscArgs += "/resource:$((Resolve-Path $iniTemplate).Path),Thornswood.ini"
 } else {
@@ -335,7 +335,7 @@ if (Test-Path -LiteralPath $oldExe) {
 }
 
 # ------------------------------------------------------------ setup stub
-$stubSrc = Join-Path $Here 'setup\Bootstrap.cs'
+$stubSrc = Join-Path $Here '..\installer\setup\Bootstrap.cs'
 if (Test-Path $stubSrc) {
     Head 'Setup stub'
     # Built to a scratch name first. Deleting the old one up front meant a

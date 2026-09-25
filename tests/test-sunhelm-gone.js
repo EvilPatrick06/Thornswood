@@ -123,7 +123,7 @@ const playerWords = (pA >= 0 && pB > pA) ? GM.slice(pA, pB) : '';
 yes('PLAYER_WORDS is in the gamemode', playerWords.length > 0);
 
 // ---------------------------------------------------------- the Help page
-const helpStrings = csStrings(read(['app', 'Help.cs']));
+const helpStrings = csStrings(read(['..', 'launcher', 'app', 'Help.cs']));
 yes('the Help page has text to read, ' + helpStrings.length + ' strings', helpStrings.length > 50);
 const helpGone = [];
 helpStrings.forEach(function (s) {
@@ -226,7 +226,7 @@ if (/metal the worst|metal is the worst/i.test(body)) {
 }
 
 // ------------------------------------------------------ the Controls page
-const pagesStrings = csStrings(read(['app', 'Pages.cs']));
+const pagesStrings = csStrings(read(['..', 'launcher', 'app', 'Pages.cs']));
 yes('the Controls page has text to read, ' + pagesStrings.length + ' strings', pagesStrings.length > 20);
 const pagesGone = [];
 pagesStrings.forEach(function (s) {

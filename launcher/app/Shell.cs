@@ -25,7 +25,7 @@ namespace Thornswood
     /// handler. So this is one static class, not a Window subclass, split
     /// across Shell.cs and every other file that declares partial class Shell.
     ///
-    /// tools\app\ARCHITECTURE.md walks through it: the startup order, what
+    /// launcher\app\ARCHITECTURE.md walks through it: the startup order, what
     /// each of the other classes owns on disk, and every step between the
     /// Play button and the game starting, with the file and line of each.
     /// Whoever changes one of those steps changes that page in the same pull

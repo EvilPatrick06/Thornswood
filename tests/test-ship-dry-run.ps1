@@ -195,12 +195,12 @@ function Read-Version([string]$path) {
 }
 
 try {
-    foreach ($d in @($tools, (Join-Path $tools 'app'), (Join-Path $rel '.git'), $relDev, $bin,
+    foreach ($d in @($tools, (Join-Path $tools '..\launcher\app'), (Join-Path $rel '.git'), $relDev, $bin,
                      (Join-Path $root 'Launcher'), (Join-Path $rootDev 'Launcher'), $dist, (Join-Path $appdata 'Thornswood'))) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
     Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $tools 'Ship.ps1') -Force
-    $updaterCs = Join-Path $tools 'app\Updater.cs'
+    $updaterCs = Join-Path $tools '..\launcher\app\Updater.cs'
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.93`";`r`n")
     [IO.File]::WriteAllText((Join-Path $rel 'version.json'), '{"launcherVersion":"1.1.93","packs":[]}')
     [IO.File]::WriteAllText((Join-Path $relDev 'version.json'), '{"launcherVersion":"1.1.93.2","packs":[],"serverPort":7001}')

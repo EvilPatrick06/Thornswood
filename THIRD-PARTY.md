@@ -12,7 +12,7 @@ of its own, and choosing one is Patrick's decision.
 
 `tests\test-third-party.js` checks this file against the build. It covers every
 resource Build-Launcher.ps1 compiles into the launcher, every file under
-`tools\lib`, every font and minified script the site serves from
+`launcher\lib`, every font and minified script the site serves from
 `site\public`, the six client files and the commits in
 `tools\client-build.json` and `tools\server-build.json`, and the source
 paragraph on the public credits page. Where Vortex's copy of the Thornswood
@@ -51,12 +51,12 @@ or the build check goes red.
 Everything else Build-Launcher.ps1 compiles into the launcher is Thornswood's
 own: `ui.xaml`, `logo.png`, `launcher-header.jpg`, `launcher-header.mp4`,
 `app.ico`, `voice-host.html`, `Thornswood.ini` and `client-build.json`. The
-setup stub, `Thornswood-Setup.exe`, is `tools\setup\Bootstrap.cs` and
+setup stub, `Thornswood-Setup.exe`, is `installer\setup\Bootstrap.cs` and
 `logo-192.png`, also Thornswood's own.
 
 ## Microsoft WebView2 SDK, inside the launcher
 
-Three files from `tools\lib\webview2`. Build-Launcher.ps1 references them for
+Three files from `launcher\lib\webview2`. Build-Launcher.ps1 references them for
 the compile and embeds them as resources. Voice.cs hands the two managed ones to
 the runtime from memory and writes `WebView2Loader.dll` beside the exe on start.
 They give the launcher the browser that voice runs in.
@@ -331,7 +331,7 @@ them, names the SIL Open Font License, Version 1.1.
 
 - The rest of the collection. Each person installs every mod from Nexus Mods
   through Vortex, under its author's own terms. The launcher lists every one
-  with a link to its page (`tools\app\Links.cs`), and the public credits page
+  with a link to its page (`launcher\app\Links.cs`), and the public credits page
   says so. The two mods in it that Thornswood uploads itself are not in this
   group: they have their own sections above. The mod files the installer
   carries anyway are entry 168, above.

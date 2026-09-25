@@ -120,7 +120,7 @@ $root = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-outside-' + [Guid]::Ne
 $null = New-Item -ItemType Directory -Force -Path $root
 $record = Join-Path $root 'steam-build.json'
 [IO.File]::WriteAllText($record, '{ "appId": 489830, "publicBuildId": "100", "recordedUtc": "2026-09-24T10:00:14Z" }')
-$Allowed = Read-AllowedHosts (Join-Path $Tools 'app\Updater.cs')
+$Allowed = Read-AllowedHosts (Join-Path $Tools '..\launcher\app\Updater.cs')
 
 function Run([string]$feedUrl = '', [string[]]$hosts = $Allowed, [string]$steamRecord = $record) {
   $script:Asked.Clear()
@@ -144,7 +144,7 @@ function AskedFor($r, [string]$url) { return (@($r.Asked | Where-Object { $_.Url
 try {
   # ---- the files it reads out of the repository ------------------------------
   Yes "AllowedHosts is read out of the real Updater.cs" (($Allowed -contains 'api.github.com') -and ($Allowed -contains 'release-assets.githubusercontent.com'))
-  $d = Read-Defaults (Join-Path $Tools 'app\Config.cs')
+  $d = Read-Defaults (Join-Path $Tools '..\launcher\app\Config.cs')
   Yes 'the releases repository is read out of the real Config.cs' ($d.Repo -match '^[^/\s]+/[^/\s]+$' -and $d.Repo -like '*Releases*')
   Yes 'so is the collection address' ($d.Collection -like 'https://*nexusmods.com/*')
   Yes 'and the site, so it can be kept off it' ($d.SiteHost -eq 'thornswood.net')

@@ -64,7 +64,7 @@
 #>
 [CmdletBinding()]
 param(
-  # owner/name of the releases repository. Read from tools\app\Config.cs when
+  # owner/name of the releases repository. Read from launcher\app\Config.cs when
   # not given, which is where every installed launcher gets it.
   [string]$Repo,
   # main is the live feed, dev the dev one.
@@ -402,7 +402,7 @@ function Invoke-Outside {
     # ---- every address, without a request per address
     Head 'Every address in it'
     if (@(@($Hosts) | Where-Object { $_ }).Count -eq 0) {
-      Bad "could not read AllowedHosts out of tools\app\Updater.cs, so no address was checked against the launcher's list."
+      Bad "could not read AllowedHosts out of launcher\app\Updater.cs, so no address was checked against the launcher's list."
     }
     $items = New-Object 'System.Collections.Generic.List[object]'
     foreach ($p in @($v.packs)) {
@@ -497,7 +497,7 @@ function Invoke-Outside {
   # ---- Steam, which the feed does not name
   Head 'Steam'
   Check-Steam $SteamRecord
-  Skip ('whether the three depot manifests tools\app\Downgrade.cs pins at 1.6.1170 can still be downloaded.' +
+  Skip ('whether the three depot manifests launcher\app\Downgrade.cs pins at 1.6.1170 can still be downloaded.' +
         ' Steam hands a depot only to an account that owns the game, so that stays a check by hand.')
 
   # ---- Nexus
@@ -532,10 +532,10 @@ function Invoke-Outside {
 # not a run against the real feed.
 if ($MyInvocation.InvocationName -eq '.') { return }
 
-$d = Read-Defaults (Join-Path $Here 'app\Config.cs')
+$d = Read-Defaults (Join-Path $Here '..\launcher\app\Config.cs')
 if (-not $Repo) { $Repo = $d.Repo }
 if (-not $SteamRecord) { $SteamRecord = Join-Path $Here 'steam-build.json' }
-$allowed = Read-AllowedHosts (Join-Path $Here 'app\Updater.cs')
+$allowed = Read-AllowedHosts (Join-Path $Here '..\launcher\app\Updater.cs')
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  what a first install needs that we do not run' -ForegroundColor White

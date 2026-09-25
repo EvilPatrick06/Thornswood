@@ -14,7 +14,7 @@
   card at "Part 1 of 3: 7,145 MB down so far", and the log line saying Steam's
   window would not come to the front.
 
-  Two causes, both in tools\app\Downgrade.cs:
+  Two causes, both in launcher\app\Downgrade.cs:
 
     1. Steam's window was looked for only among processes named steam, and
        Steam counted as in front only when the foreground window's process
@@ -46,7 +46,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here 'app' }
+if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
 
 $script:pass = 0
 $script:fail = 0
@@ -62,7 +62,7 @@ function Done {
 }
 
 $src = Join-Path $AppPath 'Downgrade.cs'
-Yes 'tools\app\Downgrade.cs is there' (Test-Path -LiteralPath $src)
+Yes 'launcher\app\Downgrade.cs is there' (Test-Path -LiteralPath $src)
 if (-not (Test-Path -LiteralPath $src)) { Done }
 $text = [IO.File]::ReadAllText($src)
 
@@ -210,7 +210,7 @@ namespace Probe
         static void TryClipboard(string text) { Clipboard.Add(text); }
         static void FlashLauncher() { Flashes++; }
 
-        // ---- lifted from tools\app\Downgrade.cs ----
+        // ---- lifted from launcher\app\Downgrade.cs ----
 __LIFTED__
     }
 }

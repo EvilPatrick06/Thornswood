@@ -61,7 +61,7 @@ const reaches = [];
   yes('the overlay range table is where it was (' + got.join(', ') + ' m)', got.length === 3);
   reaches.push(...got);
 
-  const host = read(path.join(__dirname, '..', 'tools', 'launcher', 'voice-host.html'));
+  const host = read(path.join(__dirname, '..', 'launcher', 'voice-host.html'));
   const range = /var RANGE = \{([\s\S]*?)\};/.exec(host);
   const quiet = range ? (range[1].match(/quiet:\s*[\d.]+/g) || []).map(s => Number(s.split(':')[1])) : [];
   yes('the launcher voice host range table is where it was (' + quiet.join(', ') + ' m)', quiet.length === 3);

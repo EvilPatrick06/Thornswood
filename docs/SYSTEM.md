@@ -14,7 +14,7 @@ DEVELOPING.md is the long form; CONTRIBUTING.md has the rules.
 | Patrick's machine (and any developer's, for dev) | The repo, the SkyMP fork build, `Ship.ps1`, `Publish-*`, `Deploy-*`, `Install-*` | Developers. Only Patrick's machine ships main (CONTRIBUTING.md) |
 | The VPS, 192.135.112.23, Windows, user Administrator | Both game servers, both voice services, the site, Caddy, the bot, the watchdog, the nightly backup | Reached over ssh by the scripts; nobody edits it by hand |
 
-<!-- VPS address: Deploy-Server.ps1:39, Deploy-Docs.ps1:41, Install-Bot.ps1:26, Install-Voice.ps1:32, tools/app/Config.cs:256 -->
+<!-- VPS address: Deploy-Server.ps1:39, Deploy-Docs.ps1:41, Install-Bot.ps1:26, Install-Voice.ps1:32, launcher/app/Config.cs:256 -->
 
 ## The picture
 
@@ -72,7 +72,7 @@ flowchart LR
 
 The launcher lives at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on
 most machines). Everything else hangs off that root, which is the folder above
-the exe (`tools/app/Paths.cs:42`):
+the exe (`launcher/app/Paths.cs:42`):
 
 | Folder or file | What it is | From |
 | --- | --- | --- |

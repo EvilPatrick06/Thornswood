@@ -57,7 +57,7 @@ On the VPS beside the game servers: the live service in `C:\Thornswood-Voice`
 on 7778, task `Thornswood Voice`, and the dev one in `C:\Thornswood-Voice-Dev`
 on 7789, task `Thornswood Dev Voice`. Caddy carries
 https://thornswood.net/voice/ and /voice-dev/ to them. Its clients are the
-launcher's hidden voice page (`tools\launcher`), the in-game overlays
+launcher's hidden voice page (`launcher`), the in-game overlays
 (`game\ui`) and the two gamemodes. `.\tools\Install-Voice.ps1` copies
 `voice-server.js` and the two files in `public\`, restarts the task and waits
 for `/health`; the dev service is the same script with

@@ -35,7 +35,7 @@ const os = require('os');
   they cannot share code across C#, PowerShell and this, so this is the one
   that fails loudly when they drift: it reads the C# and asserts the shape.
 */
-const CS = fs.readFileSync(path.join(TOOLS_DIR, 'app', 'Checks.cs'), 'utf8');
+const CS = fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Checks.cs'), 'utf8');
 const PS = fs.readFileSync(path.join(TOOLS_DIR, 'LoadOrder.ps1'), 'utf8');
 
 let pass = 0, fail = 0;
@@ -134,7 +134,7 @@ yes('the publisher refuses a bad slug', /\^\[A-Za-z0-9\]\+\$/.test(PS));
 
 /* The thing this replaced must not creep back as the test. */
 yes('nothing decides staleness from po3_StartOnSave any more',
-    fs.readFileSync(path.join(TOOLS_DIR, 'app', 'Shell.cs'), 'utf8')
+    fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Shell.cs'), 'utf8')
       .indexOf('if (!Checks.StartOnSaveInstalled()) return "stale"') < 0);
 
 console.log('');

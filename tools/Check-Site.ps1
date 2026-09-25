@@ -21,7 +21,7 @@
   exists. Same check as before.
 
   Nothing here names a machine. The site address and the box come from the
-  launcher's own config (tools\app\Config.cs), which is the one place
+  launcher's own config (launcher\app\Config.cs), which is the one place
   Set-Vps.ps1 keeps them, and the ssh user comes from the Host entry
   Setup-SshKey.ps1 wrote into ~\.ssh\config. Without that entry the ssh half
   is skipped and says so.
@@ -63,7 +63,7 @@ if ($Who -and $Who -notmatch '^[0-9]{17,20}$') {
 # The launcher's config is what every installed copy uses, so it is the one
 # place the address and the site are true. Set-Vps.ps1 rewrites it when the
 # box moves, and this follows without being told.
-$configCs = Join-Path $Here 'app\Config.cs'
+$configCs = Join-Path $Here '..\launcher\app\Config.cs'
 $cs = ''
 if (Test-Path -LiteralPath $configCs) { $cs = [IO.File]::ReadAllText($configCs) }
 if (-not $Site) {
@@ -237,7 +237,7 @@ else { Write-Host '  Nothing wrong from the outside.' -ForegroundColor Green }
 
 # --------------------------------------------------------------- the box
 if ($NoSsh) { Say '  -NoSsh, the box was not asked.' 'DarkGray' }
-elseif (-not $Vps) { Say '  No box address in tools\app\Config.cs, the box was not asked.' 'DarkGray' }
+elseif (-not $Vps) { Say '  No box address in launcher\app\Config.cs, the box was not asked.' 'DarkGray' }
 elseif (-not $User) { Say "  No Host entry for $Vps in ~\.ssh\config, so no ssh user. Run .\tools\Setup-SshKey.ps1 first. The box was not asked." 'DarkGray' }
 else {
   Head 'What the site holds, asked on the box'

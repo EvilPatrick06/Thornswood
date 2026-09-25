@@ -37,7 +37,7 @@ function yes(what, cond) {
 
 const helpSrc = process.env.HELP
   ? fs.readFileSync(process.env.HELP, 'utf8').split(CR).join('')
-  : read('app', 'Help.cs');
+  : read('..', 'launcher', 'app', 'Help.cs');
 const gm      = read('..', 'game', 'gamemode.js');
 const emotes  = read('..', 'game', 'plugins', 'thornswood-emotes.js');
 const front   = read('..', 'game', 'plugins', 'thornswood-front.js');
@@ -45,10 +45,10 @@ const vplug   = read('..', 'game', 'plugins', 'thornswood-voice.js');
 const vpage   = read('..', 'game', 'ui', 'thornswood-voice.js');
 const vserver = read('..', 'voice', 'voice-server.js');
 const vinstall = read('Install-Voice.ps1');
-const keys    = read('app', 'Keys.cs');
-const shell   = read('app', 'Shell.cs');
-const enforce = read('app', 'Enforce.cs');
-const ini     = read('emotes', 'Thornswood.ini');
+const keys    = read('..', 'launcher', 'app', 'Keys.cs');
+const shell   = read('..', 'launcher', 'app', 'Shell.cs');
+const enforce = read('..', 'launcher', 'app', 'Enforce.cs');
+const ini     = read('..', 'launcher', 'Thornswood.ini');
 
 // ------------------------------------------------------------- the items
 /*

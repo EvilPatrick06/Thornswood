@@ -10,7 +10,7 @@
 // A reviewer measured on 23 September that the list stopped there. Once the
 // launcher reports in, the game's page goes into relay mode and drops every
 // connection it had, and the audio plays in the launcher's voice page,
-// tools/launcher/voice-host.html, hosted by Voice.cs in WebView2. That page's
+// launcher/voice-host.html, hosted by Voice.cs in WebView2. That page's
 // place() set the gain from levelFor(...) and never looked at a mute: profile
 // 123 muted in the game, in the same cell at zero distance, was played at
 // gain 1. A muted person was still heard.
@@ -64,7 +64,7 @@ function pannerNode() {
   service sending one, gains lists every gain node the page made, in order.
 */
 function hostPage() {
-  const html = read('launcher/voice-host.html');
+  const html = read('../launcher/voice-host.html');
   const m = /<script>([\s\S]*)<\/script>/.exec(html);
   if (!m) { throw new Error('voice-host.html has no script'); }
 
@@ -357,7 +357,7 @@ function plugin() {
 
 // ------------------------------------------------------ the launcher side
 {
-  const cs = read('app/Voice.cs');
+  const cs = read('../launcher/app/Voice.cs');
   yes('Voice.cs reads voice-muted.txt from the channel folders',
       /Path\.Combine\(d, "voice-muted\.txt"\)/.test(cs) && /foreach \(string d in dirs\)/.test(cs));
   yes('and hands the line to its page as a muted message',

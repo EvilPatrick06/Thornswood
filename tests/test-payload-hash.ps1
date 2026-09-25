@@ -40,7 +40,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
 if (-not $InstallerPath) { $InstallerPath = Join-Path $Here 'Publish-Installer.ps1' }
 if (-not $ServerPath)    { $ServerPath    = Join-Path $Here '..\site\server.js' }
-if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here 'setup\Bootstrap.cs' }
+if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here '..\installer\setup\Bootstrap.cs' }
 
 $script:pass = 0
 $script:fail = 0

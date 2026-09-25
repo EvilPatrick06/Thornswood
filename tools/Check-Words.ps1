@@ -8,7 +8,7 @@
 
   MEASURED 24 September, before the fixes that came with it: eleven hits over
   the files below. Five em dashes in README.md (37, 55, 69, 72, 78) and one in
-  SETUP.md:46. The word at README.md:3, tools/app/Help.cs:207, the rules page
+  SETUP.md:46. The word at README.md:3, launcher/app/Help.cs:207, the rules page
   at 295, and the Known Issues and Help pages (known.md:49, help.md:121),
   which the site serves to anybody without a sign in. The old owner name had
   none. Since then main deleted SETUP.md (#265) and rewrote README.md for
@@ -48,7 +48,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $Root) { $Root = Split-Path -Parent $Here }
 
 $Paths = @(
-    'README.md', 'SECURITY.md', 'tools/app/Help.cs', 'tools/ui.xaml', 'bot/content.py',
+    'README.md', 'SECURITY.md', 'launcher/app/Help.cs', 'launcher/ui.xaml', 'bot/content.py',
     'site/data/site/*.md', 'site/data/known.md', 'site/data/help.md',
     'site/public/home.html'
 )

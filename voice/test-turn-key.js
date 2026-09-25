@@ -138,7 +138,7 @@ function leaks(r, key) {
   // an unchanged answer leaves every page exactly where it started.
   const pages = [
     ['the in-game page', path.join(TOOLS, '..', 'game', 'ui', 'thornswood-voice.js')],
-    ['the launcher overlay', path.join(TOOLS, 'launcher', 'voice-host.html')],
+    ['the launcher overlay', path.join(TOOLS, '..', 'launcher', 'voice-host.html')],
     ['the plain page the service serves', path.join(__dirname, 'public', 'voice.js')]
   ];
   for (const p of pages) {

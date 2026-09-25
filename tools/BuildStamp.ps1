@@ -12,7 +12,7 @@
         "commit":                the repo's short commit when it was stamped,
         "gamemodeMatchesCommit": false when gamemode.js had edits not in it,
         "gamemodeSha256":        the gamemode.js this describes,
-        "launcherVersion":       tools\app\Updater.cs, the number Ship reads,
+        "launcherVersion":       launcher\app\Updater.cs, the number Ship reads,
         "feedVersion":           what that channel's version.json offers,
         "stampedUtc":            when the stamp was made
       }
@@ -85,7 +85,7 @@ function New-ThornswoodBuildStamp {
   } catch { }
 
   $launcher = ''
-  $updater = Join-Path $RepoDir 'tools\app\Updater.cs'
+  $updater = Join-Path $RepoDir 'launcher\app\Updater.cs'
   if (Test-Path -LiteralPath $updater) {
     $m = [regex]::Match([IO.File]::ReadAllText($updater), 'Version\s*=\s*"([^"]+)"')
     if ($m.Success) { $launcher = $m.Groups[1].Value }

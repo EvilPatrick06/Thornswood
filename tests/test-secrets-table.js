@@ -289,7 +289,7 @@ function addDir(rel, re) {
   });
 }
 addDir('tools', /\.(ps1|js)$/i);
-addDir('tools/app', /\.cs$/i);
+addDir('launcher/app', /\.cs$/i);
 addDir('voice', /\.js$/i);
 addDir('site', /^server\.js$/i);
 addDir('bot', /\.py$/i);

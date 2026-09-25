@@ -72,7 +72,7 @@ function Leaf([string]$p) { return $p.Substring($p.LastIndexOf('\') + 1) }
 $clientPath  = Join-Path $Here 'client-build.json'
 $serverPath  = Join-Path $Here 'server-build.json'
 $packagePath = Join-Path $Here 'Package-Thornswood.ps1'
-$setupPath   = Join-Path $Here 'Setup-Thornswood.ps1'
+$setupPath   = Join-Path $Here '..\installer\Setup-Thornswood.ps1'
 $creditsPath = Join-Path $Here '..\site\data\site\credits.md'
 $homePath    = Join-Path $Here '..\site\public\home.html'
 
@@ -268,7 +268,7 @@ Yes 'Setup-Thornswood.ps1 copies SOURCE CODE.txt into the install folder' `
 # And the uninstall takes it out again. Finish ends with a plain rmdir of the
 # install folder, which only works on an empty one, and the farewell calls
 # anything it does not know "not Thornswood's".
-$uninstall = Get-Content -LiteralPath (Join-Path $Here 'app\Uninstall.cs') -Raw
+$uninstall = Get-Content -LiteralPath (Join-Path $Here '..\launcher\app\Uninstall.cs') -Raw
 Yes 'Uninstall.cs removes SOURCE CODE.txt from the install folder' `
     ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "SOURCE CODE\.txt"\)\)')
 

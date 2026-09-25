@@ -27,7 +27,7 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const src = fs.readFileSync(path.join(TOOLS_DIR, 'app', 'Checks.cs'), 'utf8');
+const src = fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Checks.cs'), 'utf8');
 const m = /public static readonly string\[\] MustBeLight = \{([\s\S]*?)\};/.exec(src);
 yes('Checks.MustBeLight is in the launcher', !!m);
 const list = m ? (m[1].match(/"([^"]+)"/g) || []).map(function (s) { return s.slice(1, -1); }) : [];

@@ -898,7 +898,7 @@ $exePath = Get-LauncherExe (Join-Path $Root 'Launcher')
 $launcherVersion = ''
 if ($Launcher) {
     if (-not (Test-Path $exePath)) { Die "No launcher at $exePath. Run Build-Launcher.ps1 first." }
-    $updaterCs = Join-Path $Here 'app\Updater.cs'
+    $updaterCs = Join-Path $Here '..\launcher\app\Updater.cs'
     if (Test-Path $updaterCs) {
         $m = [regex]::Match((Get-Content $updaterCs -Raw), 'Version\s*=\s*"([^"]+)"')
         if ($m.Success) { $launcherVersion = $m.Groups[1].Value }

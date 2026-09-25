@@ -126,7 +126,7 @@ try {
     # The same ignore rules that matter here: the front's zip and the logs.
     Put '.gitignore' "*.zip`n*.log`n"
     Put 'game/plugins/thornswood-front.js' "// ours`n"
-    Put 'tools/app/Updater.cs' "class Updater { const string Version = ""1.1.92""; }`n"
+    Put 'launcher/app/Updater.cs' "class Updater { const string Version = ""1.1.92""; }`n"
     $ok = $ok -and ((Run-Git -C $work add -A) -eq 0)
     $ok = $ok -and ((Run-Git -C $work commit -q -m 'start') -eq 0)
     $ok = $ok -and ((Run-Git -C $work remote add origin $origin) -eq 0)
@@ -151,11 +151,11 @@ try {
     Yes "G3 the same file does not stop a dev release: '$r'" ($r -eq '')
     Drop 'game/plugins/scratch.js'
 
-    # G4: the launcher compiles every tools\app\*.cs, tracked or not.
-    Put 'tools/app/Scratch.cs' "class Scratch { }`n"
+    # G4: the launcher compiles every launcher\app\*.cs, tracked or not.
+    Put 'launcher/app/Scratch.cs' "class Scratch { }`n"
     $r = Gate $work $false
-    Yes 'G4 an untracked tools\app\Scratch.cs stops a main release' ($r -match 'git does not know')
-    Drop 'tools/app/Scratch.cs'
+    Yes 'G4 an untracked launcher\app\Scratch.cs stops a main release' ($r -match 'git does not know')
+    Drop 'launcher/app/Scratch.cs'
 
     # G5: ignored files are not counted. Measured 24 Sep on Patrick's machine:
     #     14 files under tools are not tracked and every one is ignored

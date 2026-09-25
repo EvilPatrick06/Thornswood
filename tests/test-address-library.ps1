@@ -46,9 +46,9 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ChecksPath) { $ChecksPath = Join-Path $Here 'app\Checks.cs' }
-if (-not $ShellPath)  { $ShellPath  = Join-Path $Here 'app\Shell.cs' }
-if (-not $UiPath)     { $UiPath     = Join-Path $Here 'ui.xaml' }
+if (-not $ChecksPath) { $ChecksPath = Join-Path $Here '..\launcher\app\Checks.cs' }
+if (-not $ShellPath)  { $ShellPath  = Join-Path $Here '..\launcher\app\Shell.cs' }
+if (-not $UiPath)     { $UiPath     = Join-Path $Here '..\launcher\ui.xaml' }
 
 $pass = 0; $fail = 0
 function Yes($what, $cond) {

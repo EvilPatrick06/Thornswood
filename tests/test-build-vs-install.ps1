@@ -148,19 +148,19 @@ $saved = @{ TEMP = $env:TEMP; TMP = $env:TMP; RUNNER_TEMP = $env:RUNNER_TEMP; TS
             TS_TEST_CALLS = $env:TS_TEST_CALLS; TS_TEST_BUILD_EXIT = $env:TS_TEST_BUILD_EXIT; TS_TEST_INSTALL_EXIT = $env:TS_TEST_INSTALL_EXIT }
 $held = $null
 try {
-    foreach ($d in @($tools, (Join-Path $tools 'app'), (Join-Path $tools 'lib\webview2'), (Join-Path $tools 'launcher'),
-                     (Join-Path $tools 'setup'), $tmp)) {
+    foreach ($d in @($tools, (Join-Path $tools '..\launcher\app'), (Join-Path $tools '..\launcher\lib\webview2'), (Join-Path $tools '..\launcher'),
+                     (Join-Path $tools '..\installer\setup'), $tmp)) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
     Copy-Item -LiteralPath (Join-Path $Here 'Build-Launcher.ps1') -Destination $tools
     $haveInstall = Test-Path -LiteralPath (Join-Path $Here 'Install-Launcher.ps1')
     if ($haveInstall) { Copy-Item -LiteralPath (Join-Path $Here 'Install-Launcher.ps1') -Destination $tools }
-    Copy-Item -LiteralPath (Join-Path $Here 'app.ico') -Destination $tools
-    Copy-Item -LiteralPath (Join-Path $Here 'ui.xaml') -Destination $tools
-    Copy-Item -Path (Join-Path $Here 'lib\webview2\*') -Destination (Join-Path $tools 'lib\webview2')
-    Copy-Item -LiteralPath (Join-Path $Here 'launcher\voice-host.html') -Destination (Join-Path $tools 'launcher')
-    Set-Content -LiteralPath (Join-Path $tools 'app\Program.cs') -Value 'static class Program { [System.STAThread] static void Main() { } }' -Encoding ASCII
-    Set-Content -LiteralPath (Join-Path $tools 'setup\Bootstrap.cs') -Value 'static class Setup { [System.STAThread] static void Main() { } }' -Encoding ASCII
+    Copy-Item -LiteralPath (Join-Path $Here '..\launcher\app.ico') -Destination $tools
+    Copy-Item -LiteralPath (Join-Path $Here '..\launcher\ui.xaml') -Destination $tools
+    Copy-Item -Path (Join-Path $Here '..\launcher\lib\webview2\*') -Destination (Join-Path $tools '..\launcher\lib\webview2')
+    Copy-Item -LiteralPath (Join-Path $Here '..\launcher\voice-host.html') -Destination (Join-Path $tools '..\launcher')
+    Set-Content -LiteralPath (Join-Path $tools '..\launcher\app\Program.cs') -Value 'static class Program { [System.STAThread] static void Main() { } }' -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $tools '..\installer\setup\Bootstrap.cs') -Value 'static class Setup { [System.STAThread] static void Main() { } }' -Encoding ASCII
     Set-Content -LiteralPath (Join-Path $tools 'Close-Launcher.ps1') -Value $fakeClose -Encoding ASCII
 
     $env:TEMP = $tmp
@@ -270,7 +270,7 @@ try {
         Yes 'I6 and it is newer than the one it replaced, which is what Ship checks' ((Get-Item -LiteralPath $staleExe).LastWriteTimeUtc -gt $staleTime)
         Yes 'I7 the SkyrimTogether.exe from before the rename is gone' (-not (Test-Path -LiteralPath (Join-Path $l3 'SkyrimTogether.exe')))
         Yes 'I8 and so is the old script launcher' (-not (Test-Path -LiteralPath (Join-Path $l3 'SkyrimTogether-Launcher.ps1')))
-        $hash = (Get-FileHash -LiteralPath (Join-Path $Here 'app.ico') -Algorithm SHA256).Hash.Substring(0, 8).ToLower()
+        $hash = (Get-FileHash -LiteralPath (Join-Path $Here '..\launcher\app.ico') -Algorithm SHA256).Hash.Substring(0, 8).ToLower()
         Yes "I9 the icon file named after the artwork is there (icon-$hash.ico)" (Test-Path -LiteralPath (Join-Path $l3 "icon-$hash.ico"))
         Yes 'I10 and an old one is cleared away' (-not (Test-Path -LiteralPath (Join-Path $l3 'icon-00000000.ico')))
         $lnk = Join-Path $root3 'Thornswood.lnk'

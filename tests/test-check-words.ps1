@@ -106,9 +106,9 @@ try {
         'Ask gavin about it.'
     )
     Put 'SECURITY.md' @('Fine.', 'An entity &mdash; here.', 'A number &#8212; here.', 'A hex one &#x2014; here.', 'Fine again.')
-    Put 'tools/app/Help.cs' @('new HelpItem("x", "fine"),', 'new HelpItem("y", "a single-player game"),')
+    Put 'launcher/app/Help.cs' @('new HelpItem("x", "fine"),', 'new HelpItem("y", "a single-player game"),')
     # With a byte order mark, which the check has to read through.
-    Put 'tools/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>', ('<TextBlock Text="one' + $em + 'two"/>')) $utf8bom
+    Put 'launcher/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>', ('<TextBlock Text="one' + $em + 'two"/>')) $utf8bom
     Put 'bot/content.py' @('WELCOME = """', 'Nothing wrong here.', '"""')
     Put 'site/data/site/a.md' @('Fine.', ('Not' + $em + 'fine.'))
     Put 'site/data/site/b.md' @('Fine, with a hyphen - and nothing else.')
@@ -119,8 +119,8 @@ try {
     $want = @(
         'README.md:2', 'README.md:3', 'README.md:4', 'README.md:7',
         'SECURITY.md:2', 'SECURITY.md:3', 'SECURITY.md:4',
-        'tools/app/Help.cs:2',
-        'tools/ui.xaml:2',
+        'launcher/app/Help.cs:2',
+        'launcher/ui.xaml:2',
         'site/data/site/a.md:2',
         'site/data/known.md:2',
         'site/public/home.html:3'
@@ -137,7 +137,7 @@ try {
     Yes ('every seeded break is reported at its own file and line (' + $want.Count + ' wanted, ' + $s.Hits.Count + ' reported)') ($missing.Count -eq 0)
     Yes 'nothing allowed is reported: multiplayer, playtest, getPlayer, PlayerCharacter, an en dash, a hyphen' ($extra.Count -eq 0)
     Yes ('a hit exits 1 (exit ' + $s.Code + ')') ($s.Code -eq 1)
-    Yes 'a file with a byte order mark is read through it' ($s.Hits -contains 'tools/ui.xaml:2')
+    Yes 'a file with a byte order mark is read through it' ($s.Hits -contains 'launcher/ui.xaml:2')
     Yes 'a page under the site glob is named by its own path' ($s.Hits -contains 'site/data/site/a.md:2')
 
     $after = @{}
@@ -162,8 +162,8 @@ try {
     # Clean the seeded breaks away and the same files pass.
     Put 'README.md' @('# Seeded', 'A multiplayer engine, a playtest, getPlayer() and PlayerCharacter.')
     Put 'SECURITY.md' @('Fine.')
-    Put 'tools/app/Help.cs' @('new HelpItem("x", "fine"),')
-    Put 'tools/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>') $utf8bom
+    Put 'launcher/app/Help.cs' @('new HelpItem("x", "fine"),')
+    Put 'launcher/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>') $utf8bom
     Put 'site/data/site/a.md' @('Fine.')
     Put 'site/data/known.md' @('| A | B |', '| an ordinary Skyrim save | why |')
     Put 'site/public/home.html' @('<p>one, two</p>')

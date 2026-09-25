@@ -67,8 +67,8 @@ Yes 'Ship''s untracked-file gate looks past tools' ($s -match "\`$moreRoots = @\
 # ---- every file these lines name is tracked --------------------------------------
 if (Get-Command git -ErrorAction SilentlyContinue) {
     $tracked = @(& git -C $repo ls-files 2>$null)
-    foreach ($f in 'tools/logo.png', 'tools/launcher-header.jpg', 'tools/launcher-header.mp4', 'tools/emotes/Thornswood.ini',
-                   'tools/client-build.json', 'tools/Setup-Thornswood.ps1', 'tools/Install.bat', 'tools/Setup.bat', 'tools/READ ME FIRST.txt',
+    foreach ($f in 'launcher/logo.png', 'launcher/launcher-header.jpg', 'launcher/launcher-header.mp4', 'launcher/Thornswood.ini',
+                   'tools/client-build.json', 'installer/Setup-Thornswood.ps1', 'installer/Install.bat', 'installer/Setup.bat', 'installer/READ ME FIRST.txt',
                    'game/ui/index.html', 'site/public/banner.webm', 'site/public/banner.mp4', 'site/public/banner.jpg',
                    'game/menu/logo.nif', 'game/menu/logo01ae.nif', 'game/menu/Mainmenuwallpaper.dds', 'tools/Sync-Client.ps1') {
         Yes "$f is tracked, so its absence is a wrong path" ($tracked -contains $f)
