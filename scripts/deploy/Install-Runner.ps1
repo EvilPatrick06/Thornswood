@@ -200,15 +200,27 @@ $out = Remote @"
 `$acct = '$Account'
 
 # The account. In Users and nothing else. A password nobody ever sees: made
-# here, set, handed to config.cmd for the service, and dropped.
-Add-Type -AssemblyName System.Web
-`$pw = [System.Web.Security.Membership]::GeneratePassword(40, 8)
+# here, set, handed to config.cmd for the service, and dropped. Letters and
+# digits only: config.cmd is a batch file, and cmd.exe reads & | % ^ < > in
+# its arguments as its own, and the .NET generator used before put them in
+# (25 Sep). Upper, lower and digit each at least once, which the box's
+# password rule wants.
+`$rng = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+function Pick([string]`$from, [int]`$n) {
+  `$bytes = New-Object byte[] `$n
+  `$rng.GetBytes(`$bytes)
+  -join (`$bytes | ForEach-Object { `$from[`$_ % `$from.Length] })
+}
+`$up = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; `$lo = 'abcdefghijkmnopqrstuvwxyz'; `$dg = '23456789'
+`$pw = (Pick `$up 1) + (Pick `$lo 1) + (Pick `$dg 1) + (Pick (`$up + `$lo + `$dg) 37)
 `$sec = ConvertTo-SecureString `$pw -AsPlainText -Force
+# The description is at most 48 characters; New-LocalUser refuses a longer
+# one, which stopped the first install on 25 Sep.
 if (Get-LocalUser -Name `$acct -EA SilentlyContinue) {
   Set-LocalUser -Name `$acct -Password `$sec -PasswordNeverExpires `$true
   'account ' + `$acct + ' was there, new password set'
 } else {
-  New-LocalUser -Name `$acct -Password `$sec -PasswordNeverExpires -UserMayNotChangePassword -Description 'Runs the Thornswood build check. Install-Runner.ps1.' | Out-Null
+  New-LocalUser -Name `$acct -Password `$sec -PasswordNeverExpires -UserMayNotChangePassword -Description 'Thornswood build check runner' | Out-Null
   Add-LocalGroupMember -Group 'Users' -Member `$acct -EA SilentlyContinue
   'account ' + `$acct + ' made'
 }
@@ -286,5 +298,5 @@ $mine = @($r.runners | Where-Object { $_.name -eq $RunnerName })
 if (-not $mine.Count) { Die "The service runs but GitHub does not list a runner called $RunnerName yet. Give it a minute and run -Status." }
 Say ('  ' + $mine[0].name + ' is ' + $mine[0].status) 'Green'
 Say ''
-Say '  The build check runs on it from the next push to a pull request.' 'Gray'
+Say '  The build check is off on GitHub since 25 Sep; started by hand from the Actions tab, it runs here.' 'Gray'
 Done
