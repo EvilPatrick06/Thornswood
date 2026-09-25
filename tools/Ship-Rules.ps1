@@ -98,6 +98,8 @@ $ShipMachineFiles = @(
     'Data\Platform\thornswood-characters.json',
     'Data\Platform\thornswood-choice.txt',
     'Data\Platform\thornswood-forget.txt',
+    # Whether this person turned the scroll in front of the choice off.
+    'Data\Platform\thornswood-intro.txt',
     # The same list as a script beside the page (Chars.WriteCharacters), so
     # the choice draws before any plugin runs. Every profile id the install
     # owns, so never in a pack.
@@ -250,6 +252,14 @@ function Test-ShipOtherServer([string]$rel) {
     # whose name merely starts the same way is not matched.
     # OwnGame.Foreign carries the same rule; change the two together.
     if ($rel -match '^Data\\SkyrimTogetherReborn($|\\)') { return $true }
+    # Other launchers' parking folders inside our own game folder, Djinn, 25
+    # September. Keizaal's launcher moves the Creation Club archives it turns
+    # off into Data\_disabledByKzl and keeps its own backup and plugin list
+    # beside the game; the Daedric server's launcher keeps DaedricData. They
+    # came back after a Play and put 2.4 GB of somebody else's files into a dev
+    # release. Never shipped, never removed. Anchored, with a boundary.
+    if ($rel -match '^Data\\_disabledByKzl($|\\)') { return $true }
+    if ($rel -match '^(_keizaal-plugins-off|DaedricData|keizaal-backup-[^\\]+)($|\\)') { return $true }
     # See $ShipDeleteAlways below for why this one also has to be DELETED from
     # machines that already have it, and not merely left out of new packs.
     # A loose map.swf. Somebody else left it in the Steam copy, it overrides

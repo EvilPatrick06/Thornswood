@@ -142,7 +142,55 @@
     // Well below the hint and centred, so it is nowhere near the characters.
     '#ts-select .quitrow{display:flex;justify-content:center;margin-top:18px}',
     '#ts-select .quit{opacity:.72}',
-    '#ts-select .quit:hover{opacity:1}'
+    '#ts-select .quit:hover{opacity:1}',
+    /*
+      The scroll in front of the choice, Djinn, 24 September. The painting
+      plays with the sealed "To Start" scroll resting on the ledge by the
+      warrior; clicking it (or Enter) breaks the seal, the scroll rises and
+      unrolls, and Continue brings up the slots. The stage below is 16:9 and
+      covers the window the way the loop does (object-fit:cover), so the
+      scroll sits on the same spot of the ledge at any size. Same rules as
+      the rest of this page: no hover, no cursor rules, no transitions; the
+      only motion is keyframes started by the click.
+    */
+    '#ts-select .intro{position:absolute;inset:0;z-index:1;overflow:hidden}',
+    '#ts-select .intro .stage{position:absolute;left:50%;top:50%;width:max(100vw,177.778vh);height:max(56.25vw,100vh);transform:translate(-50%,-50%)}',
+    '#ts-select .intro .closed{position:absolute;left:20.625%;top:74.931%;width:17.93%;height:auto}',
+    '#ts-select .intro .flash{position:absolute;left:29.881%;top:79.632%;width:3%;height:0;padding-bottom:3%;border-radius:50%;opacity:0;',
+    'transform:translate(-50%,-50%) scale(0);pointer-events:none;',
+    'background:radial-gradient(circle,#fff8e0 0%,rgba(243,211,143,.95) 22%,rgba(158,111,201,.55) 52%,transparent 72%)}',
+    '#ts-select .intro .open{position:absolute;left:50%;top:58%;width:44%;opacity:0;transform:translate(-50%,-50%) scale(.04,.12);pointer-events:none}',
+    '#ts-select .intro .open img{display:block;width:100%;height:auto}',
+    '#ts-select .intro .words{position:absolute;left:17%;right:17%;top:20%;bottom:18%;display:flex;flex-direction:column;',
+    'align-items:center;justify-content:center;text-align:center;opacity:0}',
+    '#ts-select .intro .said{font-style:italic;font-size:1.6vw;line-height:1.45;color:#2c1e10}',
+    /*
+      What is written on the open scroll, Djinn, 25 September: it has to read
+      as ink on the parchment, not as a page's form. The tick box is a small
+      square ruled in the same brown ink with a quill stroke for the tick, and
+      Continue is lettered between two ink flourishes instead of sitting in a
+      dark button. Still no hover, cursor or transition rules, as above.
+    */
+    '#ts-select .intro .skip{margin-top:1.3vw;font-size:1.05vw;font-style:italic;color:#3a2714;display:flex;align-items:center;gap:.6vw;',
+    'text-shadow:0 1px 0 rgba(255,236,190,.35)}',
+    '#ts-select .intro .skip input{-webkit-appearance:none;appearance:none;flex:none;width:1.15vw;height:1.15vw;margin:0;position:relative;',
+    'border:.13vw solid rgba(44,30,16,.78);border-radius:.12vw .22vw .1vw .25vw;background:rgba(255,238,196,.18);',
+    'box-shadow:inset 0 0 .25vw rgba(90,60,25,.35),0 1px 0 rgba(255,236,190,.35)}',
+    '#ts-select .intro .skip input:checked{background:rgba(255,238,196,.18) url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 20 20\'><path d=\'M3.5 10.5 C5.5 11.5 7 13.5 8.2 16 C10.5 10.5 13.5 6 17.5 2.5\' fill=\'none\' stroke=\'%232c1e10\' stroke-width=\'2.4\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/></svg>") center/135% no-repeat}',
+    '#ts-select .intro .go{margin-top:1.3vw;padding:.35vw 0;border:0;background:none;display:flex;align-items:center;gap:.9vw;',
+    'font-size:1.2vw;letter-spacing:.32em;text-transform:uppercase;color:#2c1e10;text-shadow:0 1px 0 rgba(255,236,190,.4)}',
+    '#ts-select .intro .go::before,#ts-select .intro .go::after{content:"";width:3.2vw;height:.12vw;',
+    'background:linear-gradient(90deg,transparent,rgba(44,30,16,.8))}',
+    '#ts-select .intro .go::after{background:linear-gradient(270deg,transparent,rgba(44,30,16,.8))}',
+    '#ts-select .intro.opening .flash{animation:tsFlash .7s ease-out forwards}',
+    '#ts-select .intro.opening .closed{animation:tsFade .5s ease .35s forwards}',
+    '#ts-select .intro.opening .open{pointer-events:auto;animation:tsRise 1.1s cubic-bezier(.22,.9,.25,1) .35s forwards}',
+    '#ts-select .intro.opening .words{animation:tsShow .9s ease 1.6s forwards}',
+    '@keyframes tsFlash{0%{opacity:0;transform:translate(-50%,-50%) scale(0)}12%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(8)}}',
+    '@keyframes tsFade{to{opacity:0}}',
+    '@keyframes tsShow{to{opacity:1}}',
+    '@keyframes tsRise{0%{opacity:0;left:29.5%;top:81%;transform:translate(-50%,-50%) scale(.04,.12)}30%{opacity:1}',
+    '60%{transform:translate(-50%,-50%) scale(.3,1)}100%{opacity:1;left:50%;top:58%;transform:translate(-50%,-50%) scale(1,1)}}'
   ].join('');
   var style = document.createElement('style');
   style.id = 'ts-select-css';
@@ -153,6 +201,14 @@
   root.id = 'ts-select';
   root.innerHTML =
     '<div class="bg"></div><div class="shade"></div>' +
+    '<div class="intro" style="display:none"><div class="stage">' +
+      '<img class="closed" src="thornswood-scroll.webp" alt="To Start">' +
+      '<div class="flash"></div>' +
+      '<div class="open"><img src="thornswood-scroll-open.webp" alt="">' +
+        '<div class="words"><div class="said">The seal is broken.<br>Your journey through Thornswood begins.</div>' +
+        '<label class="skip"><input type="checkbox" class="skipnext"> Start without the scroll next time</label>' +
+        '<div class="btn2 go">Continue</div></div></div>' +
+    '</div></div>' +
     '<div class="panel">' +
       '<div class="head"><div><div class="eyebrow">Thornswood</div><div class="title">Who are you today?</div></div>' +
       '<div class="count"></div></div>' +
@@ -203,6 +259,78 @@
   }
   var elCount = root.querySelector('.count');
   var elStatus = root.querySelector('.status');
+
+  /*
+    The scroll, Djinn, 24 September. Up first unless this person ticked
+    "Start without the scroll next time" (the launcher passes intro:false
+    then, from Data/Platform/thornswood-intro.txt, which the plugin writes).
+    It only stands in front of the slots: the painting, the music and the
+    pick are exactly as before, and if either picture of the scroll is
+    missing the slots come straight up.
+  */
+  var elIntro = root.querySelector('.intro');
+  var elShade = root.querySelector('.shade');
+  var introPhase = 0;       // 0 not showing, 1 on the ledge, 2 opened
+  var introSay = '';        // 'intro off' or 'intro on', said again with the pick
+  function introEnd(why) {
+    if (!introPhase) return;
+    introPhase = 0;
+    var box = root.querySelector('.intro .skipnext');
+    if (box && box.checked) { introSay = 'intro off'; tell(introSay); }
+    elIntro.style.display = 'none';
+    elPanel.style.display = '';
+    elShade.style.display = '';
+    if (why) tell('intro: ' + why);
+    fit(); draw();
+  }
+  function introOpen() {
+    if (introPhase !== 1) return;
+    introPhase = 2;
+    elIntro.className = 'intro opening';
+    tell('intro: the scroll was opened');
+  }
+  // Keys while the scroll is up. The slots are not on screen yet, so no
+  // other key reaches them; Space on the checkbox still ticks it.
+  function introKey(ev) {
+    if (!introPhase) return false;
+    if (ev.key === 'Escape') { introEnd('skipped with Escape'); ev.preventDefault(); return true; }
+    if (ev.key === ' ' && ev.target && ev.target.className === 'skipnext') return true;
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      if (introPhase === 1) introOpen(); else introEnd('');
+      ev.preventDefault();
+    }
+    return true;
+  }
+  if (elIntro && LIST.intro !== false) {
+    introPhase = 1;
+    elPanel.style.display = 'none';
+    elShade.style.display = 'none';
+    elIntro.style.display = '';
+    var introImgs = elIntro.querySelectorAll('img');
+    for (var ii = 0; ii < introImgs.length; ii++) {
+      introImgs[ii].onerror = function () { introEnd('a scroll picture is missing, straight to the slots'); };
+    }
+    elIntro.querySelector('.closed').onclick = introOpen;
+    /*
+      Continue is when the choice really starts, Djinn, 25 September: the
+      client's fallback to the last character is meant to count from here
+      and not from the game reaching the menu, so time on the scroll is not
+      time taken from choosing. Told to the client as 'thornswood',
+      'choosing'; a client from before that change ignores it.
+    */
+    elIntro.querySelector('.go').onclick = function () {
+      try { window.skyrimPlatform.sendMessage('thornswood', 'choosing'); } catch (e) { }
+      introEnd('continue clicked, the choice starts now');
+    };
+    tell('intro: the scroll is up');
+  } else if (LIST.intro === false) {
+    var introBack = el('div', 'hint', 'The scroll at the start is off. Click here to have it back next time.');
+    introBack.onclick = function () {
+      introSay = 'intro on'; tell(introSay);
+      introBack.textContent = 'The scroll will be back next time.';
+    };
+    root.querySelector('.foot').insertBefore(introBack, root.querySelector('.quitrow'));
+  }
 
   /*
     Close the game. Asked twice, then sent to the front, which calls the
@@ -467,6 +595,7 @@
   function sendPick() {
     if (!picked || acked) return;
     try { window.skyrimPlatform.sendMessage('thornswood', 'select', picked); } catch (err) { }
+    if (introSay) tell(introSay);
   }
   function play() {
     if (sent) return;
@@ -491,6 +620,7 @@
 
   function onKey(ev) {
     if (root.className === 'gone') return;
+    if (introKey(ev)) return;
     var list = slots();
     var n = list.length;
     if (asking) {

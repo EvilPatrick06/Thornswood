@@ -414,6 +414,10 @@
   const CHOICE_FILE = 'Data/Platform/thornswood-choice.txt';
   const CHARACTERS_FILE = 'Data/Platform/thornswood-characters.json';
   const FORGET_FILE = 'Data/Platform/thornswood-forget.txt';
+  // "Start without the scroll next time" on the choice page (Djinn, 24
+  // September): "off" in here and the launcher tells the page, and the
+  // injected list below carries it too. Anything else, or no file, shows it.
+  const INTRO_FILE = 'Data/Platform/thornswood-intro.txt';
   const chooseAtMenu = !!((client.gameData || {}).chooseAtMenu);
   let menuPhase = 0;
   let menuAt = 0;
@@ -654,7 +658,8 @@
       gets a loadUrl as a last resort and the wait that comes with it.
     */
     if (menuPhase === 0) {
-      if (now - loadedAt < 600) { return; }
+      // 100 ms, was 600 (Djinn, 25 September: the still before the loop was up too long).
+      if (now - loadedAt < 100) { return; }
       if (chosenOnDisk()) { menuPhase = 9; log('menu: a choice is already on disk for this session'); return; }
       try {
         sp.browser.setVisible(true);
@@ -768,6 +773,7 @@
       menuPhase = 9;
       return;
     }
+    try { if (readText(INTRO_FILE).trim() === 'off') { list.intro = false; } } catch (e) { }
     if (has !== 'list') { T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';'); }
     inject('thornswood-select.js');
     menuPhase = 2; menuAt = Date.now(); menuBeatAt = Date.now();
@@ -5527,6 +5533,15 @@
     // The delete icon at the menu: one id, for the launcher, which drops the
     // character from its list on its next poll. The character stays on the
     // server; this is the old launcher's Delete, moved into the game.
+    // The scroll in front of the choice: its checkbox, and the way back.
+    // One word on disk for the launcher to pass on next time.
+    if (what === 'select:intro off' || what === 'select:intro on') {
+      try { require('fs').writeFileSync(INTRO_FILE, what.slice(13) + '\n'); }
+      catch (e) { log('menu: could not write the scroll setting:', e); }
+      log('menu: the scroll at the start is now', what.slice(13));
+      menuBeatAt = Date.now();
+      return;
+    }
     if (what.indexOf('select:forget ') === 0) {
       const gid = Number(what.slice(14)) || 0;
       if (gid > 0) {
