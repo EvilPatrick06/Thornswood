@@ -155,7 +155,10 @@ the team before code; nobody settles it alone, and a Claude never does.
   GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
   through its own pull request, or the next main release loses it. 1.1.93 was
   the first, built from 55ac6ef. A hotfix is Patrick's call, like any live
-  release.
+  release. Once it is live, its commit is kept as a tag, `live-<version>`,
+  and the branch is deleted, so no hotfix branch sits on GitHub: the next
+  hotfix starts with `git checkout -b hotfix/<name> live-<version>` from the
+  tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
 - Nobody pushes to main any more, Patrick included. Everything goes through a
   pull request. This replaces the 18 Sep decision that his own work went
   straight to main, which held while `enforce_admins` was off and stopped
