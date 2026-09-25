@@ -1290,9 +1290,8 @@ namespace Thornswood
             {
                 string why = "Could not remove " + folder + ", left over from an earlier attempt: " + ex.Message +
                              " If Steam is still downloading into it, let that finish or restart Steam. Then delete that folder and press the button again.";
-                log(why);
-                status(why);
-                return false;
+                // Through Stop, so the bar goes too, as every other early stop does.
+                return Stop(why, log, status);
             }
         }
 
