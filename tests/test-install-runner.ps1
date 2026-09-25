@@ -60,7 +60,12 @@ Yes '  and nothing runs pip with the machine''s python' ($yml -notmatch '(?m)^\s
 Yes 'the account is made as a plain local user' ($text -match 'New-LocalUser')
 Yes '  in Users' ($text -match "Add-LocalGroupMember -Group 'Users'")
 Yes '  and never in Administrators' ($text -notmatch "Add-LocalGroupMember -Group 'Administrators'")
-Yes '  its password is made on the box, not sent from here' ($text -match 'GeneratePassword' -and $text -notmatch '(?m)^\s*\$pw\s*=')
+Yes '  its password is made on the box, not sent from here' ($text -match 'RNGCryptoServiceProvider' -and $text -notmatch '(?m)^\s*\$pw\s*=')
+$descs = @([regex]::Matches($text, "-Description '([^']*)'") | ForEach-Object { $_.Groups[1].Value })
+Yes '  its description fits the 48 characters New-LocalUser allows' ($descs.Count -ge 1 -and @($descs | Where-Object { $_.Length -gt 48 }).Count -eq 0)
+$acctDefault = [regex]::Match($text, "\[string\]\`$Account\s*=\s*'([^']*)'").Groups[1].Value
+Yes "  its name fits the 20 characters a local account may have (found '$acctDefault')" ($acctDefault.Length -ge 1 -and $acctDefault.Length -le 20)
+Yes '  its password is letters and digits, which cmd.exe passes to config.cmd untouched' ($text -notmatch 'GeneratePassword' -and $text.Contains('Pick (`$up + `$lo + `$dg) 37'))
 Yes 'the service runs as that account' ($text -match '--windowslogonaccount')
 Yes 'every live Thornswood folder is denied to it' ($text.Contains('icacls.exe `$d.FullName /deny'))
 Yes '  except its own' ($text -match 'if \(`\$d\.FullName -eq `\$root\) \{ continue \}')
