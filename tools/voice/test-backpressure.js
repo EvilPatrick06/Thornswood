@@ -311,10 +311,13 @@ yes('only the roster is sent newest-only',
   const R = await open();
   let roster = [];
   const got = [];
+  // The largest position message it was sent, which is how much one tick
+  // puts behind a socket that does not read.
+  let posBytes = 0;
   const heard = [];
   read(R, (m) => {
     if (m.t === 'peers') roster = m.peers;
-    if (m.t === 'pos') got.push(Date.now());
+    if (m.t === 'pos') { got.push(Date.now()); posBytes = Math.max(posBytes, JSON.stringify(m).length); }
     if (m.t === 'chat') heard.push(m);
   });
   send(R, { t: 'join', profileId: 100000, name: 'keeps up' });
@@ -353,8 +356,21 @@ yes('only the roster is sent newest-only',
   console.log('      held ' + MB(from.held) + ' a second in, ' + MB(last.held) + ' at the end');
 
   yes('the queue behind it stays under the ceiling', peak <= CEILING);
+  /* Read over a second and a half at each end rather than once, and allowed
+     one position message between them. The queue sits at one message, but a
+     socket is backed only from a tick until the kernel takes what it can, so
+     a single read can land after the drain: on the Windows runner on 25
+     September the read a second in was 0.00 MB, every other one was 0.14 MB,
+     and main went red three runs in a row. The code before #275 put one more
+     message on for every tick, thirty in these six seconds. */
+  const WINDOW = 1500;
+  const early = after.filter((p) => p.at >= from.at && p.at < from.at + WINDOW);
+  const late = after.filter((p) => p.at > last.at - WINDOW);
+  const most = (xs) => Math.max.apply(null, xs.map((p) => p.queue));
+  console.log('      largest queue ' + MB(most(early)) + ' over the first ' + WINDOW + ' ms, ' +
+              MB(most(late)) + ' over the last, one position message ' + MB(posBytes));
   yes('and stops growing rather than climbing with every tick',
-      last.queue - from.queue < 64 * 1024);
+      posBytes > 0 && most(late) - most(early) < posBytes + 64 * 1024);
   yes('and the memory the service holds stops growing with it',
       last.held - from.held < 1024 * 1024);
   yes('a stuck socket is not closed for positions alone, they are dropped instead',
