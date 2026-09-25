@@ -79,9 +79,42 @@ try {
     }
 } catch {
     $code = 0; try { $code = [int]$_.Exception.Response.StatusCode } catch { }
-    if ($code -eq 403) { Say 'STOP. Discord says the bot may not read the audit log (403). Give its role "View Audit Log" (Server Settings, Roles), and check that role is not below one that denies it. Nothing was changed.' 'Red' }
-    else { Say ("STOP. Reading the audit log failed{0}: {1}. Nothing was changed." -f $(if ($code) { " ($code)" } else { '' }), $_.Exception.Message) 'Red' }
-    exit 1
+    $said = ''; try { $said = [string]$_.ErrorDetails.Message } catch { }
+    Say ("  the audit log could not be read ({0}): {1}" -f $code, $(if ($said) { $said } else { $_.Exception.Message })) 'Yellow'
+    $entries = $null
+}
+
+# ---- without the audit log: what was made inside the window -----------------
+# A Discord id carries the moment it was made, so the channels and the role
+# that run created are the ones whose ids are younger than the window. Only
+# those are deleted. The bot's channel overwrites only let it see and post,
+# which Admin already allows, and the join message setting was the same before
+# the run (Build-Discord.py writes it on every run), so both are left alone.
+if ($null -eq $entries) {
+    Say '  working from the channels and roles made in the window instead' 'Yellow'
+    $chans = @(Api GET "/guilds/$Guild/channels" $null | Where-Object { (Ms $_.id) -ge $since })
+    $roles = @(Api GET "/guilds/$Guild/roles" $null | Where-Object { (Ms $_.id) -ge $since -and -not $_.managed })
+    # Channels before the categories that hold them.
+    $chans = @($chans | Sort-Object { if ([int]$_.type -eq 4) { 1 } else { 0 } })
+    if (-not ($chans.Count + $roles.Count)) { Say ("  nothing was made in the last {0} hours; try -Hours 12" -f $Hours) 'Yellow'; exit 0 }
+    $done = 0; $failed = 0
+    foreach ($c in $chans) {
+        $when = [DateTimeOffset]::FromUnixTimeMilliseconds((Ms $c.id)).ToLocalTime().ToString('HH:mm')
+        $what = "delete #$($c.name), made at $when"
+        if (-not $Apply) { Say "  would $what" 'Yellow'; continue }
+        try { Api DELETE "/channels/$($c.id)" $null | Out-Null; Say "  $what" 'Green'; $done++ } catch { Say "  FAILED: $what ($($_.Exception.Message))" 'Red'; $failed++ }
+    }
+    foreach ($r in $roles) {
+        $when = [DateTimeOffset]::FromUnixTimeMilliseconds((Ms $r.id)).ToLocalTime().ToString('HH:mm')
+        $what = "delete role $($r.name), made at $when"
+        if (-not $Apply) { Say "  would $what" 'Yellow'; continue }
+        try { Api DELETE "/guilds/$Guild/roles/$($r.id)" $null | Out-Null; Say "  $what" 'Green'; $done++ } catch { Say "  FAILED: $what ($($_.Exception.Message))" 'Red'; $failed++ }
+    }
+    $token = $null; $headers = $null
+    Say ''
+    if (-not $Apply) { Say 'Nothing was changed. If every line above is from the Setup-Discord run and nothing you made yourself, run it again with -Apply.' 'Yellow'; exit 0 }
+    Say ("deleted {0}, failed {1}" -f $done, $failed) $(if ($failed) { 'Red' } else { 'Green' })
+    exit $(if ($failed) { 1 } else { 0 })
 }
 Say ("{0} change(s) by the bot in the last {1} hours" -f $entries.Count, $Hours)
 
