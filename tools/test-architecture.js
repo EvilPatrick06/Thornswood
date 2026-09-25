@@ -417,15 +417,15 @@ yes('the steps the page lists inside each method are in the order the code runs 
   else console.log('      every .cs file in tools/app is named on the page');
 }
 
-// The six shared files, as CLAUDE.md names them today.
+// The six shared files, as CONTRIBUTING.md names them today.
 {
-  const claude = (read(path.join(ROOT, 'CLAUDE.md')) || '').replace(/\s+/g, ' ');
+  const claude = (read(path.join(ROOT, 'CONTRIBUTING.md')) || '').replace(/\s+/g, ' ');
   const m = claude.match(/Do not edit (.+?) without a line in #dev/);
   const s4 = page.slice(Math.max(0, page.indexOf('## 4. The six shared files')));
-  if (!m) note('CLAUDE.md no longer words its #dev rule as "Do not edit ... without a line in #dev", so section 4 was not compared with it');
+  if (!m) note('CONTRIBUTING.md no longer words its #dev rule as "Do not edit ... without a line in #dev", so section 4 was not compared with it');
   else {
     const named = m[1].match(/[\w-]+\.(?:cs|ps1)/g) || [];
-    yes('CLAUDE.md\'s #dev rule names files, ' + named.length + ' of them', named.length > 0);
+    yes('CONTRIBUTING.md\'s #dev rule names files, ' + named.length + ' of them', named.length > 0);
     named.forEach(function (f) { yes('section 4 lists ' + f, s4.indexOf(f) >= 0); });
   }
 }

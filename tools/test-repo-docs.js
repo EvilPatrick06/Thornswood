@@ -76,6 +76,7 @@ if (readme !== null) {
   // stale against join.md and nobody noticed, so this one points instead.
   yes('README.md points people who want to join at thornswood.net/join',
       /https:\/\/thornswood\.net\/join/.test(readme));
+  yes('README.md points developers at CONTRIBUTING.md', /\]\(CONTRIBUTING\.md\)/.test(readme));
   yes('README.md points developers at CLAUDE.md', /\]\(CLAUDE\.md\)/.test(readme));
   yes('README.md points developers at SECOND-DEVELOPER.md', /\]\(SECOND-DEVELOPER\.md\)/.test(readme));
   yes('README.md does not send anybody to SETUP.md, which describes the old product' + where(readme, /SETUP\.md/),

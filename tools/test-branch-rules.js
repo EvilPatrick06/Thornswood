@@ -158,6 +158,14 @@ yes('Bump-Version.ps1 pushes nothing itself; it prints the push for a person to 
 
 // ------------------------------------------------------------ CODEOWNERS
 const coRaw = read('.github/CODEOWNERS');
+const claudeRaw = read('CONTRIBUTING.md');
+// The team, from the table in CONTRIBUTING.md: the GitHub column, as handles.
+const TEAM = [];
+((claudeRaw || '').split(/\r?\n/)).forEach(function (l) {
+  const m = /^\|\s*[^|]+\|\s*([A-Za-z0-9-]+)\s*\|/.exec(l);
+  if (m && m[1] !== 'GitHub' && !/^-+$/.test(m[1])) TEAM.push('@' + m[1]);
+});
+yes('CONTRIBUTING.md has a team table with GitHub handles (' + TEAM.join(' ') + ')', TEAM.length >= 3);
 const rules = coRaw.split(/\r?\n/).filter(function (l) { return l.trim() && !/^\s*#/.test(l); })
   .map(function (l) { const p = l.trim().split(/\s+/); return { path: p[0], owners: p.slice(1) }; });
 yes('CODEOWNERS has rules to read (' + rules.length + ')', rules.length >= 6);
@@ -169,24 +177,23 @@ yes('every path CODEOWNERS names exists, since GitHub ignores a wrong one in sil
 const badOwner = [];
 rules.forEach(function (r) {
   if (!r.owners.length) badOwner.push(r.path + ' has no owner');
-  r.owners.forEach(function (o) { if (o !== '@EvilPatrick06' && o !== '@WiccanDjinn') badOwner.push(r.path + ' ' + o); });
+  r.owners.forEach(function (o) { if (TEAM.indexOf(o) < 0) badOwner.push(r.path + ' ' + o); });
 });
 badOwner.forEach(function (b) { console.log('      ' + b); });
-yes('every owner is Patrick or Djinn by GitHub handle', badOwner.length === 0);
+yes('every owner is somebody in CONTRIBUTING.md\'s team table, by GitHub handle', badOwner.length === 0);
 
-const claudeRaw = read('CLAUDE.md');
 const shared = /Do not edit ([\s\S]*?) without a line in #dev/.exec(claudeRaw);
 const sharedNames = shared ? shared[1].replace(/\s+/g, ' ').split(/,\s*|\s+or\s+/).map(function (s) { return s.trim(); }).filter(Boolean) : [];
-yes('CLAUDE.md lists the six shared files (' + sharedNames.join(', ') + ')', sharedNames.length === 6);
+yes('CONTRIBUTING.md lists the six shared files (' + sharedNames.join(', ') + ')', sharedNames.length === 6);
 const uncovered = sharedNames.filter(function (n) {
-  return !rules.some(function (r) { return path.posix.basename(r.path) === n && r.owners.length === 2; });
+  return !rules.some(function (r) { return path.posix.basename(r.path) === n && TEAM.every(function (o) { return r.owners.indexOf(o) >= 0; }); });
 });
-uncovered.forEach(function (n) { console.log('      not in CODEOWNERS for both of them: ' + n); });
-yes('each of the six shared files has a CODEOWNERS line naming both of them', sharedNames.length === 6 && uncovered.length === 0);
+uncovered.forEach(function (n) { console.log('      not in CODEOWNERS for the whole team: ' + n); });
+yes('each of the six shared files has a CODEOWNERS line naming the whole team (' + TEAM.join(' ') + ')', sharedNames.length === 6 && uncovered.length === 0);
 
 // ------------------------------------------------------------ the documents
 const docs = [
-  { name: 'CLAUDE.md', text: flat(claudeRaw, false) },
+  { name: 'CONTRIBUTING.md', text: flat(claudeRaw, false) },
   { name: 'SECOND-DEVELOPER.md', text: flat(read('SECOND-DEVELOPER.md'), false) },
   { name: '.github/CODEOWNERS', text: flat(coRaw, true) }
 ];
