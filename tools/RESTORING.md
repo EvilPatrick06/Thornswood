@@ -20,7 +20,8 @@ the exercise, not paperwork about it.
 
 A backup holds `game\world` (the characters), `game\private` (the door list and
 who is allowed in), `game\data`, `server-settings.json`, `gamemode.js`, the
-site's `data` folder, the bot's config, and the voice service's `owners.json`
+site's `data` folder, the bot's config and its join record (`joins.json`, which
+arrival each person was), and the voice service's `owners.json`
 and `choices.json`. It does **not** hold node_modules, the installer, or the
 Skyrim data files. Those come back from the repo.
 
@@ -85,7 +86,9 @@ place, or it writes fresh empty characters over the top.
    - `C:\restore\game\data` → `C:\Thornswood-Server\data`
    - `C:\restore\game\server-settings.json` → the server root
    - `C:\restore\site\data` → `C:\Thornswood-Docs\data`
-   - `C:\restore\bot\config.json`, `C:\restore\site\config.json` → their roots
+   - `C:\restore\bot\bot.env.json`, `C:\restore\site\config.json` → their roots
+   - `C:\restore\bot\joins.json` → `C:\Thornswood-Bot\joins.json`, before the
+     bot starts, or the join cards start counting again
    - `C:\restore\voice\owners.json` → `C:\Thornswood-Voice\owners.json`
 5. **The rest comes from a release, not from the backup.** Run `Ship.ps1` from
    Patrick's machine so the server, the gamemode and the site are the versions
