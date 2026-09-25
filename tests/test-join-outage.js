@@ -84,7 +84,11 @@ const body = async (req) => req.body;
 const sendJson = (res, code, obj) => { res.code = code; res.obj = obj; return res; };
 const slotsFor = () => 2;
 
+// standingCached, hasLeft and departed because the join route asks whether an
+// account holding the id has left the Discord before it reads the file it
+// writes back (entry 142).
 eval(grab('guildMembers') + '\n' + grab('memberOf') + '\n' + grab('roleNames') + '\n' + grab('standing') +
+     '\n' + grab('standingCached') + '\n' + grab('hasLeft') + '\n' + grab('departed') +
      '\nasync function join(p, req, res) {\n' + JOIN + '\n}');
 
 function reset() {

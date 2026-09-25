@@ -19,6 +19,7 @@
 //   Discord.Connect(...)     -> opens the browser, waits, saves the ticket
 //   Discord.Join()           -> ask the site: allowed in, and the password
 //   Discord.Forget()         -> unlink
+//   Discord.AccountId        -> the Discord id the ticket is for
 //   Discord.NewSession()     -> one id for this Play
 //   Discord.SessionStart/End -> both ends of a session, for the site's log
 
@@ -115,6 +116,40 @@ namespace Thornswood
         }
 
         public static bool Linked { get { return Ticket != null; } }
+
+        /// <summary>
+        /// The Discord id inside the ticket this copy holds, or "" when it is
+        /// not linked or the ticket cannot be read.
+        ///
+        /// Which account the launcher is acting for, so the character list
+        /// can tell when that changes (Chars.EnsureSpare). Not a check of the
+        /// ticket: the site checks the signature on every call, and nothing
+        /// here is let in or kept out on this.
+        /// </summary>
+        public static string AccountId { get { return AccountIdOf(Ticket); } }
+
+        /// <summary>
+        /// The Discord id out of a ticket, "" for anything that is not one.
+        /// The site's makeTicket writes tk1.body.signature, the body being
+        /// base64url JSON with the id in d.
+        /// </summary>
+        public static string AccountIdOf(string ticket)
+        {
+            if (string.IsNullOrEmpty(ticket)) return "";
+            string[] parts = ticket.Split('.');
+            if (parts.Length != 3 || parts[0] != "tk1" || parts[1].Length == 0) return "";
+            try
+            {
+                string b = parts[1].Replace('-', '+').Replace('_', '/');
+                while (b.Length % 4 != 0) b += "=";
+                string d = Field(Encoding.UTF8.GetString(Convert.FromBase64String(b)), "d");
+                if (d.Length == 0 || d.Length > 32) return "";
+                // A Discord id is a string of digits and nothing else.
+                foreach (char c in d) if (c < '0' || c > '9') return "";
+                return d;
+            }
+            catch { return ""; }
+        }
 
         public static void Forget()
         {
