@@ -4,6 +4,10 @@ Decided 15 September 2026. Thornswood stops keeping its own copy of Skyrim.
 The mods come from a Nexus collection, installed by Vortex into the person's
 own Skyrim, and Thornswood is a Vortex profile they switch to.
 
+**The game folder half of this was reversed on 17 and 18 September:
+Thornswood runs from its own folder. "Read this first", below, says what is
+true now.**
+
 This is what another server does. Their collection is public in Vortex right
 now: 46 mods, 4.1 GB, described as the collection used by their server.
 
@@ -40,7 +44,22 @@ collection method Vortex owns that redirection and Swap has to stop. The
 uninstall path already refuses to run while a junction is live, which is the
 behaviour to keep.
 
-## What changes
+## Read this first: half of the plan below was reversed
+
+The plan below is from 15 September. The collection half of it happened: the
+mods come from the Nexus collection deployed by Vortex, and the installer
+carries the launcher and Thornswood's own content, not the mods. The game
+folder half did not. On 17 and 18 September Patrick and Djinn decided the
+opposite (CONTRIBUTING.md, Settled design): Thornswood runs from its own
+folder, `<Root>\Game`, which the launcher builds from the Steam copy and what
+Vortex deployed into it, the big files as hard links. So `Paths.Game` is
+`<Root>\Game`, not the Steam copy; the game folder is built, by the launcher
+rather than the installer; and `Swap.cs` still junctions the Windows Skyrim
+folders every session. The rows of the table and the steps below that say
+otherwise are the plan as it stood, kept for the reasoning, not what is true
+now. DEVELOPING.md, One Skyrim of its own, is what is true now.
+
+## What changes (the 15 September plan)
 
 | Thing | Now | Becomes |
 |---|---|---|
