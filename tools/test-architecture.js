@@ -6,7 +6,7 @@
 //
 // WHY THIS EXISTS. To Do List entry 256: "There is no launcher architecture
 // document, because the one that is pointed at is a finished to-do note".
-// CLAUDE.md and SECOND-DEVELOPER.md both sent a newcomer to
+// CLAUDE.md and DEVELOPING.md both sent a newcomer to
 // tools\app\HOOKUP.md for "how the launcher classes hang together", and that
 // file was 108 lines titled "Wiring Discord.cs into the launcher": finished
 // work. Play, the flow every person hits, could not be followed from the
@@ -15,7 +15,7 @@
 //
 // What it checks:
 //   1. the page is there and the old note is gone;
-//   2. CLAUDE.md and SECOND-DEVELOPER.md point at the page, and no tracked
+//   2. CLAUDE.md and DEVELOPING.md point at the page, and no tracked
 //      document still points at the old note (docs/archive is exempt:
 //      it is the dated 17 September audit, a record of what was true then);
 //   3. Shell.cs carries a class summary that names the page;
@@ -60,7 +60,7 @@ yes('tools/app/HOOKUP.md, the finished Discord wiring note, is gone',
     !fs.existsSync(path.join(APP, 'HOOKUP.md')));
 
 // ------------------------------------------------------------ 2. the pointers
-['CLAUDE.md', 'SECOND-DEVELOPER.md'].forEach(function (doc) {
+['CLAUDE.md', 'DEVELOPING.md'].forEach(function (doc) {
   const t = read(path.join(ROOT, doc)) || '';
   yes(doc + ' points at tools\\app\\ARCHITECTURE.md', t.indexOf('tools\\app\\ARCHITECTURE.md') >= 0);
   yes(doc + ' no longer names HOOKUP.md', !/HOOKUP/i.test(t));

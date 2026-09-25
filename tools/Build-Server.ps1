@@ -74,7 +74,7 @@ if (-not $BuildDir) { $BuildDir = Join-Path $Fork 'build' }
 Head 'Where the source is'
 
 if (-not (Test-Path -LiteralPath $Fork)) {
-    Die "there is no fork at $Fork. SECOND-DEVELOPER.md says how a machine gets one."
+    Die "there is no fork at $Fork. DEVELOPING.md says how a machine gets one."
 }
 Say ("  fork        " + $Fork)
 
@@ -100,7 +100,7 @@ if ($dirty.Count) {
 if (-not (Test-Path -LiteralPath (Join-Path $BuildDir 'CMakeCache.txt'))) {
     Die ("$BuildDir has no CMakeCache.txt, so it has never been configured. " +
          "Configuring is a separate job with its own arguments and this script will not guess at them. " +
-         "See SECOND-DEVELOPER.md.")
+         "See DEVELOPING.md.")
 }
 Say ("  build       " + $BuildDir)
 
