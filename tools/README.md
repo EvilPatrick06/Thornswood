@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 194 of them, with the one line that says
+Every `.ps1` in this folder, 192 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -84,7 +84,6 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Go.ps1](Go.ps1) | Installs the front, the overlays and the plugins, then reports what the server is doing. |
 | [Install-Backup.ps1](Install-Backup.ps1) | Puts the nightly backup on the VPS: sends vps-nightly-backup.ps1 up, makes a passphrase if there is not one yet, and registers the scheduled task that runs it. |
 | [Install-Bot.ps1](Install-Bot.ps1) | Puts the Thornswood bot on the VPS and keeps it running. |
-| [Install-Emotes.ps1](Install-Emotes.ps1) | Lays down the emote wheel: a SkyrimPlatform plugin and the page it draws. |
 | [Install-Launcher.ps1](Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
 | [Install-SkyMPClient.ps1](Install-SkyMPClient.ps1) | Switches the game folder from Skyrim Together Reborn to SkyMP. |
 | [Install-Thornswood.ps1](Install-Thornswood.ps1) | Everything the client needs, in one run, in the order it has to happen in. |
@@ -117,7 +116,6 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Reset-Character.ps1](Reset-Character.ps1) | Throws away the character on the server so the next launch runs creation from the top. |
 | [Restart-Server.ps1](Restart-Server.ps1) | Restarts a Thornswood service on the VPS. Nothing is copied and nothing is built: this only stops it and starts it again. |
 | [Restore-Backup.ps1](Restore-Backup.ps1) | Opens one of the nightly backups: checks it has not been tampered with, decrypts it, and unpacks it into a folder you name. |
-| [Revert.ps1](Revert.ps1) | Put the game back to the state it was working in. |
 | [Roll-Log.ps1](Roll-Log.ps1) | Rolls a log just before the service that writes it starts. |
 | [Rotate-ServerPassword.ps1](Rotate-ServerPassword.ps1) | Changes the server password and hands the new one to the site, so the launcher can fetch it after checking Discord. |
 | [Set-Collection.ps1](Set-Collection.ps1) | Asks for the collection address and publishes it, in the two places that decide it, the same two Set-Server.ps1 uses. |
