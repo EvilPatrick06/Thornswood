@@ -1017,48 +1017,50 @@
   function applyFocus() {
     let up;
     try { up = !!sp.browser.isFocused(); } catch (e) { return; }
-    const want = anyClaim();
+    /*
+      F6 IS A PERSON, NOT A STRAY, AND NOW IT IS ASKED FOR BY NAME.
+
+      skymp5-client binds F6 to toggling browser focus. Somebody looking at a
+      panel with no claim behind it presses F6, focus goes up, and this
+      function put it straight back down on the very next frame, for ever. No
+      cursor, and with focus down the browser is sent no keys and no clicks
+      either, so the panel's own Escape and Close are unreachable: Task
+      Manager was the only way out, which is exactly what Djinn reported on
+      22 September.
+
+      THE FIRST ANSWER TO THAT DID NOT WORK, AND THIS IS WHY. It held an
+      unexplained focus once it had been up 1.2 seconds. Outside the race menu
+      nothing ever got to 1.2 seconds: the first frame fell through to the put
+      down below, so F6 at a panel still did nothing. tools\test-f6-focus.js
+      run against that text has the focus down again on the first frame.
+      Inside the race menu it did hold, for two minutes, with the browser
+      hidden because a menu was open and nothing claimed: a keyboard taken
+      from the race menu and given to a page nobody could see.
+
+      AND THE PUT DOWN ON THE FIRST FRAME HAS TO STAY. skymp5-client binds
+      Enter to raise focus as well (browserService.ts in the fork, at the
+      commit client-build.json records), and that put down is the only thing
+      that stops an Enter pressed in the world leaving somebody unable to
+      move. So the two keys are told apart at the key rather than guessed at
+      here: F6 is watched for by watchFocusKeys below, and the focus it asks
+      for counts as a claim until F6 or Escape gives it back, a claim comes
+      along and takes over, a menu opens by itself, or MANUAL_FOCUS_MS runs
+      out. Every other focus nothing asked for, Enter's included, goes back
+      down exactly as it did before.
+    */
+    const claimed = anyClaim();
+    if (claimed) { manualFocusSince = 0; }
+    const want = claimed || manualFocusHeld();
 
     if (up === want) { strayFocusSince = 0; return; }
 
     if (!want) {
-      /*
-        F6 IS A PERSON, NOT A STRAY, and treating it as one is what made a
-        panel unescapable.
-
-        skymp5-client binds F6 to toggling browser focus. Somebody looking at
-        a panel with no claim behind it presses F6, focus goes up, and this
-        function used to put it straight back down on the very next frame, for
-        ever. No cursor, and with focus down the browser is sent no keys and
-        no clicks either, so the panel's own Escape and Close are unreachable:
-        Task Manager was the only way out, which is exactly what Djinn
-        reported on 22 September.
-
-        So an unexplained focus is held rather than fought. It still cannot
-        last: manualFocusSince below caps it the same way every claim is
-        capped, so a focus nobody ever puts down still comes back on its own.
-        What is gone is the frame-by-frame fight that made F6 do nothing.
-
-        The race menu case below is unchanged and still comes first: that one
-        really is something else taking the keyboard.
-      */
       if (!strayFocusSince) { strayFocusSince = Date.now(); }
       const waited = Date.now() - strayFocusSince;
       if (raceMenuOpen() && waited < 1200) { return; }
       if (waited >= 1200) {
-        if (!manualFocusSince) {
-          manualFocusSince = Date.now();
-          say('the keyboard was taken and nothing here asked for it. ' +
-              'Treating it as F6 and leaving it up; press F6 again to give it back.');
-        }
-        // Held, not taken back, until the cap below says otherwise.
-        if (Date.now() - manualFocusSince < MANUAL_FOCUS_MS) { return; }
-        say('F6 focus has been up for ' + Math.round(MANUAL_FOCUS_MS / 60000) +
-            ' minutes with nothing using it, taking it back');
-        manualFocusSince = 0;
+        say('something took the keyboard and nothing here asked for it, taking it back');
       }
-    } else {
-      manualFocusSince = 0;
     }
 
     try { sp.browser.setFocused(want); } catch (e) { }
@@ -1076,6 +1078,111 @@
   */
   let manualFocusSince = 0;
   const MANUAL_FOCUS_MS = 120000;
+
+  /** Whether an F6 focus still stands, ending it when it should end. */
+  function manualFocusHeld() {
+    if (!manualFocusSince) { return false; }
+    // A load screen, a message box or somebody talking to you needs the
+    // keyboard the page is holding, the same reason the chat box is shut.
+    const over = interrupted();
+    if (over) {
+      say('F6 focus given back, ' + over + ' opened');
+      manualFocusSince = 0;
+      return false;
+    }
+    if (Date.now() - manualFocusSince < MANUAL_FOCUS_MS) { return true; }
+    say('F6 focus has been up for ' + Math.round(MANUAL_FOCUS_MS / 60000) +
+        ' minutes, taking it back');
+    manualFocusSince = 0;
+    return false;
+  }
+
+  /*
+    F6, AND THE ESCAPE THAT ENDS IT, ARE ASKED OF THE KEYBOARD, NOT WAITED FOR
+    AS KEY EVENTS. 0x40 is F6's DirectInput scan code, the code
+    skymp5-client's own binding asks for (DxScanCode.F6).
+
+    buttonEvent cannot hear the F6 that gives the keyboard back. It is built
+    from the game's own input events (the kButton case in EventHandler.cpp in
+    the fork), and while focus is up DInputHook.cpp hands the game an empty
+    keyboard buffer. The snapshot it reads first goes to the browser and
+    nowhere else: OnKeyStateChange in the fork's main.cpp returns at once
+    unless the browser has focus, and then only injects the key into it.
+    This machine's platform log for 23 September agrees: the K panel held
+    focus from 10:21:04 to 10:21:31, a class, a profession and a town were
+    picked in it with the mouse, and every five second line in between says
+    "input: 0 keys in 5s, browser focus yes". Not one button event of any
+    kind reached this file while focus was up. An F6 caught there would
+    raise focus, and the F6 meant to lower it would never arrive:
+    skymp5-client would lower it and applyFocus would raise it again, for two
+    minutes.
+
+    skymp5-client hears F6 with focus up because it asks Input.isKeyPressed
+    whenever the number of keys held changes (keyboardEventsService.ts in the
+    fork). This asks the same question the same way, so the two see the same
+    presses, for one call a frame, the same one skymp5-client already makes.
+    Both codes are keyboard codes to Input.isKeyPressed, so the left stick
+    click (0x40 from a pad) and the right mouse button (1 from a mouse) are
+    neither of them.
+
+    Set outright rather than toggled, because skymp5-client toggles on the
+    same press and two toggles cancel: whichever of the two runs first, the
+    arbiter above ends up where this says. Nothing while a claim holds the
+    keyboard, since focus is already up and the claim decides when it comes
+    down. Nothing in a menu that owns the keyboard either, which is
+    skymp5-client's own list of menus it refuses F6 in plus the few that take
+    text (KEYBOARD_MENUS above): in the race menu a raised focus is a keyboard
+    taken from the race menu and handed to a page that is hidden.
+
+    Escape ends it too, the way skymp5-client's own Escape binding lowers
+    focus.
+  */
+  const F6_KEY = 0x40;
+  let f6Was = false;
+  let escWas = false;
+  let keysHeldWas = -1;
+
+  function watchFocusKeys() {
+    if (!T.ready) { return; }
+    let held;
+    try { held = sp.Input.getNumKeysPressed(); } catch (e) { return; }
+    if (held === keysHeldWas) { return; }
+    keysHeldWas = held;
+    let f6 = false;
+    let esc = false;
+    try {
+      f6 = !!sp.Input.isKeyPressed(F6_KEY);
+      esc = !!sp.Input.isKeyPressed(ESC);
+    } catch (e) { return; }
+    const f6Down = f6 && !f6Was;
+    const escDown = esc && !escWas;
+    f6Was = f6;
+    escWas = esc;
+    if (escDown && manualFocusSince) {
+      manualFocusSince = 0;
+      say('Escape, the F6 keyboard goes back to the game');
+    }
+    if (f6Down) { f6Pressed(); }
+  }
+
+  function f6Pressed() {
+    if (anyClaim()) { return; }
+    if (manualFocusSince) {
+      manualFocusSince = 0;
+      say('F6 again, the keyboard goes back to the game');
+      applyFocus();
+      return;
+    }
+    const busy = busyMenuOpen();
+    if (busy) {
+      say('F6 seen, but ' + busy + ' is open');
+      return;
+    }
+    manualFocusSince = Date.now();
+    say('F6: the cursor is on the overlay until F6 or Escape, or ' +
+        Math.round(MANUAL_FOCUS_MS / 60000) + ' minutes');
+    applyFocus();
+  }
 
   /*
     WHEN EACH CLAIM WENT UP, so the cap below can cover all of them.
@@ -1910,12 +2017,34 @@
     walked. The menu closing is the fact itself, and this is the one place
     that can see it.
   */
+  /*
+    AND THE RACE MENU BEING UP, told as /racemenu when it opens and once a
+    minute while it stays.
+
+    Djinn, 22 September: "Sitting in the selector window, it automatically
+    timed me out to name choice without any input commands". The server's five
+    minute give up could not tell somebody making a face from a race menu that
+    never opened, fired on him at 300 seconds exactly, and pushed the K panel
+    over a race menu the client cannot close. This is the one place that can
+    see the menu, so it says so, and the server holds the give up while the
+    reports keep coming (FACE_SEEN_MS in the gamemode). Only once the overlays
+    are in: a line queued before then would arrive late and say something
+    that is no longer true.
+  */
   let raceWasOpen = false;
+  let raceToldAt = 0;
+  const RACE_BEAT_MS = 60000;
   sp.on('update', guard('race', () => {
     const open = raceMenuOpen();
+    if (open && T.ready && Date.now() - raceToldAt >= RACE_BEAT_MS) {
+      if (!raceToldAt) { log('the race menu is up, telling the server once a minute while it is'); }
+      raceToldAt = Date.now();
+      tellServer('/racemenu');
+    }
     if (open === raceWasOpen) { return; }
     raceWasOpen = open;
     if (!open) {
+      raceToldAt = 0;
       log('the race menu closed, telling the server');
       tellServer('/face done');
     }
@@ -4723,6 +4852,8 @@
       the keyboard.
     */
     if (phase >= 2) {
+      // F6 and Escape first, so the focus they ask for is settled this frame.
+      watchFocusKeys();
       applyFocus();
     }
 
@@ -4778,7 +4909,11 @@
       // input while the render handler reports itself visible, every letter
       // typed after that goes nowhere. That is the chat that draws, takes the
       // cursor, and then will not accept a word.
-      const hide = !anyClaim() && gameMenuOpen();
+      //
+      // An F6 focus is the same case with no claim behind it. Without the
+      // middle test its CursorMenu turns this answer to hide, and the cursor F6
+      // asked for would come up over a page no longer drawn or sent a click.
+      const hide = !anyClaim() && !manualFocusSince && gameMenuOpen();
       if (sp.browser.isVisible() === hide) { sp.browser.setVisible(!hide); }
 
       // A menu opening while the chat box has the keyboard would leave the

@@ -3688,6 +3688,47 @@ const CHOOSE_LATER_MS = 600000;
  * over a nose is not. */
 const GIVEUP_MS = 300000;
 
+/*
+  AND IT WAITS WHILE THE RACE MENU IS REPORTED UP, for up to half an hour.
+
+  Djinn, 22 September, in "Timed out": "Sitting in the selector window, it
+  automatically timed me out to name choice without any input commands, then
+  once I named the character it then brought back up the selector and is stuck
+  there since the cursor icon F6 button does not show/initiate the cursor to
+  choose anything and is now stuck on this window and have to task out exit."
+
+  His session is in the live log: profile 61415365 went to appearance at
+  19:50:42, and at 19:55:43, to the second, "appearance never arrived after
+  300s, going on to the choices anyway". The same line fired twice more that
+  day, 22:15:14 on live and 01:11:15 on dev, each at exactly 300 seconds. Five
+  minutes was measured against a race menu that never opened, and the server
+  had no way to tell that from one somebody is still using, so it fired on
+  people making a face. What it does then is worse than moving them on. The
+  client cannot close a race menu (remoteServer.ts in the fork: "TODO:
+  Implement closeMenu in SkyrimPlatform"), so the race menu stays on screen
+  and the K panel is pushed on top of it. And where there is a face on file,
+  closeRaceMenu tells the server the menu is shut, so the face they finish
+  afterwards arrives at a server that throws it away, as closeRaceMenu below
+  explains. On 22 September that close went out whatever was on file: the
+  check for a face went in at 01:12 the next morning (a06abe3).
+
+  So the plugin says when the race menu is up (/racemenu, once when it opens
+  and once a minute while it stays open), and while that is fresh the give up
+  holds off. Sitting still reading a slider moves nobody on.
+
+  FACE_SEEN_MS is how fresh the last report has to be: two and a half beats,
+  so one lost line does not end the hold, while a client that crashed or quit
+  stops reporting and the give up runs as it always did. A client that never
+  reports at all, because its plugin is older or the race menu never opened,
+  is exactly the case the five minutes were written for and still gets them.
+
+  FACE_CAP_MS is for a race menu that is up and wedged: after half an hour of
+  it being reported, the give up goes on anyway, because the panel and a home
+  are then the only way out of the hall the server has.
+*/
+const FACE_SEEN_MS = 150000;
+const FACE_CAP_MS = 1800000;
+
 const firstSeen = new Map();
 
 // Bards already handed the ability to play, this run of the server.
@@ -3983,6 +4024,23 @@ globalThis.__thornswoodChargen = {
     st.faceDone = Date.now();
     setChargen(actorId, st);
     log('chargen', actorId.toString(16), 'the plugin says the race menu closed');
+    return true;
+  },
+  /*
+    The plugin says the race menu is on screen right now. Only means something
+    while the face is awaited; see FACE_SEEN_MS for what it holds off. The
+    first report is logged and the once a minute ones after it are not.
+  */
+  faceOpen: function (actorId) {
+    const st = chargenOf(actorId);
+    if (!st || st.stage !== 'appearance') { return false; }
+    const now = Date.now();
+    if (!st.faceOpenAt) {
+      st.faceOpenAt = now;
+      log('chargen', actorId.toString(16), 'the plugin says the race menu is up');
+    }
+    st.faceSeenAt = now;
+    setChargen(actorId, st);
     return true;
   },
   /*
@@ -4584,6 +4642,10 @@ function chargenTick() {
         delete state.where;
         delete state.askedAt;
         delete state.nudged;
+        // The last session's race menu went with it. This one reports its own.
+        delete state.faceOpenAt;
+        delete state.faceSeenAt;
+        delete state.faceHeld;
         // Long enough for the arrival to settle before a baseline is taken,
         // the same grace a fresh arrival gets.
         state.askAt = now + 4000;
@@ -4835,6 +4897,26 @@ function chargenTick() {
       }
 
       if (waited > GIVEUP_MS) {
+        // Not while the plugin says the race menu is up: that person is making
+        // a face, not stuck. See FACE_SEEN_MS, and FACE_CAP_MS for the one
+        // exception. Said once, when the hold starts, and not every tick.
+        const menuUp = !!state.faceSeenAt && now - state.faceSeenAt < FACE_SEEN_MS;
+        const menuFor = state.faceOpenAt ? now - state.faceOpenAt : 0;
+        if (menuUp && menuFor < FACE_CAP_MS) {
+          if (!state.faceHeld) {
+            state.faceHeld = now;
+            setChargen(actorId, state);
+            log('chargen', actorId.toString(16), 'no face after',
+                Math.round(waited / 1000) + 's, but the race menu is still up,',
+                'so the give up waits for it, for at most',
+                Math.round(FACE_CAP_MS / 60000), 'minutes');
+          }
+          continue;
+        }
+        if (menuUp) {
+          log('chargen', actorId.toString(16), 'the race menu has been up for',
+              Math.round(menuFor / 60000), 'minutes, going on without it');
+        }
         // Still no face. Go on without one rather than leave them standing
         // here: a character who never saw the race menu can change their face
         // later, a character who cannot leave the room can do nothing at all.
@@ -18388,6 +18470,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
                '/place', '/burn', '/ate',
+               // The client saying its race menu is still up. Never typed; see
+               // FACE_SEEN_MS.
+               '/racemenu',
                // The mold key: a blank pressed into the door under the
                // crosshair. Sent by the plugin, not typed; see moldHere.
                '/moldhere',
@@ -18603,6 +18688,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         word === '/restart' || word === '/shutdown') { return true; }
     if ((word === '/tp' || word === '/goto') && !parts.slice(1).join(' ').trim()) { return true; }
     if (word === '/place' || word === '/burn' || word === '/chopped') { return true; }
+    // "The race menu is up" is a moment too, and one replayed a minute late
+    // would hold the give up for somebody who has already left it.
+    if (word === '/racemenu') { return true; }
     return WORDS.indexOf(word) === -1;
   }
 
@@ -19110,6 +19198,22 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var faceActor = actorOf(profileId);
         if (cg && cg.faceDone && faceActor) { cg.faceDone(faceActor); }
       } catch (eFace) { log('/face failed:', eFace); }
+      return;
+    }
+
+    // The plugin, not a person: the race menu is on screen on this client,
+    // said when it opens and once a minute while it stays. Answered with
+    // nothing, like /face. A different word from /face ON PURPOSE: a gamemode
+    // from before this reads any /face as the menu closing and would push the
+    // panel over the race menu the moment it opened. An unknown word only
+    // earns a "no command called" line, which is harmless and says which half
+    // is out of date.
+    if (word === '/racemenu') {
+      try {
+        var cgUp = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodChargen;
+        var upActor = actorOf(profileId);
+        if (cgUp && cgUp.faceOpen && upActor) { cgUp.faceOpen(upActor); }
+      } catch (eUp) { log('/racemenu failed:', eUp); }
       return;
     }
 
