@@ -186,6 +186,18 @@ run them.
      with no channel is the live one, and that is for a security fix, for
      something that leaves the game untestable, or for work Patrick has
      said goes live.
+
+     The note is the release post: #news, the launcher's News tab and the
+     site all show it. Asked for by Patrick on 25 September, after a one-line
+     dev note went out as a bare title: "what you gave for the news wasnt
+     detailed enough". So a Ship command written for him carries the whole
+     note. The first line is a title from the customer's side. Then one line
+     starting with `- ` for each thing a person will notice, a plain sentence
+     saying what it does for them and how to use it: the key, the button, the
+     place. Never one line, and never branch names, pull request numbers or
+     entry numbers. The dev post of 24 September 14:36 is the shape to copy.
+     Ship warns about a one-line note and carries on, so the warning is not
+     the check.
    - The gamemode behind that dev release: `.\tools\Deploy-DevGamemode.ps1`.
      `Deploy-Gamemode.ps1` then `Deploy-Server.ps1` is the live pair.
    - The site's app or `tools\docs-app\public`: `.\tools\Deploy-Docs.ps1`.
