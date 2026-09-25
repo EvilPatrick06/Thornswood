@@ -32,8 +32,9 @@ git and nothing in the repo builds it; without it Go.ps1 says so and leaves
 the front that a release already put in the game folder. `-SkipServer`
 matters: without it Go.ps1 also copies the voice service over the live one on
 the VPS and restarts it. The plugins' two rules apply here too: the launcher
-holds these files read only while the game runs, and without
-`Profile\developer.flag` Keep puts its copy back at Play. A new overlay has to
+holds these files read only while the game runs, and Keep puts its copy back
+at Play, so Go.ps1 makes what it installs the kept copy and a file copied in by
+hand is undone. A new overlay has to
 be called `thornswood-*.js`, like every other file of ours under
 `Data\Platform`, and named in the `OVERLAYS` list at the top of
 `thornswood-front.js`, or nothing loads it. There is no build step; the

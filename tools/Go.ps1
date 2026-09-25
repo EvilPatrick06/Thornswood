@@ -73,6 +73,75 @@ function Head($t) { Write-Host ''; Write-Host $t -ForegroundColor Cyan }
 function Note($t) { Write-Host "  $t" }
 function Bad($t)  { Write-Host "  $t" -ForegroundColor Yellow }
 
+<#
+  THE LAUNCHER'S KEPT COPIES FOLLOW WHAT THIS PUTS IN.
+
+  The launcher keeps a copy of every file of ours under Data\Platform, in
+  Profile\Keep beside the game folder, and puts it back at every Play over
+  whatever else is there (Keep.cs), which is how a tester's install survives
+  another server's launcher writing over ours. A pack refreshes that copy when
+  it writes the file (Updater.cs, Keep.Remember). What this script installs
+  never comes in a pack on the machine that runs it, so without the same step
+  the next Play put the previous copy back over what was just installed.
+
+  Until 25 September Profile\developer.flag did that job on the machine that
+  ships, by letting any game file newer than its kept copy win. It also meant
+  that machine never saw the repair a tester's launcher makes, which is why it
+  went (Patrick: "it will make testing easier"). So every file this run puts
+  under Data\Platform becomes the kept copy, and every file it takes out loses
+  its kept copy, the way a pack does. Nothing else in the game folder is
+  adopted: a file another launcher wrote is still put back at Play.
+#>
+$script:installed = New-Object System.Collections.Generic.List[string]
+$script:removed   = New-Object System.Collections.Generic.List[string]
+
+# Keep.cs UnderPlatform: any file under Data\Platform\UI, and a script under
+# Data\Platform\Plugins. Nothing else has a kept copy.
+function Test-KeptPath([string]$rel) {
+  if (-not $rel -or $rel.Contains('..')) { return $false }
+  $ui = 'Data\Platform\UI\'
+  if ($rel.StartsWith($ui, [StringComparison]::OrdinalIgnoreCase)) { return $rel.Length -gt $ui.Length }
+  if ($rel.StartsWith('Data\Platform\Plugins\', [StringComparison]::OrdinalIgnoreCase)) {
+    return $rel.EndsWith('.js', [StringComparison]::OrdinalIgnoreCase)
+  }
+  return $false
+}
+
+# Copies each installed file under Data\Platform into Profile\Keep and drops
+# the kept copy of each removed one. Returns how many were copied, or -1 when
+# there is no Profile beside the game folder, which is the Steam copy (-Vortex)
+# or a folder no launcher looks after.
+function Update-KeptCopies([string]$GameDir, [string[]]$Installed, [string[]]$Removed) {
+  $g = ($GameDir -replace '/', '\').TrimEnd('\')
+  $prof = Join-Path (Split-Path -Parent $g) 'Profile'
+  if (-not (Test-Path -LiteralPath $prof)) { return -1 }
+  $keepDir = Join-Path $prof 'Keep'
+  $g = $g + '\'
+  $n = 0
+  foreach ($p in @($Installed)) {
+    if (-not $p) { continue }
+    $q = $p -replace '/', '\'
+    if (-not $q.StartsWith($g, [StringComparison]::OrdinalIgnoreCase)) { continue }
+    $rel = $q.Substring($g.Length)
+    if (-not (Test-KeptPath $rel)) { continue }
+    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
+    $dst = Join-Path $keepDir $rel
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+    Copy-Item -LiteralPath $p -Destination $dst -Force
+    $n++
+  }
+  foreach ($p in @($Removed)) {
+    if (-not $p) { continue }
+    $q = $p -replace '/', '\'
+    if (-not $q.StartsWith($g, [StringComparison]::OrdinalIgnoreCase)) { continue }
+    $rel = $q.Substring($g.Length)
+    if (-not (Test-KeptPath $rel)) { continue }
+    $kept = Join-Path $keepDir $rel
+    if (Test-Path -LiteralPath $kept -PathType Leaf) { Remove-Item -LiteralPath $kept -Force }
+  }
+  return $n
+}
+
 # ------------------------------------------------------------------- front --
 Head 'Front'
 $zip = Join-Path $Here 'thornswood-front.zip'
@@ -81,6 +150,12 @@ if (-not (Test-Path -LiteralPath $zip)) {
 } else {
   New-Item -ItemType Directory -Force -Path $ui | Out-Null
   Expand-Archive -LiteralPath $zip -DestinationPath $ui -Force
+  try {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $z = [IO.Compression.ZipFile]::OpenRead($zip)
+    try { foreach ($e in $z.Entries) { if ($e.Name) { $script:installed.Add((Join-Path $ui ($e.FullName -replace '/', '\'))) } } }
+    finally { $z.Dispose() }
+  } catch { Bad ('could not read what the front zip holds, so its kept copies were not refreshed: ' + $_.Exception.Message) }
   if (Test-Path -LiteralPath (Join-Path $ui 'index.html')) {
     Note 'index.html and build.js are in place'
   } else {
@@ -93,6 +168,7 @@ if (-not (Test-Path -LiteralPath $zip)) {
 $oldWheel = Join-Path $ui 'thornswood-emotes.html'
 if (Test-Path -LiteralPath $oldWheel) {
   Remove-Item -LiteralPath $oldWheel -Force
+  $script:removed.Add($oldWheel)
   Note 'removed the old wheel page'
 }
 
@@ -102,6 +178,7 @@ $uiSrc = Join-Path $Here 'ts-ui'
 if (Test-Path -LiteralPath $uiSrc) {
   foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.js) {
     Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
   }
   # The page itself. The front's zip above carries the plain one; ours is
@@ -112,6 +189,7 @@ if (Test-Path -LiteralPath $uiSrc) {
   $page = Join-Path $uiSrc 'index.html'
   if (Test-Path -LiteralPath $page) {
     Copy-Item -LiteralPath $page -Destination (Join-Path $ui 'index.html') -Force
+    $script:installed.Add((Join-Path $ui 'index.html'))
     Note 'index.html (ours, over the front''s)'
   } else {
     Bad 'ts-ui\index.html is missing, so the menu choice cannot draw before the plugin runs'
@@ -121,6 +199,7 @@ if (Test-Path -LiteralPath $uiSrc) {
   # a main pack never carries it.
   foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.mp3) {
     Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
   }
   # The painting behind the main menu's character choice: the site's own
@@ -131,6 +210,7 @@ if (Test-Path -LiteralPath $uiSrc) {
     $src = Join-Path $siteArt $pair[0]
     if (Test-Path -LiteralPath $src) {
       Copy-Item -LiteralPath $src -Destination (Join-Path $ui $pair[1]) -Force
+      $script:installed.Add((Join-Path $ui $pair[1]))
       Note ($pair[1] + ' (from the site''s ' + $pair[0] + ')')
     } else {
       Bad ('the site''s ' + $pair[0] + ' is not in docs-app\public, so the menu has no painting')
@@ -171,6 +251,7 @@ New-Item -ItemType Directory -Force -Path $plugins | Out-Null
 if (Test-Path -LiteralPath $plSrc) {
   foreach ($f in Get-ChildItem -LiteralPath $plSrc -Filter *.js) {
     Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $plugins $f.Name) -Force
+    $script:installed.Add((Join-Path $plugins $f.Name))
     Note $f.Name
   }
 } else {
@@ -191,6 +272,9 @@ $sync = Join-Path $Here 'Sync-Client.ps1'
 if (Test-Path -LiteralPath $sync) {
   & $sync -Game $Game -NoPause
   if ($LASTEXITCODE -ne 0) { Bad 'the client runtime is not the recorded build; see the lines above' }
+  # The bundle is the one client file under Data\Platform\Plugins, so it is
+  # the one with a kept copy. Only the recorded build becomes it.
+  else { $script:installed.Add((Join-Path $plugins 'skymp5-client.js')) }
 } else {
   Bad 'Sync-Client.ps1 is not next to this script'
 }
@@ -200,6 +284,7 @@ if (Test-Path -LiteralPath $sync) {
 $probe = Join-Path $plugins 'thornswood-probe.js'
 if (Test-Path -LiteralPath $probe) {
   Remove-Item -LiteralPath $probe -Force
+  $script:removed.Add($probe)
   Note 'removed the probe, voice reports the same things now'
 }
 
@@ -222,7 +307,14 @@ foreach ($s in (Get-ChildItem -LiteralPath $plugins -File)) {
   if ($keep -contains $s.Name) { continue }
   Bad "removing stray file from the plugins folder: $($s.Name)"
   Remove-Item -LiteralPath $s.FullName -Force
+  # Guarded: test-chargen-gone.ps1 lifts this loop and runs it on its own.
+  if ($null -ne $script:removed) { $script:removed.Add($s.FullName) }
 }
+
+Head 'The launcher''s kept copies'
+$kept = Update-KeptCopies $Game $script:installed.ToArray() $script:removed.ToArray()
+if ($kept -lt 0) { Note 'no Profile folder beside this game folder, so no launcher keeps copies here' }
+else { Note "$kept file(s) the launcher keeps a copy of now match what was just installed, so Play will not put an older copy back" }
 
 # -------------------------------------------------------------- load order --
 Head 'Load order'
