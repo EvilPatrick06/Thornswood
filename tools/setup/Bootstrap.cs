@@ -64,18 +64,19 @@ namespace SkyrimTogetherSetup
         const string Magic = "STSFX001";
         const int TrailerLen = 24;          // 8 magic + 8 offset + 8 length
 
-        // Three shapes, in the order they are looked for. A zip beside this
-        // program, the same thing attached to the end of it, or nothing at all,
-        // in which case it is fetched from the site.
+        // Two shapes: the payload attached to the end of this program, or
+        // nothing, in which case the published one is fetched from the site
+        // and checked against the SHA-256 the site gives for it.
         //
-        // These names were still the pre-rename ones, so a published
-        // Thornswood-Setup-20260915-1639.zip sitting right next to this program
-        // matched nothing and the installer told people their download was
-        // missing while it was in the same folder.
-        static readonly string[] PayloadNames =
-            { "Thornswood-Setup.zip", "SkyrimTogether-Setup.zip", "payload.zip" };
-        static readonly string[] PayloadGlobs =
-            { "Thornswood-Setup*.zip", "SkyrimTogether-Setup*.zip" };
+        // A zip lying about is never used. This took the first
+        // SkyrimTogether-Setup.zip, payload.zip or Thornswood-Setup*.zip it
+        // found beside itself or anywhere in the Downloads folder, before the
+        // payload attached to it and before asking the site, unpacked it with
+        // no check at all and ran whatever Setup.bat was inside. Anybody with a
+        // zip left over from an earlier download, the Skyrim Together ones
+        // included, got that old install from a new looking window. Nobody is
+        // told to put a zip beside this any more: Publish-Installer publishes
+        // the payload hidden and the Downloads page has one button.
 
         // Where to get it when there is none either way.
         //
@@ -586,67 +587,12 @@ namespace SkyrimTogetherSetup
                 return;
             }
 
-            if (found.File == exe)
-            {
-                txtFound.Text = "Everything needed is inside this program.";
-                return;
-            }
-
-            txtFound.Text = Path.GetFileName(found.File) + "   ·   " + Gb(found.Length);
-            txtStat.Text = Path.GetDirectoryName(found.File);
+            txtFound.Text = "Everything needed is inside this program.";
         }
 
-        /// <summary>The setup zip, beside this program or in the Downloads folder.</summary>
-        static string FindZip(string exeDir)
-        {
-            var roots = new System.Collections.Generic.List<string>();
-            if (!string.IsNullOrEmpty(exeDir)) roots.Add(exeDir);
-            try
-            {
-                string dl = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-                if (!roots.Contains(dl)) roots.Add(dl);
-            }
-            catch { }
-
-            foreach (string root in roots)
-            {
-                if (!Directory.Exists(root)) continue;
-
-                foreach (string name in PayloadNames)
-                {
-                    string exact = Path.Combine(root, name);
-                    if (File.Exists(exact)) return exact;
-                }
-
-                // The published name carries a build stamp, and a browser that
-                // has seen the file before adds " (1)" on top of that. Take the
-                // biggest match rather than trying to predict the name.
-                string best = null; long bestLen = -1;
-                foreach (string glob in PayloadGlobs)
-                {
-                    try
-                    {
-                        foreach (string f in Directory.GetFiles(root, glob))
-                        {
-                            long len = new FileInfo(f).Length;
-                            if (len > bestLen) { bestLen = len; best = f; }
-                        }
-                    }
-                    catch { }
-                }
-                if (best != null) return best;
-            }
-            return null;
-        }
-
-        /// <summary>Where the payload is: a zip beside this program, or attached to it.</summary>
+        /// <summary>The payload attached to this program, or null when it has none and the site's is fetched.</summary>
         static Payload Locate(string exe)
         {
-            string zip = FindZip(Path.GetDirectoryName(exe));
-            if (zip != null)
-                return new Payload { File = zip, Offset = 0, Length = new FileInfo(zip).Length };
-
             // The trailer is the last 24 bytes of the file as the packager
             // leaves it. Signing the installer puts the certificate on the end
             // AFTER that, so on a signed build the last 24 bytes are part of a
