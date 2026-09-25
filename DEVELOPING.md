@@ -49,7 +49,7 @@ Its configured build tree and toolchain (`engine\skymp\build`, and
 Patrick's machine alone for now. The release output is `out` in the repository
 folder, ignored by git. `tools\Where.ps1` says where each of these is on the
 machine it runs on. Who holds each thing Thornswood cannot run without, and who the
-second holder is, is `tools\OWNERSHIP.md`.
+second holder is, is `docs\OWNERSHIP.md`.
 
 ## How a release goes out
 
@@ -447,9 +447,9 @@ it per session and ignores which profile Vortex has on.
   developer's machine is "Setting up a machine" above.
 - `tools\app\ARCHITECTURE.md`: how the launcher starts, what each class owns
   on disk, and every step between pressing Play and the game starting.
-- `tools\MOVING-THE-SERVER.md`, `tools\COLLECTION-METHOD.md`: the VPS and the
+- `docs\MOVING-THE-SERVER.md`, `docs\COLLECTION-METHOD.md`: the VPS and the
   mod collection.
-- `tools\OWNERSHIP.md`: who holds each credential, account and build, and who
+- `docs\OWNERSHIP.md`: who holds each credential, account and build, and who
   the second holder is.
 - `lore\`: history and the Accord. `tools\docs-app\data\site\*.md`: the public
   pages (join, rules, classes, world, credits, privacy, terms), also live on

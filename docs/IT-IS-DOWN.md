@@ -35,7 +35,7 @@ first. That cost the first round of the 21 September outage.
 `it does, nothing to do` means the box is up and this is a service. If ssh
 itself does not answer, the box is off or unreachable and nothing in this file
 helps: that is the host's control panel, and the address is in
-`tools\MOVING-THE-SERVER.md`.
+`docs\MOVING-THE-SERVER.md`.
 
 ## The site
 
@@ -145,7 +145,7 @@ nothing again.
 
 ## What is deliberately not here
 
-- Restoring from backup. That is `tools\RESTORING.md`, it takes longer than this
+- Restoring from backup. That is `docs\RESTORING.md`, it takes longer than this
   file's problems, and it has never been rehearsed.
 - Anything that needs a secret. If a step wants a token or a password, stop:
   they live in the owner's password manager and on the box, never in the repo

@@ -1,6 +1,6 @@
 // test-ownership.js
 //
-// tools/OWNERSHIP.md names every credential file the scripts and the launcher
+// docs/OWNERSHIP.md names every credential file the scripts and the launcher
 // use, and every row in it has a second holder.
 //
 // WHY THIS EXISTS. The To Do List entry "Five things exist only on your laptop
@@ -38,8 +38,8 @@ function read(p) {
   try { return fs.readFileSync(p, 'utf8'); } catch (e) { return ''; }
 }
 
-const page = read(path.join(HERE, 'OWNERSHIP.md'));
-yes('tools/OWNERSHIP.md exists', page.length > 0);
+const page = read(path.join(HERE, '..', 'docs', 'OWNERSHIP.md'));
+yes('docs/OWNERSHIP.md exists', page.length > 0);
 
 // ------------------------------------------------------------ the table --
 const HEADER = ['asset', 'where it lives', 'who holds it', 'second holder', 'how to reissue'];
@@ -198,7 +198,7 @@ yes('DEVELOPING.md no longer says the fork is Patrick\'s alone',
     !/fork and its build tree are Patrick's alone/i.test(second));
 yes('DEVELOPING.md says the fork source is on GitHub',
     /github\.com\/EvilPatrick06\/skymp/i.test(second));
-yes('DEVELOPING.md points at tools\\OWNERSHIP.md', /tools\\OWNERSHIP\.md/.test(second));
+yes('DEVELOPING.md points at docs\\OWNERSHIP.md', /docs\\OWNERSHIP\.md/.test(second));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

@@ -32,7 +32,7 @@ git -C engine/skymp fetch upstream
 ```
 
 The fork at the pinned commit, then its own submodules, vcpkg among them
-(`tools\OWNERSHIP.md:38`), then the `upstream/main` the record scripts measure
+(`docs\OWNERSHIP.md:38`), then the `upstream/main` the record scripts measure
 against (`New-ServerBuildRecord.ps1:62`, `New-ClientBuildRecord.ps1:87`).
 A machine that only copies server binaries can leave the fork unfetched.
 
@@ -65,7 +65,7 @@ cmake -S engine\skymp -B engine\skymp\build -G "Visual Studio 17 2022" -A x64 `
 ```
 
 These are the settings read off the shipping machine's `CMakeCache.txt` on
-24 September (`tools\OWNERSHIP.md:68-71`) and used again for the configure at
+24 September (`docs\OWNERSHIP.md:68-71`) and used again for the configure at
 `engine\skymp` on 25 September, which took 24.2 seconds
 (`docs\archive\todo-list-2026-09-25.md:2987`). NOT CHECKED against the fork's
 own `CMakeLists.txt`: the submodule was not fetched where this page was

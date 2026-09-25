@@ -8,7 +8,7 @@ way a stranger would, with the time and every word on screen written down.
 Until somebody has walked it once on a clean virtual machine and filled in
 every row, this is a plan and not a record, and the right assumption is that
 something in it is wrong. The run is how to find out which part. It is held to
-the same standard as `tools\RESTORING.md`.
+the same standard as `docs\RESTORING.md`.
 
 ## Why
 
