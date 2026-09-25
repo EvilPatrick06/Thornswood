@@ -118,7 +118,7 @@ const gamemode = read('tools/gamemode.js');
 const site = read('tools/docs-app/server.js');
 const rotate = read('tools/Rotate-ServerPassword.ps1');
 const publish = read('tools/Publish-Update.ps1');
-const voice = read('tools/voice/voice-server.js');
+const voice = read('voice/voice-server.js');
 const installVoice = read('tools/Install-Voice.ps1');
 yes('Deploy-Gamemode.ps1 still writes offlineMode true, so a client names its own profile id',
     /NotePropertyName offlineMode\s+-NotePropertyValue \$true/.test(deployGm));
@@ -289,7 +289,7 @@ function addDir(rel, re) {
 }
 addDir('tools', /\.(ps1|js)$/i);
 addDir('tools/app', /\.cs$/i);
-addDir('tools/voice', /\.js$/i);
+addDir('voice', /\.js$/i);
 addDir('tools/docs-app', /^server\.js$/i);
 addDir('bot', /\.py$/i);
 function usedTogether(a, b) {

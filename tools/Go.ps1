@@ -410,7 +410,7 @@ if (-not $SkipServer) {
     the current copy. Two things were wrong with how this did that.
 
     It read voice-server.js from the tools folder. The real one moved into
-    tools\voice months ago and the copy left behind at the top went stale, so
+    voice months ago and the copy left behind at the top went stale, so
     running this pushed an old build over a good one.
 
     And the restart below had three literal vertical tab bytes in it, where a
@@ -424,7 +424,7 @@ if (-not $SkipServer) {
     loser dies quietly while the winner keeps serving whatever it was already
     running, which is the exact failure that hid days of changes.
   #>
-  $vsrc = Join-Path $Here 'voice\voice-server.js'
+  $vsrc = Join-Path $Here '..\voice\voice-server.js'
   if (Test-Path -LiteralPath $vsrc) {
     & scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {

@@ -76,7 +76,7 @@ $ContentRules = @(
     @{ Name = 'github-token';      Rx = '(?<![A-Za-z0-9_])(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{50,})' },
     # The key that signs in to the VPS, or any other private key.
     @{ Name = 'private-key';       Rx = '-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----' },
-    # A voice join token, the shape signToken in tools\voice\voice-server.js
+    # A voice join token, the shape signToken in voice\voice-server.js
     # makes: v1.<profile id>.<expiry in ms>.<43 character signature>. This is
     # what nine published packs carried in voice-token.txt.
     @{ Name = 'voice-join-token';  Rx = '(?<![A-Za-z0-9_.-])v1\.[0-9]{1,12}\.[0-9]{12,14}\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])' },

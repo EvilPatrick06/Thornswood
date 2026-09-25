@@ -16,7 +16,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `tools/ts-ui`: the overlays inside the game.
 - `tools/gamemode.js`: the server's gamemode.
 - `tools/docs-app`: the site. Its public pages are `tools/docs-app/data/site`.
-- `tools/voice`: proximity voice.
+- `voice`: proximity voice.
 - `bot`: the Discord bot, in Python.
 - `tools/signing`: the code signing setup, switched off until it is finished.
 - `tools/*.ps1`: the scripts that build, ship and deploy all of the above.
@@ -29,7 +29,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `lore/`: the world.
 
 `bot`, `tools/docs-app`, `tools/launcher`, `tools/setup`,
-`tools/signing`, `tools/ts-plugins`, `tools/ts-ui` and `tools/voice` each have
+`tools/signing`, `tools/ts-plugins`, `tools/ts-ui` and `voice` each have
 a README of their own, which says what the folder is and how to change it.
 
 ## Before changing anything

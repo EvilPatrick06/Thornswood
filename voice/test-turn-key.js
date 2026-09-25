@@ -25,7 +25,7 @@
   expects, read correctly whatever encoding a Windows box wrote it in, never
   logged, and beaten by the variable when both are set.
 
-  Runs the real tools/voice/voice-server.js in scratch folders on a spare
+  Runs the real voice/voice-server.js in scratch folders on a spare
   port. Never connects to anything off this machine.
 */
 const { spawn } = require('child_process');
@@ -37,14 +37,14 @@ const crypto = require('crypto');
 
 const PORT = 7921;
 const BASE = 'http://127.0.0.1:' + PORT;
-const TOOLS = path.resolve(__dirname, '..');
+const TOOLS = path.resolve(__dirname, '..', 'tools');
 
 // What /ice answered, to the byte, before any of this. The STUN server the
 // pages had always had typed into them, and nothing else.
 const STUN_ONLY = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}';
 // And /health's fields, in the order it wrote them. chatRange came in with
-// local chat (tools/voice/test-local-chat.js), and the five from backed on
-// with the backpressure work (tools/voice/test-backpressure.js), each
+// local chat (voice/test-local-chat.js), and the five from backed on
+// with the backpressure work (voice/test-backpressure.js), each
 // separately from the relay key.
 const HEALTH_FIELDS = ['ok', 'build', 'auth', 'uptimeSeconds', 'startedAt', 'bind', 'turn',
                        'chatRange', 'peers', 'tracked', 'queuedCommands',
@@ -139,7 +139,7 @@ function leaks(r, key) {
   const pages = [
     ['the in-game page', path.join(TOOLS, 'ts-ui', 'thornswood-voice.js')],
     ['the launcher overlay', path.join(TOOLS, 'launcher', 'voice-host.html')],
-    ['the plain page the service serves', path.join(TOOLS, 'voice', 'public', 'voice.js')]
+    ['the plain page the service serves', path.join(__dirname, 'public', 'voice.js')]
   ];
   for (const p of pages) {
     let text = '';

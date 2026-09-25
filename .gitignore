@@ -79,15 +79,15 @@ thornswood-backup-key.txt
 # git status: token-key.txt signs the join tokens, secret.txt is the password
 # the account routes check, and owners.json is the register it keeps. Found on
 # 23 September by running the service locally to prove a header, which left a
-# signing key sitting untracked in tools\voice.
-tools/voice/token-key.txt
+# signing key sitting untracked in voice.
+voice/token-key.txt
 # Not made by the service: the TURN relay's key, put beside it by hand. Ignored
 # here so a copy made to try the relay out of a checkout never reaches git.
-tools/voice/turn-key.txt
-tools/voice/secret.txt
-tools/voice/owners.json
-tools/voice/owners.json.tmp
-tools/voice/chat/
+voice/turn-key.txt
+voice/secret.txt
+voice/owners.json
+voice/owners.json.tmp
+voice/chat/
 
 # Build output, in the repository folder since 25 September rather than in
 # C:\Thornswood-Dev (tools\Where.ps1): the packs, the launcher and the

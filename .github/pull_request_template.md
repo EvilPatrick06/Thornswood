@@ -12,7 +12,7 @@ request is merged", has the command for each. They all run in the same sitting. 
 - [ ] The site's app or `tools\docs-app\public`: Deploy-Docs
 - [ ] The public pages (`tools\docs-app\data\site`): Deploy-Docs -Site
 - [ ] The bot (`bot`): Install-Bot -CodeOnly
-- [ ] The voice service (`tools\voice`): Install-Voice
+- [ ] The voice service (`voice`): Install-Voice
 - [ ] Only scripts that run on the machine that ships: nothing more
 - [ ] Docs only
 

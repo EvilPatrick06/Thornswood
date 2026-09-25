@@ -42,7 +42,7 @@ reports
 the `BUILD` string at the top of the file, which is the only way to tell from
 outside which copy is running, so change it whenever behaviour changes. The
 harnesses run the real file in a temporary folder on a spare port and need
-nothing else: `node tools\voice\test-auth.js` and the rest.
+nothing else: `node voice\test-auth.js` and the rest.
 
 A TURN relay, for the pairs of people who cannot reach each other directly,
 is `THORNSWOOD_TURN_URL`. Its key is `THORNSWOOD_TURN_SECRET` or, so it stays

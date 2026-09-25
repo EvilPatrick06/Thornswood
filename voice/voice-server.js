@@ -640,7 +640,7 @@ class Sock {
         frames after that belong to somebody onclose has already taken out
         of the room: they used to be handled anyway, and chat from them went
         past the chat limit to the room and the log as profile 0 with no
-        name. tools/voice/test-backpressure.js sends exactly that.
+        name. voice/test-backpressure.js sends exactly that.
       */
       if (this.closed) return;
       if (this.buf.length < 2) return;
@@ -811,7 +811,7 @@ function snapshot() {
   faults in one, and it is entry 282 on the To Do List. Anybody holding a
   socket learned where everybody in the world was standing. And the traffic
   grew with the square of the room, against a box that measured 93 Mbit/s and
-  an 8 TB monthly cap. tools/voice/test-cull.js measures it on the wire with
+  an 8 TB monthly cap. voice/test-cull.js measures it on the wire with
   two hundred people across ten cells: 5,284,000 bytes a tick, 26 MB a
   second, 380 GB over a four hour evening, sent whole; 492,203 bytes a tick,
   2.5 MB a second, culled. Nine of those ten cells are interiors where all
@@ -841,7 +841,7 @@ function snapshot() {
   has is the overlay's yell at 85 metres (thornswood-voice.js MODES).
   HEAR_UNITS is 100 metres, so a yell fading out at its edge is never cut
   before the client's own falloff reaches nothing. Raise this before raising
-  a range there: tools/voice/test-cull.js reads the client range tables and
+  a range there: voice/test-cull.js reads the client range tables and
   fails when one outgrows it.
 */
 const UNITS_PER_METRE = 70;
@@ -1100,7 +1100,7 @@ const TURN_URL = String(process.env.THORNSWOOD_TURN_URL || '').trim();
   No file, which is every box today, changes nothing: nothing is logged, /ice
   answers the same bytes, and /health the same fields, with only the build name
   moved so an install can tell this copy is the one running.
-  tools/voice/test-turn-key.js holds it to that. The key itself is never logged,
+  voice/test-turn-key.js holds it to that. The key itself is never logged,
   only where it was read from.
 
   Written by hand on Windows, so it may arrive as UTF-16 with a byte order

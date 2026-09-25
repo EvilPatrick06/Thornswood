@@ -248,7 +248,7 @@ machine, from the repo folder.
      sends it. It is uploaded by hand in the Discord developer portal.
    - `tools\gamemode.js`: `.\tools\Deploy-Gamemode.ps1`, then
      `.\tools\Deploy-Server.ps1`.
-   - The voice service (`tools\voice\voice-server.js`, `tools\voice\public`):
+   - The voice service (`voice\voice-server.js`, `voice\public`):
      `.\tools\Install-Voice.ps1`.
    - Only scripts that run on Patrick's machine (Ship.ps1, Publish-Update.ps1,
      the Deploy scripts): nothing more. The pull is the change.

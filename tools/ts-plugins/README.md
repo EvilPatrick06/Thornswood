@@ -28,7 +28,7 @@ copies every `.js` here into `C:\Thornswood\Game\Data\Platform\Plugins`
 and the overlays from `tools\ts-ui` beside them, and removes anything in that
 folder that is not ours. It also puts the menu art and the recorded client in
 place. `-SkipServer` matters: without it Go.ps1 also copies
-`tools\voice\voice-server.js` over the live voice service on the VPS and
+`voice\voice-server.js` over the live voice service on the VPS and
 restarts it. The game has to be closed because the launcher holds these files
 read only while it runs (Hold). Keep puts its own copy back at every Play, so
 Go.ps1 makes what it installs the kept copy, the way a pack does; an edit

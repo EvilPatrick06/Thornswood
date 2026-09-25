@@ -36,7 +36,7 @@ function yes(what, cond) {
 const UI = path.join(__dirname, 'ts-ui');
 const overlay = fs.readFileSync(path.join(UI, 'thornswood-voice.js'), 'utf8');
 const chat = fs.readFileSync(path.join(UI, 'thornswood-chat.js'), 'utf8');
-const plain = fs.readFileSync(path.join(__dirname, 'voice', 'public', 'voice.js'), 'utf8');
+const plain = fs.readFileSync(path.join(__dirname, '..', 'voice', 'public', 'voice.js'), 'utf8');
 
 /* Lift a function out of a page by name, braces balanced. */
 function lift(src, head) {
