@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 194 of them, with the one line that says
+Every `.ps1` in this folder, 195 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -170,6 +170,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-feed-rules.ps1](test-feed-rules.ps1) | No pack goes onto the update feed that a launcher cannot download, and the ones already there can be taken off. |
 | [test-go-keeps.ps1](test-go-keeps.ps1) | Go.ps1 makes what it installs under Data\Platform the launcher's kept copy, and drops the kept copy of what it takes out, so Play does not put an older copy back; nothing else in the game folder is adopted; and Publish-Update no longer writes Profile\developer.flag. |
 | [test-installer-own-payload.ps1](test-installer-own-payload.ps1) | The installer unpacks its own payload or the site's, never a zip it finds lying about. |
+| [test-live-parse-check.ps1](test-live-parse-check.ps1) | The live gamemode deploys check gamemode.js parses before anything is written or sent. |
 | [test-load-order.ps1](test-load-order.ps1) | The rule the pack's plugin list is put through before it ships, driven with stubs so it needs no game folder, no Data and no server. |
 | [test-log-upload.ps1](test-log-upload.ps1) | The launcher's half of the session logs: which files it picks, what it takes out of them, and whether the site can read what it sends. |
 | [test-master-flag.ps1](test-master-flag.ps1) | The master flag in the plugin header, which the game honours BEFORE the list order, and which Deploy-Gamemode.ps1 never read until 22 September. |
