@@ -84,7 +84,7 @@ in `tools\app\Updater.cs` (1.1.35 to 1.1.36), commits that one file, and
 prints the rest. main refuses a push from everybody, so it prints the
 commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
 push it and open the pull request, which is merged once `Launcher builds` is
-green (see Two machines shipping). Then, back on main:
+green (see How work moves, the long form). Then, back on main:
 
 ```
 git checkout main

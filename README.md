@@ -40,6 +40,8 @@ a README of their own, which says what the folder is and how to change it.
 - [CLAUDE.md](CLAUDE.md): what applies to a Claude on top of those rules.
 - [DEVELOPING.md](DEVELOPING.md): the long form. What the pieces
   are, how a release goes out, how a machine is set up.
+- [docs](docs): the system map, the update feed, the gamemode and a glossary.
+  [engine/README.md](engine/README.md): building the SkyMP fork.
 - [docs/archive](docs/archive): dated snapshots kept for history, not current.
 - [tools/app/ARCHITECTURE.md](tools/app/ARCHITECTURE.md): how the launcher
   starts, what each class owns and every step between Play and the game.
