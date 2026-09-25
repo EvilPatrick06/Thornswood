@@ -39,7 +39,11 @@ if (-not $RepoDir) { $RepoDir = Split-Path -Parent $Here }
 # version.json is published from the public releases clone, not the source one.
 if (-not $ReleaseDir) {
     $guess = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
-    $ReleaseDir = if (Test-Path (Join-Path $guess '.git')) { $guess } else { $RepoDir }
+    # The feed lives only in the releases clone. This repository's own copy, the
+    # old fallback, was deleted on 25 September (#363), so without a clone
+    # there is nothing to edit and this stops rather than guess.
+    if (-not (Test-Path (Join-Path $guess '.git'))) { throw "No Thornswood-Releases clone at $guess. Clone it there (git clone https://github.com/EvilPatrick06/Thornswood-Releases), or pass -ReleaseDir." }
+    $ReleaseDir = $guess
 }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
