@@ -14,8 +14,9 @@ gamemode's half of the position feed as `Add-VoiceFeed.ps1` first added it.
 The copy between the voice feed markers in `game\gamemode.js` has moved on
 since: it reads its port from `server-settings.json`, so the dev server feeds
 the dev service, where this file still has 7778 written in.
-`Add-VoiceFeed.ps1` writes this file over that block and redeploys the live
-gamemode, so running it would undo that.
+`Add-VoiceFeed.ps1` would write this file over that block and redeploy the
+live gamemode, undoing that, so it stops when the two differ; `-Force` is the
+only way past.
 
 ## On your machine
 

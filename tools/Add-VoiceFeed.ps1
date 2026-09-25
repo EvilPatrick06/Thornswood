@@ -13,6 +13,14 @@
   the worst case is a line in the log once and no voice.
 
   Safe to run twice. It replaces its own block rather than stacking another.
+
+  IT WILL NOT UNDO A NEWER BLOCK. The copy between the markers in
+  game\gamemode.js has moved on since voice\gamemode-voice.js was written: it
+  reads its port from server-settings.json, so the dev server feeds the dev
+  voice service, where the file still has 7778 written in. Running this used
+  to put the old file over it and redeploy the live gamemode (issue #546).
+  Now it stops when the block in the gamemode is not the file, and -Force is
+  the only way past that.
 #>
 [CmdletBinding()]
 param(
@@ -20,6 +28,7 @@ param(
     [string]$Block,
     [switch]$Remove,
     [switch]$NoDeploy,
+    [switch]$Force,
     [switch]$NoPause
 )
 
@@ -44,6 +53,14 @@ $text = [IO.File]::ReadAllText($Gamemode)
 # stacks, and -Remove has nothing special to do.
 $pattern = [regex]::Escape($START) + '.*?' + [regex]::Escape($END)
 $had = [regex]::IsMatch($text, $pattern, 'Singleline')
+if ($had -and -not $Remove -and -not $Force -and (Test-Path -LiteralPath $Block)) {
+    $inside = [regex]::Match($text, [regex]::Escape($START) + '\r?\n(.*?)\r?\n' + [regex]::Escape($END), 'Singleline').Groups[1].Value
+    $file = [IO.File]::ReadAllText($Block).TrimEnd()
+    if ($inside.Replace("`r`n", "`n").TrimEnd() -ne $file.Replace("`r`n", "`n")) {
+        Die ("The voice feed in $Gamemode is not ${Block}: it has been changed since, and this would put the older one back " +
+             "and redeploy it. Nothing was changed. Put the change into $Block first, or run with -Force if replacing it is what you mean.")
+    }
+}
 if ($had) {
     $text = [regex]::Replace($text, $pattern, '', 'Singleline').TrimEnd() + "`r`n"
     Say '  removed the previous feed block' 'DarkGray'
