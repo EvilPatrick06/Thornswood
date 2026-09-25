@@ -53,7 +53,7 @@ the part to check first.
 Framework 4 csc (C# 5 only) into `<Root>\Launcher\Thornswood.exe`. It embeds,
 as resources: `launcher\ui.xaml`, the emblem, header art and video, the WebView2
 DLLs, `launcher\voice-host.html`, the `Thornswood.ini` template from
-`tools\emotes`, and `tools\client-build.json`. The update system publishes
+`launcher`, and `records\client-build.json`. The update system publishes
 this one exe and nothing beside it, which is why everything rides inside.
 
 ### There is no compiled window
@@ -299,7 +299,7 @@ folder being made. Every writer into Game calls `OwnGame.cs:717 Unshare()` or
 Detach first, so a write never lands in Vortex's copy through a hard link.
 
 **ClientRuntime** (ClientRuntime.cs). The six files that are the SkyMP client,
-checked by SHA-256 against `tools\client-build.json`, which is compiled into
+checked by SHA-256 against `records\client-build.json`, which is compiled into
 the exe (`ClientRuntime.cs:179 Good()`), and put back from a pack when they
 are not (`ClientRuntime.cs:206 Heal()`).
 
@@ -513,4 +513,4 @@ machines work in them.
 | `launcher\app\Keep.cs` | Our Data\Platform files put back and other plugins parked. | Anything new the plugins ship under Data\Platform, and how the main and dev builds share a game. |
 | `launcher\app\Hold.cs` | The read-only hold while the game runs. | It holds exactly what Keep keeps, so they change together. |
 | `launcher\app\Updater.cs` | The feed, the packs, the self update, and `Version`. | Every release moves `Version`, from whichever machine ran Bump-Version. |
-| `tools\Publish-Update.ps1` | Diffs the build, packs what belongs by Ship-Rules.ps1, uploads, writes version.json. | Ship runs it on whichever machine ships: main from Patrick's, dev from either. |
+| `scripts\release\Publish-Update.ps1` | Diffs the build, packs what belongs by Ship-Rules.ps1, uploads, writes version.json. | Ship runs it on whichever machine ships: main from Patrick's, dev from either. |

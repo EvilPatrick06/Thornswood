@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 124 of them, by area: `release` builds and
+Every `.ps1` under this folder, 125 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -12,9 +12,9 @@ the script, then run
 
     .\scripts\dev\New-ScriptIndex.ps1
 
-and commit this file with it. The build check on every pull request runs
-tests\test-script-index.ps1, which goes red when this file is not what that
-would write.
+and commit this file with it. tests\test-script-index.ps1 fails when this
+file is not what that would write; run it before merging, since the build
+check on GitHub is off.
 
 A script's options are not listed here. Get-Help reads them off its param
 block, so they are always all of them:
@@ -33,7 +33,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [deploy/Deploy-Server.ps1](deploy/Deploy-Server.ps1) | Sends the built server up to the VPS and restarts it. |
 | [deploy/Install-Backup.ps1](deploy/Install-Backup.ps1) | Puts the nightly backup on the VPS: sends vps-nightly-backup.ps1 up, makes a passphrase if there is not one yet, and registers the scheduled task that runs it. |
 | [deploy/Install-Bot.ps1](deploy/Install-Bot.ps1) | Puts the Thornswood bot on the VPS and keeps it running. |
-| [deploy/Install-Runner.ps1](deploy/Install-Runner.ps1) | Puts a GitHub Actions runner on the VPS, so the build check runs on every pull request again without paying for minutes. |
+| [deploy/Install-Runner.ps1](deploy/Install-Runner.ps1) | Puts a GitHub Actions runner on the VPS, so the build check can run there without paying for minutes; the check itself is off and runs only when started by hand. |
 | [deploy/Install-ThornswoodContent.ps1](deploy/Install-ThornswoodContent.ps1) | Drops Thornswood-Content.esp into the game folder and inserts it into the load order ahead of the city overhauls. |
 | [deploy/Install-ThornswoodServer.ps1](deploy/Install-ThornswoodServer.ps1) | Run this ON THE VPS, after Bootstrap-VPS.ps1, as Administrator. |
 | [deploy/Install-Voice.ps1](deploy/Install-Voice.ps1) | Puts the proximity voice service on the VPS beside the game server and opens the one port it needs. |
@@ -102,6 +102,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [ops/Set-Door.ps1](ops/Set-Door.ps1) | Turns the game server's door on, off, or tells you what it has been seeing. |
 | [ops/Set-Server.ps1](ops/Set-Server.ps1) | Sets the server everyone connects to, in the two places that decide it, and pushes. |
 | [ops/Wipe-Saves.ps1](ops/Wipe-Saves.ps1) | Starts the world over. Everybody begins again, nothing is claimed, nothing has been looted, and every container in the province is holding what Bethesda put in it. |
+| [release/Build-Engine.ps1](release/Build-Engine.ps1) | Takes a machine from a fresh clone to a built engine: the SkyMP server and the client runtime, out of the fork in engine\skymp. |
 | [release/Build-Launcher.ps1](release/Build-Launcher.ps1) | Compiles the launcher into a real Thornswood.exe. |
 | [release/Build-Server.ps1](release/Build-Server.ps1) | Compiles the game server out of our fork and puts the result where Deploy-Server.ps1 and Publish-Server.ps1 expect to find it. |
 | [release/BuildStamp.ps1](release/BuildStamp.ps1) | What a server's gamemode is, written down beside it. |

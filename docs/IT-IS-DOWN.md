@@ -140,7 +140,7 @@ Everything answers from here and one person cannot play.
 ## When it is back
 
 Say so in Discord, then write down what it was. Anything found here goes on the
-To Do List before the session ends, or the next person at 2am starts from
+board before the session ends, or the next person at 2am starts from
 nothing again.
 
 ## What is deliberately not here

@@ -1,7 +1,7 @@
 # Expand Install-Voice's here-string exactly as the script does and look at the
 # text that would actually be sent. Skipping this step is how '$log' silently
 # became '**' and killed live voice twice.
-$src = Get-Content 'C:\Users\evilp\Downloads\Thornswood-Repo\scripts\deploy\Install-Voice.ps1' -Raw
+$src = Get-Content (Join-Path $PSScriptRoot '..\deploy\Install-Voice.ps1') -Raw
 
 # What the outer script would have set by the time the here-string is built.
 $Root = 'C:\Thornswood-Voice-Dev'

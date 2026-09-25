@@ -50,11 +50,33 @@ check that branch is still at the pinned commit before building.
   every library in the fork's `vcpkg.json` into
   `build\vcpkg_installed\x64-windows-sp` (`THIRD-PARTY.md:127`).
 
+## Building it on your machine
+
+Any developer builds the engine on their own machine, and needs to before a
+dev Ship: Ship checks the client runtime against `records\client-build.json`
+(issue #545). From the repository folder:
+
+```powershell
+.\scripts\release\Build-Engine.ps1 -Check   # what is missing; changes nothing
+.\scripts\release\Build-Engine.ps1          # fetch, configure, build, compare
+```
+
+It checks the tools above and says what to install, fetches the fork at the
+pinned commit and its submodules, configures `engine\skymp\build` the first
+time with the line below (`SKYRIM_DIR` is `C:\Thornswood\Game` unless
+`-SkyrimDir` says otherwise), builds everything in Release, and compares the
+six client files with the record. The first run builds every vcpkg library
+and takes a long while; after that only what changed is rebuilt, so after a
+fork change somebody else made, `git submodule update engine/skymp` and run it
+again. When it says the build is not the recorded one and you did not change
+the engine, the fork is not at the pinned commit; when you did, run
+`New-ClientBuildRecord.ps1` and put the record in your pull request.
+
 ## Configuring
 
-`Build-Server.ps1` never configures and stops when `build\CMakeCache.txt` is
-missing (`Build-Server.ps1:32-35`, `100-104`). Configure once, from the
-repository folder:
+`Build-Engine.ps1` runs this line. `Build-Server.ps1` never configures and
+stops when `build\CMakeCache.txt` is missing (`Build-Server.ps1:32-35`,
+`100-104`). By hand, once, from the repository folder:
 
 ```powershell
 cmake -S engine\skymp -B engine\skymp\build -G "Visual Studio 17 2022" -A x64 `

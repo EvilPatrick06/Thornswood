@@ -504,7 +504,11 @@ foreach ($f in 'plugins.txt', 'loadorder.txt') {
 # compiled into one exe, which is why a release that only changed the launcher
 # used to produce an empty file list and a news post that said nothing. Hashed
 # so the news can at least name which parts of it moved.
-$srcDir = Join-Path $RepoDir 'tools'
+# launcher\ since the reorganisation (issue #440, phase 7); it read tools\ until
+# 25 September and found nothing there after the move. The keys are the paths
+# under that folder, app\Shell.cs and ui.xaml, the same as before, so a
+# baseline written before the move still compares.
+$srcDir = Join-Path $RepoDir 'launcher'
 if (Test-Path $srcDir) {
     foreach ($f in @(Get-ChildItem -LiteralPath $srcDir -Recurse -File -ErrorAction SilentlyContinue |
                      Where-Object { $_.Extension -in '.cs', '.xaml' })) {

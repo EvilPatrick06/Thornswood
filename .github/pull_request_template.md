@@ -26,4 +26,4 @@ what you saw in game. "Not run" is an answer; leave nothing blank. -->
 - [ ] It changes one thing. A branch that changes eight things is eight reviews.
 - [ ] If it edits Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1, there is a line in #staff-general about it.
 - [ ] If it changes anything in CONTRIBUTING.md's settled design, the team agreed it in #staff-general first.
-- [ ] Anything it found or left unfinished is on the To Do List.
+- [ ] Anything it found or left unfinished is on the board (GitHub Issues).

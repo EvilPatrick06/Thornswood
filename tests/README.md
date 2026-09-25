@@ -6,8 +6,9 @@ Every `test-*.js` and `test-*.ps1` here checks one thing the scripts, the
 launcher, the plugins, the gamemode or the site promise, by reading the files
 or by running a piece of them against a scratch copy. None of them talks to
 the VPS or to GitHub unless it says so at the top (`test-branch-rules.js
---live` is the one that does). The build check runs every one of them on each
-pull request (`.github/workflows/build.yml`), and a red one stops the merge.
+--live` is the one that does). The build check (`.github/workflows/build.yml`) runs every one of them, but
+it is off since 25 September and runs only when started by hand, so run the
+ones your change touches yourself before merging.
 
 The voice service's own harnesses stay beside it in `voice\`, and the bot's in
 `bot\`, because they are run from there.
