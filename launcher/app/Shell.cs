@@ -528,6 +528,27 @@ namespace Thornswood
 
         static T F<T>(string name) where T : class { return win.FindName(name) as T; }
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern int GetSystemMetrics(int index);
+
+        /// <summary>How far a maximized window hangs past the screen: the sizing frame plus its padding, in WPF units.</summary>
+        static Thickness MaximizedInset()
+        {
+            double px = 0;
+            try { px = GetSystemMetrics(32) + GetSystemMetrics(92); }   // SM_CXSIZEFRAME + SM_CXPADDEDBORDER
+            catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, asking Windows for the frame size", ex); }
+            if (px <= 0) px = 8;
+            double scale = 1;
+            try
+            {
+                PresentationSource src = PresentationSource.FromVisual(win);
+                if (src != null && src.CompositionTarget != null) scale = src.CompositionTarget.TransformToDevice.M11;
+            }
+            catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, reading the screen scale", ex); }
+            if (scale <= 0) scale = 1;
+            return new Thickness(px / scale);
+        }
+
         static void Bind()
         {
             txtServer = F<TextBlock>("TxtServer"); txtPing = F<TextBlock>("TxtPing");
@@ -1106,6 +1127,16 @@ namespace Thornswood
                 }
                 try { win.DragMove(); } catch { }
             };
+
+            // With WindowChrome a maximized window hangs past the screen by its
+            // resize frame, so the frame is pulled in by that much while maximized.
+            var frame = F<Border>("WindowFrame");
+            if (frame != null)
+            {
+                Action fit = delegate { frame.Margin = win.WindowState == WindowState.Maximized ? MaximizedInset() : new Thickness(0); };
+                win.StateChanged += delegate { fit(); };
+                fit();
+            }
 
             btnMin.Click += delegate { win.WindowState = WindowState.Minimized; };
             btnMax.Click += delegate { win.WindowState = win.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized; };
@@ -2949,7 +2980,8 @@ namespace Thornswood
             var l = new TextBlock();
             l.Text = label; l.FontSize = 11.5;
             l.FontFamily = new FontFamily("Constantia, Georgia");
-            l.Foreground = Res("Faint");
+            // Ink a little dimmed, not Faint: over the banner art Faint could not be read (#596).
+            l.Foreground = Res("Ink"); l.Opacity = 0.78;
             sp.Children.Add(l);
 
             var v = new TextBlock();
@@ -3454,8 +3486,13 @@ namespace Thornswood
         /// </summary>
         static void StartPing()
         {
-            txtPing.Text = "checking";
-            dotServer.Fill = Res("Faint");
+            // Only the first check says "checking". After that the last answer
+            // stays up and changes in place when the new one lands (#596).
+            if (string.IsNullOrEmpty(txtPing.Text) || txtPing.Text == "no address")
+            {
+                txtPing.Text = "checking";
+                dotServer.Fill = Res("Faint");
+            }
 
             string host = cfg.ServerAddress;
             if (string.IsNullOrEmpty(host)) { txtPing.Text = "no address"; return; }
@@ -3495,16 +3532,15 @@ namespace Thornswood
 
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
-                    if (up)
-                    {
-                        txtPing.Text = ms + " ms";
-                        dotServer.Fill = Res(serving ? "Ok" : "Warn");
-                    }
-                    else
-                    {
-                        txtPing.Text = "no reply";
-                        dotServer.Fill = Res("Warn");
-                    }
+                    string now = up ? ms + " ms" : "no reply";
+                    // Keep who is on until the next count comes back, so the line
+                    // does not shrink and grow again every refresh.
+                    string was = txtPing.Text ?? "";
+                    int dot = was.IndexOf("   \u00b7   ");
+                    string tail = dot >= 0 ? was.Substring(dot) : "";
+                    string want = now + tail;
+                    if (txtPing.Text != want) txtPing.Text = want;
+                    dotServer.Fill = Res(up ? (serving ? "Ok" : "Warn") : "Warn");
                     RecordPing(up ? ms : -1, serving);
                     AskOnline();
                 }));
@@ -3539,7 +3575,7 @@ namespace Thornswood
         {
             if (txtVoiceState == null) return;
             Config c = cfg;
-            txtVoiceState.Text = "checking";
+            if (string.IsNullOrEmpty(txtVoiceState.Text)) txtVoiceState.Text = "checking";
             ThreadPool.QueueUserWorkItem(delegate
             {
                 // Asked at the address voice really uses, not by knocking on the
@@ -4150,7 +4186,9 @@ namespace Thornswood
 
         static void AskOnline()
         {
-            pingText = txtPing.Text;
+            pingText = txtPing.Text ?? "";
+            int dot = pingText.IndexOf("   \u00b7   ");
+            if (dot >= 0) pingText = pingText.Substring(0, dot);
             ThreadPool.QueueUserWorkItem(delegate
             {
                 Online.Count c = null;
@@ -4159,7 +4197,8 @@ namespace Thornswood
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     string extra = Online.Line(got);
-                    if (extra.Length > 0) txtPing.Text = pingText + "   \u00b7   " + extra;
+                    string want = extra.Length > 0 ? pingText + "   \u00b7   " + extra : pingText;
+                    if (txtPing.Text != want) txtPing.Text = want;
                     if (playing && got != null)
                     {
                         try { Presence.Update(got.Known ? got.Now : -1, got.Max); } catch { }
