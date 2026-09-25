@@ -80,7 +80,8 @@ Yes 'the registration token is never printed' ($sayToken.Count -eq 0)
 Yes '  and is dropped once used' ($text -match '(?m)^\$token = \$null')
 
 # ---- priority ----------------------------------------------------------------------
-Yes 'the runner is held at below normal priority' ($text -match "PriorityClass = ''BelowNormal''")
+Yes 'the runner is held at normal priority, not above' ($text -match "PriorityClass = ''Normal''" -and $text -notmatch "PriorityClass = ''(High|AboveNormal|RealTime)''")
+Yes 'Defender skips the runner''s own folder and nothing else' ($text -match 'Add-MpPreference -ExclusionPath `\$root' -and ([regex]::Matches($text, 'Add-MpPreference')).Count -eq 1)
 Yes '  by a task that runs at start and every five minutes' ($text -match 'AtStartup' -and $text -match 'RepetitionInterval \(New-TimeSpan -Minutes 5\)')
 
 # ---- ssh ---------------------------------------------------------------------------

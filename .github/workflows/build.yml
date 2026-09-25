@@ -17,8 +17,8 @@
 # blocked on billing and every run failed in seconds, and Patrick chose a
 # runner on the box over paying for minutes (issue #437).
 # scripts\deploy\Install-Runner.ps1 puts it there, as its own local account that is
-# shut out of every live Thornswood folder, at below normal priority so a build
-# never takes the processor from the game server, the site, voice or the bot.
+# shut out of every live Thornswood folder, at normal priority (never above)
+# and with Defender skipping its own folder, so a check takes minutes.
 # The label is what picks it; change it here and in Install-Runner together.
 # Safe because the repository is private: nobody outside the team can open a
 # pull request that runs code on the box.
@@ -47,8 +47,7 @@ jobs:
   launcher:
     name: Launcher builds
     runs-on: [self-hosted, Windows, thornswood-vps]
-    # Seven to ten minutes on GitHub's runners; below normal priority on a box
-    # that is also serving people is slower. Past this it is stuck, not slow.
+    # About five minutes on the VPS is the aim. Past this it is stuck, not slow.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -137,25 +136,33 @@ jobs:
           # Written to be run by hand, and until now never run anywhere else.
           # A harness that reads this machine's game folder says SKIP for the
           # parts it cannot measure on a runner and still checks the rest.
-          # FOUR AT A TIME, since 25 September. One after another the ~190 took
+          # IN PARALLEL, since 25 September. One after another the ~190 took
           # five and a half minutes on the VPS; Patrick wanted a check in about
           # five. Each harness is its own process with its own temp folder and
           # a free port, so they do not meet. The output of each is printed
           # whole, in name order, and the ones that failed are listed together
           # at the end, where the tail of the log shows them.
           $all = @(Get-ChildItem tests -File | Where-Object { $_.Name -like 'test-*.js' -or $_.Name -like 'test-*.ps1' } | Sort-Object Name)
-          $results = $all | ForEach-Object -ThrottleLimit 4 -Parallel {
+          # As many at once as the box has cores: four on a small VPS was slower
+          # than one at a time, because each start is scanned and they queue.
+          $cores = [Math]::Max(1, [Environment]::ProcessorCount)
+          Write-Host ("{0} core(s), so {0} harness(es) at a time" -f $cores)
+          $results = $all | ForEach-Object -ThrottleLimit $cores -Parallel {
             $t = $_
+            $sw = [Diagnostics.Stopwatch]::StartNew()
             $out = if ($t.Extension -eq '.js') { & node $t.FullName 2>&1 | Out-String } else { & pwsh -NoProfile -File $t.FullName 2>&1 | Out-String }
-            [pscustomobject]@{ Name = $t.Name; Path = $t.FullName; Code = $LASTEXITCODE; Out = $out }
+            [pscustomobject]@{ Name = $t.Name; Path = $t.FullName; Code = $LASTEXITCODE; Out = $out; Secs = [Math]::Round($sw.Elapsed.TotalSeconds, 1) }
           }
           $failed = @()
           foreach ($r in ($results | Sort-Object Name)) {
-            Write-Host ("--- {0}" -f $r.Name)
+            Write-Host ("--- {0}  ({1}s)" -f $r.Name, $r.Secs)
             Write-Host $r.Out
             if ($r.Code -ne 0) { $failed += $r.Name; Write-Host ("::error file={0}::harness failed" -f $r.Path) }
           }
           $bad = $failed.Count
+          Write-Host ''
+          Write-Host ('slowest: ' + ((@($results | Sort-Object Secs -Descending | Select-Object -First 10) | ForEach-Object { '{0} {1}s' -f $_.Name, $_.Secs }) -join ', '))
+          Write-Host ('all of them, added up: {0}s' -f [Math]::Round(($results | Measure-Object Secs -Sum).Sum))
           $voiceFailed = @()
           # The five in voice, which run nowhere else. They spawn the
           # real service in a temp folder and drive it over HTTP, so they need

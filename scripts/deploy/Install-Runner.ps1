@@ -28,9 +28,12 @@
     4. Downloads the runner release GitHub calls latest, checked against the
        SHA-256 GitHub publishes in that release's notes, and registers it as a
        service that runs as that account.
-    5. Registers a task that keeps the runner at below normal priority, so a
-       build never takes the processor from the game server, the site, voice
-       or the bot on the same five cores.
+    5. Registers a task that keeps the runner at normal priority, never
+       above it, so a build shares the five cores with the game server, the
+       site, voice and the bot rather than taking them. Below normal until
+       25 September, when Patrick wanted a check in about five minutes.
+    6. Tells Windows Defender to skip the runner's own folder, so the few
+       hundred processes a check starts are not each scanned on the way in.
 
   It needs gh on this machine, signed in as somebody who can administer the
   repository (Patrick): the registration token comes from
@@ -262,6 +265,12 @@ if (-not (Test-Path (Join-Path `$root 'bin\Runner.Listener.exe')) -or -not (Test
   'downloaded actions/runner $version, checksum matched'
 } else { 'actions/runner $version already unpacked' }
 
+# Windows Defender scans every process a test starts, several hundred per
+# check, which was most of its five minutes. The runner's own folder only;
+# every live C:\Thornswood-* folder stays scanned. The repository is
+# private, so what runs here is the team's own code.
+try { Add-MpPreference -ExclusionPath `$root -EA Stop; 'Defender skips ' + `$root } catch { 'Defender exclusion not set: ' + `$_.Exception.Message }
+
 # Its own folder is the one place it may write.
 & icacls.exe `$root /grant (`$acct + ':(OI)(CI)M') /T /C /Q 2>&1 | Out-Null
 
@@ -273,10 +282,12 @@ Pop-Location
 `$cfg | Where-Object { "`$_" -match 'Runner successfully|Settings Saved|Service .* started|error|Error|failed' } | ForEach-Object { '  config: ' + "`$_".Trim() }
 if (`$code -ne 0) { throw ('config.cmd stopped with ' + `$code) }
 
-# Below normal, always. Jobs are started by Runner.Listener and inherit its
-# priority, so holding the listener there holds every build. At start and
-# every five minutes, in case the service restarts.
-`$fix = 'Get-Process Runner.Listener, Runner.Worker -EA SilentlyContinue | ForEach-Object { `$_.PriorityClass = ''BelowNormal'' }'
+# Normal priority since 25 September (below normal until then). Patrick
+# wanted a check in about five minutes, and at below normal every test
+# waited behind whatever the box was doing. Jobs are started by
+# Runner.Listener and inherit its priority. At start and every five
+# minutes, in case the service restarts.
+`$fix = 'Get-Process Runner.Listener, Runner.Worker -EA SilentlyContinue | ForEach-Object { `$_.PriorityClass = ''Normal'' }'
 `$act = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -WindowStyle Hidden -Command "' + `$fix + '"')
 `$t1 = New-ScheduledTaskTrigger -AtStartup
 `$t2 = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
