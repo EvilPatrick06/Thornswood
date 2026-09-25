@@ -22,7 +22,6 @@
     .github/workflows/build.yml   its own step's lines, run the way GitHub runs them
     Ship.ps1                      its build block lifted out and run against stand-ins
     Install-Thornswood.ps1        a copy run with -Only launcher, against the same stand-ins
-    RunAll.cmd                    still calls the build with nothing the build refuses
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -322,7 +321,7 @@ try {
         Yes "N2 Build-Launcher.ps1 does not use $m" ($members -notcontains $m)
     }
     Yes 'N3 Build-Launcher.ps1 does not dot-source Close-Launcher.ps1' (@($strings | Where-Object { $_ -eq 'Close-Launcher.ps1' }).Count -eq 0)
-    Yes 'N4 Build-Launcher.ps1 has no parameter a caller must pass, so RunAll.cmd and a bare hand build still bind' (
+    Yes 'N4 Build-Launcher.ps1 has no parameter a caller must pass, so a bare hand build still binds' (
         @($bAst.ParamBlock.Parameters | Where-Object { $_.Attributes | Where-Object { $_.Extent.Text -match 'Mandatory' } }).Count -eq 0)
 
     if ($haveInstall) {
@@ -456,8 +455,6 @@ try {
     }
     $callers = @($callers | Sort-Object)
     Yes ('W1 only Ship.ps1 and Install-Thornswood.ps1 run the install, found: ' + ($callers -join ', ')) (($callers -join ',') -eq 'Install-Thornswood.ps1,Ship.ps1')
-    $runAll = Get-Content -LiteralPath (Join-Path $Here 'RunAll.cmd') -Raw
-    Yes 'W2 RunAll.cmd still calls the build with no parameters' ($runAll -match '-File "%~dp0Build-Launcher\.ps1" <nul')
 
     # Last, so it covers every run above.
     Yes 'D1 the Desktop shortcuts were not touched by any of it' ((Get-DesktopState) -eq $deskBefore)
