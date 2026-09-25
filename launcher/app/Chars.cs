@@ -28,7 +28,8 @@ namespace Thornswood
     //
     // What stays here is the list itself, profiles.txt: one row per id this
     // install has played, plus one spare row on slot 0 holding the id the
-    // menu's New character will use. Ids are never reused inside one install.
+    // menu's New character will use, minted under the Discord account the
+    // install is linked to. Ids are never reused inside one install.
     //
     // The save folder is still redirected, to one folder for the whole install
     // rather than one per slot. SkyrimPlatform writes its own .ess as it works
@@ -44,7 +45,7 @@ namespace Thornswood
 
         // One line per character, and one for the spare:
         //
-        //     slot  profileId  lastPlayedTicks  playedSeconds  trade  town
+        //     slot  profileId  lastPlayedTicks  playedSeconds  trade  town  discordId
         //
         // Deliberately not JSON. The launcher's only serializer is the data
         // contract one, which cannot round trip a shape it was not told about in
@@ -62,6 +63,12 @@ namespace Thornswood
         // anybody picks New character at the menu. Any other slot number is a
         // character. New rows take the next free number; there is no longer a
         // limit of two.
+        //
+        // The last field is the Discord account the row's id was minted under,
+        // a dash when nobody knows (every row written before 24 September).
+        // Only the spare's is read; see EnsureSpare for why. An older launcher
+        // reads the first six fields and writes the seventh back as nothing,
+        // which this one takes as not known and mints a fresh spare for.
         static string ProfileFile { get { return Path.Combine(Home, "profiles.txt"); } }
         static string StartIni
         {
@@ -116,6 +123,8 @@ namespace Thornswood
             public long Seconds;
             public string Trade = "";
             public string Town = "";
+            // The Discord id this row's id was minted under, "" when not known.
+            public string Owner = "";
         }
 
         static List<Row> Rows()
@@ -140,6 +149,7 @@ namespace Thornswood
                     if (p.Length > 3 && long.TryParse(p[3], out secs) && secs >= 0) r.Seconds = secs;
                     if (p.Length > 4 && p[4] != "-") r.Trade = p[4];
                     if (p.Length > 5 && p[5] != "-") r.Town = p[5];
+                    if (p.Length > 6 && p[6] != "-") r.Owner = p[6];
                     l.Add(r);
                 }
             }
@@ -156,7 +166,7 @@ namespace Thornswood
                 foreach (Row r in rows)
                 {
                     sb.AppendLine(r.Slot + " " + r.Id + " " + r.Played.Ticks + " " + r.Seconds +
-                                  " " + Dash(r.Trade) + " " + Dash(r.Town));
+                                  " " + Dash(r.Trade) + " " + Dash(r.Town) + " " + Dash(r.Owner));
                 }
                 File.WriteAllText(ProfileFile, sb.ToString());
             }
@@ -303,11 +313,40 @@ namespace Thornswood
         /// character. Saves the file only when it had to mint one, and reads
         /// the list back off disk for that so the new id is checked against
         /// everything already written.
+        ///
+        /// A spare belongs to the Discord account it was minted under, and
+        /// one minted under any other account is retired and a fresh one made.
+        /// Found reviewing To Do List entry 142 on 24 September. The site's
+        /// check in files an id under the first account that checks in with
+        /// it and moves it only once that account has left the Discord,
+        /// because it cannot tell somebody's own id from one they learned off
+        /// the voice service. Shell checks the spare in at every Play
+        /// (KnownIds), so account A already holds it. Unlink and Connect
+        /// Discord, or Reconnect, to account B left that spare in place, and
+        /// B's first New character was made on it: filed under A for as long
+        /// as A stays in the Discord, voice refused it as not B's, the menu
+        /// card got no name,
+        /// and it was let through the game's door on A's standing. Every
+        /// launch runs Prepare before the check ins, so B's spare is minted
+        /// under B before the site hears of it.
+        ///
+        /// A spare with no account written down (every list before this) is
+        /// retired as well, once, because an install relinked before now holds
+        /// exactly that. It costs an id nobody played. When the account is not
+        /// known, the ticket missing or unreadable, the spare is left alone:
+        /// there is nothing to compare it with.
         /// </summary>
         static int EnsureSpare(List<Row> rows)
         {
+            string who = "";
+            try { who = Discord.AccountId ?? ""; } catch { who = ""; }
+
             Row sp = Find(rows, 0);
-            if (sp != null && sp.Id > 0) return sp.Id;
+            if (sp != null && sp.Id > 0)
+            {
+                if (who.Length == 0 || sp.Owner == who) return sp.Id;
+                Retire(sp.Id);
+            }
             if (sp == null)
             {
                 sp = new Row();
@@ -316,8 +355,25 @@ namespace Thornswood
             }
             sp.Id = NextProfileId();
             sp.Played = DateTime.MinValue;
+            sp.Seconds = 0;
+            sp.Owner = who;
             Save(rows);
             return sp.Id;
+        }
+
+        /// <summary>
+        /// Writes an id down as never to be minted again on this install: a
+        /// returning id would hand back whatever the server holds under it.
+        /// </summary>
+        static void Retire(int profileId)
+        {
+            if (profileId <= 0) return;
+            try
+            {
+                Directory.CreateDirectory(Home);
+                File.AppendAllText(RetiredFile, profileId + Environment.NewLine);
+            }
+            catch { }
         }
 
         static List<int> Retired()
@@ -371,12 +427,7 @@ namespace Thornswood
             if (r == null || r.Slot <= 0) return;
             rows.Remove(r);
             Save(rows);
-            try
-            {
-                Directory.CreateDirectory(Home);
-                File.AppendAllText(RetiredFile, profileId + Environment.NewLine);
-            }
-            catch { }
+            Retire(profileId);
         }
 
         /// <summary>The id played most recently, or 0 when nothing has been.</summary>
@@ -763,7 +814,24 @@ namespace Thornswood
             // offer first. SetChooseAtMenu reads the file back and throws when
             // it does not say what was written, which is what stops Play.
             List<Row> rows = Rows();
+            Row oldSpare = Find(rows, 0);
+            int spareBefore = oldSpare != null ? oldSpare.Id : 0;
+            string ownerBefore = oldSpare != null ? oldSpare.Owner : "";
             int spare = EnsureSpare(rows);
+            // A line for the log when the spare was replaced, so launcher.log
+            // says whose it was and a relinked install can be read afterwards.
+            string reminted = null;
+            if (spareBefore > 0 && spare != spareBefore)
+            {
+                string now = "";
+                try { now = Discord.AccountId ?? ""; } catch { now = ""; }
+                reminted = "New character's id " + spareBefore +
+                           (ownerBefore.Length == 0
+                               ? " was made before the launcher wrote down which Discord account it was for"
+                               : " was made under Discord " + ownerBefore) +
+                           ", and this copy is linked to Discord " + now +
+                           ", so it was retired and New character uses " + spare + " instead.";
+            }
             int last = LastPlayedId(rows);
             int point = last > 0 ? last : spare;
             AutoJoin.SetChooseAtMenu(point);
@@ -810,6 +878,7 @@ namespace Thornswood
             // Shell logs the note; its Log is its own, so the tidy's line
             // rides along here rather than being written from this class.
             if (tidied != null) note = (note == null ? "" : note + " ") + tidied;
+            if (reminted != null) note = (note == null ? "" : note + " ") + reminted;
             return note;
         }
 

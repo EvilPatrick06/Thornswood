@@ -1780,6 +1780,75 @@ async function standing(discordId) {
   return out;
 }
 
+/*
+  Has this account left the Thornswood Discord, so that nothing it holds in
+  linked.json is anybody's any more?
+
+  Added reviewing To Do List entry 142 on 24 September. /api/play/join stopped
+  writing a profile id against a second account once a first one holds it,
+  because that is how somebody took an id they learned off the voice service.
+  It also stopped a person who moved to a new Discord account from ever having
+  the characters their install made under the old one filed under the new, and
+  a reviewer measured what that cost: voice refused the new account on all of
+  them, and once the old account left the Discord /api/allowed dropped them and
+  the game's door turned that person away from every character made before the
+  switch, with a hand edit of linked.json on the VPS the only way back. On main
+  before this, the new account simply took them at its first Play.
+
+  An account that has left cannot play anything, so there is nobody left to
+  keep those ids for, and /api/play/join moves them to whoever checks in with
+  one next. Left means all of these, and anything short of them is the safe
+  side, still holding:
+    - Discord says the account is not in the server: a 404, which is the only
+      failure standing() takes as certain. A lookup that failed is not left.
+    - It is not banned in bans.json, which standing() reads before anything.
+    - It is not on Discord's own ban list. A ban from inside Discord takes
+      somebody out of the server as well, so it reads as a 404 here, and must
+      not hand their characters to the second account they come back on. The
+      ban list needs the bot to be allowed to ban members; when it cannot be
+      read the account counts as still holding its ids.
+  An account still in the Discord keeps its ids with or without the play role,
+  because taking a role away is not leaving.
+*/
+async function hasLeft(discordId) {
+  let st;
+  try { st = await standingCached(String(discordId)); } catch (e) { return false; }
+  if (!st || st.inGuild || st.banned || st.lookupFailed) return false;
+  if (!cfg.discord.botToken || !cfg.discord.guildId) return false;
+  const ban = await discordGet('/guilds/' + cfg.discord.guildId + '/bans/' +
+                               encodeURIComponent(String(discordId)));
+  return !!ban && !ban.ok && ban.status === 404;
+}
+
+/*
+  The accounts other than the caller's that hold this profile id and have
+  left the Discord (hasLeft above), as a set of Discord ids. Empty when the
+  caller holds it already, so checking in with your own id never asks Discord
+  about anybody else.
+
+  Handed the table rather than reading it, and the join route reads the file
+  again after this for the copy it writes back, because asking Discord waits
+  and a wait between reading linked.json and writing it would write over
+  whatever another launcher checked in meanwhile.
+*/
+async function departed(linked, pid, caller) {
+  const out = new Set();
+  const table = linked || {};
+  const n = Number(pid) || 0;
+  if (n <= 0) return out;
+  const own = (table[caller] && Array.isArray(table[caller].profiles))
+    ? table[caller].profiles.map(Number) : [];
+  if (own.indexOf(n) >= 0) return out;
+  for (const d of Object.keys(table)) {
+    if (String(d) === String(caller)) continue;
+    const theirs = (table[d] && Array.isArray(table[d].profiles))
+      ? table[d].profiles.map(Number) : [];
+    if (theirs.indexOf(n) < 0) continue;
+    if (await hasLeft(d)) out.add(String(d));
+  }
+  return out;
+}
+
 /* The ticket the launcher keeps. Signed rather than stored, so a restart does
    not sign everybody out, and short enough lived that leaving the Discord
    stops mattering within the month even if nothing checks. Every use is
@@ -2581,9 +2650,12 @@ async function handle(req, res) {
   /*
     What the launcher talks to. The person links Discord once, the launcher
     keeps a signed ticket, and every launch it asks here whether that ticket is
-    still somebody who is allowed in. The answer carries the server password,
-    so the password is no longer a thing written in version.json for anybody
-    who has ever installed the game to keep forever.
+    still somebody who is allowed in. The answer used to carry the server
+    password as well, so the password stopped being a thing written in
+    version.json for anybody who has ever installed the game to keep forever.
+    It has not carried one since 18 September, when the site stopped reading
+    the password at all: a yes now says who the account is and what it may
+    do, and nothing more.
 
     Every call re-asks Discord. Leaving the server, or being handed the Banned
     role, stops the next launch working, with nothing to remember to do.
@@ -2633,16 +2705,129 @@ async function handle(req, res) {
     if (wantsDev && !st.dev) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
       'The dev build is for the ' + (cfg.access.dev || []).join(' and ') + ' roles. Play on the main build.' });
 
-    const linked = jsonFile(LINKED, {});
-    const was = linked[t.d] || {};
     // The launcher sends the profile id it is about to play as. The game
     // server never sees a Discord account, only this number, so this is the
     // one place the two get tied together, and /api/allowed hands the numbers
     // back to the server's door. A person has a couple of character slots, so
     // it is a short list rather than one value.
     const pid = Number(o.profileId) || 0;
+    // Which accounts holding this id have left the Discord, asked off a copy
+    // of the file before the one written back is read. Nothing may wait
+    // between that read and putJson below; departed() says why.
+    const left = await departed(jsonFile(LINKED, {}), pid, t.d);
+    const linked = jsonFile(LINKED, {});
+    const was = linked[t.d] || {};
     const profiles = Array.isArray(was.profiles) ? was.profiles.slice() : [];
-    if (pid > 0 && profiles.indexOf(pid) < 0) profiles.push(pid);
+    /*
+      A number already against somebody else's Discord account is theirs, and
+      this used to write it against the caller's account anyway.
+
+      Found reading the code for To Do List entry 142, identity on the game
+      server being a number the client picks. voice-server.js sends every
+      profile id to every voice peer five times a second, so any account with
+      the play role could learn somebody's id, check in with it here, and
+      from then on /api/play/owns below answered "theirs" and the voice
+      service minted a proven token for it. /owns already refuses somebody
+      else's number; this is the same loop, run before anything is written.
+
+      The caller's own list is read first, the way /owns reads it, so a
+      person checking in again with an id they already hold is always
+      claimed, even if an older file also has that id against a second
+      account. An id nobody holds still belongs to whoever checks in with it
+      first, which is the launcher that just made the character.
+
+      Not written, and NOT refused. The first cut of this answered 409, and
+      that locked out a tester who had done nothing wrong. The launcher's
+      character list is kept per install, not per Discord account, and the
+      door check (Door.Check, before Chars.Prepare) sends the id played last.
+      So an install that had played under one account and was then linked to
+      another with the launcher's own Unlink and Connect Discord (a second
+      person on a shared PC, an alt, somebody who changed accounts) got a 409
+      on every Play, a warning box, and no game, with no way to reach New
+      character at the menu. Refusing protected nothing either: the yes below
+      carries no password, and nothing in it is about the character, only
+      about the account that asked. What needed protecting is linked.json,
+      and leaving the id off the caller's list is the whole of that. The
+      caller is still stamped as seen, because they did check in. claimed
+      false says the id was left off, for whoever wants to read it.
+
+      Such an install's spare, the id the menu's New character uses, was
+      checked in under the first account too, and this route cannot tell it
+      from an id somebody took. So the launcher mints the relinked account a
+      fresh spare before it checks anything in (Chars.EnsureSpare), and the
+      new character is filed under the account that made it.
+
+      WHAT THIS COSTS SOMEBODY WHO CHANGED ACCOUNTS, which is new with this
+      rule and not something main did. Measured by a reviewer on 24 September
+      running this route, /owns and /api/allowed from main and from here: an
+      install with characters 700 and 701 made under A, relinked to B. On main
+      B took both at its first Play. Here they stay A's. While A is in the
+      Discord the game's door still lets them in on A's standing, but /owns
+      calls them somebody else's, so the voice service refuses B a token on
+      either. Whether that is the right price for stopping id theft is
+      Patrick's to decide; an admin action that moves an id between accounts
+      is the other half of it and is not built.
+      What is not a price worth paying is the rest of what the reviewer
+      found: once A left the Discord, /api/allowed dropped 700 and 701 and
+      the door turned B away from both, with a hand edit of linked.json on the
+      VPS the only way back. So an id held only by accounts that have left the
+      Discord, and are not banned (hasLeft), is free: it is taken off them and
+      claimed by whoever checks in with it, which for that install is B at its
+      next Play.
+    */
+    let claimed = pid > 0 && profiles.map(Number).indexOf(pid) >= 0;
+    /*
+      An id the caller already holds goes to the end of their list, so the
+      eight kept below are the eight checked in most recently.
+
+      Found reviewing this route for entry 142 on 24 September. The list was
+      kept in the order ids first arrived and cut to its last eight, and an id
+      already on it never moved. Every Play checks the characters in before
+      the spare, and a relinked install mints a new spare each time it goes
+      back to an account, so that account's list grew by one spare per switch
+      while its characters sat at the front. On the ninth id its oldest
+      character fell off, and the other account's next Play checked it in
+      with nobody holding it and claimed it for good, which is the same harm
+      the holder rule below exists to stop. Measured with test-play-join.js:
+      one character, A to B to A each round, off A's list after round seven
+      and B's from round eight. Moved to the end, an install's own ids are
+      always the newest, and a spare the launcher retired is what drops off.
+    */
+    if (claimed) {
+      for (let i = profiles.length - 1; i >= 0; i--) {
+        if (Number(profiles[i]) === pid) profiles.splice(i, 1);
+      }
+      profiles.push(pid);
+    }
+    if (pid > 0 && !claimed) {
+      let holder = '';
+      const gone = [];
+      for (const d of Object.keys(linked)) {
+        if (String(d) === String(t.d)) continue;
+        const theirs = (linked[d] && Array.isArray(linked[d].profiles))
+          ? linked[d].profiles.map(Number) : [];
+        if (theirs.indexOf(pid) < 0) continue;
+        // An account that holds it and was not asked about above (it took the
+        // id since) counts as still holding it, which is the safe side.
+        if (left.has(String(d))) { gone.push(String(d)); continue; }
+        holder = d;
+        break;
+      }
+      if (holder) {
+        console.log('[thornswood-docs] join kept profile ' + pid + ' off Discord ' + t.d +
+                    ': it is held by Discord ' + holder);
+      } else {
+        // Off the accounts that have left, so one id has one holder and the
+        // rule above keeps working for the account that has it now.
+        for (const d of gone) {
+          linked[d].profiles = linked[d].profiles.filter((n) => Number(n) !== pid);
+          console.log('[thornswood-docs] join moved profile ' + pid + ' to Discord ' + t.d +
+                      ' from Discord ' + d + ', which has left the Thornswood Discord');
+        }
+        profiles.push(pid);
+        claimed = true;
+      }
+    }
     linked[t.d] = Object.assign(was, {
       id: String(t.d), name: st.name || t.n,
       first: was.first || Date.now(), seen: Date.now(),
@@ -2658,7 +2843,11 @@ async function handle(req, res) {
       admin: st.admin,
       dev: !!st.dev,
       roles: st.roles,
-      slots: slotsFor(st)
+      slots: slotsFor(st),
+      // Whether the profile id sent is now against this account. False when
+      // none was sent, and when another account already holds it, in which
+      // case it was left off this one and the door still said yes.
+      claimed: claimed
     });
   }
 
@@ -3010,7 +3199,8 @@ async function handle(req, res) {
     made the character: refusing those would break character creation for
     every new character, which is the one case this runs in. A number already
     against somebody else's Discord account is theirs, and that is the case
-    worth refusing.
+    worth refusing, unless that account has left the Discord without being
+    banned: see hasLeft.
   */
   if (p === '/api/play/owns' && req.method === 'POST') {
     let o = {};
@@ -3044,14 +3234,21 @@ async function handle(req, res) {
       ? linked[t.d].profiles.map(Number) : [];
     if (mine.indexOf(pid) >= 0) return sendJson(res, 200, { ok: true, why: 'theirs' });
 
+    // The same rule /api/play/join keeps: an account that has left the
+    // Discord and is not banned (hasLeft) holds nothing, so somebody whose
+    // old account has gone has voice on their characters before their next
+    // Play moves the ids across.
+    const left = await departed(linked, pid, t.d);
+    let gone = false;
     for (const d of Object.keys(linked)) {
       if (String(d) === String(t.d)) continue;
       const theirs = (linked[d] && Array.isArray(linked[d].profiles))
         ? linked[d].profiles.map(Number) : [];
-      if (theirs.indexOf(pid) >= 0) {
-        return sendJson(res, 200, { ok: false, why: 'somebody else' });
-      }
+      if (theirs.indexOf(pid) < 0) continue;
+      if (left.has(String(d))) { gone = true; continue; }
+      return sendJson(res, 200, { ok: false, why: 'somebody else' });
     }
+    if (gone) return sendJson(res, 200, { ok: true, why: 'left' });
     // Nobody has it. The launcher that just made the character is the one
     // asking, and it checks in with this number a moment later anyway.
     return sendJson(res, 200, { ok: true, why: 'unclaimed' });
