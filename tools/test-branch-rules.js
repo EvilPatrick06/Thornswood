@@ -145,7 +145,9 @@ yes('Ship.ps1 refuses a main release that is ahead of origin/main, and sends it 
     /ahead of origin\/(main|\$branch)\. A release has to be buildable[\s\S]{0,300}?through a pull request/.test(shipSrc) &&
     !/ahead of origin\/(main|\$branch)\. Run git push first/.test(shipSrc));
 yes('Ship.ps1 refuses a main release with a file under tools that git does not know, which both documents now name',
-    /file\(s\) under tools that git does not know about/.test(shipSrc));
+    // Since phase 0 of the reorganisation (issue #440) the gate also looks at
+    // the other folders a release is built from, and says so.
+    /file\(s\) under tools(, or another folder a release is built from,)? that git does not know about/.test(shipSrc));
 
 // ------------------------------------------------------------ Bump-Version.ps1
 const bump = gitCalls(read('tools/Bump-Version.ps1'));

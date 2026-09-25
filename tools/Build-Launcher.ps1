@@ -164,16 +164,19 @@ if (-not $icon) { Die "app.ico was not found next to this script or in $Src" }
 # game's own icon and simply does not draw an emblem.
 $logo    = Join-Path $Here 'logo.png'
 $logoSml = Join-Path $Here 'logo-192.png'
-if (-not (Test-Path $logo))    { Say '  logo.png is missing, the launcher will run without its emblem' 'Yellow' }
+# Optional to the launcher, not to the build: every one of these is tracked in
+# the repository, so a missing one is a path that went wrong in a move, and a
+# warning here would ship a launcher without it (issue #440, phase 0).
+if (-not (Test-Path $logo))    { Die "logo.png is not at $logo. It is in the repository, so the path is wrong; the launcher would ship without its emblem." }
 if (-not (Test-Path $logoSml)) { $logoSml = $logo }
 # The landscape behind the title on the Play page. Optional the same way:
 # without it the band keeps its pattern.
 $headerArt = Join-Path $Here 'launcher-header.jpg'
-if (-not (Test-Path $headerArt)) { Say '  launcher-header.jpg is missing, the title band will keep its pattern' 'Yellow' }
+if (-not (Test-Path $headerArt)) { Die "launcher-header.jpg is not at $headerArt. It is in the repository, so the path is wrong." }
 # The same strip moving, over the picture. Optional too: without it the band
 # keeps the still picture.
 $headerVideo = Join-Path $Here 'launcher-header.mp4'
-if (-not (Test-Path $headerVideo)) { Say '  launcher-header.mp4 is missing, the title band will keep the still picture' 'Yellow' }
+if (-not (Test-Path $headerVideo)) { Die "launcher-header.mp4 is not at $headerVideo. It is in the repository, so the path is wrong." }
 Say "  $($cs.Count) source files" 'Green'
 
 $null = New-Item -ItemType Directory -Force -Path $outDir
@@ -288,7 +291,7 @@ $iniTemplate = Join-Path $Here 'emotes\Thornswood.ini'
 if (Test-Path -LiteralPath $iniTemplate) {
     $cscArgs += "/resource:$((Resolve-Path $iniTemplate).Path),Thornswood.ini"
 } else {
-    Say '  tools\emotes\Thornswood.ini is missing; a machine with no Thornswood.ini will play on the plugins'' own defaults' 'Yellow'
+    Die "Thornswood.ini is not at $iniTemplate. It is in the repository, so the path is wrong; a machine with no Thornswood.ini would play on the plugins' own defaults."
 }
 
 # The record of which SkyMP client runtime belongs beside this launcher.
@@ -307,7 +310,7 @@ $clientRecord = Join-Path $Here 'client-build.json'
 if (Test-Path -LiteralPath $clientRecord) {
     $cscArgs += "/resource:$((Resolve-Path $clientRecord).Path),client-build.json"
 } else {
-    Say '  tools\client-build.json is missing; the launcher will not be able to check or repair the client runtime' 'Yellow'
+    Die "client-build.json is not at $clientRecord. It is in the repository, so the path is wrong; the launcher could not check or repair the client runtime."
 }
 
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }

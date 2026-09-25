@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 196 of them, with the one line that says
+Every `.ps1` in this folder, 197 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -175,6 +175,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-log-upload.ps1](test-log-upload.ps1) | The launcher's half of the session logs: which files it picks, what it takes out of them, and whether the site can read what it sends. |
 | [test-master-flag.ps1](test-master-flag.ps1) | The master flag in the plugin header, which the game honours BEFORE the list order, and which Deploy-Gamemode.ps1 never read until 22 September. |
 | [test-max-online.ps1](test-max-online.ps1) | One number for how many a server seats, entry 281. |
+| [test-missing-files-stop.ps1](test-missing-files-stop.ps1) | A file the repository tracks that a build step cannot find stops the build. |
 | [test-package-release-dir.ps1](test-package-release-dir.ps1) | The installer has to find the releases feed on whichever machine builds it, and has to stop rather than guess when the feed is not there. |
 | [test-payload-hash.ps1](test-payload-hash.ps1) | The setup program checks the payload it downloads against a hash the site publishes, and deletes one that does not match instead of running it. |
 | [test-pinned-downloads.ps1](test-pinned-downloads.ps1) | What a fresh VPS downloads is one exact version, checked against the checksum its vendor published for it, and nothing is installed when the download does not match. |

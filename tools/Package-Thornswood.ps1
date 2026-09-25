@@ -571,7 +571,9 @@ if (Test-Path $lexe) {
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRST.txt') {
     $s = Join-Path $here $f
-    if (Test-Path $s) { Copy-Item $s $stage -Force } else { Say "  $f missing next to this script" 'Yellow' }
+    # All four are in the repository, so a missing one is a wrong path, and an
+    # installer without it is broken for everybody (issue #440, phase 0).
+    if (Test-Path $s) { Copy-Item $s $stage -Force } else { Die "$f is not at $s. It is in the repository, so the path is wrong. Nothing was packaged." }
 }
 
 # ---- where the source is ---------------------------------------------------

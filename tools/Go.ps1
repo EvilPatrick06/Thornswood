@@ -72,6 +72,12 @@ $plugins = Join-Path $Game 'Data\Platform\Plugins'
 function Head($t) { Write-Host ''; Write-Host $t -ForegroundColor Cyan }
 function Note($t) { Write-Host "  $t" }
 function Bad($t)  { Write-Host "  $t" -ForegroundColor Yellow }
+# A file this repository tracks that is not where this script looks for it.
+# That is a path gone wrong, not a missing extra, so it fails the run: Go.ps1
+# exits 1 and Ship stops (issue #440, phase 0). Before, it was a yellow line
+# and a release without the file.
+$script:gone = New-Object System.Collections.Generic.List[string]
+function Gone($t) { Write-Host "  $t" -ForegroundColor Red; $script:gone.Add($t) }
 
 <#
   THE LAUNCHER'S KEPT COPIES FOLLOW WHAT THIS PUTS IN.
@@ -192,7 +198,7 @@ if (Test-Path -LiteralPath $uiSrc) {
     $script:installed.Add((Join-Path $ui 'index.html'))
     Note 'index.html (ours, over the front''s)'
   } else {
-    Bad 'ts-ui\index.html is missing, so the menu choice cannot draw before the plugin runs'
+    Gone 'ts-ui\index.html is missing, so the menu choice cannot draw before the plugin runs'
   }
   # The dev test track lives beside the overlays. It goes into the game
   # folder like them; whether it leaves the machine is Ship-Rules' call, and
@@ -219,11 +225,11 @@ if (Test-Path -LiteralPath $uiSrc) {
       $script:installed.Add((Join-Path $ui $pair[1]))
       Note ($pair[1] + ' (from the site''s ' + $pair[0] + ')')
     } else {
-      Bad ('the site''s ' + $pair[0] + ' is not in site\public, so the menu has no painting')
+      Gone ('the site''s ' + $pair[0] + ' is not in site\public, so the menu has no painting')
     }
   }
 } else {
-  Bad 'the ts-ui folder is not next to this script'
+  Gone 'the ts-ui folder is not next to this script'
 }
 
 # ------------------------------------------------------ the menu backdrop --
@@ -243,7 +249,7 @@ $menuPairs = @(
 foreach ($pair in $menuPairs) {
   $src = Join-Path $menuSrc $pair[0]
   $dst = Join-Path $Game $pair[1]
-  if (-not (Test-Path -LiteralPath $src)) { Bad ($pair[0] + ' is not in tools\art\menu'); continue }
+  if (-not (Test-Path -LiteralPath $src)) { Gone ($pair[0] + ' is not in tools\art\menu'); continue }
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
   if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
   Copy-Item -LiteralPath $src -Destination $dst -Force
@@ -261,7 +267,7 @@ if (Test-Path -LiteralPath $plSrc) {
     Note $f.Name
   }
 } else {
-  Bad 'the ts-plugins folder is not next to this script'
+  Gone 'the ts-plugins folder is not next to this script'
 }
 
 # ------------------------------------------------------------------ client --
@@ -282,7 +288,7 @@ if (Test-Path -LiteralPath $sync) {
   # the one with a kept copy. Only the recorded build becomes it.
   else { $script:installed.Add((Join-Path $plugins 'skymp5-client.js')) }
 } else {
-  Bad 'Sync-Client.ps1 is not next to this script'
+  Gone 'Sync-Client.ps1 is not next to this script'
 }
 
 # The probe's job is done: the voice client reports the same facts, in its own
@@ -475,3 +481,10 @@ Head 'Next'
 Note 'Start the game from the launcher, play for a minute, quit, then paste:'
 Note '  Get-Content C:\Thornswood\Game\Data\Platform\thornswood-voice.log'
 Note '  Get-Content C:\Thornswood\Game\Data\Platform\thornswood-front.log'
+
+if ($script:gone.Count) {
+  Write-Host ''
+  Write-Host ('  ' + $script:gone.Count + ' file(s) this repository has did not reach the game folder; see the red lines above.') -ForegroundColor Red
+  exit 1
+}
+exit 0
