@@ -38,15 +38,25 @@ namespace Thornswood
     //   Ok/Warn/Bad state, and never the accent
     static class Themes
     {
-        static Theme Make(string name, string note, bool light, string[] pairs)
+        // swatch is the little square on the theme's own button. It is the
+        // accent by default, because the accent is the one colour a theme is
+        // known by. A theme may name its own instead: Snow's square is white,
+        // asked for on issue #607, so the one theme with nothing but cold
+        // daylight in it reads as a white square rather than as its blue accent.
+        static Theme Make(string name, string note, bool light, string[] pairs, string swatch)
         {
             var t = new Theme();
             t.Name = name;
             t.Note = note;
             t.Light = light;
             for (int i = 0; i < pairs.Length; i += 2) t.Colors[pairs[i]] = pairs[i + 1];
-            t.Swatch = t.Colors["Accent"];
+            t.Swatch = string.IsNullOrEmpty(swatch) ? t.Colors["Accent"] : swatch;
             return t;
+        }
+
+        static Theme Make(string name, string note, bool light, string[] pairs)
+        {
+            return Make(name, note, light, pairs, null);
         }
 
         public static readonly Theme[] All = new Theme[]
@@ -115,21 +125,16 @@ namespace Thornswood
                 "AccentInk","#171200", "Ok","#7D9A4A", "Warn","#D2762A",
                 "Bad","#BF4436" }),
 
-            Make("Parchment", "Ink on warm paper. Light.", true, new string[] {
-                "Bg","#EFEAE0", "Panel","#F8F4EC", "Card","#FFFDF8",
-                "CardHover","#F2ECE0", "Deep","#E4DDD0", "Line","#D8CFBE",
-                "Edge","#FFFFFF", "Ink","#221D16", "Muted","#5E5546",
-                "Faint","#8C8372", "Accent","#A2572A", "AccentSoft","#28A2572A",
-                "AccentInk","#FFF6EF", "Ok","#4A7D52", "Warn","#94702B",
-                "Bad","#A03A2E" }),
-
+            // Parchment, a warm paper light theme, sat here until issue #607
+            // asked for it to go and for Snow to be the one light theme, its
+            // square white. Snow's swatch is set to white below for that.
             Make("Snow", "Cold daylight. Light.", true, new string[] {
                 "Bg","#EEF1F4", "Panel","#F8FAFC", "Card","#FFFFFF",
                 "CardHover","#EFF3F7", "Deep","#E2E7EC", "Line","#D3DAE1",
                 "Edge","#FFFFFF", "Ink","#1A1F24", "Muted","#55606B",
                 "Faint","#8794A0", "Accent","#2F6FA8", "AccentSoft","#282F6FA8",
                 "AccentInk","#F2F8FC", "Ok","#3C7D4E", "Warn","#8A6A20",
-                "Bad","#A33A2E" }),
+                "Bad","#A33A2E" }, "#FFFFFF"),
 
         };
 
