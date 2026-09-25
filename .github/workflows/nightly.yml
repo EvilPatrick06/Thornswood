@@ -1,0 +1,283 @@
+# Every night on the VPS: everything the pull request check does, and the
+# slow half it leaves out. Patrick, 25 September: "let's do #1 and setup a
+# nightly schedule to do a bunch of security, file, github, code checks".
+#
+#   security  the secret scan of the tree and of the built launcher
+#   files     every PowerShell, game and bot file parses; the writing rules
+#   code      all ~190 test harnesses, the bot and voice harnesses, the
+#             launcher window check and the launcher build
+#   GitHub    pull requests open more than two days and branches other than
+#             main, which CONTRIBUTING.md says are merged or closed
+#
+# Any failure opens an issue on the board, or adds to the one already open,
+# with a link to the run; the last lines of the harness step name every
+# harness that failed and the ten slowest. Runs at 03:00 Mountain (09:00
+# UTC), when nobody is playing, and by hand from the Actions tab.
+name: Nightly checks
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+jobs:
+  nightly:
+    name: Nightly checks
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Scan the tree for secrets
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # Entry 236. Every tracked file, by the rules in scripts\dev\Check-Secrets.ps1.
+          # A hit names the file, the line and the rule and never the value,
+          # because anybody on the repository can read this log. A known
+          # non-secret goes in scripts\dev\Check-Secrets.allow.txt with its reason.
+          .\scripts\dev\Check-Secrets.ps1
+          exit $LASTEXITCODE
+
+      - name: Parse every PowerShell script
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $bad = 0
+          Get-ChildItem -Path scripts, tools, tests -Filter *.ps1 -Recurse -File | ForEach-Object {
+            $tokens = $null; $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            foreach ($e in $errors) {
+              $bad++
+              Write-Host ("::error file={0},line={1}::{2}" -f $_.FullName, $e.Extent.StartLineNumber, $e.Message)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host "every script parses"
+
+      - name: Check the writing rules
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # The Words section of CLAUDE.md, over the files people read: no em
+          # dashes, never the word player, and the owner is Patrick. Written
+          # down since the start and never checked, and on 24 September eleven
+          # hits had gone out in those files. Each hit is marked on its line.
+          .\scripts\dev\Check-Words.ps1
+
+      - name: Check the launcher window
+        if: ${{ !cancelled() }}
+        shell: powershell
+        run: |
+          # The launcher builds its window from ui.xaml at startup and finds
+          # every control by name, so a renamed control or a window that does
+          # not parse compiles clean and is found by the person using it. This
+          # fails on either. Windows PowerShell on purpose: it parses with the
+          # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
+          & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
+
+      - name: Parse every game script
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $bad = 0
+          # game\ since the reorganisation's phase 6 (issue #440): the gamemode,
+          # the plugins and the overlays.
+          $files = @(Get-ChildItem -Path scripts -Filter *.js -File -Recurse) + @(Get-ChildItem -Path game -Filter *.js -File) +
+                   @(Get-ChildItem -Path game\plugins, game\ui -Filter *.js -File -ErrorAction SilentlyContinue)
+          foreach ($f in $files) {
+            & node --check $f.FullName 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              $bad++
+              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host ("{0} game script(s) parse" -f $files.Count)
+
+      - name: Parse every bot file
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          if (-not (Test-Path bot)) { Write-Host 'no bot to parse'; exit 0 }
+          $bad = 0
+          foreach ($f in (Get-ChildItem bot -Filter *.py -Recurse -File)) {
+            & python -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read(), sys.argv[1])" $f.FullName 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              $bad++
+              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host 'every bot file parses'
+
+      - name: Run the test harnesses
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # Written to be run by hand, and until now never run anywhere else.
+          # A harness that reads this machine's game folder says SKIP for the
+          # parts it cannot measure on a runner and still checks the rest.
+          # ONE AT A TIME, timed. Run in parallel on the VPS on 25 September the
+          # step hung for twenty minutes where one at a time it finished in five
+          # and a half, so it stays serial. Each harness's time is printed, and
+          # the step ends with the ten slowest and the ones that failed.
+          $all = @(Get-ChildItem tests -File | Where-Object { $_.Name -like 'test-*.js' -or $_.Name -like 'test-*.ps1' } | Sort-Object Name)
+          $results = foreach ($t in $all) {
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            $out = if ($t.Extension -eq '.js') { & node $t.FullName 2>&1 | Out-String } else { & pwsh -NoProfile -File $t.FullName 2>&1 | Out-String }
+            [pscustomobject]@{ Name = $t.Name; Path = $t.FullName; Code = $LASTEXITCODE; Out = $out; Secs = [Math]::Round($sw.Elapsed.TotalSeconds, 1) }
+          }
+          $failed = @()
+          foreach ($r in ($results | Sort-Object Name)) {
+            Write-Host ("--- {0}  ({1}s)" -f $r.Name, $r.Secs)
+            Write-Host $r.Out
+            if ($r.Code -ne 0) { $failed += $r.Name; Write-Host ("::error file={0}::harness failed" -f $r.Path) }
+          }
+          $bad = $failed.Count
+          Write-Host ''
+          Write-Host ('slowest: ' + ((@($results | Sort-Object Secs -Descending | Select-Object -First 10) | ForEach-Object { '{0} {1}s' -f $_.Name, $_.Secs }) -join ', '))
+          Write-Host ('all of them, added up: {0}s' -f [Math]::Round(($results | Measure-Object Secs -Sum).Sum))
+          $voiceFailed = @()
+          # The five in voice, which run nowhere else. They spawn the
+          # real service in a temp folder and drive it over HTTP, so they need
+          # node and nothing else, and node is already here. Added 23
+          # September: the harness step globbed tools with no -Recurse, so
+          # thirty ran and these five never had.
+          foreach ($t in (Get-ChildItem voice -Filter 'test-*.js' -File | Sort-Object Name)) {
+            Write-Host ("--- voice/{0}" -f $t.Name)
+            & node $t.FullName
+            if ($LASTEXITCODE -ne 0) { $bad++; $voiceFailed += ('voice/' + $t.Name); Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          }
+          if ($bad) {
+            Write-Host ''
+            Write-Host ("{0} harness(es) failed: {1}" -f $bad, (($failed + $voiceFailed) -join ', '))
+            exit 1
+          }
+          Write-Host 'every harness passed'
+
+      - name: Run the bot harnesses
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # The two Python ones import bot.py for real, so they need the
+          # library the bot runs on. They were written to be run by hand and,
+          # like every harness above before this file existed, had never run
+          # anywhere: nothing was checking the bot's startup on a pull request.
+          #
+          # An install that fails says so and stops the step rather than the
+          # build, because a pip outage is not a fault in the branch. A
+          # harness that fails is red, which is the point.
+          #
+          # From requirements.txt, the file Install-Bot.ps1 installs on the
+          # VPS, so the versions tested here are the versions the bot runs.
+          #
+          # Into a venv of this run's own, never the machine's Python: the
+          # runner is on the VPS, and the live bot runs on that Python.
+          $venv = Join-Path $env:RUNNER_TEMP 'bot-venv'
+          python -m venv $venv
+          $py = Join-Path $venv 'Scripts\python.exe'
+          if (-not (Test-Path $py)) {
+            Write-Host '::warning::could not make a venv for the bot harnesses, so they did not run'
+            exit 0
+          }
+          & $py -m pip install --quiet --disable-pip-version-check -r bot\requirements.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::warning::could not install discord.py, so the bot harnesses did not run'
+            exit 0
+          }
+          $env:DISCORD_TOKEN = 'not-a-real-token'
+          $bad = 0
+          foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
+            Write-Host ("--- {0}" -f $t.Name)
+            & $py $t.FullName
+            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          }
+          if ($bad) { exit 1 }
+          Write-Host 'every bot harness passed'
+
+      - name: Count the silent catches in the launcher
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # Entry 239. A catch with nothing in it leaves no line in
+          # launcher.log when it fires, and there were 386 of them on 24 Sep.
+          # Red when any file in launcher\app has more than
+          # scripts\dev\swallow-baseline.txt allows; the script says what to do.
+          .\scripts\dev\Check-Swallow.ps1
+
+      - name: Build the launcher
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'Thornswood'
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
+          .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
+          if (-not (Test-Path (Join-Path $root 'Launcher\Thornswood.exe'))) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
+
+      - name: Scan the built launcher for secrets
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # The secrets that shipped were in built artefacts, not in the source,
+          # so what this build made is read too, byte by byte: the launcher with
+          # everything Build-Launcher embeds in it, and the setup stub.
+          $built = @(Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe')
+          if (Test-Path tools\setup-stub.exe) { $built += (Resolve-Path tools\setup-stub.exe).Path }
+          .\scripts\dev\Check-Secrets.ps1 -Binary $built
+          exit $LASTEXITCODE
+
+      - name: Keep the exe from this build
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: Thornswood.exe
+          path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.exe
+          retention-days: 7
+
+      - name: Stray pull requests and branches
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # CONTRIBUTING.md: no stray branches and no stray pull requests.
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'thornswood-nightly'; Accept = 'application/vnd.github+json' }
+          $api = "https://api.github.com/repos/$env:REPO"
+          $old = [DateTime]::UtcNow.AddDays(-2)
+          $prs = @(Invoke-RestMethod -Headers $h -Uri "$api/pulls?state=open&per_page=100" | Where-Object { [DateTime]$_.created_at -lt $old })
+          $branches = @(Invoke-RestMethod -Headers $h -Uri "$api/branches?per_page=100" | Where-Object { $_.name -ne 'main' } | ForEach-Object { $_.name })
+          $open = @(Invoke-RestMethod -Headers $h -Uri "$api/pulls?state=open&per_page=100" | ForEach-Object { $_.head.ref })
+          $stray = @($branches | Where-Object { $open -notcontains $_ })
+          foreach ($p in $prs) { Write-Host ("::error::pull request #{0} has been open since {1}: {2}" -f $p.number, $p.created_at, $p.title) }
+          foreach ($b in $stray) { Write-Host ("::error::branch {0} has no open pull request" -f $b) }
+          if ($prs.Count -or $stray.Count) { Write-Host ("{0} old pull request(s), {1} stray branch(es)" -f $prs.Count, $stray.Count); exit 1 }
+          Write-Host 'no stray pull requests or branches'
+
+      - name: Put a failure on the board
+        if: failure()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'thornswood-nightly'; Accept = 'application/vnd.github+json' }
+          $api = "https://api.github.com/repos/$env:REPO"
+          $title = 'Nightly checks failed'
+          $line = "The nightly checks failed on $((Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')): $env:RUN. The failed step says which check; the harness step's last lines name every harness that failed."
+          $mine = @(Invoke-RestMethod -Headers $h -Uri "$api/issues?state=open&per_page=100" | Where-Object { $_.title -eq $title -and -not $_.pull_request })
+          if ($mine.Count) {
+            Invoke-RestMethod -Method Post -Headers $h -Uri "$api/issues/$($mine[0].number)/comments" -Body (@{ body = $line } | ConvertTo-Json) -ContentType 'application/json' | Out-Null
+            Write-Host "added to #$($mine[0].number)"
+          } else {
+            $i = Invoke-RestMethod -Method Post -Headers $h -Uri "$api/issues" -Body (@{ title = $title; body = $line + "`n`nClose this once the nightly run is green again." } | ConvertTo-Json) -ContentType 'application/json'
+            Write-Host "opened #$($i.number)"
+          }

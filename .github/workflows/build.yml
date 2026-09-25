@@ -5,10 +5,9 @@
 # branch would stop Ship.ps1; a green one means it is worth a person's time
 # to read. It builds only; nothing is published.
 #
-# Everything is one job on purpose. Branch protection named ONE required
-# check, "Launcher builds", until 25 September, and a second job would not
-# be covered by it, so a new job would be a check that blocks nothing if the
-# requirement comes back. Steps are named instead, and
+# Everything is one job on purpose. Branch protection names ONE required
+# check, "Launcher builds", and a second job would not be covered by it, so
+# a new job would be a check that blocks nothing. Steps are named instead, and
 # a failed step names itself in the summary just as a failed job would.
 #
 # The harnesses were all written to be run by hand and none of them had ever
@@ -18,26 +17,32 @@
 # blocked on billing and every run failed in seconds, and Patrick chose a
 # runner on the box over paying for minutes (issue #437).
 # scripts\deploy\Install-Runner.ps1 puts it there, as its own local account that is
-# shut out of every live Thornswood folder, at below normal priority so a build
-# never takes the processor from the game server, the site, voice or the bot.
+# shut out of every live Thornswood folder, at normal priority (never above)
+# and with Defender skipping its own folder, so a check takes minutes.
 # The label is what picks it; change it here and in Install-Runner together.
 # Safe because the repository is private: nobody outside the team can open a
 # pull request that runs code on the box.
 #
-# OFF, AT PATRICK'S WORD, 25 SEPTEMBER: "turn off GitHub's build checker
-# thing too so it stops being flagged as red", then "just turn it all the
-# way off we arent paying to use it anyways". With no runner registered
-# yet, every push and pull request queued a run nothing could pick up. It
-# no longer starts on its own; it can still be started by hand from the
-# Actions tab. The runner on the VPS stays: Install-Runner.ps1 still puts it
-# there. Patrick removed "Launcher builds" from main's required checks the
-# same day. Turning the check back on is his call; it is these lines under
-# on:, "Launcher builds" required again, and enforce_admins on (#437):
-#   pull_request:
-#   push:
-#     branches: [main]
+# FAST, SINCE 25 SEPTEMBER: every pull request and every push to main gets
+# the checks that take seconds (secrets, every script and file parses, the
+# writing rules, the launcher window) and the launcher build, about two
+# minutes on the VPS. The ~190 test harnesses took over five minutes there
+# on their own, so they run every night instead, in nightly.yml, with the
+# rest of the security, file, GitHub and code checks (Patrick: "let's do
+# #1 and setup a nightly schedule"). A nightly failure opens an issue.
+#
+# ON AGAIN, ON THE VPS, 25 SEPTEMBER. It was off for part of that day while
+# no runner existed. Then Patrick: "I want it set so they can commit+merge
+# as long as the checks on the VPS go through so they don't need me".
+# Then: "we don't need the required check/reviewer at all anymore for
+# anyone as long as we give verbal agreement and the VPS check goes
+# through". So nothing is required in GitHub's settings; the team merges
+# once this is green and it has been said in #staff-general.
 name: Build check
 on:
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -50,9 +55,8 @@ jobs:
   launcher:
     name: Launcher builds
     runs-on: [self-hosted, Windows, thornswood-vps]
-    # Seven to ten minutes on GitHub's runners; below normal priority on a box
-    # that is also serving people is slower. Past this it is stuck, not slow.
-    timeout-minutes: 30
+    # About two minutes on the VPS. Past this it is stuck, not slow.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -133,76 +137,6 @@ jobs:
           }
           if ($bad) { exit 1 }
           Write-Host 'every bot file parses'
-
-      - name: Run the test harnesses
-        shell: pwsh
-        run: |
-          # Written to be run by hand, and until now never run anywhere else.
-          # A harness that reads this machine's game folder says SKIP for the
-          # parts it cannot measure on a runner and still checks the rest.
-          $bad = 0
-          # In tests\ since the reorganisation's phase 5 (issue #440).
-          foreach ($t in (Get-ChildItem tests -Filter 'test-*.js' -File | Sort-Object Name)) {
-            Write-Host ("--- {0}" -f $t.Name)
-            & node $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
-          }
-          foreach ($t in (Get-ChildItem tests -Filter 'test-*.ps1' -File | Sort-Object Name)) {
-            Write-Host ("--- {0}" -f $t.Name)
-            & pwsh -NoProfile -File $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
-          }
-          # The five in voice, which run nowhere else. They spawn the
-          # real service in a temp folder and drive it over HTTP, so they need
-          # node and nothing else, and node is already here. Added 23
-          # September: the harness step globbed tools with no -Recurse, so
-          # thirty ran and these five never had.
-          foreach ($t in (Get-ChildItem voice -Filter 'test-*.js' -File | Sort-Object Name)) {
-            Write-Host ("--- voice/{0}" -f $t.Name)
-            & node $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
-          }
-          if ($bad) { exit 1 }
-          Write-Host 'every harness passed'
-
-      - name: Run the bot harnesses
-        shell: pwsh
-        run: |
-          # The two Python ones import bot.py for real, so they need the
-          # library the bot runs on. They were written to be run by hand and,
-          # like every harness above before this file existed, had never run
-          # anywhere: nothing was checking the bot's startup on a pull request.
-          #
-          # An install that fails says so and stops the step rather than the
-          # build, because a pip outage is not a fault in the branch. A
-          # harness that fails is red, which is the point.
-          #
-          # From requirements.txt, the file Install-Bot.ps1 installs on the
-          # VPS, so the versions tested here are the versions the bot runs.
-          #
-          # Into a venv of this run's own, never the machine's Python: the
-          # runner is on the VPS, and the live bot runs on that Python.
-          $venv = Join-Path $env:RUNNER_TEMP 'bot-venv'
-          python -m venv $venv
-          $py = Join-Path $venv 'Scripts\python.exe'
-          if (-not (Test-Path $py)) {
-            Write-Host '::warning::could not make a venv for the bot harnesses, so they did not run'
-            exit 0
-          }
-          & $py -m pip install --quiet --disable-pip-version-check -r bot\requirements.txt
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::warning::could not install discord.py, so the bot harnesses did not run'
-            exit 0
-          }
-          $env:DISCORD_TOKEN = 'not-a-real-token'
-          $bad = 0
-          foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
-            Write-Host ("--- {0}" -f $t.Name)
-            & $py $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
-          }
-          if ($bad) { exit 1 }
-          Write-Host 'every bot harness passed'
 
       - name: Count the silent catches in the launcher
         shell: pwsh

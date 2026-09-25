@@ -165,12 +165,11 @@ the team before code; nobody settles it alone, and a Claude never does.
   holding the moment it went on.
 - What branch protection on main actually enforces, since 25 Sep:
   `enforce_admins` is **off**, there is no required check, required
-  approving reviews is **0**, and the code owner review is **off**. Patrick
-  removed the required check (`Launcher builds`) that day, when the build
-  check on GitHub was turned off: "remove the label since we arent using
-  it". So a pull request can be merged by its own author as soon as it is
-  opened, and nothing on GitHub checks it first; run the harnesses you
-  touched before you merge. Force pushes are refused.
+  approving reviews is **0**, and the code owner review is **off**.
+  Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
+  anybody on the team merges their own pull request once `Launcher builds`
+  (the build check, on the VPS) is green and they have said what it is in
+  #staff-general. Nobody waits for Patrick. Force pushes are refused.
   What changed on 23 Sep, since 22 Sep: the review requirement was one
   approving review, which Patrick could not give himself and had to override
   with `--admin` on every one of his own pull requests, and it is now zero.
@@ -242,15 +241,18 @@ the team before code; nobody settles it alone, and a Claude never does.
     decide on: ask them, and put it on the board if they cannot be asked.
     Check whether its work is already in main before deleting it; a
     squashed merge leaves the branch looking unmerged to git.
-- The build check on GitHub (.github/workflows/build.yml: the scripts parse,
-  the harnesses pass, the launcher compiles with the .NET Framework csc) is
-  off, at Patrick's word on 25 Sep: it no longer starts on a push or a pull
-  request, and runs only when started by hand from the Actions tab. So run
-  the harnesses you touched yourself before asking for a read.
-  It is set to run on the VPS, on a runner `.\scripts\deploy\Install-Runner.ps1`
-  puts there (issue #437): GitHub's own runners were blocked on billing from
-  25 Sep. `enforce_admins` was turned off that day so Patrick could merge,
-  and the required check removed; turning any of them back on is his call.
+- Every pull request gets the build check (.github/workflows/build.yml, about
+  two minutes: the secret scan, every script and file parses, the writing
+  rules, the launcher window, and the launcher compiles with the .NET
+  Framework csc). Red means the branch would stop Ship at the build step;
+  fix that, and merge once it is green and you have said so in
+  #staff-general. Run the test harnesses your change touches yourself. All
+  ~190 of them, the bot and voice ones, and a look for stray pull requests
+  and branches run every night on the VPS (.github/workflows/nightly.yml,
+  03:00 Mountain); a failure there opens an issue on the board, "Nightly
+  checks failed", and whoever broke it fixes it next. It runs on the VPS, on a runner
+  `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
+  GitHub's own runners were blocked on billing from 25 Sep.
   `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
