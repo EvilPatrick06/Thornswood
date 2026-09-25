@@ -40,9 +40,12 @@ a half.
 | Bot | `tools\discord`, on the VPS at `C:\Thornswood-Bot`, task `Thornswood Bot` | discord.py: tickets, join cards, staff tools |
 | Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour |
 
-The server's SkyMP fork and its build tree are Patrick's alone for now
-(`C:\Thornswood-Dev\skymp`); server binaries are copied, not rebuilt, on a
-second machine.
+The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
+`thornswood/engine-changes`), so its source survives any one machine. Its
+configured build tree and toolchain (`C:\Thornswood-Dev\skymp\build`) are on
+Patrick's machine alone for now; server binaries are copied, not rebuilt, on a
+second machine. Who holds each thing Thornswood cannot run without, and who the
+second holder is, is `tools\OWNERSHIP.md`.
 
 ## How a release goes out
 
@@ -414,6 +417,8 @@ it per session and ignores which profile Vortex has on.
   on disk, and every step between pressing Play and the game starting.
 - `tools\MOVING-THE-SERVER.md`, `tools\COLLECTION-METHOD.md`: the VPS and the
   mod collection.
+- `tools\OWNERSHIP.md`: who holds each credential, account and build, and who
+  the second holder is.
 - `lore\`: history and the Accord. `tools\docs-app\data\site\*.md`: the public
   pages (world, rules, join, classes, credits, support), also live on the site.
 - The site's hub boards: Active Issues, Known Issues, Test These, Suggestions,
