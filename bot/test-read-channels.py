@@ -39,7 +39,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-JOIN_MD = os.path.join(HERE, '..', 'docs-app', 'data', 'site', 'join.md')
+JOIN_MD = os.path.join(HERE, '..', 'tools', 'docs-app', 'data', 'site', 'join.md')
 sys.path.insert(0, HERE)
 
 PASS = []
@@ -150,16 +150,16 @@ if callable(section):
 # says something else. What content.py makes has to follow the page.
 TMP = tempfile.mkdtemp(prefix='thornswood-read-channels-')
 try:
-    os.makedirs(os.path.join(TMP, 'discord'))
-    os.makedirs(os.path.join(TMP, 'docs-app', 'data', 'site'))
-    shutil.copy(os.path.join(HERE, 'content.py'), os.path.join(TMP, 'discord', 'content.py'))
+    os.makedirs(os.path.join(TMP, 'bot'))
+    os.makedirs(os.path.join(TMP, 'tools', 'docs-app', 'data', 'site'))
+    shutil.copy(os.path.join(HERE, 'content.py'), os.path.join(TMP, 'bot', 'content.py'))
 
     def load_with(md, tag):
-        with open(os.path.join(TMP, 'docs-app', 'data', 'site', 'join.md'), 'w',
+        with open(os.path.join(TMP, 'tools', 'docs-app', 'data', 'site', 'join.md'), 'w',
                   encoding='utf-8', newline='\n') as f:
             f.write(md)
         spec = importlib.util.spec_from_file_location(
-            'content_' + tag, os.path.join(TMP, 'discord', 'content.py'))
+            'content_' + tag, os.path.join(TMP, 'bot', 'content.py'))
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod

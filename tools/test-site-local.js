@@ -158,7 +158,7 @@ if (headAt >= 0) {
     rows.push({
       routes: (cells[0] || '').match(/`\/[^`]*`/g) ? cells[0].match(/`\/[^`]*`/g).map(function (s) { return s.slice(1, -1); }) : [],
       method: cells[1] || '',
-      files: uniq(((cells[2] || '').match(new RegExp('tools' + BS + BS + '[A-Za-z0-9_.' + BS + BS + '-]+', 'g')) || [])
+      files: uniq(((cells[2] || '').match(new RegExp('(?:tools|bot)' + BS + BS + '[A-Za-z0-9_.' + BS + BS + '-]+', 'g')) || [])
         .map(function (p) { return p.replace(/[.]+$/, ''); })),
       text: cells[2] || ''
     });
@@ -213,7 +213,7 @@ function walk(dir, re, out) {
 }
 const askers = walk('tools/app', /\.cs$/, []).concat(walk('tools/setup', /\.cs$/, []),
   walk('tools/ts-plugins', /\.js$/, []), walk('tools/ts-ui', /\.js$/, []),
-  walk('tools/voice', /\.js$/, []), walk('tools/discord', /\.py$/, []), ['tools/gamemode.js']);
+  walk('tools/voice', /\.js$/, []), walk('bot', /\.py$/, []), ['tools/gamemode.js']);
 const whoRow = rows.filter(function (r) { return r.routes.indexOf('/api/play/who') >= 0; })[0];
 const whoCallers = askers.filter(function (f) { return (read(f) || '').indexOf('/api/play/who') >= 0; });
 yes('the table says nothing asks /api/play/who, and nothing in ' + askers.length + ' files does' +

@@ -66,7 +66,7 @@ $Here = $PSScriptRoot
 # accident. The lookarounds keep a rule from firing on a longer run of the
 # same characters, which is what random data and base64 look like.
 $ContentRules = @(
-    # The news and dev webhooks (tools\discord). Anyone holding one can post
+    # The news and dev webhooks (bot). Anyone holding one can post
     # as the bot.
     @{ Name = 'discord-webhook';   Rx = '(?i)discord(?:app)?\.com/api/webhooks/[0-9]{15,22}/[A-Za-z0-9_-]{30,}' },
     # The bot's own token (bot.env.json on the VPS).
