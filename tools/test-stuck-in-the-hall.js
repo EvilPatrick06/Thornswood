@@ -399,7 +399,11 @@ function tickAs(state, now, cameOn) {
   const FRONT = process.env.FRONT || path.join(__dirname, 'ts-plugins', 'thornswood-front.js');
   const fsrc = fs.readFileSync(FRONT, 'utf8').split(CR).join('');
   const a = fsrc.indexOf('  let raceWasOpen = false;');
-  const b = a < 0 ? -1 : fsrc.indexOf("  sp.on('update', guard('console'", a);
+  // To the end of the race menu's own handler, and no further: the code after
+  // it changes (closing Skyrim while making a face went in there on 24
+  // September and needs iniNumber, which is nothing to do with this watcher).
+  const endAt = a < 0 ? -1 : fsrc.indexOf('\n  }));\n', a);
+  const b = endAt < 0 ? -1 : endAt + '\n  }));\n'.length;
   yes('S15 the plugin\'s race menu watcher is there', a >= 0 && b > a);
   if (a >= 0 && b > a) {
     const clock = { t: 1000000 };
@@ -408,11 +412,13 @@ function tickAs(state, now, cameOn) {
     const menu = { open: false };
     let handler = null;
     const sp = { on: function (ev, fn) { if (ev === 'update') { handler = fn; } } };
-    new Function('sp', 'guard', 'raceMenuOpen', 'log', 'tellServer', 'T', 'Date',
+    // closingGame is the flag closeGame sets while Skyrim is being closed from
+    // the face and body menu; this watcher reads it, and it is false here.
+    new Function('sp', 'guard', 'raceMenuOpen', 'log', 'tellServer', 'T', 'Date', 'closingGame',
       fsrc.slice(a, b))(
       sp, function (n, fn) { return fn; }, function () { return menu.open; },
       function () { }, function (l) { told.push(l); }, T,
-      { now: function () { return clock.t; } });
+      { now: function () { return clock.t; } }, false);
     function frames(ms) {
       const end = clock.t + ms;
       while (clock.t < end) { handler(); clock.t += 16; }
