@@ -6,10 +6,12 @@ You need **Skyrim Special Edition** on Steam, on build **1.6.1170**, and
 **Vortex** with a free Nexus Mods account. Nothing else has to be installed
 first. Anniversary Edition is not required.
 
-Thornswood goes into the Skyrim you already have. It does not make a second
-copy of the game. Vortex keeps the mods in a profile of their own, so switching
-back to your usual profile and running Purge Mods leaves your own Skyrim the
-way it was.
+Thornswood leaves the Skyrim you already have alone. The launcher builds a
+game folder of its own, `C:\Thornswood\Game`, out of your Steam copy and what
+Vortex put into it. Most of it is hard links to your own files, which take no
+extra space, and the few files other programs rewrite are real copies. Vortex keeps the mods in a profile of their own, so
+switching back to your usual profile and running Purge Mods leaves your own
+Skyrim the way it was.
 
 1. From the [Downloads](/downloads) page take the installer. One file. Run it.
    It fetches Thornswood's own content while you watch, about half a gigabyte,
@@ -102,15 +104,8 @@ The launcher's own log, for anything that went wrong before the game started:
 C:\Thornswood\Profile\launcher.log
 ```
 
-Crash logs, if the game closed itself, are in the SKSE folder under your
-documents:
-
-```
-Documents\My Games\Skyrim Special Edition\SKSE\
-```
-
-If Thornswood runs from a Skyrim folder of its own (the card in Settings), the
-crash logs are here instead:
+Crash logs, if the game closed itself, are in Thornswood's own My Games
+folder:
 
 ```
 C:\Thornswood\Profile\MyGames\SKSE\

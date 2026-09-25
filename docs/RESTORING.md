@@ -21,8 +21,10 @@ the exercise, not paperwork about it.
 A backup holds `game\world` (the characters), `game\private` (the door list and
 who is allowed in), `game\data`, `server-settings.json`, `gamemode.js`, the
 site's `data` folder, the bot's config and its join record (`joins.json`, which
-arrival each person was), and the voice service's `owners.json`
-and `choices.json`. It does **not** hold node_modules, the installer, or the
+arrival each person was), the voice service's `choices.json`, and the
+Caddyfile. The voice service's `owners.json` and `secret.txt` stopped being
+taken on 23 September, when the character register they belonged to was
+retired. It does **not** hold node_modules, the installer, or the
 Skyrim data files. Those come back from the repo.
 
 Before 18 September it held none of it. The world was never in the backup at
@@ -38,7 +40,8 @@ both are gone, so are the backups, and nothing in this file helps.
 
 The common case, and it does not need the server stopped for long.
 
-1. Find which profile id. `tools\Characters.ps1` lists them, or the person's
+1. Find which profile id. `.\tools\Chargen-Log.ps1` prints a
+   `chargen <actor> profile <id>` line for each character, or the person's
    launcher shows it.
 2. Get a backup from before it went wrong.
    ```powershell
@@ -67,7 +70,7 @@ played since.
 Order matters here. The game server must not start before its world is in
 place, or it writes fresh empty characters over the top.
 
-1. **A new box, and the repo.** `tools\MOVING-THE-SERVER.md` is the long form
+1. **A new box, and the repo.** `docs\MOVING-THE-SERVER.md` is the long form
    of standing one up: Windows, node, the firewall rules, the scheduled tasks.
    Do all of that first and start nothing.
 2. **Unpack the newest backup that opens.**
@@ -89,13 +92,20 @@ place, or it writes fresh empty characters over the top.
    - `C:\restore\bot\bot.env.json`, `C:\restore\site\config.json` → their roots
    - `C:\restore\bot\joins.json` → `C:\Thornswood-Bot\joins.json`, before the
      bot starts, or the join cards start counting again
-   - `C:\restore\voice\owners.json` → `C:\Thornswood-Voice\owners.json`
-5. **The rest comes from a release, not from the backup.** Run `Ship.ps1` from
-   Patrick's machine so the server, the gamemode and the site are the versions
-   that go with each other. `gamemode.js` is in the backup to be read, not to
-   be the thing you run.
-6. **Secrets that are not in there.** The server password, the Discord bot
-   token, the client secret and the site keys are in the config files above, so
+   - `C:\restore\voice\choices.json` → `C:\Thornswood-Voice\choices.json`
+   - `C:\restore\web\Caddyfile` → `C:\Thornswood-Caddy\Caddyfile`
+5. **The rest comes from the repository, not from the backup.** `Ship.ps1`
+   publishes the launcher and the packs and deploys none of these, so each
+   goes back with its own command, from main on Patrick's machine, in this
+   order: `.\tools\Deploy-Server.ps1` (the recorded server build),
+   `.\tools\Deploy-Gamemode.ps1`, `.\tools\Deploy-Docs.ps1` (never
+   `-SeedDocs`, which would flatten the restored documents),
+   `.\tools\Install-Bot.ps1 -CodeOnly` and `.\tools\Install-Voice.ps1`.
+   `gamemode.js` is in the backup to be read, not to be the thing you run.
+   The dev roots (`C:\Thornswood-Server-Dev`, `C:\Thornswood-Voice-Dev`) are
+   not in the backup; a dev server starts from a fresh world, and
+   `.\tools\Deploy-DevGamemode.ps1` puts its gamemode back.
+6. **Secrets that are not in there.** The Discord bot token, the client secret and the site keys are in the config files above, so
    they do come back. What does not is anything that was only ever in a config
    on the old box and not in one of those. Check `NOTES.txt` in the backup for
    what was running.

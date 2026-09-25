@@ -14,6 +14,8 @@ logs/
 
 # Scratch that has been committed by accident before.
 tools/thornswood-probe.js
+# What Audit-Mods.ps1 writes. A report of one machine at one moment, not source.
+tools/mod-audit.json
 
 # The Discord webhook is a credential: anyone holding the URL can post as the
 # bot. Publish-Discord reads it from here on the machine that ships.

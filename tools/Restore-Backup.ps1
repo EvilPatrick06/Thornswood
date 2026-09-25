@@ -17,7 +17,7 @@
   -CheckOnly verifies the signature and stops. That is worth running on a
   schedule: it is the difference between having backups and believing you do.
 
-  Putting what comes out back onto the server is tools\RESTORING.md. This
+  Putting what comes out back onto the server is docs\RESTORING.md. This
   script deliberately does not do that part. Writing over a live world folder
   is not something a script should be able to do by accident.
 #>
@@ -152,6 +152,6 @@ if ($temp) { Remove-Item -LiteralPath $temp -Force -EA SilentlyContinue }
 Head 'Unpacked'
 Say "  $To" 'Green'
 Write-Host ''
-Say '  Putting this back onto a server is tools\RESTORING.md. It is deliberately' 'DarkGray'
+Say '  Putting this back onto a server is docs\RESTORING.md. It is deliberately' 'DarkGray'
 Say '  not something this script will do for you.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

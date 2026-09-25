@@ -34,14 +34,18 @@ a README of their own, which says what the folder is and how to change it.
 
 ## Before changing anything
 
-- [CLAUDE.md](CLAUDE.md): how work moves between the two machines, the settled
-  design and the words we use. Read it first, every session.
-- [SECOND-DEVELOPER.md](SECOND-DEVELOPER.md): the long form. What the pieces
+- [CONTRIBUTING.md](CONTRIBUTING.md): the rules for everybody, with AI or
+  without. Who is on the team, the words we use, the settled design, how work
+  moves and what to run after a merge. Read it before your first change.
+- [CLAUDE.md](CLAUDE.md): what applies to a Claude on top of those rules.
+- [DEVELOPING.md](DEVELOPING.md): the long form. What the pieces
   are, how a release goes out, how a machine is set up.
-- [HANDOFF.md](HANDOFF.md): open work and what is live.
+- [docs](docs): the system map, the update feed, the gamemode and a glossary.
+  [engine/README.md](engine/README.md): building the SkyMP fork.
+- [docs/archive](docs/archive): dated snapshots kept for history, not current.
 - [tools/app/ARCHITECTURE.md](tools/app/ARCHITECTURE.md): how the launcher
   starts, what each class owns and every step between Play and the game.
-- [IT-IS-DOWN.md](IT-IS-DOWN.md): what to do when the server is down.
+- [docs/IT-IS-DOWN.md](docs/IT-IS-DOWN.md): what to do when the server is down.
 - [SECURITY.md](SECURITY.md): how to report a hole quietly.
 
 Everything reaches `main` through a pull request, and `main` is what ships.

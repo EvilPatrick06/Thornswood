@@ -16,7 +16,7 @@
 // pointed at the old box (192.135.119.166, port 25565) and the old product's
 // update repository. SETUP.md walked a reader through making a repository
 // called skyrim-together, a personal access token and a build script that
-// does not exist, and CLAUDE.md and SECOND-DEVELOPER.md both sent people to it.
+// does not exist, and CLAUDE.md and DEVELOPING.md both sent people to it.
 //
 // So this reads those three and fails on the old product, on the words the
 // repo does not use, on a Google Drive link anywhere, and on an example config
@@ -46,7 +46,7 @@ function read(rel) {
 const EM_DASH = /—/;
 const OLD_NAME = /skyrim\s*together/i;
 const PLAYER = /\bplayers?\b/i;
-// A link, not the words: WORKING-NOTES.md quotes the search that looks for it.
+// A link, not the words: docs/archive/WORKING-NOTES.md quotes the search that looks for it.
 const DRIVE = /:\/\/drive\.google\.com/i;
 // Problems go to the Discord or the report page, never to one person by name.
 const PERSON = /\b(Patrick|Gavin)\b/;
@@ -76,8 +76,9 @@ if (readme !== null) {
   // stale against join.md and nobody noticed, so this one points instead.
   yes('README.md points people who want to join at thornswood.net/join',
       /https:\/\/thornswood\.net\/join/.test(readme));
+  yes('README.md points developers at CONTRIBUTING.md', /\]\(CONTRIBUTING\.md\)/.test(readme));
   yes('README.md points developers at CLAUDE.md', /\]\(CLAUDE\.md\)/.test(readme));
-  yes('README.md points developers at SECOND-DEVELOPER.md', /\]\(SECOND-DEVELOPER\.md\)/.test(readme));
+  yes('README.md points developers at DEVELOPING.md', /\]\(DEVELOPING\.md\)/.test(readme));
   yes('README.md does not send anybody to SETUP.md, which describes the old product' + where(readme, /SETUP\.md/),
       !/SETUP\.md/.test(readme));
   yes('README.md describes no F2 party menu, which nothing binds' + where(readme, /\bF2\b/),
@@ -157,10 +158,10 @@ if (cfgText === null) {
 if (tracked) {
   yes('tools/Message to friends.txt is not tracked', tracked.indexOf('tools/Message to friends.txt') < 0);
   // SETUP.md is deleted rather than rewritten: a customer's install is the
-  // join page and a developer's machine is SECOND-DEVELOPER.md, so a third
+  // join page and a developer's machine is DEVELOPING.md, so a third
   // copy of either would only drift again, the way this one did.
   yes('SETUP.md is not tracked', tracked.indexOf('SETUP.md') < 0);
-  ['CLAUDE.md', 'SECOND-DEVELOPER.md'].forEach(function (rel) {
+  ['CLAUDE.md', 'DEVELOPING.md'].forEach(function (rel) {
     const t = read(rel);
     yes(rel + ' is there', t !== null);
     if (t !== null) {

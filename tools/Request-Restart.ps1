@@ -57,7 +57,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 
 if ($ThenRestart -and $Cancel) { throw 'Use one or the other: -Cancel calls it off, -ThenRestart sees it through.' }
 if ($ThenRestart -and $Mode -ne 'restart') {

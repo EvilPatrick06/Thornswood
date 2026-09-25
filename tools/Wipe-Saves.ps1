@@ -23,9 +23,13 @@
                              purse. Take this away and every chest in Skyrim is
                              full again and untouched.
     private\characters.json  who everybody is.
-    data\property.json       who holds which building, which are locked, and
+    private\property.json    who holds which building, which are locked, and
                              the ground each one covers.
-    data\farm-claims.json    the farms on ground with no building on it.
+    private\farm-claims.json the farms on ground with no building on it.
+    data\property.json and data\farm-claims.json, where both were until
+                             25 September (issue #541: data is served to
+                             anybody), so a wipe on a server still running
+                             the older gamemode takes them too.
 
   The first two were here from the start. The last two are the gamemode's own
   and were added on 21 September: without them a fresh world would have come
@@ -72,7 +76,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -165,7 +169,7 @@ foreach (`$t in (Get-ScheduledTask -EA SilentlyContinue)) {
 foreach (`$r in `$roots) {
   'ROOT|' + `$r
   if (`$taskOf.ContainsKey(`$r)) { 'TASK|' + `$r + '|' + `$taskOf[`$r] } else { 'NOTASK|' + `$r }
-  foreach (`$n in @('world', 'private\characters.json', 'data\property.json', 'data\farm-claims.json')) {
+  foreach (`$n in @('world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json', 'data\property.json', 'data\farm-claims.json')) {
     `$p = Join-Path `$r `$n
     if (-not (Test-Path `$p)) { 'NONE|' + `$n; continue }
     `$b = 0; `$c = 0
@@ -246,13 +250,13 @@ Head 'Moving the old storage aside'
 $moved = Remote @"
 `$ErrorActionPreference = 'Continue'
 foreach (`$r in @($rootsLit)) {
-foreach (`$n in @('world', 'private\characters.json', 'data\property.json', 'data\farm-claims.json')) {
+foreach (`$n in @('world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json', 'data\property.json', 'data\farm-claims.json')) {
   `$p = Join-Path `$r `$n
   if (-not (Test-Path `$p)) { continue }
   `$leaf = Split-Path -Leaf `$p
   `$dir  = Split-Path -Parent `$p
   if (`$leaf -like '*.json') {
-    # Each of the three json files keeps its own name, or a fresh world would
+    # Each json file keeps its own name, or a fresh world would
     # come up with the property register saved as characters-before-<stamp>.
     `$to = Join-Path `$dir ((`$leaf -replace '[.]json$', '') + '-before-$stamp.json')
   }

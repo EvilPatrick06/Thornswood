@@ -13524,13 +13524,37 @@ log('gamemode loaded:',
 
   // ------------------------------------------------------------- the claims --
 
+  var claimsMoved = false;
   function claimsPath() {
+    // In the private folder, not data. Issue #541, 25 September: the
+    // resources server hands anything under data to anybody who asks, and
+    // every record here carries the profile id of the person it belongs to,
+    // which is what the door checks. Measured the same day: the live
+    // farm-claims.json answered 200 on port 3000. The door list moved for the
+    // same reason (privDir, above). A copy left in data by the code before
+    // this one is carried across the first time, so nothing anybody owns is
+    // lost, and the public copy is removed either way.
+    var fs = require('fs');
+    var path = require('path');
     var dataDir = 'data';
+    var privDir = 'private';
     try {
-      var cfg = JSON.parse(require('fs').readFileSync('server-settings.json', 'utf8'));
+      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
       if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+      if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
     } catch (e) { }
-    return require('path').join(dataDir, 'farm-claims.json');
+    var to = path.join(privDir, 'farm-claims.json');
+    if (claimsMoved) { return to; }
+    try {
+      if (!fs.existsSync(privDir)) { fs.mkdirSync(privDir, { recursive: true }); }
+      var from = path.join(dataDir, 'farm-claims.json');
+      if (fs.existsSync(from)) {
+        if (!fs.existsSync(to)) { fs.renameSync(from, to); }
+        else { fs.unlinkSync(from); }
+      }
+      claimsMoved = true;
+    } catch (e) { }
+    return to;
   }
 
   /*
@@ -14501,13 +14525,37 @@ log('gamemode loaded:',
 
   // ----------------------------------------------------------- the register --
 
+  var registerMoved = false;
   function registerPath() {
+    // In the private folder, not data. Issue #541, 25 September: the
+    // resources server hands anything under data to anybody who asks, and
+    // every record here carries the profile id of the person it belongs to,
+    // which is what the door checks. Measured the same day: the live
+    // property.json answered 200 on port 3000. The door list moved for the
+    // same reason (privDir, above). A copy left in data by the code before
+    // this one is carried across the first time, so nothing anybody owns is
+    // lost, and the public copy is removed either way.
+    var fs = require('fs');
+    var path = require('path');
     var dataDir = 'data';
+    var privDir = 'private';
     try {
-      var cfg = JSON.parse(require('fs').readFileSync('server-settings.json', 'utf8'));
+      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
       if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+      if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
     } catch (e) { }
-    return require('path').join(dataDir, 'property.json');
+    var to = path.join(privDir, 'property.json');
+    if (registerMoved) { return to; }
+    try {
+      if (!fs.existsSync(privDir)) { fs.mkdirSync(privDir, { recursive: true }); }
+      var from = path.join(dataDir, 'property.json');
+      if (fs.existsSync(from)) {
+        if (!fs.existsSync(to)) { fs.renameSync(from, to); }
+        else { fs.unlinkSync(from); }
+      }
+      registerMoved = true;
+    } catch (e) { }
+    return to;
   }
 
   /*

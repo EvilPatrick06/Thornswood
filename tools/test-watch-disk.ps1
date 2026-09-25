@@ -6,7 +6,7 @@
 
   WHY THIS EXISTS. Everything on that box shares one volume: both game
   servers, the site and its uploads, voice, the bot, every log and every
-  payload. tools\MOVING-THE-SERVER.md has it at 80 GB with 81 percent free,
+  payload. docs\MOVING-THE-SERVER.md has it at 80 GB with 81 percent free,
   read off the box on 15 September, and all of those only grow. Until entry
   213 on the To Do List nothing watched it. From the entry: "Free space is a
   first-class alert, usually at twenty percent and again at ten, because it

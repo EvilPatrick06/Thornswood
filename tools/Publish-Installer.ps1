@@ -51,7 +51,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
+$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $rootWin = $Root.Replace('/','\')
@@ -133,14 +133,6 @@ if (-not $single) {
   $zipSha = (Get-FileHash -LiteralPath $zipItem.FullName -Algorithm SHA256).Hash.ToLower()
 }
 
-if (-not $Version) {
-  # The number people see in the launcher, rather than a build date nobody
-  # recognises.
-  try {
-    $v = Get-Content (Join-Path (Split-Path -Parent $Here) 'version.json') -Raw | ConvertFrom-Json
-    if ($v.launcher) { $Version = "launcher $($v.launcher)" }
-  } catch { }
-}
 # Date and time, not just the date. Two builds in one day are normal here
 # and a bare date cannot tell them apart, which is how somebody ends up
 # testing this morning's installer and reporting a bug fixed at lunch.

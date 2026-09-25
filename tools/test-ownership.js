@@ -1,6 +1,6 @@
 // test-ownership.js
 //
-// tools/OWNERSHIP.md names every credential file the scripts and the launcher
+// docs/OWNERSHIP.md names every credential file the scripts and the launcher
 // use, and every row in it has a second holder.
 //
 // WHY THIS EXISTS. The To Do List entry "Five things exist only on your laptop
@@ -13,7 +13,7 @@
 // scripts.
 //
 // What it measured when it was written, 24 September: the secrets table in
-// SECOND-DEVELOPER.md had seven rows and no row for signing.json,
+// DEVELOPING.md had seven rows and no row for signing.json,
 // dev-webhook.txt, the backup passphrase, token-key.txt, server-secret.txt or
 // the launcher's UpdateToken, all of which the scripts name.
 //
@@ -38,8 +38,8 @@ function read(p) {
   try { return fs.readFileSync(p, 'utf8'); } catch (e) { return ''; }
 }
 
-const page = read(path.join(HERE, 'OWNERSHIP.md'));
-yes('tools/OWNERSHIP.md exists', page.length > 0);
+const page = read(path.join(HERE, '..', 'docs', 'OWNERSHIP.md'));
+yes('docs/OWNERSHIP.md exists', page.length > 0);
 
 // ------------------------------------------------------------ the table --
 const HEADER = ['asset', 'where it lives', 'who holds it', 'second holder', 'how to reissue'];
@@ -189,16 +189,16 @@ VALUE.forEach(function (v) {
 yes('the page has no em dash', page.indexOf('—') < 0);
 yes('the page never says player', !/\bplayers?\b/i.test(page));
 
-// ------------------------------------------------ SECOND-DEVELOPER.md --
+// ------------------------------------------------ DEVELOPING.md --
 // It said the fork and its build tree were Patrick's alone. The fork is on
 // GitHub; only the configured build and its toolchain are on one disk.
-const second = read(path.join(ROOT, 'SECOND-DEVELOPER.md'));
-yes('SECOND-DEVELOPER.md is there to read', second.length > 0);
-yes('SECOND-DEVELOPER.md no longer says the fork is Patrick\'s alone',
+const second = read(path.join(ROOT, 'DEVELOPING.md'));
+yes('DEVELOPING.md is there to read', second.length > 0);
+yes('DEVELOPING.md no longer says the fork is Patrick\'s alone',
     !/fork and its build tree are Patrick's alone/i.test(second));
-yes('SECOND-DEVELOPER.md says the fork source is on GitHub',
+yes('DEVELOPING.md says the fork source is on GitHub',
     /github\.com\/EvilPatrick06\/skymp/i.test(second));
-yes('SECOND-DEVELOPER.md points at tools\\OWNERSHIP.md', /tools\\OWNERSHIP\.md/.test(second));
+yes('DEVELOPING.md points at docs\\OWNERSHIP.md', /docs\\OWNERSHIP\.md/.test(second));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

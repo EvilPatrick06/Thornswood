@@ -63,7 +63,7 @@ which service leads each of those, and when the busiest hour was.
 
 Leave it a week that includes a busy evening before reading anything into it.
 Whether the answer is the plan above or moving some services off this box is
-for Patrick and Djinn in #dev, and whatever is done goes back on this page.
+for the team in #dev, and whatever is done goes back on this page.
 
 ## Doing it
 
@@ -112,10 +112,9 @@ and the Discord sign in all carry on.
 
 ## If it is a new machine, new address
 
-Do the Vortex switch first. The installer on the site is about 18 GB today and
-all of it would have to be copied to the new box. After the mods come out of
-the installer it is a fraction of that. Moving first and switching later means
-doing the painful copy for no reason.
+The Vortex switch this page used to say to do first is done: the mods come
+from the Nexus collection, and the installer on the site is a few hundred MB
+rather than 18 GB, so nothing big has to be copied to the new box.
 
 Then, in this order:
 
@@ -127,9 +126,12 @@ Then, in this order:
    scripts can reach it without a password.
 4. `.\tools\Bootstrap-VPS.ps1` against the new address. Node, Python, git,
    the folders.
-5. Restore from the backup zip, by hand, into the same four places:
-   `C:\Thornswood-Docs\data`, `C:\Thornswood-Bot`, `C:\Thornswood-Voice`, and
-   the game server's own folder. The website's `data` folder is the one that
+5. Restore from the backup, by hand, as `docs\RESTORING.md` says, into:
+   `C:\Thornswood-Docs\data`, `C:\Thornswood-Bot`, `C:\Thornswood-Voice`,
+   the game server's own folder and `C:\Thornswood-Caddy`. The dev roots
+   (`C:\Thornswood-Server-Dev`, `C:\Thornswood-Voice-Dev`) are made fresh,
+   and `C:\Thornswood-Watch` and `C:\Thornswood-Backup` by their own install
+   scripts (`Watch-Services.ps1 -Install`, `Install-Backup.ps1`). The website's `data` folder is the one that
    matters. It has the linked Discord accounts, the boards and every document
    anyone has typed into on the site.
 6. `.\tools\Install-Bot.ps1`, `.\tools\Install-Voice.ps1` and
@@ -140,7 +142,7 @@ Then, in this order:
 8. Open the ports. They are listed in `notes.txt` in the backup. The game is
    UDP, which is the one people forget.
 9. Import the scheduled tasks from the `tasks` folder in the backup, so the
-   three services come back after a reboot.
+   services come back after a reboot.
 10. Point the DNS A record for thornswood.net at the new address. Wait for the
     certificate to reissue before telling anyone, or the site shows a warning.
 11. Check the Discord application's redirect URI. If it names the domain there
@@ -149,8 +151,16 @@ Then, in this order:
 12. `.\tools\Set-Vps.ps1`. It asks for the new address and repoints all
     twenty three files in the repo that carry the old one, and adds a line to
     the launcher so copies already installed move themselves across.
-13. `.\tools\Ship.ps1 "Server moved"` so a fresh install has the new address
-    baked in.
+    The deploy scripts check the box's ssh host key (accept-new): the first
+    connection to a new address records its key, and a box rebuilt on the
+    same address is refused until the old key is taken out with
+    `ssh-keygen -R <address>` on each machine that deploys. That refusal is
+    the check working, so confirm the rebuild was yours before removing it.
+13. Commit what Set-Vps changed on a branch, open a pull request and merge
+    it, then `.\tools\Bump-Version.ps1` through its own pull request, then a
+    main `.\tools\Ship.ps1 "Server moved"` from Patrick's machine, so a
+    fresh install has the new address baked in. A move is one of the main
+    releases that does not wait for dev: the old address is going away.
 14. `.\tools\Set-Server.ps1` with the new address. This is the one that moves
     everybody. It checks the new box answers before it publishes.
 

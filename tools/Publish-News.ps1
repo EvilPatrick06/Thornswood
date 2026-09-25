@@ -32,7 +32,7 @@ param(
   # and the copy still sitting in this repo stopped being updated the day that
   # happened. Reading the stale one is why a run right after shipping 1.0.198
   # announced launcher 1.0.196 to the world.
-  [string]$ReleaseDir = 'C:\Users\evilp\Downloads\Thornswood-Releases',
+  [string]$ReleaseDir = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'Thornswood-Releases'),
   # Everything before this date is development history and stays off the site.
   # Read from tools\news-from.txt when not given, so it is one line to change.
   [string]$From,
@@ -68,7 +68,7 @@ function PropList($obj, $name) {
   if ($null -eq $p) { return @() }
   return @($p.Value)
 }
-$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
+$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 
@@ -77,17 +77,12 @@ if (-not $From) {
   if (Test-Path -LiteralPath $cut) { $From = (Get-Content $cut -Raw).Trim() }
 }
 
-$repoV = Join-Path (Split-Path -Parent $Here) 'version.json'
-$liveV = Join-Path $ReleaseDir 'version.json'
-
-$vf = $null
-if (Test-Path -LiteralPath $liveV) { $vf = $liveV }
-elseif (Test-Path -LiteralPath $repoV) {
-  $vf = $repoV
-  Write-Host "  no version.json in $ReleaseDir, falling back to the copy in this repo." -ForegroundColor Yellow
-  Write-Host "  That one is stale, so the version below may be wrong." -ForegroundColor Yellow
-} else {
-  throw "No version.json in either $ReleaseDir or $repoV."
+# The live feed only. This repository's own version.json was a copy left from
+# before releases had a repository of their own, frozen at launcher 1.0.196,
+# and it was deleted on 25 September rather than fallen back to.
+$vf = Join-Path $ReleaseDir 'version.json'
+if (-not (Test-Path -LiteralPath $vf)) {
+  throw "No version.json in $ReleaseDir. Clone Thornswood-Releases there, or pass -ReleaseDir."
 }
 
 # A byte order mark is not JSON. ConvertFrom-Json stops on the first character

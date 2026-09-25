@@ -200,7 +200,6 @@ Object.keys(HAND).forEach(function (k) {
 [
   path.join(__dirname, 'emotes', 'Thornswood.ini'),
   path.join(__dirname, 'ts-plugins', 'thornswood-mark.js'),
-  path.join(__dirname, 'emotes', 'thornswood-mark.js'),
   path.join(__dirname, 'Mark-Spot.ps1')
 ].forEach(function (f) {
   let text = '';

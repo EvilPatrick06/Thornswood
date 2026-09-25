@@ -38,7 +38,7 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 $target = "$VpsUser@$VpsHost"
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=no')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
 foreach ($t in 'ssh', 'scp') {
   if (-not (Get-Command $t -ErrorAction SilentlyContinue)) { Die "$t is not on PATH." }
 }
@@ -118,5 +118,5 @@ if (-not (Test-Path -LiteralPath $restore)) {
 
 Write-Host ''
 Say "  They are in $To" 'DarkGray'
-Say '  Restoring one for real is tools\RESTORING.md.' 'DarkGray'
+Say '  Restoring one for real is docs\RESTORING.md.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
