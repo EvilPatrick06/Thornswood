@@ -201,7 +201,7 @@ Object.keys(HAND).forEach(function (k) {
 [
   path.join(TOOLS_DIR, '..', 'launcher', 'Thornswood.ini'),
   path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-mark.js'),
-  path.join(TOOLS_DIR, 'Mark-Spot.ps1')
+  path.join(TOOLS_DIR, '..', 'scripts', 'ops', 'Mark-Spot.ps1')
 ].forEach(function (f) {
   let text = '';
   try { text = fs.readFileSync(f, 'utf8'); } catch (e) { text = null; }

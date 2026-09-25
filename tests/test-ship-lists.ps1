@@ -111,13 +111,20 @@ function Quote([string]$s) { return "'" + $s.Replace("'", "''") + "'" }
 # One module per script, so the two scripts' old lists (which used the same
 # variable names) cannot see each other. Built with PSModuleInfo rather than
 # New-Module so nothing is imported into this session.
+# A script by name: beside the folder given, as in a copy of the old flat
+# tools\ that -Before unpacks, or in scripts\release since phase 8 of #440.
+function Find-In([string]$toolsDir, [string]$name) {
+    $flat = Join-Path $toolsDir $name
+    if (Test-Path -LiteralPath $flat) { return $flat }
+    return (Join-Path $toolsDir ('..\scripts\release\' + $name))
+}
 function New-Decider([string]$toolsDir, [string]$which) {
-    $rules = Join-Path $toolsDir 'Ship-Rules.ps1'
+    $rules = Find-In $toolsDir 'Ship-Rules.ps1'
     $sb = New-Object System.Text.StringBuilder
     [void]$sb.AppendLine('. ' + (Quote $rules))
     if ($which -eq 'pack') {
         $file = 'Publish-Update.ps1'
-        $ast = Read-Script (Join-Path $toolsDir $file)
+        $ast = Read-Script (Find-In $toolsDir $file)
         $own = Get-OwnLists $ast
         foreach ($a in $own) { [void]$sb.AppendLine($a.Extent.Text) }
         foreach ($fn in 'Test-Vanilla', 'Test-Runtime', 'Test-Machine', 'Test-FromCollection') {
@@ -152,7 +159,7 @@ function Select-Removed([string[]]$removed) {
         $machine = Get-FunctionText $ast 'Test-Machine' $file
     } else {
         $file = 'Package-Thornswood.ps1'
-        $ast = Read-Script (Join-Path $toolsDir $file)
+        $ast = Read-Script (Find-In $toolsDir $file)
         $own = Get-OwnLists $ast
         foreach ($a in $own) { [void]$sb.AppendLine($a.Extent.Text) }
         foreach ($fn in 'Test-Vanilla', 'Test-Runtime', 'Test-Optional', 'Test-FromCollection') {
@@ -236,7 +243,7 @@ function Fate($set, [string]$p) {
 # those paths can be kept out of the comparison. Empty on 24 September.
 function Get-OptionalPrefixes([string]$toolsDir) {
     $out = @()
-    $f = Join-Path $toolsDir 'optional-packs.txt'
+    $f = Find-In $toolsDir 'optional-packs.txt'
     if (-not (Test-Path -LiteralPath $f)) { return ,$out }
     foreach ($line in (Get-Content -LiteralPath $f)) {
         $t = $line.Trim()
@@ -418,7 +425,7 @@ if ($Before) {
         $oldDir = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ship-lists-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
         $null = New-Item -ItemType Directory -Force -Path $oldDir
         $zip = Join-Path $oldDir 'before.zip'
-        & git -C $repo archive --format=zip -o $zip $Before tools/Ship-Rules.ps1 tools/Publish-Update.ps1 tools/Package-Thornswood.ps1 tools/client-build.json
+        & git -C $repo archive --format=zip -o $zip $Before scripts/release/Ship-Rules.ps1 scripts/release/Publish-Update.ps1 scripts/release/Package-Thornswood.ps1 records/client-build.json
         if ($LASTEXITCODE -ne 0) { throw "git archive of $Before failed" }
         Expand-Archive -LiteralPath $zip -DestinationPath $oldDir
         $old = [pscustomobject]@{

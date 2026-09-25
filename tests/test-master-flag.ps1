@@ -34,7 +34,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $DeployPath) { $DeployPath = Join-Path $Here 'Deploy-Gamemode.ps1' }
+if (-not $DeployPath) { $DeployPath = Join-Path $Here '..\scripts\deploy\Deploy-Gamemode.ps1' }
 
 $script:pass = 0
 $script:fail = 0

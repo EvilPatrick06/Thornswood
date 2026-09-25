@@ -138,7 +138,7 @@ if (-not $ok) {
 }
 
 Write-Host ''
-Say '  Next: .\tools\Ship.ps1 -Package "..."' 'Gray'
+Say '  Next: .\scripts\release\Ship.ps1 -Package "..."' 'Gray'
 Say '  The publisher sees these as removals, so everyone else loses them too,' 'Gray'
 Say '  and -Package rebuilds the installer without them.' 'Gray'
 Write-Host ''

@@ -1,5 +1,5 @@
 # The SkyMP fork our engine changes live in, pinned to the commit
-# tools\server-build.json and tools\client-build.json name. Until 25 September
+# records\server-build.json and records\client-build.json name. Until 25 September
 # it was a separate clone at C:\Thornswood-Dev\skymp on Patrick's machine.
 #
 #   git submodule update --init engine/skymp

@@ -85,7 +85,7 @@ working directory (`gamemode.js:125-127`). The gamemode reads `dataDir`
 (`gamemode.js:253`), `thornswoodChargen` (`gamemode.js:3652`),
 `thornswoodAdmins` (`gamemode.js:20300`) and `loadOrder`
 (`gamemode.js:11623`). `Deploy-Gamemode.ps1` writes that file on every deploy
-(`tools\Deploy-Gamemode.ps1:491` sets `dataDir`).
+(`scripts\deploy\Deploy-Gamemode.ps1:491` sets `dataDir`).
 
 ## Character creation
 
@@ -111,7 +111,7 @@ An old `arriving` state is folded into `done` (`gamemode.js:4668-4671`).
 key in `private\door.json` (`gamemode.js:11364`) and refreshed on a timer
 (`gamemode.js:11497-11503`). It turns somebody away only when that file says
 `"enforce": true`; otherwise it writes WOULD TURN AWAY in `private\door.log`
-(`gamemode.js:11060`). `tools\Set-Door.ps1` sets both. DEVELOPING.md,
+(`gamemode.js:11060`). `scripts\ops\Set-Door.ps1` sets both. DEVELOPING.md,
 "Who gets into the game", says what it can and cannot keep out.
 
 ## Professions, benches and BENCH_ACCESS
@@ -183,7 +183,7 @@ There is no custom packet. Two paths:
 The voice feed (`gamemode.js:10459`) posts every position to
 `POST /positions` every 200 ms. `voicePort()` reads the port from
 `server-settings.json`, so the dev server talks to the dev voice service.
-Do not run `tools\Add-VoiceFeed.ps1`: it writes the older
+Do not run `scripts\deploy\Add-VoiceFeed.ps1`: it writes the older
 `voice\gamemode-voice.js` over this block, with 7778 written in and no
 party field (`voice\README.md:12-18`).
 
@@ -196,10 +196,10 @@ In the server's folder, `C:\Thornswood-Server` live and
 |---|---|---|
 | `data` | `online.json`, `manifest.json`, `server-bases.json`, `thornswood-log.json`, `restart.json` | Yes: the resources port (3000 live, 7788 dev) hands out anything under it over plain HTTP (`gamemode.js:55-58`) |
 | `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json` (moved from `data` on 25 September, issue #541, because they carry profile ids; the gamemode carries an old copy across on first load) | No |
-| `world` | Not the gamemode's: SkyMP's changeform database, every reference the server has written to (`tools\Wipe-Saves.ps1:19-24`, `tools\Where.ps1:77`) | No |
+| `world` | Not the gamemode's: SkyMP's changeform database, every reference the server has written to (`scripts\ops\Wipe-Saves.ps1:19-24`, `scripts\release\Where.ps1:77`) | No |
 | the folder itself | `thornswood.log`, rolled at 4 MB with five kept (`gamemode.js:74-108`) | No |
 
-`tools\Wipe-Saves.ps1` starts the world over by moving `world`,
+`scripts\ops\Wipe-Saves.ps1` starts the world over by moving `world`,
 `private\characters.json`, `private\property.json` and `private\farm-claims.json` (and the old copies in `data`, for a server still on the older gamemode).
 
 ## Generated tables
@@ -234,20 +234,20 @@ in the gamemode: it goes into `thornswood-front.js`.
 
 Everything goes to the dev server first.
 
-- **Dev:** `.\tools\Deploy-DevGamemode.ps1`. It checks the file parses with
-  `node --check` (`tools\Deploy-DevGamemode.ps1:192-199`), reads how many are
+- **Dev:** `.\scripts\deploy\Deploy-DevGamemode.ps1`. It checks the file parses with
+  `node --check` (`scripts\deploy\Deploy-DevGamemode.ps1:192-199`), reads how many are
   on, warns them, sends `gamemode.js` alone to `C:\Thornswood-Server-Dev` and
   restarts only the process on the dev port. `-LoadOrder` brings the dev load
   order up to the built server's; a change to the CHARGEN records needs
-  `Deploy-Gamemode.ps1 -Vortex` first (`tools\Deploy-DevGamemode.ps1:33`).
-- **Live:** `.\tools\Deploy-Gamemode.ps1` copies `gamemode.js` into the local
-  server build (`tools\Where.ps1 ServerDist`, `tools\Deploy-Gamemode.ps1:226`)
+  `Deploy-Gamemode.ps1 -Vortex` first (`scripts\deploy\Deploy-DevGamemode.ps1:33`).
+- **Live:** `.\scripts\deploy\Deploy-Gamemode.ps1` copies `gamemode.js` into the local
+  server build (`scripts\release\Where.ps1 ServerDist`, `scripts\deploy\Deploy-Gamemode.ps1:226`)
   and writes `server-settings.json` and the load order; it does not talk to
-  the VPS (`tools\Deploy-Gamemode.ps1:208`). Then `.\tools\Deploy-Server.ps1`
+  the VPS (`scripts\deploy\Deploy-Gamemode.ps1:208`). Then `.\scripts\deploy\Deploy-Server.ps1`
   stages the build on the VPS, warns, swaps and restarts
-  (`tools\Deploy-Server.ps1:410-422` takes `gamemode.js` from `tools`).
+  (`scripts\deploy\Deploy-Server.ps1:410-422` takes `gamemode.js` from `tools`).
 
-Ship does not carry `gamemode.js`. `.\tools\Check-LiveGamemode.ps1` says
+Ship does not carry `gamemode.js`. `.\scripts\vps\Check-LiveGamemode.ps1` says
 whether the live server runs the file in this repository, by hash.
 
 ## Tests that read it

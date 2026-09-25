@@ -39,7 +39,9 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
+# The scripts are in scripts\<area> since phase 8 of issue #440; tools\ holds
+# only forwarding copies.
+if (-not $ToolsPath) { $ToolsPath = Join-Path (Split-Path -Parent $Here) 'scripts' }
 
 $script:pass = 0
 $script:fail = 0
@@ -58,7 +60,7 @@ function OnTheWire([string]$script) {
     return ('powershell -NoProfile -EncodedCommand ').Length + $b.Length
 }
 
-$files = Get-ChildItem -Path $ToolsPath -Filter *.ps1 -File |
+$files = Get-ChildItem -Path $ToolsPath -Filter *.ps1 -File -Recurse |
          Where-Object { $_.Name -ne 'test-remote-length.ps1' } |
          Sort-Object Name
 
@@ -100,7 +102,8 @@ Yes ("every one of them that is too long to fit sends a file instead" +
 # look for, and because a rewrite that drops the guard from either of them is
 # a rewrite that quietly stops the voice install and the site check working.
 foreach ($name in @('Install-Voice.ps1', 'Check-Site.ps1')) {
-    $p = Join-Path $ToolsPath $name
+    $p = @(Get-ChildItem -Path $ToolsPath -Filter $name -File -Recurse | Select-Object -First 1 -ExpandProperty FullName)[0]
+    if (-not $p) { $p = Join-Path $ToolsPath $name }
     if (-not (Test-Path -LiteralPath $p)) { Yes "$name is there" $false; continue }
     $t = Get-Content -LiteralPath $p -Raw
     Yes "$name still sends a long script as a file" ($t -match '\$cmd\.Length -le')

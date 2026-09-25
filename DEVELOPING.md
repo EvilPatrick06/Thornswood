@@ -27,7 +27,7 @@ release, launcher, game files and server together, are in CONTRIBUTING.md.
 | --- | --- | --- |
 | Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
 | Releases repo | github.com/EvilPatrick06/Thornswood-Releases (public), clone beside the source repo as `Thornswood-Releases`, dev branch as a worktree `Thornswood-Releases-dev` | `version.json` per branch (main, dev) and the release assets: packs and launcher exes |
-| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `tools\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
+| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Settings page | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Owner and Dev roles only |
 | Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
 | Plugins | `game\plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `game\ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
@@ -47,7 +47,7 @@ build, so a machine that only copies server binaries can leave it unfetched.
 Its configured build tree and toolchain (`engine\skymp\build`, and
 `C:\Thornswood-Dev\skymp\build` until Patrick's machine has moved) are on
 Patrick's machine alone for now. The release output is `out` in the repository
-folder, ignored by git. `tools\Where.ps1` says where each of these is on the
+folder, ignored by git. `scripts\release\Where.ps1` says where each of these is on the
 machine it runs on. Who holds each thing Thornswood cannot run without, and who the
 second holder is, is `docs\OWNERSHIP.md`.
 
@@ -58,7 +58,7 @@ A main release is for a security fix, for something that leaves the game
 untestable, or for work Patrick has said goes live, and it is his call.
 
 ```
-.\tools\Ship.ps1 -Channel dev "what changed, in plain words"
+.\scripts\release\Ship.ps1 -Channel dev "what changed, in plain words"
 ```
 
 That is the dev release: version 1.1.36.1, .2, .3, pack ids ending `-dev`, the
@@ -76,7 +76,7 @@ A main release, on Patrick's machine:
 cd C:\Users\<you>\Downloads\Thornswood-Repo
 git checkout main
 git pull
-.\tools\Bump-Version.ps1
+.\scripts\release\Bump-Version.ps1
 ```
 
 The version moves first and on its own. `Bump-Version.ps1` changes `Version`
@@ -89,16 +89,17 @@ green (see How work moves, the long form). Then, back on main:
 ```
 git checkout main
 git pull
-.\tools\Ship.ps1 "what changed, in plain words"
+.\scripts\release\Ship.ps1 "what changed, in plain words"
 ```
 
 Ship writes nothing to this repository. It refuses a main release with
-anything uncommitted, with a file under `tools` that git does not know, with
+anything uncommitted, with a file under `scripts` or another folder a release
+is built from that git does not know, with
 a `-Version` other than the number already on main, or with main here behind
 or ahead of `origin/main`, so what ships is what is on GitHub. It builds the
 launcher, checks that the game folder holds the recorded client build
 (`Sync-Client.ps1 -Check`), then runs
-`tools\Publish-Update.ps1`, which
+`scripts\release\Publish-Update.ps1`, which
 scans the game folder for loose files that are not Vortex's, not vanilla, not
 runtime and not per machine, diffs them against this machine's baseline
 (`%LOCALAPPDATA%\Thornswood\published.json`), zips the difference as a pack,
@@ -130,7 +131,7 @@ Several people, several machines, one repo. The short rules are in
 - **main is what ships.** Only Patrick's machine ships main. `Ship.ps1`
   refuses a main release that is not on the `main` branch, is behind or
   ahead of `origin/main`, has anything uncommitted, or has a file under
-  `tools` that git does not know. It commits and pushes nothing, so what
+  `scripts` or another folder a release is built from that git does not know. It commits and pushes nothing, so what
   shipped is already on GitHub and every other machine can `git pull` exactly
   that.
 - **Every change goes through a pull request, Patrick's included.** Nobody
@@ -158,7 +159,7 @@ Several people, several machines, one repo. The short rules are in
 - **`git pull` before anything.** A conflicting pull is resolved on your
   branch (`git fetch`, `git rebase origin/main`), never on main. A rejected
   push means pull first; never `--force`.
-- **The dev channel is for trying.** `.\tools\Ship.ps1 -Channel dev "..."`
+- **The dev channel is for trying.** `.\scripts\release\Ship.ps1 -Channel dev "..."`
   runs from any branch on any machine and puts that build on the dev
   server. There is one dev feed and the last dev Ship wins, so say in #staff-general
   when you take it. A main Ship resets dev to match main.
@@ -181,7 +182,7 @@ Several people, several machines, one repo. The short rules are in
   nothing writes `Profile\developer.flag`, which used to let the machine that
   ships keep newer game files instead.
 - **What never leaves a machine** in a pack or an installer is one list,
-  `tools\Ship-Rules.ps1`, read by `Publish-Update.ps1` and
+  `scripts\release\Ship-Rules.ps1`, read by `Publish-Update.ps1` and
   `Package-Thornswood.ps1` both: runtime folders, one machine's own files,
   other servers' files, and the SkyMP client's saved sign in
   (`Data\Platform\PluginsNoLoad`). The installer of 16 Sep carried that
@@ -213,18 +214,18 @@ beside the main install. Then open it once and let it make its own game folder,
 `<Root>-DevBuild\Game`: it offers at startup, and its own Settings, Maintenance
 has "Make it". Ship refuses `-Channel dev` without the dev build, and with the
 dev build but without that folder it builds the dev release out of the Steam
-copy instead. `.\tools\Check-ShipReady.ps1 -Channel dev` says whether both are
+copy instead. `.\scripts\release\Check-ShipReady.ps1 -Channel dev` says whether both are
 in place, without shipping anything.
 
 Then in `Thornswood-Repo`:
 
 ```
-.\tools\Setup-SshKey.ps1 -KeyOnly
+.\scripts\vps\Setup-SshKey.ps1 -KeyOnly
 ```
 
 which makes a key for the VPS, points ssh at it, and prints the public line.
-Send that line to Patrick; he runs `.\tools\Add-VpsKey.ps1 -PublicKey '<the line>'`
-from his machine and the VPS knows you. `.\tools\Setup-SshKey.ps1 -Test`
+Send that line to Patrick; he runs `.\scripts\vps\Add-VpsKey.ps1 -PublicKey '<the line>'`
+from his machine and the VPS knows you. `.\scripts\vps\Setup-SshKey.ps1 -Test`
 proves it. Until then the scripts that talk to the VPS (`Deploy-*`,
 `Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) cannot
 reach it, and Ship still publishes but cannot warn the room.
@@ -232,7 +233,7 @@ reach it, and Ship still publishes but cannot warn the room.
 The first publish from a new machine needs a baseline:
 
 ```
-.\tools\Publish-Update.ps1 -Baseline
+.\scripts\release\Publish-Update.ps1 -Baseline
 ```
 
 which records what the game folder holds right now without shipping
@@ -303,17 +304,17 @@ except the backup passphrase, in the clear.
 
 **Checking a row.** Each of these reads, and none prints a value:
 
-- `.\tools\Check-Roster.ps1`: whether `door.json` and `allowed.json` are in
+- `.\scripts\ops\Check-Roster.ps1`: whether `door.json` and `allowed.json` are in
   both servers' `private` folders, by name and size.
-- `.\tools\Set-Door.ps1`: whether the live door is enforcing or only watching,
+- `.\scripts\ops\Set-Door.ps1`: whether the live door is enforcing or only watching,
   and whether it is refreshing. Add `-Root C:\Thornswood-Server-Dev` for dev.
-- `.\tools\Check-Site.ps1`: whether the site's client secret and bot token look
+- `.\scripts\vps\Check-Site.ps1`: whether the site's client secret and bot token look
   right and the bot can read the Discord.
-- `.\tools\Install-Backup.ps1 -Status`: whether the passphrase is on the box,
+- `.\scripts\deploy\Install-Backup.ps1 -Status`: whether the passphrase is on the box,
   by length.
-- `.\tools\Set-DevNews.ps1 -Check`: whether the dev webhook is set and which
+- `.\scripts\ops\Set-DevNews.ps1 -Check`: whether the dev webhook is set and which
   channel it points at.
-- `.\tools\Setup-SshKey.ps1 -Test` and `gh auth status`: your own two.
+- `.\scripts\vps\Setup-SshKey.ps1 -Test` and `gh auth status`: your own two.
 - `https://thornswood.net/api/allowed` in a browser answers `no` with a 401
   while `botKey` is set, and `not set up` with a 404 when it is not.
 
@@ -359,9 +360,9 @@ With no Steam copy on the machine the folder is not made.
 **The client.** The SkyMP client runtime is built from the fork, the
 `engine\skymp` submodule on `thornswood/engine-changes`: `npx webpack` in
 `skymp5-client` for the bundle and the native build for the rest. After a
-rebuild, `tools\New-ClientBuildRecord.ps1` records the six files that build
+rebuild, `scripts\release\New-ClientBuildRecord.ps1` records the six files that build
 produces which differ from upstream, by hash, against the fork commit, into
-`tools\client-build.json`. `tools\Sync-Client.ps1` copies those six from the
+`records\client-build.json`. `scripts\release\Sync-Client.ps1` copies those six from the
 build output into the game folder and refuses any file that is not the
 recorded one; `Go.ps1` runs it beside the overlays and the plugins. Ship runs
 `Sync-Client.ps1 -Check` and refuses a release whose client is not the recorded
@@ -385,7 +386,7 @@ launcher's own writes into the game folder go through `OwnGame.Unshare` or
 
 **Left out of the folder, and of every pack and installer:** decided by what
 belongs, never by whose a file is. `OwnGame.Foreign` in the launcher and
-`Test-ShipOtherServer` in `tools\Ship-Rules.ps1` are the same list; change both
+`Test-ShipOtherServer` in `scripts\release\Ship-Rules.ps1` are the same list; change both
 together. In `Data\Platform\Plugins` only `thornswood-*.js` and the recorded
 bundle belong; in `Data\Platform\UI` only `index.html`, `build.js` and
 `thornswood-*.js`; `PluginsNoLoad` is sign-in data with a token in it and never
@@ -417,7 +418,7 @@ the collection out of packs and the installer, exactly as they read
 on if the list is empty. `Profile\OwnGame\plugins.txt` and `loadorder.txt` are
 the Vortex profile's lists as of the folder's last update, and are the
 reference load order a release carries (`Get-ShipLoadOrderDir`). Ship checks
-the client in `<Root>\Game` against `tools\client-build.json`.
+the client in `<Root>\Game` against `records\client-build.json`.
 
 **The Skyrim build.** Steam updates the Steam copy by itself. With Thornswood's
 own folder, the Downgrade button works on the Steam copy the folder is made

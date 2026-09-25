@@ -39,7 +39,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" -ForegroundColor Red }
 }
 
-$rules = Join-Path $here 'Feed-Rules.ps1'
+$rules = Join-Path $here '..\scripts\release\Feed-Rules.ps1'
 if (-not (Test-Path -LiteralPath $rules)) {
     Write-Host 'FAIL  Feed-Rules.ps1 is not in tools' -ForegroundColor Red
     Write-Host ''
@@ -110,7 +110,7 @@ Yes 'an empty feed splits into two empty lists' (($none.Keep.Count -eq 0) -and (
 Write-Host ''
 Write-Host 'Publish-Update adding packs'
 
-$pubSrc = Get-Content -LiteralPath (Join-Path $here 'Publish-Update.ps1') -Raw
+$pubSrc = Get-Content -LiteralPath (Join-Path $here '..\scripts\release\Publish-Update.ps1') -Raw
 $a = $pubSrc.IndexOf('# ==== thornswood feed append ====')
 $b = $pubSrc.IndexOf('# ==== end thornswood feed append ====')
 Yes 'the feed append block is marked in Publish-Update.ps1' (($a -ge 0) -and ($b -gt $a))
@@ -212,7 +212,7 @@ Write-Host ''
 Write-Host 'Repair-Manifest'
 
 $ps = (Get-Process -Id $PID).Path
-$repair = Join-Path $here 'Repair-Manifest.ps1'
+$repair = Join-Path $here '..\scripts\release\Repair-Manifest.ps1'
 function Run-Repair([string[]]$more) {
     $args2 = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $repair) + $more
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'

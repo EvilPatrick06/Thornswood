@@ -36,7 +36,7 @@ const os = require('os');
   that fails loudly when they drift: it reads the C# and asserts the shape.
 */
 const CS = fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Checks.cs'), 'utf8');
-const PS = fs.readFileSync(path.join(TOOLS_DIR, 'LoadOrder.ps1'), 'utf8');
+const PS = fs.readFileSync(path.join(TOOLS_DIR, '..', 'scripts', 'mods', 'LoadOrder.ps1'), 'utf8');
 
 let pass = 0, fail = 0;
 const yes = (w, c) => {

@@ -38,7 +38,7 @@ function LineOf([string[]]$lines, [string]$pattern) {
 }
 
 # ---- Deploy-Gamemode.ps1 ------------------------------------------------------
-$g = @(Get-Content -LiteralPath (Join-Path $Tools 'Deploy-Gamemode.ps1'))
+$g = @(Get-Content -LiteralPath (Join-Path $Tools '..\scripts\deploy\Deploy-Gamemode.ps1'))
 $check = LineOf $g '^\s*& node --check \$Gamemode'
 $copy = LineOf $g "^Copy-Item -LiteralPath \`$Gamemode -Destination \(Join-Path \`$Dist 'gamemode.js'\)"
 Yes 'Deploy-Gamemode runs node --check on gamemode.js' ($check -gt 0)
@@ -47,7 +47,7 @@ Yes '  and stops when it fails' (($g -join "`n") -match "LASTEXITCODE -ne 0\) \{
 Yes '  and stops when node is missing, rather than skipping' (($g -join "`n") -match "Get-Command node[^\n]*\) \{ throw")
 
 # ---- Deploy-Server.ps1 --------------------------------------------------------
-$s = @(Get-Content -LiteralPath (Join-Path $Tools 'Deploy-Server.ps1'))
+$s = @(Get-Content -LiteralPath (Join-Path $Tools '..\scripts\deploy\Deploy-Server.ps1'))
 $check = LineOf $s '^\s*& node --check \$built'
 $list = LineOf $s "^\`$files = 'scam_native.node'"
 $first = LineOf $s '^\$(online|who)\s*=\s*OnlineNow|^OnlineNow|^\s*Remote '
@@ -57,7 +57,7 @@ Yes '  and before anything talks to the VPS' ($check -gt 0 -and ($first -eq 0 -o
 Yes '  and stops when it fails' (($s -join "`n") -match "LASTEXITCODE -ne 0\) \{ throw 'gamemode.js does not parse")
 
 # ---- Deploy-DevGamemode.ps1 still has its own ---------------------------------
-$d = @(Get-Content -LiteralPath (Join-Path $Tools 'Deploy-DevGamemode.ps1'))
+$d = @(Get-Content -LiteralPath (Join-Path $Tools '..\scripts\deploy\Deploy-DevGamemode.ps1'))
 Yes 'Deploy-DevGamemode still runs node --check' ((LineOf $d '& node --check \$Gamemode') -gt 0)
 
 # ---- node --check really fails on a broken file -------------------------------

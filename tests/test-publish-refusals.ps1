@@ -40,7 +40,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $PublishPath) { $PublishPath = Join-Path $Here 'Publish-Update.ps1' }
+if (-not $PublishPath) { $PublishPath = Join-Path $Here '..\scripts\release\Publish-Update.ps1' }
 $ToolsDir = Split-Path -Parent $PublishPath
 
 $script:pass = 0
@@ -95,7 +95,7 @@ function Invoke-Publish([string]$root, [string[]]$extra) {
     $ErrorActionPreference = 'Continue'
     try {
         $argv = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-                  '-File', (Join-Path $tools 'Publish-Update.ps1'),
+                  '-File', (Join-Path $tools '..\scripts\release\Publish-Update.ps1'),
                   '-Root', $root,
                   '-ReleaseDir', (Join-Path $root 'rel'),
                   '-DistRoot', (Join-Path $root 'dist'),
@@ -126,11 +126,17 @@ function Unchanged($r) {
 
 try {
     # ---- the real script, and a Close-Launcher that closes nothing -------------
-    foreach ($f in 'Publish-Update.ps1', 'Ship-Rules.ps1', 'LoadOrder.ps1', 'Where.ps1', 'client-build.json') {
-        $from = Join-Path $ToolsDir $f
-        if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $tools -Force }
+    # Each where it is in the repository since phase 8 of issue #440.
+    $repoRoot = Split-Path -Parent (Split-Path -Parent $ToolsDir)
+    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
+                   'scripts\release\Where.ps1', 'records\client-build.json') {
+        $from = Join-Path $repoRoot $f
+        $to = Join-Path (Split-Path -Parent $tools) $f
+        New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
+        if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $to -Force }
     }
-    [IO.File]::WriteAllText((Join-Path $tools 'Close-Launcher.ps1'), (
+    New-Item -ItemType Directory -Path (Join-Path $tools '..\scripts\dev') -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $tools '..\scripts\dev\Close-Launcher.ps1'), (
         "function Stop-Game { param([string]`$Root)`r`n" +
         "    [IO.File]::WriteAllText((Join-Path `$Root 'stop-game-was-called.txt'), 'yes')`r`n" +
         "    return `$false`r`n" +

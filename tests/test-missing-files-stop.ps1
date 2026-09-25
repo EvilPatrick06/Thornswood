@@ -34,7 +34,12 @@ function Yes([string]$what, [bool]$cond) {
     if ($cond) { $script:pass++; Write-Host "PASS  $what" }
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
-function Read([string]$name) { [IO.File]::ReadAllText((Join-Path $Tools $name)) }
+# In scripts\<area> since phase 8 of issue #440; tools\ holds forwarding copies.
+function Read([string]$name) {
+    $p = @(Get-ChildItem -LiteralPath (Join-Path (Split-Path -Parent $Tools) 'scripts') -Filter $name -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName)[0]
+    if (-not $p) { $p = Join-Path $Tools $name }
+    [IO.File]::ReadAllText($p)
+}
 
 # ---- Build-Launcher.ps1 --------------------------------------------------------
 $b = Read 'Build-Launcher.ps1'
@@ -62,15 +67,15 @@ $s = Read 'Ship.ps1'
 $go = $s.IndexOf("& (Join-Path `$Here 'Go.ps1') @goArgs")
 $stop = $s.IndexOf('if ($LASTEXITCODE -ne 0) {', [Math]::Max($go, 0))
 Yes 'Ship stops when Go.ps1 fails' ($go -gt 0 -and $stop -gt $go -and ($stop - $go) -lt 400)
-Yes 'Ship''s untracked-file gate looks past tools' ($s -match "\`$moreRoots = @\(@\('site', 'game', 'launcher', 'installer'\)" -and $s -match 'ls-files --others --exclude-standard -- tools @moreRoots')
+Yes 'Ship''s untracked-file gate looks past tools' ($s -match "\`$moreRoots = @\(@\('scripts', 'records', 'site', 'game', 'launcher', 'installer'\)" -and $s -match 'ls-files --others --exclude-standard -- tools @moreRoots')
 
 # ---- every file these lines name is tracked --------------------------------------
 if (Get-Command git -ErrorAction SilentlyContinue) {
     $tracked = @(& git -C $repo ls-files 2>$null)
     foreach ($f in 'launcher/logo.png', 'launcher/launcher-header.jpg', 'launcher/launcher-header.mp4', 'launcher/Thornswood.ini',
-                   'tools/client-build.json', 'installer/Setup-Thornswood.ps1', 'installer/Install.bat', 'installer/Setup.bat', 'installer/READ ME FIRST.txt',
+                   'records/client-build.json', 'installer/Setup-Thornswood.ps1', 'installer/Install.bat', 'installer/Setup.bat', 'installer/READ ME FIRST.txt',
                    'game/ui/index.html', 'site/public/banner.webm', 'site/public/banner.mp4', 'site/public/banner.jpg',
-                   'game/menu/logo.nif', 'game/menu/logo01ae.nif', 'game/menu/Mainmenuwallpaper.dds', 'tools/Sync-Client.ps1') {
+                   'game/menu/logo.nif', 'game/menu/logo01ae.nif', 'game/menu/Mainmenuwallpaper.dds', 'scripts/release/Sync-Client.ps1') {
         Yes "$f is tracked, so its absence is a wrong path" ($tracked -contains $f)
     }
 }

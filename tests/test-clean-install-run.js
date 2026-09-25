@@ -169,8 +169,8 @@ yes('nothing says the own folder is not on main, which stopped being true on 18 
 // ---- the two closing checks ------------------------------------------------
 yes('Check-Build.ps1 is run against the copy with -Data, not against Patrick\'s own install', /Check-Build\.ps1 -Data \S/.test(doc));
 yes('Check-Manifest.ps1 is run against the copy with -Client, not against Patrick\'s own install', /Check-Manifest\.ps1 -Client \S/.test(doc));
-const cb = readRepo('tools\\Check-Build.ps1') || '';
-const cm = readRepo('tools\\Check-Manifest.ps1') || '';
+const cb = readRepo('scripts\\release\\Check-Build.ps1') || '';
+const cm = readRepo('scripts\\mods\\Check-Manifest.ps1') || '';
 yes('Check-Build.ps1 still takes -Data and -NoPause', /\[string\]\$Data\b/.test(cb) && /\[switch\]\$NoPause\b/.test(cb));
 yes('Check-Manifest.ps1 still takes -Client and -NoPause', /\[string\]\$Client\b/.test(cm) && /\[switch\]\$NoPause\b/.test(cm));
 yes('Check-Manifest.ps1 still reads the load order and the plugins from where M7 puts them',

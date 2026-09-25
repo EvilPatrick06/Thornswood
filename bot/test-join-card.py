@@ -283,7 +283,7 @@ finally:
 
 
 # ------------------------------------------------ what Install-Bot touches --
-with open(os.path.join(TOOLS, 'Install-Bot.ps1'), encoding='utf-8') as f:
+with open(os.path.join(os.path.dirname(HERE), 'scripts', 'deploy', 'Install-Bot.ps1'), encoding='utf-8') as f:
     install = f.read()
 lines = install.splitlines()
 

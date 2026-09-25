@@ -85,13 +85,17 @@ function Set-OneByteChanged([string]$p, [int]$at) {
 function Say($m, $c = 'Gray') { }
 function Die($m) { throw ('DIE ' + $m) }
 
-$realRecord = Join-Path $Tools 'client-build.json'
+$realRecord = Join-Path $Tools '..\records\client-build.json'
 $names = @((Get-Content -LiteralPath $realRecord -Raw | ConvertFrom-Json).files.PSObject.Properties.Name)
 $bundle = 'Data\Platform\Plugins\skymp5-client.js'
 $dll    = 'Data\SKSE\Plugins\MpClientPlugin.dll'
 
 $scratch  = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-client-by-hash-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
-$fixTools = Join-Path $scratch 'tools'
+# Laid out like the repository since phase 8 of issue #440: Ship-Rules in
+# scripts\release, the record in records\, Check-Secrets in scripts\dev.
+$fixTools = Join-Path $scratch 'scripts\release'
+$fixRecords = Join-Path $scratch 'records'
+$fixDev = Join-Path $scratch 'scripts\dev'
 $fixGame  = Join-Path $scratch 'Game'
 
 try {
@@ -99,8 +103,8 @@ try {
     Write-Host ''
     Write-Host 'The rule, against a made up game folder' -ForegroundColor Cyan
 
-    $null = New-Item -ItemType Directory -Force -Path $fixTools, $fixGame
-    Copy-Item -LiteralPath (Join-Path $Tools 'Ship-Rules.ps1') -Destination $fixTools
+    $null = New-Item -ItemType Directory -Force -Path $fixTools, $fixRecords, $fixDev, $fixGame
+    Copy-Item -LiteralPath (Join-Path $Tools '..\scripts\release\Ship-Rules.ps1') -Destination $fixTools
     $files = [ordered]@{}
     foreach ($n in $names) {
         $full = Join-Path $fixGame $n
@@ -109,7 +113,7 @@ try {
         $files[$n] = [ordered]@{ sha256 = (Sha $full); bytes = (Get-Item -LiteralPath $full).Length }
     }
     [ordered]@{ forkCommit = 'harness'; files = $files } | ConvertTo-Json -Depth 4 |
-        Set-Content -LiteralPath (Join-Path $fixTools 'client-build.json') -Encoding UTF8
+        Set-Content -LiteralPath (Join-Path $fixRecords 'client-build.json') -Encoding UTF8
     $bundleFull = Join-Path $fixGame $bundle
     $dllFull    = Join-Path $fixGame $dll
     $goodBundle = [IO.File]::ReadAllBytes($bundleFull)
@@ -153,7 +157,7 @@ try {
     Write-Host ''
     Write-Host 'Publish-Update.ps1: the scan and the removals' -ForegroundColor Cyan
 
-    $pub = Get-Content -LiteralPath (Join-Path $Tools 'Publish-Update.ps1') -Raw
+    $pub = Get-Content -LiteralPath (Join-Path $Tools '..\scripts\release\Publish-Update.ps1') -Raw
     $tm = [regex]::Match($pub, '(?m)^function Test-Machine\(.*$')
     $diff = [regex]::Match($pub, '(?ms)^\$changed = @\(\); \$removed = @\(\)\r?$.*?^\$removed\s+= @\(\$removed \| Where-Object \{[^\r\n]*Test-Machine[^\r\n]*\r?$')
     Yes 'Publish-Update.ps1 still defines Test-Machine on one line' $tm.Success
@@ -189,7 +193,7 @@ try {
     Write-Host 'Package-Thornswood.ps1: the listing and the refusal' -ForegroundColor Cyan
 
     $tok = $null; $err = $null
-    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Tools 'Package-Thornswood.ps1'), [ref]$tok, [ref]$err)
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Tools '..\scripts\release\Package-Thornswood.ps1'), [ref]$tok, [ref]$err)
     Yes 'Package-Thornswood.ps1 parses' ($err.Count -eq 0)
     $loops = @($ast.FindAll({ param($n)
         $n -is [System.Management.Automation.Language.ForEachStatementAst] -and
@@ -249,12 +253,12 @@ function Invoke-Listing($all, $prefix) {
     Write-Host ''
     Write-Host 'Check-Secrets.ps1: a pack and an installer stage that carry the client' -ForegroundColor Cyan
 
-    $scanSrc = Join-Path $Tools 'Check-Secrets.ps1'
+    $scanSrc = Join-Path $Tools '..\scripts\dev\Check-Secrets.ps1'
     if (-not (Test-Path -LiteralPath $scanSrc)) {
         Write-Host 'SKIP  no Check-Secrets.ps1 in these tools; it arrived with entry 236' -ForegroundColor Yellow
     } else {
         # Beside the made up record, so it reads that record through Ship-Rules.
-        $scan = Join-Path $fixTools 'Check-Secrets.ps1'
+        $scan = Join-Path $fixDev 'Check-Secrets.ps1'
         Copy-Item -LiteralPath $scanSrc -Destination $scan
         $shell = (Get-Process -Id $PID).Path
         Add-Type -AssemblyName System.IO.Compression
@@ -299,7 +303,7 @@ function Invoke-Listing($all, $prefix) {
         Write-Host ("SKIP  no game folder at {0}; nothing on this machine to measure" -f $Game) -ForegroundColor Yellow
     } else {
         # The real record now, from the real tools folder.
-        . (Join-Path $Tools 'Ship-Rules.ps1')
+        . (Join-Path $Tools '..\scripts\release\Ship-Rules.ps1')
         $rec = Get-Content -LiteralPath $realRecord -Raw | ConvertFrom-Json
         $GameDir = $Game
         $recorded = 0

@@ -92,7 +92,7 @@ function Done {
     exit 0
 }
 
-$deploy = Join-Path $ToolsPath 'Deploy-Docs.ps1'
+$deploy = Join-Path $ToolsPath '..\scripts\deploy\Deploy-Docs.ps1'
 $errs = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($deploy, [ref]$null, [ref]$errs)
 Yes 'Deploy-Docs.ps1 parses' ($errs.Count -eq 0)

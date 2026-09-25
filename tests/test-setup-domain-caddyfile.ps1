@@ -3,7 +3,7 @@
 
       pwsh -NoProfile -File .\tests\test-setup-domain-caddyfile.ps1
 
-  Setup-Domain.ps1 sends tools\Caddyfile rather than writing its own.
+  Setup-Domain.ps1 sends scripts\deploy\Caddyfile rather than writing its own.
 
   WHY. It used to write a Caddyfile that proxied the domain to 3001 and
   nothing else. A full run on a new box would have taken the /voice and
@@ -29,13 +29,13 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$text = [IO.File]::ReadAllText((Join-Path $Tools 'Setup-Domain.ps1'))
-$cf = [IO.File]::ReadAllText((Join-Path $Tools 'Caddyfile'))
+$text = [IO.File]::ReadAllText((Join-Path $Tools '..\scripts\deploy\Setup-Domain.ps1'))
+$cf = [IO.File]::ReadAllText((Join-Path $Tools '..\scripts\deploy\Caddyfile'))
 
 Yes 'the tracked Caddyfile has the voice route' ($cf.Contains('handle_path /voice/*'))
 Yes '  and the dev voice route' ($cf.Contains('handle_path /voice-dev/*'))
 Yes '  and the site' ($cf.Contains('reverse_proxy 127.0.0.1:3001'))
-Yes 'Setup-Domain reads tools\Caddyfile' ($text -match "Join-Path \`$Here 'Caddyfile'")
+Yes 'Setup-Domain reads scripts\deploy\Caddyfile' ($text -match "Join-Path \`$Here 'Caddyfile'")
 Yes '  and no longer writes a Caddyfile of its own' (-not ($text -match '(?m)^\$Domain, www\.\$Domain \{'))
 Yes '  and keeps a Caddyfile already on the box before replacing it' ($text.Contains("'.before-'"))
 
@@ -47,7 +47,8 @@ Yes 'the building lines are found' ($start -gt 0 -and $end -gt $start)
 if ($start -gt 0 -and $end -gt $start) {
     $code = $text.Substring($start, $end - $start)
     function Build([string]$Domain, [string]$Email) {
-        $Here = $Tools
+        # Setup-Domain and the Caddyfile sit together in scripts\deploy.
+        $Here = Join-Path $Tools '..\scripts\deploy'
         . ([scriptblock]::Create($code))
         return $caddyfile
     }

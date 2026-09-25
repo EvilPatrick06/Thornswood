@@ -18,7 +18,7 @@ $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $here = Join-Path (Split-Path -Parent $here) 'tools'
-if (-not $Path) { $Path = Join-Path $here 'Deploy-Docs.ps1' }
+if (-not $Path) { $Path = Join-Path $here '..\scripts\deploy\Deploy-Docs.ps1' }
 
 $pass = 0; $fail = 0
 function yes([string]$what, [bool]$cond) {

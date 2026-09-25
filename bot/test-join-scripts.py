@@ -360,7 +360,7 @@ finally:
 
 # ------------------------------------------------------ the nightly backup --
 PS = shutil.which('powershell') or shutil.which('powershell.exe')
-NIGHTLY = os.path.join(TOOLS, 'vps-nightly-backup.ps1')
+NIGHTLY = os.path.join(os.path.dirname(HERE), 'scripts', 'vps', 'vps-nightly-backup.ps1')
 if not PS:
     print('SKIP  the nightly backup half: there is no Windows PowerShell here')
 else:

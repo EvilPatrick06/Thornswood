@@ -111,7 +111,7 @@ launcher.
 | `maintenance` | string (read as on only for `true`, `1`, `yes`, `on`) | By hand | `FeedNotice.cs:61-68,91-96` | On: Play held, button says CLOSED FOR MAINTENANCE. Absent in the current feeds. |
 | `minLauncher` | string, dotted numbers | By hand | `FeedNotice.cs:58-77` | A launcher below it holds Play. A value that is not digits and dots is ignored, so a typo cannot lock everybody out (`FeedNotice.cs:98-120`). Absent in the current feeds. |
 | `packs` | array | `Publish-Update.ps1:1210-1233` appends; `Repair-Manifest.ps1` removes | `Updater.Pending` (`Updater.cs:360-368`) | See below. |
-| `optional` | array | `Publish-Pack.ps1:197-213` | Add-ons tab (`Shell.cs:2310`) | Absent in both feeds today; `tools/optional-packs.txt` lists none. |
+| `optional` | array | `Publish-Pack.ps1:197-213` | Add-ons tab (`Shell.cs:2310`) | Absent in both feeds today; `scripts/release/optional-packs.txt` lists none. |
 | `clientRuntime` | object | `Publish-Update.ps1:1236-1245`, only when the fork commit changed | `ClientRuntime.Heal` (`ClientRuntime.cs:261-269`) | Null or no `url`: a missing client file cannot be repaired from it. Same host and sha256 checks as a pack. |
 | `news` | array, newest first, at most 40 | `Publish-Update.ps1:1507-1536`; `Publish-Server.ps1:415-520` | News tab (`Shell.cs:2965-3160`); `Publish-News.ps1` copies it to the site | Cosmetic. |
 | `mainVersion` | string | `Publish-Update.ps1:1554-1599`: the main feed's `launcherVersion` on a dev ship, `""` on a main ship | Dev News tab header (`Shell.cs:2992-3002`) | Cosmetic. Stale today, see the end. |

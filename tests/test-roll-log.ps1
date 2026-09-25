@@ -51,7 +51,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$roller = Join-Path $ToolsPath 'Roll-Log.ps1'
+$roller = Join-Path $ToolsPath '..\scripts\vps\Roll-Log.ps1'
 $winps  = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
 $node   = $null
@@ -194,7 +194,7 @@ try {
     Yes 'once the holder is gone it rolls' ((Size ($held + '.1')) -gt 0 -and (Get ($held + '.1')) -ne 'OLDER' -and (Get ($held + '.2')) -eq 'OLDER')
 
     # ======================================================= the game server task
-    $inst = Get-Content -LiteralPath (Join-Path $ToolsPath 'Install-ThornswoodServer.ps1') -Raw
+    $inst = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\deploy\Install-ThornswoodServer.ps1') -Raw
     $m = [regex]::Match($inst, '\$cmd = \(''(/c [^\r\n]*?skymp5-server\.js[^\r\n]*?)'' -f ([^\r\n]+)\)')
     Yes 'the server task line is in Install-ThornswoodServer.ps1' $m.Success
 
@@ -230,7 +230,7 @@ try {
     }
 
     # ============================================================ the voice task
-    $vtext = Get-Content -LiteralPath (Join-Path $ToolsPath 'Install-Voice.ps1') -Raw
+    $vtext = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\deploy\Install-Voice.ps1') -Raw
     $m = [regex]::Match($vtext, '`\$cmd = \(''(/c "set THORNSWOOD_SITE=[^\r\n]*?)'' -f ([^\r\n]+)\)')
     Yes 'the voice task line is in Install-Voice.ps1' $m.Success
     if ($node -and $m.Success) {
@@ -260,7 +260,7 @@ try {
         $vtext -notmatch 'Remove-Item -LiteralPath `\$log\b' -and $vtext -match '& `\$roll -Path `\$log -Force')
 
     # ============================================================ the dev voice
-    $dtext = Get-Content -LiteralPath (Join-Path $ToolsPath 'vps-dev-instance.ps1') -Raw
+    $dtext = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\vps\vps-dev-instance.ps1') -Raw
     $lb = $dtext.IndexOf('$lines = @(')
     $le = if ($lb -ge 0) { $dtext.IndexOf("`n    )", $lb) } else { -1 }
     Yes 'the dev voice run file is in vps-dev-instance.ps1' ($lb -ge 0 -and $le -gt $lb)
@@ -285,7 +285,7 @@ try {
         ([regex]::Matches($dtext, '& robocopy [^\r\n]*/XF [^\r\n]*\*\.log\.\*')).Count -eq 2)
 
     # ================================================================== the bot
-    $btext = Get-Content -LiteralPath (Join-Path $ToolsPath 'Install-Bot.ps1') -Raw
+    $btext = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\deploy\Install-Bot.ps1') -Raw
     $ra = $btext.IndexOf("`$run = @'")
     $rb = if ($ra -ge 0) { $btext.IndexOf("`n'@", $ra) } else { -1 }
     $runPs1 = if ($ra -ge 0 -and $rb -gt $ra) { $btext.Substring($ra, $rb - $ra) } else { '' }
@@ -340,7 +340,7 @@ try {
 
     # ===================================================== the server installer
     Yes 'Publish-Server sends the roller beside the installer' (
-        (Get-Content -LiteralPath (Join-Path $ToolsPath 'Publish-Server.ps1') -Raw) -match 'scp \$rollLog "\$\{target\}:C:/Roll-Log\.ps1"')
+        (Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\release\Publish-Server.ps1') -Raw) -match 'scp \$rollLog "\$\{target\}:C:/Roll-Log\.ps1"')
     Yes 'the installer puts it in the server''s folder as roll-log.ps1' (
         $inst -match 'Join-Path \$here ''Roll-Log\.ps1''' -and $inst -match 'Join-Path \$Root ''roll-log\.ps1''')
     Yes 'the installer rolls server.log at install rather than deleting it' (

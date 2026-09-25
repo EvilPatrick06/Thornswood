@@ -328,7 +328,7 @@ function Test-Sends([string]$name, [scriptblock]$sendBig, [scriptblock]$sendShor
 }
 
 # ---- Remote.ps1, which takes any script --------------------------------------
-$remotePs1 = Join-Path $ToolsPath 'Remote.ps1'
+$remotePs1 = Join-Path $ToolsPath '..\scripts\vps\Remote.ps1'
 Yes 'Remote.ps1 is there' (Test-Path -LiteralPath $remotePs1)
 if (Test-Path -LiteralPath $remotePs1) {
     Test-Sends 'Remote.ps1 -Script' {
@@ -366,7 +366,7 @@ function Get-FunctionText([string]$path, [string]$name) {
 }
 
 $helpers = 0
-foreach ($f in (Get-ChildItem -Path $ToolsPath -Filter *.ps1 -File | Where-Object { $_.Name -notlike 'test-*' } | Sort-Object Name)) {
+foreach ($f in (Get-ChildItem -Path (Join-Path $ToolsPath '..\scripts') -Filter *.ps1 -File -Recurse | Where-Object { $_.Name -notlike 'test-*' -and $_.FullName -notmatch '[\\/]oneoff[\\/]' } | Sort-Object Name)) {
     $fn = Get-FunctionText $f.FullName 'Remote'
     if (-not $fn) { continue }
     if ($fn -notmatch '\$cmd\.Length -(le|gt) \d+') {
@@ -388,7 +388,7 @@ Yes 'the guarded helpers were found and sent to' ($helpers -ge 10)
 # claim about the VPS. It keeps every helper on the form that runs under
 # either shell while which one the VPS uses is not known.
 $quoted = @()
-foreach ($f in (Get-ChildItem -Path $ToolsPath -Filter *.ps1 -File | Where-Object { $_.Name -notlike 'test-*' } | Sort-Object Name)) {
+foreach ($f in (Get-ChildItem -Path (Join-Path $ToolsPath '..\scripts') -Filter *.ps1 -File -Recurse | Where-Object { $_.Name -notlike 'test-*' -and $_.FullName -notmatch '[\\/]oneoff[\\/]' } | Sort-Object Name)) {
     $i = 0
     foreach ($line in [IO.File]::ReadAllLines($f.FullName)) {
         $i++

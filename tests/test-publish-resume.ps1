@@ -13,7 +13,7 @@ if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, what they test is in tools\.
 $here = Join-Path (Split-Path -Parent $here) 'tools'
 
-$src = Get-Content -LiteralPath (Join-Path $here 'Publish-Update.ps1') -Raw
+$src = Get-Content -LiteralPath (Join-Path $here '..\scripts\release\Publish-Update.ps1') -Raw
 $a = $src.IndexOf('# ==== thornswood publish resume ====')
 $b = $src.IndexOf('# ==== end thornswood publish resume ====')
 if ($a -lt 0 -or $b -lt 0) {

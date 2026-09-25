@@ -31,7 +31,7 @@ const { spawnSync } = require('child_process');
 
 const CR = String.fromCharCode(13);
 const read = (p) => fs.readFileSync(path.join(TOOLS_DIR, p), 'utf8').split(CR).join('');
-const publisher = read('Publish-Installer.ps1');
+const publisher = read('../scripts/release/Publish-Installer.ps1');
 const server = read(path.join('..', 'site', 'server.js'));
 const page = read(path.join('..', 'site', 'public', 'home.html'));
 

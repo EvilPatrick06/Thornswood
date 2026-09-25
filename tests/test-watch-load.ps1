@@ -50,10 +50,10 @@ function Finish {
     exit 0
 }
 
-$collector = Join-Path $Here 'vps-load.ps1'
-$reader    = Join-Path $Here 'Read-Load.ps1'
-$watcher   = Join-Path $Here 'Watch-Load.ps1'
-$checkLoad = Join-Path $Here 'Check-Load.ps1'
+$collector = Join-Path $Here '..\scripts\vps\vps-load.ps1'
+$reader    = Join-Path $Here '..\scripts\vps\Read-Load.ps1'
+$watcher   = Join-Path $Here '..\scripts\vps\Watch-Load.ps1'
+$checkLoad = Join-Path $Here '..\scripts\vps\Check-Load.ps1'
 $gamemode  = Join-Path $Here '..\game\gamemode.js'
 
 foreach ($f in @($collector, $reader, $watcher)) {

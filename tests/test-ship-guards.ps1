@@ -41,7 +41,7 @@ $ToolsHere = $PSScriptRoot
 if (-not $ToolsHere) { $ToolsHere = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $ToolsHere = Join-Path (Split-Path -Parent $ToolsHere) 'tools'
-if (-not $ShipPath) { $ShipPath = Join-Path $ToolsHere 'Ship.ps1' }
+if (-not $ShipPath) { $ShipPath = Join-Path $ToolsHere '..\scripts\release\Ship.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -82,7 +82,7 @@ function Find-If([string]$condition, [int]$after, [string]$mark) {
 
 $script:dryBefore = Find-If '$DryRun' $src.IndexOf('$dryKeep = @()') '$dryKeep +='
 $script:dryAfter  = Find-If '$DryRun' $src.IndexOf("& (Join-Path `$Here 'Publish-Update.ps1') @pubArgs") 'foreach ($k in $dryKeep)'
-$script:guard     = Find-If '$GameDir' 0 "Join-Path `$Here '..\game\plugins'"
+$script:guard     = Find-If '$GameDir' 0 "Join-Path `$Here '..\..\game\plugins'"
 $unbump = ''
 foreach ($fn in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
     if ($fn.Name -eq 'Unbump') { $unbump = $fn.Extent.Text; break }
@@ -188,7 +188,8 @@ try {
         try { Invoke-Expression $script:guard; return 'went on' }
         catch { return [string]$_.Exception.Message }
     }
-    $repoTools = Join-Path $work 'tools'
+    # Ship.ps1 sits in scripts\release since phase 8 of issue #440.
+    $repoTools = Join-Path (Join-Path $work 'scripts') 'release'
     $plugins = Join-Path $work 'game\plugins'
     $game = Join-Path $work 'Game'
     $live = Join-Path $game 'Data\Platform\Plugins'

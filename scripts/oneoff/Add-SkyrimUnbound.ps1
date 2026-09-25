@@ -223,7 +223,7 @@ if ($NoShip) {
     Head 'Done'
     Say 'Installed. Nothing published, you asked for -NoShip.' 'Green'
     Write-Host ''
-    Say 'When you are ready:  .\tools\Ship.ps1 "what changed"' 'Gray'
+    Say 'When you are ready:  .\scripts\release\Ship.ps1 "what changed"' 'Gray'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0

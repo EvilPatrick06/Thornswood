@@ -20,7 +20,7 @@
 //
 // Two halves.
 //
-//   A. The builder itself, tools/Build-RaceTable.js, run on plugins this
+//   A. The builder itself, scripts/dev/Build-RaceTable.js, run on plugins this
 //      harness writes, so it runs on any machine: one line per record, keyed
 //      by the plugin that made it, worth what the last plugin says.
 //
@@ -109,6 +109,8 @@ fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(TOOLS, { recursive: true });
 // The gamemode and its tables sit in game\ beside tools\ since phase 6 (issue #440).
 fs.mkdirSync(path.join(TMP, 'game', 'data'), { recursive: true });
+// And the table builders in scripts\dev since phase 8.
+fs.mkdirSync(path.join(TMP, 'scripts', 'dev'), { recursive: true });
 fs.mkdirSync(path.join(TMP, 'Profile', 'Default'), { recursive: true });
 
 /*
@@ -150,12 +152,12 @@ fs.writeFileSync(path.join(DATA, 'LowerCase.esp'), plugin(0, ['skyrim.esm'], [
 ]));
 fs.writeFileSync(path.join(TMP, 'Profile', 'Default', 'plugins.txt'),
   ['*RaceMod.esp', '*LowerCase.esp', ''].join(String.fromCharCode(13, 10)));
-fs.copyFileSync(path.join(HERE, 'Build-RaceTable.js'), path.join(TOOLS, 'Build-RaceTable.js'));
+fs.copyFileSync(path.join(HERE, '..', 'scripts', 'dev', 'Build-RaceTable.js'), path.join(TOOLS, '..', 'scripts', 'dev', 'Build-RaceTable.js'));
 fs.writeFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'),
   ['const FOODS = {"items":{}};', 'const RACES = {"items":{}};', ''].join(String.fromCharCode(10)));
 
 function build() {
-  return spawnSync(process.execPath, [path.join(TOOLS, 'Build-RaceTable.js'), '--data', DATA],
+  return spawnSync(process.execPath, [path.join(TOOLS, '..', 'scripts', 'dev', 'Build-RaceTable.js'), '--data', DATA],
                    { encoding: 'utf8' });
 }
 function installed() {

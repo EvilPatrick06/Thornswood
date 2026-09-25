@@ -91,6 +91,6 @@ if (Test-Path $pl) {
 }
 
 Write-Host ''
-Say '  Next: .\tools\Ship.ps1 -Package "..."' 'Gray'
+Say '  Next: .\scripts\release\Ship.ps1 -Package "..."' 'Gray'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

@@ -11,13 +11,13 @@ each half, with the file and line for each step.
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
 pins a commit, not the branch: on 25 September `git submodule status` printed
 `c8832519866e6848b9501039940dc2c6f0508668`, the commit both build records name
-(`tools\server-build.json:10`, `tools\client-build.json:6`).
+(`records\server-build.json:10`, `records\client-build.json:6`).
 
 `ignore = dirty` (`.gitmodules:15`) keeps a build inside the fork from showing
 as a change here. A different commit checked out in it still shows, and is
 committed here together with the new build records (`.gitmodules:7-10`).
 
-Scripts ask `tools\Where.ps1` where things are: `Engine` is `engine\skymp`
+Scripts ask `scripts\release\Where.ps1` where things are: `Engine` is `engine\skymp`
 once it has a `CMakeLists.txt`, else the old `C:\Thornswood-Dev\skymp`
 (`Where.ps1:56-62`); `ServerDist` and `ClientDist` are `build\dist\server` and
 `build\dist\client` in it (`Where.ps1:74-75`); `Out` is the ignored `out`.
@@ -80,8 +80,8 @@ which is why the move to `engine\skymp` needed this configure again.
 ## The server: Build-Server.ps1
 
 ```powershell
-.\tools\Build-Server.ps1               # Release, then records it
-.\tools\Build-Server.ps1 -NoRecord     # compile only
+.\scripts\release\Build-Server.ps1               # Release, then records it
+.\scripts\release\Build-Server.ps1 -NoRecord     # compile only
 ```
 
 - Reports the fork's branch and commit and any uncommitted file, and never
@@ -93,11 +93,11 @@ which is why the move to `engine\skymp` needed this configure again.
 - Checks that `build\dist\server\scam_native.node` came out and says whether
   its sha256 differs from the one there before (`Build-Server.ps1:134-165`).
 - Without `-NoRecord` it runs `New-ServerBuildRecord.ps1`
-  (`Build-Server.ps1:171-188`). With it, `tools\server-build.json` is left
+  (`Build-Server.ps1:171-188`). With it, `records\server-build.json` is left
   alone, and `Deploy-Server.ps1` refuses the new binary until the record
   names it (`Build-Server.ps1:167-170`). It sends nothing anywhere.
 
-`tools\New-ServerBuildRecord.ps1` writes `tools\server-build.json`: the
+`scripts\release\New-ServerBuildRecord.ps1` writes `records\server-build.json`: the
 binary's sha256, size and build time, and the fork's origin, branch, commit,
 upstream and merge base (`New-ServerBuildRecord.ps1:98-112`). It warns when
 the fork has uncommitted changes (`:69-74`) or a source file under
@@ -116,21 +116,21 @@ every script below look.
 
 Then, in order:
 
-1. `.\tools\New-ClientBuildRecord.ps1` hashes the six into
-   `tools\client-build.json`. It refuses a bundle with no `THORNSWOOD PATCH`
+1. `.\scripts\release\New-ClientBuildRecord.ps1` hashes the six into
+   `records\client-build.json`. It refuses a bundle with no `THORNSWOOD PATCH`
    block or with another server's markers (`New-ClientBuildRecord.ps1:75-79`),
    and warns when the fork is dirty or a source file is newer than the build
    (`:109-113`).
-2. `.\tools\Sync-Client.ps1` checks all six in the build against the record
+2. `.\scripts\release\Sync-Client.ps1` checks all six in the build against the record
    and copies nothing until all six pass, then copies them into the game
    folder, `C:\Thornswood\Game` by default (`Sync-Client.ps1:40`, `66-109`).
    `Go.ps1` runs it.
-3. `.\tools\Sync-Client.ps1 -Check` compares only: exit 0 all in place, 2
+3. `.\scripts\release\Sync-Client.ps1 -Check` compares only: exit 0 all in place, 2
    something differs, 1 the build is not the recorded one or is missing
    (`Ship.ps1:726-733`). Ship runs it and refuses to go on otherwise
    (`Ship.ps1:742-750`).
 
-The launcher carries `tools\client-build.json` inside it
+The launcher carries `records\client-build.json` inside it
 (`Build-Launcher.ps1:306-310`) and checks the same six by hash
 (`launcher\app\ARCHITECTURE.md:301-304`).
 
@@ -149,7 +149,7 @@ So the recorded binaries stay unless the engine changed:
   `.gitignore:101`), run `Build-Server.ps1 -NoRecord`, then put the backup
   back and check it:
   ```powershell
-  (Get-FileHash engine\skymp\build\dist\server\scam_native.node -Algorithm SHA256).Hash.ToLower() -eq (Get-Content tools\server-build.json -Raw | ConvertFrom-Json).sha256
+  (Get-FileHash engine\skymp\build\dist\server\scam_native.node -Algorithm SHA256).Hash.ToLower() -eq (Get-Content records\server-build.json -Raw | ConvertFrom-Json).sha256
   ```
   It prints True when the recorded binary is back.
 - When the engine did change: commit and push on `thornswood/engine-changes`

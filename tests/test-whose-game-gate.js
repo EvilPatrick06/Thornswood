@@ -168,11 +168,11 @@ function note(ms) { return ms + ' Thornswood Dev'; }
 
 // ------------------------------------------------ the address Set-Vps moves
 const configCs = fs.readFileSync(path.join(TOOLS, '..', 'launcher', 'app', 'Config.cs'), 'utf8');
-const setVps = fs.readFileSync(path.join(TOOLS, 'Set-Vps.ps1'), 'utf8');
+const setVps = fs.readFileSync(path.join(TOOLS, '..', 'scripts', 'vps', 'Set-Vps.ps1'), 'utf8');
 const OLD_RX = 'public\\s+string\\s+ServerAddress\\s*=\\s*"([^"]+)"';
 
 yes('Set-Vps.ps1 still takes the address it moves from the ServerAddress default in app\\Config.cs',
-    setVps.indexOf("Join-Path $Here '..\\launcher\\app\\Config.cs'") >= 0 && setVps.indexOf("'" + OLD_RX + "'") >= 0);
+    setVps.indexOf("Join-Path $Here '..\\..\\launcher\\app\\Config.cs'") >= 0 && setVps.indexOf("'" + OLD_RX + "'") >= 0);
 const cfgMatch = new RegExp(OLD_RX).exec(configCs);
 yes('app\\Config.cs has a ServerAddress default', !!cfgMatch);
 const OURS = cfgMatch ? cfgMatch[1] : '';

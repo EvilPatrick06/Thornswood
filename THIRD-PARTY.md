@@ -14,7 +14,7 @@ of its own, and choosing one is Patrick's decision.
 resource Build-Launcher.ps1 compiles into the launcher, every file under
 `launcher\lib`, every font and minified script the site serves from
 `site\public`, the six client files and the commits in
-`tools\client-build.json` and `tools\server-build.json`, and the source
+`records\client-build.json` and `records\server-build.json`, and the source
 paragraph on the public credits page. Where Vortex's copy of the Thornswood
 Client Runtime and the launcher's `Profile\OwnGame\files.txt` are on the
 machine, it also holds the section on that mod to every file in it. When a
@@ -26,7 +26,7 @@ or the build check goes red.
 
 - **The launcher**, `Thornswood.exe`, from the update feed and inside the
   installer. Build-Launcher.ps1 compiles everything it needs into the one file.
-- **The client runtime**, the six files in `tools\client-build.json`. They go
+- **The client runtime**, the six files in `records\client-build.json`. They go
   out as `client-runtime-<commit>.zip` on the feed (Publish-Update.ps1), and
   in game packs and the installer.
 - **Game packs and the installer payload**: every file in the game folder that
@@ -83,7 +83,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 ## The SkyMP client runtime, built from the fork
 
-The six files recorded in `tools\client-build.json` are built from
+The six files recorded in `records\client-build.json` are built from
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
 commit `c8832519` (in full, `c8832519866e6848b9501039940dc2c6f0508668`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
@@ -342,7 +342,7 @@ them, names the SIL Open Font License, Version 1.1.
 ## On our servers
 
 - The game server's native module, `scam_native.node`, recorded in
-  `tools\server-build.json`. It is built from `skymp5-server` in the fork at the
+  `records\server-build.json`. It is built from `skymp5-server` in the fork at the
   same commit, `c8832519866e6848b9501039940dc2c6f0508668`, and it is AGPL-3.0.
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.

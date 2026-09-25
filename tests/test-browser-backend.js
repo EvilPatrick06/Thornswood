@@ -11,7 +11,7 @@
 // on", that SkyrimPlatform.ini says BackendName = nirnlab, and that
 // Data\NirnLabUIPlatform "is not foreign either"; the note on ForeignPaths
 // called that folder "this build's own browser". Meanwhile OwnGame.Foreign and
-// Test-ShipOtherServer in tools/Ship-Rules.ps1 both leave NirnLab out as
+// Test-ShipOtherServer in scripts/release/Ship-Rules.ps1 both leave NirnLab out as
 // another server's, and the ini on Patrick's machine read BackendName =
 // tilted, with his thornswood-front.log saying "browser backend: tilted".
 //
@@ -65,7 +65,7 @@ function comments(src) {
 const checks = read('../launcher/app/Checks.cs');
 const chars = read('../launcher/app/Chars.cs');
 const ownGame = read('../launcher/app/OwnGame.cs');
-const shipRules = read('Ship-Rules.ps1');
+const shipRules = read('../scripts/release/Ship-Rules.ps1');
 const front = read('../game/plugins/thornswood-front.js');
 
 // The note on ForeignNames: from its warning line to the ForeignPaths array.

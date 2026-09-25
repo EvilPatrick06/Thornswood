@@ -100,28 +100,33 @@ Yes 'and tools\emotes no longer holds the unretired copy Install-Emotes and Reve
 
 # The two files that name it to keep it out. Sections 3 and 4 check what they
 # say about it.
-$keepsItOut = @('app\OwnGame.cs', 'Ship-Rules.ps1')
+# By path from the repository root. The scripts are in scripts\<area> and the
+# launcher in launcher\ since issue #440; scripts\oneoff is parked history and
+# still names the tools it once ran beside, so it is not read.
+$repoRoot = Split-Path -Parent $Here
+function RepoRel($f) { return $f.FullName.Substring($repoRoot.Length).TrimStart('\', '/').Replace('/', '\') }
+$keepsItOut = @('launcher\app\OwnGame.cs', 'scripts\release\Ship-Rules.ps1')
 $sources = @()
-$sources += @(Get-ChildItem -LiteralPath $Here -File | Where-Object { $_.Extension -in '.ps1', '.js', '.cs', '.xaml' })
-foreach ($d in 'app', '..\game\plugins', '..\game\ui', 'emotes', 'launcher') {
-    $p = Join-Path $Here $d
+foreach ($d in 'scripts', 'launcher', 'game\plugins', 'game\ui') {
+    $p = Join-Path $repoRoot $d
     if (Test-Path -LiteralPath $p) {
-        $sources += @(Get-ChildItem -LiteralPath $p -File -Recurse | Where-Object { $_.Extension -in '.ps1', '.js', '.cs', '.xaml', '.html' })
+        $sources += @(Get-ChildItem -LiteralPath $p -File -Recurse | Where-Object {
+            $_.Extension -in '.ps1', '.js', '.cs', '.xaml', '.html' -and (RepoRel $_) -notlike 'scripts\oneoff\*' })
     }
 }
 $sources = @($sources | Where-Object { $_.Name -notlike 'test-*' })
 $naming = @($sources | Where-Object {
-    ($keepsItOut -notcontains $_.FullName.Substring($Here.Length).TrimStart('\')) -and
+    ($keepsItOut -notcontains (RepoRel $_)) -and
     ([IO.File]::ReadAllText($_.FullName)).IndexOf($name, [StringComparison]::OrdinalIgnoreCase) -ge 0 })
-Yes ("no script, launcher source or plugin under tools names it but the two rules that keep it out ({0} files read)" -f $sources.Count) ($naming.Count -eq 0)
-foreach ($n in $naming) { Write-Host ('      still named in ' + $n.FullName.Substring($Here.Length).TrimStart('\')) }
+Yes ("no script, launcher source or plugin names it but the two rules that keep it out ({0} files read)" -f $sources.Count) ($naming.Count -eq 0)
+foreach ($n in $naming) { Write-Host ('      still named in ' + (RepoRel $n)) }
 
 # Not $keep: the Go.ps1 block lifted below has a $keep of its own.
 $keepCs = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\Keep.cs'))
 Yes 'Keep.cs still calls any thornswood-*.js in the plugin folder ours, so a copy not yet removed is never parked' ($keepCs.IndexOf('name.StartsWith("thornswood-"', [StringComparison]::Ordinal) -ge 0)
 
 # ---- 2. Go.ps1 takes a leftover copy out of the game folder ---------------------
-$go = [IO.File]::ReadAllText((Join-Path $Here 'Go.ps1'))
+$go = [IO.File]::ReadAllText((Join-Path $Here '..\scripts\release\Go.ps1'))
 $sweep = [regex]::Match($go, '(?ms)^\$keep = @\(''skymp5-client\.js''.*?^\}\r?$')
 Yes 'Go.ps1 still builds its keep list from game\plugins and sweeps the plugin folder against it' ($sweep.Success -and $sweep.Value.Contains('Remove-Item -LiteralPath $s.FullName'))
 
@@ -147,13 +152,13 @@ try {
 }
 
 # ---- 3. every pack names it in delete.txt, and none carries it -------------------
-. (Join-Path $Here 'Ship-Rules.ps1')
+. (Join-Path $Here '..\scripts\release\Ship-Rules.ps1')
 Yes 'Ship-Rules calls it not ours, so no pack or installer carries it again' (Test-ShipOtherServer $rel)
 Yes 'and it is on the list every pack deletes, which is what gets it past that rule into delete.txt' (@(Get-ShipDeleteAlways) -contains $rel)
 Yes 'and it is not a runtime path' (-not (Test-ShipRuntime $rel))
 Yes 'our own plugins are still ours to ship' (@($ours | Where-Object { Test-ShipMachine ('Data\Platform\Plugins\' + $_) }).Count -eq 0)
 
-$pub = [IO.File]::ReadAllText((Join-Path $Here 'Publish-Update.ps1'))
+$pub = [IO.File]::ReadAllText((Join-Path $Here '..\scripts\release\Publish-Update.ps1'))
 $tm   = [regex]::Match($pub, '(?m)^function Test-Machine\(.*$')
 $fc   = [regex]::Match($pub, '(?ms)^function Test-FromCollection\(.*?^\}\r?$')
 $dso  = [regex]::Match($pub, '(?m)^\$DevShipsOurs = .*$')

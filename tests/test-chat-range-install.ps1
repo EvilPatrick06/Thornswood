@@ -27,7 +27,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $InstallPath) { $InstallPath = Join-Path $Here 'Install-Voice.ps1' }
+if (-not $InstallPath) { $InstallPath = Join-Path $Here '..\scripts\deploy\Install-Voice.ps1' }
 if (-not $ServerPath) { $ServerPath = Join-Path $Here '..\voice\voice-server.js' }
 
 $script:pass = 0

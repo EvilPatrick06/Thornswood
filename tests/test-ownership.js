@@ -139,7 +139,8 @@ function addDir(dir, ext) {
     sources.push(path.join(dir, f));
   });
 }
-addDir(HERE, '.ps1');
+// The scripts are in scripts\<area> since phase 8 of issue #440.
+['release', 'deploy', 'vps', 'ops', 'mods', 'dev'].forEach(function (a) { addDir(path.join(HERE, '..', 'scripts', a), '.ps1'); });
 addDir(path.join(HERE, '..', 'launcher', 'app'), '.cs');
 yes('there are scripts and launcher sources to read, ' + sources.length + ' of them', sources.length > 50);
 

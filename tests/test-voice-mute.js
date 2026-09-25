@@ -367,7 +367,7 @@ function plugin() {
   yes('and again whenever the page loads, which starts it with nobody muted',
       /static void Configure\(Action<string> log\)\s*\{\s*\/\/[^\n]*\n\s*mutedSeen = null;/.test(cs));
 
-  const rules = read('Ship-Rules.ps1');
+  const rules = read('../scripts/release/Ship-Rules.ps1');
   const machine = /\$ShipMachineFiles = @\(([\s\S]*?)\n\)/.exec(rules);
   yes('and one person\'s mute list never rides in a pack',
       !!machine && machine[1].indexOf("'Data\\Platform\\voice-muted.txt'") >= 0);

@@ -6,7 +6,7 @@
 // WHY THIS EXISTS. The table's first row said the game server had a password,
 // sPassword in server-settings.json, handed to the launcher by the site at
 // check in. The script that manages that password,
-// tools\Rotate-ServerPassword.ps1, said the opposite in its own header: SkyMP
+// scripts\deploy\Rotate-ServerPassword.ps1, said the opposite in its own header: SkyMP
 // has no join password, and it stopped touching the game server "because
 // there was nothing to write there". The door key row named data\door.json
 // while the gamemode reads private\door.json. The heading said none of them
@@ -114,13 +114,13 @@ yes('the join password row names the script that still rotates it', /Rotate-Serv
 
 // And the code still agrees with it. If any of these stops being true, the
 // game server has grown a password and the row has to be rewritten.
-const deployGm = read('tools/Deploy-Gamemode.ps1');
+const deployGm = read('scripts/deploy/Deploy-Gamemode.ps1');
 const gamemode = read('game/gamemode.js');
 const site = read('site/server.js');
-const rotate = read('tools/Rotate-ServerPassword.ps1');
-const publish = read('tools/Publish-Update.ps1');
+const rotate = read('scripts/deploy/Rotate-ServerPassword.ps1');
+const publish = read('scripts/release/Publish-Update.ps1');
 const voice = read('voice/voice-server.js');
-const installVoice = read('tools/Install-Voice.ps1');
+const installVoice = read('scripts/deploy/Install-Voice.ps1');
 yes('Deploy-Gamemode.ps1 still writes offlineMode true, so a client names its own profile id',
     /NotePropertyName offlineMode\s+-NotePropertyValue \$true/.test(deployGm));
 yes('gamemode.js still reads no join password', gamemode.length > 0 && !/sPassword|serverPassword/.test(gamemode));
@@ -168,8 +168,8 @@ yes('the botKey row names every place the value is copied: the bot, both doors',
     /C:\\Thornswood-Server-Dev\\private\\door\.json/.test(key[1]));
 yes('the botKey row reissues through Install-Bot.ps1 -RotateKey and then both doors',
     /Install-Bot\.ps1 -RotateKey/.test(key[3]) && (key[3].match(/Set-Door\.ps1 -Connect/g) || []).length >= 2);
-const installBot = read('tools/Install-Bot.ps1');
-const setDoor = read('tools/Set-Door.ps1');
+const installBot = read('scripts/deploy/Install-Bot.ps1');
+const setDoor = read('scripts/ops/Set-Door.ps1');
 yes('Install-Bot.ps1 still has -RotateKey and still writes the key into the site as botKey',
     /\[switch\]\$RotateKey/.test(installBot) && /\$cfg\['botKey'\]/.test(installBot));
 yes('Set-Door.ps1 still copies the site botKey into door.json',
@@ -198,7 +198,7 @@ yes('the bot token row names both files it lives in and both scripts that write 
     /config\.json/.test(tok[1]) && /bot\.env\.json/.test(tok[1]) &&
     /Set-DiscordLogin\.ps1/.test(tok[3]) && /Install-Bot\.ps1/.test(tok[3]));
 yes('Set-DiscordLogin.ps1 and Install-Bot.ps1 still each write the token',
-    /\$d\.botToken = \$botToken/.test(read('tools/Set-DiscordLogin.ps1')) && /DISCORD_TOKEN'\] = /.test(installBot));
+    /\$d\.botToken = \$botToken/.test(read('scripts/deploy/Set-DiscordLogin.ps1')) && /DISCORD_TOKEN'\] = /.test(installBot));
 
 // ------------------------------------------------------------------- the voice ---
 const vk = row(/voice/i) || ['', '', '', ''];
@@ -221,7 +221,7 @@ yes('the VPS access row moves the old key and its .pub aside before Setup-SshKey
     aside >= 0 && keyOnly > aside && /rename/i.test(vps[3].slice(0, keyOnly)));
 yes('the VPS access row removes the old line out of the moved .pub, not the new line',
     /\.old \.pub>' -Remove/.test(vps[3]));
-const setupSsh = read('tools/Setup-SshKey.ps1');
+const setupSsh = read('scripts/vps/Setup-SshKey.ps1');
 const firstWorks = setupSsh.indexOf('if (Works) {');
 const reusePub = setupSsh.indexOf('if (Test-Path -LiteralPath "$KeyPath.pub") {');
 yes('Setup-SshKey.ps1 still stops when a key already gets in, before it looks at the key file',
@@ -247,10 +247,10 @@ function exists(rel) { try { return fs.statSync(path.join(ROOT, rel)).isFile(); 
 const scripts = {};
 (section.match(/[A-Za-z0-9-]+\.(?:ps1|py)\b/g) || []).forEach(function (s) { scripts[s] = true; });
 const missing = Object.keys(scripts).filter(function (s) {
-  return !exists('tools/' + s) && !exists('bot/' + s);
+  return !['release', 'deploy', 'vps', 'ops', 'mods', 'dev'].some(function (a) { return exists('scripts/' + a + '/' + s); }) && !exists('bot/' + s);
 });
 missing.forEach(function (s) { console.log('      named but not in tools: ' + s); });
-yes('every script the section names is in tools, ' + Object.keys(scripts).length + ' of them',
+yes('every script the section names is in scripts, ' + Object.keys(scripts).length + ' of them',
     Object.keys(scripts).length >= 10 && missing.length === 0);
 
 // Every repo path a row says lives on a machine is one git will never take.
@@ -288,7 +288,8 @@ function addDir(rel, re) {
     corpus.push(read(rel + '/' + n).split('/').join(BS).toLowerCase());
   });
 }
-addDir('tools', /\.(ps1|js)$/i);
+// The scripts are in scripts\<area> since phase 8 of issue #440.
+['release', 'deploy', 'vps', 'ops', 'mods', 'dev'].forEach(function (a) { addDir('scripts/' + a, /\.(ps1|js)$/i); });
 addDir('launcher/app', /\.cs$/i);
 addDir('voice', /\.js$/i);
 addDir('site', /^server\.js$/i);

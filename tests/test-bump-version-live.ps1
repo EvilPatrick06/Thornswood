@@ -24,7 +24,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $BumpPath) { $BumpPath = Join-Path $Here 'Bump-Version.ps1' }
+if (-not $BumpPath) { $BumpPath = Join-Path $Here '..\scripts\release\Bump-Version.ps1' }
 $shell = (Get-Process -Id $PID).Path
 
 $script:pass = 0
@@ -41,8 +41,8 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-bump-' + [Guid]::NewGu
 function Run([string]$current, [string]$live, [string[]]$extra) {
     $root = Join-Path $work ([Guid]::NewGuid().ToString('N'))
     $repo = Join-Path $root 'Thornswood-Repo'
-    New-Item -ItemType Directory -Path (Join-Path $repo 'launcher\app'), (Join-Path $repo 'tools') -Force | Out-Null
-    Copy-Item -LiteralPath $BumpPath -Destination (Join-Path $repo 'tools\Bump-Version.ps1')
+    New-Item -ItemType Directory -Path (Join-Path $repo 'launcher\app'), (Join-Path $repo 'scripts\release') -Force | Out-Null
+    Copy-Item -LiteralPath $BumpPath -Destination (Join-Path $repo 'scripts\release\Bump-Version.ps1')
     $cs = Join-Path $repo 'launcher\app\Updater.cs'
     [IO.File]::WriteAllText($cs, "namespace Thornswood { static class Updater {`n    public const string Version = `"$current`";`n} }`n")
     & git -C $repo init -q 2>&1 | Out-Null
@@ -51,7 +51,7 @@ function Run([string]$current, [string]$live, [string[]]$extra) {
         New-Item -ItemType Directory -Path $rel -Force | Out-Null
         [IO.File]::WriteAllText((Join-Path $rel 'version.json'), '{"launcherVersion":"' + $live + '","packs":[]}')
     }
-    $args2 = @('-NoProfile', '-File', (Join-Path $repo 'tools\Bump-Version.ps1'), '-WhatIf', '-NoPause') + $extra
+    $args2 = @('-NoProfile', '-File', (Join-Path $repo 'scripts\release\Bump-Version.ps1'), '-WhatIf', '-NoPause') + $extra
     $out = (& $shell @args2 2>&1 | Out-String)
     return @{ Out = $out; Code = $LASTEXITCODE; Cs = [IO.File]::ReadAllText($cs); Repo = $repo }
 }
