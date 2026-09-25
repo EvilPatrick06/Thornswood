@@ -156,6 +156,19 @@
     '#ts-select .intro{position:absolute;inset:0;z-index:1;overflow:hidden}',
     '#ts-select .intro .stage{position:absolute;left:50%;top:50%;width:max(100vw,177.778vh);height:max(56.25vw,100vh);transform:translate(-50%,-50%)}',
     '#ts-select .intro .closed{position:absolute;left:20.625%;top:74.931%;width:17.93%;height:auto}',
+    /*
+      The glow behind the sealed scroll, Djinn, 25 September: it has to look
+      clickable. A soft candle-gold halo centred on the seal breathes brighter
+      and dimmer every 2.6 seconds and fades the moment the scroll is opened.
+      The one motion here not started by a click, and still no hover, cursor
+      or transition rules: it is an opacity keyframe on a gradient, which the
+      compositor runs without repainting the page.
+    */
+    '#ts-select .intro .halo{position:absolute;left:29.9%;top:79.8%;width:24%;height:22%;transform:translate(-50%,-50%);border-radius:50%;',
+    'pointer-events:none;opacity:.35;animation:tsGlow 1.3s ease-in-out infinite alternate;',
+    'background:radial-gradient(ellipse closest-side,rgba(255,222,150,.85) 0%,rgba(246,200,112,.55) 38%,rgba(230,170,80,.22) 64%,transparent 100%)}',
+    '#ts-select .intro.opening .halo{animation:tsFade .3s ease forwards}',
+    '@keyframes tsGlow{from{opacity:.35}to{opacity:1}}',
     '#ts-select .intro .flash{position:absolute;left:29.881%;top:79.632%;width:3%;height:0;padding-bottom:3%;border-radius:50%;opacity:0;',
     'transform:translate(-50%,-50%) scale(0);pointer-events:none;',
     'background:radial-gradient(circle,#fff8e0 0%,rgba(243,211,143,.95) 22%,rgba(158,111,201,.55) 52%,transparent 72%)}',
@@ -202,7 +215,7 @@
   root.innerHTML =
     '<div class="bg"></div><div class="shade"></div>' +
     '<div class="intro" style="display:none"><div class="stage">' +
-      '<img class="closed" src="thornswood-scroll.webp" alt="To Start">' +
+      '<div class="halo"></div><img class="closed" src="thornswood-scroll.webp" alt="To Start">' +
       '<div class="flash"></div>' +
       '<div class="open"><img src="thornswood-scroll-open.webp" alt="">' +
         '<div class="words"><div class="said">The seal is broken.<br>Your journey through Thornswood begins.</div>' +
@@ -702,5 +715,9 @@
   window.thornswoodSelect = { play: play, acked: onAcked, close: function () { root.className = 'gone'; } };
   fit();
   draw();
-  tell('ready ' + slots().length + ' slots ' + seen());
+  // When the page itself started, so the front log shows how long it sat
+  // drawn but hidden before the plugins ran and showed the browser.
+  var startedAt = '';
+  try { startedAt = ' page started ' + new Date(performance.timeOrigin).toTimeString().slice(0, 8) + '.' + String(Math.floor(performance.timeOrigin % 1000)).padStart(3, '0'); } catch (e) { }
+  tell('ready ' + slots().length + ' slots ' + seen() + startedAt);
 })();
