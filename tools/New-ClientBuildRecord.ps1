@@ -12,7 +12,7 @@
   came from Vortex, measured against the deployment manifest, and none of it
   came from here.
 
-  The client is built from the fork now, C:\Thornswood-Dev\skymp, with
+  The client is built from the fork now, engine\skymp in this repository, with
   npx webpack in skymp5-client for the bundle and the native build for the
   rest. This records the six files that build produces which differ from
   upstream, by hash, against the fork commit they came from. Sync-Client.ps1
@@ -78,14 +78,43 @@ $otherMarkers = ([regex]::Matches($bundle, '(?i)daedric')).Count
 if ($patchBlocks -lt 1) { throw 'the bundle carries no THORNSWOOD PATCH block; this is not a build from the fork' }
 if ($otherMarkers -gt 0) { throw "the bundle carries $otherMarkers marker(s) from another server's lineage; refusing to record it" }
 
+# The fork is a submodule now, which checks out a commit and not a branch, and
+# a fresh clone of it has no upstream remote. Both used to leave the record
+# with an empty branch, or "HEAD", and no base (issue #546). These fall back
+# to what the clone itself can say.
+function Get-ForkBranch([string]$clone, [string]$now) {
+  if ($now -and $now -ne 'HEAD') { return $now }
+  $remote = @(& git -C $clone branch -r --contains HEAD 2>$null | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch '->' })
+  if ($remote -contains 'origin/thornswood/engine-changes') { return 'thornswood/engine-changes' }
+  if ($remote.Count) { return ($remote[0] -replace '^origin/', '') }
+  # A clone fetched with one branch knows no other: the branch the repository
+  # follows it on, from .gitmodules, when that is where it lives.
+  $top = (& git -C $clone rev-parse --show-superproject-working-tree 2>$null | Out-String).Trim()
+  if ($top) {
+    $b = (& git -C $top config -f .gitmodules --get submodule.engine/skymp.branch 2>$null | Out-String).Trim()
+    if ($b) { return $b }
+  }
+  return $now
+}
+function Get-UpstreamBase([string]$clone, [string]$now, [string]$recorded) {
+  if ($now) { return $now }
+  if ($recorded) {
+    & git -C $clone merge-base --is-ancestor $recorded HEAD 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { return $recorded }
+  }
+  return ''
+}
+
 # The commit, and whether the clone is clean and the build is not older than
 # the source it claims to be built from.
 $commit = ''; $branch = ''; $base = ''; $dirty = $false; $stale = @()
 try {
   $commit = (& git -C $Clone rev-parse --short=8 HEAD 2>$null).Trim()
-  $branch = (& git -C $Clone branch --show-current 2>$null).Trim()
-  $base   = (& git -C $Clone merge-base HEAD upstream/main 2>$null)
-  if ($base) { $base = $base.Trim().Substring(0, 8) } else { $base = 'unknown, fetch upstream to fill this in' }
+  $branch = Get-ForkBranch $Clone ((& git -C $Clone branch --show-current 2>$null) -join '').Trim()
+  $recordedBase = ''
+  try { $recordedBase = [string]((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'client-build.json') -Raw | ConvertFrom-Json).upstreamBase) } catch { }
+  $base   = Get-UpstreamBase $Clone ((& git -C $Clone merge-base HEAD upstream/main 2>$null) -join '').Trim() $recordedBase
+  if ($base) { $base = $base.Substring(0, [Math]::Min(8, $base.Length)) } else { $base = 'unknown, fetch upstream to fill this in' }
   $dirty  = [bool]((& git -C $Clone status --porcelain -- skymp5-client skymp5-server 2>$null) | Where-Object { $_ })
   foreach ($src in (Get-ChildItem -LiteralPath (Join-Path $Clone 'skymp5-client\src') -Recurse -File -Include *.ts -EA SilentlyContinue)) {
     if ($src.LastWriteTimeUtc -gt $newest) { $stale += $src.FullName.Substring($Clone.Length + 1) }
