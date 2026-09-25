@@ -114,7 +114,9 @@ release was built from, carries only the fix and its `Bump-Version.ps1`
 commit, is pushed, and Ship runs from a checkout of it. Every other check
 above still applies, Ship refuses a hotfix branch that is not on GitHub, and
 the dev feed is left alone. The fix also goes to main through its own pull
-request, or the next main release loses it.
+request, or the next main release loses it. Once live, the hotfix's commit
+is tagged `live-<version>` and the branch deleted; the next hotfix starts
+from that tag (`git checkout -b hotfix/<name> live-1.1.94` today).
 
 Everything else, and which one each change needs, is the list under "After a
 pull request is merged" in CONTRIBUTING.md: `Deploy-Server.ps1` pushes a server
