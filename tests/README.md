@@ -6,8 +6,9 @@ Every `test-*.js` and `test-*.ps1` here checks one thing the scripts, the
 launcher, the plugins, the gamemode or the site promise, by reading the files
 or by running a piece of them against a scratch copy. None of them talks to
 the VPS or to GitHub unless it says so at the top (`test-branch-rules.js
---live` is the one that does). The build check (`.github/workflows/build.yml`) runs every one of them on
-each pull request, on the VPS runner; the team merges only once it is green.
+--live` is the one that does). The nightly checks (`.github/workflows/nightly.yml`) run every one of them
+on the VPS each night and open an issue when one fails; on a pull request,
+run the ones your change touches yourself.
 
 The voice service's own harnesses stay beside it in `voice\`, and the bot's in
 `bot\`, because they are run from there.

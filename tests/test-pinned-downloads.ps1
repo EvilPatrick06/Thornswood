@@ -285,7 +285,8 @@ if ($pipBlocks.Count -eq 1) {
 }
 
 # The build check installs what the VPS installs, so what is tested is what runs.
-$yml = Join-Path $RepoRoot '.github\workflows\build.yml'
+# The bot harnesses run in the nightly checks since 25 September.
+$yml = Join-Path $RepoRoot '.github\workflows\nightly.yml'
 if (Test-Path -LiteralPath $yml) {
     $ymlText = Get-Content -LiteralPath $yml -Raw
     Yes 'the build check installs the bot libraries from the same requirements.txt' (

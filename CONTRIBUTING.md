@@ -238,11 +238,16 @@ the team before code; nobody settles it alone, and a Claude never does.
     decide on: ask them, and put it on the board if they cannot be asked.
     Check whether its work is already in main before deleting it; a
     squashed merge leaves the branch looking unmerged to git.
-- Every pull request gets the build check (.github/workflows/build.yml: the
-  scripts parse, the harnesses pass, the launcher compiles with the .NET
+- Every pull request gets the build check (.github/workflows/build.yml, about
+  two minutes: the secret scan, every script and file parses, the writing
+  rules, the launcher window, and the launcher compiles with the .NET
   Framework csc). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green and you have said so in
-  #staff-general. It runs on the VPS, on a runner
+  #staff-general. Run the test harnesses your change touches yourself. All
+  ~190 of them, the bot and voice ones, and a look for stray pull requests
+  and branches run every night on the VPS (.github/workflows/nightly.yml,
+  03:00 Mountain); a failure there opens an issue on the board, "Nightly
+  checks failed", and whoever broke it fixes it next. It runs on the VPS, on a runner
   `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
   GitHub's own runners were blocked on billing from 25 Sep.
   `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.

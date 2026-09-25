@@ -23,6 +23,14 @@
 # Safe because the repository is private: nobody outside the team can open a
 # pull request that runs code on the box.
 #
+# FAST, SINCE 25 SEPTEMBER: every pull request and every push to main gets
+# the checks that take seconds (secrets, every script and file parses, the
+# writing rules, the launcher window) and the launcher build, about two
+# minutes on the VPS. The ~190 test harnesses took over five minutes there
+# on their own, so they run every night instead, in nightly.yml, with the
+# rest of the security, file, GitHub and code checks (Patrick: "let's do
+# #1 and setup a nightly schedule"). A nightly failure opens an issue.
+#
 # ON AGAIN, ON THE VPS, 25 SEPTEMBER. It was off for part of that day while
 # no runner existed. Then Patrick: "I want it set so they can commit+merge
 # as long as the checks on the VPS go through so they don't need me".
@@ -47,8 +55,8 @@ jobs:
   launcher:
     name: Launcher builds
     runs-on: [self-hosted, Windows, thornswood-vps]
-    # About five minutes on the VPS is the aim. Past this it is stuck, not slow.
-    timeout-minutes: 30
+    # About two minutes on the VPS. Past this it is stuck, not slow.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -129,89 +137,6 @@ jobs:
           }
           if ($bad) { exit 1 }
           Write-Host 'every bot file parses'
-
-      - name: Run the test harnesses
-        shell: pwsh
-        run: |
-          # Written to be run by hand, and until now never run anywhere else.
-          # A harness that reads this machine's game folder says SKIP for the
-          # parts it cannot measure on a runner and still checks the rest.
-          # ONE AT A TIME, timed. Run in parallel on the VPS on 25 September the
-          # step hung for twenty minutes where one at a time it finished in five
-          # and a half, so it stays serial. Each harness's time is printed, and
-          # the step ends with the ten slowest and the ones that failed.
-          $all = @(Get-ChildItem tests -File | Where-Object { $_.Name -like 'test-*.js' -or $_.Name -like 'test-*.ps1' } | Sort-Object Name)
-          $results = foreach ($t in $all) {
-            $sw = [Diagnostics.Stopwatch]::StartNew()
-            $out = if ($t.Extension -eq '.js') { & node $t.FullName 2>&1 | Out-String } else { & pwsh -NoProfile -File $t.FullName 2>&1 | Out-String }
-            [pscustomobject]@{ Name = $t.Name; Path = $t.FullName; Code = $LASTEXITCODE; Out = $out; Secs = [Math]::Round($sw.Elapsed.TotalSeconds, 1) }
-          }
-          $failed = @()
-          foreach ($r in ($results | Sort-Object Name)) {
-            Write-Host ("--- {0}  ({1}s)" -f $r.Name, $r.Secs)
-            Write-Host $r.Out
-            if ($r.Code -ne 0) { $failed += $r.Name; Write-Host ("::error file={0}::harness failed" -f $r.Path) }
-          }
-          $bad = $failed.Count
-          Write-Host ''
-          Write-Host ('slowest: ' + ((@($results | Sort-Object Secs -Descending | Select-Object -First 10) | ForEach-Object { '{0} {1}s' -f $_.Name, $_.Secs }) -join ', '))
-          Write-Host ('all of them, added up: {0}s' -f [Math]::Round(($results | Measure-Object Secs -Sum).Sum))
-          $voiceFailed = @()
-          # The five in voice, which run nowhere else. They spawn the
-          # real service in a temp folder and drive it over HTTP, so they need
-          # node and nothing else, and node is already here. Added 23
-          # September: the harness step globbed tools with no -Recurse, so
-          # thirty ran and these five never had.
-          foreach ($t in (Get-ChildItem voice -Filter 'test-*.js' -File | Sort-Object Name)) {
-            Write-Host ("--- voice/{0}" -f $t.Name)
-            & node $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; $voiceFailed += ('voice/' + $t.Name); Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
-          }
-          if ($bad) {
-            Write-Host ''
-            Write-Host ("{0} harness(es) failed: {1}" -f $bad, (($failed + $voiceFailed) -join ', '))
-            exit 1
-          }
-          Write-Host 'every harness passed'
-
-      - name: Run the bot harnesses
-        shell: pwsh
-        run: |
-          # The two Python ones import bot.py for real, so they need the
-          # library the bot runs on. They were written to be run by hand and,
-          # like every harness above before this file existed, had never run
-          # anywhere: nothing was checking the bot's startup on a pull request.
-          #
-          # An install that fails says so and stops the step rather than the
-          # build, because a pip outage is not a fault in the branch. A
-          # harness that fails is red, which is the point.
-          #
-          # From requirements.txt, the file Install-Bot.ps1 installs on the
-          # VPS, so the versions tested here are the versions the bot runs.
-          #
-          # Into a venv of this run's own, never the machine's Python: the
-          # runner is on the VPS, and the live bot runs on that Python.
-          $venv = Join-Path $env:RUNNER_TEMP 'bot-venv'
-          python -m venv $venv
-          $py = Join-Path $venv 'Scripts\python.exe'
-          if (-not (Test-Path $py)) {
-            Write-Host '::warning::could not make a venv for the bot harnesses, so they did not run'
-            exit 0
-          }
-          & $py -m pip install --quiet --disable-pip-version-check -r bot\requirements.txt
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::warning::could not install discord.py, so the bot harnesses did not run'
-            exit 0
-          }
-          $env:DISCORD_TOKEN = 'not-a-real-token'
-          $bad = 0
-          foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
-            Write-Host ("--- {0}" -f $t.Name)
-            & $py $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; $voiceFailed += ('voice/' + $t.Name); Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
-          }
-          if ($bad) { exit 1 }
-          Write-Host 'every bot harness passed'
 
       - name: Count the silent catches in the launcher
         shell: pwsh

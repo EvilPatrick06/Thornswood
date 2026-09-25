@@ -309,5 +309,5 @@ $mine = @($r.runners | Where-Object { $_.name -eq $RunnerName })
 if (-not $mine.Count) { Die "The service runs but GitHub does not list a runner called $RunnerName yet. Give it a minute and run -Status." }
 Say ('  ' + $mine[0].name + ' is ' + $mine[0].status) 'Green'
 Say ''
-Say '  The build check runs on it from the next push to a pull request.' 'Gray'
+Say '  The build check runs on it from the next push to a pull request, and the nightly checks every night.' 'Gray'
 Done
