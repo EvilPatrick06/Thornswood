@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 203 of them, with the one line that says
+Every `.ps1` in this folder, 204 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -172,6 +172,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-dev-version.ps1](test-dev-version.ps1) | A dev build has to outrank what main has published, or nobody can take it. |
 | [test-docs-backup.ps1](test-docs-backup.ps1) | Deploy-Docs.ps1 -Docs, -Boards and -SeedDocs overwrite documents people type into on the site, and each one promises a .bak beside every document first. |
 | [test-docs-password.ps1](test-docs-password.ps1) | Deploy-Docs.ps1 -Password changes the site's password and nothing else in its config.json. |
+| [test-docs-public.ps1](test-docs-public.ps1) | Deploy-Docs.ps1 sends a public file only when it differs from the copy on the VPS. |
 | [test-door-outage.ps1](test-door-outage.ps1) | The launcher's half of "Discord did not answer is not a no". |
 | [test-downgrade-foreground.ps1](test-downgrade-foreground.ps1) | The Downgrade button brings Steam's window to the front for a later part too, when the person has gone to another program since the button was pressed, and never joins a window that has stopped answering. |
 | [test-downgrade-leftover.ps1](test-downgrade-leftover.ps1) | The Downgrade button removes a depot folder an earlier attempt left behind before it asks Steam for that part, and keeps one this build finished. |

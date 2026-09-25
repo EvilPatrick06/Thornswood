@@ -163,12 +163,32 @@ Write-Host '  server.js'
 # Everything in public\, by listing the folder rather than by a list kept here.
 # robots.txt was added and did not go up, because this was six named files and
 # a seventh is invisible to it.
+#
+# And only what differs from the copy already up there. Every file went every
+# time, and on 25 September -Site and -Docs known both stopped here with
+# "scp.exe: dest open C:/Thornswood-Docs/public/banner.mp4: Failure", after
+# server.js and banner.jpg had gone. banner.mp4 had not changed since #91, so
+# there was nothing to send, and the throw left the public pages and the
+# restart below undone. A file whose hash matches is left alone; one that
+# cannot be hashed up there, or is not there, still goes.
+$publicThere = @{}
+$hashed = Remote @"
+Get-ChildItem '$rootWin\public' -File -EA SilentlyContinue | ForEach-Object {
+  `$_.Name + '|' + (Get-FileHash -LiteralPath `$_.FullName -Algorithm SHA256 -EA SilentlyContinue).Hash
+}
+"@
+foreach ($l in @($hashed)) {
+  if ($l -is [string] -and $l.Trim() -match '^(.+)\|([0-9A-Fa-f]{64})$') { $publicThere[$Matches[1]] = $Matches[2].ToUpper() }
+}
 $sentPublic = @()
+$samePublic = 0
 Get-ChildItem (Join-Path $App 'public') -File -EA SilentlyContinue | ForEach-Object {
+  if ($publicThere[$_.Name] -eq (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash) { $samePublic++; return }
   Push $_.FullName "$Root/public/$($_.Name)"
   $sentPublic += $_.Name
 }
-Write-Host ('  ' + ($sentPublic -join ', '))
+if ($sentPublic.Count) { Write-Host ('  ' + ($sentPublic -join ', ')) }
+Write-Host ('  ' + $samePublic + ' public file(s) already the same up there, not sent')
 
 # The public pages are markdown like everything else, so they can be edited
 # from the site rather than redeployed. Same rule: only the missing ones go.
