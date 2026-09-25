@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 195 of them, with the one line that says
+Every `.ps1` in this folder, 196 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -155,6 +155,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-bot-wrapper.ps1](test-bot-wrapper.ps1) | The bot's wrapper on the VPS gives up after three quick exits in a row, instead of starting a bot that cannot start every fifteen seconds for ever. |
 | [test-build-stamp.ps1](test-build-stamp.ps1) | Every gamemode deploy leaves a thornswood-build.json beside the gamemode.js it puts in place, saying which commit, which file, which launcher and which channel. |
 | [test-build-vs-install.ps1](test-build-vs-install.ps1) | Build-Launcher.ps1 builds and Install-Launcher.ps1 installs, and every caller of the build does what it did before apart from that split. |
+| [test-bump-version-live.ps1](test-bump-version-live.ps1) | Bump-Version.ps1 never proposes, and refuses to write, a launcher number at or below the one live launchers already have. |
 | [test-chargen-gone.ps1](test-chargen-gone.ps1) | The retired dresser, thornswood-chargen.js, is out of the repo, nothing that installs or ships the game names it except the rules that keep it out, every pack deletes it from the machines that already have it, and the launcher's own game folder does not copy it back in from the Steam copy afterwards. |
 | [test-chat-range-install.ps1](test-chat-range-install.ps1) | Install-Voice.ps1 can turn local chat on, and leaves it off unless told to. |
 | [test-chat-settings.ps1](test-chat-settings.ps1) | The launcher's Chat and needs settings write Thornswood.ini the way the game plugin reads it: ChatFade=5, 15, 20 or 0 (10 is the default and is not written), and NeedsBars=0 when the bars are off (on is no line at all). |
