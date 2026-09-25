@@ -28,7 +28,7 @@
 [CmdletBinding()]
 param(
   [string] $Game     = 'C:\Thornswood',
-  [string] $Settings = 'C:\Thornswood-Dev\skymp\build\dist\server\server-settings.json',
+  [string] $Settings = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerSettings),
   [string] $After    = 'SunHelmDiseases.esp'
 )
 

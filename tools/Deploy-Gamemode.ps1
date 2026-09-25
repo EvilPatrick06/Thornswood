@@ -34,7 +34,7 @@
 #>
 param(
     [string]$Gamemode,
-    [string]$Dist     = 'C:\Thornswood-Dev\skymp\build\dist\server',
+    [string]$Dist     = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
     [string]$Data     = 'C:\Thornswood\Game\Data',
     [string]$Plugins  = 'C:\Thornswood\Profile\Default\plugins.txt',
     [string]$ServerName = 'Thornswood',

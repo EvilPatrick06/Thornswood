@@ -13,7 +13,7 @@ param(
     # and its 956 MB stage folder inside the folder people play from put 10.9
     # GB on the game drive over five days. Ship passes this explicitly; the
     # default matches what Ship and Publish-Update work out for themselves.
-    [string]$OutDir  = 'C:\Thornswood-Dev\dist\Thornswood\_dist',
+    [string]$OutDir  = (& (Join-Path $PSScriptRoot 'Where.ps1') Package),
     [ValidateRange(0, 9)][int]$Level = 1,
     [switch]$NoArchive,
     [switch]$Plain7z,

@@ -411,6 +411,8 @@ try {
         $itRoot = Join-Path $work 'it\root'
         foreach ($d in @($itTools, $itRoot)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
         Copy-Item -LiteralPath (Join-Path $Here 'Install-Thornswood.ps1') -Destination $itTools
+        # Its -Server and -Client default to what tools\Where.ps1 answers.
+        Copy-Item -LiteralPath (Join-Path $Here 'Where.ps1') -Destination $itTools
         Set-Content -LiteralPath (Join-Path $itTools 'Build-Launcher.ps1') -Value $stubBuild -Encoding ASCII
         Set-Content -LiteralPath (Join-Path $itTools 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
         $env:TS_TEST_BUILD_EXIT = '0'

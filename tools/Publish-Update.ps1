@@ -15,7 +15,7 @@ param(
     # Where releases are staged and zipped. Deliberately NOT under $Root: that
     # is the folder people play from, and staging there put 10.9 GB of old
     # packs on the game drive. The dev tree is where build output belongs.
-    [string]$DistRoot = 'C:\Thornswood-Dev\dist',
+    [string]$DistRoot = (& (Join-Path $PSScriptRoot 'Where.ps1') Dist),
     # How many built packs to keep. They are all uploaded to the releases
     # repository the moment they are made, so the copies here are a local
     # convenience and nothing depends on an old one. Nothing pruned them until

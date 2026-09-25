@@ -177,7 +177,7 @@ if ($Stage) {
     }
   }
   # The build tree's debug symbols. Enormous and rebuildable.
-  $pdb = 'C:\Thornswood-Dev\skymp\build\dist\server\scam_native.pdb'
+  $pdb = Join-Path (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist) 'scam_native.pdb'
   if (Test-Path -LiteralPath $pdb) {
     $i = Get-Item -LiteralPath $pdb
     Add-Found 'this machine' 'debug symbols' $pdb $i.Length
