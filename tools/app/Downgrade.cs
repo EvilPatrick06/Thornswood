@@ -245,6 +245,7 @@ namespace Thornswood
                     log("Part " + (i + 1) + " of 3 (depot " + depot + ") is already downloaded.");
                     continue;
                 }
+                if (!ClearLeftover(folder, i + 1, log, status)) return false;
 
                 SteamLog steamLog = new SteamLog(steam);
                 bool hadFolder = Directory.Exists(folder);
@@ -260,11 +261,12 @@ namespace Thornswood
                 // command. No folder after a while means it did not take.
                 //
                 // The folder and the log are kept apart from here on. A folder
-                // an aborted attempt left behind is there before Steam has been
-                // asked anything, which is enough to carry on watching but is
-                // no proof that this run's download ever started. The log is
-                // that proof, and so is a folder that was not there before the
-                // command and is now; the fallback below needs one of them.
+                // an aborted attempt left behind would be there before Steam had
+                // been asked anything and prove nothing, which is why
+                // ClearLeftover removes it above; hadFolder stays as the guard
+                // should one ever get through. The log is proof, and so is a
+                // folder that was not there before the command and is now; the
+                // fallback below needs one of them.
                 DateTime askedAt = DateTime.Now;
                 bool started = false;
                 bool sawStart = false;
@@ -1066,6 +1068,49 @@ namespace Thornswood
                 return string.Equals(File.ReadAllText(mark).Trim(), manifest, StringComparison.Ordinal);
             }
             catch { return false; }
+        }
+
+        /// <summary>
+        /// Removes a depot folder that is here without this build's marker,
+        /// before Steam is asked for the part, so everything in it afterwards is
+        /// what Steam fetched this time. False, with the reason on the card and
+        /// in the log, when it cannot be removed.
+        ///
+        /// A tester on 1.1.94, 25 September: part 1 came down, the launcher
+        /// opened Steam's console for part 2 and nothing was typed, and the card
+        /// said "8,169 MB down so far" and never moved. Depot 489832 is 7,260 MB
+        /// at 1.6.1170, so that folder was left by an attempt at another build.
+        /// With it there the run went wrong three ways. Whether Steam had taken
+        /// the command was answered yes by the folder being there before Steam
+        /// was asked anything, so the second try at the console never ran. The
+        /// card showed the old folder's size in place of the line saying the
+        /// command was on the clipboard, which is the line that says what to do.
+        /// And Steam fills a depot folder without emptying it, so the other
+        /// build's files would have gone over the game with the 1.6.1170 ones.
+        /// The launcher used to tell the person to delete such a folder by hand,
+        /// twenty minutes in; this does it before the part starts.
+        /// </summary>
+        static bool ClearLeftover(string folder, int part, Action<string> log, Action<string> status)
+        {
+            if (!Directory.Exists(folder)) return true;
+            log("Part " + part + " of 3: " + folder + " is left over from an earlier attempt (" + (FolderSize(folder) / 1048576).ToString("n0") +
+                " MB) and is not this build's, so it is removed and Steam fetches this part afresh.");
+            try
+            {
+                // A read only file stops Directory.Delete, so they are cleared first.
+                foreach (string f in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
+                    File.SetAttributes(f, FileAttributes.Normal);
+                Directory.Delete(folder, true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string why = "Could not remove " + folder + ", left over from an earlier attempt: " + ex.Message +
+                             " If Steam is still downloading into it, let that finish or restart Steam. Then delete that folder and press the button again.";
+                log(why);
+                status(why);
+                return false;
+            }
         }
 
         static long FolderSize(string folder)
