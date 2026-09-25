@@ -7,7 +7,7 @@
 // or in your head" asked for one page naming, for each asset, where it lives,
 // who holds it, who the second holder is, and how to reissue it. Its done-when
 // is that every row has a second holder or an explicit "nobody yet", and that
-// every secret-bearing file named in tools\*.ps1 and tools\app\Config.cs
+// every secret-bearing file named in tools\*.ps1 and launcher\app\Config.cs
 // appears in the table, "checked by grepping for the file names rather than by
 // reading". This is that grep, so the page cannot quietly fall behind the
 // scripts.
@@ -140,7 +140,7 @@ function addDir(dir, ext) {
   });
 }
 addDir(HERE, '.ps1');
-addDir(path.join(HERE, 'app'), '.cs');
+addDir(path.join(HERE, '..', 'launcher', 'app'), '.cs');
 yes('there are scripts and launcher sources to read, ' + sources.length + ' of them', sources.length > 50);
 
 const found = {};
@@ -163,7 +163,7 @@ missing.forEach(function (k) { console.log('      not in the table: ' + found[k]
 yes('every credential file the scripts and the launcher name is in the table', missing.length === 0);
 
 // The launcher's own config: any field whose name says it is a secret.
-const configCs = read(path.join(HERE, 'app', 'Config.cs'));
+const configCs = read(path.join(HERE, '..', 'launcher', 'app', 'Config.cs'));
 const FIELD = /\[DataMember[^\]]*\]\s*public\s+[\w?<>]+\s+(\w*(?:token|password|secret|key)\w*)\b/gi;
 const fields = [];
 let fm;

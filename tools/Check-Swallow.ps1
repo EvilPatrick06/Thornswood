@@ -9,7 +9,7 @@
   file has more than tools\swallow-baseline.txt allows.
 
   WHY. Entry 239 on the To Do List. Measured on 24 Sep: 386 of the 618 catch
-  clauses in tools\app\*.cs had nothing between their braces, so a failure in
+  clauses in launcher\app\*.cs had nothing between their braces, so a failure in
   any of them left no line anywhere. A tester says the Save button did
   nothing, and launcher.log cannot say why, because nothing was written. The
   entry counted 367, then 373, then 386 while it sat on the list, which is why
@@ -21,7 +21,7 @@
   across several, and a body holding only a comment does not count.
 
   WHEN IT FAILS. Put Swallow.Note("Class.Method", ex) in the new catch
-  (tools\app\Swallow.cs), which writes one line to launcher.log, touches no
+  (launcher\app\Swallow.cs), which writes one line to launcher.log, touches no
   control and never throws. If nothing should be done and nothing should be
   logged, say why in a comment inside the braces. Raising a number in the
   baseline is a decision for Patrick, not a fix.
@@ -42,7 +42,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $AppDir)   { $AppDir   = Join-Path $Here 'app' }
+if (-not $AppDir)   { $AppDir   = Join-Path $Here '..\launcher\app' }
 if (-not $Baseline) { $Baseline = Join-Path $Here 'swallow-baseline.txt' }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

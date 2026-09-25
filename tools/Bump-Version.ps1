@@ -21,7 +21,7 @@
   READS the repository. Nothing it does needs write access to main any more,
   which is what lets the rules apply to everybody including the owner.
 
-  It touches ONE file, tools\app\Updater.cs, and commits only that file. Not
+  It touches ONE file, launcher\app\Updater.cs, and commits only that file. Not
   `git add -A`: sweeping the whole working tree into a release commit is its
   own entry on the list, and this is the commit that used to do it.
 #>
@@ -41,7 +41,7 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 1 }
 
-$updaterCs = Join-Path $Here 'app\Updater.cs'
+$updaterCs = Join-Path $Here '..\launcher\app\Updater.cs'
 if (-not (Test-Path -LiteralPath $updaterCs)) { Die "Could not find $updaterCs" }
 
 $src = [IO.File]::ReadAllText($updaterCs)
@@ -133,7 +133,7 @@ if ($dirty.Count) {
 
 if ($WhatIf) {
   Write-Host ''
-  Say "  -WhatIf, so nothing was changed. It would write $target and commit tools\app\Updater.cs." 'Yellow'
+  Say "  -WhatIf, so nothing was changed. It would write $target and commit launcher\app\Updater.cs." 'Yellow'
   Write-Host ''
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
   exit 0
@@ -143,12 +143,12 @@ if ($WhatIf) {
 $next = $src.Substring(0, $m.Groups[1].Index) + $target +
         $src.Substring($m.Groups[1].Index + $m.Groups[1].Length)
 [IO.File]::WriteAllText($updaterCs, $next)
-Say "  tools\app\Updater.cs now says $target" 'Green'
+Say "  launcher\app\Updater.cs now says $target" 'Green'
 
 Head 'The commit'
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 try {
-  & git -C $RepoDir add -- 'tools/app/Updater.cs' 2>&1 | Out-Null
+  & git -C $RepoDir add -- 'launcher/app/Updater.cs' 2>&1 | Out-Null
   & git -C $RepoDir commit -q -m "Launcher $target" 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) { Say '  nothing was committed' 'Yellow' }
   else { Say "  committed as Launcher $target, one file" 'Green' }

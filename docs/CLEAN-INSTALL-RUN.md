@@ -15,7 +15,7 @@ the same standard as `docs\RESTORING.md`.
 Nobody has installed Thornswood on a clean machine and written down what
 happened. Everybody who builds it already has Steam, Skyrim, Vortex, the
 collection and an old install on their disk, so every step that only a stranger
-meets goes untested. `tools\setup\Bootstrap.cs` and `tools\Setup-Thornswood.ps1`
+meets goes untested. `installer\setup\Bootstrap.cs` and `installer\Setup-Thornswood.ps1`
 are over 1,700 lines of installer, and the first person to run them on a
 machine without all of that is a new tester. One run finds most of what that
 person would, before they do.
@@ -28,14 +28,14 @@ button has been through all three.
 1. The installer on the Downloads page fetches Thornswood's own files and puts
    them into the Steam copy of Skyrim. Its payload is built with everything the
    collection provides left out, and it carries a `collection.txt` that tells
-   `tools\Setup-Thornswood.ps1` to install into the Steam copy rather than make
+   `installer\Setup-Thornswood.ps1` to install into the Steam copy rather than make
    a Skyrim of its own (`tools\Package-Thornswood.ps1`).
 2. Vortex deploys the Nexus collection into that same Steam copy.
 3. The launcher makes Thornswood's own game folder, `C:\Thornswood\Game`, out
    of what Vortex deployed: the big files as hard links, so the collection is
    not on the disk twice, and copies of everything that gets rewritten in
-   place. Then it restarts into that folder (`tools\app\OwnGame.cs`,
-   `tools\app\ShellOwnGame.cs`). This is the settled design in CLAUDE.md, and
+   place. Then it restarts into that folder (`launcher\app\OwnGame.cs`,
+   `launcher\app\ShellOwnGame.cs`). This is the settled design in CLAUDE.md, and
    the launcher will not start the game out of the shared Steam copy at all.
 
 The To Do entry that asked for this list named the Steam copy with Vortex as the
@@ -75,7 +75,7 @@ describes something that download does not do.
   Windows 11 will not install without one, 8 GB of memory or more, and a single
   virtual disk of 200 GB, dynamically expanding. One disk on purpose: the own
   folder is made of hard links, and those only work inside one drive
-  (`WhyNot` in `tools\app\OwnGame.cs`). The size is generous so that running
+  (`WhyNot` in `launcher\app\OwnGame.cs`). The size is generous so that running
   out of room is not what the run finds by accident. Row 46 measures what was
   really used.
 - Room on the host for that disk. Measured on 24 Sep, C: on Patrick's machine
@@ -270,8 +270,8 @@ Get-PSDrive C | Select-Object @{ n = 'UsedGB'; e = { [math]::Round($_.Used / 1GB
 ```
 
 **M2, which build of Skyrim.** Prints the size of SkyrimSE.exe in bytes.
-37157144 is 1.6.1170, the build the server runs (`tools\Setup-Thornswood.ps1`).
-37910440 is 1.7.104 (`tools\app\Downgrade.cs`). Write any other number down as
+37157144 is 1.6.1170, the build the server runs (`installer\Setup-Thornswood.ps1`).
+37910440 is 1.7.104 (`launcher\app\Downgrade.cs`). Write any other number down as
 it is.
 
 ```powershell
@@ -380,48 +380,48 @@ tester confused by a list that no longer matches.
 | --- | --- | --- |
 | 3 | `Anniversary Edition is not required` | `site\data\site\join.md` |
 | 3 | `Thornswood leaves the Skyrim you already have alone.` | `site\data\site\join.md` |
-| 17 | `This puts in the launcher, the script extender and Thornswood's own content.` | `tools\setup\Bootstrap.cs` |
-| 17 | `leaves your own Skyrim alone.` | `tools\setup\Bootstrap.cs` |
-| 17 | `Nothing to unpack yet.` | `tools\setup\Bootstrap.cs` |
-| 17 | `C:\Thornswood` | `tools\setup\Bootstrap.cs` |
-| 18 | `I am 18 or over. Thornswood is an adult server.` | `tools\setup\Bootstrap.cs` |
-| 18 | `Getting Thornswood's own files` | `tools\setup\Bootstrap.cs` |
-| 20 | `Thornswood installs into this copy.` | `tools\Setup-Thornswood.ps1` |
-| 20 | `This Skyrim is not build 1.6.1170, which is the one the server runs.` | `tools\Setup-Thornswood.ps1` |
-| 20 | `In Steam: Properties, Betas, and pick 1.6.1170.` | `tools\Setup-Thornswood.ps1` |
-| 21 | `the collection installs this` | `tools\Setup-Thornswood.ps1` |
-| 22 | `checks failed. Send staff a screenshot of this window in the Discord.` | `tools\Setup-Thornswood.ps1` |
-| 22 | `Opening Thornswood now.` | `tools\Setup-Thornswood.ps1` |
-| 22 | `Make a character named after yourself, save once, then connect.` | `tools\Setup-Thornswood.ps1` |
-| 22 | `The launcher opens on the collection if your mods are not in yet.` | `tools\Setup-Thornswood.ps1` |
-| 23 | `DOWNGRADE FIRST` | `tools\app\Shell.cs` |
-| 23 | `Skyrim is on the wrong build` | `tools\app\Shell.cs` |
-| 23 | `Thornswood is sharing one Skyrim with every other server on this machine` | `tools\app\ShellOwnGame.cs` |
-| 25 | `MB the installer left behind on your drive.` | `tools\app\Shell.cs` |
-| 26 | `Downgrade Skyrim to 1.6.1170?` | `tools\app\Shell.cs` |
-| 26 | `Do not type or click while Steam's window is in front, or the keys go to the wrong place.` | `tools\app\Shell.cs` |
-| 26 | `Downgrading Skyrim to 1.6.1170.` | `tools\app\Downgrade.cs` |
-| 28 | `Skyrim is on 1.6.1170 now, but Steam can still update it by itself` | `tools\app\ShellSteamUpdates.cs` |
-| 28 | `Exit Steam from its own menu (Steam, Exit), then press Yes.` | `tools\app\ShellSteamUpdates.cs` |
-| 28 | `Wait until I launch the game` | `tools\app\SteamUpdates.cs` |
-| 29 | `Your mods are not installed yet` | `tools\app\Shell.cs` |
-| 29 | `Connect Discord first and this opens the collection.` | `tools\app\Shell.cs` |
-| 29 | `INSTALL THE MODS FIRST` | `tools\app\Shell.cs` |
-| 31 | `https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a` | `tools\app\Config.cs` |
-| 37 | `MAKE THORNSWOOD'S OWN FOLDER` | `tools\app\Shell.cs` |
-| 38 | `Give Thornswood a Skyrim folder of its own?` | `tools\app\ShellOwnGame.cs` |
-| 38 | `Thornswood and other servers are sharing one Skyrim right now` | `tools\app\ShellOwnGame.cs` |
-| 38 | `Making Thornswood's own Skyrim folder:` | `tools\app\OwnGame.cs` |
-| 39 | `It will ask for administrator.` | `tools\app\ShellOwnGame.cs` |
-| 40 | `Thornswood's own Skyrim folder is ready at` | `tools\app\OwnGame.cs` |
-| 40 | `Restarting the launcher so it runs from the new folder.` | `tools\app\ShellOwnGame.cs` |
-| 42 | `is missing, the launcher will fetch it` | `tools\app\Checks.cs` |
-| 42 | `The client runtime is back to the recorded build.` | `tools\app\ClientRuntime.cs` |
-| 43 | `UPDATE FIRST` | `tools\app\Shell.cs` |
-| 44 | `Give your character a name that belongs in Skyrim` | `tools\ui.xaml` |
-| 44 | `Closed for maintenance` | `tools\app\FeedNotice.cs` |
-| 44 | `This launcher is too old to play` | `tools\app\FeedNotice.cs` |
-| 45 | `PLAY` | `tools\app\Shell.cs` |
+| 17 | `This puts in the launcher, the script extender and Thornswood's own content.` | `installer\setup\Bootstrap.cs` |
+| 17 | `leaves your own Skyrim alone.` | `installer\setup\Bootstrap.cs` |
+| 17 | `Nothing to unpack yet.` | `installer\setup\Bootstrap.cs` |
+| 17 | `C:\Thornswood` | `installer\setup\Bootstrap.cs` |
+| 18 | `I am 18 or over. Thornswood is an adult server.` | `installer\setup\Bootstrap.cs` |
+| 18 | `Getting Thornswood's own files` | `installer\setup\Bootstrap.cs` |
+| 20 | `Thornswood installs into this copy.` | `installer\Setup-Thornswood.ps1` |
+| 20 | `This Skyrim is not build 1.6.1170, which is the one the server runs.` | `installer\Setup-Thornswood.ps1` |
+| 20 | `In Steam: Properties, Betas, and pick 1.6.1170.` | `installer\Setup-Thornswood.ps1` |
+| 21 | `the collection installs this` | `installer\Setup-Thornswood.ps1` |
+| 22 | `checks failed. Send staff a screenshot of this window in the Discord.` | `installer\Setup-Thornswood.ps1` |
+| 22 | `Opening Thornswood now.` | `installer\Setup-Thornswood.ps1` |
+| 22 | `Make a character named after yourself, save once, then connect.` | `installer\Setup-Thornswood.ps1` |
+| 22 | `The launcher opens on the collection if your mods are not in yet.` | `installer\Setup-Thornswood.ps1` |
+| 23 | `DOWNGRADE FIRST` | `launcher\app\Shell.cs` |
+| 23 | `Skyrim is on the wrong build` | `launcher\app\Shell.cs` |
+| 23 | `Thornswood is sharing one Skyrim with every other server on this machine` | `launcher\app\ShellOwnGame.cs` |
+| 25 | `MB the installer left behind on your drive.` | `launcher\app\Shell.cs` |
+| 26 | `Downgrade Skyrim to 1.6.1170?` | `launcher\app\Shell.cs` |
+| 26 | `Do not type or click while Steam's window is in front, or the keys go to the wrong place.` | `launcher\app\Shell.cs` |
+| 26 | `Downgrading Skyrim to 1.6.1170.` | `launcher\app\Downgrade.cs` |
+| 28 | `Skyrim is on 1.6.1170 now, but Steam can still update it by itself` | `launcher\app\ShellSteamUpdates.cs` |
+| 28 | `Exit Steam from its own menu (Steam, Exit), then press Yes.` | `launcher\app\ShellSteamUpdates.cs` |
+| 28 | `Wait until I launch the game` | `launcher\app\SteamUpdates.cs` |
+| 29 | `Your mods are not installed yet` | `launcher\app\Shell.cs` |
+| 29 | `Connect Discord first and this opens the collection.` | `launcher\app\Shell.cs` |
+| 29 | `INSTALL THE MODS FIRST` | `launcher\app\Shell.cs` |
+| 31 | `https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a` | `launcher\app\Config.cs` |
+| 37 | `MAKE THORNSWOOD'S OWN FOLDER` | `launcher\app\Shell.cs` |
+| 38 | `Give Thornswood a Skyrim folder of its own?` | `launcher\app\ShellOwnGame.cs` |
+| 38 | `Thornswood and other servers are sharing one Skyrim right now` | `launcher\app\ShellOwnGame.cs` |
+| 38 | `Making Thornswood's own Skyrim folder:` | `launcher\app\OwnGame.cs` |
+| 39 | `It will ask for administrator.` | `launcher\app\ShellOwnGame.cs` |
+| 40 | `Thornswood's own Skyrim folder is ready at` | `launcher\app\OwnGame.cs` |
+| 40 | `Restarting the launcher so it runs from the new folder.` | `launcher\app\ShellOwnGame.cs` |
+| 42 | `is missing, the launcher will fetch it` | `launcher\app\Checks.cs` |
+| 42 | `The client runtime is back to the recorded build.` | `launcher\app\ClientRuntime.cs` |
+| 43 | `UPDATE FIRST` | `launcher\app\Shell.cs` |
+| 44 | `Give your character a name that belongs in Skyrim` | `launcher\ui.xaml` |
+| 44 | `Closed for maintenance` | `launcher\app\FeedNotice.cs` |
+| 44 | `This launcher is too old to play` | `launcher\app\FeedNotice.cs` |
+| 45 | `PLAY` | `launcher\app\Shell.cs` |
 | 48 | `This build is byte for byte what the server expects.` | `tools\Check-Build.ps1` |
 | 49 | `you have every plugin the server wants` | `tools\Check-Manifest.ps1` |
 | 49 | `POSITION BY POSITION: identical.` | `tools\Check-Manifest.ps1` |
@@ -432,7 +432,7 @@ Read out of the code before anybody has run it, so the run can prove each one
 right or wrong. To Do entries are named by title, because their numbers move.
 
 - **The setup console may call a good install broken (rows 21 and 22).** In
-  this shape `tools\Setup-Thornswood.ps1` finishes with six checks and excuses
+  this shape `installer\Setup-Thornswood.ps1` finishes with six checks and excuses
   two of them, the script extender and the Address Library, as things the
   collection brings next. The other four count. Game 1.6.1170 reads the Steam
   copy, which Steam has just installed on a newer build, and Load order looks
@@ -496,9 +496,9 @@ right or wrong. To Do entries are named by title, because their numbers move.
   and stop there.
 - **The client runtime is left out of the own folder on purpose (row 42).** The
   own folder never takes the six client files from the Steam copy (`Skip` in
-  `tools\app\OwnGame.cs`), so right after the restart the Client row should read
+  `launcher\app\OwnGame.cs`), so right after the restart the Client row should read
   missing, and the launcher should put them back by itself
-  (`HealClientBackground` in `tools\app\Shell.cs`). Row 42 records whether it
+  (`HealClientBackground` in `launcher\app\Shell.cs`). Row 42 records whether it
   did and how long it took.
 - **The load order matches the server (row 49).** This is the proof owed by "The
   Nexus collection carries the plugin order from revision 5, and what is left is
@@ -506,7 +506,7 @@ right or wrong. To Do entries are named by title, because their numbers move.
 - **An old README in the scratch folder (row 25).** The installer unpacks into
   `C:\Thornswood-setup` with a READ ME FIRST.txt that still describes the Skyrim
   Together installer and says no Nexus account or Vortex is needed. The launcher
-  clears the folder on its first start (`tools\app\Shell.cs`), so a stranger only
+  clears the folder on its first start (`launcher\app\Shell.cs`), so a stranger only
   meets it if they look before then. Owned by "The repository's own docs still
   describe the Skyrim Together product".
 

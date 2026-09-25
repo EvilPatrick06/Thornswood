@@ -49,8 +49,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $Xaml)   { $Xaml   = Join-Path $Here 'ui.xaml' }
-if (-not $AppDir) { $AppDir = Join-Path $Here 'app' }
+if (-not $Xaml)   { $Xaml   = Join-Path $Here '..\launcher\ui.xaml' }
+if (-not $AppDir) { $AppDir = Join-Path $Here '..\launcher\app' }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }

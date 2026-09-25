@@ -7,7 +7,7 @@
 # it was kept.
 #
 # A leading slash pins the pattern to the repository root, the same way a
-# gitignore pattern works. Without it, tools/app/Shell.cs would also match any
+# gitignore pattern works. Without it, launcher/app/Shell.cs would also match any
 # Shell.cs in any folder added later.
 #
 # WHAT THIS DOES AND DOES NOT DO. GitHub requests a review from the owner named
@@ -39,11 +39,11 @@
 #
 #     gh api repos/EvilPatrick06/Thornswood/codeowners/errors
 
-/tools/app/Shell.cs        @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/tools/app/Checks.cs       @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/tools/app/Keep.cs         @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/tools/app/Hold.cs         @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/tools/app/Updater.cs      @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/launcher/app/Shell.cs        @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/launcher/app/Checks.cs       @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/launcher/app/Keep.cs         @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/launcher/app/Hold.cs         @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/launcher/app/Updater.cs      @EvilPatrick06 @WiccanDjinn @Ture-Neko
 /tools/Publish-Update.ps1  @EvilPatrick06 @WiccanDjinn @Ture-Neko
 
 # Not on CONTRIBUTING.md's list, and here because getting them wrong is the same

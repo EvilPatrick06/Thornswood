@@ -11,7 +11,7 @@
   this time didnt even upon the steam console let alone put the commands in for
   you", then "Keizaal Onlines downgrader tool does this so it is possible", and
   "they have a progress bar of it in the launcher". Read from
-  tools\app\Downgrade.cs that evening:
+  launcher\app\Downgrade.cs that evening:
 
     1. Every request to Steam was Process.Start("steam://...") inside catch { }.
        Where the link does not open, that threw, the throw was thrown away,
@@ -41,7 +41,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here 'app' }
+if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
 
 $script:pass = 0
 $script:fail = 0

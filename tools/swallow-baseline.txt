@@ -1,5 +1,5 @@
 # Silent catches in the launcher, per file. Read by tools\Check-Swallow.ps1,
-# which fails when any file in tools\app has more than its line here allows.
+# which fails when any file in launcher\app has more than its line here allows.
 # A file that is not listed is allowed none.
 #
 # THE RULE. A catch counts when the body between its braces is empty or holds
@@ -18,11 +18,11 @@
 # the numbers below in this same format.
 #
 # The count reads the text, so a comment or a string that spells out an empty
-# catch is counted as one. Nothing in tools\app does that today.
+# catch is counted as one. Nothing in launcher\app does that today.
 #
 # A number here only goes down. When a file's count drops, lower its line in
 # the same pull request. To make a catch stop counting, log it with
-# Swallow.Note (tools\app\Swallow.cs). Raising a number is a decision for
+# Swallow.Note (launcher\app\Swallow.cs). Raising a number is a decision for
 # Patrick, not a fix.
 #
 # Measured 24 Sep: 386 silent catches of 618 before this list existed. The

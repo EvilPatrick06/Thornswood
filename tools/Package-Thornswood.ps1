@@ -183,7 +183,7 @@ function Get-StubRefusal([string]$stub, [string]$src) {
 }
 $stubNow = @((Join-Path $Here 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
            Where-Object { Test-Path $_ } | Select-Object -First 1
-$stubWhy = Get-StubRefusal $stubNow (Join-Path $Here 'setup\Bootstrap.cs')
+$stubWhy = Get-StubRefusal $stubNow (Join-Path $Here '..\installer\setup\Bootstrap.cs')
 if ($stubWhy) { Die $stubWhy }
 # ==== end thornswood setup stub ====
 
@@ -570,7 +570,8 @@ if (Test-Path $lexe) {
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRST.txt') {
-    $s = Join-Path $here $f
+    # In installer\ beside tools\ since the reorganisation's phase 7 (issue #440).
+    $s = Join-Path (Join-Path $here '..\installer') $f
     # All four are in the repository, so a missing one is a wrong path, and an
     # installer without it is broken for everybody (issue #440, phase 0).
     if (Test-Path $s) { Copy-Item $s $stage -Force } else { Die "$f is not at $s. It is in the repository, so the path is wrong. Nothing was packaged." }

@@ -43,7 +43,7 @@ const read = function (p) { return fs.readFileSync(p, 'utf8').split(CR).join('')
 
 const SKILLS_PATH = process.env.SKILLS || path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-skills.js');
 const FRONT_PATH = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
-const INI_PATH = process.env.INI || path.join(TOOLS_DIR, 'emotes', 'Thornswood.ini');
+const INI_PATH = process.env.INI || path.join(TOOLS_DIR, '..', 'launcher', 'Thornswood.ini');
 const page = read(SKILLS_PATH);
 const front = read(FRONT_PATH);
 const ini = read(INI_PATH);
@@ -518,7 +518,7 @@ yes('the shipped Thornswood.ini carries CloseGameKey = 68', !!iniM && Number(ini
     if (['CloseGameKey', 'VoicePort', 'Microphone'].indexOf(m[1]) === -1) { take(Number(m[2]), 'ini ' + m[1]); }
   }
   // Every row on the launcher's Controls page, ours and the mods'.
-  const keys = read(path.join(TOOLS_DIR, 'app', 'Keys.cs'));
+  const keys = read(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Keys.cs'));
   const rxCs = /Dxd?\("(\w+)",[\s\S]*?, "(\w+)", (?:"\w+", )?(-?\d+)\)\);/g;
   let rows = 0;
   while ((m = rxCs.exec(keys)) !== null) { rows++; take(Number(m[3]), 'Controls ' + m[1]); }

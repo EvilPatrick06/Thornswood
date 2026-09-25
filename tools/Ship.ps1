@@ -434,7 +434,7 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
         }
         # The uncommitted count above never saw a NEW file, and a new file
         # ships all the same: Go.ps1 copies every game\plugins\*.js into
-        # the game folder and the build compiles every tools\app\*.cs, whether
+        # the game folder and the build compiles every launcher\app\*.cs, whether
         # git knows them or not. So a scratch plugin would pass this gate and go
         # out in the pack while GitHub had never seen it, which is where the
         # entry's worry, "a scratch file with something private in it lands
@@ -464,7 +464,7 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
 }
 
 # ------------------------------------------------------------ version
-$updaterCs = Join-Path $Here 'app\Updater.cs'
+$updaterCs = Join-Path $Here '..\launcher\app\Updater.cs'
 if (-not (Test-Path $updaterCs)) { Die "Could not find $updaterCs" }
 
 $src = Get-Content $updaterCs -Raw

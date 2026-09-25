@@ -10,7 +10,7 @@
   its first start, left somebody with no launcher at all. The entry: "An
   unsigned exe that Defender flags is exactly when a fallback is needed".
 
-  WHAT IT DOES. Compiles tools\app\SelfSwap.cs on its own with the .NET
+  WHAT IT DOES. Compiles launcher\app\SelfSwap.cs on its own with the .NET
   Framework 4 csc, the compiler the launcher is built with, which also proves
   it is still C# 5. Compiles stub launchers around it:
 
@@ -51,7 +51,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$App = Join-Path $Here 'app'
+$App = Join-Path $Here '..\launcher\app'
 
 $script:pass = 0
 $script:fail = 0
@@ -69,7 +69,7 @@ function Finish {
 # ---- the sources say what they should ---------------------------------------
 $swapCs = Join-Path $App 'SelfSwap.cs'
 $haveSwap = Test-Path -LiteralPath $swapCs
-Yes 'tools\app\SelfSwap.cs exists' $haveSwap
+Yes 'launcher\app\SelfSwap.cs exists' $haveSwap
 
 $upd = Get-Content -LiteralPath (Join-Path $App 'Updater.cs') -Raw
 $at = $upd.IndexOf('public static void SelfUpdate(')

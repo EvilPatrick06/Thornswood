@@ -12,7 +12,7 @@
   menu on the screen so it doesnt show and they can do /needs to find it all".
 
   HOW. The real ChatFade and NeedsBars classes are lifted out of
-  tools\app\Display.cs by brace match and compiled with the .NET Framework csc
+  launcher\app\Display.cs by brace match and compiled with the .NET Framework csc
   the launcher builds with, beside a Paths that points at a temp folder and a
   Swallow that records. tests\test-chat-fade.js checks the other half, that
   the plugin reads these lines. Read only apart from its own temp folder.
@@ -25,7 +25,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here 'app' }
+if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
 
 $script:pass = 0
 $script:fail = 0

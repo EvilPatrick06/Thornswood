@@ -6,7 +6,7 @@
 //
 // From the To Do List, entry 171: "There is no licence on this project and no
 // third-party notices file anywhere." Its done-when asks that every /resource:
-// in Build-Launcher.ps1 and every file under tools\lib be "either the project's
+// in Build-Launcher.ps1 and every file under launcher\lib be "either the project's
 // own or listed by name and licence", and it asks for that cross-check to be
 // made "mechanically rather than by memory". This is that check.
 //
@@ -68,13 +68,13 @@ const C = creditsRaw || '';
 // Everything Build-Launcher.ps1 compiles into an exe, by the name it is given
 // inside the exe. These are made here, each one for Thornswood:
 const OURS = {
-  'ui.xaml': 'the launcher window, tools\\ui.xaml',
-  'logo.png': 'the emblem, tools\\logo.png and logo-192.png for the setup stub',
+  'ui.xaml': 'the launcher window, launcher\\ui.xaml',
+  'logo.png': 'the emblem, launcher\\logo.png and logo-192.png for the setup stub',
   'launcher-header.jpg': 'a strip of the Thornswood backdrop, tools\\art',
   'launcher-header.mp4': 'the same strip moving',
   'app.ico': 'the icon',
-  'voice-host.html': 'the voice page, tools\\launcher',
-  'Thornswood.ini': 'the key template, tools\\emotes',
+  'voice-host.html': 'the voice page, launcher',
+  'Thornswood.ini': 'the key template, launcher',
   'client-build.json': 'the record of the client runtime'
 };
 
@@ -117,7 +117,7 @@ resources.forEach(function (name) {
   }
 });
 
-// ---------------------------------------------------------------- tools\lib
+// ---------------------------------------------------------------- launcher\lib
 //
 // Every file, by name and by sha256, so a newer WebView2 dropped in without a
 // word in the notices fails here.
@@ -130,8 +130,8 @@ function walk(dir, out) {
   });
   return out;
 }
-const libFiles = walk(path.join(TOOLS, 'lib'), []);
-yes('tools\\lib has files to check (' + libFiles.length + ')', libFiles.length > 0);
+const libFiles = walk(path.join(TOOLS, '..', 'launcher', 'lib'), []);
+yes('launcher\\lib has files to check (' + libFiles.length + ')', libFiles.length > 0);
 
 // The file version out of a Windows version resource: the UTF-16 key
 // "FileVersion", its padding, then the value.
@@ -160,14 +160,14 @@ libFiles.forEach(function (p) {
   const name = path.basename(p);
   const buf = fs.readFileSync(p);
   const sha = crypto.createHash('sha256').update(buf).digest('hex');
-  yes(name + ' (tools\\lib) is named in THIRD-PARTY.md', N.indexOf(name) >= 0);
+  yes(name + ' (launcher\\lib) is named in THIRD-PARTY.md', N.indexOf(name) >= 0);
   yes(name + ' is in THIRD-PARTY.md by its sha256, ' + sha.slice(0, 16), N.toLowerCase().indexOf(sha) >= 0);
   const v = fileVersion(buf);
   if (v) { versions[v] = (versions[v] || []).concat([name]); }
 });
 wv2.forEach(function (n) {
-  yes(n + ', which the launcher embeds, is in tools\\lib\\webview2',
-      fs.existsSync(path.join(TOOLS, 'lib', 'webview2', n)));
+  yes(n + ', which the launcher embeds, is in launcher\\lib\\webview2',
+      fs.existsSync(path.join(TOOLS, '..', 'launcher', 'lib', 'webview2', n)));
 });
 const vList = Object.keys(versions);
 yes('the WebView2 files all carry one file version (' + vList.join(', ') + ')', vList.length === 1);
@@ -398,7 +398,7 @@ if (!haveFork) {
 // Microsoft's shader compiler and one Skyrim Platform script, about 349 MB.
 // THIRD-PARTY.md once filed all of it under "Not shipped by Thornswood", and
 // nothing here noticed, because this harness looked no further than the
-// launcher, tools\lib, the site and the six client files. So the section on
+// launcher, launcher\lib, the site and the six client files. So the section on
 // that mod is held to the mod itself where Vortex's copy is on this machine,
 // and to the launcher's record of where each game file came from.
 function section(title) {

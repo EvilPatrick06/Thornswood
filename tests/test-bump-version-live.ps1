@@ -41,9 +41,9 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-bump-' + [Guid]::NewGu
 function Run([string]$current, [string]$live, [string[]]$extra) {
     $root = Join-Path $work ([Guid]::NewGuid().ToString('N'))
     $repo = Join-Path $root 'Thornswood-Repo'
-    New-Item -ItemType Directory -Path (Join-Path $repo 'tools\app') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $repo 'launcher\app'), (Join-Path $repo 'tools') -Force | Out-Null
     Copy-Item -LiteralPath $BumpPath -Destination (Join-Path $repo 'tools\Bump-Version.ps1')
-    $cs = Join-Path $repo 'tools\app\Updater.cs'
+    $cs = Join-Path $repo 'launcher\app\Updater.cs'
     [IO.File]::WriteAllText($cs, "namespace Thornswood { static class Updater {`n    public const string Version = `"$current`";`n} }`n")
     & git -C $repo init -q 2>&1 | Out-Null
     if ($live) {

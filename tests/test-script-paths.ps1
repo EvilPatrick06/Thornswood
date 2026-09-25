@@ -52,7 +52,7 @@ $notInGit = @{
     'bot/announced.json'  = 'what Publish-Discord.ps1 has posted, written on the machine that ships'
     'bot/dev-webhook.txt' = 'a webhook, a secret kept out of git'
     'bot/news-webhook.txt'= 'a webhook, a secret kept out of git'
-    'tools/app/app.ico'             = 'the second place the icon lookups try; the icon is tools/app.ico'
+    'launcher/app/app.ico'             = 'the second place the icon lookups try; the icon is launcher/app.ico'
 }
 # Setup-Thornswood.ps1 runs inside an unpacked installer, where its own folder
 # is the installer's, not tools, so its paths are the installer's layout.

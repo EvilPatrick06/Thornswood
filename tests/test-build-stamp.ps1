@@ -180,7 +180,7 @@ $env:GIT_CEILING_DIRECTORIES = $tmp
 try {
     $gm = Join-Path $repo 'game\gamemode.js'
     Put $gm "'use strict';`nconsole.log('gamemode');`n"
-    Put (Join-Path $repo 'tools\app\Updater.cs') "namespace T {`n    public static class Updater {`n        public const string Version = `"1.2.3`";`n    }`n}`n"
+    Put (Join-Path $repo 'launcher\app\Updater.cs') "namespace T {`n    public static class Updater {`n        public const string Version = `"1.2.3`";`n    }`n}`n"
     Put (Join-Path $repo 'version.json') '{ "launcherVersion": "0.9.9" }'
     Put (Join-Path $mainFeed 'version.json') '{ "launcherVersion": "1.2.3" }'
     New-Item -ItemType Directory -Force -Path (Join-Path $mainFeed '.git') | Out-Null

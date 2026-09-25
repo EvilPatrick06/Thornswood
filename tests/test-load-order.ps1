@@ -31,7 +31,7 @@
   it is checked to agree, because a test that never saw a stale copy fail
   proves nothing by passing.
 
-  THE LAUNCHER. LoadOrder.ps1 says it and tools\app\LoadOrder.cs "are held to
+  THE LAUNCHER. LoadOrder.ps1 says it and launcher\app\LoadOrder.cs "are held to
   identical output by a test". No such test was in the repo: the commit that
   added both on 20 September measured it once, by hand. The last part of this
   file compiles LoadOrder.cs and runs both sides over the same cases, so that
@@ -51,7 +51,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
 if (-not $LoadOrderPath) { $LoadOrderPath = Join-Path $Here 'LoadOrder.ps1' }
-if (-not $LauncherPath) { $LauncherPath = Join-Path $Here 'app\LoadOrder.cs' }
+if (-not $LauncherPath) { $LauncherPath = Join-Path $Here '..\launcher\app\LoadOrder.cs' }
 . $LoadOrderPath
 
 $script:pass = 0
@@ -426,7 +426,7 @@ try {
     } catch {
         Write-Host ('      ' + $_.Exception.Message) -ForegroundColor Red
     }
-    Yes 'tools\app\LoadOrder.cs compiles on its own' ($null -ne $cs)
+    Yes 'launcher\app\LoadOrder.cs compiles on its own' ($null -ne $cs)
 
     if ($null -ne $cs) {
         function Cs([string]$name, [object[]]$argv) { return (Show ($cs.GetMethod($name).Invoke($null, $argv))) }

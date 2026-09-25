@@ -153,8 +153,8 @@ yes('Ship.ps1 refuses a main release with a file under tools that git does not k
 // ------------------------------------------------------------ Bump-Version.ps1
 const bump = gitCalls(read('tools/Bump-Version.ps1'));
 const bumpAdds = bump.filter(function (c) { return c.sub === 'add'; });
-yes('Bump-Version.ps1 stages one path, tools/app/Updater.cs, and nothing else',
-    bumpAdds.length === 1 && /^\s+--\s+'tools\/app\/Updater\.cs'\s/.test(bumpAdds[0].rest + ' '));
+yes('Bump-Version.ps1 stages one path, launcher/app/Updater.cs, and nothing else',
+    bumpAdds.length === 1 && /^\s+--\s+'launcher\/app\/Updater\.cs'\s/.test(bumpAdds[0].rest + ' '));
 yes('Bump-Version.ps1 commits', bump.some(function (c) { return c.sub === 'commit'; }));
 yes('Bump-Version.ps1 pushes nothing itself; it prints the push for a person to run',
     !bump.some(function (c) { return c.sub === 'push'; }));

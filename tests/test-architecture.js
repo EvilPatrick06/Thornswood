@@ -1,13 +1,13 @@
 // test-architecture.js
 //
-// tools\app\ARCHITECTURE.md is the launcher's one architecture page, the two
+// launcher\app\ARCHITECTURE.md is the launcher's one architecture page, the two
 // long-form documents point at it, and every step it names is still where it
 // says and in the order it says.
 //
 // WHY THIS EXISTS. To Do List entry 256: "There is no launcher architecture
 // document, because the one that is pointed at is a finished to-do note".
 // CLAUDE.md and DEVELOPING.md both sent a newcomer to
-// tools\app\HOOKUP.md for "how the launcher classes hang together", and that
+// launcher\app\HOOKUP.md for "how the launcher classes hang together", and that
 // file was 108 lines titled "Wiring Discord.cs into the launcher": finished
 // work. Play, the flow every person hits, could not be followed from the
 // written record at all. The entry's own trap is the reason for the checks
@@ -20,7 +20,7 @@
 //      it is the dated 17 September audit, a record of what was true then);
 //   3. Shell.cs carries a class summary that names the page;
 //   4. every `File.cs:123 Name` reference on the page resolves: the file is in
-//      tools\app and the name is still in it, as a declaration when it ends
+//      launcher\app and the name is still in it, as a declaration when it ends
 //      in () and as code (not a comment, not a string) otherwise;
 //   5. under each heading, references into the same method are in the order
 //      the code runs them, so a step moved in Play is a step moved on the page;
@@ -42,7 +42,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const ROOT = path.join(TOOLS_DIR, '..');
-const APP = path.join(TOOLS_DIR, 'app');
+const APP = path.join(TOOLS_DIR, '..', 'launcher', 'app');
 const PAGE = path.join(APP, 'ARCHITECTURE.md');
 
 let pass = 0, fail = 0;
@@ -56,14 +56,14 @@ function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 // ------------------------------------------------------------ 1. the files
 const page = read(PAGE);
-yes('tools/app/ARCHITECTURE.md exists', page !== null);
-yes('tools/app/HOOKUP.md, the finished Discord wiring note, is gone',
+yes('launcher/app/ARCHITECTURE.md exists', page !== null);
+yes('launcher/app/HOOKUP.md, the finished Discord wiring note, is gone',
     !fs.existsSync(path.join(APP, 'HOOKUP.md')));
 
 // ------------------------------------------------------------ 2. the pointers
 ['CLAUDE.md', 'DEVELOPING.md'].forEach(function (doc) {
   const t = read(path.join(ROOT, doc)) || '';
-  yes(doc + ' points at tools\\app\\ARCHITECTURE.md', t.indexOf('tools\\app\\ARCHITECTURE.md') >= 0);
+  yes(doc + ' points at launcher\\app\\ARCHITECTURE.md', t.indexOf('launcher\\app\\ARCHITECTURE.md') >= 0);
   yes(doc + ' no longer names HOOKUP.md', !/HOOKUP/i.test(t));
 });
 
@@ -94,7 +94,7 @@ if (tracked) {
   const m = before.match(/((?:[ \t]*\/\/\/[^\n]*\n)+)$/);
   const summary = m ? m[1] : '';
   yes('Shell.cs has a /// summary directly above the class', /<summary>/.test(summary) && /<\/summary>/.test(summary));
-  yes('that summary names tools\\app\\ARCHITECTURE.md', summary.indexOf('tools\\app\\ARCHITECTURE.md') >= 0);
+  yes('that summary names launcher\\app\\ARCHITECTURE.md', summary.indexOf('launcher\\app\\ARCHITECTURE.md') >= 0);
 }
 
 if (page === null) {
@@ -263,7 +263,7 @@ const gone = [];
 const spotsIn = {};
 refs.forEach(function (r) {
   const lines = source(r.file);
-  if (lines === null) { gone.push(r.text + ' (page line ' + r.pageLine + '): tools/app/' + r.file + ' does not exist'); return; }
+  if (lines === null) { gone.push(r.text + ' (page line ' + r.pageLine + '): launcher/app/' + r.file + ' does not exist'); return; }
   const all = spotsIn[r.file] || (spotsIn[r.file] = {});
   const key = r.line + ' ' + r.name + (r.decl ? '()' : '');
   const s = all[key] || (all[key] = { key: key, line: r.line, hits: hitsOf(lines, r) });
@@ -405,7 +405,7 @@ yes('the steps the page lists inside each method are in the order the code runs 
   yes('section 2 says there is no class called Creation', /no class called Creation/.test(s2));
 }
 
-// Every class in tools\app named somewhere on the page. Reported rather than
+// Every class in launcher\app named somewhere on the page. Reported rather than
 // failed: a new file is a new line on the page, and the NOTE says which.
 {
   const unnamed = [];
@@ -415,7 +415,7 @@ yes('the steps the page lists inside each method are in the order the code runs 
     });
   } catch (e) { }
   if (unnamed.length) note('not named on the page yet: ' + unnamed.join(', '));
-  else console.log('      every .cs file in tools/app is named on the page');
+  else console.log('      every .cs file in launcher/app is named on the page');
 }
 
 // The six shared files, as CONTRIBUTING.md names them today.

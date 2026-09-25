@@ -30,7 +30,7 @@
   still puts the Windows Skyrim folders back before it deletes anything, and
   the command Windows runs is still the exe with -root and -uninstall.
 
-  Read only. Give it a folder to read another copy of tools\app, which is how
+  Read only. Give it a folder to read another copy of launcher\app, which is how
   it was shown to fail on the code before the change:
 
       node tests/test-uninstall-entry.js <folder>
@@ -39,7 +39,7 @@ const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests a
 const fs = require('fs');
 const path = require('path');
 
-const APP = process.argv[2] ? path.resolve(process.argv[2]) : path.join(TOOLS_DIR, 'app');
+const APP = process.argv[2] ? path.resolve(process.argv[2]) : path.join(TOOLS_DIR, '..', 'launcher', 'app');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

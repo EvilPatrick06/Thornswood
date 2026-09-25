@@ -199,7 +199,7 @@ Object.keys(HAND).forEach(function (k) {
 // Four files told the next person Morthal and Dawnstar share a point, which
 // 1.1.41 had already made untrue and which was never a collision anyway.
 [
-  path.join(TOOLS_DIR, 'emotes', 'Thornswood.ini'),
+  path.join(TOOLS_DIR, '..', 'launcher', 'Thornswood.ini'),
   path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-mark.js'),
   path.join(TOOLS_DIR, 'Mark-Spot.ps1')
 ].forEach(function (f) {

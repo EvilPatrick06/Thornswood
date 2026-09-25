@@ -117,7 +117,7 @@ Yes ("no script, launcher source or plugin under tools names it but the two rule
 foreach ($n in $naming) { Write-Host ('      still named in ' + $n.FullName.Substring($Here.Length).TrimStart('\')) }
 
 # Not $keep: the Go.ps1 block lifted below has a $keep of its own.
-$keepCs = [IO.File]::ReadAllText((Join-Path $Here 'app\Keep.cs'))
+$keepCs = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\Keep.cs'))
 Yes 'Keep.cs still calls any thornswood-*.js in the plugin folder ours, so a copy not yet removed is never parked' ($keepCs.IndexOf('name.StartsWith("thornswood-"', [StringComparison]::Ordinal) -ge 0)
 
 # ---- 2. Go.ps1 takes a leftover copy out of the game folder ---------------------
@@ -207,7 +207,7 @@ Pack $false $true
 Yes 'a pack whose baseline never carried it still names it in delete.txt' ($removed -contains $rel)
 Yes 'and a copy still on the shipping machine does not go into the pack' ((-not $now.ContainsKey($rel)) -and ($changed -notcontains $rel))
 
-$upd = [IO.File]::ReadAllText((Join-Path $Here 'app\Updater.cs'))
+$upd = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\Updater.cs'))
 Yes 'Updater deletes each delete.txt line from the game folder and remembers it as removed' (
     $upd.Contains('ar.GetEntry("delete.txt")') -and $upd.Contains('File.Delete(target)') -and $upd.Contains('removed.Add(rel);'))
 Yes 'and hands that list to Keep.Forget, so Keep does not put the file back at the next Play' ($upd.Contains('Keep.Forget(removed);'))
@@ -255,8 +255,8 @@ function Get-CsLine([string]$text, [string]$pattern) {
     return $null
 }
 
-$og = [IO.File]::ReadAllText((Join-Path $Here 'app\OwnGame.cs'))
-$ck = [IO.File]::ReadAllText((Join-Path $Here 'app\Checks.cs'))
+$og = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\OwnGame.cs'))
+$ck = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\Checks.cs'))
 $lifted = [ordered]@{
     'OwnGame.Skip'             = Get-CsMember $og 'static string Skip(string rel)'
     'OwnGame.CrashesUs'        = Get-CsMember $og 'static bool CrashesUs(string rel)'

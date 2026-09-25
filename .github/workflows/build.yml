@@ -87,7 +87,7 @@ jobs:
           # fails on either. Windows PowerShell on purpose: it parses with the
           # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
           & powershell -NoProfile -File tools\Check-Controls.ps1 -NoPause
-          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tools/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
 
       - name: Parse every game script
         shell: pwsh
@@ -197,7 +197,7 @@ jobs:
         run: |
           # Entry 239. A catch with nothing in it leaves no line in
           # launcher.log when it fires, and there were 386 of them on 24 Sep.
-          # Red when any file in tools\app has more than
+          # Red when any file in launcher\app has more than
           # tools\swallow-baseline.txt allows; the script says what to do.
           .\tools\Check-Swallow.ps1
 

@@ -1,10 +1,10 @@
 # Glossary
 
 The Thornswood words a newcomer meets in CONTRIBUTING.md, DEVELOPING.md,
-`tools\app\ARCHITECTURE.md` and the scripts, alphabetical. `<Root>` is the
+`launcher\app\ARCHITECTURE.md` and the scripts, alphabetical. `<Root>` is the
 launcher's install folder (`C:\Thornswood` on most machines), `Profile` is
 `<Root>\Profile` and `Game` is `<Root>\Game`. Launcher files are in
-`tools\app`.
+`launcher\app`.
 
 | Term | What it is | Where it lives |
 |---|---|---|

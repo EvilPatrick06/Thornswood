@@ -96,7 +96,7 @@ Write-Host ''
 # ------------------------------------------------------------ the collection --
 # The address comes out of this machine's config.json, as Check-ShipReady
 # reads it, and falls back to the one the launcher ships with (Config.Collection
-# in tools\app\Config.cs). The newest revision Vortex has installed is the one
+# in launcher\app\Config.cs). The newest revision Vortex has installed is the one
 # read, and it is named in the output, because a stale revision was the whole
 # problem on 22 September.
 $revision = 0

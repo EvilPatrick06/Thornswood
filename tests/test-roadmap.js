@@ -20,7 +20,7 @@
 // than out of the code, which is how a wrong one gets onto a page.
 //
 // So nothing below takes a key or a count on trust. The letter comes out of
-// tools/emotes/Thornswood.ini, decoded with that file's own A to Z table, and
+// launcher/Thornswood.ini, decoded with that file's own A to Z table, and
 // the count comes out of the plugin's CATEGORIES array. A key that moves or a
 // wheel that grows fails here until the words say so too.
 //
@@ -126,7 +126,7 @@ yes('the row keeps done false like every other roadmap row, since Done is the se
     !!w && w.row.done === false);
 
 // -------------------------------------------------------------- the keys ----
-const ini = read('emotes/Thornswood.ini');
+const ini = read('../launcher/Thornswood.ini');
 function iniKey(name) {
   const m = ini.match(new RegExp('^\\s*' + name + '\\s*=\\s*(\\d+)', 'm'));
   return m ? parseInt(m[1], 10) : NaN;
@@ -159,7 +159,7 @@ yes('the row says Tab moves on, as the ini does', /\bTab\b/.test(text));
 yes('the row says ' + stopLetter + ' stops, as the ini does', !!stopLetter && stops(text, stopLetter));
 
 /* "The launcher's Controls page moves any of those keys" is a claim too. */
-const keys = read('app/Keys.cs');
+const keys = read('../launcher/app/Keys.cs');
 yes('the launcher\'s Controls page does list WheelKey, PageKey and StopKey, as the row says',
     ['WheelKey', 'PageKey', 'StopKey'].every(function (k) {
       return keys.indexOf('ThornIni, "' + k + '"') !== -1;

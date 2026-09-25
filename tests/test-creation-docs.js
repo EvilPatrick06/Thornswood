@@ -63,8 +63,8 @@ function slice(src, start, end) {
 // ------------------------------------------------------ what the game does
 
 // The launcher has no creation step. Creation.cs was the dialog; nothing in
-// tools/app declares a class of that name now.
-const appDir = path.join(TOOLS_DIR, 'app');
+// launcher/app declares a class of that name now.
+const appDir = path.join(TOOLS_DIR, '..', 'launcher', 'app');
 const csFiles = fs.readdirSync(appDir).filter(function (f) { return /\.cs$/i.test(f); });
 const launcherCreates = csFiles.some(function (f) {
   return /\bclass\s+Creation\b/.test(fs.readFileSync(path.join(appDir, f), 'utf8'));

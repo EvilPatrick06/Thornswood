@@ -337,9 +337,9 @@ function Invoke-Listing($all, $prefix) {
     # ---- and the text search is gone ---------------------------------------------
     Write-Host ''
     Write-Host 'The launcher' -ForegroundColor Cyan
-    $checks = Get-Content -LiteralPath (Join-Path $Tools 'app\Checks.cs') -Raw
+    $checks = Get-Content -LiteralPath (Join-Path $Tools '..\launcher\app\Checks.cs') -Raw
     Yes 'Checks.ClientPatched, the text search for our own name, is gone' (-not ($checks -match 'static bool ClientPatched\s*\('))
-    $callers = @(Get-ChildItem -LiteralPath (Join-Path $Tools 'app') -Filter '*.cs' -File |
+    $callers = @(Get-ChildItem -LiteralPath (Join-Path $Tools '..\launcher\app') -Filter '*.cs' -File |
                  Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match '(?<!bool\s+)ClientPatched\s*\(\s*\)' })
     Yes 'and nothing in the launcher calls it' ($callers.Count -eq 0)
 }

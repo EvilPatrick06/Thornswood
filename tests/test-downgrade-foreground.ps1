@@ -19,7 +19,7 @@
   thread to join.
 
   HOW. BringToFront, SteamInFront, ForegroundIsSteam, IsSteam and InFront are
-  lifted out of tools\app\Downgrade.cs by brace match and compiled with the
+  lifted out of launcher\app\Downgrade.cs by brace match and compiled with the
   same .NET Framework csc that Build-Launcher.ps1 uses (C# 5), against a
   stand-in desktop. Nothing here focuses a window or sends a key.
 
@@ -39,7 +39,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here 'app' }
+if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
 
 $script:pass = 0
 $script:fail = 0
@@ -55,7 +55,7 @@ function Done {
 }
 
 $src = Join-Path $AppPath 'Downgrade.cs'
-Yes 'tools\app\Downgrade.cs is there' (Test-Path -LiteralPath $src)
+Yes 'launcher\app\Downgrade.cs is there' (Test-Path -LiteralPath $src)
 if (-not (Test-Path -LiteralPath $src)) { Done }
 $text = [IO.File]::ReadAllText($src)
 
@@ -208,7 +208,7 @@ namespace Probe
             return allowed;
         }
 
-        // ---- lifted from tools\app\Downgrade.cs ----
+        // ---- lifted from launcher\app\Downgrade.cs ----
 __LIFTED__
     }
 }

@@ -57,7 +57,7 @@ if ($fn -and $list) {
 }
 
 $code = Get-Content -LiteralPath $src -Raw
-yes 'the launcher side it relies on is still there: Updater unshares before it extracts' ((Get-Content -LiteralPath (Join-Path $here 'app\Updater.cs') -Raw) -match 'OwnGame\.Unshare\(full\);\s*\r?\n\s*e\.ExtractToFile\(full, true\);')
+yes 'the launcher side it relies on is still there: Updater unshares before it extracts' ((Get-Content -LiteralPath (Join-Path $here '..\launcher\app\Updater.cs') -Raw) -match 'OwnGame\.Unshare\(full\);\s*\r?\n\s*e\.ExtractToFile\(full, true\);')
 
 Write-Host ''
 Write-Host ('{0} passed, {1} failed' -f $pass, $fail)

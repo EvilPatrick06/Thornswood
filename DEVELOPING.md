@@ -27,7 +27,7 @@ release, launcher, game files and server together, are in CONTRIBUTING.md.
 | --- | --- | --- |
 | Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
 | Releases repo | github.com/EvilPatrick06/Thornswood-Releases (public), clone beside the source repo as `Thornswood-Releases`, dev branch as a worktree `Thornswood-Releases-dev` | `version.json` per branch (main, dev) and the release assets: packs and launcher exes |
-| Launcher | `tools\app\*.cs` + `tools\ui.xaml`, built by `tools\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
+| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `tools\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Settings page | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Owner and Dev roles only |
 | Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
 | Plugins | `game\plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `game\ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
@@ -80,7 +80,7 @@ git pull
 ```
 
 The version moves first and on its own. `Bump-Version.ps1` changes `Version`
-in `tools\app\Updater.cs` (1.1.35 to 1.1.36), commits that one file, and
+in `launcher\app\Updater.cs` (1.1.35 to 1.1.36), commits that one file, and
 prints the rest. main refuses a push from everybody, so it prints the
 commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
 push it and open the pull request, which is merged once `Launcher builds` is
@@ -330,7 +330,7 @@ launcher's builds, copied across from the Steam copy on every rebuild and then
 patched by text. None of them had come from Vortex and none had come from
 here.
 
-**The folder.** The launcher makes `<Root>\Game` itself (`tools\app\OwnGame.cs`,
+**The folder.** The launcher makes `<Root>\Game` itself (`launcher\app\OwnGame.cs`,
 Settings, Maintenance, "Thornswood's own Skyrim folder"). With the Thornswood
 profile deployed in Vortex, it builds the folder from that deployment, then
 restarts and runs from it. `Paths.Init` prefers `<Root>\Game` over the Steam
@@ -445,7 +445,7 @@ it per session and ignores which profile Vortex has on.
 - `README.md`: what the repo is and where to start. A customer's install is
   the site's join page, `site\data\site\join.md`; setting up a
   developer's machine is "Setting up a machine" above.
-- `tools\app\ARCHITECTURE.md`: how the launcher starts, what each class owns
+- `launcher\app\ARCHITECTURE.md`: how the launcher starts, what each class owns
   on disk, and every step between pressing Play and the game starting.
 - `docs\MOVING-THE-SERVER.md`, `docs\COLLECTION-METHOD.md`: the VPS and the
   mod collection.

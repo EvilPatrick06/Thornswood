@@ -8,7 +8,7 @@ how a machine is set up. CLAUDE.md is only what applies to a Claude.
 ## What this is
 
 Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in closed
-playtest. This repo is the launcher (tools\app, C# 5, WPF, built with the
+playtest. This repo is the launcher (launcher\app, C# 5, WPF, built with the
 .NET Framework 4 csc), the game plugins (game\plugins, Skyrim Platform
 JavaScript), the site (site, node), the Discord bot (bot,
 Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06). The team is in the table below.
@@ -223,7 +223,7 @@ machine, from the repo folder.
 1. `git checkout main`, then `git pull`. Ship.ps1 refuses a main release
    that is behind origin, so the pull comes first.
 2. Then one command for each part the pull request touched:
-   - The launcher (`tools\app`, `tools\ui.xaml`, the art and video that
+   - The launcher (`launcher\app`, `launcher\ui.xaml`, the art and video that
      Build-Launcher.ps1 embeds), the game plugins (`game\plugins`), or
      anything else that goes out in a pack:
      `.\tools\Ship.ps1 -Channel dev "what changed"`. The dev build is where

@@ -5,7 +5,7 @@
 
   The launcher's updater, asked its own questions.
 
-  WHY THIS EXISTS. Seven functions in tools\app\Updater.cs decide what counts
+  WHY THIS EXISTS. Seven functions in launcher\app\Updater.cs decide what counts
   as an update, where one may come from, and which files a pack may write or
   delete: IsNewer, Parts, RepoCandidates, Inside, ClaimedElsewhere, Pending and
   CheckUrl. Each has the incident that shaped it written above it, and until
@@ -15,7 +15,7 @@
   to be written". test-dev-version.ps1 carries a PowerShell copy of IsNewer,
   which answers for the copy and not for the launcher.
 
-  HOW. It compiles tools\app\*.cs into a library in a temp folder, with the
+  HOW. It compiles launcher\app\*.cs into a library in a temp folder, with the
   same csc, the same /noconfig and the same references Build-Launcher.ps1
   uses (the names are read out of Build-Launcher.ps1 itself, so the two cannot
   drift), loads it, and calls the functions by reflection. Updater is a
@@ -53,7 +53,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Src) { $Src = Join-Path $Here 'app' }
+if (-not $Src) { $Src = Join-Path $Here '..\launcher\app' }
 
 # ---- the launcher's runtime, not pwsh's --------------------------------------
 if ($PSVersionTable.PSEdition -eq 'Core') {

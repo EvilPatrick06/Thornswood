@@ -1,6 +1,6 @@
 # How the launcher is put together
 
-This page is for somebody opening `tools\app` for the first time. It says how
+This page is for somebody opening `launcher\app` for the first time. It says how
 the launcher starts, which class owns which files, and exactly what happens
 between pressing Play and the game window appearing, with the file and line of
 every step. It replaces a finished note about wiring Discord.cs in, which both
@@ -23,7 +23,7 @@ one line. Nothing here describes it as something to run, and the two shapes
 must never be mixed in one release.
 
 `<Root>` is the install folder and `Profile` means `<Root>\Profile`. Every file
-named below is in `tools\app` unless the path says otherwise.
+named below is in `launcher\app` unless the path says otherwise.
 
 ## Reading the references, and keeping them true
 
@@ -49,17 +49,17 @@ the part to check first.
 
 ### What the exe is
 
-`tools\Build-Launcher.ps1` compiles every `tools\app\*.cs` with the .NET
+`tools\Build-Launcher.ps1` compiles every `launcher\app\*.cs` with the .NET
 Framework 4 csc (C# 5 only) into `<Root>\Launcher\Thornswood.exe`. It embeds,
-as resources: `tools\ui.xaml`, the emblem, header art and video, the WebView2
-DLLs, `tools\launcher\voice-host.html`, the `Thornswood.ini` template from
+as resources: `launcher\ui.xaml`, the emblem, header art and video, the WebView2
+DLLs, `launcher\voice-host.html`, the `Thornswood.ini` template from
 `tools\emotes`, and `tools\client-build.json`. The update system publishes
 this one exe and nothing beside it, which is why everything rides inside.
 
 ### There is no compiled window
 
 There is no App.xaml, no code-behind and no `InitializeComponent`. The window
-is `tools\ui.xaml`, read out of the exe's resources as a string and turned into
+is `launcher\ui.xaml`, read out of the exe's resources as a string and turned into
 a live `Window` object at run time by
 `Shell.cs:261 XamlReader.Parse`. The xaml carries no `x:Class` and no event
 handlers. So:
@@ -508,9 +508,9 @@ machines work in them.
 
 | File | What it is | Why both machines are in it |
 |---|---|---|
-| `tools\app\Shell.cs` | The window, startup and the whole Play sequence. | Nearly every change that adds a button or a step touches it. |
-| `tools\app\Checks.cs` | The rows that gate Play, and finding and closing the game. | A new requirement for Play is a new row here. |
-| `tools\app\Keep.cs` | Our Data\Platform files put back and other plugins parked. | Anything new the plugins ship under Data\Platform, and how the main and dev builds share a game. |
-| `tools\app\Hold.cs` | The read-only hold while the game runs. | It holds exactly what Keep keeps, so they change together. |
-| `tools\app\Updater.cs` | The feed, the packs, the self update, and `Version`. | Every release moves `Version`, from whichever machine ran Bump-Version. |
+| `launcher\app\Shell.cs` | The window, startup and the whole Play sequence. | Nearly every change that adds a button or a step touches it. |
+| `launcher\app\Checks.cs` | The rows that gate Play, and finding and closing the game. | A new requirement for Play is a new row here. |
+| `launcher\app\Keep.cs` | Our Data\Platform files put back and other plugins parked. | Anything new the plugins ship under Data\Platform, and how the main and dev builds share a game. |
+| `launcher\app\Hold.cs` | The read-only hold while the game runs. | It holds exactly what Keep keeps, so they change together. |
+| `launcher\app\Updater.cs` | The feed, the packs, the self update, and `Version`. | Every release moves `Version`, from whichever machine ran Bump-Version. |
 | `tools\Publish-Update.ps1` | Diffs the build, packs what belongs by Ship-Rules.ps1, uploads, writes version.json. | Ship runs it on whichever machine ships: main from Patrick's, dev from either. |

@@ -32,7 +32,7 @@ const path = require('path');
 
 const SRC = process.argv[2] || path.join(TOOLS_DIR, '..', 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8');
-const DOOR = fs.readFileSync(process.argv[3] || path.join(TOOLS_DIR, 'app', 'Door.cs'), 'utf8');
+const DOOR = fs.readFileSync(process.argv[3] || path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Door.cs'), 'utf8');
 
 function braced(at, what) {
   const b = src.indexOf('{', at);

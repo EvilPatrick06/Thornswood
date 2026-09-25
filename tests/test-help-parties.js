@@ -12,7 +12,7 @@
 // markers and the compass strip the same morning (#139). The Help item went on
 // saying "There is no party system", measured against Skyrim Together. It is
 // copy, so nothing failed and nothing told anybody. This file reads the Help
-// items out of tools\app\Help.cs and holds the party ones to the code they
+// items out of launcher\app\Help.cs and holds the party ones to the code they
 // describe: the cap, the bonus, how long an ask stands and the keys are read
 // out of the gamemode, the plugin and the Controls page rather than typed in
 // here, and the real party block is run over a fake mp to show the cap, the
@@ -28,8 +28,8 @@ function read(...bits) {
 }
 const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const helpCs = read('app', 'Help.cs');
-const keysCs = read('app', 'Keys.cs');
+const helpCs = read('..', 'launcher', 'app', 'Help.cs');
+const keysCs = read('..', 'launcher', 'app', 'Keys.cs');
 const front = read('..', 'game', 'plugins', 'thornswood-front.js');
 const panel = read('..', 'game', 'ui', 'thornswood-party.js');
 

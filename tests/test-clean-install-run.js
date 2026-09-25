@@ -224,9 +224,9 @@ exp.forEach(function (e) {
 
 // ---- every file the list names is in the repository ------------------------
 const mentioned = {};
-doc.replace(/`(tools\\[^`\s]+\.[A-Za-z0-9]+)`/g, function (m, p) { mentioned[p] = true; return m; });
+doc.replace(/`((?:tools|launcher|installer|game)\\[^`\s]+\.[A-Za-z0-9]+)`/g, function (m, p) { mentioned[p] = true; return m; });
 const missingFiles = Object.keys(mentioned).filter(function (p) { return !fs.existsSync(repoFile(p)); });
-yes('every tools\\ file the list names is in the repository (' + Object.keys(mentioned).length + ' named)' +
+yes('every repository file the list names is there (' + Object.keys(mentioned).length + ' named)' +
     (missingFiles.length ? ' (not there: ' + missingFiles.join(', ') + ')' : ''),
     Object.keys(mentioned).length > 5 && missingFiles.length === 0);
 

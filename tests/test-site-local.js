@@ -159,7 +159,7 @@ if (headAt >= 0) {
     rows.push({
       routes: (cells[0] || '').match(/`\/[^`]*`/g) ? cells[0].match(/`\/[^`]*`/g).map(function (s) { return s.slice(1, -1); }) : [],
       method: cells[1] || '',
-      files: uniq(((cells[2] || '').match(new RegExp('(?:tools|game|bot|voice)' + BS + BS + '[A-Za-z0-9_.' + BS + BS + '-]+', 'g')) || [])
+      files: uniq(((cells[2] || '').match(new RegExp('(?:tools|game|launcher|installer|bot|voice)' + BS + BS + '[A-Za-z0-9_.' + BS + BS + '-]+', 'g')) || [])
         .map(function (p) { return p.replace(/[.]+$/, ''); })),
       text: cells[2] || ''
     });
@@ -212,7 +212,7 @@ function walk(dir, re, out) {
   });
   return out;
 }
-const askers = walk('tools/app', /\.cs$/, []).concat(walk('tools/setup', /\.cs$/, []),
+const askers = walk('launcher/app', /\.cs$/, []).concat(walk('installer/setup', /\.cs$/, []),
   walk('game/plugins', /\.js$/, []), walk('game/ui', /\.js$/, []),
   walk('voice', /\.js$/, []), walk('bot', /\.py$/, []), ['game/gamemode.js']);
 const whoRow = rows.filter(function (r) { return r.routes.indexOf('/api/play/who') >= 0; })[0];
@@ -235,7 +235,7 @@ yes('every /api/play/ route and every route behind the bot key is in the table (
     play.length + ' and ' + keyed.length + ')' + (left.length ? ', missing ' + left.join(', ') : ''),
     play.length >= 6 && keyed.length >= 3 && left.length === 0);
 
-const grace = (/const int GraceHours = (\d+);/.exec(read('tools/app/Door.cs') || '') || [])[1];
+const grace = (/const int GraceHours = (\d+);/.exec(read('launcher/app/Door.cs') || '') || [])[1];
 yes('the grace the README gives, ' + grace + ' hours, is GraceHours in Door.cs',
     !!grace && new RegExp('a yes from the last ' + grace + '\\s+hours').test(readme));
 

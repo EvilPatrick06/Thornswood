@@ -6,7 +6,7 @@
 // WHY THIS EXISTS. To Do entry 268, "Which browser the in-game interface uses
 // is inferred from another server's file, and recorded nowhere", warned that
 // "the repo currently contradicts itself about NirnLabUIPlatform in three
-// places". On 24 September two of them were still in tools/app/Checks.cs. The
+// places". On 24 September two of them were still in launcher/app/Checks.cs. The
 // note on ForeignNames said NirnLab "is the browser backend this build runs
 // on", that SkyrimPlatform.ini says BackendName = nirnlab, and that
 // Data\NirnLabUIPlatform "is not foreign either"; the note on ForeignPaths
@@ -62,9 +62,9 @@ function comments(src) {
   return out.join(' ').replace(/\s+/g, ' ');
 }
 
-const checks = read('app/Checks.cs');
-const chars = read('app/Chars.cs');
-const ownGame = read('app/OwnGame.cs');
+const checks = read('../launcher/app/Checks.cs');
+const chars = read('../launcher/app/Chars.cs');
+const ownGame = read('../launcher/app/OwnGame.cs');
 const shipRules = read('Ship-Rules.ps1');
 const front = read('../game/plugins/thornswood-front.js');
 

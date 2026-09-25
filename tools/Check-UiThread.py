@@ -337,7 +337,7 @@ def scan(app, depth=1):
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser()
-    ap.add_argument('--app', default=os.path.join(here, 'app'))
+    ap.add_argument('--app', default=os.path.join(here, '..', 'launcher', 'app'))
     ap.add_argument('--depth', type=int, default=1,
                     help='how many calls deep to follow from a background delegate')
     ap.add_argument('--fix', action='store_true',

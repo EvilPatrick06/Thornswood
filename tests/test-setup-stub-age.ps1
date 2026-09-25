@@ -60,7 +60,7 @@ Yes 'it stops the packager when there is a reason' ($block.Contains('if ($stubWh
 $pick = "@((Join-Path `$Here 'setup-stub.exe'), (Join-Path `$OutDir 'setup-stub.exe'))"
 $late = "@((Join-Path `$here 'setup-stub.exe'), (Join-Path `$OutDir 'setup-stub.exe'))"
 Yes 'it checks the stub the installer is built from' ($block.Contains($pick) -and $src.Contains($late))
-Yes 'against setup\Bootstrap.cs' ($block.Contains("(Join-Path `$Here 'setup\Bootstrap.cs')"))
+Yes 'against installer\setup\Bootstrap.cs' ($block.Contains("(Join-Path `$Here '..\installer\setup\Bootstrap.cs')"))
 
 $m = [regex]::Match($block, '(?s)function Get-StubRefusal\(.*?\n\}')
 Yes 'Get-StubRefusal is in the block' ($m.Success)

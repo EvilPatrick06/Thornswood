@@ -9,7 +9,7 @@
   WHY THIS EXISTS. Patrick, 24 September, with a tester on the main build:
   "it only give you the fiurst one to yuor clipboards and not all of them".
   The next part is asked for only once Steam has said the part before it is
-  down, and tools\app\Downgrade.cs listened for that in the wrong place. It
+  down, and launcher\app\Downgrade.cs listened for that in the wrong place. It
   read Steam's content_log.txt alone, and took "depot_489831" as the sign a
   download had started. Two downgraders written by other people for these
   same three depots read console_log.txt, and one of them keeps the real
@@ -42,7 +42,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here 'app' }
+if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
 
 $script:pass = 0
 $script:fail = 0
@@ -58,7 +58,7 @@ function Done {
 }
 
 $src = Join-Path $AppPath 'Downgrade.cs'
-Yes 'tools\app\Downgrade.cs is there' (Test-Path -LiteralPath $src)
+Yes 'launcher\app\Downgrade.cs is there' (Test-Path -LiteralPath $src)
 if (-not (Test-Path -LiteralPath $src)) { Done }
 $text = [IO.File]::ReadAllText($src)
 

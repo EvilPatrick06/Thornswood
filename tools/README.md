@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 125 of them, with the one line that says
+Every `.ps1` in this folder, 124 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -130,7 +130,6 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Setup-Discord.ps1](Setup-Discord.ps1) | Builds the Thornswood Discord: roles, categories, channels, permissions and the words in the read only channels, in one run. |
 | [Setup-Domain.ps1](Setup-Domain.ps1) | Puts thornswood.net in front of the docs site, with a real certificate. |
 | [Setup-SshKey.ps1](Setup-SshKey.ps1) | Type the VPS password one last time. |
-| [Setup-Thornswood.ps1](Setup-Thornswood.ps1) | Puts Thornswood on this machine. |
 | [Ship-Rules.ps1](Ship-Rules.ps1) | The one list of what never leaves a machine inside a Thornswood pack or installer. |
 | [Ship.ps1](Ship.ps1) | Builds the launcher and publishes everything that changed, launcher and mods both, in a single release, to the main build or the dev build. |
 | [Show-BotLog.ps1](Show-BotLog.ps1) | What the bot has been saying, without redeploying it to find out. |

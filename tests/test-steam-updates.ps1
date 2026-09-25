@@ -37,7 +37,7 @@
   pressed Yes on a question that says what Yes does. Reading it to warn is
   fine; Play is never held on it.
 
-  It compiles the shipped tools\app\SteamUpdates.cs with the same .NET
+  It compiles the shipped launcher\app\SteamUpdates.cs with the same .NET
   Framework csc that Build-Launcher.ps1 uses, which is C# 5, and drives the
   real class. Where this machine has Steam and Skyrim, it also parses the
   real manifest, without writing to it.
@@ -52,7 +52,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here 'app' }
+if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
 
 $script:pass = 0
 $script:fail = 0
@@ -69,7 +69,7 @@ function Done {
 
 # ---- compile the shipped class ---------------------------------------------
 $src = Join-Path $AppPath 'SteamUpdates.cs'
-Yes 'tools\app\SteamUpdates.cs is there' (Test-Path -LiteralPath $src)
+Yes 'launcher\app\SteamUpdates.cs is there' (Test-Path -LiteralPath $src)
 if (-not (Test-Path -LiteralPath $src)) { Done }
 
 $csc = @(

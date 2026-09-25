@@ -7,14 +7,15 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 
 ## What is in here
 
-- `tools/app`: the launcher. C# 5 and WPF, compiled by
+- `launcher/app`: the launcher. C# 5 and WPF, compiled by
   `tools/Build-Launcher.ps1` with the .NET Framework 4 csc.
-- `tools/launcher`: not the launcher's code, only the voice page it opens in
-  a hidden window.
-- `tools/setup`: the small setup program people download.
+- `launcher`: the window, the art and the voice page the launcher is
+  built with.
+- `installer`: what a new person runs first; `installer/setup` is the small
+  setup program people download.
 - `game/plugins`: the game plugins, in Skyrim Platform JavaScript.
 - `game/ui`: the overlays inside the game.
-- `game/gamemode.js`: the server's gamemode.
+- `game/gamemode.js`: the server's gamemode, with its tables in `game/data`.
 - `site`: the site. Its public pages are `site/data/site`.
 - `voice`: proximity voice.
 - `bot`: the Discord bot, in Python.
@@ -29,7 +30,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
   that never go to GitHub. Both are ignored by git.
 - `lore/`: the world.
 
-`bot`, `site`, `tests`, `tools/launcher`, `tools/setup`,
+`bot`, `game`, `installer`, `site`, `tests`, `launcher`, `installer/setup`,
 `tools/signing`, `game/plugins`, `game/ui` and `voice` each have
 a README of their own, which says what the folder is and how to change it.
 
@@ -44,7 +45,7 @@ a README of their own, which says what the folder is and how to change it.
 - [docs](docs): the system map, the update feed, the gamemode and a glossary.
   [engine/README.md](engine/README.md): building the SkyMP fork.
 - [docs/archive](docs/archive): dated snapshots kept for history, not current.
-- [tools/app/ARCHITECTURE.md](tools/app/ARCHITECTURE.md): how the launcher
+- [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md): how the launcher
   starts, what each class owns and every step between Play and the game.
 - [docs/IT-IS-DOWN.md](docs/IT-IS-DOWN.md): what to do when the server is down.
 - [SECURITY.md](SECURITY.md): how to report a hole quietly.

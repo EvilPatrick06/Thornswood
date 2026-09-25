@@ -4,7 +4,7 @@
 
 This folder holds one file, `Bootstrap.cs`, the source of the small program a
 new person runs first, `Thornswood-Setup.exe`. It is not the launcher's source;
-that is `tools\app`. It is a WPF window in C# 5, like the launcher, because the
+that is `launcher\app`. It is a WPF window in C# 5, like the launcher, because the
 same .NET Framework 4 csc compiles both and understands nothing newer. It asks
 which drive to install to (`C:\Thornswood` unless another is picked), reads the
 payload attached to its own end, or downloads it from the site

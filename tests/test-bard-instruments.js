@@ -31,7 +31,7 @@ const read = (p) => fs.readFileSync(p, 'utf8').split(CR).join('');
 const TESTS = process.env.TESTS_MD || path.join(TOOLS_DIR, '..', 'site', 'data', 'tests.md');
 const KNOWN = path.join(TOOLS_DIR, '..', 'site', 'data', 'known.md');
 const EMOTES = path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-emotes.js');
-const INI = path.join(TOOLS_DIR, 'emotes', 'Thornswood.ini');
+const INI = path.join(TOOLS_DIR, '..', 'launcher', 'Thornswood.ini');
 const GM = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const DATA = process.env.GAME_DATA || 'C:\\Thornswood\\Game\\Data';
 const PLUGIN = 'PlayFluteLuteDrum.esp';
@@ -80,7 +80,7 @@ yes('Known Issues still says mod scripts never fire',
 
 /*
   The wheel's key. The plugin reads WheelKey out of Thornswood.ini, and a
-  machine with no ini is given tools\emotes\Thornswood.ini by
+  machine with no ini is given launcher\Thornswood.ini by
   ThornIni.Ensure, so the template's WheelKey is the key a tester has unless
   they rebound it. The 48 in the plugin is only a fallback for a file with no
   WheelKey line, and it is out of date: the wheel moved from B to G on 13 Sep,

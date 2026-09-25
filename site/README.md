@@ -14,19 +14,19 @@ the dev server), and it answers from the Discord roles in its config.
 These are what ask it for something other than a page, and each of them stops
 working while the site is down. `/api/play/join` is the launcher's question
 before every launch; when the site does not answer, a yes from the last 72
-hours still starts the game (`GraceHours` in `tools\app\Door.cs`) and nothing
+hours still starts the game (`GraceHours` in `launcher\app\Door.cs`) and nothing
 else does.
 
 | Route | Method | Asked by |
 | --- | --- | --- |
-| `/api/play/join` | POST | the launcher, before every launch (`tools\app\Discord.cs`) |
-| `/api/play/start`, `/api/play/end`, `/api/play/logs` | POST | the launcher, as a session starts, as it ends, and with the logs after (`tools\app\Discord.cs`) |
-| `/api/play/roster` | POST | the launcher, for the names on the character cards (`tools\app\Roster.cs`) |
-| `/auth/discord` | GET | the launcher's link button, through the browser; Discord sends the browser back to `/auth/discord/callback` (`tools\app\Discord.cs`) |
+| `/api/play/join` | POST | the launcher, before every launch (`launcher\app\Discord.cs`) |
+| `/api/play/start`, `/api/play/end`, `/api/play/logs` | POST | the launcher, as a session starts, as it ends, and with the logs after (`launcher\app\Discord.cs`) |
+| `/api/play/roster` | POST | the launcher, for the names on the character cards (`launcher\app\Roster.cs`) |
+| `/auth/discord` | GET | the launcher's link button, through the browser; Discord sends the browser back to `/auth/discord/callback` (`launcher\app\Discord.cs`) |
 | `/api/allowed`, `/dev/api/allowed` | GET | each game server's door, every five minutes, with the bot's key; the dev server's `door.json` names the site with `/dev` on the end (`game\gamemode.js`) |
 | `/api/roster` | POST | the game server, with the bot's key, when its book of characters changes (`game\gamemode.js`) |
 | `/api/play/owns` | POST | the voice service, before it keeps a character creation choice (`voice\voice-server.js`) |
-| `/api/payload` | GET | the installer, which then downloads the zip it names from `/file/` (`tools\setup\Bootstrap.cs`) |
+| `/api/payload` | GET | the installer, which then downloads the zip it names from `/file/` (`installer\setup\Bootstrap.cs`) |
 | `/api/ticket` | POST | the Discord bot, for a support ticket (`bot\bot.py`) |
 | `/api/play/who` | POST | nothing in the repo asks it now. It says who a ticket belongs to and writes nothing, which makes it the one to try by hand |
 

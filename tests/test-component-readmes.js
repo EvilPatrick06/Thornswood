@@ -13,8 +13,8 @@
 // copy. The setup block listed git, gh, node and Python and never mentioned the
 // dev build, although every change goes to the dev build first. And none of
 // these six folders had a word written about it outside the code:
-// tools\launcher reads like the launcher's source and holds one HTML page, and
-// tools\setup holds the installer, not the launcher.
+// launcher reads like the launcher's source and holds one HTML page, and
+// installer\setup holds the installer, not the launcher.
 //
 // A README is worth having only while it is true, so this checks what each one
 // states against the code that decides it, not only that the file is there:
@@ -90,7 +90,8 @@ function glob(f) {
 
 const SIX = ['docs-app', 'voice', 'ts-plugins', 'ts-ui', 'setup', 'launcher'];
 // Where each lives: voice left tools for the repository root on 25 September.
-const AT = { 'voice': 'voice', 'docs-app': 'site', 'ts-plugins': 'game/plugins', 'ts-ui': 'game/ui' };
+const AT = { 'voice': 'voice', 'docs-app': 'site', 'ts-plugins': 'game/plugins', 'ts-ui': 'game/ui',
+  'launcher': 'launcher', 'setup': 'installer/setup' };
 function at(d) { return AT[d] || ('tools/' + d); }
 const HEADS = ['## What it is', '## On your machine', '## Where it runs'];
 const readme = {};
@@ -178,7 +179,7 @@ SIX.forEach(function (d) {
 {
   const t = readme.voice || '';
   const vs = read('voice/voice-server.js') || '';
-  const dev = read('tools/app/DevBuild.cs') || '';
+  const dev = read('launcher/app/DevBuild.cs') || '';
   const iv = read('tools/Install-Voice.ps1') || '';
   const watch = read('tools/Watch-Services.ps1') || '';
   const live = (/THORNSWOOD_VOICE_PORT \|\| (\d+)/.exec(vs) || [])[1];
@@ -218,7 +219,7 @@ SIX.forEach(function (d) {
 {
   const t = readme['ts-plugins'] || '';
   const go = read('tools/Go.ps1') || '';
-  const keep = read('tools/app/Keep.cs') || '';
+  const keep = read('launcher/app/Keep.cs') || '';
   const rules = read('tools/Ship-Rules.ps1') || '';
   const game = (/\[string\]\s*\$Game\s*=\s*'([^']+)'/.exec(go) || [])[1];
   yes('plugins: the README names the game folder Go.ps1 installs into by default, ' + game,
@@ -248,40 +249,42 @@ SIX.forEach(function (d) {
   yes('overlays: and that zip is not in git, as the README says', zip === false);
 }
 
-// --------------------------------------------------------- tools\launcher --
+// --------------------------------------------------------- launcher --
 {
   const t = readme.launcher || '';
   const bl = read('tools/Build-Launcher.ps1') || '';
-  const voice = read('tools/app/Voice.cs') || '';
-  const held = files('tools/launcher').filter(function (f) { return f !== 'README.md'; });
-  yes('tools' + BS + 'launcher: holds the one file its README says, voice-host.html (' + held.join(', ') + ')',
-      held.length === 1 && held[0] === 'voice-host.html');
-  yes('tools' + BS + 'launcher: Build-Launcher.ps1 embeds that page by name',
-      bl.indexOf("'launcher" + BS + "voice-host.html'") >= 0);
-  yes('tools' + BS + 'launcher: Voice.cs loads it by that name', voice.indexOf('"voice-host.html"') >= 0);
-  yes('tools' + BS + 'launcher: the README says it is not the launcher source, and where that is',
-      /not the launcher's\s+source/.test(t) && t.indexOf('`tools' + BS + 'app`') >= 0);
+  const voice = read('launcher/app/Voice.cs') || '';
+  const held = files('launcher');
+  // Since phase 7 (issue #440) this is the whole launcher, not only its voice
+  // page: the source, the window, the icon and art, the voice page, WebView2.
+  yes('launcher: holds the source folder, the window and the voice page (' + held.join(', ') + ')',
+      held.indexOf('ui.xaml') >= 0 && held.indexOf('voice-host.html') >= 0 && exists('launcher/app/Shell.cs'));
+  yes('launcher: Build-Launcher.ps1 embeds the voice page by name',
+      bl.indexOf("'.." + BS + "launcher" + BS + "voice-host.html'") >= 0);
+  yes('launcher: Voice.cs loads it by that name', voice.indexOf('"voice-host.html"') >= 0);
+  yes('launcher: the README says where the source and the window are',
+      t.indexOf('`launcher' + BS + 'app`') >= 0 && t.indexOf('ui.xaml') >= 0 && t.indexOf('voice-host.html') >= 0);
 }
 
-// ------------------------------------------------------------ tools\setup --
+// ------------------------------------------------------------ installer\setup --
 {
   const t = readme.setup || '';
   const bl = read('tools/Build-Launcher.ps1') || '';
-  const boot = read('tools/setup/Bootstrap.cs') || '';
-  const held = files('tools/setup').filter(function (f) { return f !== 'README.md'; });
-  yes('tools' + BS + 'setup: holds the one file its README says, Bootstrap.cs (' + held.join(', ') + ')',
+  const boot = read('installer/setup/Bootstrap.cs') || '';
+  const held = files('installer/setup').filter(function (f) { return f !== 'README.md'; });
+  yes('installer' + BS + 'setup: holds the one file its README says, Bootstrap.cs (' + held.join(', ') + ')',
       held.length === 1 && held[0] === 'Bootstrap.cs');
-  yes('tools' + BS + 'setup: Build-Launcher.ps1 compiles Bootstrap.cs by name into setup-stub.exe',
-      bl.indexOf("'setup" + BS + "Bootstrap.cs'") >= 0 && bl.indexOf("'setup-stub.exe'") >= 0 &&
+  yes('installer' + BS + 'setup: Build-Launcher.ps1 compiles Bootstrap.cs by name into setup-stub.exe',
+      bl.indexOf("'.." + BS + "installer" + BS + "setup" + BS + "Bootstrap.cs'") >= 0 && bl.indexOf("'setup-stub.exe'") >= 0 &&
       t.indexOf('setup-stub.exe') >= 0);
   const inst = (/installRoot = @"([^"]+)"/.exec(boot) || [])[1];
-  yes('tools' + BS + 'setup: the README gives the install folder Bootstrap.cs offers, ' + inst,
+  yes('installer' + BS + 'setup: the README gives the install folder Bootstrap.cs offers, ' + inst,
       !!inst && t.indexOf('`' + inst + '`') >= 0);
   const site = (/const string Site = "([^"]+)"/.exec(boot) || [])[1];
-  yes('tools' + BS + 'setup: and the address it downloads the payload from',
+  yes('installer' + BS + 'setup: and the address it downloads the payload from',
       !!site && boot.indexOf('Site + "/api/payload"') >= 0 && t.indexOf(site + '/api/payload') >= 0);
-  yes('tools' + BS + 'setup: the README says it is not the launcher source, and where that is',
-      /not the launcher's\s+source/.test(t) && t.indexOf('`tools' + BS + 'app`') >= 0);
+  yes('installer' + BS + 'setup: the README says it is not the launcher source, and where that is',
+      /not the launcher's\s+source/.test(t) && t.indexOf('`launcher' + BS + 'app`') >= 0);
 }
 
 // ------------------------------------------- nothing carries a README out --
@@ -321,9 +324,9 @@ SIX.forEach(function (d) {
       !!sent && sent.indexOf('*') < 0 && !/README/i.test(sent) && !/Get-ChildItem/.test(iv));
 
   const bl = read('tools/Build-Launcher.ps1') || '';
-  yes('Build-Launcher.ps1 never lists tools' + BS + 'launcher or tools' + BS + 'setup, so only the named file goes in',
+  yes('Build-Launcher.ps1 never lists launcher or installer' + BS + 'setup, so only the named file goes in',
       !bl.split('\n').some(function (l) {
-        return /Get-ChildItem/.test(l) && /'(launcher|setup)(['\\])/.test(l);
+        return /Get-ChildItem/.test(l) && /'(\.\.\\launcher|\.\.\\installer\\setup|launcher|setup)(['\\])/.test(l);
       }));
 }
 
@@ -359,7 +362,7 @@ SIX.forEach(function (d) {
     while (e < lines.length - 1 && lines[e + 1].trim() !== '') { e++; }
     para = lines.slice(s, e + 1).join('\n');
   }
-  const ui = read('tools/ui.xaml') || '';
+  const ui = read('launcher/ui.xaml') || '';
   const install = (/x:Name="BtnDevInstall"[^>]*Content="([^"]+)"/.exec(ui) || [])[1];
   const make = (/x:Name="BtnOwnGameMake"[^>]*Content="([^"]+)"/.exec(ui) || [])[1];
   yes('the setup paragraph names the button that installs the dev build as the launcher labels it, "' +
@@ -380,7 +383,7 @@ SIX.forEach(function (d) {
   yes('the paragraph keeps the words rules',
       para.length > 0 && !/\bplayers?\b/i.test(para) && para.indexOf('\u2014') < 0);
 
-  const own = read('tools/app/ShellOwnGame.cs') || '';
+  const own = read('launcher/app/ShellOwnGame.cs') || '';
   yes('the dev channel section no longer says the dev build starts on the Steam copy, which Play refuses',
       sd.indexOf('so it starts on the Steam copy') < 0 && /static bool OwnGameRequired\(\)/.test(own) &&
       /Play will\s+not start the game out of the Steam copy/.test(sd));

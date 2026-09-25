@@ -43,7 +43,7 @@ const FRONT_PATH = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plug
 const GM_PATH = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const front = read(FRONT_PATH);
 const gm = read(GM_PATH);
-const ini = read(path.join(TOOLS_DIR, 'emotes', 'Thornswood.ini'));
+const ini = read(path.join(TOOLS_DIR, '..', 'launcher', 'Thornswood.ini'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -113,7 +113,7 @@ yes('the shipped Thornswood.ini carries MoldKey = 22', !!iniM && Number(iniM[1])
   while ((m = rxIni.exec(ini)) !== null) {
     if (['MoldKey', 'VoicePort', 'Microphone'].indexOf(m[1]) === -1) { take(Number(m[2]), 'ini ' + m[1]); }
   }
-  const keys = read(path.join(TOOLS_DIR, 'app', 'Keys.cs'));
+  const keys = read(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Keys.cs'));
   const rxCs = /ThornIni, "(\w+)", (-?\d+)\)/g;
   let rows = 0;
   while ((m = rxCs.exec(keys)) !== null) { rows++; take(Number(m[2]), 'Controls ' + m[1]); }

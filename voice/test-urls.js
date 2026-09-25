@@ -13,7 +13,7 @@ function lift(src, name) {
   throw new Error('unbalanced ' + name);
 }
 
-const page = fs.readFileSync(R + '/tools/launcher/voice-host.html', 'utf8');
+const page = fs.readFileSync(R + '/launcher/voice-host.html', 'utf8');
 const pageFns = new Function('cfg', lift(page, 'voiceBase') + '\n' + lift(page, 'voiceSocket') +
   '; return { base: voiceBase, socket: voiceSocket };');
 
