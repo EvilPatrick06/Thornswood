@@ -24,6 +24,10 @@ bot/news-webhook.txt
 # Scratch beside the repo, and the local patch runs that made 1.1.35.
 _to_delete/
 
+# The Python virtual environment the Cloud Agent setup (.cursor/install.sh)
+# makes for the bot's libraries. It is built on the machine, not shared.
+.venv/
+
 # Python's bytecode cache. Running the bot once leaves bot\__pycache__
 # behind, and it then shows up as untracked in every git status after, which is
 # how it nearly went into an unrelated pull request on 2026-09-17.
