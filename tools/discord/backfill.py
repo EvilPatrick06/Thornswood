@@ -13,9 +13,20 @@ Who already has a card is worked out from the channels themselves: every card
 message is the bot's, says "came up the road." and mentions the person, so the
 mentioned ids across #welcome-travelers and #general-chat are the people done.
 Anybody else who joined after the newest existing card, and is not a bot, is
-owed one. Their number is their place in the join order among the members
-still here, which is what member_count was when they arrived if nobody has
-left since.
+owed one. Their number is the one joins.json holds for them, read through
+bot.py's own functions; it holds one when the bot numbered them and the
+greeting then failed. Somebody it has no number for, which is everybody who
+arrived while the bot had nowhere to greet, gets the old rule, their place in
+the join order among the members still here, and the line for them says so,
+and says when that number is one the record already gave somebody else. A
+record that is there and cannot be read stops the run.
+
+It reads joins.json and never writes it, as it never wrote anything before:
+it put numbers on cards and kept no record of them. The bot writes the record
+on every join, and a second process writing the whole file while the bot runs
+could put back a copy from before a number the bot has just given out.
+The record is the one beside this file, so run it in the bot's folder on the
+VPS; anywhere else there is none and every number is the old rule.
 """
 import asyncio
 import os
@@ -24,6 +35,7 @@ import traceback
 
 import discord
 
+import bot
 import card
 
 TOKEN = os.environ.get('DISCORD_TOKEN', '').strip()
@@ -90,25 +102,45 @@ async def work():
     have, newest = await done_ids(guild, [WELCOME, 'general-chat', 'general'])
     say('%d people already have a card; newest card %s' % (len(have), newest.isoformat(timespec='minutes') if newest else 'none found'))
 
+    try:
+        given = bot.joins_given(guild)
+    except Exception:
+        say('could not read %s, so nothing is posted: every number would be '
+            'a guess that can repeat one on it.\n%s'
+            % (bot.JOINS, traceback.format_exc()))
+        return
+    if os.path.exists(bot.JOINS):
+        say('%d numbers in %s' % (len(given), bot.JOINS))
+    else:
+        say('no %s here, so every number below is by join order' % bot.JOINS)
+
     owed = []
     for i, m in enumerate(members):
         if m.bot or m.id in have:
             continue
         if newest is not None and m.joined_at <= newest:
             continue
-        owed.append((i + 1, m))
+        number = given.get(m.id)
+        why = ''
+        if number is None:
+            number = i + 1
+            why = ' (not in joins.json, so by join order among the members still here'
+            if number in given.values():
+                why += ', which repeats a number joins.json gave somebody else'
+            why += ')'
+        owed.append((number, why, m))
 
     if not owed:
         say('nobody is owed a card')
         return
-    for number, m in owed:
-        say('owed: #%d %s (%s) joined %s' % (number, m.display_name or m.name, m, m.joined_at.isoformat(timespec='minutes')))
+    for number, why, m in owed:
+        say('owed: #%d %s (%s) joined %s%s' % (number, m.display_name or m.name, m, m.joined_at.isoformat(timespec='minutes'), why))
 
     if not GO:
         say('dry run, nothing posted. Run with --go to post them.')
         return
 
-    for number, m in owed:
+    for number, why, m in owed:
         name = m.display_name or m.name
         png = None
         try:
@@ -123,10 +155,14 @@ async def work():
                 await ch.send(line, file=discord.File(png, 'welcome.png'))
             else:
                 await ch.send(line)
-            say('posted #%d %s' % (number, m))
+            say('posted #%d %s%s' % (number, m, why))
         except Exception:
             say('posting failed for %s:\n%s' % (m, traceback.format_exc()))
         await asyncio.sleep(1.5)
 
 
-client.run(TOKEN, log_handler=None)
+# Under a main guard, as bot.py is, so test-join-scripts.py can import this
+# and run work() against a stand-in server. `python backfill.py` runs it as
+# before.
+if __name__ == '__main__':
+    client.run(TOKEN, log_handler=None)

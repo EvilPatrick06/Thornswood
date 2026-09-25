@@ -59,9 +59,67 @@ const WORLDSPACES = new Set(DATA.worldspaces);
 
   Opened lazily and given up on for good the first time a write fails, because
   a log that throws once a tick is worse than no log.
+
+  ROLLED AT 4 MB, FIVE KEPT, entry 220, the same rule as the site's site.log.
+  Nothing rolled this file, so it grew until reading last night's crash meant
+  opening a file nothing could open. appendFileSync opens, writes and closes
+  on every line, so between lines this process holds nothing and a rename
+  works. server.log is different: cmd holds it open for as long as the server
+  runs, so roll-log.ps1 rolls that one before the server starts. The size is
+  read once per load and counted after that, so a busy tick does not ask the
+  disk about the file for every line.
 */
 let logFile = null;
 let logBroken = false;
+const LOG_MAX_BYTES = 4 * 1024 * 1024;
+const LOG_KEEP = 5;
+let logBytes = -1;
+let logStateSaid = false;
+
+// Oldest first, so nothing is overwritten on the way: .5 goes, .4 becomes .5,
+// and the live file becomes .1. Rolled, never deleted: deleting a log is how
+// the evidence for the last crash disappeared in the first place.
+function rollLog(where) {
+  const fs = require('fs');
+  try {
+    const oldest = where + '.' + LOG_KEEP;
+    if (fs.existsSync(oldest)) { fs.unlinkSync(oldest); }
+    for (let i = LOG_KEEP - 1; i >= 1; i--) {
+      if (fs.existsSync(where + '.' + i)) { fs.renameSync(where + '.' + i, where + '.' + (i + 1)); }
+    }
+    if (fs.existsSync(where)) { fs.renameSync(where, where + '.1'); }
+    return true;
+  } catch (e) { return false; }
+}
+
+/*
+  WHETHER THIS LOG IS WORKING, where it can be read from outside.
+
+  The give-up below used to be one line on the console, which lands in
+  server.log among four fifths engine noise, and nothing else, so a server
+  that had stopped writing thornswood.log looked exactly like a quiet one. The
+  entry asks for the give-up to "set a state the health or manifest route
+  reports, so a server logging nothing is visible from outside".
+
+  So it goes in thornswood-log.json in the data folder, which the resources
+  server hands out over plain HTTP: /thornswood-log.json on 3000 for live and
+  7788 for dev, readable with no ssh. It says whether the log works and, when
+  it does not, why, and nothing about anybody. Written when the first line of
+  a load lands, so a restart that fixed it says so, and once when it breaks.
+*/
+function sayLogState(state) {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    let dataDir = 'data';
+    try {
+      const cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+    } catch (e) { }
+    state.at = Date.now();
+    fs.writeFileSync(path.join(dataDir, 'thornswood-log.json'), JSON.stringify(state));
+  } catch (e) { }
+}
 
 function logPath() {
   if (logFile !== null || logBroken) { return logFile; }
@@ -86,12 +144,28 @@ function log() {
   const where = logPath();
   if (!where) { return; }
   try {
-    require('fs').appendFileSync(where, stamp() + ' ' + line + '\n');
+    const fs = require('fs');
+    const text = stamp() + ' ' + line + '\n';
+    if (logBytes < 0) {
+      try { logBytes = fs.statSync(where).size; } catch (e) { logBytes = 0; }
+    }
+    if (logBytes >= LOG_MAX_BYTES) {
+      // A roll refused because something is reading the file right then is
+      // tried again a little later, not on every line until it lets go.
+      logBytes = rollLog(where) ? 0 : LOG_MAX_BYTES - 256 * 1024;
+    }
+    fs.appendFileSync(where, text);
+    logBytes += Buffer.byteLength(text);
+    if (!logStateSaid) {
+      logStateSaid = true;
+      sayLogState({ ok: true });
+    }
   } catch (e) {
     // Once. A log that throws every tick is worse than no log.
     logBroken = true;
     console.log('[thornswood] could not write thornswood.log, carrying on ' +
-                'with the console only: ' + e);
+                'with the console only, and saying so at /thornswood-log.json: ' + e);
+    sayLogState({ ok: false, why: String((e && (e.code || e.message)) || e) });
   }
 }
 
@@ -3238,7 +3312,24 @@ function mineOre(actorId, refrId, baseDesc) {
     0x10F575  WoodChoppingBlockCOPY0000  a stray duplicate, and the one that is
                                          missing FurnitureWoodChoppingBlock
 
-  All three are here because a person cannot tell one chopping block from
+  AND A FOURTH, IN Dragonborn.esm, added 24 September:
+
+    0x03828B  DLC2WoodChoppingBlockAsh   Solstheim's, three placed, all in
+                                         DLC2SolstheimWorld
+
+  The chopping blocks fix of 24 September read every placed block in the load
+  order and found this base missing here, so the three on Solstheim were
+  outside the Woodwright rules: a press fell through every branch of the
+  activate chain to loot(), which answers nothing for a thing that is not an
+  actor, and the engine sat whoever pressed it down to swing, whatever their
+  trade, while chopWood never ran and no Woodwright was paid. Read out of the
+  plugins the same day (C:\Thornswood\Game\Data and the profile's plugins.txt,
+  last one wins, nothing overrides it): the same model as WoodChoppingBlock,
+  the same three keywords including FurnitureWoodChoppingBlock, the same WBDT
+  00ff, the same markers and the same ResourceFurnitureScript. It is the common
+  block with ash on it.
+
+  All four are here because a person cannot tell one chopping block from
   another, which is the same reason TOOLS.farmer accepts both shovels.
 
   WHY IT IS THE WOODWRIGHT'S AND NOT THE WOODWORKER'S. The kiln gates on
@@ -3248,9 +3339,10 @@ function mineOre(actorId, refrId, baseDesc) {
   novice. Until today the Woodwright had no verb and no bench in the entire load
   order, so half of the Woodworker was a title with nothing behind it.
 */
-const CHOPPING_BLOCKS = ['7022e:Skyrim.esm', 'a91bf:Skyrim.esm', '10f575:Skyrim.esm'];
+const CHOPPING_BLOCKS = ['7022e:Skyrim.esm', 'a91bf:Skyrim.esm', '10f575:Skyrim.esm',
+                         '3828b:Dragonborn.esm'];
 
-/** True when this base is one of the three chopping blocks. */
+/** True when this base is one of the four chopping blocks. */
 function isChoppingBlock(baseDesc) {
   for (let i = 0; i < CHOPPING_BLOCKS.length; i++) {
     if (CHOPPING_BLOCKS[i] === baseDesc) { return true; }
@@ -3263,8 +3355,8 @@ function isChoppingBlock(baseDesc) {
  *
  * NOT a bench and not a crafting menu. Patrick, 21 September: it is "just for
  * getting the firewood and not usable by non woodworkers". So it is answered
- * here the way the quarry and the kiln are, and the three records in Skyrim.esm
- * are left exactly as Bethesda wrote them. See CHOPPING_BLOCKS.
+ * here the way the quarry and the kiln are, and the four records in Skyrim.esm
+ * and Dragonborn.esm are left exactly as Bethesda wrote them. See CHOPPING_BLOCKS.
  *
  * THE YIELD RISES WITH THE RANK, the same shape mineSalt uses, because the whole
  * of the wood chain hangs off this: firewood is what the kiln burns and what a
@@ -3332,7 +3424,7 @@ function choppedSwing(actorId) {
     Solitude Stables:  -76193.3, 96600.6, -11435
     Dragon Bridge:     -101780.7, 80484.5, -12522.7
 
-  BY POSITION, BECAUSE THE BASE IS SHARED. CHOPPING_BLOCKS is three BASE
+  BY POSITION, BECAUSE THE BASE IS SHARED. CHOPPING_BLOCKS is four BASE
   records and every block in Skyrim is one of them, so there is no way to name
   one block without naming all of them. A placed reference cannot be deleted
   from here either: that is a change to a plugin, which is a rebuild and a
@@ -7188,7 +7280,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   let message = null;
   if (baseDesc === STATIONS.saltQuarry) message = mineSalt(casterRefrId, refrId);
   else if (baseDesc === STATIONS.charcoalKiln) message = burnCharcoal(casterRefrId, refrId);
-  // The three chopping blocks. Before the STATIONS branches would not matter,
+  // The four chopping blocks. Before the STATIONS branches would not matter,
   // because these are not ours, but before the FURN fallthrough further down
   // very much does: a chopping block is a FURN, and a FURN that reaches
   // ProcessActivateNormal sits the person down on it.

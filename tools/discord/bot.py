@@ -519,6 +519,45 @@ def _joins_write(d):
     os.replace(tmp, JOINS)
 
 
+def _joins_of(rec, guild):
+    """This server's part of the record, and the numbers in it by member id,
+       each made empty when it is missing or not the shape it should be."""
+    g = rec.get(str(guild.id))
+    if not isinstance(g, dict):
+        g = {}
+    ids = g.get('members')
+    if not isinstance(ids, dict):
+        ids = {}
+    return g, ids
+
+
+def _joins_number(ids, member_id):
+    """The number the record holds for this member, or None."""
+    had = ids.get(str(member_id))
+    return had if type(had) is int and had > 0 else None
+
+
+def joins_given(guild):
+    """
+    {member id: number} for everybody the record has numbered on this server,
+    read and never written.
+
+    backfill.py and redraw.py read the record through this and the two above,
+    so a card they draw carries the number on_member_join gave, by the same
+    reading of the file. Until 24 September they numbered by join order among
+    the members still here and never opened it, so redraw.py --all would have
+    put numbers on old cards that disagree with the record. Raises, like
+    _joins_read, when the record is there and cannot be read.
+    """
+    g, ids = _joins_of(_joins_read(), guild)
+    out = {}
+    for k in ids:
+        n = _joins_number(ids, k)
+        if n is not None and str(k).isdigit():
+            out[int(k)] = n
+    return out
+
+
 def arrival_number(guild, member):
     """
     Which arrival this member is on this server: the number they were given
@@ -532,14 +571,9 @@ def arrival_number(guild, member):
     count = guild.member_count
     try:
         rec = _joins_read()
-        g = rec.get(str(guild.id))
-        if not isinstance(g, dict):
-            g = {}
-        ids = g.get('members')
-        if not isinstance(ids, dict):
-            ids = {}
-        had = ids.get(str(member.id))
-        if type(had) is int and had > 0:
+        g, ids = _joins_of(rec, guild)
+        had = _joins_number(ids, member.id)
+        if had is not None:
             n, said = had, 'came back and keeps number %d' % had
         else:
             last = g.get('last')

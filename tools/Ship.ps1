@@ -1,6 +1,9 @@
 ﻿<#
-  Ship.ps1
+.SYNOPSIS
+  Builds the launcher and publishes everything that changed, launcher and
+  mods both, in a single release, to the main build or the dev build.
 
+.DESCRIPTION
   One command. Builds the launcher and publishes everything that changed,
   launcher and mods both, in a single release.
 
@@ -28,18 +31,156 @@
       - Map markers in Riverwood, Whiterun, Falkreath and Rorikstead
       - Nothing to reinstall, it arrives with the update"
 
-  Options:
-      -NoBump          kept for anything that passes it; every main release
-                       now keeps the version number, so it changes nothing
-      -Version 1.2.0   a dev build's number; a main release refuses it, and
-                       .\tools\Bump-Version.ps1 -To 1.2.0 is how main moves
-      -ModsOnly        skip the launcher, publish only changed mod files
-      -DryRun          build and diff, but upload nothing
-      -Package         also rebuild the two installer files for new people
-                       and put them on the site; not on a -DryRun
-      -AcceptSize      let through a release over Publish-Update's size cap,
-                       once you have read what made it that big
+  EVERY OPTION HAS ITS OWN .PARAMETER BELOW, and Get-Help puts each one beside
+  what the param block declares, so nobody has to open this file to see them:
 
+      Get-Help .\tools\Ship.ps1 -Full
+      Get-Help .\tools\Ship.ps1 -Parameter Channel
+
+  This header used to carry a hand-written list of five options, laid out as
+  if it were all of them, while the param block declared thirteen. -Channel,
+  the one the whole dev workflow runs on, was in the param block and nowhere
+  else, and Get-Help printed nothing but the syntax line (entry 260 on the To
+  Do List). tools\test-script-index.ps1 now fails the build check when a
+  parameter is declared here without a .PARAMETER of its own.
+
+.PARAMETER Notes
+  What customers read about this release: the launcher's News tab, the site
+  and #news for a main release, the dev launcher's News tab and the dev
+  updates channel for a dev release. Mandatory, and the only option taken by
+  position, so it can come first without its name. The first line is the
+  title, a line starting with a dash becomes a bullet, and the rest becomes
+  the body. The server's warning before the restart carries the title only.
+
+.PARAMETER Version
+  A dev build's number, for example 1.2.0.1, in place of the one Ship would
+  work out from the dev feed. It is written into app\Updater.cs for the build
+  and put back afterwards, so it only ever lives in the dev feed.
+
+  A main release refuses it. Main ships the number already on main, and
+  .\tools\Bump-Version.ps1 -To 1.2.0 moves that number first, through its own
+  pull request, before Ship runs without -Version. The same number main
+  already has is let through, because it changes nothing. -ModsOnly keeps the
+  number where it is whatever this says.
+
+.PARAMETER NoBump
+  Kept for anything that passes it. Every main release now keeps the version
+  number, so it changes nothing.
+
+.PARAMETER ModsOnly
+  Skips the launcher and publishes only the mod files that changed. The
+  version number stays where it is.
+
+.PARAMETER DryRun
+  Builds and works out what would ship, and uploads no pack, publishes no
+  feed and tells nobody: no news post, no warning from the server. The git
+  checks are skipped, and the feed, the baseline and the version number are
+  put back afterwards.
+
+  IT STILL CHANGES THIS MACHINE, so do not run it while the game is open here.
+  It closes any running Skyrim, SKSE loader or SkyMP client, matched by name
+  wherever it runs from, and it does that even with -ModsOnly, because
+  the publisher closes the game before it reads a single file. Without
+  -ModsOnly it also closes the launcher and puts the new Thornswood.exe in
+  <Root>\Launcher. It copies the plugins into the game folder. The pack it
+  makes stays in -DistRoot, and every pack-*.zip there older than the ten
+  newest is deleted. The first -Channel dev run on a machine makes the dev
+  branch of the releases repo and pushes it to GitHub, so a dry run on a
+  machine whose releases repo has no dev branch stops rather than make one:
+  run -Channel dev once without -DryRun.
+
+  With -Package the installer is not rebuilt, because Package-Thornswood.ps1
+  puts what it builds on the site. The dry run says so and prints the
+  -NoPublish line that builds one and publishes nothing.
+
+.PARAMETER Package
+  Also rebuilds the two installer files for new people, after the release is
+  out, and puts them on the site. Twenty minutes or more. Not on a -DryRun,
+  and a dev release never touches the installer.
+
+.PARAMETER Root
+  The Thornswood install whose launcher is built and whose files are
+  published. Left out, it is the first of C:\Thornswood and Thornswood on any
+  other fixed drive that has Launcher\Thornswood.exe in it, and for a dev
+  release that folder with -DevBuild on the end, where the main launcher's
+  Settings page installs the dev build.
+
+.PARAMETER DistRoot
+  Where releases are staged and zipped, passed straight through to
+  Publish-Update and Package-Thornswood so all three agree. Not under -Root:
+  that is the folder people play from.
+
+.PARAMETER MoveServer
+  Lets a main release change the server address in version.json. Without it,
+  a release whose config.json names a different server from the one the feed
+  has stops before anything is published, because that address moves
+  everybody.
+
+.PARAMETER AcceptSize
+  Passed straight to Publish-Update, which refuses a release bigger than its
+  cap (-MaxReleaseMB, 3072 by default) and lists the biggest files, because
+  the release that nearly went out on 17 September was the whole mod
+  collection. Give it only once you have read what made the release that big.
+
+.PARAMETER NoPause
+  Exits without waiting for Enter, so Ship can be chained after something
+  else without stopping for a keypress nobody is there to give.
+
+.PARAMETER AnnounceMinutes
+  How many minutes of warning the server gives everybody in the world before
+  putting them back to the launcher to pick up the release.
+
+.PARAMETER NoAnnounce
+  Ships quietly. The server is not told and nobody is put out; people pick
+  the release up the next time they open the launcher.
+
+.PARAMETER Channel
+  main or dev, and main when it is left out.
+
+  main is the build everybody plays on, and ships only what is already on
+  GitHub. It refuses a release that is not on main or on a hotfix/ branch,
+  that is behind or ahead of the same branch on origin, that has anything
+  uncommitted, that has a file under tools git does not know about (the
+  build and Go.ps1 would take it anyway), or that asks for a new number with
+  -Version. A hotfix/ branch is the live build plus one fix and its version
+  bump, cut from the commit the live release was built from. Ship refuses
+  one that is not on GitHub, and it is Patrick's call like any live release.
+
+  dev builds and publishes the second launcher: the dev branch of the
+  releases repo, the dev server, and a version like 1.1.35.3 that a main
+  release always outranks. It may ship from any branch, on either machine.
+
+  THERE IS ONE DEV FEED AND THE LAST DEV SHIP WINS. Both machines publish to
+  the same one, so a dev Ship replaces whatever the other machine put there.
+  Say in #dev before taking it. A main Ship resets dev to match main. A
+  hotfix does not, because the work on dev was not in it.
+
+  Everything goes to dev first, decided by Patrick on 23 September: "even
+  small changes go to the dev build launcher for pretesting". A main Ship is
+  for a security fix or for something that leaves the game untestable, and he
+  says which.
+
+.EXAMPLE
+  .\tools\Ship.ps1 -Channel dev "The map marker points at the right door now"
+
+  Puts this branch on the dev build and the dev server for testing. Say in
+  #dev first: the last dev Ship wins.
+
+.EXAMPLE
+  .\tools\Ship.ps1 -DryRun "The map marker points at the right door now"
+
+  Builds and works out what would ship without publishing it. It closes a
+  running game and puts the new launcher in place on this machine, so run it
+  with the game closed. Get-Help .\tools\Ship.ps1 -Parameter DryRun lists
+  everything it still changes.
+
+.EXAMPLE
+  .\tools\Ship.ps1 "The map marker points at the right door now"
+
+  A main release, from main, pulled, with the version number already moved by
+  Bump-Version.ps1 and merged. Only when Patrick has said it goes live.
+
+.NOTES
   The installer package is the one thing publishing does not touch, and that is
   on purpose: it is a 21 GB copy and a 13 GB compress, twenty minutes or more,
   for a release that is usually a handful of small files. Shipping does not wait
