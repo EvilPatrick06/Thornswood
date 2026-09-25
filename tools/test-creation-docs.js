@@ -48,8 +48,8 @@ function yes(what, cond) {
 const SRC = process.env.GM || path.join(__dirname, 'gamemode.js');
 const gm = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 const skills = read(path.join('ts-ui', 'thornswood-skills.js'));
-const known = read(path.join('docs-app', 'data', 'known.md'));
-const help = read(path.join('docs-app', 'data', 'help.md'));
+const known = read(path.join('..', 'site', 'data', 'known.md'));
+const help = read(path.join('..', 'site', 'data', 'help.md'));
 
 /** From a start marker to the first end marker after it, or null. */
 function slice(src, start, end) {
@@ -150,9 +150,9 @@ function launcherChooses(s) {
 
 // The public site pages are not this entry's to rewrite, but they say the
 // same thing and must go on agreeing with the game. They do today.
-const siteDir = path.join(__dirname, 'docs-app', 'data', 'site');
+const siteDir = path.join(__dirname, '..', 'site', 'data', 'site');
 fs.readdirSync(siteDir).filter(function (f) { return /\.md$/.test(f); }).forEach(function (f) {
-  const wrong = sentences(read(path.join('docs-app', 'data', 'site', f))).filter(launcherChooses);
+  const wrong = sentences(read(path.join('..', 'site', 'data', 'site', f))).filter(launcherChooses);
   if (wrong.length) { yes('site/' + f + ' puts a choice in the launcher: "' + wrong[0] + '"', false); }
 });
 

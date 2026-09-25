@@ -5941,7 +5941,7 @@ var CROP_GROW_MINUTES_MAX = ENGINE_RELOOT_MINUTES - 5;
 /*
   WHAT A FARMER MAY GROW, AND HOW LONG IT TAKES. INVENTED, ALL OF IT.
 
-  tools\docs-app\data\site\classes.md, 'What you are allowed to grow', publishes
+  site\data\site\classes.md, 'What you are allowed to grow', publishes
   the ladder and not the crops in it: Novice the common field crops, Advanced
   the crops worth more than those, Expert the orchard, Master everything. Which
   crop sits on which rung is the part nobody has written down, so it is decided
@@ -12267,7 +12267,7 @@ log('gamemode loaded:',
       plant and replant and wait you know'.
 
       WHAT THE RULEBOOK NOW SETS, and it is more than it set this morning.
-      tools\docs-app\data\site\classes.md has a Farming section as of
+      site\data\site\classes.md has a Farming section as of
       20 September. It says plots start empty; that a farmer claims one farm at a
       time and a claim lapses if the farm is left unworked; that the crop is its
       own seed; that a higher rank shortens the wait; that what you bring in is

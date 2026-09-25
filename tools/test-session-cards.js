@@ -28,12 +28,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const PAGE = path.join(__dirname, 'docs-app', 'public', 'index.html');
+const PAGE = path.join(__dirname, '..', 'site', 'public', 'index.html');
 const src = fs.readFileSync(PAGE, 'utf8');
 
 function grab(name) {
   const at = src.indexOf('function ' + name);
-  if (at < 0) throw new Error('docs-app/public/index.html has no function ' + name);
+  if (at < 0) throw new Error('site/public/index.html has no function ' + name);
   const b = src.indexOf('{', at);
   let d = 0;
   for (let i = b; i < src.length; i++) {

@@ -32,7 +32,7 @@
 // Read only.
 const fs = require('fs');
 const path = require('path');
-const APP = process.env.DOCS_APP || path.join(__dirname, 'docs-app');
+const APP = process.env.DOCS_APP || path.join(__dirname, '..', 'site');
 const CR = String.fromCharCode(13);
 function read(rel) {
   try { return fs.readFileSync(path.join(APP, rel), 'utf8').split(CR).join(''); }

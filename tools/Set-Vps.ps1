@@ -117,7 +117,7 @@ foreach ($f in (Get-ChildItem -LiteralPath $RepoDir -Recurse -File -ErrorAction 
   # data\board.json and the like are a record of what was said, not a setting.
   # Rewriting history there would make old messages describe a box that never
   # existed at the time. Those get listed and left alone.
-  $isRecord = ($rel -match '(^|[\\/])docs-app[\\/]data[\\/]') -and ($f.Extension -eq '.json')
+  $isRecord = ($rel -match '(^|[\\/])site[\\/]data[\\/]') -and ($f.Extension -eq '.json')
 
   if ($isRecord) { $content += [pscustomobject]@{ Rel = $rel; Count = $n } }
   else { $hits += [pscustomobject]@{ Path = $f.FullName; Rel = $rel; Count = $n; Text = $text } }

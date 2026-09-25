@@ -16,7 +16,7 @@
   below puts the two halves back together and compares every byte.
 
   It lifts the real /file/ route and the real static route out of
-  docs-app\server.js by text and serves them from a real node http server on
+  site\server.js by text and serves them from a real node http server on
   a loopback port, against files in a temp folder. Nothing is read from or
   written to the site's own folders, and no other port is touched.
 */
@@ -26,7 +26,7 @@ const os = require('os');
 const http = require('http');
 
 const CR = String.fromCharCode(13);
-const SRC = path.join(__dirname, 'docs-app', 'server.js');
+const SRC = path.join(__dirname, '..', 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
 let pass = 0, fail = 0;
@@ -43,7 +43,7 @@ function block(at) {
     if (src[i] === '{') d++;
     else if (src[i] === '}') { d--; if (d === 0) return i + 1; }
   }
-  throw new Error('unbalanced braces in docs-app/server.js');
+  throw new Error('unbalanced braces in site/server.js');
 }
 function grab(head) {
   const at = src.indexOf(head);

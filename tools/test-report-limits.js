@@ -10,7 +10,7 @@
 // anywhere pushed every ticket off the end.
 //
 // TWO HALVES. The first lifts the block between the report limits markers out
-// of docs-app\server.js and drives it with fake requests and a fake clock,
+// of site\server.js and drives it with fake requests and a fake clock,
 // because that is the only way to reach a socket that is not loopback and a
 // day that has gone by. The second copies the real server.js into a scratch
 // folder, starts it on a spare port and fires real posts at it, which is the
@@ -29,9 +29,9 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const CR = String.fromCharCode(13);
-const SRC = path.join(__dirname, 'docs-app', 'server.js');
+const SRC = path.join(__dirname, '..', 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const HOME = fs.readFileSync(path.join(__dirname, 'docs-app', 'public', 'home.html'), 'utf8')
+const HOME = fs.readFileSync(path.join(__dirname, '..', 'site', 'public', 'home.html'), 'utf8')
   .split(CR).join('');
 
 let pass = 0, fail = 0;

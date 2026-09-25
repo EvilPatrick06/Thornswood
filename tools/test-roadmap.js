@@ -57,7 +57,7 @@ function says(text, n) {
 
 // ------------------------------------------------------------- the board ----
 let board = null;
-try { board = JSON.parse(read('docs-app/data/board.json')); }
+try { board = JSON.parse(read('../site/data/board.json')); }
 catch (e) { console.log('      board.json: ' + e.message); }
 yes('board.json parses', !!board);
 
@@ -189,7 +189,7 @@ yes('the row never says player', !/\bplayers?\b/i.test(text));
 
 // -------------------------------------------------- the note in todo.md ----
 /* The note the wrong numbers were copied from, so the next copy is right. */
-const todo = read('docs-app/data/todo.md');
+const todo = read('../site/data/todo.md');
 const t0 = todo.indexOf('- Emote wheel.');
 const t1 = t0 < 0 ? -1 : todo.indexOf('\n- ', t0 + 1);
 const note = t0 < 0 ? '' : todo.slice(t0, t1 < 0 ? todo.length : t1).replace(/\s+/g, ' ');

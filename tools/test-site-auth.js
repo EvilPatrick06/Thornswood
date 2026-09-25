@@ -8,10 +8,10 @@
   good forever, and the OAuth state was the same string for every attempt at
   the same page and could be used again. This drives all three for real.
 
-  It runs the real docs-app\server.js out of a scratch folder on a spare port,
+  It runs the real site\server.js out of a scratch folder on a spare port,
   with a config written here for this run: a random secret, a random bot key,
   and one id on the hand written admin list so nobody has to be in a real
-  Discord. Never tools\docs-app\config.json and never the live one, whose key
+  Discord. Never site\config.json and never the live one, whose key
   is entry 2's to rotate. The key made here is never printed either.
 
   Nothing leaves the machine. A stub loaded ahead of the site answers the two
@@ -34,7 +34,7 @@ const net = require('net');
 const os = require('os');
 const path = require('path');
 
-const SITE_SRC = process.argv[2] || path.join(__dirname, 'docs-app', 'server.js');
+const SITE_SRC = process.argv[2] || path.join(__dirname, '..', 'site', 'server.js');
 const GAME_SRC = process.argv[3] || path.join(__dirname, 'gamemode.js');
 
 let pass = 0, fail = 0;

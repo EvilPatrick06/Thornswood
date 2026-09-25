@@ -89,7 +89,7 @@ function glob(f) {
 
 const SIX = ['docs-app', 'voice', 'ts-plugins', 'ts-ui', 'setup', 'launcher'];
 // Where each lives: voice left tools for the repository root on 25 September.
-const AT = { 'voice': 'voice' };
+const AT = { 'voice': 'voice', 'docs-app': 'site' };
 function at(d) { return AT[d] || ('tools/' + d); }
 const HEADS = ['## What it is', '## On your machine', '## Where it runs'];
 const readme = {};
@@ -156,7 +156,7 @@ SIX.forEach(function (d) {
 // ------------------------------------------------------------------ the site --
 {
   const t = readme['docs-app'] || '';
-  const server = read('tools/docs-app/server.js') || '';
+  const server = read('site/server.js') || '';
   const deploy = read('tools/Deploy-Docs.ps1') || '';
   const port = (/THORNSWOOD_DOCS_PORT \|\| (\d+)/.exec(server) || [])[1];
   yes('site: server.js has a default port to hold the README to', !!port);

@@ -34,7 +34,7 @@ release, launcher, game files and server together, are in CONTRIBUTING.md.
 | Game server | VPS 192.135.112.23, `C:\Thornswood-Server`, UDP/TCP 7777, resources 3000, task `Thornswood Server` | skymp5-server with `gamemode.js`; the door reads its allowed list from the site |
 | Dev game server | `C:\Thornswood-Server-Dev`, 7787, resources 7788, task `Thornswood Dev Server` | Same binaries, fresh world, door list is Owner and Dev only (`https://thornswood.net/dev`) |
 | Voice | `C:\Thornswood-Voice` 7778 and `C:\Thornswood-Voice-Dev` 7789 | node, `voice\voice-server.js`; the launcher holds the microphone, the game plugin relays state through files in `Data\Platform` |
-| Site | `tools\docs-app`, on the VPS at `C:\Thornswood-Docs`, node on 127.0.0.1:3001 behind Caddy, https://thornswood.net | Public pages from `data\site\*.md`, admin hub, Discord login, the door API, uploads, news |
+| Site | `site`, on the VPS at `C:\Thornswood-Docs`, node on 127.0.0.1:3001 behind Caddy, https://thornswood.net | Public pages from `data\site\*.md`, admin hub, Discord login, the door API, uploads, news |
 | Bot | `bot`, on the VPS at `C:\Thornswood-Bot`, task `Thornswood Bot` | discord.py: tickets, join cards, staff tools |
 | Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour |
 
@@ -443,7 +443,7 @@ it per session and ignores which profile Vortex has on.
   Claude on top of them. The To Do board,
   https://github.com/users/EvilPatrick06/projects/1: all outstanding work.
 - `README.md`: what the repo is and where to start. A customer's install is
-  the site's join page, `tools\docs-app\data\site\join.md`; setting up a
+  the site's join page, `site\data\site\join.md`; setting up a
   developer's machine is "Setting up a machine" above.
 - `tools\app\ARCHITECTURE.md`: how the launcher starts, what each class owns
   on disk, and every step between pressing Play and the game starting.
@@ -451,7 +451,7 @@ it per session and ignores which profile Vortex has on.
   mod collection.
 - `docs\OWNERSHIP.md`: who holds each credential, account and build, and who
   the second holder is.
-- `lore\`: history and the Accord. `tools\docs-app\data\site\*.md`: the public
+- `lore\`: history and the Accord. `site\data\site\*.md`: the public
   pages (join, rules, classes, world, credits, privacy, terms), also live on
   the site.
 - The site's hub boards (Active Issues, Known Issues, Test These, Suggestions,

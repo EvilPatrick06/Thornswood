@@ -40,7 +40,7 @@ const crypto = require('crypto');
 const vm = require('vm');
 const { spawn } = require('child_process');
 
-const APP = path.join(__dirname, 'docs-app');
+const APP = path.join(__dirname, '..', 'site');
 const PUBLIC = path.join(APP, 'public');
 const MARKED = 'marked-12.0.2.min.js';
 

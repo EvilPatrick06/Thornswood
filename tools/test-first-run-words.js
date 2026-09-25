@@ -27,7 +27,7 @@ function read(rel) {
 }
 const xaml = read('ui.xaml');
 const help = read(path.join('app', 'Help.cs'));
-const site = read(path.join('docs-app', 'data', 'help.md'));
+const site = read(path.join('..', 'site', 'data', 'help.md'));
 const shell = read(path.join('app', 'Shell.cs'));
 
 let pass = 0, fail = 0;

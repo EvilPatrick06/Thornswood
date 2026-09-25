@@ -108,20 +108,20 @@ try {
     # With a byte order mark, which the check has to read through.
     Put 'tools/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>', ('<TextBlock Text="one' + $em + 'two"/>')) $utf8bom
     Put 'bot/content.py' @('WELCOME = """', 'Nothing wrong here.', '"""')
-    Put 'tools/docs-app/data/site/a.md' @('Fine.', ('Not' + $em + 'fine.'))
-    Put 'tools/docs-app/data/site/b.md' @('Fine, with a hyphen - and nothing else.')
-    Put 'tools/docs-app/data/known.md' @('| A | B |', '| a player save | why |')
-    Put 'tools/docs-app/data/help.md' @('Fine.')
-    Put 'tools/docs-app/public/home.html' @('<html>', '<body>', '<p>one &mdash; two</p>', '</body>', '</html>')
+    Put 'site/data/site/a.md' @('Fine.', ('Not' + $em + 'fine.'))
+    Put 'site/data/site/b.md' @('Fine, with a hyphen - and nothing else.')
+    Put 'site/data/known.md' @('| A | B |', '| a player save | why |')
+    Put 'site/data/help.md' @('Fine.')
+    Put 'site/public/home.html' @('<html>', '<body>', '<p>one &mdash; two</p>', '</body>', '</html>')
 
     $want = @(
         'README.md:2', 'README.md:3', 'README.md:4', 'README.md:7',
         'SECURITY.md:2', 'SECURITY.md:3', 'SECURITY.md:4',
         'tools/app/Help.cs:2',
         'tools/ui.xaml:2',
-        'tools/docs-app/data/site/a.md:2',
-        'tools/docs-app/data/known.md:2',
-        'tools/docs-app/public/home.html:3'
+        'site/data/site/a.md:2',
+        'site/data/known.md:2',
+        'site/public/home.html:3'
     ) | Sort-Object
 
     $before = @{}
@@ -136,7 +136,7 @@ try {
     Yes 'nothing allowed is reported: multiplayer, playtest, getPlayer, PlayerCharacter, an en dash, a hyphen' ($extra.Count -eq 0)
     Yes ('a hit exits 1 (exit ' + $s.Code + ')') ($s.Code -eq 1)
     Yes 'a file with a byte order mark is read through it' ($s.Hits -contains 'tools/ui.xaml:2')
-    Yes 'a page under the site glob is named by its own path' ($s.Hits -contains 'tools/docs-app/data/site/a.md:2')
+    Yes 'a page under the site glob is named by its own path' ($s.Hits -contains 'site/data/site/a.md:2')
 
     $after = @{}
     foreach ($f in (Get-ChildItem -Path $tmp -Recurse -File)) { $after[$f.FullName] = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash }
@@ -162,9 +162,9 @@ try {
     Put 'SECURITY.md' @('Fine.')
     Put 'tools/app/Help.cs' @('new HelpItem("x", "fine"),')
     Put 'tools/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>') $utf8bom
-    Put 'tools/docs-app/data/site/a.md' @('Fine.')
-    Put 'tools/docs-app/data/known.md' @('| A | B |', '| an ordinary Skyrim save | why |')
-    Put 'tools/docs-app/public/home.html' @('<p>one, two</p>')
+    Put 'site/data/site/a.md' @('Fine.')
+    Put 'site/data/known.md' @('| A | B |', '| an ordinary Skyrim save | why |')
+    Put 'site/public/home.html' @('<p>one, two</p>')
     $c2 = Invoke-Check $self $tmp
     Yes ('clean files exit 0 with no hits (exit ' + $c2.Code + ', ' + $c2.Hits.Count + ' hit(s))') ($c2.Code -eq 0 -and $c2.Hits.Count -eq 0)
 

@@ -115,7 +115,7 @@ yes('the join password row names the script that still rotates it', /Rotate-Serv
 // game server has grown a password and the row has to be rewritten.
 const deployGm = read('tools/Deploy-Gamemode.ps1');
 const gamemode = read('tools/gamemode.js');
-const site = read('tools/docs-app/server.js');
+const site = read('site/server.js');
 const rotate = read('tools/Rotate-ServerPassword.ps1');
 const publish = read('tools/Publish-Update.ps1');
 const voice = read('voice/voice-server.js');
@@ -290,7 +290,7 @@ function addDir(rel, re) {
 addDir('tools', /\.(ps1|js)$/i);
 addDir('tools/app', /\.cs$/i);
 addDir('voice', /\.js$/i);
-addDir('tools/docs-app', /^server\.js$/i);
+addDir('site', /^server\.js$/i);
 addDir('bot', /\.py$/i);
 function usedTogether(a, b) {
   a = a.toLowerCase(); b = (b || '').toLowerCase();

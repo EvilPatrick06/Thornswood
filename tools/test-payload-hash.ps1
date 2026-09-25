@@ -12,7 +12,7 @@
 
   THREE PIECES HAVE TO AGREE, AND THIS RUNS ALL THREE. Publish-Installer.ps1
   measures the zip and writes the hash into files.json. The /api/payload route
-  in docs-app\server.js reads files.json and hands the hash over. Bootstrap.cs
+  in site\server.js reads files.json and hands the hash over. Bootstrap.cs
   reads it out of that reply with the same string search it uses for the rest,
   and deletes a download that does not match. Each piece is lifted out of the
   real file by text and run, the way test-dev-version.ps1 and
@@ -37,7 +37,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $InstallerPath) { $InstallerPath = Join-Path $Here 'Publish-Installer.ps1' }
-if (-not $ServerPath)    { $ServerPath    = Join-Path $Here 'docs-app\server.js' }
+if (-not $ServerPath)    { $ServerPath    = Join-Path $Here '..\site\server.js' }
 if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here 'setup\Bootstrap.cs' }
 
 $script:pass = 0

@@ -51,8 +51,8 @@ function at(hits) {
 }
 
 // --------------------------------------------------- the disclaimer stays --
-const credits = read('tools/docs-app/data/site/credits.md');
-const home = read('tools/docs-app/public/home.html');
+const credits = read('site/data/site/credits.md');
+const home = read('site/public/home.html');
 yes('credits.md and home.html are both there', credits !== null && home !== null);
 const bc = lines(credits, /bethesda/i);
 const bh = lines(home, /bethesda/i);
@@ -68,14 +68,14 @@ yes('and so does the foot of home.html', flat(home).indexOf(line) >= 0);
 // typed out, or the words. Case matters for the typed ones, because the
 // scripts in home.html are full of function (r).
 const MARK = /™|®|&trade;|&reg;|&#8482;|&#174;|\((TM|R)\)|[Rr]egistered [Tt]rademark/;
-const pages = ['README.md', 'tools/docs-app/public/home.html'];
+const pages = ['README.md', 'site/public/home.html'];
 let site = [];
 try {
-  site = fs.readdirSync(path.join(ROOT, 'tools/docs-app/data/site'))
+  site = fs.readdirSync(path.join(ROOT, 'site/data/site'))
     .filter(function (f) { return /\.md$/.test(f); }).sort();
 } catch (e) { site = []; }
 yes('the public pages in data/site can be listed (' + site.length + ')', site.length > 0);
-site.forEach(function (f) { pages.push('tools/docs-app/data/site/' + f); });
+site.forEach(function (f) { pages.push('site/data/site/' + f); });
 pages.forEach(function (rel) {
   const t = read(rel);
   if (t === null) { yes(rel + ' is there', false); return; }

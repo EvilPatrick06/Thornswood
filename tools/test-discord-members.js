@@ -16,18 +16,18 @@
   HOW MANY REQUESTS GO OUT, because that is the whole point of the change and
   it is the one thing that cannot be seen by reading the answer.
 
-  It reads the real functions out of docs-app\server.js rather than a copy, so
+  It reads the real functions out of site\server.js rather than a copy, so
   it cannot pass against a version of them that is no longer what ships.
 */
 const fs = require('fs');
 const path = require('path');
 
-const SRC = path.join(__dirname, 'docs-app', 'server.js');
+const SRC = path.join(__dirname, '..', 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8');
 
 function grab(name) {
   const at = src.indexOf('async function ' + name);
-  if (at < 0) throw new Error('docs-app/server.js has no async function ' + name);
+  if (at < 0) throw new Error('site/server.js has no async function ' + name);
   const b = src.indexOf('{', at);
   let d = 0;
   for (let i = b; i < src.length; i++) {

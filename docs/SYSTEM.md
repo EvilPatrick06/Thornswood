@@ -116,10 +116,10 @@ packs and as its own asset named in the feed's `clientRuntime`
   `Publish-Installer.ps1` copies it over ssh into `C:\Thornswood-Docs\files`
   on the VPS (`Publish-Installer.ps1:45,157,198`). The setup program asks the
   site's `/api/payload` for the newest `Thornswood-Setup-*.zip`, its size and
-  sha256 (`tools/docs-app/server.js:2247-2275`); people get it from
+  sha256 (`site/server.js:2247-2275`); people get it from
   `https://thornswood.net/downloads` (`server.js:2214-2215`). A dev release
   never touches the installer (`Ship.ps1:975-978`).
-- **The site.** `tools\docs-app`, deployed by `Deploy-Docs.ps1` into
+- **The site.** `site`, deployed by `Deploy-Docs.ps1` into
   `C:\Thornswood-Docs` (`Deploy-Docs.ps1:43`). Node listens on 3001
   (`server.js:34`) and, once `THORNSWOOD_DOCS_LOCAL=1` is set by
   `Setup-Domain.ps1:207`, only on 127.0.0.1 (`server.js:38`). Caddy holds 80 and

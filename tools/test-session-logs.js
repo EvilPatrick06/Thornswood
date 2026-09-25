@@ -34,12 +34,12 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 
-const SRC = path.join(__dirname, 'docs-app', 'server.js');
+const SRC = path.join(__dirname, '..', 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8');
 
 function grab(name) {
   const at = src.indexOf('function ' + name);
-  if (at < 0) throw new Error('docs-app/server.js has no function ' + name);
+  if (at < 0) throw new Error('site/server.js has no function ' + name);
   const b = src.indexOf('{', at);
   let d = 0;
   for (let i = b; i < src.length; i++) {
@@ -284,7 +284,7 @@ console.log('       (rolled by ' + rolledBy + ')');
    real ones rather than a copy that drifts. */
 function grabConst(name) {
   const at = src.indexOf('const ' + name);
-  if (at < 0) throw new Error('docs-app/server.js has no const ' + name);
+  if (at < 0) throw new Error('site/server.js has no const ' + name);
   const open = src.indexOf('[', at);
   let d = 0;
   for (let i = open; i < src.length; i++) {

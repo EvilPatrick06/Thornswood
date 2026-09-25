@@ -71,8 +71,8 @@ $clientPath  = Join-Path $Here 'client-build.json'
 $serverPath  = Join-Path $Here 'server-build.json'
 $packagePath = Join-Path $Here 'Package-Thornswood.ps1'
 $setupPath   = Join-Path $Here 'Setup-Thornswood.ps1'
-$creditsPath = Join-Path $Here 'docs-app\data\site\credits.md'
-$homePath    = Join-Path $Here 'docs-app\public\home.html'
+$creditsPath = Join-Path $Here '..\site\data\site\credits.md'
+$homePath    = Join-Path $Here '..\site\public\home.html'
 
 $client = Read-Json $clientPath
 $server = Read-Json $serverPath
