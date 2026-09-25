@@ -3958,6 +3958,24 @@ globalThis.__thornswoodChargen = {
     const st = chargenOf(actorId);
     return !!(st && st.stage === 'choosing');
   },
+  /*
+    IN CREATION: the face and then the panel, from the hall to the home.
+
+    Patrick, 24 September, over a tester's screenshot of the hall with the
+    needs bars drawn and drifting: "needs menu shouldnt show or be actuive
+    during creation". The needs block asks this, and it is the chargen stage
+    and nothing else: appearance and choosing are creation, done is the world.
+
+    Before the stage opens there is no record at all for the first SETTLE_MS
+    of a session. For that window it is the same physical fact the tick
+    decides on: standing in the hall means new, because nobody logs out there.
+  */
+  inCreation: function (actorId) {
+    const st = chargenOf(actorId);
+    if (st) { return st.stage === 'appearance' || st.stage === 'choosing'; }
+    if (!CHARGEN_ENABLED) { return false; }
+    try { return mp.get(actorId, 'worldOrCellDesc') === HALL.desc; } catch (e) { return false; }
+  },
   /** The plugin saw the race menu close. Only means something while the face is awaited. */
   faceDone: function (actorId) {
     const st = chargenOf(actorId);
@@ -21453,6 +21471,18 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   }
 
   /*
+    Whether somebody is still making their character. The chargen block's own
+    answer, through the global the way the character block reaches it, and no
+    answer counts as not in creation, so a missing block never freezes anybody.
+  */
+  function inCreation(actorId) {
+    try {
+      var c = g.__thornswoodChargen;
+      return !!(c && c.inCreation && c.inCreation(actorId));
+    } catch (e) { return false; }
+  }
+
+  /*
     Bring a character's meters up to now, and answer them.
 
     Everything is worked out from ELAPSED REAL TIME rather than ticked, so a
@@ -21463,6 +21493,31 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   function settle(actorId, now) {
     now = now || Date.now();
     var n = read(actorId);
+    /*
+      IN CREATION NOTHING MOVES, AND THE CLOCK IS MOVED ON WITH IT.
+
+      Patrick, 24 September, over a tester in the hall with the bars at 96,
+      91 and 99 and Temp at 58 while the K panel was still asking for a home:
+      "needs menu shouldnt show or be actuive during creation". So a character
+      in creation keeps the values they had: no drain, no warming or cooling,
+      and no band to report because nothing crosses one.
+
+      at is still brought up to now, which is the half that matters. Every
+      number here is worked from elapsed time, so leaving at behind would
+      charge the whole of creation in one go on the first settle after it.
+      The first settle after the home is picked starts the meters from the
+      last one here, whether or not they ever reconnect in between.
+
+      creating rides on the property so the HUD takes the bars off. read()
+      drops it, so it is written only while this is true.
+    */
+    if (inCreation(actorId)) {
+      if (!n) { n = fresh(); }
+      n.at = now;
+      n.creating = true;
+      write(actorId, n);
+      return n;
+    }
     if (!n) { n = fresh(); write(actorId, n); return n; }
 
     var hours = (now - n.at) / 3600000;
@@ -22357,6 +22412,18 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
       '    if (!v || typeof v !== "object") { return; }',
       '    var st = ctx.state;',
       '    if (!st) { return; }',
+      /*
+        IN CREATION THE BARS COME OFF, once, and stay off. settle() writes
+        creating while the chargen stage is appearance or choosing. The
+        signature is a word nothing else produces, so the first reading after
+        the home is picked is different from it and draws the bars again.
+      */
+      '    if (v.creating) {',
+      '      if (st.thornswoodHud === "creating") { return; }',
+      '      st.thornswoodHud = "creating";',
+      '      try { ctx.sp.browser.executeJavaScript("(function(){try{var d=document.getElementById(\'ts-hud\');if(d&&d.parentNode){d.parentNode.removeChild(d);}}catch(e){}})();"); } catch (e) { }',
+      '      return;',
+      '    }',
       // Rounded, because the raw numbers move every frame and the screen does
       // not. This is the whole of what stops a per-frame redraw.
       '    var food = Math.round(Number(v.food));',

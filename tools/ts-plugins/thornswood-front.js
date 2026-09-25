@@ -1596,13 +1596,20 @@
   const LOCKPICK = 0xa;
   const toServer = [];
 
+  /*
+    The true after the line marks it as the plugin's own, so the chat page
+    queues it without saying "Not connected yet" over it. Patrick, 24
+    September, over a tester in the creation hall who had typed nothing: "it
+    says mulitple trimes he wasnt connected yet". A page from before the
+    marker ignores it and says what it always said.
+  */
   function tellServer(line) {
     if (line) { toServer.push(line); }
     if (toServer.length > 20) { toServer.splice(0, toServer.length - 20); }
     if (!T.ready) { return; }
     while (toServer.length) {
       const sent = T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' +
-                        JSON.stringify(toServer[0]) + ');}catch(e){}');
+                        JSON.stringify(toServer[0]) + ',true);}catch(e){}');
       if (!sent) { return; }
       toServer.shift();
     }
