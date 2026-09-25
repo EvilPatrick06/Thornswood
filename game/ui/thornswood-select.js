@@ -707,9 +707,22 @@
   // Every two seconds while the choice is up. The plugin reloads the page
   // after six seconds without one, which is how a page that dies under the
   // mouse comes back instead of leaving a blank menu.
+  //
+  // No fallback while the scroll is on, Djinn, 25 September: the client's
+  // fallback to the last character is only for somebody who ticked "Start
+  // without the scroll next time". With the scroll on, this page tells the
+  // client ('thornswood', 'stay') on the first beat and every ten seconds
+  // after, until a character is picked; from the first one the client never
+  // falls back this session (the fork's AuthService). Repeated because the
+  // page is up before the client listens. With the scroll off it stays quiet
+  // and the three minute fallback works as before.
+  var beats = 0;
   var beat = setInterval(function () {
     if (sent || root.className === 'gone') { clearInterval(beat); return; }
     tell('alive ' + seen());
+    if (LIST.intro !== false && beats++ % 5 === 0) {
+      try { window.skyrimPlatform.sendMessage('thornswood', 'stay'); } catch (e) { }
+    }
   }, 2000);
 
   window.thornswoodSelect = { play: play, acked: onAcked, close: function () { root.className = 'gone'; } };
