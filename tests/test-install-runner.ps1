@@ -37,6 +37,9 @@ function Yes([string]$what, [bool]$cond) {
 $path = Join-Path $Tools '..\scripts\deploy\Install-Runner.ps1'
 $text = [IO.File]::ReadAllText($path)
 $yml = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
+# The bot harnesses run in the nightly checks since 25 September.
+$night = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\nightly.yml'))
+$nightRunsOn = [regex]::Match($night, 'runs-on:\s*(\[[^\]]+\])').Groups[1].Value
 
 $t = $null; $e = $null
 [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$t, [ref]$e)
@@ -47,13 +50,14 @@ $label = [regex]::Match($text, "\[string\]\`$Label\s*=\s*'([^']+)'").Groups[1].V
 Yes "Install-Runner gives the runner a label ($label)" ($label.Length -gt 0)
 $runsOn = [regex]::Match($yml, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value
 Yes "build.yml asks for a self-hosted Windows runner with that label ($runsOn)" ($runsOn -match 'self-hosted' -and $runsOn -match 'Windows' -and $runsOn -match [regex]::Escape($label))
+Yes "nightly.yml runs on the same runner ($nightRunsOn)" ($nightRunsOn -match 'self-hosted' -and $nightRunsOn -match 'Windows' -and $nightRunsOn -match [regex]::Escape($label) -and $label)
 Yes '  and no longer for GitHub''s own runners' ($yml -notmatch 'windows-latest')
 Yes '  with a timeout' ($yml -match '(?m)^\s*timeout-minutes:\s*\d+')
 Yes '  one run per branch at a time' ($yml -match 'cancel-in-progress:\s*true')
 Yes '  and a token that can only read' ($yml -match '(?m)^permissions:\s*\r?\n\s+contents:\s*read')
 
 # ---- the bot step never touches the machine's Python ----------------------------
-Yes 'the bot harnesses install into a venv of their own' ($yml -match 'python -m venv' -and $yml -match "Scripts\\python\.exe")
+Yes 'the bot harnesses install into a venv of their own' ($night -match 'python -m venv' -and $night -match "Scripts\\python\.exe")
 Yes '  and nothing runs pip with the machine''s python' ($yml -notmatch '(?m)^\s*python -m pip install')
 
 # ---- the account ------------------------------------------------------------------
@@ -80,7 +84,8 @@ Yes 'the registration token is never printed' ($sayToken.Count -eq 0)
 Yes '  and is dropped once used' ($text -match '(?m)^\$token = \$null')
 
 # ---- priority ----------------------------------------------------------------------
-Yes 'the runner is held at below normal priority' ($text -match "PriorityClass = ''BelowNormal''")
+Yes 'the runner is held at normal priority, not above' ($text -match "PriorityClass = ''Normal''" -and $text -notmatch "PriorityClass = ''(High|AboveNormal|RealTime)''")
+Yes 'Defender skips the runner''s own folder and nothing else' ($text -match 'Add-MpPreference -ExclusionPath `\$root' -and ([regex]::Matches($text, 'Add-MpPreference')).Count -eq 1)
 Yes '  by a task that runs at start and every five minutes' ($text -match 'AtStartup' -and $text -match 'RepetitionInterval \(New-TimeSpan -Minutes 5\)')
 
 # ---- ssh ---------------------------------------------------------------------------

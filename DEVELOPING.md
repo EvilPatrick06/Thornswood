@@ -143,13 +143,12 @@ Several people, several machines, one repo. The short rules are in
   commits with plain messages, `git push -u origin <branch>`, then
   `gh pr create --fill` standing on the branch. Nothing is force pushed.
 - **What GitHub enforces on main, and what it does not.** Since 25 Sep:
-  `enforce_admins` is off; there is no required check, because the build
-  check on GitHub was turned off and Patrick removed `Launcher builds` from
-  the rules the same day; required approving reviews is 0; the code owner
-  review is off. So a pull request can be merged by its own author as soon
-  as it is opened, and nothing on GitHub has built it first: run the
-  harnesses you touched, and `Build-Launcher.ps1` into a scratch root if you
-  touched the launcher, before you merge. Nothing merges by itself: auto-merge is off on the repository, so
+  `enforce_admins` is off; there is no required check; required approving
+  reviews is 0; the code owner review is off. The build check,
+  `Launcher builds` in `.github/workflows/build.yml`, runs on every pull
+  request on the VPS runner, and the rule is ours rather than a setting:
+  merge your own pull request once it is green and you have said so in
+  #staff-general. Nothing merges by itself: auto-merge is off on the repository, so
   somebody presses merge or runs `gh pr merge --squash`. Each of us merges
   our own. Somebody else on the team reading a pull request first is a habit,
   not a setting. `.github/CODEOWNERS` asks the rest of the team for a review when

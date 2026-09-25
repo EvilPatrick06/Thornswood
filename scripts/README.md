@@ -12,9 +12,8 @@ the script, then run
 
     .\scripts\dev\New-ScriptIndex.ps1
 
-and commit this file with it. tests\test-script-index.ps1 fails when this
-file is not what that would write; run it before merging, since the build
-check on GitHub is off.
+and commit this file with it. tests\test-script-index.ps1, which the nightly
+checks run, fails when this file is not what that would write.
 
 A script's options are not listed here. Get-Help reads them off its param
 block, so they are always all of them:
@@ -33,7 +32,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [deploy/Deploy-Server.ps1](deploy/Deploy-Server.ps1) | Sends the built server up to the VPS and restarts it. |
 | [deploy/Install-Backup.ps1](deploy/Install-Backup.ps1) | Puts the nightly backup on the VPS: sends vps-nightly-backup.ps1 up, makes a passphrase if there is not one yet, and registers the scheduled task that runs it. |
 | [deploy/Install-Bot.ps1](deploy/Install-Bot.ps1) | Puts the Thornswood bot on the VPS and keeps it running. |
-| [deploy/Install-Runner.ps1](deploy/Install-Runner.ps1) | Puts a GitHub Actions runner on the VPS, so the build check can run there without paying for minutes; the check itself is off and runs only when started by hand. |
+| [deploy/Install-Runner.ps1](deploy/Install-Runner.ps1) | Puts a GitHub Actions runner on the VPS, so the build check runs on every pull request without paying for minutes. |
 | [deploy/Install-ThornswoodContent.ps1](deploy/Install-ThornswoodContent.ps1) | Drops Thornswood-Content.esp into the game folder and inserts it into the load order ahead of the city overhauls. |
 | [deploy/Install-ThornswoodServer.ps1](deploy/Install-ThornswoodServer.ps1) | Run this ON THE VPS, after Bootstrap-VPS.ps1, as Administrator. |
 | [deploy/Install-Voice.ps1](deploy/Install-Voice.ps1) | Puts the proximity voice service on the VPS beside the game server and opens the one port it needs. |
