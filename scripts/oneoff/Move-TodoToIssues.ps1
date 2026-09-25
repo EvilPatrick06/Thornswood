@@ -69,14 +69,23 @@ function Save-Done {
     if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
     [IO.File]::WriteAllText($doneFile, ($done | ConvertTo-Json -Depth 3), (New-Object Text.UTF8Encoding($false)))
 }
-function Gh {
-    $out = & gh @args 2>&1
-    if ($LASTEXITCODE -ne 0) { throw ("gh " + ($args -join ' ') + " failed: " + ($out | Out-String).Trim()) }
+# The gh program itself, found once. A function named Gh here would be the
+# same name to PowerShell, which ignores case, and call itself until the call
+# stack ran out: the first run on 25 September stopped exactly so.
+$GhExe = (Get-Command gh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+if (-not $GhExe -and -not $DryRun) { throw 'gh is not installed or not on the PATH.' }
+# What gh prints to stdout comes back; what it prints to stderr (progress and
+# warnings) is kept out of it, so it cannot land in the JSON being read, and
+# is shown only when gh fails.
+function Invoke-Gh {
+    $all = @(& $GhExe @args 2>&1)
+    $out = @($all | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { [string]$_ })
+    if ($LASTEXITCODE -ne 0) { throw ("gh " + ($args -join ' ') + " failed: " + (($all | ForEach-Object { [string]$_ }) -join ' ').Trim()) }
     return $out
 }
 
 if (-not $DryRun) {
-    & gh auth status 2>&1 | Out-Null
+    & $GhExe auth status 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'gh is not signed in. Run gh auth login first.' }
 }
 
@@ -89,23 +98,23 @@ foreach ($l in $labels) {
     if ($l -like 'wave:*') { $color = 'fbca04' }
     elseif ($l -like 'needs:*') { $color = 'd93f0b' }
     elseif ($l -eq 'anyone can start') { $color = '0e8a16' }
-    if ($DryRun) { Write-Host "  would make: $l" } else { Gh label create $l -R $Repo --color $color --force | Out-Null }
+    if ($DryRun) { Write-Host "  would make: $l" } else { Invoke-Gh label create $l -R $Repo --color $color --force | Out-Null }
 }
 
 # ---- the board --------------------------------------------------------------
 $number = $null; $projectId = $null; $fieldId = $null
 if (-not $DryRun) {
-    $projects = (Gh project list --owner $Owner --format json --limit 100 | Out-String) | ConvertFrom-Json
+    $projects = (Invoke-Gh project list --owner $Owner --format json --limit 100 | Out-String) | ConvertFrom-Json
     $p = @($projects.projects | Where-Object { $_.title -eq $Title }) | Select-Object -First 1
     if (-not $p) {
-        $p = (Gh project create --owner $Owner --title $Title --format json | Out-String) | ConvertFrom-Json
+        $p = (Invoke-Gh project create --owner $Owner --title $Title --format json | Out-String) | ConvertFrom-Json
         Write-Host "Made the Project: $Title"
     } else { Write-Host "Found the Project: $Title" }
     $number = $p.number; $projectId = $p.id
-    & gh project link $number --owner $Owner --repo $Repo 2>&1 | Out-Null
-    $fields = (Gh project field-list $number --owner $Owner --format json --limit 100 | Out-String) | ConvertFrom-Json
+    & $GhExe project link $number --owner $Owner --repo $Repo 2>&1 | Out-Null
+    $fields = (Invoke-Gh project field-list $number --owner $Owner --format json --limit 100 | Out-String) | ConvertFrom-Json
     $f = @($fields.fields | Where-Object { $_.name -eq 'Order' }) | Select-Object -First 1
-    if (-not $f) { $f = (Gh project field-create $number --owner $Owner --name Order --data-type NUMBER --format json | Out-String) | ConvertFrom-Json }
+    if (-not $f) { $f = (Invoke-Gh project field-create $number --owner $Owner --name Order --data-type NUMBER --format json | Out-String) | ConvertFrom-Json }
     $fieldId = $f.id
 } else {
     Write-Host "  would find or make the Project '$Title', link it to $Repo, and give it a number field Order"
@@ -126,9 +135,9 @@ try {
         [IO.File]::WriteAllText($tmp, [string]$i.body, (New-Object Text.UTF8Encoding($false)))
         $a = @('issue', 'create', '-R', $Repo, '--title', [string]$i.title, '--body-file', $tmp, '--label', ($i.labels -join ','))
         if ($i.assignee) { $a += @('--assignee', [string]$i.assignee) }
-        $url = ((Gh @a) | Select-Object -Last 1).ToString().Trim()
-        $item = (Gh project item-add $number --owner $Owner --url $url --format json | Out-String) | ConvertFrom-Json
-        Gh project item-edit --id $item.id --project-id $projectId --field-id $fieldId --number ([int]$i.order) | Out-Null
+        $url = ((Invoke-Gh @a) | Select-Object -Last 1).ToString().Trim()
+        $item = (Invoke-Gh project item-add $number --owner $Owner --url $url --format json | Out-String) | ConvertFrom-Json
+        Invoke-Gh project item-edit --id $item.id --project-id $projectId --field-id $fieldId --number ([int]$i.order) | Out-Null
         $done[$key] = $url
         Save-Done
         $made++
