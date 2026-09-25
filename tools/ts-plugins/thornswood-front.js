@@ -2045,9 +2045,159 @@
     raceWasOpen = open;
     if (!open) {
       raceToldAt = 0;
+      // Not when the menu went because the game is being closed: a face
+      // left half made is not a face done. See closeGame.
+      if (closingGame) { log('the race menu closed with the game closing, not telling the server'); return; }
       log('the race menu closed, telling the server');
       tellServer('/face done');
     }
+  }));
+
+  /*
+    ------------------------------------------ closing Skyrim while making a face
+
+    Patrick, 24 September: "there is no button to close skyrim still while
+    doing the actiual chacrther making and desing stuff before naming
+    yourself". The face and body are made in Skyrim's own RaceSex Menu,
+    which owns the mouse, and skymp5-client hides the browser for the whole
+    of it (badMenus in browserService.ts), so nothing on our page can be
+    shown there, let alone clicked. A key is the only way in.
+
+    F10 PRESSED TWICE within five seconds, and only while the RaceSex Menu
+    is open. The first press arms it and the line on screen says to press it
+    again; five seconds without a second press disarms it. With the menu
+    shut the key does nothing at all, so it can never end a session in the
+    world. The quit is closeGame, the same one the character page's Close
+    the game uses.
+
+    WHY F10, checked on 24 September against what is really bound rather
+    than remembered, and held there by tools\test-creation-close.js:
+      RaceMenu, which draws this menu here, reads Accept, Activate, Cancel,
+      the four directions, Jump, Quicksave (F5), Quickload (F9), Ready
+      Weapon, Shout, Sneak, Sprint, Toggle POV and Wait, and Tab, Enter,
+      Shift, Alt and Space by code: read out of racesex_menu.swf in the game
+      folder. Skyrim's own controlmap.txt (Skyrim - Interface.bsa) has F5,
+      F9 and F12 in play; its other function key rows are the debug
+      overlay's. skymp5-client holds F1, F2 and F6. SkyUI's four favourite
+      group keys are F1 to F4, the mod settings menu is F4, and
+      thornswood-mark.js has F8. F10 was the minimap's settings panel until
+      the minimap left the build on 20 September (Keys.cs), and nothing else
+      of ours or in the installed mods' ini files answers to it. And the
+      name box on this same menu takes letters, which is why it is not one.
+
+    CloseGameKey in Thornswood.ini, like every other key here, and 68 when
+    it is not there.
+
+    THE LINE. SkyrimPlatform draws its own texts (createText, the call
+    skymp5-client draws the names above heads with), not the page, but by
+    default only while the browser is visible: 'inheritBrowser', TextApi.h
+    in the fork. So while the menu is open the texts are switched 'on', and
+    when it closes they go back to what they were. For those minutes a name
+    above somebody else in the hall can show over the menu too; that is the
+    whole cost, and it ends with the menu.
+  */
+  let closingGame = false;   // set by closeGame, read by the race menu above
+  const CLOSE_GAME_KEY = iniNumber(ini, 'CloseGameKey', 68);   // F10
+  const CLOSE_GAME_NAME = ({ 59: 'F1', 60: 'F2', 61: 'F3', 62: 'F4', 63: 'F5', 64: 'F6',
+                             65: 'F7', 66: 'F8', 67: 'F9', 68: 'F10', 87: 'F11', 88: 'F12' })[CLOSE_GAME_KEY] ||
+                          keyName(CLOSE_GAME_KEY);
+  const CLOSE_ARM_MS = 5000;
+  const CLOSE_LINE_EVERY = 200;
+  const CLOSE_LINE_COLOUR = [0.91, 0.82, 0.61, 0.95];   // the K panel's gold
+  let closeArmedAt = 0;
+  let closeLineId = 0;
+  let closeLineSaid = '';
+  let closeTextsOn = false;    // this block switched the texts on
+  let closeTextsWere = '';     // and what they were before it did
+  let closeLineAt = 0;
+
+  function closeLineText() {
+    return closeArmedAt ? 'Press ' + CLOSE_GAME_NAME + ' again to close Skyrim'
+                        : CLOSE_GAME_NAME + ' twice closes Skyrim';
+  }
+
+  /* Up, or brought up to date. Only ever called with the menu open. The
+     line is ours while its id still says our words: destroyAllTexts, which
+     any plugin may call, empties every text and starts SkyrimPlatform's ids
+     again from one (TextsCollection.cpp in the fork), so the id can be gone
+     or be somebody's name, and then a new line is made rather than their
+     text written over. */
+  function closeLineShow() {
+    const text = closeLineText();
+    if (closeLineId) {
+      let ours = false;
+      try { ours = sp.getTextString(closeLineId) === closeLineSaid; } catch (e) { ours = false; }
+      if (ours && text === closeLineSaid) { return; }
+      if (ours) {
+        try { sp.setTextString(closeLineId, text); closeLineSaid = text; return; } catch (e) { }
+      }
+      closeLineId = 0;
+    }
+    let w = 0, h = 0;
+    try {
+      w = Number(sp.Utility.getINIInt('iSize W:Display')) || 0;
+      h = Number(sp.Utility.getINIInt('iSize H:Display')) || 0;
+    } catch (e) { }
+    if (!w || !h) { w = 1920; h = 1080; }
+    try {
+      closeLineId = sp.createText(Math.round(w / 2), Math.round(h * 0.06), text, CLOSE_LINE_COLOUR);
+      closeLineSaid = text;
+    } catch (e) {
+      closeLineId = 0;
+      log('close key: could not put the line up:', e);
+      return;
+    }
+    try { sp.setTextSize(closeLineId, 0.5); } catch (e) { }
+    if (!closeTextsOn) {
+      try {
+        closeTextsWere = typeof sp.getTextsVisibility === 'function' ? String(sp.getTextsVisibility() || '') : '';
+        sp.setTextsVisibility('on');
+        closeTextsOn = true;
+      } catch (e) { log('close key: could not switch the texts on over the menu:', e); }
+    }
+    log('close key: the RaceSex Menu is open, the line says "' + text + '"');
+  }
+
+  /* Down, and the texts back to what they were. The id is only destroyed
+     while it still says our words, for the reason above. */
+  function closeLineHide() {
+    closeArmedAt = 0;
+    if (closeLineId) {
+      try { if (sp.getTextString(closeLineId) === closeLineSaid) { sp.destroyText(closeLineId); } } catch (e) { }
+      closeLineId = 0;
+      closeLineSaid = '';
+      log('close key: the RaceSex Menu is shut, the line is down');
+    }
+    if (closeTextsOn) {
+      try { sp.setTextsVisibility(closeTextsWere || 'inheritBrowser'); } catch (e) { }
+      closeTextsOn = false;
+      closeTextsWere = '';
+    }
+  }
+
+  sp.on('update', guard('close key line', () => {
+    const now = Date.now();
+    if (now - closeLineAt < CLOSE_LINE_EVERY) { return; }
+    closeLineAt = now;
+    if (closeArmedAt && now - closeArmedAt >= CLOSE_ARM_MS) { closeArmedAt = 0; }
+    if (raceMenuOpen()) { closeLineShow(); } else { closeLineHide(); }
+  }));
+
+  sp.on('buttonEvent', guard('close key', (e) => {
+    if (!e.isDown || e.isUp || e.code !== CLOSE_GAME_KEY) { return; }
+    // Asked at the press, never cached: this is the one gate between a key
+    // and the end of somebody's session.
+    if (!raceMenuOpen()) { closeArmedAt = 0; return; }
+    const now = Date.now();
+    if (closeArmedAt && now - closeArmedAt < CLOSE_ARM_MS) {
+      closeArmedAt = 0;
+      closeGame('the close key, in the RaceSex Menu');
+      return;
+    }
+    closeArmedAt = now;
+    log('close key: pressed once in the RaceSex Menu, once more inside ' +
+        (CLOSE_ARM_MS / 1000) + ' seconds closes Skyrim');
+    closeLineShow();
   }));
 
   sp.on('update', guard('console', () => {
@@ -5291,6 +5441,72 @@
     log('server unreachable', PROBE_STRIKES, 'times running, quitting to the main menu');
   }
 
+  /*
+    Close the game, the one way this file ends Skyrim, for the three things
+    that ask: the character choice page's Close the game ('select:quit'),
+    the K panel's Close Skyrim while creating ('skills:quit'), and the close
+    key in the RaceSex Menu (CLOSE_GAME_KEY). Every one of them asks twice
+    before it gets here, so nothing here asks again.
+
+    The two notes on 'select:quit' in the handler below say why this is
+    win32.exitProcess and not Debug.quitGame, and why the browser is put down
+    first. They were written for the character page and hold for all three:
+    exitProcess needs no Papyrus, so it works from a tick as well as from
+    the key's update.
+
+    closingGame goes up first, so the race menu closing as the game comes
+    apart is not told to the server as a finished face.
+  */
+  function closeGame(from) {
+    closingGame = true;
+    log('menu: closing the game, asked from ' + from);
+    try {
+      T.js('try{' +
+           'var v=document.querySelector("#ts-select video");' +
+           'if(v){v.pause();v.removeAttribute("src");v.load();}' +
+           'var a=document.querySelectorAll("audio");' +
+           'for(var i=0;i<a.length;i++){a[i].pause();a[i].removeAttribute("src");}' +
+           '}catch(e){}');
+    } catch (e) { }
+    try { sp.browser.setFocused(false); } catch (e) { }
+    try { sp.browser.setVisible(false); } catch (e) { }
+
+    let asked = false;
+    try {
+      if (sp.win32 && typeof sp.win32.exitProcess === 'function') {
+        sp.win32.exitProcess();
+        asked = true;
+      }
+    } catch (e) {
+      log('menu: win32.exitProcess threw:', e);
+    }
+    if (!asked) {
+      // Older clients have no win32. Debug.quitGame will almost certainly
+      // throw from a tick for the reason in the notes, but a refusal that is
+      // logged is better than none, and the page's own timeout puts the
+      // button back.
+      try { sp.Debug.quitGame(); asked = true; }
+      catch (e) { log('menu: nothing could close the game:', e); }
+    }
+    if (asked) { log('menu: asked the engine to exit'); }
+    else { closingGame = false; }
+  }
+
+  /*
+    Whether the server's last word on this character is that it is being
+    created. Read off the view the K panel passes back ('skills:view', see
+    the tree block), so 'skills:quit' is taken only from somebody the server
+    itself says is still creating, whatever the page thinks.
+  */
+  let skillsCreating = false;
+  function skillsCreatingFrom(json) {
+    try {
+      const v = JSON.parse(String(json));
+      const p = (v && v.panel && typeof v.panel === 'object') ? v.panel : v;
+      skillsCreating = !!(p && p.creating);
+    } catch (e) { }
+  }
+
   sp.on('browserMessage', guard('browserMessage', (event) => {
     const a = event.arguments;
     if (!a) return;
@@ -5391,35 +5607,12 @@
         None of that can be fixed from here, since the shutdown is the
         engine's. What CAN be done is arriving at it with less to unwind: stop
         the media, drop focus, hide the browser, and only then ask to exit.
-      */
-      try {
-        T.js('try{' +
-             'var v=document.querySelector("#ts-select video");' +
-             'if(v){v.pause();v.removeAttribute("src");v.load();}' +
-             'var a=document.querySelectorAll("audio");' +
-             'for(var i=0;i<a.length;i++){a[i].pause();a[i].removeAttribute("src");}' +
-             '}catch(e){}');
-      } catch (e) { }
-      try { sp.browser.setFocused(false); } catch (e) { }
-      try { sp.browser.setVisible(false); } catch (e) { }
 
-      let asked = false;
-      try {
-        if (sp.win32 && typeof sp.win32.exitProcess === 'function') {
-          sp.win32.exitProcess();
-          asked = true;
-        }
-      } catch (e) {
-        log('menu: win32.exitProcess threw:', e);
-      }
-      if (!asked) {
-        // Older clients have no win32. Debug.quitGame will almost certainly
-        // throw here for the reason above, but a refusal that is logged is
-        // better than none, and the page's own timeout puts the button back.
-        try { sp.Debug.quitGame(); asked = true; }
-        catch (e) { log('menu: nothing could close the game:', e); }
-      }
-      if (asked) { log('menu: asked the engine to exit'); }
+        The code these two notes describe is closeGame, above this handler,
+        since the K panel's Close Skyrim and the close key in the RaceSex
+        Menu end the game the same way.
+      */
+      closeGame('the character choice page');
       return;
     }
     // The character choice page reports in plain lines: ready, alive, the
@@ -5453,6 +5646,22 @@
       log('the ' + what.split(':')[0] + ' panel is in');
       return;
     }
+
+    /*
+      Close Skyrim, from the K panel while creating. The page offers it only
+      while creating and asks twice first (closeButton in
+      thornswood-skills.js); this also asks the server's own last word, so
+      nothing outside creation can end the game from here.
+    */
+    if (what === 'skills:quit') {
+      if (!skillsCreating) {
+        log('skills: the panel asked to close the game, but the server last said this character is not being created; not closing');
+        return;
+      }
+      closeGame('the K panel, while creating');
+      return;
+    }
+    if (what.indexOf('skills:quit ') === 0) { log('skills:', what.slice(7)); return; }
 
     if (what === 'skills:opened') { T.claimFocus('skills', true); return; }
     if (what === 'skills:closed') { T.claimFocus('skills', false); return; }
@@ -5492,7 +5701,7 @@
       own can send the map by itself. The same numbers arriving twice cost
       nothing; an unchanged map is never applied twice.
     */
-    if (what.indexOf('skills:view ') === 0) { treeFromView(what.slice(12)); return; }
+    if (what.indexOf('skills:view ') === 0) { skillsCreatingFrom(what.slice(12)); treeFromView(what.slice(12)); return; }
     if (what.indexOf('skills:effects ') === 0) { treeFromMap(what.slice(15)); return; }
 
     if (what === 'typing') { beat = Date.now(); return; }

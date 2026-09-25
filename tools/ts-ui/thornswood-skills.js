@@ -411,6 +411,9 @@
     'color:#e9d19b;background:rgba(0,0,0,.25);font-family:inherit;cursor:pointer}',
     '#ts-skills .tsbtn.primary{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     '#ts-skills .tsbtn.primary.off{opacity:.35;pointer-events:none}',
+    // Close Skyrim once it is armed, the colours of the character page's own
+    // Close the game when it asks the second time (thornswood-select.js).
+    '#ts-skills .tsbtn.danger{border-color:#e9a27a;color:#f6c9b0;background:rgba(120,40,30,.45)}',
     // The buttons are .tsbtn, not .btn, and the name matters: the front's own
     // stylesheet (build.js, in this same document) carries an unscoped .btn
     // rule with width 50px, height 50px and margin 20px. Our rules are scoped
@@ -512,9 +515,12 @@
   var elStatus = root.querySelector('.status');
   var elConfirm = root.querySelector('[data-act="confirm"]');
   var elClose = root.querySelector('[data-act="close"]');
-  // The word inside the Close button, so drawFoot can say "Not now" while
+  // The word inside the Close button, so drawFoot can say Close Skyrim while
   // creating without rebuilding the button or losing its key cap.
   var elCloseLabel = elClose.querySelector('span');
+  // And its K key cap, which is hidden while creating: there the button
+  // closes Skyrim, and K never does. See closeButton.
+  var elCloseKey = elClose.querySelector('.key');
   var elPanel = root.querySelector('.panel');
 
   /*
@@ -1689,7 +1695,8 @@
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
       : (section !== 'tree' && section !== 'recipes' && section !== 'property');
-    var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr]);
+    var shut = closeWord();
+    var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut]);
     if (key === footKey) return;
     footKey = key;
     elStatus.className = 'status' + (statusKind ? ' ' + statusKind : '');
@@ -1698,9 +1705,12 @@
     elConfirm.textContent = label;
     elConfirm.style.display = showConfirm ? '' : 'none';
     elClose.style.display = '';
-    // "Not now" while creating, because Close beside Begin reads like
-    // cancelling the character rather than putting the panel down.
-    elCloseLabel.textContent = cr ? 'Not now' : 'Close';
+    // Close Skyrim while creating and Close in the world. It said "Not now"
+    // while creating and only put the panel down; see closeButton for why it
+    // does not any more.
+    elClose.className = 'tsbtn ghost' + ((cr && quitArmed) ? ' danger' : '');
+    elCloseLabel.textContent = shut;
+    elCloseKey.style.display = cr ? 'none' : '';
   }
 
   function hint() {
@@ -1897,6 +1907,74 @@
   }
 
   /*
+    CLOSE SKYRIM, the panel's own button while creating.
+
+    Patrick, 24 September: "the k not now button during creatioon doesnt
+    close skyrim it exists the menu and lets the roam the room". While
+    creating the button said Not now and did what Escape does, which is
+    closeByHand above: the panel goes down, the server holds its reminder
+    off, and the person is left standing in the hall. So while creating it
+    says Close Skyrim and ends the game, through the front plugin's quit, the
+    same one the character page's Close the game uses ('select:quit' in
+    thornswood-front.js, and thornswood-select.js for the page).
+
+    IT ASKS TWICE, the way that page does. The first press arms it and it
+    says Press again to close Skyrim; a second press inside five seconds
+    sends 'skills:quit'. A first press on its own disarms after five seconds,
+    so a stray click never ends anybody's session. If the game is still here
+    six seconds after the second press, the button comes back and the front
+    is told, so it never sits on Closing for ever, which is how the
+    character page's button was reported on 22 September.
+
+    NO '/pick later' GOES FIRST. That record only holds the server's
+    reminder off for the rest of this session, and the gamemode starts the
+    reminder again from nothing on the next login (the seenAt check in its
+    'choosing' stage), so a session that is ending has nothing to hold off.
+
+    Outside creation the button is Close and puts the panel down, as it
+    always has. Escape and K still put the panel down while creating;
+    neither of them closes the game, which is why the K key cap is not
+    shown beside Close Skyrim.
+  */
+  var QUIT_ARM_MS = 5000;
+  var QUIT_BACK_MS = 6000;
+  var quitArmed = 0;   // when the first press was, while it is armed
+  var quitSent = 0;    // when 'skills:quit' went, until the game goes
+
+  function closeWord() {
+    if (!creating()) return 'Close';
+    if (quitSent) return 'Closing Skyrim';
+    if (quitArmed) return 'Press again to close Skyrim';
+    return 'Close Skyrim';
+  }
+
+  function closeButton() {
+    if (!creating()) { closeByHand(); return; }
+    if (quitSent) return;
+    var now = Date.now();
+    if (quitArmed && now - quitArmed < QUIT_ARM_MS) {
+      quitArmed = 0;
+      quitSent = now;
+      tell('quit');
+      drawFoot();
+      setTimeout(function () {
+        if (!quitSent || Date.now() - quitSent < QUIT_BACK_MS) return;
+        quitSent = 0;
+        tell('quit did not take, the game is still here');
+        drawFoot();
+      }, QUIT_BACK_MS);
+      return;
+    }
+    quitArmed = now;
+    drawFoot();
+    setTimeout(function () {
+      if (!quitArmed || Date.now() - quitArmed < QUIT_ARM_MS) return;
+      quitArmed = 0;
+      drawFoot();
+    }, QUIT_ARM_MS);
+  }
+
+  /*
     The server answered by rewriting the property. Each pick in flight is
     cleared by its own answer, the thing it asked for now set, and says so;
     a refusal clears the one its note is about (see refused). Confirm sends
@@ -2022,7 +2100,7 @@
   }
   window.addEventListener('keydown', onKey, true);
   elConfirm.onclick = confirm;
-  elClose.onclick = function () { closeByHand(); };
+  elClose.onclick = function () { closeButton(); };
 
   // ---------------------------------------------------------------- api --
   var api = {
@@ -2037,6 +2115,7 @@
     close: function () {
       if (root.className === 'gone') return;
       root.className = 'gone';
+      quitArmed = 0;   // a panel put down with Close Skyrim armed comes back unarmed
       tell('closed');
     },
     toggle: function () {
