@@ -30,7 +30,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const SRC = path.join(__dirname, 'voice', 'voice-server.js');
+const SRC = path.join(__dirname, '..', 'voice', 'voice-server.js');
 const src = fs.readFileSync(SRC, 'utf8');
 
 function grab(name) {

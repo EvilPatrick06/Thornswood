@@ -25,7 +25,7 @@ else does.
 | `/auth/discord` | GET | the launcher's link button, through the browser; Discord sends the browser back to `/auth/discord/callback` (`tools\app\Discord.cs`) |
 | `/api/allowed`, `/dev/api/allowed` | GET | each game server's door, every five minutes, with the bot's key; the dev server's `door.json` names the site with `/dev` on the end (`tools\gamemode.js`) |
 | `/api/roster` | POST | the game server, with the bot's key, when its book of characters changes (`tools\gamemode.js`) |
-| `/api/play/owns` | POST | the voice service, before it keeps a character creation choice (`tools\voice\voice-server.js`) |
+| `/api/play/owns` | POST | the voice service, before it keeps a character creation choice (`voice\voice-server.js`) |
 | `/api/payload` | GET | the installer, which then downloads the zip it names from `/file/` (`tools\setup\Bootstrap.cs`) |
 | `/api/ticket` | POST | the Discord bot, for a support ticket (`bot\bot.py`) |
 | `/api/play/who` | POST | nothing in the repo asks it now. It says who a ticket belongs to and writes nothing, which makes it the one to try by hand |

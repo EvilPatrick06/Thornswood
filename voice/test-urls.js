@@ -1,6 +1,6 @@
 // Lift the url builders out of the shipped files so this tests them, not a copy.
 const fs = require('fs');
-const R = require('path').resolve(__dirname, '..', '..');
+const R = require('path').resolve(__dirname, '..');
 
 function lift(src, name) {
   const i = src.indexOf('function ' + name + '(');

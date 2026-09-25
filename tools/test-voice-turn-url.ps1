@@ -15,7 +15,7 @@
   Install-Voice.ps1 built the service's whole environment from -Site, -Port,
   -Bind and -Auth, so no relay address could ever reach the running service.
   Its key does not go this way at all: it sits in turn-key.txt beside the
-  service, which tools\voice\test-turn-key.js covers.
+  service, which voice\test-turn-key.js covers.
 
   Nobody has stood up a relay yet, so the first thing held here is that an
   install without one is the same install, to the character.
@@ -29,7 +29,7 @@
     the probe      what is already running, read through a stand-in Remote.ps1
                    that runs the probe in Windows PowerShell on this machine,
                    which is what sshd runs on the box, against real copies of
-                   tools\voice\voice-server.js started here on spare ports
+                   voice\voice-server.js started here on spare ports
     the command    the service's command line, built from the install's own
                    here-string, then run through cmd.exe against a stand-in
                    voice-server.js that writes down the environment it got
@@ -244,7 +244,7 @@ $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
 function StartVoice([int]$port, [hashtable]$vars, [string]$key) {
     $dir = Join-Path $script:temp ('voice-' + $port)
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    Copy-Item -LiteralPath (Join-Path $ToolsPath 'voice\voice-server.js') -Destination (Join-Path $dir 'voice-server.js')
+    Copy-Item -LiteralPath (Join-Path $ToolsPath '..\voice\voice-server.js') -Destination (Join-Path $dir 'voice-server.js')
     Set-Content -LiteralPath (Join-Path $dir 'token-key.txt') -Value 'a join token key for this test only' -Encoding ASCII
     if ($key) { Set-Content -LiteralPath (Join-Path $dir 'turn-key.txt') -Value $key -Encoding ASCII }
     $psi = New-Object System.Diagnostics.ProcessStartInfo

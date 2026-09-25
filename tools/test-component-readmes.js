@@ -88,14 +88,17 @@ function glob(f) {
 }
 
 const SIX = ['docs-app', 'voice', 'ts-plugins', 'ts-ui', 'setup', 'launcher'];
+// Where each lives: voice left tools for the repository root on 25 September.
+const AT = { 'voice': 'voice' };
+function at(d) { return AT[d] || ('tools/' + d); }
 const HEADS = ['## What it is', '## On your machine', '## Where it runs'];
 const readme = {};
-SIX.forEach(function (d) { readme[d] = read('tools/' + d + '/README.md'); });
+SIX.forEach(function (d) { readme[d] = read(at(d) + '/README.md'); });
 
 // ------------------------------------------------------ every README, alike --
 SIX.forEach(function (d) {
   const t = readme[d];
-  const name = 'tools' + BS + d;
+  const name = at(d).split('/').join(BS);
   yes(name + ' has a README.md', t !== null);
   if (t === null) { return; }
   const lines = t.split('\n');
@@ -132,8 +135,8 @@ SIX.forEach(function (d) {
       paths.length + ' named)' + (noPath.length ? ', missing ' + noPath.join(', ') : ''),
       noPath.length === 0);
 
-  const code = files('tools/' + d).filter(function (f) { return /\.(js|cs|html)$/.test(f); })
-    .map(function (f) { return read('tools/' + d + '/' + f) || ''; }).join('\n');
+  const code = files(at(d)).filter(function (f) { return /\.(js|cs|html)$/.test(f); })
+    .map(function (f) { return read(at(d) + '/' + f) || ''; }).join('\n');
   const settings = uniq(t.match(/THORNSWOOD_[A-Z_]+/g) || []);
   const unread = settings.filter(function (s) { return code.indexOf(s) < 0; });
   yes(name + ': every THORNSWOOD_ setting it names is read by the code beside it (' +
@@ -173,7 +176,7 @@ SIX.forEach(function (d) {
 // ------------------------------------------------------------------- voice --
 {
   const t = readme.voice || '';
-  const vs = read('tools/voice/voice-server.js') || '';
+  const vs = read('voice/voice-server.js') || '';
   const dev = read('tools/app/DevBuild.cs') || '';
   const iv = read('tools/Install-Voice.ps1') || '';
   const watch = read('tools/Watch-Services.ps1') || '';
@@ -198,12 +201,12 @@ SIX.forEach(function (d) {
       /const BUILD = '/.test(vs) && /build: BUILD/.test(vs) && t.indexOf('`BUILD`') >= 0);
   // The README says the gamemode's copy of the feed has moved on from
   // gamemode-voice.js. If the two are ever brought back together, this fails
-  // and the paragraph in tools\voice\README.md is what to change.
+  // and the paragraph in voice\README.md is what to change.
   const gm = read('tools/gamemode.js') || '';
   const a = gm.indexOf('// ==== thornswood voice feed, added by Add-VoiceFeed.ps1 ====');
   const b = gm.indexOf('// ==== end thornswood voice feed ====');
   const block = (a >= 0 && b > a) ? gm.slice(a, b) : '';
-  const file = read('tools/voice/gamemode-voice.js') || '';
+  const file = read('voice/gamemode-voice.js') || '';
   yes('voice: the gamemode carries the voice feed block between its markers', block.length > 0);
   yes('voice: as the README says, that block reads its port and gamemode-voice.js has 7778 written in',
       /VOICE_PORT = voicePort\(\)/.test(block) && /VOICE_PORT = 7778;/.test(file) &&
@@ -222,7 +225,7 @@ SIX.forEach(function (d) {
   const serverPart = go.indexOf('if (-not $SkipServer)');
   yes('plugins: Go.ps1 still copies the voice service to the VPS unless it is given -SkipServer, ' +
       'which is why the README says to pass it',
-      serverPart >= 0 && go.indexOf("'voice" + BS + "voice-server.js'", serverPart) > serverPart &&
+      serverPart >= 0 && go.indexOf("'.." + BS + "voice" + BS + "voice-server.js'", serverPart) > serverPart &&
       t.indexOf('Go.ps1 -SkipServer') >= 0 && (readme['ts-ui'] || '').indexOf('Go.ps1 -SkipServer') >= 0);
   yes('plugins: Keep and Ship-Rules still tell ours by the thornswood- name the README gives',
       keep.indexOf('StartsWith("thornswood-"') >= 0 && rules.indexOf("'thornswood-*.js'") >= 0 &&

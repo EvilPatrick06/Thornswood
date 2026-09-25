@@ -8,7 +8,7 @@ source: the C# is in `tools\app` and the window's layout in `tools\ui.xaml`.
 (`tools\app\Voice.cs`) opens it in a hidden WebView2 window, where a real
 browser can hold the microphone, run WebRTC between people and play the
 audio, none of which the game's own browser ever managed. It talks to the
-voice service (`tools\voice`) on the same protocol as the in-game page. Push
+voice service (`voice`) on the same protocol as the in-game page. Push
 to talk, the one thing it needs from the game, reaches it through the
 launcher, which hears it from the game plugin over a local socket and a small
 file in `Data\Platform`.

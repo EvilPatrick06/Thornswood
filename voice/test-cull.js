@@ -15,7 +15,7 @@
 //                 stand-in mp, with the real social block keeping the parties,
 //                 and what it would POST is captured. Each row has to carry
 //                 the person's party, because the service cannot know it.
-//   the service   tools/voice/voice-server.js runs in a temp folder on a spare
+//   the service   voice/voice-server.js runs in a temp folder on a spare
 //                 port, is fed that body, and two hundred real websockets
 //                 join as the two hundred people. What each one is sent on
 //                 the next tick is what is checked, and its bytes are counted.
@@ -35,7 +35,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const SERVER = process.env.VOICE_SERVER || path.join(__dirname, 'voice-server.js');
-const GM = process.env.GM || path.join(__dirname, '..', 'gamemode.js');
+const GM = process.env.GM || path.join(__dirname, '..', 'tools', 'gamemode.js');
 const PORT = 7911;
 const UNITS_PER_METRE = 70;
 const CR = String.fromCharCode(13);
@@ -55,13 +55,13 @@ function read(p) { return fs.readFileSync(p, 'utf8').split(CR).join(''); }
 */
 const reaches = [];
 {
-  const overlay = read(path.join(__dirname, '..', 'ts-ui', 'thornswood-voice.js'));
+  const overlay = read(path.join(__dirname, '..', 'tools', 'ts-ui', 'thornswood-voice.js'));
   const modes = /var MODES = \{([\s\S]*?)\};/.exec(overlay);
   const got = modes ? (modes[1].match(/max:\s*[\d.]+/g) || []).map(s => Number(s.split(':')[1])) : [];
   yes('the overlay range table is where it was (' + got.join(', ') + ' m)', got.length === 3);
   reaches.push(...got);
 
-  const host = read(path.join(__dirname, '..', 'launcher', 'voice-host.html'));
+  const host = read(path.join(__dirname, '..', 'tools', 'launcher', 'voice-host.html'));
   const range = /var RANGE = \{([\s\S]*?)\};/.exec(host);
   const quiet = range ? (range[1].match(/quiet:\s*[\d.]+/g) || []).map(s => Number(s.split(':')[1])) : [];
   yes('the launcher voice host range table is where it was (' + quiet.join(', ') + ' m)', quiet.length === 3);

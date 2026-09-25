@@ -1,6 +1,6 @@
 const { spawn } = require('child_process');
 const fs = require('fs'), path = require('path'), os = require('os'), crypto = require('crypto');
-const REPO = path.resolve(__dirname, '..', '..');
+const REPO = path.resolve(__dirname, '..');
 const PORT = 7903;
 let pass = 0, fail = 0;
 function check(what, got, want) {

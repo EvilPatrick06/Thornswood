@@ -192,7 +192,7 @@ yes('the live default is the live voice service\'s chat folder', !!liveRoot && f
 yes('the dev default is the dev voice service\'s chat folder', !!devRoot && fallback('dev') === devRoot + '\\chat');
 yes('Get-Logs reads dev voice from the same folder', !!devRoot && getLogs.indexOf("if ($Dev) { '" + devRoot + "' }") >= 0);
 yes('the voice service writes chat into its own folder unless told otherwise',
-    /const CHAT_DIR = process\.env\.THORNSWOOD_CHAT_DIR \|\| path\.join\(HERE, 'chat'\)/.test(readTool(path.join('voice', 'voice-server.js'))));
+    /const CHAT_DIR = process\.env\.THORNSWOOD_CHAT_DIR \|\| path\.join\(HERE, 'chat'\)/.test(readTool(path.join('..', 'voice', 'voice-server.js'))));
 yes('and neither install script tells it otherwise',
     readTool('Install-Voice.ps1').indexOf('THORNSWOOD_CHAT_DIR') < 0 && vpsDev.indexOf('THORNSWOOD_CHAT_DIR') < 0);
 

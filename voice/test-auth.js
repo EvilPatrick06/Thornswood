@@ -3,7 +3,7 @@
 
   Runs the shipped voice-server.js in a scratch folder on a spare port, mints
   tokens through its own /token route, and joins over a real WebSocket. Nothing
-  here is a stand-in: the file under test is tools/voice/voice-server.js.
+  here is a stand-in: the file under test is voice/voice-server.js.
 
   THORNSWOOD_SITE is left unset on purpose, so owns() answers 'unchecked' and
   /token mints without the site. That is the same path a site outage takes, and
@@ -17,7 +17,7 @@ const os = require('os');
 const crypto = require('crypto');
 
 // The repo this file sits in, so it runs from anywhere.
-const REPO = path.resolve(__dirname, '..', '..');
+const REPO = path.resolve(__dirname, '..');
 const PORT = 7901;
 const AUTH = process.argv[2] || 'on';
 

@@ -33,7 +33,7 @@ release, launcher, game files and server together, are in CONTRIBUTING.md.
 | Plugins | `tools\ts-plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `tools\ts-ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
 | Game server | VPS 192.135.112.23, `C:\Thornswood-Server`, UDP/TCP 7777, resources 3000, task `Thornswood Server` | skymp5-server with `gamemode.js`; the door reads its allowed list from the site |
 | Dev game server | `C:\Thornswood-Server-Dev`, 7787, resources 7788, task `Thornswood Dev Server` | Same binaries, fresh world, door list is Owner and Dev only (`https://thornswood.net/dev`) |
-| Voice | `C:\Thornswood-Voice` 7778 and `C:\Thornswood-Voice-Dev` 7789 | node, `tools\voice\voice-server.js`; the launcher holds the microphone, the game plugin relays state through files in `Data\Platform` |
+| Voice | `C:\Thornswood-Voice` 7778 and `C:\Thornswood-Voice-Dev` 7789 | node, `voice\voice-server.js`; the launcher holds the microphone, the game plugin relays state through files in `Data\Platform` |
 | Site | `tools\docs-app`, on the VPS at `C:\Thornswood-Docs`, node on 127.0.0.1:3001 behind Caddy, https://thornswood.net | Public pages from `data\site\*.md`, admin hub, Discord login, the door API, uploads, news |
 | Bot | `bot`, on the VPS at `C:\Thornswood-Bot`, task `Thornswood Bot` | discord.py: tickets, join cards, staff tools |
 | Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour |
