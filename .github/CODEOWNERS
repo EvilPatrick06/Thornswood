@@ -1,8 +1,8 @@
-# The files both machines touch.
+# The files every machine touches.
 #
-# CLAUDE.md and SECOND-DEVELOPER.md both say these six need a word before they
-# are edited, because a change in any of them lands on the other machine's work
-# without warning. Until now that rule was prose in two documents with nothing
+# CONTRIBUTING.md and SECOND-DEVELOPER.md both say these six need a word in
+# #dev before they are edited, because a change in any of them lands on
+# everybody else's work without warning. Until now that rule was prose in two documents with nothing
 # behind it: nothing asked, nothing checked, and it was forgotten as often as
 # it was kept.
 #
@@ -12,8 +12,10 @@
 #
 # WHAT THIS DOES AND DOES NOT DO. GitHub requests a review from the owner named
 # here when a pull request touches the file, and never asks a pull request's
-# own author. So a pull request Patrick opens on Shell.cs asks Djinn, and one
-# Djinn opens asks Patrick, which is exactly the intent.
+# own author. So a pull request one of the team opens on Shell.cs asks the
+# others, which is exactly the intent. The team is the table in
+# CONTRIBUTING.md; somebody added there is added here too, and
+# tools\test-branch-rules.js checks the two agree.
 #
 # It is a request and nothing more. Branch protection on main, read off GitHub
 # on 23 September: enforce_admins is on, so every change, Patrick's included,
@@ -27,7 +29,7 @@
 # free. With enforce_admins on, a pull request of his that touches /.github/
 # could never merge, because he is its only owner and GitHub does not let an
 # author approve their own. Every one of his that touches the shared files
-# below would wait for Djinn. The settings change without a commit, so read
+# below would wait for somebody else. The settings change without a commit, so read
 # them rather than this comment:
 #
 #     gh api repos/EvilPatrick06/Thornswood/branches/main/protection
@@ -37,15 +39,15 @@
 #
 #     gh api repos/EvilPatrick06/Thornswood/codeowners/errors
 
-/tools/app/Shell.cs        @EvilPatrick06 @WiccanDjinn
-/tools/app/Checks.cs       @EvilPatrick06 @WiccanDjinn
-/tools/app/Keep.cs         @EvilPatrick06 @WiccanDjinn
-/tools/app/Hold.cs         @EvilPatrick06 @WiccanDjinn
-/tools/app/Updater.cs      @EvilPatrick06 @WiccanDjinn
-/tools/Publish-Update.ps1  @EvilPatrick06 @WiccanDjinn
+/tools/app/Shell.cs        @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/tools/app/Checks.cs       @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/tools/app/Keep.cs         @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/tools/app/Hold.cs         @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/tools/app/Updater.cs      @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/tools/Publish-Update.ps1  @EvilPatrick06 @WiccanDjinn @Ture-Neko
 
-# Not on CLAUDE.md's list, and here because getting them wrong is the same
+# Not on CONTRIBUTING.md's list, and here because getting them wrong is the same
 # shape of accident: they decide what leaves a machine and what a release is.
-/tools/Ship.ps1            @EvilPatrick06 @WiccanDjinn
-/tools/Ship-Rules.ps1      @EvilPatrick06 @WiccanDjinn
+/tools/Ship.ps1            @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/tools/Ship-Rules.ps1      @EvilPatrick06 @WiccanDjinn @Ture-Neko
 /.github/                  @EvilPatrick06

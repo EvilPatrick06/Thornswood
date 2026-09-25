@@ -34,8 +34,10 @@ a README of their own, which says what the folder is and how to change it.
 
 ## Before changing anything
 
-- [CLAUDE.md](CLAUDE.md): how work moves between the two machines, the settled
-  design and the words we use. Read it first, every session.
+- [CONTRIBUTING.md](CONTRIBUTING.md): the rules for everybody, with AI or
+  without. Who is on the team, the words we use, the settled design, how work
+  moves and what to run after a merge. Read it before your first change.
+- [CLAUDE.md](CLAUDE.md): what applies to a Claude on top of those rules.
 - [SECOND-DEVELOPER.md](SECOND-DEVELOPER.md): the long form. What the pieces
   are, how a release goes out, how a machine is set up.
 - [docs/archive](docs/archive): dated snapshots kept for history, not current.

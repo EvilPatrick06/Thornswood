@@ -1,7 +1,7 @@
 <#
   Check-Words.ps1
 
-  The Words section of CLAUDE.md, checked instead of hoped for: no em dashes
+  The Words section of CONTRIBUTING.md, checked instead of hoped for: no em dashes
   anywhere written for people, never the word player, and the owner is
   Patrick. Entry 237 on the To Do List: "it is the only way a rule about
   writing survives two people and a deadline."
@@ -79,7 +79,7 @@ foreach ($p in $Paths) {
 }
 
 if ($hits) {
-    Write-Host ("{0} hit(s) in the {1} file(s) read. The rules are the Words section of CLAUDE.md." -f $hits, $read)
+    Write-Host ("{0} hit(s) in the {1} file(s) read. The rules are the Words section of CONTRIBUTING.md." -f $hits, $read)
     exit 1
 }
 Write-Host ("the writing rules hold in all {0} file(s) read" -f $read)
