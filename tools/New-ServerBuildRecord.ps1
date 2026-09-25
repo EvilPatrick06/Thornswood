@@ -31,8 +31,8 @@
   .\tools\New-ServerBuildRecord.ps1
 #>
 param(
-  [string]$Dist  = 'C:\Thornswood-Dev\skymp\build\dist\server',
-  [string]$Clone = 'C:\Thornswood-Dev\skymp',
+  [string]$Dist  = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
+  [string]$Clone = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine),
   [string]$Out
 )
 

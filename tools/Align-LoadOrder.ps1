@@ -22,7 +22,7 @@
 param(
     [string]$Data     = 'C:\Thornswood\Game\Data',
     [string]$Plugins  = 'C:\Thornswood\Profile\Default\plugins.txt',
-    [string]$Settings = 'C:\Thornswood-Dev\skymp\build\dist\server\server-settings.json',
+    [string]$Settings = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerSettings),
     [switch]$Fix
 )
 

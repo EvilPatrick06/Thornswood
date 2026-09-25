@@ -36,7 +36,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Dist = 'C:\Thornswood-Dev\skymp\build\dist\client',
+  [string]$Dist = (& (Join-Path $PSScriptRoot 'Where.ps1') ClientDist),
   [string]$Game = 'C:\Thornswood\Game',
   [string]$Record,
   [switch]$Check,

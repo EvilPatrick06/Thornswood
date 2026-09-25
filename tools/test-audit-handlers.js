@@ -35,7 +35,11 @@
 const fs = require('fs');
 const path = require('path');
 const SRC = process.env.GM || path.join(__dirname, 'gamemode.js');
-const FORK = process.env.SKYMP || 'C:/Thornswood-Dev/skymp';
+// The fork is the engine/skymp submodule once it has files in it, and
+// C:/Thornswood-Dev/skymp until then (tools/Where.ps1 has the same rule).
+const REPO_FORK = path.join(__dirname, '..', 'engine', 'skymp');
+const FORK = process.env.SKYMP ||
+  (fs.existsSync(path.join(REPO_FORK, 'CMakeLists.txt')) ? REPO_FORK : 'C:/Thornswood-Dev/skymp');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 

@@ -124,7 +124,7 @@ function Unchanged($r) {
 
 try {
     # ---- the real script, and a Close-Launcher that closes nothing -------------
-    foreach ($f in 'Publish-Update.ps1', 'Ship-Rules.ps1', 'LoadOrder.ps1', 'client-build.json') {
+    foreach ($f in 'Publish-Update.ps1', 'Ship-Rules.ps1', 'LoadOrder.ps1', 'Where.ps1', 'client-build.json') {
         $from = Join-Path $ToolsDir $f
         if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $tools -Force }
     }

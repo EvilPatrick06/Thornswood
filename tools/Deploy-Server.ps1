@@ -35,7 +35,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Dist    = 'C:\Thornswood-Dev\skymp\build\dist\server',
+  [string]$Dist    = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
   [string]$Vps     = '192.135.112.23',
   [string]$User    = 'Administrator',
   [string]$Root    = 'C:/Thornswood-Server',

@@ -208,7 +208,7 @@ $rec = Join-Path $Here 'client-build.json'
 Ready 'the client build record is in the repo' (Test-Path $rec) 'tools\client-build.json' `
   'It is tracked in git, so git pull brings it'
 
-$fork = 'C:\Thornswood-Dev\skymp'
+$fork = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine)
 $hasFork = Test-Path (Join-Path $fork '.git')
 $forkBranch = ''
 if ($hasFork) { $forkBranch = (& git -C $fork rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim() }

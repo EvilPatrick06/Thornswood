@@ -41,7 +41,7 @@ function MB($b) { '{0,9:n2} MB' -f ($b / 1MB) }
 $roots = @(
     'C:\SkyrimTogether'
     'C:\Thornswood'
-    'C:\Thornswood-Dev\skymp'
+    (& (Join-Path $PSScriptRoot 'Where.ps1') Engine)
     'C:\SkyrimRP'
     'C:\Users\evilp\Downloads'
     'C:\Users\evilp\AppData\Roaming\skyrim-rp-launcher'
@@ -77,7 +77,9 @@ $keepRx = @(
     '(?i)\\OneDrive\\'
     # The repo's own working tree. Its .orig and .bak files belong to vcpkg and
     # node_modules, which own their contents and repair them on their terms.
-    '(?i)\\Thornswood-Dev\\skymp\\(vcpkg|.*node_modules)\\'
+    # The fork was C:\Thornswood-Dev\skymp until 25 September and is the
+    # engine\skymp submodule of this repository after it (tools\Where.ps1).
+    '(?i)\\(Thornswood-Dev|engine)\\skymp\\(vcpkg|.*node_modules)\\'
 ) -join '|'
 
 <#

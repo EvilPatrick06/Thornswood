@@ -30,10 +30,16 @@
     account was created in, or signing fails with a 403 that does not say why.
       {
         "method": "artifactsigning",
-        "dlib": "C:\\tools\\Azure.CodeSigning.Dlib.dll",
-        "metadata": "C:\\tools\\metadata.json",
+        "dlib": "tools\\signing\\client\\Azure.CodeSigning.Dlib.dll",
+        "metadata": "tools\\signing\\metadata.json",
         "timestampUrl": "http://timestamp.acs.microsoft.com"
       }
+
+    A dlib or metadata path that is not a full path is read from the repository
+    folder. Since 25 September the signing setup lives there, not in C:\tools:
+    tools\signing\metadata.json is tracked, because it names the Azure account
+    and holds no key or password, and tools\signing\client is Microsoft's
+    signing client, which git ignores (tools\signing\README.md).
 
     A certificate already in the machine's store:
       {
@@ -94,6 +100,14 @@ try {
 } catch {
     Say ("  tools\signing.json is not valid JSON: " + $_.Exception.Message) 'Red'
     exit 1
+}
+
+# A dlib or metadata that is not a full path is the repository folder's, so the
+# same signing.json works wherever the repository is cloned.
+$repoRoot = Split-Path -Parent $Here
+foreach ($k in 'dlib', 'metadata') {
+    $v = [string]$cfg.$k
+    if ($v -and -not [IO.Path]::IsPathRooted($v)) { $cfg.$k = Join-Path $repoRoot $v }
 }
 
 # ------------------------------------------------------------ half done ----

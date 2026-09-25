@@ -73,13 +73,23 @@ def active_plugins(plugins_txt):
     return out
 
 
+def default_settings():
+    # The fork is the engine\skymp submodule of this repository once it has
+    # files in it, and C:\Thornswood-Dev\skymp until then: the same rule as
+    # tools\Where.ps1, which the PowerShell scripts ask.
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    fork = os.path.join(repo, "engine", "skymp")
+    if not os.path.exists(os.path.join(fork, "CMakeLists.txt")):
+        fork = r"C:\Thornswood-Dev\skymp"
+    return os.path.join(fork, "build", "dist", "server", "server-settings.json")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--plugins",
                     default=r"C:\Thornswood\Profile\LocalAppData\Plugins.txt")
     ap.add_argument("--data", default=r"C:\Thornswood\Game\Data")
-    ap.add_argument("--settings",
-                    default=r"C:\Thornswood-Dev\skymp\build\dist\server\server-settings.json")
+    ap.add_argument("--settings", default=default_settings())
     ap.add_argument("--server-data", default="C:/Thornswood/Game/Data",
                     help="how the SERVER sees its Data folder, forward slashes")
     ap.add_argument("--dry-run", action="store_true")

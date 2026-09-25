@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 197 of them, with the one line that says
+Every `.ps1` in this folder, 203 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -155,6 +155,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-bot-wrapper.ps1](test-bot-wrapper.ps1) | The bot's wrapper on the VPS gives up after three quick exits in a row, instead of starting a bot that cannot start every fifteen seconds for ever. |
 | [test-build-stamp.ps1](test-build-stamp.ps1) | Every gamemode deploy leaves a thornswood-build.json beside the gamemode.js it puts in place, saying which commit, which file, which launcher and which channel. |
 | [test-build-vs-install.ps1](test-build-vs-install.ps1) | Build-Launcher.ps1 builds and Install-Launcher.ps1 installs, and every caller of the build does what it did before apart from that split. |
+| [test-bump-version-live.ps1](test-bump-version-live.ps1) | Bump-Version.ps1 never proposes, and refuses to write, a launcher number at or below the one live launchers already have. |
 | [test-chargen-gone.ps1](test-chargen-gone.ps1) | The retired dresser, thornswood-chargen.js, is out of the repo, nothing that installs or ships the game names it except the rules that keep it out, every pack deletes it from the machines that already have it, and the launcher's own game folder does not copy it back in from the Steam copy afterwards. |
 | [test-chat-range-install.ps1](test-chat-range-install.ps1) | Install-Voice.ps1 can turn local chat on, and leaves it off unless told to. |
 | [test-chat-settings.ps1](test-chat-settings.ps1) | The launcher's Chat and needs settings write Thornswood.ini the way the game plugin reads it: ChatFade=5, 15, 20 or 0 (10 is the default and is not written), and NeedsBars=0 when the bars are off (on is no line at all). |
@@ -172,6 +173,8 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-docs-backup.ps1](test-docs-backup.ps1) | Deploy-Docs.ps1 -Docs, -Boards and -SeedDocs overwrite documents people type into on the site, and each one promises a .bak beside every document first. |
 | [test-docs-password.ps1](test-docs-password.ps1) | Deploy-Docs.ps1 -Password changes the site's password and nothing else in its config.json. |
 | [test-door-outage.ps1](test-door-outage.ps1) | The launcher's half of "Discord did not answer is not a no". |
+| [test-downgrade-foreground.ps1](test-downgrade-foreground.ps1) | The Downgrade button brings Steam's window to the front for a later part too, when the person has gone to another program since the button was pressed, and never joins a window that has stopped answering. |
+| [test-downgrade-leftover.ps1](test-downgrade-leftover.ps1) | The Downgrade button removes a depot folder an earlier attempt left behind before it asks Steam for that part, and keeps one this build finished. |
 | [test-downgrade-says-why.ps1](test-downgrade-says-why.ps1) | The Downgrade button reaches Steam even when Windows will not open a steam:// link, says on the card why it stopped whenever it stops, and shows how far it has got. |
 | [test-downgrade-steam-log.ps1](test-downgrade-steam-log.ps1) | The Downgrade button hears Steam say a part has started, finished or failed, and checks the downloaded SkyrimSE.exe before it replaces anything. |
 | [test-downgrade-steam-window.ps1](test-downgrade-steam-window.ps1) | The Downgrade button finds Steam's window when steamwebhelper draws it, and the clipboard fallback says which part of three is on the clipboard. |
@@ -202,6 +205,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-ship-lists.ps1](test-ship-lists.ps1) | Whether a pack and the installer leave out the same files. |
 | [test-ship-rules.ps1](test-ship-rules.ps1) | Every file that has ever leaked in a pack or an installer stays out, and the rules that decide what leaves this machine still say what they mean. |
 | [test-show-botlog.ps1](test-show-botlog.ps1) | Show-BotLog.ps1 reads bot.log.1 before bot.log, so the lines just before a roll are not hidden by it, and with no bot.log.1 it reads bot.log exactly as it did before. |
+| [test-signing-folder.ps1](test-signing-folder.ps1) | The signing setup lives in tools\signing, and Sign-Artifact.ps1 finds a dlib or metadata that signing.json names relative to the repository. |
 | [test-site-account.ps1](test-site-account.ps1) | Deploy-Docs.ps1 -RunAs chooses the account the site's scheduled task runs as. |
 | [test-source-offer.ps1](test-source-offer.ps1) | Where the source of the SkyMP files Thornswood ships is, said on the site and in the installed folder, and said truthfully. |
 | [test-steam-updates.ps1](test-steam-updates.ps1) | Steam's Updates setting for Skyrim, which nothing in the launcher read or set until 24 September (entry 271 on the To Do List, "Nothing stops Steam putting Skyrim back on the wrong build"). |
@@ -212,10 +216,12 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-vortex-folder.ps1](test-vortex-folder.ps1) | Scan finds the Skyrim folder Vortex really deploys into, Fix builds Thornswood's own folder from it, and nothing of another server's install comes with it. |
 | [test-watch-disk.ps1](test-watch-disk.ps1) | The watchdog on the VPS watches the disk, and says so once when a line is crossed rather than on every five minute run. |
 | [test-watch-load.ps1](test-watch-load.ps1) | The load record the VPS keeps, and the note read out of it. |
+| [test-where.ps1](test-where.ps1) | Where.ps1 finds the engine fork and the build output in the repository once they are there, in C:\Thornswood-Dev while they are still there, and in the repository on a machine that never had that folder; and no script names C:\Thornswood-Dev for itself any more. |
 | [vps-dev-instance.ps1](vps-dev-instance.ps1) | Runs ON the VPS. Makes the dev game server and the dev voice server beside the live ones, from copies of the live installs, on their own ports, with their own scheduled tasks, firewall rules and watchdog entries. |
 | [vps-load.ps1](vps-load.ps1) | Runs ON the VPS, every five minutes, as the scheduled task that Watch-Load.ps1 -Install puts there. |
 | [vps-nightly-backup.ps1](vps-nightly-backup.ps1) | Runs on the VPS, once a night, as the scheduled task that Install-Backup.ps1 puts there. |
 | [Watch-Foreground.ps1](Watch-Foreground.ps1) | Which window Windows is giving the keyboard to, sampled from outside the game. |
 | [Watch-Load.ps1](Watch-Load.ps1) | The website, the game server, the voice service and the bot share one five core box, and nothing kept a number for any of them. |
 | [Watch-Services.ps1](Watch-Services.ps1) | Everything runs on one box now. The website, the game, the bot and the voice server are four things that can stop on their own, and nothing up there notices when one does. |
+| [Where.ps1](Where.ps1) | Says where the engine fork and the build output are on this machine, so every script asks one place instead of carrying its own copy of a path. |
 | [Wipe-Saves.ps1](Wipe-Saves.ps1) | Starts the world over. Everybody begins again, nothing is claimed, nothing has been looted, and every container in the province is holding what Bethesda put in it. |
