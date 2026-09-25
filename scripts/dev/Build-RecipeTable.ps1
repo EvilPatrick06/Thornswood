@@ -824,7 +824,13 @@ $STATION_VERBS = @(
     # unsupplied input in the table, 79 entries, and until chopWood existed
     # nothing in this world produced a single stick of it.
     @{ Fn = 'chopWood';     Who = 'woodworker';
-       What = 'the chopping blocks, three in Skyrim.esm and Solstheim''s ash one in Dragonborn.esm, which are the Woodwright half''s: halfGate(actorId, ''woodwright''). Bethesda''s records are untouched and the verb is answered server side, because Patrick said on 21 September that a chopping block is "just for getting the firewood and not usable by non woodworkers".' }
+       What = 'the chopping blocks, three in Skyrim.esm and Solstheim''s ash one in Dragonborn.esm, which are the Woodwright half''s: halfGate(actorId, ''woodwright''). Bethesda''s records are untouched and the verb is answered server side, because Patrick said on 21 September that a chopping block is "just for getting the firewood and not usable by non woodworkers".'},
+    # Added 24 September, and it is the other half of that same sentence. The
+    # food rule in scripts\dev\Build-HarvestTable.ps1 took the churn off the gatherer
+    # and gave it to nobody, which left Butter, 46 of the Cook's inputs, with no
+    # producer at all. Patrick, 21 September: "give milk and butter to farmers".
+    @{ Fn = 'churn';        Who = 'farmer';
+       What = 'the butter churn in HearthFires.esm, BYOHButterChurn, which is a farmer''s verb: classGate(actorId, ''farm'')' }
 )
 
 # WHERE THE STATIONS ARE READ FROM. The shipped gamemode, in this folder, which
