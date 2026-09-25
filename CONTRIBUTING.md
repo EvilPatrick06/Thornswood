@@ -83,7 +83,7 @@ How to use it:
   whatever else rewrites a copied file in place). Decided by Patrick on
   20 Sep: nothing here supports another server's install any more. The SkyMP
   client runtime is built from the fork and recorded in
-  `tools\client-build.json`; `Sync-Client.ps1` puts it in the game folder and
+  `records\client-build.json`; `Sync-Client.ps1` puts it in the game folder and
   Ship refuses a release whose client is not the recorded build. Nothing is
   taken from the Steam copy's `Data\Platform` or its SkyMP DLLs, because until
   that day another launcher's builds of all of them were what shipped.
@@ -112,7 +112,7 @@ How to use it:
   in Data\Platform, nothing touches Vortex's own files.
 - The SkyMP client runtime is built from the fork, the `engine\skymp`
   submodule of this repository on `thornswood/engine-changes`, and recorded
-  in `tools\client-build.json` by `New-ClientBuildRecord.ps1`.
+  in `records\client-build.json` by `New-ClientBuildRecord.ps1`.
   `Sync-Client.ps1` puts the six recorded files in the game folder and
   refuses any that is not the recorded build; Ship refuses a release whose
   client is not. Every change Patch-Client.ps1 used to make by text is in the
@@ -123,7 +123,7 @@ How to use it:
   `engine\skymp` submodule, pinned to the commit the build records name; the
   output (packs, launcher, installer, server payload) is `out`, ignored by
   git; anything else that folder held and that never goes to GitHub is
-  `local`, ignored too. Scripts ask `tools\Where.ps1` where each of these is
+  `local`, ignored too. Scripts ask `scripts\release\Where.ps1` where each of these is
   rather than naming a path, and it falls back to `C:\Thornswood-Dev` on a
   machine that still has it, so nothing breaks halfway through the move.
 - Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
@@ -138,7 +138,7 @@ the team before code; nobody settles it alone, and a Claude never does.
 
 - main is what ships. Only Patrick's machine ships main, and Ship.ps1 refuses
   a main release that is not on main, is behind or ahead of origin, has
-  anything uncommitted, has a file under `tools` that git does not know, or
+  anything uncommitted, has a file under `scripts` or another folder a release is built from that git does not know, or
   asks for a new number with `-Version`. A main Ship writes nothing to the
   repository: the version moves first through `Bump-Version.ps1` and its own
   pull request, and Ship builds only what is already on GitHub, so every other
@@ -197,7 +197,7 @@ the team before code; nobody settles it alone, and a Claude never does.
   pretesting". Size is not a reason to skip it. A main Ship is for a
   security fix or for something that leaves the game untestable, and he
   says which.
-- The dev channel (`.\tools\Ship.ps1 -Channel dev "what changed"`) may be
+- The dev channel (`.\scripts\release\Ship.ps1 -Channel dev "what changed"`) may be
   run from any branch, from any developer's machine, to try work on the dev server.
   Say in #staff-general when you take it, because there is one dev feed and the last
   dev Ship wins. A main Ship resets it.
@@ -207,12 +207,12 @@ the team before code; nobody settles it alone, and a Claude never does.
   the scripts parse, the launcher compiles with the .NET Framework csc). Red
   means the branch would stop Ship at the build step; fix that before asking
   for a read.
-  It runs on the VPS, on a runner `.\tools\Install-Runner.ps1` puts there
+  It runs on the VPS, on a runner `.\scripts\deploy\Install-Runner.ps1` puts there
   (issue #437): GitHub's own runners were blocked on billing from 25 Sep.
   Until that runner is up, the check waits and nothing can be merged by its
   author; on 25 Sep `enforce_admins` was turned off so Patrick could merge
   meanwhile, and it goes back on once the runner has run a check green.
-  `.\tools\Install-Runner.ps1 -Status` says whether GitHub sees it.
+  `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
 ## After a pull request is merged
@@ -226,8 +226,8 @@ machine, from the repo folder.
    - The launcher (`launcher\app`, `launcher\ui.xaml`, the art and video that
      Build-Launcher.ps1 embeds), the game plugins (`game\plugins`), or
      anything else that goes out in a pack:
-     `.\tools\Ship.ps1 -Channel dev "what changed"`. The dev build is where
-     it goes first, by the rule above. `.\tools\Ship.ps1 "what changed"`
+     `.\scripts\release\Ship.ps1 -Channel dev "what changed"`. The dev build is where
+     it goes first, by the rule above. `.\scripts\release\Ship.ps1 "what changed"`
      with no channel is the live one, and that is for a security fix, for
      something that leaves the game untestable, or for work Patrick has
      said goes live.
@@ -243,19 +243,19 @@ machine, from the repo folder.
      entry numbers. The dev post of 24 September 14:36 is the shape to copy.
      Ship warns about a one-line note and carries on, so the warning is not
      the check.
-   - The gamemode behind that dev release: `.\tools\Deploy-DevGamemode.ps1`.
+   - The gamemode behind that dev release: `.\scripts\deploy\Deploy-DevGamemode.ps1`.
      `Deploy-Gamemode.ps1` then `Deploy-Server.ps1` is the live pair.
-   - The site's app or `site\public`: `.\tools\Deploy-Docs.ps1`.
+   - The site's app or `site\public`: `.\scripts\deploy\Deploy-Docs.ps1`.
      The public pages (`site\data\site\*.md`) need
-     `.\tools\Deploy-Docs.ps1 -Site`.
+     `.\scripts\deploy\Deploy-Docs.ps1 -Site`.
    - The bot's code or join card art in `bot`:
-     `.\tools\Install-Bot.ps1 -CodeOnly`.
+     `.\scripts\deploy\Install-Bot.ps1 -CodeOnly`.
    - The bot's avatar (`bot\thornswood-bot-*.png`): no script
      sends it. It is uploaded by hand in the Discord developer portal.
-   - `game\gamemode.js`: `.\tools\Deploy-Gamemode.ps1`, then
-     `.\tools\Deploy-Server.ps1`.
+   - `game\gamemode.js`: `.\scripts\deploy\Deploy-Gamemode.ps1`, then
+     `.\scripts\deploy\Deploy-Server.ps1`.
    - The voice service (`voice\voice-server.js`, `voice\public`):
-     `.\tools\Install-Voice.ps1`.
+     `.\scripts\deploy\Install-Voice.ps1`.
    - Only scripts that run on Patrick's machine (Ship.ps1, Publish-Update.ps1,
      the Deploy scripts): nothing more. The pull is the change.
    A pull request that touches several of these gets every one of them, in

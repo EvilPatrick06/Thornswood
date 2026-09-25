@@ -70,7 +70,7 @@ Yes 'node is here to run the voice service' ([bool]$nodeExe)
 if (-not $nodeExe) { Done }
 
 # ---- the script, parsed ----------------------------------------------------
-$installPath = Join-Path $ToolsPath 'Install-Voice.ps1'
+$installPath = Join-Path $ToolsPath '..\scripts\deploy\Install-Voice.ps1'
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($installPath, [ref]$tokens, [ref]$errors)
 Yes 'Install-Voice.ps1 parses' ($errors.Count -eq 0)
@@ -150,7 +150,7 @@ $logPath = Join-Path $root 'voice.log'
 # reach node through the whole line the box runs and not a line without it.
 $psExePath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $rollPath = Join-Path $root 'roll-log.ps1'
-Copy-Item -LiteralPath (Join-Path $ToolsPath 'Roll-Log.ps1') -Destination $rollPath
+Copy-Item -LiteralPath (Join-Path $ToolsPath '..\scripts\vps\Roll-Log.ps1') -Destination $rollPath
 # Stands in for the service: writes down what cmd.exe handed it and stops.
 $seenPath = Join-Path $root 'seen.json'
 Set-Content -LiteralPath (Join-Path $root 'voice-server.js') -Encoding ASCII -Value @'

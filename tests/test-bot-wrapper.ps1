@@ -48,7 +48,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $InstallBotPath) { $InstallBotPath = Join-Path $Here 'Install-Bot.ps1' }
+if (-not $InstallBotPath) { $InstallBotPath = Join-Path $Here '..\scripts\deploy\Install-Bot.ps1' }
 
 $script:pass = 0
 $script:fail = 0

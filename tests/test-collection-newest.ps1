@@ -40,7 +40,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $LoadOrderPath) { $LoadOrderPath = Join-Path $Here 'LoadOrder.ps1' }
+if (-not $LoadOrderPath) { $LoadOrderPath = Join-Path $Here '..\scripts\mods\LoadOrder.ps1' }
 . $LoadOrderPath
 
 $pass = 0; $fail = 0

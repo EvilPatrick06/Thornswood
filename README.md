@@ -8,7 +8,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 ## What is in here
 
 - `launcher/app`: the launcher. C# 5 and WPF, compiled by
-  `tools/Build-Launcher.ps1` with the .NET Framework 4 csc.
+  `scripts/release/Build-Launcher.ps1` with the .NET Framework 4 csc.
 - `launcher`: the window, the art and the voice page the launcher is
   built with.
 - `installer`: what a new person runs first; `installer/setup` is the small
@@ -19,9 +19,9 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `site`: the site. Its public pages are `site/data/site`.
 - `voice`: proximity voice.
 - `bot`: the Discord bot, in Python.
-- `tools/signing`: the code signing setup, switched off until it is finished.
-- `tools/*.ps1`: the scripts that build, ship and deploy all of the above.
-  `tools/Where.ps1` says where the engine and the build output are.
+- `records`: the client and server build records, and code signing.
+- `scripts`: what builds, ships and deploys it all, listed in
+  `scripts/README.md`; `tools` forwards the common commands there for now.
 - `tests`: the test harnesses the build check runs on every pull request.
 - `engine/skymp`: the SkyMP fork our engine changes live in, a git submodule.
   `git submodule update --init engine/skymp` fetches it; it needs Visual
@@ -30,8 +30,8 @@ and follow [thornswood.net/join](https://thornswood.net/join).
   that never go to GitHub. Both are ignored by git.
 - `lore/`: the world.
 
-`bot`, `game`, `installer`, `site`, `tests`, `launcher`, `installer/setup`,
-`tools/signing`, `game/plugins`, `game/ui` and `voice` each have
+`bot`, `game`, `installer`, `records`, `scripts`, `site`, `tests`, `launcher`, `installer/setup`,
+`records/signing`, `game/plugins`, `game/ui` and `voice` each have
 a README of their own, which says what the folder is and how to change it.
 
 ## Before changing anything

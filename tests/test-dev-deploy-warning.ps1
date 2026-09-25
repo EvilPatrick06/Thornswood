@@ -63,8 +63,8 @@ function Done {
     exit 0
 }
 
-$deployPath = Join-Path $tools 'Deploy-DevGamemode.ps1'
-$askPath    = Join-Path $tools 'Request-Restart.ps1'
+$deployPath = Join-Path $tools '..\scripts\deploy\Deploy-DevGamemode.ps1'
+$askPath    = Join-Path $tools '..\scripts\vps\Request-Restart.ps1'
 $src = Get-Content -LiteralPath $deployPath -Raw
 
 # ---- the block is there to test -------------------------------------------
@@ -155,10 +155,13 @@ Yes 'Request-Restart.ps1 takes both modes the deploy offers' ($askModes -contain
 
 # ---- stand-ins -------------------------------------------------------------------
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-devwarn-' + [Guid]::NewGuid().ToString('N'))
-$askDir = Join-Path $work 'tools'
-$noAskDir = Join-Path $work 'empty'
-New-Item -ItemType Directory -Path $askDir, $noAskDir -Force | Out-Null
-$askLog = Join-Path $askDir 'asked.txt'
+# The deploy runs from scripts\deploy and finds Request-Restart.ps1 in
+# scripts\vps beside it, since phase 8 of issue #440.
+$askDir = Join-Path $work 'scripts\deploy'
+$vpsDir = Join-Path $work 'scripts\vps'
+$noAskDir = Join-Path $work 'empty\deploy'
+New-Item -ItemType Directory -Path $askDir, $vpsDir, $noAskDir -Force | Out-Null
+$askLog = Join-Path $vpsDir 'asked.txt'
 
 $stub = $askAst.ParamBlock.Extent.Text + "`r`n" + @'
 $rec = [ordered]@{
@@ -168,7 +171,7 @@ $rec = [ordered]@{
 Add-Content -LiteralPath (Join-Path $PSScriptRoot 'asked.txt') -Value ($rec | ConvertTo-Json -Compress)
 exit [int]$env:THORNSWOOD_TEST_ASK_EXIT
 '@
-[IO.File]::WriteAllText((Join-Path $askDir 'Request-Restart.ps1'), $stub, (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path $vpsDir 'Request-Restart.ps1'), $stub, (New-Object Text.UTF8Encoding($false)))
 
 # What the functions read from the deploy's own scope. The address is one that
 # cannot resolve, so that even a stand-in that failed to take would reach nothing.

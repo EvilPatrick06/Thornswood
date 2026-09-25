@@ -39,17 +39,17 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$where = Join-Path $Tools 'Where.ps1'
-Yes 'tools\Where.ps1 is there' (Test-Path -LiteralPath $where)
+$where = Join-Path $Tools '..\scripts\release\Where.ps1'
+Yes 'scripts\release\Where.ps1 is there' (Test-Path -LiteralPath $where)
 if (-not (Test-Path -LiteralPath $where)) { Write-Host ''; Write-Host '0 passed, 1 failed'; exit 1 }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-where-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 try {
     $repo = Join-Path $work 'Thornswood-Repo'
     $old = Join-Path $work 'Thornswood-Dev'
-    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'tools') | Out-Null
-    Copy-Item -LiteralPath $where -Destination (Join-Path $repo 'tools\Where.ps1')
-    $w = Join-Path $repo 'tools\Where.ps1'
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'scripts\release') | Out-Null
+    Copy-Item -LiteralPath $where -Destination (Join-Path $repo 'scripts\release\Where.ps1')
+    $w = Join-Path $repo 'scripts\release\Where.ps1'
     function Ask([string]$what) { return [string](& $w $what -OldRoot $old) }
     function Same([string]$a, [string]$b) { return [IO.Path]::GetFullPath($a).TrimEnd('\', '/') -eq [IO.Path]::GetFullPath($b).TrimEnd('\', '/') }
     $newEngine = Join-Path $repo 'engine\skymp'
@@ -106,7 +106,9 @@ try {
     $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip')
     $badKeys = @()
     $callers = 0
-    foreach ($f in Get-ChildItem -LiteralPath $Tools -Filter *.ps1 -File) {
+    # scripts\<area> since phase 8 of issue #440; scripts\oneoff is parked history.
+    $scriptsDir = Join-Path (Split-Path -Parent $Tools) 'scripts'
+    foreach ($f in @(Get-ChildItem -LiteralPath $scriptsDir -Filter *.ps1 -File -Recurse | Where-Object { $_.FullName -notmatch '[\\/]oneoff[\\/]' })) {
         $tokens = $null; $errors = $null
         [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)
         if ($allowed -notcontains $f.Name) {
@@ -117,7 +119,7 @@ try {
             }
         }
         $text = [IO.File]::ReadAllText($f.FullName)
-        foreach ($m in [regex]::Matches($text, "Join-Path \`$PSScriptRoot 'Where\.ps1'\)\s+(\w+)")) {
+        foreach ($m in [regex]::Matches($text, "Join-Path \`$PSScriptRoot '(?:\.\.\\release\\)?Where\.ps1'\)\s+(\w+)")) {
             $callers++
             if ($keys -notcontains $m.Groups[1].Value) { $badKeys += ('{0}: {1}' -f $f.Name, $m.Groups[1].Value) }
         }

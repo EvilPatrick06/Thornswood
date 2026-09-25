@@ -84,6 +84,6 @@ CONTRIBUTING.md (the rules, for everybody), the board for open work,
 DEVELOPING.md (the long form), README.md,
 launcher\app\ARCHITECTURE.md (the launcher: startup, what each class owns, and
 the Play sequence), docs\MOVING-THE-SERVER.md (the VPS), lore\ (the world),
-site\data\site\*.md (public pages), tools\Ship-Rules.ps1 (what
+site\data\site\*.md (public pages), scripts\release\Ship-Rules.ps1 (what
 never leaves a machine in a release), docs\archive (dated snapshots, history
 only).

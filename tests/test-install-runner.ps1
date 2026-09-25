@@ -34,7 +34,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$path = Join-Path $Tools 'Install-Runner.ps1'
+$path = Join-Path $Tools '..\scripts\deploy\Install-Runner.ps1'
 $text = [IO.File]::ReadAllText($path)
 $yml = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
 

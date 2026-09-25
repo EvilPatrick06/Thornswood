@@ -1,6 +1,6 @@
 # test-check-secrets.ps1
 #
-# Drives tools\Check-Secrets.ps1 over scratch trees, zips, folders and programs
+# Drives scripts\dev\Check-Secrets.ps1 over scratch trees, zips, folders and programs
 # with obviously fake values planted in them, and over this repository as it is.
 #
 # WHY. Entry 236. A secret shipped inside a built artefact twice: the SkyMP
@@ -35,8 +35,8 @@ function Done {
     if ($script:fail) { exit 1 } else { exit 0 }
 }
 
-$scan = Join-Path $here 'Check-Secrets.ps1'
-yes 'tools\Check-Secrets.ps1 is there' (Test-Path -LiteralPath $scan)
+$scan = Join-Path $here '..\scripts\dev\Check-Secrets.ps1'
+yes 'scripts\dev\Check-Secrets.ps1 is there' (Test-Path -LiteralPath $scan)
 if (-not (Test-Path -LiteralPath $scan)) { Done }
 
 # Obviously fake, one for each rule by shape.
@@ -278,13 +278,13 @@ try {
 
     # Wired in before anything leaves: the upload in Publish-Update, the
     # compression in Package-Thornswood, both steps in the build check.
-    $pub = [IO.File]::ReadAllText((Join-Path $here 'Publish-Update.ps1'))
-    $a = $pub.IndexOf("'Check-Secrets.ps1'")
+    $pub = [IO.File]::ReadAllText((Join-Path $here '..\scripts\release\Publish-Update.ps1'))
+    $a = $pub.IndexOf("Check-Secrets.ps1')")
     $b = $pub.IndexOf('gh release create')
     yes 'Publish-Update runs the scan over what it built' ($a -ge 0 -and $pub.Contains('-Zip $scanZips'))
     yes 'and before the upload' ($a -ge 0 -and $b -gt $a)
-    $pkg = [IO.File]::ReadAllText((Join-Path $here 'Package-Thornswood.ps1'))
-    $a = $pkg.IndexOf("'Check-Secrets.ps1'")
+    $pkg = [IO.File]::ReadAllText((Join-Path $here '..\scripts\release\Package-Thornswood.ps1'))
+    $a = $pkg.IndexOf("Check-Secrets.ps1')")
     yes 'Package-Thornswood scans the stage' ($a -ge 0 -and $pkg.Contains('-Dir $stage'))
     yes 'before -NoArchive hands it over and before it is compressed' ($a -ge 0 -and $a -lt $pkg.IndexOf('if ($NoArchive)') -and $a -lt $pkg.IndexOf("Head 'Compressing'"))
 
@@ -301,7 +301,9 @@ try {
     }
     function Die($m) { $script:died = [string]$m }
     function Head($m) { }
-    $Here = $here
+    # The two hooks run as if from their own folder, scripts\release, where
+    # their Join-Path $Here reaches Check-Secrets.ps1 in scripts\dev.
+    $Here = Join-Path (Split-Path -Parent $here) (Join-Path 'scripts' 'release')
     $pubFrom = '# ---- nothing that must never ship, read off what was built'
     $pubTo = 'if (-not $NoUpload -and $gh) {'
     $Launcher = $false; $exePath = ''; $clientRel = $null

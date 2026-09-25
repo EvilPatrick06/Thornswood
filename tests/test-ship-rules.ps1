@@ -52,7 +52,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $RulesPath) { $RulesPath = Join-Path $Here 'Ship-Rules.ps1' }
+if (-not $RulesPath) { $RulesPath = Join-Path $Here '..\scripts\release\Ship-Rules.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -71,7 +71,8 @@ function Done {
 
 # The record of our own client build sits beside the rules, and the rules read
 # it from there. Read here too, so the six files are asked about by name.
-$record = Join-Path (Split-Path -Parent $RulesPath) 'client-build.json'
+# In records\ since phase 8 of issue #440, two folders up from scripts\release.
+$record = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $RulesPath))) (Join-Path 'records' 'client-build.json')
 $clientFiles = @()
 if (Test-Path -LiteralPath $record) {
     $clientFiles = @((Get-Content -LiteralPath $record -Raw | ConvertFrom-Json).files.PSObject.Properties.Name)
@@ -318,7 +319,7 @@ Yes 'and so does our own plugin' (-not (Test-ShipMachine 'Data\Thornswood-Conten
 # From the line that starts the two lists to the line that filters removals by
 # Test-Machine, plus Test-Machine itself. If either is renamed this fails
 # rather than quietly testing nothing.
-$pubPath = Join-Path $Here 'Publish-Update.ps1'
+$pubPath = Join-Path $Here '..\scripts\release\Publish-Update.ps1'
 $pub = Get-Content -LiteralPath $pubPath -Raw
 $tm = [regex]::Match($pub, '(?m)^function Test-Machine\(.*$')
 $diff = [regex]::Match($pub, '(?ms)^\$changed = @\(\); \$removed = @\(\)\r?$.*?^\$removed\s+= @\(\$removed \| Where-Object \{[^\r\n]*Test-Machine[^\r\n]*\r?$')
@@ -350,7 +351,7 @@ Yes 'the lifted diff is live: a mesh that really went is still removed' ($remove
 Yes 'and our overlay is neither changed nor removed' (($changed -notcontains 'Data\Platform\Plugins\thornswood-hud.js') -and ($removed -notcontains 'Data\Platform\Plugins\thornswood-hud.js'))
 
 # ---- the installer asks the same question ----------------------------------------
-$pkg = Get-Content -LiteralPath (Join-Path $Here 'Package-Thornswood.ps1') -Raw
+$pkg = Get-Content -LiteralPath (Join-Path $Here '..\scripts\release\Package-Thornswood.ps1') -Raw
 Yes 'Package-Thornswood.ps1 dot-sources Ship-Rules.ps1' ($pkg -match '\. \(Join-Path \$Here ''Ship-Rules\.ps1''\)')
 Yes 'and its filter loop leaves out what Test-ShipMachine claims' ($pkg -match 'if \(Test-ShipMachine \$rel\) \{')
 Yes 'and it reports the loose art it is about to ship' ($pkg -match '\$loose = Get-ShipLooseArt \$ship')
@@ -388,7 +389,7 @@ $none = Get-ShipLooseArt @((Row 'Data\meshes\interface\logo\logo.nif' 1), (Row '
 Yes 'nothing to report is an empty list, not nothing' (($null -ne $none) -and $none.Count -eq 0)
 $one = Get-ShipLooseArt @((Row 'Data\meshes\MCE\robe.nif' 29))
 Yes 'one folder is still a list of one' ($one.Count -eq 1 -and $one[0].Folder -eq 'Data\meshes\MCE' -and $one[0].Bytes -eq 29)
-Yes 'the three files Go.ps1 writes are the three called ours' ((@($ShipOwnArt) | Where-Object { (Get-Content -LiteralPath (Join-Path $Here 'Go.ps1') -Raw).Contains("'" + $_ + "'") }).Count -eq 3)
+Yes 'the three files Go.ps1 writes are the three called ours' ((@($ShipOwnArt) | Where-Object { (Get-Content -LiteralPath (Join-Path $Here '..\scripts\release\Go.ps1') -Raw).Contains("'" + $_ + "'") }).Count -eq 3)
 
 # ---- measured on this machine, where it can be ------------------------------------
 $baseline = Join-Path $env:LOCALAPPDATA 'Thornswood\published.json'

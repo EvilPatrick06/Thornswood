@@ -29,7 +29,7 @@ button has been through all three.
    them into the Steam copy of Skyrim. Its payload is built with everything the
    collection provides left out, and it carries a `collection.txt` that tells
    `installer\Setup-Thornswood.ps1` to install into the Steam copy rather than make
-   a Skyrim of its own (`tools\Package-Thornswood.ps1`).
+   a Skyrim of its own (`scripts\release\Package-Thornswood.ps1`).
 2. Vortex deploys the Nexus collection into that same Steam copy.
 3. The launcher makes Thornswood's own game folder, `C:\Thornswood\Game`, out
    of what Vortex deployed: the big files as hard links, so the collection is
@@ -93,7 +93,7 @@ describes something that download does not do.
 - No graphics card is needed. The run stops at the launcher's Play page, before
   the game starts.
 
-**The outside.** The day of the run, Patrick runs `.\tools\Check-Outside.ps1`
+**The outside.** The day of the run, Patrick runs `.\scripts\dev\Check-Outside.ps1`
 from the repo folder on his own machine. It only reads, sends no token, and
 walks what a first install fetches from outside the project: the update feed,
 every pack, the launcher, the client runtime, Steam's public build and the
@@ -348,8 +348,8 @@ goes to the repo folder.
 
 ```powershell
 cd C:\Users\evilp\Downloads\Thornswood-Repo
-.\tools\Check-Build.ps1 -Data C:\ts-clean-run\Game\Data -NoPause
-.\tools\Check-Manifest.ps1 -Client C:\ts-clean-run -NoPause
+.\scripts\release\Check-Build.ps1 -Data C:\ts-clean-run\Game\Data -NoPause
+.\scripts\mods\Check-Manifest.ps1 -Client C:\ts-clean-run -NoPause
 ```
 
 C1 reads the live server's manifest over HTTP and compares every plugin it
@@ -422,9 +422,9 @@ tester confused by a list that no longer matches.
 | 44 | `Closed for maintenance` | `launcher\app\FeedNotice.cs` |
 | 44 | `This launcher is too old to play` | `launcher\app\FeedNotice.cs` |
 | 45 | `PLAY` | `launcher\app\Shell.cs` |
-| 48 | `This build is byte for byte what the server expects.` | `tools\Check-Build.ps1` |
-| 49 | `you have every plugin the server wants` | `tools\Check-Manifest.ps1` |
-| 49 | `POSITION BY POSITION: identical.` | `tools\Check-Manifest.ps1` |
+| 48 | `This build is byte for byte what the server expects.` | `scripts\release\Check-Build.ps1` |
+| 49 | `you have every plugin the server wants` | `scripts\mods\Check-Manifest.ps1` |
+| 49 | `POSITION BY POSITION: identical.` | `scripts\mods\Check-Manifest.ps1` |
 
 ## What the code predicts
 
@@ -485,7 +485,7 @@ right or wrong. To Do entries are named by title, because their numbers move.
   installed machine".
 - **Updates on the first open (row 43).** An installer older than the last
   release offers what came after it. One built with no record of the packs it
-  already holds offers every pack ever published, and `tools\Check-Outside.ps1`
+  already holds offers every pack ever published, and `scripts\dev\Check-Outside.ps1`
   found on 24 Sep that 164 of the feed's 227 packs point at a repository a
   stranger cannot download from. Owned by "The installer is a snapshot of your
   game folder with your home folder path baked into the script, and it is
@@ -529,7 +529,7 @@ right or wrong. To Do entries are named by title, because their numbers move.
   run that only tests what is ours can start there and say so on its Last run
   line.
 - M1 to M6 and M8 can become one script that writes its answers to a file, so
-  the measuring rows are pasted rather than typed. `tools\Check-Outside.ps1`
+  the measuring rows are pasted rather than typed. `scripts\dev\Check-Outside.ps1`
   already scripts the outside half: what the feed, GitHub, Steam and Nexus
   answer a stranger.
 - The setup console keeps no record of itself, which is why rows 20 to 22 lean

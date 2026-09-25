@@ -36,7 +36,7 @@ const zlib = require('zlib');
 const { spawnSync } = require('child_process');
 
 const TOOLS = TOOLS_DIR;
-const MEASURE = path.join(TOOLS, 'Measure-MineBuildings.py');
+const MEASURE = path.join(TOOLS, '..', 'scripts', 'dev', 'Measure-MineBuildings.py');
 const CR = String.fromCharCode(13);
 const LF = String.fromCharCode(10);
 const CRLF = CR + LF;
@@ -370,7 +370,7 @@ Object.keys(realByDoor).forEach(function (k) { claimable[realByDoor[k]] = true; 
 
 const rb = real.buildings || {};
 const rk = Object.keys(rb);
-const stale = 'if this fails, the door table moved: run python tools/Measure-MineBuildings.py --out game/data/mine-buildings.json';
+const stale = 'if this fails, the door table moved: run python scripts/dev/Measure-MineBuildings.py --out game/data/mine-buildings.json';
 yes('every building in it is one /claim would take (' + stale + ')',
     rk.length > 0 && rk.every(function (k) { return claimable[k]; }));
 yes('every building in it is named the way BUILDING_NAME names it',

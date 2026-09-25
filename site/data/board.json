@@ -837,7 +837,7 @@
             "cells": {
               "s4a": "**The picker**",
               "s4b": "Four columns: Profession, Which half, Class, Where you wake up. The halves column rebuilds when the profession changes. Mage switches to pick two of five schools. Bard, Merchant, Priest, Scholar, Thief and Woodworker are gone.",
-              "s4c": "```powershell\n.\\tools\\Deploy-Server.ps1\n.\\tools\\Ship.ps1 \"Professions, sub professions and classes\"\n```"
+              "s4c": "```powershell\n.\\scripts\\deploy\\Deploy-Server.ps1\n.\\scripts\\release\\Ship.ps1 \"Professions, sub professions and classes\"\n```"
             }
           },
           {
@@ -1250,7 +1250,7 @@
             "cells": {
               "c1bot": "**Install it**",
               "c2bot": "Copies the bot up, installs discord.py and Pillow, takes the token at a prompt, makes a shared key so the site only accepts tickets from the bot, and registers a task that starts it at boot and restarts it if it falls over.",
-              "c3bot": "```powershell\n.\\tools\\Install-Bot.ps1\n```\n\nRun it again any time to push a change. It stops the old one first."
+              "c3bot": "```powershell\n.\\scripts\\deploy\\Install-Bot.ps1\n```\n\nRun it again any time to push a change. It stops the old one first."
             }
           },
           {
@@ -1261,7 +1261,7 @@
             "cells": {
               "c1bot": "**Restart the site**",
               "c2bot": "So it picks up the shared key and starts accepting tickets.",
-              "c3bot": "```powershell\n.\\tools\\Deploy-Docs.ps1\n```"
+              "c3bot": "```powershell\n.\\scripts\\deploy\\Deploy-Docs.ps1\n```"
             }
           },
           {
@@ -1392,7 +1392,7 @@
             "cells": {
               "c1pt": "**Tell the site where it is**",
               "c2pt": "Puts a real Patreon link in the nav and the footer instead of the Support page.",
-              "c3pt": "```powershell\n.\\tools\\Set-DiscordLogin.ps1 -Patreon https://www.patreon.com/<your page> -NoSecrets\n```\n\nPaste your real page URL in place of the last part. The nav and the footer switch from Support to Patreon straight away."
+              "c3pt": "```powershell\n.\\scripts\\deploy\\Set-DiscordLogin.ps1 -Patreon https://www.patreon.com/<your page> -NoSecrets\n```\n\nPaste your real page URL in place of the last part. The nav and the footer switch from Support to Patreon straight away."
             }
           },
           {

@@ -4,11 +4,11 @@
       pwsh -NoProfile -File .\tests\test-script-index.ps1
 
   Ship.ps1 says every option it takes where Get-Help can read it, and
-  tools\README.md lists every script in this folder exactly as
+  scripts\README.md lists every script in this folder exactly as
   New-ScriptIndex.ps1 writes it.
 
   WHY THIS EXISTS. Entry 260 on the To Do List. MEASURED 24 SEPTEMBER:
-  Get-Help .\tools\Ship.ps1 -Full printed the syntax line and nothing else.
+  Get-Help .\scripts\release\Ship.ps1 -Full printed the syntax line and nothing else.
   Ship's header listed five options as if they were all of them, while its
   param block declared thirteen, and the one left out that mattered was
   -Channel, which the whole dev workflow runs on. There were 128 scripts in
@@ -44,7 +44,8 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
+# The scripts, in scripts\<area> since phase 8 of issue #440.
+if (-not $ToolsPath) { $ToolsPath = Join-Path (Split-Path -Parent $Here) 'scripts' }
 
 $script:pass = 0
 $script:fail = 0
@@ -54,8 +55,8 @@ function Yes([string]$what, [bool]$cond) {
 }
 
 $Utf8 = New-Object Text.UTF8Encoding($false)
-$Ship = Join-Path $ToolsPath 'Ship.ps1'
-$Gen = Join-Path $ToolsPath 'New-ScriptIndex.ps1'
+$Ship = Join-Path $ToolsPath 'release\Ship.ps1'
+$Gen = Join-Path $ToolsPath 'dev\New-ScriptIndex.ps1'
 $Readme = Join-Path $ToolsPath 'README.md'
 
 # What the param block declares against what the help block documents, both
@@ -156,7 +157,7 @@ $closers = @()
 foreach ($m in [regex]::Matches($shipText, "& \(Join-Path \`$Here '([^']+\.ps1)'\)")) {
     $n = $m.Groups[1].Value
     if ($closers -contains $n) { continue }
-    $p = Join-Path $ToolsPath $n
+    $p = Join-Path (Join-Path $ToolsPath 'release') $n
     if ((Test-Path -LiteralPath $p) -and ([IO.File]::ReadAllText($p, $Utf8) -match '(?m)^\s*(\$null\s*=\s*)?Stop-Game\b')) { $closers += $n }
 }
 $closers = @($closers | Sort-Object)
@@ -219,22 +220,25 @@ try {
     Yes 'New-ScriptIndex.ps1 is there' (Test-Path -LiteralPath $Gen)
     # Everything below runs it, and a missing script is one FAIL, not a crash.
     if (-not (Test-Path -LiteralPath $Gen)) { throw 'no New-ScriptIndex.ps1, so the index was not checked' }
-    Yes 'tools\README.md is there' (Test-Path -LiteralPath $Readme)
+    Yes 'scripts\README.md is there' (Test-Path -LiteralPath $Readme)
     $global:LASTEXITCODE = 0
     & $Gen -Tools $ToolsPath -Check
-    Yes 'tools\README.md is what New-ScriptIndex.ps1 writes (if not, run it and commit the file)' ($LASTEXITCODE -eq 0)
+    Yes 'scripts\README.md is what New-ScriptIndex.ps1 writes (if not, run it and commit the file)' ($LASTEXITCODE -eq 0)
 
     $rows = @()
     if (Test-Path -LiteralPath $Readme) {
         $rows = @([IO.File]::ReadAllText($Readme, $Utf8) -split "\r?\n" | Where-Object { $_ -match '^\| \[' })
     }
-    $scripts = @(Get-ChildItem -LiteralPath $ToolsPath -Filter '*.ps1' -File |
-                 Where-Object { $_.Extension -eq '.ps1' } | ForEach-Object { $_.Name })
+    $rootFull = (Resolve-Path -LiteralPath $ToolsPath).Path.TrimEnd('\', '/')
+    $scripts = @(Get-ChildItem -LiteralPath $ToolsPath -Filter '*.ps1' -File -Recurse |
+                 Where-Object { $_.Extension -eq '.ps1' } |
+                 ForEach-Object { $_.FullName.Substring($rootFull.Length + 1).Replace('\', '/') } |
+                 Where-Object { $_ -notlike 'oneoff/*' })
     $listed = @($rows | ForEach-Object { if ($_ -match '^\| \[([^\]]+)\]') { $Matches[1] } })
     $unlisted = @($scripts | Where-Object { $listed -notcontains $_ })
     $some = @($unlisted | Select-Object -First 8)
     if ($unlisted.Count -gt $some.Count) { $some += ('and ' + ($unlisted.Count - $some.Count) + ' more') }
-    Yes ("it has one row for each of the {0} scripts in tools" -f $scripts.Count +
+    Yes ("it has one row for each of the {0} scripts under scripts" -f $scripts.Count +
          $(if ($unlisted.Count) { ', not listed: ' + ($some -join ', ') } else { '' })) (
         $rows.Count -eq $scripts.Count -and $unlisted.Count -eq 0)
     $silent = @($rows | Where-Object { $_.Contains('Nothing at the top of this script says what it is for.') })
@@ -247,21 +251,21 @@ try {
         return ''
     }
     Yes "Ship.ps1's row is its synopsis" (
-        $gaps.Help -and (Row 'Ship.ps1') -and (Row 'Ship.ps1') -eq (($gaps.Help.Synopsis -replace '\s+', ' ').Trim()))
+        $gaps.Help -and (Row 'release/Ship.ps1') -and (Row 'release/Ship.ps1') -eq (($gaps.Help.Synopsis -replace '\s+', ' ').Trim()))
     Yes 'a name line with the purpose on it gives that purpose (Chargen-Log.ps1)' (
-        (Row 'Chargen-Log.ps1') -eq 'What the server thinks is happening to your character.')
+        (Row 'ops/Chargen-Log.ps1') -eq 'What the server thinks is happening to your character.')
     Yes 'and carries it on to the next line (Go.ps1)' (
-        (Row 'Go.ps1') -eq 'Installs the front, the overlays and the plugins, then reports what the server is doing.')
+        (Row 'release/Go.ps1') -eq 'Installs the front, the overlays and the plugins, then reports what the server is doing.')
     Yes 'usage lines at the top are passed over (Check-Build.ps1)' (
-        (Row 'Check-Build.ps1') -and (Row 'Check-Build.ps1') -notmatch '^\.\\')
+        (Row 'release/Check-Build.ps1') -and (Row 'release/Check-Build.ps1') -notmatch '^\.\\')
     Yes 'a header written in # lines is read too (Check-DevRosterSeed.ps1)' (
-        (Row 'Check-DevRosterSeed.ps1').StartsWith('Expand the roster seed here-string'))
+        (Row 'ops/Check-DevRosterSeed.ps1').StartsWith('Expand the roster seed here-string'))
 
     # ================================================== the check goes red
 
     $t = Join-Path $work 'tools'
     New-Item -ItemType Directory -Path $t -Force | Out-Null
-    foreach ($n in 'Ship.ps1', 'Go.ps1', 'Check-Plugins.ps1') {
+    foreach ($n in 'release\Ship.ps1', 'release\Go.ps1', 'mods\Check-Plugins.ps1') {
         Copy-Item -LiteralPath (Join-Path $ToolsPath $n) -Destination $t
     }
     $out = Join-Path $t 'README.md'

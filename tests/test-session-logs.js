@@ -175,7 +175,7 @@ yes('a server log that is not on this box says so rather than throwing',
   real Roll-Log.ps1 the way the task line runs it, and asks again.
 */
 const { spawnSync } = require('child_process');
-const ROLLER = path.join(TOOLS_DIR, 'Roll-Log.ps1');
+const ROLLER = path.join(TOOLS_DIR, '..', 'scripts', 'vps', 'Roll-Log.ps1');
 const WINPS = path.join(process.env.SystemRoot || 'C:\\Windows',
                         'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 let rolledBy = 'Roll-Log.ps1';

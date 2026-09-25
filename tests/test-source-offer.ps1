@@ -5,8 +5,8 @@
   in the installed folder, and said truthfully.
 
   WHY IT MATTERS. Entry 170 on the To Do List. The installer and every pack
-  carry six files built from SkyMP (tools\client-build.json), and the server
-  runs a seventh (tools\server-build.json). SkyMP's folders carry the GNU GPL
+  carry six files built from SkyMP (records\client-build.json), and the server
+  runs a seventh (records\server-build.json). SkyMP's folders carry the GNU GPL
   and AGPL version 3, each in its own LICENSE file. Nothing Thornswood put in
   front of a stranger said where the source was: credits.md named SkyMP with
   no licence and no link, and on 24 September the installer's READ ME
@@ -50,7 +50,7 @@
   Read only apart from files under its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$Fork = (& (Join-Path $PSScriptRoot '..\tools\Where.ps1') Engine))
+param([string]$Fork = (& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') Engine))
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -69,9 +69,9 @@ function Read-Json([string]$p) {
 }
 function Leaf([string]$p) { return $p.Substring($p.LastIndexOf('\') + 1) }
 
-$clientPath  = Join-Path $Here 'client-build.json'
-$serverPath  = Join-Path $Here 'server-build.json'
-$packagePath = Join-Path $Here 'Package-Thornswood.ps1'
+$clientPath  = Join-Path $Here '..\records\client-build.json'
+$serverPath  = Join-Path $Here '..\records\server-build.json'
+$packagePath = Join-Path $Here '..\scripts\release\Package-Thornswood.ps1'
 $setupPath   = Join-Path $Here '..\installer\Setup-Thornswood.ps1'
 $creditsPath = Join-Path $Here '..\site\data\site\credits.md'
 $homePath    = Join-Path $Here '..\site\public\home.html'
@@ -257,7 +257,7 @@ Yes 'Package-Thornswood.ps1 writes SOURCE CODE.txt into the stage from the recor
     ($package -match "Join-Path \`$stage 'SOURCE CODE\.txt'" -and $package -match 'Get-SourceNotice \$clientRecordPath')
 # And hands it the payload, or the files it did not build are never named.
 Yes 'Package-Thornswood.ps1 hands Get-SourceNotice the payload it staged' `
-    ($package -match "Get-SourceNotice \`$clientRecordPath \(Join-Path \`$PSScriptRoot 'server-build\.json'\) \`$payloadDir")
+    ($package -match "Get-SourceNotice \`$clientRecordPath \(Join-Path \`$PSScriptRoot '\.\.\\\.\.\\records\\server-build\.json'\) \`$payloadDir")
 
 # The setup program unpacks into a scratch folder, so the note has to be put
 # where a person keeps things.

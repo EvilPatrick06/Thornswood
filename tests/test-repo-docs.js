@@ -97,7 +97,7 @@ if (readme !== null) {
 // prints a yellow line when it is missing and carries on, which is an
 // installer with no read me that nobody notices.
 const RMF = 'installer/READ ME FIRST.txt';
-const pkg = read('tools/Package-Thornswood.ps1');
+const pkg = read('scripts/release/Package-Thornswood.ps1');
 yes('Package-Thornswood.ps1 still copies READ ME FIRST.txt into the installer',
     pkg !== null && /foreach\s*\(\$f in [^)]*'READ ME FIRST\.txt'/.test(pkg));
 

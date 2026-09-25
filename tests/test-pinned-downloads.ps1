@@ -108,7 +108,7 @@ function Start-Process {
 try {
 
 # ============================================================== caddy ======
-$sdPath = Join-Path $ToolsPath 'Setup-Domain.ps1'
+$sdPath = Join-Path $ToolsPath '..\scripts\deploy\Setup-Domain.ps1'
 $sd = ParseOf $sdPath
 $sdText = Get-Content -LiteralPath $sdPath -Raw
 Yes 'Setup-Domain.ps1 parses' ($sd.Errors.Count -eq 0)
@@ -197,7 +197,7 @@ if ($caddyBlocks.Count -eq 1) {
 }
 
 # =============================================================== node ======
-$bvPath = Join-Path $ToolsPath 'Bootstrap-VPS.ps1'
+$bvPath = Join-Path $ToolsPath '..\scripts\vps\Bootstrap-VPS.ps1'
 $bv = ParseOf $bvPath
 $bvText = Get-Content -LiteralPath $bvPath -Raw
 Yes 'Bootstrap-VPS.ps1 parses' ($bv.Errors.Count -eq 0)
@@ -267,7 +267,7 @@ foreach ($lib in 'discord.py', 'pillow', 'certifi') {
     Yes "  $lib is pinned" (@($req | Where-Object { $_ -like "$lib==*" }).Count -eq 1)
 }
 
-$ibPath = Join-Path $ToolsPath 'Install-Bot.ps1'
+$ibPath = Join-Path $ToolsPath '..\scripts\deploy\Install-Bot.ps1'
 $ib = ParseOf $ibPath
 $ibText = Get-Content -LiteralPath $ibPath -Raw
 Yes 'Install-Bot.ps1 parses' ($ib.Errors.Count -eq 0)

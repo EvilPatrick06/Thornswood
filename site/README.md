@@ -77,11 +77,11 @@ the temp folder, and never reads a `config.json` out of the checkout.
 
 On the VPS in `C:\Thornswood-Docs`, started by the scheduled task
 `Thornswood Docs`, answering on 127.0.0.1:3001 only. Caddy holds ports 80 and
-443 and the certificate in front of it (`tools\Caddyfile` is the reference
+443 and the certificate in front of it (`scripts\deploy\Caddyfile` is the reference
 copy of the live `C:\Thornswood-Caddy\Caddyfile`), and `Setup-Domain.ps1` is
 what set `THORNSWOOD_DOCS_LOCAL=1` there. Its `config.json` on the VPS holds
 the member password, the Discord client secret and bot token, the bot's key
-and the cookie secret, and is never in the repo. `.\tools\Deploy-Docs.ps1`
+and the cookie secret, and is never in the repo. `.\scripts\deploy\Deploy-Docs.ps1`
 sends `server.js` and everything in `public\` and restarts the task, and
 `-Site` also sends the public pages. A plain deploy never overwrites a
 document somebody has typed into on the site; `-Boards`, `-Docs` and

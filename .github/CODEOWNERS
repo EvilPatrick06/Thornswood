@@ -44,10 +44,10 @@
 /launcher/app/Keep.cs         @EvilPatrick06 @WiccanDjinn @Ture-Neko
 /launcher/app/Hold.cs         @EvilPatrick06 @WiccanDjinn @Ture-Neko
 /launcher/app/Updater.cs      @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/tools/Publish-Update.ps1  @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/scripts/release/Publish-Update.ps1  @EvilPatrick06 @WiccanDjinn @Ture-Neko
 
 # Not on CONTRIBUTING.md's list, and here because getting them wrong is the same
 # shape of accident: they decide what leaves a machine and what a release is.
-/tools/Ship.ps1            @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/tools/Ship-Rules.ps1      @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/scripts/release/Ship.ps1            @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/scripts/release/Ship-Rules.ps1      @EvilPatrick06 @WiccanDjinn @Ture-Neko
 /.github/                  @EvilPatrick06

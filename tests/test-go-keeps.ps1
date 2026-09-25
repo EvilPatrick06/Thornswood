@@ -43,8 +43,8 @@ function Done {
     exit 0
 }
 
-$go = Join-Path $Tools 'Go.ps1'
-$pub = Join-Path $Tools 'Publish-Update.ps1'
+$go = Join-Path $Tools '..\scripts\release\Go.ps1'
+$pub = Join-Path $Tools '..\scripts\release\Publish-Update.ps1'
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($go, [ref]$tokens, [ref]$errors)
 Yes 'Go.ps1 parses' ($errors.Count -eq 0)

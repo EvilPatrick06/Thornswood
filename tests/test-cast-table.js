@@ -9,7 +9,7 @@
 // before anything is deleted, because the deletion is the part that cannot be
 // undone".
 //
-// tools/Build-CastTable.py writes that list into tools/cast.json. This drives
+// scripts/dev/Build-CastTable.py writes that list into tools/cast.json. This drives
 // the real script against a small load order built here, byte by byte, where
 // every answer is known, and then reads the committed cast.json for the people
 // the list has to get right in the real one.
@@ -80,8 +80,8 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const TOOL = process.env.CAST_TOOL || path.join(TOOLS_DIR, 'Build-CastTable.py');
-yes('tools/Build-CastTable.py is in the repo', fs.existsSync(TOOL));
+const TOOL = process.env.CAST_TOOL || path.join(TOOLS_DIR, '..', 'scripts', 'dev', 'Build-CastTable.py');
+yes('scripts/dev/Build-CastTable.py is in the repo', fs.existsSync(TOOL));
 
 // ------------------------------------------------------------ plugin bytes
 function u32(n) { const b = Buffer.alloc(4); b.writeUInt32LE(n >>> 0, 0); return b; }
@@ -602,7 +602,7 @@ try {
   const CAST = path.join(TOOLS_DIR, '..', 'game', 'data', 'cast.json');
   let j = null;
   try { j = JSON.parse(fs.readFileSync(CAST, 'utf8')); } catch (e) { j = null; }
-  yes('game/data/cast.json is in the repo, written by the script', j !== null && j.builtBy === 'tools/Build-CastTable.py');
+  yes('game/data/cast.json is in the repo, written by the script', j !== null && j.builtBy === 'scripts/dev/Build-CastTable.py');
   j = j || { holds: {}, counts: {} };
   const rows = function (h, col) { return ((j.holds[h] || {})[col]) || []; };
   const bel = rows('Whiterun', 'traders').filter(function (r) { return r.name === 'Belethor'; });

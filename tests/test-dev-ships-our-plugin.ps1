@@ -5,7 +5,7 @@
 #
 # Patrick, 24 September: "we can put a temp patch for the plugins until we put
 # them on nexus", "yeah they shoul be entrily isolated for testing", "thats the
-# point of a dev build". See $DevShipsOurs in tools/Publish-Update.ps1.
+# point of a dev build". See $DevShipsOurs in scripts/release/Publish-Update.ps1.
 #
 # This lifts the real $DevShipsOurs line and the real Test-FromCollection out
 # of Publish-Update.ps1 with the PowerShell parser and runs them, rather than
@@ -15,7 +15,7 @@ $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $here = Join-Path (Split-Path -Parent $here) 'tools'
-$src = Join-Path $here 'Publish-Update.ps1'
+$src = Join-Path $here '..\scripts\release\Publish-Update.ps1'
 
 $pass = 0; $fail = 0
 function yes([string]$what, [bool]$cond) {

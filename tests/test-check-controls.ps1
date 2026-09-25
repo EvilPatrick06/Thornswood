@@ -31,7 +31,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $CheckPath) { $CheckPath = Join-Path $Here 'Check-Controls.ps1' }
+if (-not $CheckPath) { $CheckPath = Join-Path $Here '..\scripts\dev\Check-Controls.ps1' }
 $RealXaml = Join-Path $Here '..\launcher\ui.xaml'
 $RealApp  = Join-Path $Here '..\launcher\app'
 
@@ -118,7 +118,7 @@ try {
 
     # ---- the exit code a person reads in the same session ---------------------
     #
-    # Run in process, the way ".\tools\Check-Controls.ps1 -NoPause; $LASTEXITCODE"
+    # Run in process, the way ".\scripts\dev\Check-Controls.ps1 -NoPause; $LASTEXITCODE"
     # runs it. A script that simply ends leaves the session's last exit code
     # alone, so without an explicit exit 0 the clean run after a failing one
     # would still read 1.

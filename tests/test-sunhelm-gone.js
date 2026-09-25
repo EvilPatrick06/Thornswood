@@ -273,7 +273,7 @@ if (shCount) {
 }
 
 // ------------------------------------------------------- Add-CartTravel.ps1
-const CART = read(['Add-CartTravel.ps1']);
+const CART = read(['..', 'scripts', 'mods', 'Add-CartTravel.ps1']);
 const says = [];
 CART.split('\n').forEach(function (line) {
   const m = /^\s*Say\s+'((?:[^']|'')*)'/.exec(line) || /^\s*Say\s+"([^"]*)"/.exec(line);

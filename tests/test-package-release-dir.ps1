@@ -27,7 +27,7 @@ $Here0 = $PSScriptRoot
 if (-not $Here0) { $Here0 = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here0 = Join-Path (Split-Path -Parent $Here0) 'tools'
-if (-not $PackagePath) { $PackagePath = Join-Path $Here0 'Package-Thornswood.ps1' }
+if (-not $PackagePath) { $PackagePath = Join-Path $Here0 '..\scripts\release\Package-Thornswood.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -137,7 +137,8 @@ try {
     # One machine's layout: the repo and the feed side by side, and the repo
     # carrying its own stale version.json, the way it does today.
     $repo  = Join-Path $work 'Thornswood-Repo'
-    $tools = Join-Path $repo 'tools'
+    # Package-Thornswood is in scripts\release since phase 8 of issue #440.
+    $tools = Join-Path (Join-Path $repo 'scripts') 'release'
     $feed  = Join-Path $work 'Thornswood-Releases'
     New-Item -ItemType Directory -Path $tools, $feed -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $repo 'version.json') -Value '{"packs":[{"id":"stale"}]}' -Encoding UTF8
@@ -151,7 +152,7 @@ try {
 
     # ---- a different account, a different drive: no home folder in it
     $other = Join-Path $work 'D\Somebody Else\Code'
-    $otherTools = Join-Path $other 'Thornswood-Repo\tools'
+    $otherTools = Join-Path (Join-Path (Join-Path $other 'Thornswood-Repo') 'scripts') 'release'
     $otherFeed = Join-Path $other 'Thornswood-Releases'
     New-Item -ItemType Directory -Path $otherTools, $otherFeed -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $otherFeed 'version.json') -Value '{"packs":[]}' -Encoding UTF8
@@ -192,7 +193,7 @@ finally {
 # or a build runner has no feed beside it, so that is a SKIP, not a failure.
 $realFeed = Join-Path (Split-Path -Parent (Split-Path -Parent $Here0)) 'Thornswood-Releases'
 if (Test-Path -LiteralPath (Join-Path $realFeed '.git')) {
-    $r = Run-Lookup $Here0 ''
+    $r = Run-Lookup (Join-Path (Split-Path -Parent $Here0) (Join-Path 'scripts' 'release')) ''
     Yes ("on this machine it reads " + $r.vLive) ($r.Died -eq '' -and $r.vLive -eq (Join-Path $realFeed 'version.json'))
 } else {
     Write-Host ("SKIP  no releases clone at {0}, so the real path is not checked here" -f $realFeed)

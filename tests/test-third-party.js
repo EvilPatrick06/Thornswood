@@ -70,7 +70,7 @@ const C = creditsRaw || '';
 const OURS = {
   'ui.xaml': 'the launcher window, launcher\\ui.xaml',
   'logo.png': 'the emblem, launcher\\logo.png and logo-192.png for the setup stub',
-  'launcher-header.jpg': 'a strip of the Thornswood backdrop, tools\\art',
+  'launcher-header.jpg': 'a strip of the Thornswood backdrop, launcher\\art',
   'launcher-header.mp4': 'the same strip moving',
   'app.ico': 'the icon',
   'voice-host.html': 'the voice page, launcher',
@@ -78,7 +78,7 @@ const OURS = {
   'client-build.json': 'the record of the client runtime'
 };
 
-const build = read(path.join(TOOLS, 'Build-Launcher.ps1')) || '';
+const build = read(path.join(TOOLS, '..', 'scripts', 'release', 'Build-Launcher.ps1')) || '';
 yes('Build-Launcher.ps1 is there to read', build.length > 0);
 
 // The WebView2 names come out of two arrays and go in through a loop as $n,
@@ -281,8 +281,8 @@ function namesLicence(text, want) {
 }
 
 let cb = null;
-try { cb = JSON.parse(read(path.join(TOOLS, 'client-build.json'))); } catch (e) { cb = null; }
-yes('tools\\client-build.json reads', !!(cb && cb.files && cb.forkCommit));
+try { cb = JSON.parse(read(path.join(TOOLS, '..', 'records', 'client-build.json'))); } catch (e) { cb = null; }
+yes('records\\client-build.json reads', !!(cb && cb.files && cb.forkCommit));
 const cbFiles = cb && cb.files ? Object.keys(cb.files) : [];
 const commit = cb ? String(cb.forkCommit || '') : '';
 const forkUrl = cb ? String(cb.fork || '').replace(/\.git$/, '') : '';
@@ -333,8 +333,8 @@ Object.keys(LICENCE_OF).forEach(function (sub) {
 
 // ---------------------------------------------------------------- the server
 let sb = null;
-try { sb = JSON.parse(read(path.join(TOOLS, 'server-build.json'))); } catch (e) { sb = null; }
-yes('tools\\server-build.json reads', !!(sb && sb.source && sb.source.commit));
+try { sb = JSON.parse(read(path.join(TOOLS, '..', 'records', 'server-build.json'))); } catch (e) { sb = null; }
+yes('records\\server-build.json reads', !!(sb && sb.source && sb.source.commit));
 if (sb && sb.source) {
   const sc = String(sb.source.commit);
   yes('THIRD-PARTY.md names the server binary, ' + sb.binary, N.indexOf(String(sb.binary)) >= 0);
@@ -349,7 +349,7 @@ if (sb && sb.source) {
 // Only where the fork is cloned here and holds the recorded commit. This is
 // what makes the licence column a measurement rather than a memory.
 // The engine/skymp submodule once it has files in it, and the old clone until
-// then: the same rule as tools\Where.ps1.
+// then: the same rule as scripts\release\Where.ps1.
 const REPO_FORK = path.join(TOOLS_DIR, '..', 'engine', 'skymp');
 const FORK = process.env.THORNSWOOD_SKYMP ||
   (fs.existsSync(path.join(REPO_FORK, 'CMakeLists.txt')) ? REPO_FORK : 'C:\\Thornswood-Dev\\skymp');

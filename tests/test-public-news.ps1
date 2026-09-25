@@ -50,7 +50,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$newsScript = Join-Path $Tools 'Publish-News.ps1'
+$newsScript = Join-Path $Tools '..\scripts\ops\Publish-News.ps1'
 $ip = '\b\d{1,3}(\.\d{1,3}){3}\b'
 
 # Runs Publish-News over one feed and hands back what it would have published,
@@ -191,7 +191,7 @@ try {
 # ---- Publish-Server no longer writes them ------------------------------------
 # It needs the VPS to run, so its source is read instead: every place it adds
 # to the details, and every place it sets the body.
-$psPath = Join-Path $Tools 'Publish-Server.ps1'
+$psPath = Join-Path $Tools '..\scripts\release\Publish-Server.ps1'
 $tk = $null; $er = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($psPath, [ref]$tk, [ref]$er)
 Yes 'Publish-Server.ps1 parses' (@($er).Count -eq 0)
@@ -214,7 +214,7 @@ function Noise-List($path) {
     return @($as.Right.FindAll({ param($x) $x -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
 }
 $newsNoise = @(Noise-List $newsScript)
-$discordNoise = @(Noise-List (Join-Path $Tools 'Publish-Discord.ps1'))
+$discordNoise = @(Noise-List (Join-Path $Tools '..\scripts\ops\Publish-Discord.ps1'))
 Yes ("Publish-News strips {0} kinds of line, the load order and the gamemode among them" -f $newsNoise.Count) (($newsNoise -contains '^\s*Load order\s*:') -and ($newsNoise -contains '^\s*The gamemode was rebuilt\b'))
 $missing = @($newsNoise | Where-Object { $discordNoise -notcontains $_ })
 foreach ($m in $missing) { Write-Host ('      Publish-Discord does not strip: ' + $m) }

@@ -29,7 +29,7 @@ const zlib = require('zlib');
 const { spawnSync } = require('child_process');
 
 const TOOLS = TOOLS_DIR;
-const AUDIT = path.join(TOOLS, 'Audit-PapyrusEvents.py');
+const AUDIT = path.join(TOOLS, '..', 'scripts', 'dev', 'Audit-PapyrusEvents.py');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -604,7 +604,7 @@ const linked = lz4Frame([
 frames.push(linked.toString('hex'));
 frames.push(Buffer.from('not a frame at all').toString('hex'));
 frames.push(lz4Frame([{ data: Buffer.from([0x04, 40, 0, 0x10, 0x58]) }]).toString('hex'));
-const lz = py(['-c', CODE, TOOLS], { input: JSON.stringify(frames) });
+const lz = py(['-c', CODE, path.dirname(AUDIT)], { input: JSON.stringify(frames) });
 let got = [];
 try { got = JSON.parse(lz.stdout); } catch (e) { got = []; console.log(String(lz.stderr)); }
 cases.forEach(function (c, i) {

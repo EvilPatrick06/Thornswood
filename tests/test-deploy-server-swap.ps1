@@ -59,7 +59,7 @@ function Done {
 }
 
 # ---- the blocks, out of the script itself -----------------------------------
-$src = Get-Content -LiteralPath (Join-Path $Here 'Deploy-Server.ps1') -Raw
+$src = Get-Content -LiteralPath (Join-Path $Here '..\scripts\deploy\Deploy-Server.ps1') -Raw
 $a = $src.IndexOf('# ==== deploy-server remote blocks ====')
 $b = $src.IndexOf('# ==== end deploy-server remote blocks ====')
 Yes 'Deploy-Server.ps1 keeps the blocks that run on the box between its markers' ($a -ge 0 -and $b -gt $a)

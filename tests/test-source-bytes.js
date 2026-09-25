@@ -3,7 +3,7 @@
 // No tracked source file carries a control character it did not mean to.
 //
 // WHY THIS EXISTS. On 23 September two form feeds were found in
-// tools/Publish-Update.ps1, one of them inside the message Die prints when the
+// scripts/release/Publish-Update.ps1, one of them inside the message Die prints when the
 // launcher's record of Vortex's files is missing:
 //
 //     "$ProfileDir\OwnGame<FF>iles.txt is missing"

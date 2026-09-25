@@ -1,5 +1,5 @@
 {
- "builtBy": "tools/Build-CastTable.py",
+ "builtBy": "scripts/dev/Build-CastTable.py",
  "columns": {
   "everyoneElse": "every other person, a count by name.",
   "guards": "a town's GuardFaction, IsGuardFaction together with GuardDialogueFaction, or Raven Rock's guard. A count by name, for entry 321.",

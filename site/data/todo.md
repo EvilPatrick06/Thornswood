@@ -52,7 +52,7 @@ Data from staging and leaves nothing that was not deployed.
    a group. The path is the Steam copy now, not a Game folder of our own.
 
 ```
-python .\tools\Audit-ArmorSlots.py "C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data"
+python .\scripts\mods\Audit-ArmorSlots.py "C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data"
 ```
 
 ## Later
@@ -103,26 +103,26 @@ redeploy brings the collection back.
 Server deploy. Warns the room, disconnects nobody.
 
 ```
-.\tools\Deploy-Server.ps1
+.\scripts\deploy\Deploy-Server.ps1
 ```
 
 Server going down for a while. Counts down and empties the room first.
 
 ```
-.\tools\Deploy-Server.ps1 -Mode restart -Minutes 10
+.\scripts\deploy\Deploy-Server.ps1 -Mode restart -Minutes 10
 ```
 
 Announce on its own.
 
 ```
-.\tools\Request-Restart.ps1 -Mode notice -Minutes 5 -Why "a server update"
+.\scripts\vps\Request-Restart.ps1 -Mode notice -Minutes 5 -Why "a server update"
 ```
 
 Ship a release. Builds the launcher, publishes it, tells the site, posts to
 the Discord, then gives the world five minutes.
 
 ```
-.\tools\Ship.ps1 "what changed, in a sentence"
+.\scripts\release\Ship.ps1 "what changed, in a sentence"
 ```
 
 Rebuild the installer. `-Vortex` builds out of the Steam copy and leaves out
@@ -130,19 +130,19 @@ everything the collection provides, which is what makes it half a gigabyte
 instead of fourteen.
 
 ```
-.\tools\Package-Thornswood.ps1 -Vortex
+.\scripts\release\Package-Thornswood.ps1 -Vortex
 ```
 
 The public pages and the boards.
 
 ```
-.\tools\Deploy-Docs.ps1 -Site -Boards
+.\scripts\deploy\Deploy-Docs.ps1 -Site -Boards
 ```
 
 Load order, after adding or removing any mod.
 
 ```
-python .\tools\Sync-LoadOrder.py --server-data "C:/Thornswood-Server/plugins" --dry-run
+python .\scripts\mods\Sync-LoadOrder.py --server-data "C:/Thornswood-Server/plugins" --dry-run
 ```
 
 Build the server, then the Skyrim Platform DLL.

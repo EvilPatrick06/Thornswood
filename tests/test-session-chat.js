@@ -179,8 +179,8 @@ yes('and reads the server log beside it by the same channel', /serverLogSlice\(\
 // folders are named in vps-dev-instance.ps1 and Get-Logs.ps1. If any of those
 // moves, the site's default has to move with it, and this is what says so.
 const readTool = (f) => { try { return fs.readFileSync(path.join(TOOLS_DIR, f), 'utf8'); } catch (e) { return ''; } };
-const vpsDev = readTool('vps-dev-instance.ps1');
-const getLogs = readTool('Get-Logs.ps1');
+const vpsDev = readTool('../scripts/vps/vps-dev-instance.ps1');
+const getLogs = readTool('../scripts/vps/Get-Logs.ps1');
 const liveRoot = (vpsDev.match(/\$liveVoice\s*=\s*'([^']+)'/) || [])[1] || '';
 const devRoot = (vpsDev.match(/\$devVoice\s*=\s*'([^']+)'/) || [])[1] || '';
 const dirsAt = src.indexOf('const CHAT_DIRS');
@@ -195,7 +195,7 @@ yes('Get-Logs reads dev voice from the same folder', !!devRoot && getLogs.indexO
 yes('the voice service writes chat into its own folder unless told otherwise',
     /const CHAT_DIR = process\.env\.THORNSWOOD_CHAT_DIR \|\| path\.join\(HERE, 'chat'\)/.test(readTool(path.join('..', 'voice', 'voice-server.js'))));
 yes('and neither install script tells it otherwise',
-    readTool('Install-Voice.ps1').indexOf('THORNSWOOD_CHAT_DIR') < 0 && vpsDev.indexOf('THORNSWOOD_CHAT_DIR') < 0);
+    readTool('../scripts/deploy/Install-Voice.ps1').indexOf('THORNSWOOD_CHAT_DIR') < 0 && vpsDev.indexOf('THORNSWOOD_CHAT_DIR') < 0);
 
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { }
 console.log('');

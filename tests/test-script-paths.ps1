@@ -76,7 +76,12 @@ $allowedSeen = @{}
 # stub scripts a harness writes to a scratch folder, so it is not a path in
 # this repository and is passed over.
 $testsDir = Join-Path $repo 'tests'
+# And the scripts themselves, in scripts\<area> since phase 8: each one's
+# paths resolve from its own folder.
 $scan = @(Get-ChildItem -LiteralPath $Tools -Filter *.ps1 -File)
+$scriptsDir = Join-Path $repo 'scripts'
+# scripts\oneoff is parked history: its scripts name the layout they ran in.
+if (Test-Path -LiteralPath $scriptsDir) { $scan += @(Get-ChildItem -LiteralPath $scriptsDir -Filter *.ps1 -File -Recurse | Where-Object { $_.FullName -notmatch '[\\/]oneoff[\\/]' }) }
 if (Test-Path -LiteralPath $testsDir) { $scan += @(Get-ChildItem -LiteralPath $testsDir -Filter *.ps1 -File) }
 foreach ($f in $scan) {
     if ($skipScripts -contains $f.Name) { continue }
@@ -84,8 +89,12 @@ foreach ($f in $scan) {
     $text = [IO.File]::ReadAllText($f.FullName)
     foreach ($m in $rx.Matches($text)) {
         if ($inTests -and $m.Groups[1].Value -eq 'PSScriptRoot') { continue }
+        # In a script $Tools is a folder it was given (New-ScriptIndex's -Tools is
+        # scripts\), not the one it sits in, so it cannot be resolved from here.
+        if (-not $inTests -and $m.Groups[1].Value -eq 'Tools') { continue }
         $rel = $m.Groups[2].Value.Replace('\', '/').Trim('/')
-        $full = if ($m.Groups[1].Value -in 'RepoDir', 'Repo') { $rel } else { 'tools/' + $rel }
+        $baseRel = if ($inTests) { 'tools' } else { [IO.Path]::GetRelativePath($repo, (Split-Path -Parent $f.FullName)).Replace('\', '/') }
+        $full = if ($m.Groups[1].Value -in 'RepoDir', 'Repo') { $rel } else { $baseRel + '/' + $rel }
         # tools/../bot/x is bot/x: a script beside tools reaches the rest of the
         # repository that way since the folders began to move.
         $parts = New-Object System.Collections.Generic.List[string]

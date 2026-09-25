@@ -85,7 +85,7 @@ function canon(v) {
 
 const readme = read('site/README.md') || '';
 const server = read('site/server.js') || '';
-const deploy = read('tools/Deploy-Docs.ps1') || '';
+const deploy = read('scripts/deploy/Deploy-Docs.ps1') || '';
 const sampleText = String(read('site/config.sample.json'));
 // server.js takes a byte order mark off the front before it parses, so this
 // does too. Built rather than typed, like the backslash.

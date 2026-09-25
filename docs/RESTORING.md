@@ -12,10 +12,10 @@ the exercise, not paperwork about it.
 
 | | |
 | --- | --- |
-| `Thornswood Backup` | a task on the VPS, 03:15 nightly, `tools\vps-nightly-backup.ps1` |
+| `Thornswood Backup` | a task on the VPS, 03:15 nightly, `scripts\vps\vps-nightly-backup.ps1` |
 | `C:\Thornswood-Backup` | where they land on the box, seven daily and four weekly |
-| `tools\Fetch-Backups.ps1` | brings them here, run on Patrick's machine |
-| `tools\Restore-Backup.ps1` | checks and unpacks one |
+| `scripts\vps\Fetch-Backups.ps1` | brings them here, run on Patrick's machine |
+| `scripts\vps\Restore-Backup.ps1` | checks and unpacks one |
 | the passphrase | `Documents\thornswood-backup-key.txt` here, `C:\Thornswood-Backup\key.txt` on the box |
 
 A backup holds `game\world` (the characters), `game\private` (the door list and
@@ -40,12 +40,12 @@ both are gone, so are the backups, and nothing in this file helps.
 
 The common case, and it does not need the server stopped for long.
 
-1. Find which profile id. `.\tools\Chargen-Log.ps1` prints a
+1. Find which profile id. `.\scripts\ops\Chargen-Log.ps1` prints a
    `chargen <actor> profile <id>` line for each character, or the person's
    launcher shows it.
 2. Get a backup from before it went wrong.
    ```powershell
-   .\tools\Restore-Backup.ps1 -Backup "$env:USERPROFILE\Downloads\Thornswood-Backups\thornswood-<stamp>.zip.enc" -To C:\restore-check
+   .\scripts\vps\Restore-Backup.ps1 -Backup "$env:USERPROFILE\Downloads\Thornswood-Backups\thornswood-<stamp>.zip.enc" -To C:\restore-check
    ```
 3. The character is `C:\restore-check\game\world\<profileId in hex>.json`. Open
    it and confirm it is the right one before anything else.
@@ -59,7 +59,7 @@ The common case, and it does not need the server stopped for long.
    scp C:\restore-check\game\world\<id>.json Administrator@192.135.112.23:C:/Thornswood-Server/world/<id>.json
    ssh Administrator@192.135.112.23 "powershell -NoProfile -Command \"Start-ScheduledTask -TaskName 'Thornswood Server'\""
    ```
-   Check nobody is on first. `tools\Restart-Server.ps1` refuses while people
+   Check nobody is on first. `scripts\vps\Restart-Server.ps1` refuses while people
    are online and is the polite way to find out.
 
 Do not copy the whole `world` folder back for one character. Everybody else has
@@ -75,7 +75,7 @@ place, or it writes fresh empty characters over the top.
    Do all of that first and start nothing.
 2. **Unpack the newest backup that opens.**
    ```powershell
-   .\tools\Restore-Backup.ps1 -Backup <newest>.zip.enc -To C:\restore
+   .\scripts\vps\Restore-Backup.ps1 -Backup <newest>.zip.enc -To C:\restore
    ```
    If the newest will not open, work backwards. That is what four weeklies are
    for.
@@ -97,14 +97,14 @@ place, or it writes fresh empty characters over the top.
 5. **The rest comes from the repository, not from the backup.** `Ship.ps1`
    publishes the launcher and the packs and deploys none of these, so each
    goes back with its own command, from main on Patrick's machine, in this
-   order: `.\tools\Deploy-Server.ps1` (the recorded server build),
-   `.\tools\Deploy-Gamemode.ps1`, `.\tools\Deploy-Docs.ps1` (never
+   order: `.\scripts\deploy\Deploy-Server.ps1` (the recorded server build),
+   `.\scripts\deploy\Deploy-Gamemode.ps1`, `.\scripts\deploy\Deploy-Docs.ps1` (never
    `-SeedDocs`, which would flatten the restored documents),
-   `.\tools\Install-Bot.ps1 -CodeOnly` and `.\tools\Install-Voice.ps1`.
+   `.\scripts\deploy\Install-Bot.ps1 -CodeOnly` and `.\scripts\deploy\Install-Voice.ps1`.
    `gamemode.js` is in the backup to be read, not to be the thing you run.
    The dev roots (`C:\Thornswood-Server-Dev`, `C:\Thornswood-Voice-Dev`) are
    not in the backup; a dev server starts from a fresh world, and
-   `.\tools\Deploy-DevGamemode.ps1` puts its gamemode back.
+   `.\scripts\deploy\Deploy-DevGamemode.ps1` puts its gamemode back.
 6. **Secrets that are not in there.** The Discord bot token, the client secret and the site keys are in the config files above, so
    they do come back. What does not is anything that was only ever in a config
    on the old box and not in one of those. Check `NOTES.txt` in the backup for
@@ -120,7 +120,7 @@ Worth an hour, and it is the only thing that turns this file from a guess into
 a runbook.
 
 1. Stand up a throwaway box, or a second folder on the VPS the way
-   `tools\vps-dev-instance.ps1` does.
+   `scripts\vps\vps-dev-instance.ps1` does.
 2. Run the whole of "the box is gone" against it, from a real backup.
 3. Connect to it with a launcher pointed at that port and load a character.
 4. Fix whatever in this file turned out to be wrong.

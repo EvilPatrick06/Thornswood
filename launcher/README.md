@@ -6,7 +6,7 @@ Everything `Thornswood.exe` is built from. The C# is in `launcher\app`, in C# 5
 for the .NET Framework 4 csc, and `launcher\app\ARCHITECTURE.md` says what each
 class owns and how Play runs. The window's layout is `ui.xaml`, parsed at
 startup, so a control renamed there and not in the C# is found by
-`tools\Check-Controls.ps1` rather than by somebody pressing it. Beside them are
+`scripts\dev\Check-Controls.ps1` rather than by somebody pressing it. Beside them are
 the icon (`app.ico`), the emblem (`logo.png`, `logo-192.png`), the strip of art
 behind the title (`launcher-header.jpg` and `.mp4`), the key template the
 launcher writes when a machine has none (`Thornswood.ini`), and the WebView2
@@ -26,16 +26,16 @@ Updater.cs.
 
 ## On your machine
 
-`tools\Build-Launcher.ps1` compiles the launcher with the .NET Framework 4 csc
+`scripts\release\Build-Launcher.ps1` compiles the launcher with the .NET Framework 4 csc
 and puts the window, the art, the key template, the voice page and the
 client build record inside `Thornswood.exe` as resources, by name, and stops
 if one is missing. A build writes the exe into `<Root>\Launcher` and touches
-nothing else; the shortcut and the icon are `tools\Install-Launcher.ps1`,
+nothing else; the shortcut and the icon are `scripts\release\Install-Launcher.ps1`,
 which Ship runs. To compile without replacing an installed launcher, build
 into a scratch root:
 
 ```
-.\tools\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
+.\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
 ```
 
 What the launcher does is written to its own log, `Profile\launcher.log`,

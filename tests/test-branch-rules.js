@@ -124,7 +124,7 @@ const oldShip = [
 yes('the check flags the three source writes Ship used to end with, and not the dev feed push',
     sourceWrites(gitCalls(oldShip)).length === 3);
 
-const shipSrc = read('tools/Ship.ps1');
+const shipSrc = read('scripts/release/Ship.ps1');
 const ship = gitCalls(shipSrc);
 const shipReads = ship.filter(function (c) { return c.repo === '$RepoDir' && !WRITES.test(c.sub); });
 const shipFeed = ship.filter(function (c) { return WRITES.test(c.sub) && c.repo === '$devRel'; });
@@ -151,7 +151,7 @@ yes('Ship.ps1 refuses a main release with a file under tools that git does not k
     /file\(s\) under tools(, or another folder a release is built from,)? that git does not know about/.test(shipSrc));
 
 // ------------------------------------------------------------ Bump-Version.ps1
-const bump = gitCalls(read('tools/Bump-Version.ps1'));
+const bump = gitCalls(read('scripts/release/Bump-Version.ps1'));
 const bumpAdds = bump.filter(function (c) { return c.sub === 'add'; });
 yes('Bump-Version.ps1 stages one path, launcher/app/Updater.cs, and nothing else',
     bumpAdds.length === 1 && /^\s+--\s+'launcher\/app\/Updater\.cs'\s/.test(bumpAdds[0].rest + ' '));
@@ -231,8 +231,9 @@ yes('DEVELOPING.md does not say the other person reads every pull request, which
 yes('DEVELOPING.md says Patrick\'s own work goes through a pull request too',
     /Every change goes through a pull request, Patrick's included/.test(sd));
 [docs[0], docs[1]].forEach(function (d) {
-  yes(d.name + ' says a main release stops on a file under tools that git does not know, as Ship.ps1 does',
-      /file under tools that git does not know/.test(d.text));
+  // scripts\ and the other folders a release is built from since phase 8 of #440.
+  yes(d.name + ' says a main release stops on a file git does not know, as Ship.ps1 does',
+      /file under `?(tools|scripts)`?[\s\S]{0,80}?that git does not know/.test(d.text));
 });
 
 // ------------------------------------------------------------ --live

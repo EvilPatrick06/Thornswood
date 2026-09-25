@@ -32,7 +32,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ScriptPath) { $ScriptPath = Join-Path $Here 'Check-Outside.ps1' }
+if (-not $ScriptPath) { $ScriptPath = Join-Path $Here '..\scripts\dev\Check-Outside.ps1' }
 # Kept under its own name: dot-sourcing the script sets $Here to wherever the
 # script is, which is not tools\ when -ScriptPath points at a copy.
 $Tools = $Here
@@ -148,8 +148,8 @@ try {
   Yes 'the releases repository is read out of the real Config.cs' ($d.Repo -match '^[^/\s]+/[^/\s]+$' -and $d.Repo -like '*Releases*')
   Yes 'so is the collection address' ($d.Collection -like 'https://*nexusmods.com/*')
   Yes 'and the site, so it can be kept off it' ($d.SiteHost -eq 'thornswood.net')
-  $real = [IO.File]::ReadAllText((Join-Path $Tools 'steam-build.json')) | ConvertFrom-Json
-  Yes 'tools\steam-build.json records app 489830 and a build number' ($real.appId -eq 489830 -and ([string]$real.publicBuildId) -match '^\d+$')
+  $real = [IO.File]::ReadAllText((Join-Path $Tools '..\records\steam-build.json')) | ConvertFrom-Json
+  Yes 'records\steam-build.json records app 489830 and a build number' ($real.appId -eq 489830 -and ([string]$real.publicBuildId) -match '^\d+$')
 
   # ---- everything as it should be ------------------------------------------
   Clean

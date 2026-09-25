@@ -116,7 +116,7 @@ function Find-Ref([string]$name) {
 
 # The names are read off the build script rather than copied, so a reference
 # the launcher gains there is one this compile gains too.
-$builder = Join-Path $Here 'Build-Launcher.ps1'
+$builder = Join-Path $Here '..\scripts\release\Build-Launcher.ps1'
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
 $assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))

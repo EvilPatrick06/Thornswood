@@ -93,7 +93,7 @@ the launcher finds that folder (`OwnGame.DeploysInto`) and builds `Game` from
 the Steam copy's game plus exactly the files Vortex's record lists.
 
 **The SkyMP client runtime** (six files) is built from the fork in
-`engine\skymp`, recorded in `tools\client-build.json`, and shipped both inside
+`engine\skymp`, recorded in `records\client-build.json`, and shipped both inside
 packs and as its own asset named in the feed's `clientRuntime`
 (`Publish-Update.ps1:955-990,1236-1245`, `ClientRuntime.cs:261-269`).
 
@@ -125,8 +125,8 @@ packs and as its own asset named in the feed's `clientRuntime`
   `Setup-Domain.ps1:207`, only on 127.0.0.1 (`server.js:38`). Caddy holds 80 and
   443 for `thornswood.net` and `www.thornswood.net`, proxies `/voice/*` to
   7778, `/voice-dev/*` to 7789 and everything else to 3001
-  (`tools/Caddyfile:40-51`). The live Caddyfile is
-  `C:\Thornswood-Caddy\Caddyfile` (`tools/Caddyfile:4-6`). The site does
+  (`scripts/deploy/Caddyfile:40-51`). The live Caddyfile is
+  `C:\Thornswood-Caddy\Caddyfile` (`scripts/deploy/Caddyfile:4-6`). The site does
   Discord sign in, the public pages from `data\site\*.md`, news, uploads, the
   admin hub, and the door's lists.
 
@@ -155,7 +155,7 @@ when its check fails, three times an hour at most (`Watch-Services.ps1:198-247`)
 | Voice (live) | `C:\Thornswood-Voice` | TCP 7778, and `/voice` through Caddy | `Thornswood Voice` | `Install-Voice.ps1` | `Install-Voice.ps1:34-35,66,345`, `voice-server.js:28` |
 | Dev voice | `C:\Thornswood-Voice-Dev` | TCP 7789, and `/voice-dev` through Caddy | `Thornswood Dev Voice` | Made by `vps-dev-instance.ps1`; `Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'` | `vps-dev-instance.ps1:11-12,77-97`, `voice/README.md:57-64` |
 | Site | `C:\Thornswood-Docs` | 127.0.0.1:3001 | `Thornswood Docs` | `Deploy-Docs.ps1`, `-Site` for the public pages | `Deploy-Docs.ps1:43-45`, `server.js:34-38` |
-| Caddy | `C:\Thornswood-Caddy` | 80, 443 | `Thornswood Web` (at startup and every five minutes) | `Setup-Domain.ps1`; the Caddyfile itself is kept in step with `tools\Caddyfile` by hand | `Setup-Domain.ps1:30,183,248-266`, `tools/Caddyfile:4-7` |
+| Caddy | `C:\Thornswood-Caddy` | 80, 443 | `Thornswood Web` (at startup and every five minutes) | `Setup-Domain.ps1`; the Caddyfile itself is kept in step with `scripts\deploy\Caddyfile` by hand | `Setup-Domain.ps1:30,183,248-266`, `scripts/deploy/Caddyfile:4-7` |
 | Discord bot | `C:\Thornswood-Bot` | none | `Thornswood Bot` | `Install-Bot.ps1`, `-CodeOnly` for code and card art | `Install-Bot.ps1:28-30,496` |
 | Watchdog | `C:\Thornswood-Watch` (`watch.ps1`, `watch.log`) | none | `Thornswood Watch`, every five minutes as SYSTEM | `Watch-Services.ps1 -Install` | `Watch-Services.ps1:65-66,361` |
 | Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 03:15 | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:30-34,149-152`, `vps-nightly-backup.ps1:41-52` |
@@ -195,7 +195,7 @@ nothing from `C:\Thornswood-Server-Dev` or `C:\Thornswood-Voice-Dev`
 
 `Ship.ps1`, `Publish-*`, `Repair-Manifest.ps1`, `Bump-Version.ps1`, every
 `Deploy-*` and `Install-*`, and `Request-Restart.ps1`. The engine build and the
-release output (`out`, ignored by git) are in the repo folder; `tools\Where.ps1`
+release output (`out`, ignored by git) are in the repo folder; `scripts\release\Where.ps1`
 says where (`Where.ps1:71-82`). The releases repo is cloned beside the source
 repo as `Thornswood-Releases`, its dev branch as the worktree
 `Thornswood-Releases-dev` (`Publish-Update.ps1:111-129`). Which command each
@@ -205,7 +205,7 @@ change needs after a merge: CONTRIBUTING.md, "After a pull request is merged".
 
 - `Setup-Domain.ps1:136-142` writes a Caddyfile with only
   `reverse_proxy 127.0.0.1:3001`, and writes it on every run without
-  `-TaskOnly` (`Setup-Domain.ps1:130,179-181`). `tools/Caddyfile:43-49` has the
+  `-TaskOnly` (`Setup-Domain.ps1:130,179-181`). `scripts/deploy/Caddyfile:43-49` has the
   `/voice` and `/voice-dev` blocks that both feeds' `voiceUrl` now point at.
   Running `Setup-Domain.ps1` again would take voice through Caddy away.
 - `Install-Backup.ps1:32` says 03:15 is "after the nightly restart". No script

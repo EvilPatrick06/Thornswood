@@ -50,8 +50,8 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$Checker  = Join-Path $ToolsPath 'Check-Swallow.ps1'
-$Baseline = Join-Path $ToolsPath 'swallow-baseline.txt'
+$Checker  = Join-Path $ToolsPath '..\scripts\dev\Check-Swallow.ps1'
+$Baseline = Join-Path $ToolsPath '..\scripts\dev\swallow-baseline.txt'
 $AppDir   = Join-Path $ToolsPath '..\launcher\app'
 $SwallowCs = Join-Path $AppDir 'Swallow.cs'
 

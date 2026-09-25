@@ -86,7 +86,7 @@ function New-Root([string]$name, $json, [bool]$bom) {
 }
 
 # ---- 1. the helper ----------------------------------------------------------
-$helper = Join-Path $ToolsDir 'MaxOnline.ps1'
+$helper = Join-Path $ToolsDir '..\scripts\deploy\MaxOnline.ps1'
 Yes 'MaxOnline.ps1 is in tools' (Test-Path -LiteralPath $helper)
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
@@ -137,7 +137,7 @@ Yes 'the refusal never quotes the file' ($null -ne $threw -and -not $threw.Conta
 # Set-Prop, run over the same files after the same parse it does. Every case
 # the deploy writes, the feed announces, and every case the deploy leaves
 # alone, the feed says nothing about. That is what "one number" means here.
-$pu = Get-Content -LiteralPath (Join-Path $ToolsDir 'Publish-Update.ps1') -Raw
+$pu = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\release\Publish-Update.ps1') -Raw
 $feedBlock = Get-BlockText $pu "if (`$cfg.PSObject.Properties.Name -contains 'MaxOnline')"
 $setProp = Get-BlockText $pu 'function Set-Prop'
 Yes 'the feed''s MaxOnline block is in Publish-Update.ps1' ($null -ne $feedBlock -and $null -ne $setProp)
@@ -175,7 +175,7 @@ Set-MaxPlayers $s ([pscustomobject]@{ Value = 25; From = 'x'; Why = '' }) 6>$nul
 Yes 'it adds the key when the file had none' ($s.maxPlayers -eq 25)
 
 # ---- 4. Deploy-Gamemode.ps1 --------------------------------------------------
-$dg = Get-Content -LiteralPath (Join-Path $ToolsDir 'Deploy-Gamemode.ps1') -Raw
+$dg = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\deploy\Deploy-Gamemode.ps1') -Raw
 $read = $dg.IndexOf('Get-MaxOnline')
 $copy = $dg.IndexOf('Copy-Item -LiteralPath $Gamemode')
 Yes 'Deploy-Gamemode.ps1 dot-sources MaxOnline.ps1' ($dg.Contains("Join-Path `$Here 'MaxOnline.ps1'"))
@@ -220,7 +220,7 @@ if ($from -ge 0 -and $to -gt $from) {
 }
 
 # ---- 5. Deploy-DevGamemode.ps1 ----------------------------------------------
-$dd = Get-Content -LiteralPath (Join-Path $ToolsDir 'Deploy-DevGamemode.ps1') -Raw
+$dd = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\deploy\Deploy-DevGamemode.ps1') -Raw
 $read = $dd.IndexOf('Get-MaxOnline')
 $stop = $dd.IndexOf("Write-Host 'Stopping the dev server...'")
 Yes 'Deploy-DevGamemode.ps1 dot-sources MaxOnline.ps1' ($dd.Contains("Join-Path `$Here 'MaxOnline.ps1'"))

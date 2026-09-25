@@ -51,14 +51,14 @@ month and 20GB near $68. That commits you for the year.
 ## Measuring it first
 
 The decision above rests on one reading, taken on 15 September. Until
-`tools\Watch-Load.ps1` nothing on the box kept a number over time.
+`scripts\vps\Watch-Load.ps1` nothing on the box kept a number over time.
 
-    .\tools\Watch-Load.ps1 -Install   a line every five minutes, on the box
-    .\tools\Watch-Load.ps1            bring the record down and read it
+    .\scripts\vps\Watch-Load.ps1 -Install   a line every five minutes, on the box
+    .\scripts\vps\Watch-Load.ps1            bring the record down and read it
 
 Each line holds the box's CPU, memory, free disk and network bytes, the people
 on, and each of the seven services' processor time, memory and I/O
-(`tools\vps-load.ps1` lists every column). `tools\Read-Load.ps1` turns it into
+(`scripts\vps\vps-load.ps1` lists every column). `scripts\vps\Read-Load.ps1` turns it into
 which service leads each of those, and when the busiest hour was.
 
 Leave it a week that includes a busy evening before reading anything into it.
@@ -69,11 +69,11 @@ for the team in #staff-general, and whatever is done goes back on this page.
 
 It is self service. No ticket needed.
 
-1. `.\tools\Watch-Services.ps1 -Install`, first, before anything else. The
+1. `.\scripts\vps\Watch-Services.ps1 -Install`, first, before anything else. The
    change needs a restart, and if one of the four services does not come back
    on its own the watcher starts it within five minutes instead of you finding
    out from Discord.
-2. `.\tools\Backup-Server.ps1`. Two minutes, and it is the only copy of the
+2. `.\scripts\vps\Backup-Server.ps1`. Two minutes, and it is the only copy of the
    linked Discord accounts.
 3. Billing panel, Services, pick the VPS, Change Plan, drag the slider to the
    16GB plan, pay, Continue.
@@ -81,8 +81,8 @@ It is self service. No ticket needed.
 5. Disk Management on the server, right click the C: partition, Extend Volume,
    take all of it. Windows does not use new disk space on its own, so until
    this is done the plan says 160 GB and Windows still says 80.
-6. `.\tools\Check-Load.ps1` to confirm 16 GB and 160 GB are really there.
-7. `.\tools\Watch-Services.ps1` with no switches to confirm all four came
+6. `.\scripts\vps\Check-Load.ps1` to confirm 16 GB and 160 GB are really there.
+7. `.\scripts\vps\Watch-Services.ps1` with no switches to confirm all four came
    back up.
 
 What the billing charges is the difference between the plans for the days left
@@ -101,11 +101,11 @@ Two things their article does not say, so check them yourself:
 
 ## If it is a package change, same box
 
-1. `.\tools\Backup-Server.ps1`
+1. `.\scripts\vps\Backup-Server.ps1`
 2. Let them do the change. It reboots.
 3. Windows will not use the new disk space on its own. Disk Management,
    right click the C: partition, Extend Volume, take all of it.
-4. `.\tools\Check-Load.ps1` to confirm the new numbers are really there.
+4. `.\scripts\vps\Check-Load.ps1` to confirm the new numbers are really there.
 
 Nothing else moves. The address is the same, so the launchers, the DNS record
 and the Discord sign in all carry on.
@@ -118,13 +118,13 @@ rather than 18 GB, so nothing big has to be copied to the new box.
 
 Then, in this order:
 
-1. `.\tools\Backup-Server.ps1`
+1. `.\scripts\vps\Backup-Server.ps1`
 2. Order the new box in the same datacenter as the old one, so nobody's ping
    changes. Windows Server, same version as the old one, which is in
    `notes.txt` inside the backup zip.
-3. `.\tools\Setup-SshKey.ps1` against the new address, so the rest of the
+3. `.\scripts\vps\Setup-SshKey.ps1` against the new address, so the rest of the
    scripts can reach it without a password.
-4. `.\tools\Bootstrap-VPS.ps1` against the new address. Node, Python, git,
+4. `.\scripts\vps\Bootstrap-VPS.ps1` against the new address. Node, Python, git,
    the folders.
 5. Restore from the backup, by hand, as `docs\RESTORING.md` says, into:
    `C:\Thornswood-Docs\data`, `C:\Thornswood-Bot`, `C:\Thornswood-Voice`,
@@ -134,9 +134,9 @@ Then, in this order:
    scripts (`Watch-Services.ps1 -Install`, `Install-Backup.ps1`). The website's `data` folder is the one that
    matters. It has the linked Discord accounts, the boards and every document
    anyone has typed into on the site.
-6. `.\tools\Install-Bot.ps1`, `.\tools\Install-Voice.ps1` and
-   `.\tools\Install-ThornswoodServer.ps1` against the new address.
-7. `.\tools\Deploy-Docs.ps1` against the new address. Not `-SeedDocs`. That
+6. `.\scripts\deploy\Install-Bot.ps1`, `.\scripts\deploy\Install-Voice.ps1` and
+   `.\scripts\deploy\Install-ThornswoodServer.ps1` against the new address.
+7. `.\scripts\deploy\Deploy-Docs.ps1` against the new address. Not `-SeedDocs`. That
    flattens every document with the repo copy and would throw away what people
    have written.
 8. Open the ports. They are listed in `notes.txt` in the backup. The game is
@@ -144,15 +144,15 @@ Then, in this order:
 9. Import the scheduled tasks from the `tasks` folder in the backup, so the
    services come back after a reboot.
 10. Point the DNS A record for thornswood.net at the new address, then
-    `.\tools\Setup-Domain.ps1 -Vps <new address>`. It installs Caddy and
-    sends `tools\Caddyfile`, the tracked copy with the `/voice` and
+    `.\scripts\deploy\Setup-Domain.ps1 -Vps <new address>`. It installs Caddy and
+    sends `scripts\deploy\Caddyfile`, the tracked copy with the `/voice` and
     `/voice-dev` routes; a Caddyfile restored from the backup is kept beside
     it as `Caddyfile.before-<date>`. Wait for the certificate to reissue
     before telling anyone, or the site shows a warning.
 11. Check the Discord application's redirect URI. If it names the domain there
     is nothing to do. If it names an address, it has to be changed in the
     Discord developer portal by hand.
-12. `.\tools\Set-Vps.ps1`. It asks for the new address and repoints all
+12. `.\scripts\vps\Set-Vps.ps1`. It asks for the new address and repoints all
     twenty three files in the repo that carry the old one, and adds a line to
     the launcher so copies already installed move themselves across.
     The deploy scripts check the box's ssh host key (accept-new): the first
@@ -161,11 +161,11 @@ Then, in this order:
     `ssh-keygen -R <address>` on each machine that deploys. That refusal is
     the check working, so confirm the rebuild was yours before removing it.
 13. Commit what Set-Vps changed on a branch, open a pull request and merge
-    it, then `.\tools\Bump-Version.ps1` through its own pull request, then a
-    main `.\tools\Ship.ps1 "Server moved"` from Patrick's machine, so a
+    it, then `.\scripts\release\Bump-Version.ps1` through its own pull request, then a
+    main `.\scripts\release\Ship.ps1 "Server moved"` from Patrick's machine, so a
     fresh install has the new address baked in. A move is one of the main
     releases that does not wait for dev: the old address is going away.
-14. `.\tools\Set-Server.ps1` with the new address. This is the one that moves
+14. `.\scripts\ops\Set-Server.ps1` with the new address. This is the one that moves
     everybody. It checks the new box answers before it publishes.
 
 ## Then leave the old box alone for a week
@@ -175,7 +175,7 @@ has not checked for an update yet, and every Discord message anyone has ever
 posted with the old address in it. A week of the old box quietly running costs
 one month at the old price and saves a week of people asking why nothing works.
 
-`.\tools\Check-Load.ps1` against the old address shows whether anyone is still
+`.\scripts\vps\Check-Load.ps1` against the old address shows whether anyone is still
 landing there. When that is zero for a few days, cancel it.
 
 ## The logs on the box, and how big they get
@@ -204,7 +204,7 @@ and are listed below.
 - `private\door.log` in the game server's folder is not rolled or trimmed.
   The gamemode appends a line each time the door decides about somebody, and
   the file grows until somebody moves it.
-- `.\tools\Get-Logs.ps1` reads only the current file. After a restart, last
+- `.\scripts\vps\Get-Logs.ps1` reads only the current file. After a restart, last
   night's crash may be in `.1` beside it.
 - The site's /sessions page reads a session's game server lines out of
   `server.log` and, when that is shorter than 4 MB, out of the end of

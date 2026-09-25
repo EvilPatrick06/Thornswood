@@ -5,7 +5,7 @@
 
   WHY THIS EXISTS. Entry 237 on the To Do List: "The repo's own writing rules
   are written down and nothing enforces them." MEASURED 24 SEPTEMBER, before
-  tools\Check-Words.ps1 existed: eleven hits in the files people read. Five
+  scripts\dev\Check-Words.ps1 existed: eleven hits in the files people read. Five
   em dashes in README.md and one in SETUP.md, and the word the rules ban in
   README.md, the launcher's help, the rules page, and the Known Issues and
   Help pages the site serves in public.
@@ -35,7 +35,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $CheckPath) { $CheckPath = Join-Path $Here 'Check-Words.ps1' }
+if (-not $CheckPath) { $CheckPath = Join-Path $Here '..\scripts\dev\Check-Words.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -50,7 +50,7 @@ function Done {
     exit 0
 }
 
-Yes 'tools\Check-Words.ps1 exists' (Test-Path -LiteralPath $CheckPath)
+Yes 'scripts\dev\Check-Words.ps1 exists' (Test-Path -LiteralPath $CheckPath)
 if (-not (Test-Path -LiteralPath $CheckPath)) { Done }
 
 $bytes = [System.IO.File]::ReadAllBytes($CheckPath)

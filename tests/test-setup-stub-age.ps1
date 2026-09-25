@@ -24,7 +24,7 @@ $Here0 = $PSScriptRoot
 if (-not $Here0) { $Here0 = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here0 = Join-Path (Split-Path -Parent $Here0) 'tools'
-if (-not $PackagePath) { $PackagePath = Join-Path $Here0 'Package-Thornswood.ps1' }
+if (-not $PackagePath) { $PackagePath = Join-Path $Here0 '..\scripts\release\Package-Thornswood.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -57,10 +57,10 @@ Yes 'and after the release feed check' ($feed -ge 0 -and $feed -lt $a)
 Yes 'it stops the packager when there is a reason' ($block.Contains('if ($stubWhy) { Die $stubWhy }'))
 # The same two places, in the same order, as the copy further down, so the
 # stub that is checked is the stub that ships.
-$pick = "@((Join-Path `$Here 'setup-stub.exe'), (Join-Path `$OutDir 'setup-stub.exe'))"
-$late = "@((Join-Path `$here 'setup-stub.exe'), (Join-Path `$OutDir 'setup-stub.exe'))"
+$pick = "@((Join-Path `$Here '..\..\tools\setup-stub.exe'), (Join-Path `$OutDir 'setup-stub.exe'))"
+$late = "@((Join-Path `$here '..\..\tools\setup-stub.exe'), (Join-Path `$OutDir 'setup-stub.exe'))"
 Yes 'it checks the stub the installer is built from' ($block.Contains($pick) -and $src.Contains($late))
-Yes 'against installer\setup\Bootstrap.cs' ($block.Contains("(Join-Path `$Here '..\installer\setup\Bootstrap.cs')"))
+Yes 'against installer\setup\Bootstrap.cs' ($block.Contains("(Join-Path `$Here '..\..\installer\setup\Bootstrap.cs')"))
 
 $m = [regex]::Match($block, '(?s)function Get-StubRefusal\(.*?\n\}')
 Yes 'Get-StubRefusal is in the block' ($m.Success)

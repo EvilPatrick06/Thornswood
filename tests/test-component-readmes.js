@@ -121,8 +121,11 @@ SIX.forEach(function (d) {
   yes(name + ': no placeholder left in it', !/\b(TODO|TBD|FIXME|XXX)\b/.test(t) && !/lorem ipsum/i.test(t));
 
   const scripts = uniq(t.match(/\b[A-Z][A-Za-z]*(?:-[A-Z][A-Za-z]*)*\.ps1\b/g) || []);
-  const noScript = scripts.filter(function (s) { return !exists('tools/' + s); });
-  yes(name + ': every script it names is in tools (' + scripts.length + ' named)' +
+  // In scripts\<area> since phase 8 of issue #440.
+  const noScript = scripts.filter(function (s) {
+    return !['release', 'deploy', 'vps', 'ops', 'mods', 'dev'].some(function (a) { return exists('scripts/' + a + '/' + s); });
+  });
+  yes(name + ': every script it names is in scripts (' + scripts.length + ' named)' +
       (noScript.length ? ', missing ' + noScript.join(', ') : ''), noScript.length === 0);
 
   const re = new RegExp('tools' + BS + BS + '[A-Za-z0-9_.*' + BS + BS + '-]+', 'g');
@@ -159,7 +162,7 @@ SIX.forEach(function (d) {
 {
   const t = readme['docs-app'] || '';
   const server = read('site/server.js') || '';
-  const deploy = read('tools/Deploy-Docs.ps1') || '';
+  const deploy = read('scripts/deploy/Deploy-Docs.ps1') || '';
   const port = (/THORNSWOOD_DOCS_PORT \|\| (\d+)/.exec(server) || [])[1];
   yes('site: server.js has a default port to hold the README to', !!port);
   yes('site: the README gives it, 127.0.0.1:' + port, !!port && t.indexOf('127.0.0.1:' + port) >= 0);
@@ -180,8 +183,8 @@ SIX.forEach(function (d) {
   const t = readme.voice || '';
   const vs = read('voice/voice-server.js') || '';
   const dev = read('launcher/app/DevBuild.cs') || '';
-  const iv = read('tools/Install-Voice.ps1') || '';
-  const watch = read('tools/Watch-Services.ps1') || '';
+  const iv = read('scripts/deploy/Install-Voice.ps1') || '';
+  const watch = read('scripts/vps/Watch-Services.ps1') || '';
   const live = (/THORNSWOOD_VOICE_PORT \|\| (\d+)/.exec(vs) || [])[1];
   const devPort = (/DevVoicePort = "(\d+)"/.exec(dev) || [])[1];
   yes('voice: the live port read out of voice-server.js and the dev one out of DevBuild.cs',
@@ -218,16 +221,16 @@ SIX.forEach(function (d) {
 // ----------------------------------------------------------------- plugins --
 {
   const t = readme['ts-plugins'] || '';
-  const go = read('tools/Go.ps1') || '';
+  const go = read('scripts/release/Go.ps1') || '';
   const keep = read('launcher/app/Keep.cs') || '';
-  const rules = read('tools/Ship-Rules.ps1') || '';
+  const rules = read('scripts/release/Ship-Rules.ps1') || '';
   const game = (/\[string\]\s*\$Game\s*=\s*'([^']+)'/.exec(go) || [])[1];
   yes('plugins: the README names the game folder Go.ps1 installs into by default, ' + game,
       !!game && t.indexOf(game) >= 0);
   const serverPart = go.indexOf('if (-not $SkipServer)');
   yes('plugins: Go.ps1 still copies the voice service to the VPS unless it is given -SkipServer, ' +
       'which is why the README says to pass it',
-      serverPart >= 0 && go.indexOf("'.." + BS + "voice" + BS + "voice-server.js'", serverPart) > serverPart &&
+      serverPart >= 0 && go.indexOf("'.." + BS + ".." + BS + "voice" + BS + "voice-server.js'", serverPart) > serverPart &&
       t.indexOf('Go.ps1 -SkipServer') >= 0 && (readme['ts-ui'] || '').indexOf('Go.ps1 -SkipServer') >= 0);
   yes('plugins: Keep and Ship-Rules still tell ours by the thornswood- name the README gives',
       keep.indexOf('StartsWith("thornswood-"') >= 0 && rules.indexOf("'thornswood-*.js'") >= 0 &&
@@ -240,11 +243,11 @@ SIX.forEach(function (d) {
 {
   const t = readme['ts-ui'] || '';
   const front = read('game/plugins/thornswood-front.js') || '';
-  const go = read('tools/Go.ps1') || '';
+  const go = read('scripts/release/Go.ps1') || '';
   yes('overlays: thornswood-front.js still has the OVERLAYS list a new overlay has to join',
       /const OVERLAYS = \[/.test(front) && t.indexOf('`OVERLAYS`') >= 0);
   yes('overlays: Go.ps1 still takes the front from thornswood-front.zip, as the README says',
-      go.indexOf("'thornswood-front.zip'") >= 0 && t.indexOf('thornswood-front.zip') >= 0);
+      go.indexOf("tools" + BS + "thornswood-front.zip'") >= 0 && t.indexOf('thornswood-front.zip') >= 0);
   const zip = tracked('tools/thornswood-front.zip');
   yes('overlays: and that zip is not in git, as the README says', zip === false);
 }
@@ -252,7 +255,7 @@ SIX.forEach(function (d) {
 // --------------------------------------------------------- launcher --
 {
   const t = readme.launcher || '';
-  const bl = read('tools/Build-Launcher.ps1') || '';
+  const bl = read('scripts/release/Build-Launcher.ps1') || '';
   const voice = read('launcher/app/Voice.cs') || '';
   const held = files('launcher');
   // Since phase 7 (issue #440) this is the whole launcher, not only its voice
@@ -260,7 +263,7 @@ SIX.forEach(function (d) {
   yes('launcher: holds the source folder, the window and the voice page (' + held.join(', ') + ')',
       held.indexOf('ui.xaml') >= 0 && held.indexOf('voice-host.html') >= 0 && exists('launcher/app/Shell.cs'));
   yes('launcher: Build-Launcher.ps1 embeds the voice page by name',
-      bl.indexOf("'.." + BS + "launcher" + BS + "voice-host.html'") >= 0);
+      bl.indexOf("'.." + BS + ".." + BS + "launcher" + BS + "voice-host.html'") >= 0);
   yes('launcher: Voice.cs loads it by that name', voice.indexOf('"voice-host.html"') >= 0);
   yes('launcher: the README says where the source and the window are',
       t.indexOf('`launcher' + BS + 'app`') >= 0 && t.indexOf('ui.xaml') >= 0 && t.indexOf('voice-host.html') >= 0);
@@ -269,13 +272,13 @@ SIX.forEach(function (d) {
 // ------------------------------------------------------------ installer\setup --
 {
   const t = readme.setup || '';
-  const bl = read('tools/Build-Launcher.ps1') || '';
+  const bl = read('scripts/release/Build-Launcher.ps1') || '';
   const boot = read('installer/setup/Bootstrap.cs') || '';
   const held = files('installer/setup').filter(function (f) { return f !== 'README.md'; });
   yes('installer' + BS + 'setup: holds the one file its README says, Bootstrap.cs (' + held.join(', ') + ')',
       held.length === 1 && held[0] === 'Bootstrap.cs');
   yes('installer' + BS + 'setup: Build-Launcher.ps1 compiles Bootstrap.cs by name into setup-stub.exe',
-      bl.indexOf("'.." + BS + "installer" + BS + "setup" + BS + "Bootstrap.cs'") >= 0 && bl.indexOf("'setup-stub.exe'") >= 0 &&
+      bl.indexOf("'.." + BS + ".." + BS + "installer" + BS + "setup" + BS + "Bootstrap.cs'") >= 0 && bl.indexOf("setup-stub.exe'") >= 0 &&
       t.indexOf('setup-stub.exe') >= 0);
   const inst = (/installRoot = @"([^"]+)"/.exec(boot) || [])[1];
   yes('installer' + BS + 'setup: the README gives the install folder Bootstrap.cs offers, ' + inst,
@@ -289,7 +292,7 @@ SIX.forEach(function (d) {
 
 // ------------------------------------------- nothing carries a README out --
 {
-  const go = read('tools/Go.ps1') || '';
+  const go = read('scripts/release/Go.ps1') || '';
   const filters = { ui: [], pl: [] };
   let bare = 0;
   go.split('\n').forEach(function (l) {
@@ -309,7 +312,7 @@ SIX.forEach(function (d) {
   yes('and none of them would copy README.md into the game folder',
       filters.ui.concat(filters.pl).every(function (f) { return !glob(f).test('README.md'); }));
 
-  const dd = read('tools/Deploy-Docs.ps1') || '';
+  const dd = read('scripts/deploy/Deploy-Docs.ps1') || '';
   const lists = dd.split('\n').filter(function (l) {
     return /Get-ChildItem\s+(\(Join-Path \$App\b|(-LiteralPath\s+)?\$App\b)/.test(l);
   });
@@ -318,12 +321,12 @@ SIX.forEach(function (d) {
         return /Get-ChildItem \(Join-Path \$App '(public|data|data\/site)'\)/.test(l);
       }) && dd.indexOf("Push (Join-Path $App 'server.js')") >= 0);
 
-  const iv = read('tools/Install-Voice.ps1') || '';
+  const iv = read('scripts/deploy/Install-Voice.ps1') || '';
   const sent = (/foreach \(\$f in ('[^)]*')\)/.exec(iv) || [])[1];
   yes('Install-Voice.ps1 sends named files, with no wildcard (' + sent + ')',
       !!sent && sent.indexOf('*') < 0 && !/README/i.test(sent) && !/Get-ChildItem/.test(iv));
 
-  const bl = read('tools/Build-Launcher.ps1') || '';
+  const bl = read('scripts/release/Build-Launcher.ps1') || '';
   yes('Build-Launcher.ps1 never lists launcher or installer' + BS + 'setup, so only the named file goes in',
       !bl.split('\n').some(function (l) {
         return /Get-ChildItem/.test(l) && /'(\.\.\\launcher|\.\.\\installer\\setup|launcher|setup)(['\\])/.test(l);
@@ -369,7 +372,7 @@ SIX.forEach(function (d) {
       install + '"', !!install && para.indexOf(install) >= 0);
   yes('and the one that makes its game folder, "' + make + '"', !!make && para.indexOf('"' + make + '"') >= 0);
 
-  const ship = read('tools/Ship.ps1') || '';
+  const ship = read('scripts/release/Ship.ps1') || '';
   yes('Ship.ps1 refuses the dev channel without the dev build, as the paragraph says',
       /No dev build at \$Root\./.test(ship) && /refuses `-Channel dev`/.test(para));
   // If Ship stops falling back to the Steam copy, this fails, and the
@@ -377,7 +380,7 @@ SIX.forEach(function (d) {
   yes('Ship.ps1 still builds the dev release out of the Steam copy when the dev build has no game folder, ' +
       'which the paragraph warns about',
       ship.indexOf("$goArgs['Vortex'] = $true") >= 0 && /Steam\s+copy/.test(para));
-  const ready = read('tools/Check-ShipReady.ps1') || '';
+  const ready = read('scripts/release/Check-ShipReady.ps1') || '';
   yes('it names the pre-flight, Check-ShipReady.ps1 -Channel dev, which takes that channel',
       para.indexOf('Check-ShipReady.ps1 -Channel dev') >= 0 && ready.indexOf("[ValidateSet('main','dev')]") >= 0);
   yes('the paragraph keeps the words rules',

@@ -49,7 +49,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ShipPath) { $ShipPath = Join-Path $Here 'Ship.ps1' }
+if (-not $ShipPath) { $ShipPath = Join-Path $Here '..\scripts\release\Ship.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -102,7 +102,7 @@ $shipSrc = [IO.File]::ReadAllText($ShipPath)
 $ship = Parse $ShipPath
 Yes 'Ship.ps1 parses' ($ship.Errors.Count -eq 0)
 
-$pkg = Parse (Join-Path $Here 'Package-Thornswood.ps1')
+$pkg = Parse (Join-Path $Here '..\scripts\release\Package-Thornswood.ps1')
 $noPub = @($pkg.Ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'NoPublish' })
 Yes 'Package-Thornswood.ps1 has a -NoPublish switch' ($noPub.Count -eq 1)
 $pubIf = @($pkg.Ast.FindAll({ param($n) $n -is $IfAst -and $n.Clauses[0].Item1.Extent.Text -eq '-not $NoPublish' }, $true))
@@ -115,7 +115,7 @@ if ($pubIf.Count -eq 1) {
 }
 Yes ("  and Publish-Installer.ps1 is named only inside it ({0} time(s)), so without -NoPublish it publishes and with it it does not" -f $named.Count) ($named.Count -ge 1 -and $pubIf.Count -eq 1 -and $outside.Count -eq 0)
 
-$pu = Parse (Join-Path $Here 'Publish-Update.ps1')
+$pu = Parse (Join-Path $Here '..\scripts\release\Publish-Update.ps1')
 $away = @($pu.Ast.FindAll({ param($n) $n -is $CmdAst }, $true) | Where-Object {
     $name = $_.GetCommandName()
     $words = @($_.CommandElements | ForEach-Object { $_.Extent.Text })
@@ -159,7 +159,14 @@ foreach ($k in @($PSBoundParameters.Keys | Sort-Object)) {
 '@
 function Stub([string]$name, [string]$params, [string]$body) {
     $text = "param($params)`r`n" + $noteText.Replace('NAME', $name) + "`r`n" + $body + "`r`nexit 0`r`n"
-    [IO.File]::WriteAllText((Join-Path $tools ($name + '.ps1')), $text)
+    # Each in its own area under scripts\ since phase 8 of issue #440, where Ship.ps1
+    # in scripts\release calls it.
+    $area = 'release'
+    if ($name -in 'Publish-News', 'Publish-Discord') { $area = 'ops' }
+    if ($name -eq 'Request-Restart') { $area = 'vps' }
+    $dir = Join-Path $tools ('..\scripts\' + $area)
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    [IO.File]::WriteAllText((Join-Path $dir ($name + '.ps1')), $text)
 }
 
 $oldPath = $env:PATH
@@ -171,7 +178,7 @@ function Invoke-Ship([string[]]$shipArgs) {
     if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
-        $out = & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Ship.ps1') @shipArgs 2>&1 | Out-String
+        $out = & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools '..\scripts\release\Ship.ps1') @shipArgs 2>&1 | Out-String
         $code = $LASTEXITCODE
     } finally { $ErrorActionPreference = $old }
     $calls = @()
@@ -195,11 +202,11 @@ function Read-Version([string]$path) {
 }
 
 try {
-    foreach ($d in @($tools, (Join-Path $tools '..\launcher\app'), (Join-Path $rel '.git'), $relDev, $bin,
+    foreach ($d in @($tools, (Join-Path $tools '..\launcher\app'), (Join-Path $tools '..\scripts\release'), (Join-Path $rel '.git'), $relDev, $bin,
                      (Join-Path $root 'Launcher'), (Join-Path $rootDev 'Launcher'), $dist, (Join-Path $appdata 'Thornswood'))) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
-    Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $tools 'Ship.ps1') -Force
+    Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $tools '..\scripts\release\Ship.ps1') -Force
     $updaterCs = Join-Path $tools '..\launcher\app\Updater.cs'
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.93`";`r`n")
     [IO.File]::WriteAllText((Join-Path $rel 'version.json'), '{"launcherVersion":"1.1.93","packs":[]}')

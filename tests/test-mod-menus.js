@@ -38,10 +38,10 @@ function done() {
   process.exit(fail ? 1 : 0);
 }
 
-const SCRIPT = path.join(TOOLS_DIR, 'Audit-ModMenus.js');
+const SCRIPT = path.join(TOOLS_DIR, '..', 'scripts', 'mods', 'Audit-ModMenus.js');
 let A = null;
 try { A = require(SCRIPT); } catch (e) { console.log('      ' + e.message); }
-yes('tools\\Audit-ModMenus.js is there and loads', !!A);
+yes('scripts\\mods\\Audit-ModMenus.js is there and loads', !!A);
 if (!A) { done(); }
 
 // ------------------------------------------------------------ plugin bytes

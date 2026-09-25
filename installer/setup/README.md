@@ -19,16 +19,16 @@ install that way. `tests\test-installer-own-payload.ps1` holds it to that.
 
 ## On your machine
 
-`tools\Build-Launcher.ps1` compiles it after the launcher, into
+`scripts\release\Build-Launcher.ps1` compiles it after the launcher, into
 `tools\setup-stub.exe`, which git ignores like every other `.exe`. A failed
 compile keeps the last working stub and says so. Build into a scratch root, as
 for the launcher:
 
 ```
-.\tools\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
+.\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
 ```
 
-`tools\Package-Thornswood.ps1` copies the stub to `Thornswood-Setup.exe`
+`scripts\release\Package-Thornswood.ps1` copies the stub to `Thornswood-Setup.exe`
 beside `Thornswood-Setup.zip`, the payload, and `Sign-Artifact.ps1` signs the
 exe when the machine has `tools\signing.json`. Running the stub installs for
 real into the folder picked, and asks Skyrim to close first if it is running.

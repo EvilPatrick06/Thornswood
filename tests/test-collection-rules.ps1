@@ -34,7 +34,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, what they test is in tools\.
 $Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $CheckPath) { $CheckPath = Join-Path $Here 'Check-CollectionRules.ps1' }
+if (-not $CheckPath) { $CheckPath = Join-Path $Here '..\scripts\mods\Check-CollectionRules.ps1' }
 
 $script:pass = 0
 $script:fail = 0

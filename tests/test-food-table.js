@@ -16,7 +16,7 @@
 //
 // Two halves.
 //
-//   A. The builder itself, tools/Build-FoodTable.js, run on plugins this
+//   A. The builder itself, scripts/dev/Build-FoodTable.js, run on plugins this
 //      harness writes, so it runs on any machine: one line per record, keyed
 //      by the plugin that made it, worth what the last plugin says.
 //
@@ -106,6 +106,8 @@ fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(TOOLS, { recursive: true });
 // The gamemode and its tables sit in game\ beside tools\ since phase 6 (issue #440).
 fs.mkdirSync(path.join(TMP, 'game', 'data'), { recursive: true });
+// And the table builders in scripts\dev since phase 8.
+fs.mkdirSync(path.join(TMP, 'scripts', 'dev'), { recursive: true });
 fs.mkdirSync(path.join(TMP, 'Profile', 'Default'), { recursive: true });
 
 /*
@@ -147,12 +149,12 @@ fs.writeFileSync(path.join(DATA, 'Gourmet.esp'), plugin(0x200, FIVE, [
 ]));
 fs.writeFileSync(path.join(TMP, 'Profile', 'Default', 'plugins.txt'),
   ['*LowerCase.esp', '*Gourmet.esp', ''].join(String.fromCharCode(13, 10)));
-fs.copyFileSync(path.join(HERE, 'Build-FoodTable.js'), path.join(TOOLS, 'Build-FoodTable.js'));
+fs.copyFileSync(path.join(HERE, '..', 'scripts', 'dev', 'Build-FoodTable.js'), path.join(TOOLS, '..', 'scripts', 'dev', 'Build-FoodTable.js'));
 fs.writeFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'),
   ['const WARMTH = {"items":{}};', 'const FOODS = {"items":{}};', ''].join(String.fromCharCode(10)));
 
 function build() {
-  return spawnSync(process.execPath, [path.join(TOOLS, 'Build-FoodTable.js'), '--data', DATA],
+  return spawnSync(process.execPath, [path.join(TOOLS, '..', 'scripts', 'dev', 'Build-FoodTable.js'), '--data', DATA],
                    { encoding: 'utf8' });
 }
 function installed() {

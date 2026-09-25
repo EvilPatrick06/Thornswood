@@ -46,12 +46,14 @@ function Done {
     exit 0
 }
 
-$helper = Join-Path $ToolsPath 'BuildStamp.ps1'
+$helper = Join-Path $ToolsPath '..\scripts\release\BuildStamp.ps1'
 Yes 'BuildStamp.ps1 is there' (Test-Path -LiteralPath $helper)
 
 # ---- the deploy scripts, read and never run ----------------------------------
 function Read-Ast([string]$name) {
-    $p = Join-Path $ToolsPath $name
+    # In scripts\<area> since phase 8 of issue #440; tools\ holds forwarding copies.
+    $p = @(Get-ChildItem -LiteralPath (Join-Path (Split-Path -Parent $ToolsPath) 'scripts') -Filter $name -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName)[0]
+    if (-not $p) { $p = Join-Path $ToolsPath $name }
     if (-not (Test-Path -LiteralPath $p)) { return $null }
     $tokens = $null; $errors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($p, [ref]$tokens, [ref]$errors)
