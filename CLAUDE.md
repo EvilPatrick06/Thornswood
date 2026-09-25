@@ -32,9 +32,18 @@ of a test session costs more than it protects. Say which ones leave the machine
 before running them, say what they did afterwards, and say in the reply what
 went out.
 
-That is Patrick. It is not a change for anybody else's sessions, and it is not
-permission to ship on a hunch: a main Ship still needs him to say so. Never
-start the launcher or the game.
+Extended by Patrick on 25 Sep to everybody on the team, after Djinn's Claude
+kept handing him the steps: "I want to fix it so Djinn can do all of that
+... I should not be the only one doing everything they have VPS access". A
+Claude working with Djinn or Ataxayk runs the same chain for their work:
+commit, push, pull request, merge, a dev Ship (`Ship.ps1 -Channel dev`),
+`Deploy-DevGamemode.ps1` and the other dev deploys, saying what goes out as
+above. Never ask Patrick to run something the person you work with can run.
+When their machine is missing something (the engine build, the VPS key, the
+dev webhook, access to Thornswood-Releases), DEVELOPING.md "Setting up a
+machine" says how; do that with them, and put on the board only the one-time
+step that needs Patrick. It is not permission to ship on a hunch: a main Ship
+still needs Patrick to say so. Never start the launcher or the game.
 Measure before claiming a cause: read Profile\launcher.log, look at the file,
 check timestamps, say what you saw. When the doc and the machine disagree,
 say so and ask.

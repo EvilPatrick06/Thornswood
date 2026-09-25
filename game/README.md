@@ -15,7 +15,7 @@ scripts that build and ship it:
 - `data\`: the tables the gamemode's generated blocks are built from (doors,
   fires, food, harvests, hunts, ores, races, recipes, spells, stations,
   warmth, water, weather, cast and the mine buildings). The `Build-*Table`
-  scripts in `tools\` read these and write the block between its markers in
+  scripts in `scripts\dev\` read these and write the block between its markers in
   `gamemode.js`; nothing reads them at run time.
 - `content\Thornswood-Content.esp`: our plugin file. People get it through
   the Nexus collection; the dev and live deploys send it to the server.

@@ -231,6 +231,21 @@ proves it. Until then the scripts that talk to the VPS (`Deploy-*`,
 `Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) cannot
 reach it, and Ship still publishes but cannot warn the room.
 
+Every Ship, dev included, checks the SkyMP client against the record, so
+this machine builds the engine once (Visual Studio 2022 Build Tools with
+"Desktop development with C++", node and yarn; the script says what is
+missing):
+
+```
+.\scripts\release\Build-Engine.ps1
+```
+
+`engine\README.md` has the rest. Two more one-time things somebody already
+set up does for you: Patrick adds you as a collaborator on
+`EvilPatrick06/Thornswood-Releases`, which the publish pushes to, and gives
+you the dev news webhook privately, which `.\scripts\ops\Set-DevNews.ps1`
+stores on this machine (without it a dev Ship publishes and posts nothing).
+
 The first publish from a new machine needs a baseline:
 
 ```

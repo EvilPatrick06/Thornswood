@@ -7,7 +7,7 @@
 // or in your head" asked for one page naming, for each asset, where it lives,
 // who holds it, who the second holder is, and how to reissue it. Its done-when
 // is that every row has a second holder or an explicit "nobody yet", and that
-// every secret-bearing file named in tools\*.ps1 and launcher\app\Config.cs
+// every secret-bearing file named in scripts\<area>\*.ps1 and launcher\app\Config.cs
 // appears in the table, "checked by grepping for the file names rather than by
 // reading". This is that grep, so the page cannot quietly fall behind the
 // scripts.

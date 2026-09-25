@@ -1,8 +1,9 @@
 <#
   Install-Runner.ps1
 
-  Puts a GitHub Actions runner on the VPS, so the build check runs on every
-  pull request again without paying for minutes. Run it from this machine; it
+  Puts a GitHub Actions runner on the VPS, so the build check can run there
+  without paying for minutes; the check itself is off and runs only when
+  started by hand. Run it from this machine; it
   does the remote half over ssh, the same way Install-Backup.ps1 does.
 
       .\scripts\deploy\Install-Runner.ps1            install it, or put it right
