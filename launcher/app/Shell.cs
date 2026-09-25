@@ -113,6 +113,7 @@ namespace Thornswood
                           firstRunCard, quickKeysCard, quickKeys;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
+        static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
         static StackPanel chatFadeRow; static TextBlock txtChatFadeNote; static CheckBox chkNeedsBars;
         static CheckBox chkKeepSaves;
         static CheckBox chkDeleteMods;
@@ -572,6 +573,7 @@ namespace Thornswood
             btnSaveDisplay = F<Button>("BtnSaveDisplay");
             btnQuitGame = F<Button>("BtnQuitGame");
             chkLockRes = F<CheckBox>("ChkLockRes");
+            chkMusic = F<CheckBox>("ChkMusic"); sldMusic = F<Slider>("SldMusic"); txtMusic = F<TextBlock>("TxtMusic");
             dotServer = F<Ellipse>("DotServer"); dotVerify = F<Ellipse>("DotVerify");
             mineCard = F<Border>("MineCard");
             statusList = F<StackPanel>("StatusList"); modList = F<StackPanel>("ModList");
@@ -845,7 +847,7 @@ namespace Thornswood
         /// N without the Media Feature Pack, a file that will not open) it is
         /// hidden and the still picture shows exactly as before.
         ///
-        /// Stopped while the game runs as well. With Keep
+        /// Stopped while the game runs as well, the way the music is. With Keep
         /// Launcher Open ticked the window is never minimised, so until 24
         /// September the video went on decoding behind the game for the whole
         /// session, 3 to 14% of one core that the game could have had. The one
@@ -936,10 +938,106 @@ namespace Thornswood
             headerVideoDecide = decide;
         }
 
-        // The launcher plays no music (Djinn, 25 Sep, #596). The theme,
-        // Data\Platform\UI\thornswood-theme.mp3, plays on the game's own start
-        // screen and nowhere else. Until then the launcher looped a copy of it
-        // under Profile\Music with a switch and a volume on Settings.
+        /// <summary>
+        /// The theme, for the launcher, the game's main menu and the loading
+        /// screen. Asked for by Patrick on 20 September, and held to the dev
+        /// build until 22 September out of respect for the artist, because the
+        /// track was not the final one. He supplied the final version that day
+        /// and said it goes to main, so the dev-only rule is gone: the file is
+        /// Data\Platform\UI\thornswood-theme.mp3, every pack and the installer
+        /// carry it, and it plays on every build.
+        ///
+        /// It plays from the same file the game's menu plays, so there is one
+        /// track on disk and not two.
+        ///
+        /// On a loop while the launcher is open and the game is not running:
+        /// the game's own menu takes over the moment Play is pressed, and the
+        /// launcher picks it up again when the game closes. Paused while the
+        /// window is minimised, because music from a window nobody can see is
+        /// a puzzle rather than a mood. Off entirely when the person has turned
+        /// it off in Settings, which is what MusicDecide reads.
+        /// </summary>
+        static MediaPlayer music;
+        static void StartMenuMusic()
+        {
+            // Not for somebody who opened this from Windows Settings to
+            // uninstall. The theme playing is the loudest way to say the
+            // launcher has started up to play when that is not why it opened.
+            if (cfg == null || askedToUninstall) return;
+            string src = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-theme.mp3");
+            if (!File.Exists(src)) return;
+
+            // Played from a copy under Profile, never from the game folder. A
+            // MediaPlayer holds its file open, and the first dev pack that
+            // carried this track could not be installed over the copy the
+            // launcher was playing: "being used by another process", 20
+            // September 14:27, four times in a row, Play switched off. The copy
+            // is refreshed from the game folder on every start, so an updated
+            // track is heard the next time the launcher opens.
+            string file;
+            try
+            {
+                string dir = Path.Combine(Paths.ProfileDir, "Music");
+                Directory.CreateDirectory(dir);
+                file = Path.Combine(dir, "thornswood-theme.mp3");
+                var a = new FileInfo(src);
+                var b = new FileInfo(file);
+                if (!b.Exists || b.Length != a.Length || b.LastWriteTimeUtc != a.LastWriteTimeUtc)
+                    File.Copy(src, file, true);
+            }
+            catch (Exception ex)
+            {
+                Stamp("Menu music: could not copy the track out of the game folder (" + ex.Message + ")");
+                return;
+            }
+            try
+            {
+                music = new MediaPlayer();
+                music.Volume = Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
+                music.MediaEnded += delegate
+                {
+                    try { music.Position = TimeSpan.Zero; music.Play(); } catch { }
+                };
+                music.MediaFailed += delegate(object s, ExceptionEventArgs e)
+                {
+                    Stamp("Menu music: did not play (" + (e.ErrorException == null ? "no reason given" : e.ErrorException.Message) + ")");
+                    music = null;
+                };
+                music.Open(new Uri(file));
+                MusicDecide();
+                win.StateChanged += delegate { MusicDecide(); };
+                Stamp("Menu music: the theme is on, from " + file);
+            }
+            catch (Exception ex)
+            {
+                Stamp("Menu music: " + ex.Message);
+                music = null;
+            }
+        }
+
+        /// <summary>
+        /// Plays or pauses the track for the moment: not when it is switched off
+        /// in Settings, not while the game runs, not while minimised. The volume
+        /// is the Settings slider, 0 to 100.
+        /// </summary>
+        static void MusicDecide()
+        {
+            if (music == null) return;
+            bool want = cfg.MusicOn && cfg.MusicVolume > 0 && !playing && win.WindowState != WindowState.Minimized;
+            try
+            {
+                music.Volume = Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
+                if (want) music.Play(); else music.Pause();
+            }
+            catch { }
+        }
+
+        static void MusicLabel()
+        {
+            if (txtMusic == null) return;
+            int v = Math.Max(0, Math.Min(100, cfg.MusicVolume));
+            txtMusic.Text = v == 0 ? "silent" : v + "%";
+        }
 
         static void Wire()
         {
@@ -966,6 +1064,9 @@ namespace Thornswood
             DrawBuildLine();
             txtStatusRight.Text = Paths.Root;
             chkKeepOpen.IsChecked = cfg.KeepLauncherOpen;
+            if (chkMusic != null) chkMusic.IsChecked = cfg.MusicOn;
+            if (sldMusic != null) sldMusic.Value = Math.Max(0, Math.Min(100, cfg.MusicVolume));
+            MusicLabel();
             // The address, the port, the update source and the voice port are
             // not on this page any more. They are not settings: they are facts
             // about the server everybody connects to, they arrive in the update
@@ -1015,6 +1116,7 @@ namespace Thornswood
                 if (band != null && picture != null) { picture.Background = headerArt; band.Visibility = Visibility.Visible; }
                 StartHeaderVideo();
             }
+            StartMenuMusic();
 
             titleBar.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
             {
@@ -1096,6 +1198,19 @@ namespace Thornswood
                 RunUpdate();
             };
 
+            if (chkMusic != null) chkMusic.Click += delegate
+            {
+                cfg.MusicOn = chkMusic.IsChecked == true;
+                cfg.Save(Paths.CfgFile);
+                MusicDecide();
+            };
+            if (sldMusic != null) sldMusic.ValueChanged += delegate
+            {
+                cfg.MusicVolume = (int)Math.Round(sldMusic.Value);
+                MusicLabel();
+                MusicDecide();
+                cfg.Save(Paths.CfgFile);
+            };
             chkKeepOpen.Click += delegate
             {
                 cfg.KeepLauncherOpen = chkKeepOpen.IsChecked == true;
@@ -1452,6 +1567,7 @@ namespace Thornswood
                 }
                 playing = false;
                 inPlayTicks = 0;
+                MusicDecide();
                 headerVideoDecide();
                 // An update was seen during the session and they quit before
                 // the five minutes were up. The clock goes, the fact does not:
@@ -3924,6 +4040,7 @@ namespace Thornswood
                 Log("Pointing Skyrim settings and saves at this build.");
                 Swap.Apply();
                 playing = true;
+                MusicDecide();
                 headerVideoDecide();
                 btnPlay.IsEnabled = false;
                 btnPlay.Content = "RUNNING";
