@@ -1,0 +1,15 @@
+# The SkyMP fork our engine changes live in, pinned to the commit
+# records\server-build.json and records\client-build.json name. Until 25 September
+# it was a separate clone at C:\Thornswood-Dev\skymp on Patrick's machine.
+#
+#   git submodule update --init engine/skymp
+#
+# fetches it into engine\skymp. Its build folder and the fork's own vcpkg
+# live inside it, so "ignore = dirty" keeps a build from reading as an
+# uncommitted change here; a different commit checked out in it still shows,
+# and is committed here alongside the new build records.
+[submodule "engine/skymp"]
+	path = engine/skymp
+	url = https://github.com/EvilPatrick06/skymp.git
+	branch = thornswood/engine-changes
+	ignore = dirty

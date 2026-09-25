@@ -1,0 +1,240 @@
+# Every pull request and every push to main gets the checks a release starts
+# with: do all the PowerShell scripts parse, does every game script parse,
+# does the bot parse, do the test harnesses still pass, and does the launcher
+# compile with the .NET Framework 4 csc (C# 5). A red mark here means the
+# branch would stop Ship.ps1; a green one means it is worth a person's time
+# to read. It builds only; nothing is published.
+#
+# Everything is one job on purpose. Branch protection named ONE required
+# check, "Launcher builds", until 25 September, and a second job would not
+# be covered by it, so a new job would be a check that blocks nothing if the
+# requirement comes back. Steps are named instead, and
+# a failed step names itself in the summary just as a failed job would.
+#
+# The harnesses were all written to be run by hand and none of them had ever
+# run here: 236 checks across twelve files, sitting in the repo going stale.
+#
+# WHERE IT RUNS. On the VPS, since 25 September: GitHub's own runners were
+# blocked on billing and every run failed in seconds, and Patrick chose a
+# runner on the box over paying for minutes (issue #437).
+# scripts\deploy\Install-Runner.ps1 puts it there, as its own local account that is
+# shut out of every live Thornswood folder, at below normal priority so a build
+# never takes the processor from the game server, the site, voice or the bot.
+# The label is what picks it; change it here and in Install-Runner together.
+# Safe because the repository is private: nobody outside the team can open a
+# pull request that runs code on the box.
+#
+# OFF, AT PATRICK'S WORD, 25 SEPTEMBER: "turn off GitHub's build checker
+# thing too so it stops being flagged as red", then "just turn it all the
+# way off we arent paying to use it anyways". With no runner registered
+# yet, every push and pull request queued a run nothing could pick up. It
+# no longer starts on its own; it can still be started by hand from the
+# Actions tab. The runner on the VPS stays: Install-Runner.ps1 still puts it
+# there. Patrick removed "Launcher builds" from main's required checks the
+# same day. Turning the check back on is his call; it is these lines under
+# on:, "Launcher builds" required again, and enforce_admins on (#437):
+#   pull_request:
+#   push:
+#     branches: [main]
+name: Build check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+# One run per branch at a time. A newer push cancels the run it replaces, so
+# the one runner is not stuck building a commit nobody wants.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  launcher:
+    name: Launcher builds
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    # Seven to ten minutes on GitHub's runners; below normal priority on a box
+    # that is also serving people is slower. Past this it is stuck, not slow.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Scan the tree for secrets
+        shell: pwsh
+        run: |
+          # Entry 236. Every tracked file, by the rules in scripts\dev\Check-Secrets.ps1.
+          # A hit names the file, the line and the rule and never the value,
+          # because anybody on the repository can read this log. A known
+          # non-secret goes in scripts\dev\Check-Secrets.allow.txt with its reason.
+          .\scripts\dev\Check-Secrets.ps1
+          exit $LASTEXITCODE
+
+      - name: Parse every PowerShell script
+        shell: pwsh
+        run: |
+          $bad = 0
+          Get-ChildItem -Path scripts, tools, tests -Filter *.ps1 -Recurse -File | ForEach-Object {
+            $tokens = $null; $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            foreach ($e in $errors) {
+              $bad++
+              Write-Host ("::error file={0},line={1}::{2}" -f $_.FullName, $e.Extent.StartLineNumber, $e.Message)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host "every script parses"
+
+      - name: Check the writing rules
+        shell: pwsh
+        run: |
+          # The Words section of CLAUDE.md, over the files people read: no em
+          # dashes, never the word player, and the owner is Patrick. Written
+          # down since the start and never checked, and on 24 September eleven
+          # hits had gone out in those files. Each hit is marked on its line.
+          .\scripts\dev\Check-Words.ps1
+
+      - name: Check the launcher window
+        shell: powershell
+        run: |
+          # The launcher builds its window from ui.xaml at startup and finds
+          # every control by name, so a renamed control or a window that does
+          # not parse compiles clean and is found by the person using it. This
+          # fails on either. Windows PowerShell on purpose: it parses with the
+          # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
+          & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
+
+      - name: Parse every game script
+        shell: pwsh
+        run: |
+          $bad = 0
+          # game\ since the reorganisation's phase 6 (issue #440): the gamemode,
+          # the plugins and the overlays.
+          $files = @(Get-ChildItem -Path scripts -Filter *.js -File -Recurse) + @(Get-ChildItem -Path game -Filter *.js -File) +
+                   @(Get-ChildItem -Path game\plugins, game\ui -Filter *.js -File -ErrorAction SilentlyContinue)
+          foreach ($f in $files) {
+            & node --check $f.FullName 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              $bad++
+              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host ("{0} game script(s) parse" -f $files.Count)
+
+      - name: Parse every bot file
+        shell: pwsh
+        run: |
+          if (-not (Test-Path bot)) { Write-Host 'no bot to parse'; exit 0 }
+          $bad = 0
+          foreach ($f in (Get-ChildItem bot -Filter *.py -Recurse -File)) {
+            & python -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read(), sys.argv[1])" $f.FullName 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              $bad++
+              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host 'every bot file parses'
+
+      - name: Run the test harnesses
+        shell: pwsh
+        run: |
+          # Written to be run by hand, and until now never run anywhere else.
+          # A harness that reads this machine's game folder says SKIP for the
+          # parts it cannot measure on a runner and still checks the rest.
+          $bad = 0
+          # In tests\ since the reorganisation's phase 5 (issue #440).
+          foreach ($t in (Get-ChildItem tests -Filter 'test-*.js' -File | Sort-Object Name)) {
+            Write-Host ("--- {0}" -f $t.Name)
+            & node $t.FullName
+            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          }
+          foreach ($t in (Get-ChildItem tests -Filter 'test-*.ps1' -File | Sort-Object Name)) {
+            Write-Host ("--- {0}" -f $t.Name)
+            & pwsh -NoProfile -File $t.FullName
+            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          }
+          # The five in voice, which run nowhere else. They spawn the
+          # real service in a temp folder and drive it over HTTP, so they need
+          # node and nothing else, and node is already here. Added 23
+          # September: the harness step globbed tools with no -Recurse, so
+          # thirty ran and these five never had.
+          foreach ($t in (Get-ChildItem voice -Filter 'test-*.js' -File | Sort-Object Name)) {
+            Write-Host ("--- voice/{0}" -f $t.Name)
+            & node $t.FullName
+            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          }
+          if ($bad) { exit 1 }
+          Write-Host 'every harness passed'
+
+      - name: Run the bot harnesses
+        shell: pwsh
+        run: |
+          # The two Python ones import bot.py for real, so they need the
+          # library the bot runs on. They were written to be run by hand and,
+          # like every harness above before this file existed, had never run
+          # anywhere: nothing was checking the bot's startup on a pull request.
+          #
+          # An install that fails says so and stops the step rather than the
+          # build, because a pip outage is not a fault in the branch. A
+          # harness that fails is red, which is the point.
+          #
+          # From requirements.txt, the file Install-Bot.ps1 installs on the
+          # VPS, so the versions tested here are the versions the bot runs.
+          #
+          # Into a venv of this run's own, never the machine's Python: the
+          # runner is on the VPS, and the live bot runs on that Python.
+          $venv = Join-Path $env:RUNNER_TEMP 'bot-venv'
+          python -m venv $venv
+          $py = Join-Path $venv 'Scripts\python.exe'
+          if (-not (Test-Path $py)) {
+            Write-Host '::warning::could not make a venv for the bot harnesses, so they did not run'
+            exit 0
+          }
+          & $py -m pip install --quiet --disable-pip-version-check -r bot\requirements.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::warning::could not install discord.py, so the bot harnesses did not run'
+            exit 0
+          }
+          $env:DISCORD_TOKEN = 'not-a-real-token'
+          $bad = 0
+          foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
+            Write-Host ("--- {0}" -f $t.Name)
+            & $py $t.FullName
+            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          }
+          if ($bad) { exit 1 }
+          Write-Host 'every bot harness passed'
+
+      - name: Count the silent catches in the launcher
+        shell: pwsh
+        run: |
+          # Entry 239. A catch with nothing in it leaves no line in
+          # launcher.log when it fires, and there were 386 of them on 24 Sep.
+          # Red when any file in launcher\app has more than
+          # scripts\dev\swallow-baseline.txt allows; the script says what to do.
+          .\scripts\dev\Check-Swallow.ps1
+
+      - name: Build the launcher
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'Thornswood'
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
+          .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
+          if (-not (Test-Path (Join-Path $root 'Launcher\Thornswood.exe'))) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
+
+      - name: Scan the built launcher for secrets
+        shell: pwsh
+        run: |
+          # The secrets that shipped were in built artefacts, not in the source,
+          # so what this build made is read too, byte by byte: the launcher with
+          # everything Build-Launcher embeds in it, and the setup stub.
+          $built = @(Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe')
+          if (Test-Path tools\setup-stub.exe) { $built += (Resolve-Path tools\setup-stub.exe).Path }
+          .\scripts\dev\Check-Secrets.ps1 -Binary $built
+          exit $LASTEXITCODE
+
+      - name: Keep the exe from this build
+        uses: actions/upload-artifact@v7
+        with:
+          name: Thornswood.exe
+          path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.exe
+          retention-days: 7
