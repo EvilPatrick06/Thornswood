@@ -9,7 +9,7 @@ launcher's install folder (`C:\Thornswood` on most machines), `Profile` is
 | Term | What it is | Where it lives |
 |---|---|---|
 | Allowed list | The profile ids let into the game server. The site builds it from Discord roles, and the server's door fetches it every five minutes. | `private\allowed.json` on the game server; `tools\gamemode.js:11059`; DEVELOPING.md "Who gets into the game" |
-| Arrival | Where a new character first stands: the inn of the town picked at the end of creation. Respawn uses the same points. | `CHARGEN.towns` (`gamemode.js:3881`) and `arriveAt` (`gamemode.js:4039`); `tools\test-arrivals.js` |
+| Arrival | Where a new character first stands: the inn of the town picked at the end of creation. Respawn uses the same points. | `CHARGEN.towns` (`gamemode.js:3881`) and `arriveAt` (`gamemode.js:4039`); `tests\test-arrivals.js` |
 | Baseline | This machine's record of what its last release shipped. Publish-Update packs only the difference, so a machine that did not ship the last release ships those files again once. | `%LOCALAPPDATA%\Thornswood\published.json` (`published-dev.json` for dev); `Publish-Update.ps1 -Baseline` makes one |
 | Board, the | The Thornswood To Do board, the one record of outstanding work. Each piece of work is an issue; Order is the do-order. | https://github.com/users/EvilPatrick06/projects/1; CONTRIBUTING.md "Everything we need to do goes on the board" |
 | Bump-Version | Moves `Version` in `Updater.cs` as its own commit and pull request, before a main Ship. | `tools\Bump-Version.ps1`; DEVELOPING.md "How a release goes out" |

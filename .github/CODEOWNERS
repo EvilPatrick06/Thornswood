@@ -15,7 +15,7 @@
 # own author. So a pull request one of the team opens on Shell.cs asks the
 # others, which is exactly the intent. The team is the table in
 # CONTRIBUTING.md; somebody added there is added here too, and
-# tools\test-branch-rules.js checks the two agree.
+# tests\test-branch-rules.js checks the two agree.
 #
 # It is a request and nothing more. Branch protection on main, read off GitHub
 # on 23 September: enforce_admins is on, so every change, Patrick's included,

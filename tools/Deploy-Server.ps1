@@ -141,7 +141,7 @@ try {
 #
 # Both are single quoted and take their values from the lines SwapVars puts in
 # front of them, so what goes to the box is plain PowerShell a person can read
-# and tools\test-deploy-server-swap.ps1 can run against a scratch folder. Each
+# and tests\test-deploy-server-swap.ps1 can run against a scratch folder. Each
 # ends with one line the caller reads: STAGE OK or STAGE REFUSED, and SWAP OK,
 # SWAP ROLLED BACK, SWAP REFUSED or SWAP FAILED. A line and not an exit code,
 # because Remote sends a long script as a file and the exit code left behind

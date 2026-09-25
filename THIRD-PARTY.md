@@ -10,7 +10,7 @@ identified, this file says so instead of guessing.
 This file does not license Thornswood's own code. The repository has no licence
 of its own, and choosing one is Patrick's decision.
 
-`tools\test-third-party.js` checks this file against the build. It covers every
+`tests\test-third-party.js` checks this file against the build. It covers every
 resource Build-Launcher.ps1 compiles into the launcher, every file under
 `tools\lib`, every font and minified script the site serves from
 `site\public`, the six client files and the commits in
@@ -387,7 +387,7 @@ The directions reach people in three places. The installer carries
 records and Setup-Thornswood.ps1 copies into the install folder (entry 170).
 The public credits page has them under "Source code", at
 https://thornswood.net/credits#source, which the download page links beside
-the installer (entry 170). `tools\test-source-offer.ps1` holds both to the
+the installer (entry 170). `tests\test-source-offer.ps1` holds both to the
 records. And the Thornswood Client Runtime's own README, installed as
 `Data\Docs\Thornswood Client Runtime\README.txt`, names the fork, its branch
 and upstream SkyMP, but no commit, and `___systemPolyfill.js` is not on that

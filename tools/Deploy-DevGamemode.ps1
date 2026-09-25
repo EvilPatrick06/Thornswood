@@ -305,7 +305,7 @@ if ($LoadOrder) {
 # the load order is worked out, so a missing plugin still stops this before
 # anybody has been told an update is coming. WHO IS ON in the header says why.
 #
-# The functions sit between markers so tools\test-dev-deploy-warning.ps1 can
+# The functions sit between markers so tests\test-dev-deploy-warning.ps1 can
 # load them and drive them with no VPS behind them.
 # ==== thornswood dev deploy warning ====
 function Read-DevRoom($lines) {

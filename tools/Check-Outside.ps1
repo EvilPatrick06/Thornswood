@@ -528,7 +528,7 @@ function Invoke-Outside {
   return $script:Problems
 }
 
-# Dot-sourced by tools\test-check-outside.ps1, which wants the functions and
+# Dot-sourced by tests\test-check-outside.ps1, which wants the functions and
 # not a run against the real feed.
 if ($MyInvocation.InvocationName -eq '.') { return }
 

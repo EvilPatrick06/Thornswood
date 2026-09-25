@@ -35,7 +35,7 @@
   ChangeForms, Out, Dist, Package, Payload or ServerZip.
 
 .PARAMETER OldRoot
-  The folder the old layout lived in. C:\Thornswood-Dev; tools\test-where.ps1
+  The folder the old layout lived in. C:\Thornswood-Dev; tests\test-where.ps1
   points it somewhere else.
 #>
 [CmdletBinding()]

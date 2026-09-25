@@ -82,7 +82,7 @@ measured, names a second person.
 
 ## Keeping it complete
 
-`tools\test-ownership.js` reads every file name in `tools\*.ps1` and
+`tests\test-ownership.js` reads every file name in `tools\*.ps1` and
 `tools\app\*.cs` that looks like it holds a credential, and fails when one is
 not in the table above. It also fails on a row with no second holder. A new
 secret file gets a row here in the same pull request that adds it. The names

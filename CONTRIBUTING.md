@@ -101,7 +101,7 @@ How to use it:
   taken from Vortex's own mods folder, and nothing else of that folder is
   read. Scan names the folder, Fix and Settings point the launcher at it,
   and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
-  Gather, tools\test-vortex-folder.ps1). Djinn to agree it in #staff-general.
+  Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-general.
 - Whichever folder the game runs from, the launcher looks after its own
   files: Keep puts its files back before Play and parks any plugin in
   `Data\Platform\Plugins` that is not ours; Hold keeps its files open read

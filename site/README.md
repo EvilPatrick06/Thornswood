@@ -70,7 +70,7 @@ It is POST only: a GET answers 401 as well, but from the sign in gate with
 Invoke-WebRequest. With no bot token the copy counts every Discord account as
 allowed in, so a ticket signed with the `secret` it wrote into its own
 `config.json` gets a 200, which is how a change to the door can be tried
-without Discord. `tools\test-site-local.js` does all of this against copies in
+without Discord. `tests\test-site-local.js` does all of this against copies in
 the temp folder, and never reads a `config.json` out of the checkout.
 
 ## Where it runs
@@ -89,14 +89,14 @@ document somebody has typed into on the site; `-Boards`, `-Docs` and
 on the VPS, changes the member password in it and keeps every other setting.
 A `config.json` there that will not read as JSON, an empty one included, is
 left exactly as it is and the password is not changed.
-`tools\test-docs-password.ps1` runs that part of the script against copies.
+`tests\test-docs-password.ps1` runs that part of the script against copies.
 
 The pages, the downloads, the hub and every route in the table above are one
 node process. A route that throws is answered 500 and the rest carry on, and a
 throw in a timer is logged and carried on from, so a broken page does not take
 the door with it. What one process cannot keep apart: anything that holds its
 event loop holds the door for as long, and every `Deploy-Docs.ps1` restarts the
-door along with the pages. `tools\test-site-local.js` measures the first two
+door along with the pages. `tests\test-site-local.js` measures the first two
 against a copy: with a page made to throw, `/api/play/who` still answers its
 401, and with a page made to hold the loop for a second and a half, the same
 question waits until it lets go.

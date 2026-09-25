@@ -58,7 +58,7 @@ jobs:
         shell: pwsh
         run: |
           $bad = 0
-          Get-ChildItem -Path tools -Filter *.ps1 -Recurse -File | ForEach-Object {
+          Get-ChildItem -Path tools, tests -Filter *.ps1 -Recurse -File | ForEach-Object {
             $tokens = $null; $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
             foreach ($e in $errors) {
@@ -127,12 +127,13 @@ jobs:
           # A harness that reads this machine's game folder says SKIP for the
           # parts it cannot measure on a runner and still checks the rest.
           $bad = 0
-          foreach ($t in (Get-ChildItem tools -Filter 'test-*.js' -File | Sort-Object Name)) {
+          # In tests\ since the reorganisation's phase 5 (issue #440).
+          foreach ($t in (Get-ChildItem tests -Filter 'test-*.js' -File | Sort-Object Name)) {
             Write-Host ("--- {0}" -f $t.Name)
             & node $t.FullName
             if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
           }
-          foreach ($t in (Get-ChildItem tools -Filter 'test-*.ps1' -File | Sort-Object Name)) {
+          foreach ($t in (Get-ChildItem tests -Filter 'test-*.ps1' -File | Sort-Object Name)) {
             Write-Host ("--- {0}" -f $t.Name)
             & pwsh -NoProfile -File $t.FullName
             if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }

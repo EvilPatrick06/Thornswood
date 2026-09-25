@@ -3,7 +3,7 @@
 
   Runs ON the VPS, every five minutes, as the scheduled task that
   Watch-Load.ps1 -Install puts there. Not meant to be run from this machine,
-  except by tools\test-watch-load.ps1, which runs it against a scratch folder
+  except by tests\test-watch-load.ps1, which runs it against a scratch folder
   to prove the line it writes.
 
   WHY THIS EXISTS. The website, the game server, the voice service and the bot

@@ -38,7 +38,7 @@ hand is undone. A new overlay has to
 be called `thornswood-*.js`, like every other file of ours under
 `Data\Platform`, and named in the `OVERLAYS` list at the top of
 `thornswood-front.js`, or nothing loads it. There is no build step; the
-`tools\test-*.js` harnesses read several of these files and check them.
+`tests\test-*.js` harnesses read several of these files and check them.
 
 ## Where it runs
 
