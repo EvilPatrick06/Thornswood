@@ -461,7 +461,12 @@ if ($run) {
     Yes 'Run puts nothing on the clipboard by itself: both fallbacks go through OnClipboard' ($run -notmatch 'TryClipboard\(')
     Yes 'both fallbacks name their part' (([regex]::Matches($run, 'OnClipboard\(cmd, i \+ 1, ')).Count -eq 2)
     Yes 'the second fallback marks the part as pasted, so the card keeps saying so' ($run -match 'OnClipboard\(cmd, i \+ 1, "", log, status\);\s*pasted = true;')
-    Yes 'the line on the card while a part downloads comes from ProgressLine' ($run -match 'status\(ProgressLine\(i \+ 1, Depots\.Length, size, pasted\)\);')
+    # Through SizedLine since 24 September, which adds Steam's size for the part
+    # once Steam has given it and otherwise hands back ProgressLine's line, so
+    # a part on the clipboard still says so.
+    Yes 'the line on the card while a part downloads comes from SizedLine' ($run -match 'status\(SizedLine\(i \+ 1, Depots\.Length, size, total, pasted\)\);')
+    $sized = Get-Member $text 'static string SizedLine(int part, int of, long bytes, long total, bool pasted)'
+    Yes 'and SizedLine hands back ProgressLine''s line with no size or with nothing down on the clipboard' ($null -ne $sized -and $sized -match 'if \(total <= 0 \|\| \(pasted && bytes <= 0\)\) return ProgressLine\(part, of, bytes, pasted\);')
     Yes 'a new run forgets the window the last one named' ($run -match 'saidWindow = null;')
 }
 $type = Get-Member $text 'static bool TypeIntoConsole(string cmd, Action<string> log)'
