@@ -168,7 +168,7 @@ There is no custom packet. Two paths:
 
 - **Commands in.** A line typed in the game's chat starting with `/` goes up
   the voice socket, and the voice service queues it
-  (`tools\voice\voice-server.js:1488-1527`). Every 1.5 seconds the gamemode
+  (`voice\voice-server.js:1488-1527`). Every 1.5 seconds the gamemode
   asks `GET /commands?ack=1` on `127.0.0.1:<voice port>`
   (`gamemode.js:20746`), runs each one through `dispatch`
   (`gamemode.js:18798`), which holds a line for a character not yet back in
@@ -184,8 +184,8 @@ The voice feed (`gamemode.js:10459`) posts every position to
 `POST /positions` every 200 ms. `voicePort()` reads the port from
 `server-settings.json`, so the dev server talks to the dev voice service.
 Do not run `tools\Add-VoiceFeed.ps1`: it writes the older
-`tools\voice\gamemode-voice.js` over this block, with 7778 written in and no
-party field (`tools\voice\README.md:12-18`).
+`voice\gamemode-voice.js` over this block, with 7778 written in and no
+party field (`voice\README.md:12-18`).
 
 ## Where its data lives on the VPS
 

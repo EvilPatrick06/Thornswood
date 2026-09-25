@@ -74,7 +74,7 @@ if FAIL:
 # to the VPS as watch.ps1. Every line it writes goes through Note(), and every
 # Note() is a string of literals and variables joined with +, so it can be
 # rendered here exactly as the box would write it.
-PS1 = os.path.join(HERE, '..', 'Watch-Services.ps1')
+PS1 = os.path.join(HERE, '..', 'tools', 'Watch-Services.ps1')
 src = open(PS1, encoding='utf-8').read()
 a = src.index("$watcher = @'")
 watchdog = src[a:src.index("\n'@", a)]

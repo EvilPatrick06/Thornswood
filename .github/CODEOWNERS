@@ -1,7 +1,7 @@
 # The files every machine touches.
 #
 # CONTRIBUTING.md and DEVELOPING.md both say these six need a word in
-# #dev before they are edited, because a change in any of them lands on
+# #staff-general before they are edited, because a change in any of them lands on
 # everybody else's work without warning. Until now that rule was prose in two documents with nothing
 # behind it: nothing asked, nothing checked, and it was forgotten as often as
 # it was kept.

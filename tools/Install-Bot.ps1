@@ -181,7 +181,7 @@ $null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\a
 #
 # requirements.txt too, because the full run installs the libraries from it.
 foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
-  $src = Join-Path $Here "discord\$f"
+  $src = Join-Path $Here "..\bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   & scp @ssh $src "${User}@${Vps}:$Root/$f" | Out-Null
   Say "  $f" 'Green'
@@ -199,14 +199,14 @@ Say '  roll-log.ps1' 'Green'
 # only when exactly one channel carries that name, so a missing file leaves a
 # working bot rather than a silent one. Put an id in it the moment two
 # channels ever share that name, which has already happened here with news.
-$staff = Join-Path $Here 'discord\staff-channel.txt'
+$staff = Join-Path $Here '..\bot\staff-channel.txt'
 if (Test-Path $staff) {
   & scp @ssh $staff "${User}@${Vps}:$Root/staff-channel.txt" | Out-Null
   Say '  staff-channel.txt' 'Green'
 } else {
   Say '  no staff-channel.txt, so the bot resolves staff-general by name' 'DarkGray'
 }
-$art = Join-Path $Here 'discord\assets\join-card.png'
+$art = Join-Path $Here '..\bot\assets\join-card.png'
 if (Test-Path $art) {
   & scp @ssh $art "${User}@${Vps}:$Root/assets/join-card.png" | Out-Null
   Say '  assets\join-card.png' 'Green'

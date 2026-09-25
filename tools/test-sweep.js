@@ -41,7 +41,7 @@ function read(...bits) {
 const gm = read('gamemode.js');
 const chat = read('ts-ui', 'thornswood-chat.js');
 const voice = read('ts-ui', 'thornswood-voice.js');
-const svc = read('voice', 'voice-server.js');
+const svc = read('..', 'voice', 'voice-server.js');
 
 /* Comments in this repo quote old code on purpose, so a check that reads them
    as code is a check that punishes writing them. */

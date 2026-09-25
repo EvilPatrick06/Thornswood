@@ -559,7 +559,7 @@ $GAME_RANK_BY_EDITOR_ID = @{
 # it. That is the honest answer rather than a wrong one: a churn is not a crop
 # and handing it to a farmer here would be this script deciding a station on its
 # own, which is the thing the beehive taught it not to do. Whether the churn
-# becomes a farm station is a few lines in #dev for Patrick and Djinn.
+# becomes a farm station is a few lines in #staff-general for Patrick and Djinn.
 $FOOD_PROP_BY_EDITOR_ID = @('MammothCheese01', 'BYOHButterChurn')
 #
 # FOOD_STAYS_THE_GATHERERS: the food rows that stay in the plant table anyway.

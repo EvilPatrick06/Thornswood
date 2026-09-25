@@ -14,7 +14,7 @@
 # like a fault and watches nothing, which is worse than not configuring it.
 #
 # When the bot grows a requirements.txt, add a pip entry here pointing at
-# /tools/discord and it starts working the same day.
+# /bot and it starts working the same day.
 #
 # The launcher is C# built with the .NET Framework csc and has no package
 # manager at all, by design, so there is nothing here for it.

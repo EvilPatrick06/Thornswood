@@ -4,7 +4,7 @@
   Install-Voice.ps1 can turn local chat on, and leaves it off unless told to.
 
   Entry 150 put local in-character chat into the voice service behind
-  THORNSWOOD_CHAT_RANGE, shipped off (tools\voice\test-local-chat.js drives
+  THORNSWOOD_CHAT_RANGE, shipped off (voice\test-local-chat.js drives
   the service itself). A setting only counts if the install hands it over, and
   the install builds the service's command line inside a here-string that is
   expanded on this machine and run on the VPS. That expansion is where '$log'
@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $InstallPath) { $InstallPath = Join-Path $Here 'Install-Voice.ps1' }
-if (-not $ServerPath) { $ServerPath = Join-Path $Here 'voice\voice-server.js' }
+if (-not $ServerPath) { $ServerPath = Join-Path $Here '..\voice\voice-server.js' }
 
 $script:pass = 0
 $script:fail = 0

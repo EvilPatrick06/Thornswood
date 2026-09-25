@@ -149,13 +149,13 @@ try {
     # By name: files that hold a credential whatever is in them.
     Invoke-Git $tree @('rm', '-r', '-q', '--cached', 'notes')
     Remove-Item -LiteralPath (Join-Path $tree 'notes') -Recurse -Force
-    foreach ($n in 'config.json', 'tools\discord\news-webhook.txt', 'tools\voice\token-key.txt', 'server-secret.txt', 'deploy\id_ed25519', 'bot.env.json') {
+    foreach ($n in 'config.json', 'bot\news-webhook.txt', 'voice\token-key.txt', 'server-secret.txt', 'deploy\id_ed25519', 'bot.env.json') {
         Write-Utf8 (Join-Path $tree $n) "{}`n"
     }
-    Invoke-Git $tree @('add', '-A', '--', 'config.json', 'tools', 'server-secret.txt', 'deploy', 'bot.env.json')
+    Invoke-Git $tree @('add', '-A', '--', 'config.json', 'tools', 'bot', 'voice', 'server-secret.txt', 'deploy', 'bot.env.json')
     $r = Invoke-Scan @{ Root = $tree; Allow = $noAllow }
     yes 'a tracked credential file fails by its name alone' ($r.Code -eq 1)
-    foreach ($n in 'config.json', 'tools/discord/news-webhook.txt', 'tools/voice/token-key.txt', 'server-secret.txt', 'deploy/id_ed25519', 'bot.env.json') {
+    foreach ($n in 'config.json', 'bot/news-webhook.txt', 'voice/token-key.txt', 'server-secret.txt', 'deploy/id_ed25519', 'bot.env.json') {
         yes ("$n is named") ($r.Out.Contains($n + ':0  credential-file-name'))
     }
     yes 'a clean tracked file beside them is not' (-not $r.Out.Contains('thing.js'))

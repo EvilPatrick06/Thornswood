@@ -47,9 +47,9 @@ $notInGit = @{
     'tools/signing.json'            = 'a machine''s signing settings, ignored by git'
     'tools/backup-key.txt'          = 'the backup passphrase, a secret kept out of git'
     'tools/thornswood-front.zip'    = 'the front build, made outside the repository and dropped beside Go.ps1'
-    'tools/discord/announced.json'  = 'what Publish-Discord.ps1 has posted, written on the machine that ships'
-    'tools/discord/dev-webhook.txt' = 'a webhook, a secret kept out of git'
-    'tools/discord/news-webhook.txt'= 'a webhook, a secret kept out of git'
+    'bot/announced.json'  = 'what Publish-Discord.ps1 has posted, written on the machine that ships'
+    'bot/dev-webhook.txt' = 'a webhook, a secret kept out of git'
+    'bot/news-webhook.txt'= 'a webhook, a secret kept out of git'
     'tools/asked.txt'               = 'a test''s own scratch file'
     'tools/app/app.ico'             = 'the second place the icon lookups try; the icon is tools/app.ico'
 }
@@ -75,6 +75,14 @@ foreach ($f in Get-ChildItem -LiteralPath $Tools -Filter *.ps1 -File) {
     foreach ($m in $rx.Matches($text)) {
         $rel = $m.Groups[2].Value.Replace('\', '/').Trim('/')
         $full = if ($m.Groups[1].Value -in 'RepoDir', 'Repo') { $rel } else { 'tools/' + $rel }
+        # tools/../bot/x is bot/x: a script beside tools reaches the rest of the
+        # repository that way since the folders began to move.
+        $parts = New-Object System.Collections.Generic.List[string]
+        foreach ($seg in $full.Split('/')) {
+            if ($seg -eq '..') { if ($parts.Count) { $parts.RemoveAt($parts.Count - 1) } }
+            elseif ($seg -and $seg -ne '.') { $parts.Add($seg) }
+        }
+        $full = $parts -join '/'
         if ($tracked.ContainsKey($full)) { $found++; continue }
         if ($notInGit.ContainsKey($full)) { $allowedSeen[$full] = $true; continue }
         $missing += ('{0} (named in {1})' -f $full, $f.Name)

@@ -52,7 +52,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-$app = Join-Path $Here 'discord\Build-Discord.py'
+$app = Join-Path $Here '..\bot\Build-Discord.py'
 if (-not (Test-Path -LiteralPath $app)) { throw "not found: $app" }
 
 $py = (Get-Command python -EA SilentlyContinue).Source
@@ -98,11 +98,11 @@ if ($code -ne 0) {
   exit $code
 }
 
-$hook = Join-Path $Here 'discord\news-webhook.txt'
+$hook = Join-Path $Here '..\bot\news-webhook.txt'
 Write-Host ''
 if (Test-Path -LiteralPath $hook) {
   Write-Host '  Release notes will post themselves into #news from now on.' -ForegroundColor Green
-  Write-Host '  The webhook that does it is in tools\discord\news-webhook.txt' -ForegroundColor DarkGray
+  Write-Host '  The webhook that does it is in bot\news-webhook.txt' -ForegroundColor DarkGray
 } else {
   Write-Host '  Built, but no webhook was made, so releases will not post' -ForegroundColor Yellow
   Write-Host '  themselves into #news yet. Run this again once #news exists.' -ForegroundColor Yellow

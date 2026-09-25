@@ -10,7 +10,7 @@
 // has no join password, and it stopped touching the game server "because
 // there was nothing to write there". The door key row named data\door.json
 // while the gamemode reads private\door.json. The heading said none of them
-// was in the repo while a row named a file inside tools\discord. A table like
+// was in the repo while a row named a file inside bot. A table like
 // that is read by the next person as a list of controls that exist.
 //
 // From the To Do List: "A secrets inventory lists each credential, where it
@@ -59,7 +59,7 @@ if (head) {
 }
 
 // The heading used to promise none of them was in the repo, over a row that
-// named tools\discord\news-webhook.txt. Ignored by git is not the same thing.
+// named bot\news-webhook.txt. Ignored by git is not the same thing.
 const namesRepoPath = section.indexOf('`tools' + BS) >= 0;
 yes('the heading does not say none of them is in the repo while a row names a file in it',
     !(namesRepoPath && /none of them in the repo/i.test(head ? head[0] : '')));
@@ -118,7 +118,7 @@ const gamemode = read('tools/gamemode.js');
 const site = read('tools/docs-app/server.js');
 const rotate = read('tools/Rotate-ServerPassword.ps1');
 const publish = read('tools/Publish-Update.ps1');
-const voice = read('tools/voice/voice-server.js');
+const voice = read('voice/voice-server.js');
 const installVoice = read('tools/Install-Voice.ps1');
 yes('Deploy-Gamemode.ps1 still writes offlineMode true, so a client names its own profile id',
     /NotePropertyName offlineMode\s+-NotePropertyValue \$true/.test(deployGm));
@@ -246,7 +246,7 @@ function exists(rel) { try { return fs.statSync(path.join(ROOT, rel)).isFile(); 
 const scripts = {};
 (section.match(/[A-Za-z0-9-]+\.(?:ps1|py)\b/g) || []).forEach(function (s) { scripts[s] = true; });
 const missing = Object.keys(scripts).filter(function (s) {
-  return !exists('tools/' + s) && !exists('tools/discord/' + s);
+  return !exists('tools/' + s) && !exists('bot/' + s);
 });
 missing.forEach(function (s) { console.log('      named but not in tools: ' + s); });
 yes('every script the section names is in tools, ' + Object.keys(scripts).length + ' of them',
@@ -259,7 +259,7 @@ function ticks(text) {
 const local = [];
 rows.forEach(function (r) {
   ticks(r[1]).forEach(function (t) {
-    if (t.indexOf('tools' + BS) === 0 || t === 'server-secret.txt') local.push(t);
+    if (t.indexOf('tools' + BS) === 0 || t.indexOf('bot' + BS) === 0 || t === 'server-secret.txt') local.push(t);
   });
 });
 let gitOk = true;
@@ -289,9 +289,9 @@ function addDir(rel, re) {
 }
 addDir('tools', /\.(ps1|js)$/i);
 addDir('tools/app', /\.cs$/i);
-addDir('tools/voice', /\.js$/i);
+addDir('voice', /\.js$/i);
 addDir('tools/docs-app', /^server\.js$/i);
-addDir('tools/discord', /\.py$/i);
+addDir('bot', /\.py$/i);
 function usedTogether(a, b) {
   a = a.toLowerCase(); b = (b || '').toLowerCase();
   return corpus.some(function (t) { return t.indexOf(a) >= 0 && t.indexOf(b) >= 0; });

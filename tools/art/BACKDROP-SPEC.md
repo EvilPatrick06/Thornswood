@@ -343,7 +343,7 @@ That writes a loose file straight into the Steam Data folder. It needs elevation
 DEFAULT_OUT = Path(__file__).with_name("art") / "Mainmenuwallpaper.dds"
 ```
 
-Changing where a shipped file lands is a few lines in #dev before the code.
+Changing where a shipped file lands is a few lines in #staff-general before the code.
 
 ---
 
@@ -359,6 +359,6 @@ Changing where a shipped file lands is a few lines in #dev before the code.
 
 **5. The texconv command line.** No texconv on this machine, so no flag has been checked against its own help output.
 
-**6. Which of the mesh and the script is authoritative.** They disagree by 1.282945 percent and somebody has to pick. `logo.nif` was edited by hand on 16 Sep, two hours before the texture was built: 13 bytes changed, all inside the shape's translation and rotation (offsets 0x187 to 0x1B1), and the quarantined copy at `C:\Thornswood\_quarantine\20260916-0112` has no non-uniform scale at all and drew at 1.3605005277. Somebody was pushing the plane toward 3:2 by eye and stopped 1.283 percent short. There are two ways to close it: re-fit two floats in the mesh to make the plane exactly 3:2 and keep a 3:2 source, or leave the mesh and make the script match it as specified above. That is a Patrick and Djinn decision in #dev, not one for me to settle. Everything in this document assumes the second.
+**6. Which of the mesh and the script is authoritative.** They disagree by 1.282945 percent and somebody has to pick. `logo.nif` was edited by hand on 16 Sep, two hours before the texture was built: 13 bytes changed, all inside the shape's translation and rotation (offsets 0x187 to 0x1B1), and the quarantined copy at `C:\Thornswood\_quarantine\20260916-0112` has no non-uniform scale at all and drew at 1.3605005277. Somebody was pushing the plane toward 3:2 by eye and stopped 1.283 percent short. There are two ways to close it: re-fit two floats in the mesh to make the plane exactly 3:2 and keep a 3:2 source, or leave the mesh and make the script match it as specified above. That is a Patrick and Djinn decision in #staff-general, not one for me to settle. Everything in this document assumes the second.
 
 **7. Where `logo.nif` came from.** Its author string is `npurkeypile` and it was processed with SSE NIF Optimizer v3.0.10. None of the 157 Vortex staging folders holds it, so it was dropped into the Steam Data folder by hand. Six copies exist on disk, five sharing md5 `5c3cf5882818bbb0bfe2eefec4344f2a` plus the quarantined one. Nothing restores it if it goes.

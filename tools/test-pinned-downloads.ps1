@@ -253,8 +253,8 @@ if ($fn.Count -eq 1) {
 }
 
 # ================================================================ bot ======
-$reqPath = Join-Path $ToolsPath 'discord\requirements.txt'
-Yes 'tools\discord\requirements.txt exists' (Test-Path -LiteralPath $reqPath)
+$reqPath = Join-Path $ToolsPath '..\bot\requirements.txt'
+Yes 'bot\requirements.txt exists' (Test-Path -LiteralPath $reqPath)
 $req = @()
 if (Test-Path -LiteralPath $reqPath) { $req = @(Get-Content -LiteralPath $reqPath | Where-Object { $_.Trim() }) }
 Yes ('every line of it is one exact == pin' +
@@ -287,7 +287,7 @@ $yml = Join-Path $RepoRoot '.github\workflows\build.yml'
 if (Test-Path -LiteralPath $yml) {
     $ymlText = Get-Content -LiteralPath $yml -Raw
     Yes 'the build check installs the bot libraries from the same requirements.txt' (
-        $ymlText -match 'pip install [^\r\n]*-r tools[\\/]discord[\\/]requirements\.txt' -and
+        $ymlText -match 'pip install [^\r\n]*-r bot[\\/]requirements\.txt' -and
         $ymlText -notmatch 'pip install[^\r\n]*discord\.py pillow')
 } else {
     Write-Host 'SKIP  build.yml is not beside this tools folder'

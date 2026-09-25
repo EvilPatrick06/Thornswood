@@ -48,7 +48,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $Root) { $Root = Split-Path -Parent $Here }
 
 $Paths = @(
-    'README.md', 'SECURITY.md', 'tools/app/Help.cs', 'tools/ui.xaml', 'tools/discord/content.py',
+    'README.md', 'SECURITY.md', 'tools/app/Help.cs', 'tools/ui.xaml', 'bot/content.py',
     'tools/docs-app/data/site/*.md', 'tools/docs-app/data/known.md', 'tools/docs-app/data/help.md',
     'tools/docs-app/public/home.html'
 )

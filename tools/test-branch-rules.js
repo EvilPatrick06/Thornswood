@@ -182,7 +182,7 @@ rules.forEach(function (r) {
 badOwner.forEach(function (b) { console.log('      ' + b); });
 yes('every owner is somebody in CONTRIBUTING.md\'s team table, by GitHub handle', badOwner.length === 0);
 
-const shared = /Do not edit ([\s\S]*?) without a line in #dev/.exec(claudeRaw);
+const shared = /Do not edit ([\s\S]*?) without a line in #staff-general/.exec(claudeRaw);
 const sharedNames = shared ? shared[1].replace(/\s+/g, ' ').split(/,\s*|\s+or\s+/).map(function (s) { return s.trim(); }).filter(Boolean) : [];
 yes('CONTRIBUTING.md lists the six shared files (' + sharedNames.join(', ') + ')', sharedNames.length === 6);
 const uncovered = sharedNames.filter(function (n) {

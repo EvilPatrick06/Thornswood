@@ -31,7 +31,7 @@ import re
 # ticket goes in and where logs go, as the <#KEY> mentions Build-Discord.py
 # fills in.
 _JOIN = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                     '..', 'docs-app', 'data', 'site', 'join.md')
+                     '..', 'tools', 'docs-app', 'data', 'site', 'join.md')
 _SITE = 'https://thornswood.net'
 
 # Build-Discord.py packs paragraphs into messages of up to 1900 characters
@@ -79,7 +79,7 @@ _JOIN_BODY = re.sub(r'\A# [^\n]*\n+', '', JOIN)
 # "What you need" is four paragraphs, and the one about your own Skyrim is
 # the answer to a question of its own. Picked by what it says rather than
 # where it sits, and refused if it has gone, because the welcome would
-# otherwise quietly lose it. tools\discord\test-read-channels.py runs on
+# otherwise quietly lose it. bot\test-read-channels.py runs on
 # every pull request, so an edit to join.md that does this goes red there.
 _NEED = section(JOIN, 'What you need').split('\n\n')
 _YOURS = [p for p in _NEED if 'the Skyrim you already have' in p]

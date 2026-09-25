@@ -10,7 +10,7 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'ts-ui', 'thornswood-chat.js'), 'utf8');
+const SRC = fs.readFileSync(path.join(__dirname, '..', 'tools', 'ts-ui', 'thornswood-chat.js'), 'utf8');
 
 let pass = 0, fail = 0;
 function check(what, got, want) {

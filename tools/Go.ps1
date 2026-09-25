@@ -202,11 +202,17 @@ if (Test-Path -LiteralPath $uiSrc) {
     $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
   }
+  # The two pictures of the scroll in front of the character choice.
+  foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.webp) {
+    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    $script:installed.Add((Join-Path $ui $f.Name))
+    Note $f.Name
+  }
   # The painting behind the main menu's character choice: the site's own
   # banner, the loop and its first frame, copied under the page's names so
   # the one file in the repo is the site's. Ours, flat under UI, so it ships.
   $siteArt = Join-Path $Here 'docs-app\public'
-  foreach ($pair in @(@('banner.mp4', 'thornswood-menu.mp4'), @('banner.jpg', 'thornswood-menu.jpg'))) {
+  foreach ($pair in @(@('banner.webm', 'thornswood-menu.webm'), @('banner.mp4', 'thornswood-menu.mp4'), @('banner.jpg', 'thornswood-menu.jpg'))) {
     $src = Join-Path $siteArt $pair[0]
     if (Test-Path -LiteralPath $src) {
       Copy-Item -LiteralPath $src -Destination (Join-Path $ui $pair[1]) -Force
@@ -404,7 +410,7 @@ if (-not $SkipServer) {
     the current copy. Two things were wrong with how this did that.
 
     It read voice-server.js from the tools folder. The real one moved into
-    tools\voice months ago and the copy left behind at the top went stale, so
+    voice months ago and the copy left behind at the top went stale, so
     running this pushed an old build over a good one.
 
     And the restart below had three literal vertical tab bytes in it, where a
@@ -418,7 +424,7 @@ if (-not $SkipServer) {
     loser dies quietly while the winner keeps serving whatever it was already
     running, which is the exact failure that hid days of changes.
   #>
-  $vsrc = Join-Path $Here 'voice\voice-server.js'
+  $vsrc = Join-Path $Here '..\voice\voice-server.js'
   if (Test-Path -LiteralPath $vsrc) {
     & scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {

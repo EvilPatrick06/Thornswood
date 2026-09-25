@@ -152,7 +152,7 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
 }
 
 # ---------------------------------------------------------------- files -----
-$src = Join-Path $Here 'voice'
+$src = Join-Path $Here '..\voice'
 foreach ($f in 'voice-server.js', 'public\index.html', 'public\voice.js') {
     if (-not (Test-Path -LiteralPath (Join-Path $src $f))) { Die "not found: $(Join-Path $src $f)" }
 }

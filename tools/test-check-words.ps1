@@ -107,7 +107,7 @@ try {
     Put 'tools/app/Help.cs' @('new HelpItem("x", "fine"),', 'new HelpItem("y", "a single-player game"),')
     # With a byte order mark, which the check has to read through.
     Put 'tools/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>', ('<TextBlock Text="one' + $em + 'two"/>')) $utf8bom
-    Put 'tools/discord/content.py' @('WELCOME = """', 'Nothing wrong here.', '"""')
+    Put 'bot/content.py' @('WELCOME = """', 'Nothing wrong here.', '"""')
     Put 'tools/docs-app/data/site/a.md' @('Fine.', ('Not' + $em + 'fine.'))
     Put 'tools/docs-app/data/site/b.md' @('Fine, with a hyphen - and nothing else.')
     Put 'tools/docs-app/data/known.md' @('| A | B |', '| a player save | why |')

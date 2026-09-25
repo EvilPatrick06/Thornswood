@@ -420,9 +420,9 @@ yes('the steps the page lists inside each method are in the order the code runs 
 // The six shared files, as CONTRIBUTING.md names them today.
 {
   const claude = (read(path.join(ROOT, 'CONTRIBUTING.md')) || '').replace(/\s+/g, ' ');
-  const m = claude.match(/Do not edit (.+?) without a line in #dev/);
+  const m = claude.match(/Do not edit (.+?) without a line in #staff-general/);
   const s4 = page.slice(Math.max(0, page.indexOf('## 4. The six shared files')));
-  if (!m) note('CONTRIBUTING.md no longer words its #dev rule as "Do not edit ... without a line in #dev", so section 4 was not compared with it');
+  if (!m) note('CONTRIBUTING.md no longer words its #dev rule as "Do not edit ... without a line in #staff-general", so section 4 was not compared with it');
   else {
     const named = m[1].match(/[\w-]+\.(?:cs|ps1)/g) || [];
     yes('CONTRIBUTING.md\'s #dev rule names files, ' + named.length + ' of them', named.length > 0);
