@@ -501,6 +501,7 @@ function goldDescriptors(text) {
     'seam.ore': 'ore, ORES_BY_BASE',
     'ITEMS.firewood': 'firewood, ITEMS',
     'ITEMS[grade]': 'charcoal, ITEMS',
+    'ITEMS.butter': 'butter off the churn, ITEMS',
     'plant.produce': 'a plant, HARVESTS_BY_BASE',
     'caught.produce': 'a fish, FISH_BY_BASE',
     'hung.produce': 'game, GAME_BY_BASE',

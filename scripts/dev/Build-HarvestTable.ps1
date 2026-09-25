@@ -122,12 +122,15 @@
     hanging pheasant is a FLOR somebody presses E on rather than an animal
     anybody killed.
 
-    A PROP IS NOBODY'S, two rows. MammothCheese01 and BYOHButterChurn are
-    neither a plant nor an animal, so no class verb reaches them: they are left
-    out and reported by name every run, the same way the planter sacks and the
-    coin purses are. BUTTER WAS 46 OF THE COOK'S INPUTS and now has no producer
-    at all. Whether a churn becomes a farm station is a decision for Patrick
-    and Djinn and not one to make inside a sweep of the load order.
+    A PROP IS IN NO TABLE HERE, two rows. MammothCheese01 and BYOHButterChurn
+    are neither a plant nor an animal, so no pass in this script writes them
+    anywhere: they are left out and reported by name every run, the same way
+    the planter sacks and the coin purses are. The cheese is nobody's, which is
+    what Patrick asked for, and a base in no table falls through to the engine.
+    The churn is the farmer's: Patrick, 21 September, "give milk and butter to
+    farmers", so churn() in tools\gamemode.js answers it with the farm verb as
+    of 24 September, and Build-RecipeTable.ps1 reads that verb, so BUTTER, 46 OF
+    THE COOK'S INPUTS, is a farmer's to supply.
 
     THE SOUL HUSK STAYS THE GATHERER'S, two rows, and it is the one judgement
     in the four. DLC01SoulHusk01 and 02 carry the food bit like the rest, so
@@ -547,19 +550,20 @@ $GAME_RANK_BY_EDITOR_ID = @{
 #   MammothCheese01  a bowl of mammoth cheese in a giant's camp. Nobody sowed
 #                    it and nothing was hunted for it.
 #   BYOHButterChurn  the churn in a HearthFires homestead. A churn is worked,
-#                    not picked, and what it wants is milk this build has no
-#                    record for.
+#                    not picked, so it is a station and not a crop.
 # They are excluded and reported by name every run, and they go in the json's
 # unranked list, the same way the planter sacks, the coin purses and the clam at
 # Oar's Rest do, rather than being dropped without a trace.
 #
-# SAY THIS OUT LOUD WHEN IT COSTS SOMETHING, AND HERE IT DOES. Counted over
+# THE CHURN IS THE FARMER'S, AND IT IS NOT THIS SCRIPT THAT SAYS SO. Counted over
 # game\data\recipes.json on 21 September, Butter is 46 of the Cook's inputs, the
-# single biggest of them, and after this change nothing in the world produces
-# it. That is the honest answer rather than a wrong one: a churn is not a crop
-# and handing it to a farmer here would be this script deciding a station on its
-# own, which is the thing the beehive taught it not to do. Whether the churn
-# becomes a farm station is a few lines in #staff-general for Patrick and Djinn.
+# single biggest of them, and this list left it with no producer. Patrick settled
+# where it goes the same day: "give milk and butter to farmers". It still stays
+# out of every table here, because a churn is not a crop and writing it into the
+# crops map would make every churn in Skyrim a plot somebody sows. churn() in
+# game\gamemode.js answers it instead, with the farm verb, and
+# Build-RecipeTable.ps1 reads that verb out of the gamemode the way it reads the
+# salt quarry and the chopping blocks.
 $FOOD_PROP_BY_EDITOR_ID = @('MammothCheese01', 'BYOHButterChurn')
 #
 # FOOD_STAYS_THE_GATHERERS: the food rows that stay in the plant table anyway.
@@ -1414,7 +1418,7 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
                 produce     = $q.Desc
                 produceName = $q.Full
                 produceType = $q.Type
-                why         = 'its produce is food, so it is not the gatherer''s, and it is named in FOOD_PROP_BY_EDITOR_ID at the top of this script as a prop that is neither a plant anybody grows nor an animal anybody took, so no class verb in classes.md reaches it'
+                why         = 'its produce is food, so it is not the gatherer''s, and it is named in FOOD_PROP_BY_EDITOR_ID at the top of this script as a prop that is neither a plant anybody grows nor an animal anybody took, so it is in none of the tables this script writes'
             }
             continue
         } else {
@@ -1534,7 +1538,7 @@ $propRows = 0
 foreach ($e in $FOOD_PROP_BY_EDITOR_ID) {
     foreach ($d in $unranked.Keys) { if ([string]$unranked[$d].editorId -eq [string]$e) { $propRows++ } }
 }
-Note ("{0,3} are a prop that is neither a plant nor an animal and go nowhere: {1}" -f $propRows, ($FOOD_PROP_BY_EDITOR_ID -join ', '))
+Note ("{0,3} are a prop that is neither a plant nor an animal and are in none of these tables: {1}" -f $propRows, ($FOOD_PROP_BY_EDITOR_ID -join ', '))
 Note ("{0,3} are named in FOOD_STAYS_THE_GATHERERS and stay in the plant table: {1}" -f $stayed.Count, ($stayed -join ', '))
 if ($forFarmer.Count -gt 0) {
     Note 'the rows the food rule sent to the farmer, which the crops pass below has to pick up every one of:'

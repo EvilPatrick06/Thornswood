@@ -688,8 +688,9 @@ if ($recipes) {
     }
     Say '  Firewood came off this list on 21 September: chopWood in gamemode.js gives it to a'
     Say '  woodworker at the four chopping blocks, and Build-RecipeTable reads that verb out of'
-    Say '  the shipped file the same way it reads the kiln. A churn would do the same for Butter,'
-    Say '  so the shape of that work is known.'
+    Say '  the shipped file the same way it reads the kiln. Butter went the same way on 24 September:'
+    Say '  churn() gives it to a farmer at the butter churn. If Butter is still in the list above,'
+    Say '  recipes.json was built before that and wants building again.'
 }
 
 Write-Host ''
