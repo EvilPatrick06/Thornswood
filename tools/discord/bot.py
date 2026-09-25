@@ -12,6 +12,9 @@ What it does:
            goes when its thread will not open
   Watch    asks the site every five minutes over its public name, and says so
            in #dev when it stops answering and when it comes back
+  Services reads the VPS watchdog's watch.log every minute and says in the
+           same channel when a service needs a look, could not be started,
+           or did not come back after a restart
   Reports  says each thing sent in on the site's public report page in the
            staff channel, the day it arrives
   Holds    a panel in #choose-your-hold where a Member picks their hold
@@ -34,6 +37,9 @@ Everything it needs is in env:
                    default whatever dev-channel.txt beside this file holds
   WATCH_EVERY      seconds between checks, default 300
   WATCH_MISSES     how many in a row before it says so, default 2
+  WATCH_LOG        the watchdog's log, default the one Watch-Services.ps1
+                   writes on the VPS
+  WATCH_LOG_EVERY  seconds between reads of it, default 60
   HOLD_CHANNEL     channel the hold panel lives in, default choose-your-hold
   MEMBER_ROLE      role that may pick a hold, default Member
 
@@ -42,6 +48,7 @@ draw still gets a greeting, a site that is down still gets a thread, and a
 thread that cannot be made still gets an answer to the person who asked.
 """
 import asyncio
+import datetime
 import json
 import os
 import re
@@ -206,6 +213,13 @@ WATCH_EVERY = _int_env('WATCH_EVERY', 300)
 # down. Caddy's own repeating trigger is five minutes as well, so anything that
 # clears by itself has had a go at clearing before this says a word.
 WATCH_MISSES = _int_env('WATCH_MISSES', 2)
+
+# What the watchdog Watch-Services.ps1 puts on the VPS writes down. The bot
+# runs on the same box as the same SYSTEM account, so it can read it.
+WATCH_LOG = os.environ.get('WATCH_LOG', r'C:\Thornswood-Watch\watch.log')
+# Once a minute. The watchdog itself runs every five, so this is never more
+# than a minute behind it, and the file is two thousand short lines at most.
+WATCH_LOG_EVERY = _int_env('WATCH_LOG_EVERY', 60)
 
 if not TOKEN:
     raise SystemExit('No DISCORD_TOKEN. Install-Bot.ps1 sets it.')
@@ -1817,6 +1831,252 @@ async def trouble_say(text):
             + traceback.format_exc())
 
 
+# ------------------------------------------------------ the box's watchdog --
+#
+# Watch-Services.ps1 puts a watchdog on the VPS that restarts whatever stops
+# answering, three times an hour at most, and then stops and writes that the
+# service needs a look. That sentence went to watch.log on the box and nowhere
+# else. From the To Do List: "the sentence it writes when it gives up
+# currently goes to a file on the box that may itself be the thing that is
+# gone". Nobody reads a log on the VPS until they already know something is
+# wrong, so the one line written for a person was the one line no person saw.
+#
+# This reads that file and says the three lines that need a person, in the
+# staff channel the site watcher uses, found by id through watch_say. Never a
+# public channel: watch_say has no fallback to one.
+#
+#   needs a look          restarted three times this hour and still down
+#   could not be started  Windows would not run the service's task
+#   did not come back     restarted, and still not answering afterwards
+#
+# A file and not a webhook, for the same reason as watch_trouble: both run on
+# this box, so there is no new secret to make, place or keep out of git.
+#
+# WHAT IT CANNOT CATCH is the box going down, or the bot being the thing that
+# is down. Both take this with them. That needs something off the machine.
+
+# How long with no line about a service before its next line is a new outage
+# rather than more of the same one. The watchdog writes at least one line
+# about every service that is down on every run, five minutes apart, give or
+# take the minute or so a run spends restarting whatever it checks first. It
+# writes nothing about a service that is up, so a gap of ten minutes is one run
+# that found it answering, and seven and a half sits between the two.
+#
+# ONE CLEAN RUN IS ENOUGH, and it was twenty minutes until 24 September. A
+# reviewer traced a fix made by hand that held for one run and then fell over
+# again: the watchdog wrote "needs a look" ten minutes after its last line, the
+# outage had never ended, and nobody was told for as long as it stayed down.
+# The person who fixed it believed it was fixed. A fix by hand is the one way a
+# service comes back with nothing written, so one run finding it up is all the
+# evidence there will ever be.
+WATCH_LOG_QUIET = int(7.5 * 60)
+
+# How long "needs a look" stays said while the lines keep coming. A fix that
+# falls over again inside five minutes leaves no gap at all, and without this
+# it would be silent for as long as the service stayed down. Once an hour is a
+# reminder, where every five minutes was the noise this whole thing avoids.
+WATCH_LOG_REMIND = 60 * 60
+
+# The watchdog's own words, from its Note() lines in Watch-Services.ps1, tried
+# in this order. test-watch-services.py renders those lines out of that script
+# and checks each one lands here, so changing the wording there fails a
+# harness instead of quietly silencing this.
+_WATCH_LINE = re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(\S.*?)\s*$')
+_WATCH_KINDS = [
+    ('look',    re.compile(r'^(.+?) is still down after (\d+) restarts this hour\..*needs a look')),
+    ('refused', re.compile(r'^(.+?) could not be started\.')),
+    ('stuck',   re.compile(r'^(.+?) did not come back in time')),
+    ('trying',  re.compile(r'^(.+?) is not answering\. Starting ')),
+    ('back',    re.compile(r'^(.+?) is back$')),
+]
+
+
+def _watch_log_message(kind, name, hit, line, since=None):
+    """
+    What is said for one watchdog line, with the line itself under it.
+
+    since is how many minutes ago "needs a look" was last said for this
+    service, when this is the hourly reminder of it, and None otherwise.
+    """
+    who = name[:1].upper() + name[1:]
+    if kind == 'look' and since is not None:
+        head = ('**%s still needs a look.** That was said here %d minutes ago, '
+                'and the watchdog has found it down on every run since and is '
+                'still leaving it. If somebody worked on it in that time, it '
+                'did not stay up. This is said again every hour it stays down.'
+                % (who, since))
+    elif kind == 'look':
+        head = ('**%s is down and the watchdog has stopped restarting it.** It '
+                'was restarted %s times this hour and would not stay up, so it '
+                'needs a person. The watchdog writes this to watch.log every '
+                'five minutes while it stays down, and it is said here again '
+                'every hour.'
+                % (who, hit.group(2)))
+    elif kind == 'refused':
+        head = ('**%s could not be started.** The watchdog on the VPS found it '
+                'not answering and Windows would not run its task, which '
+                'usually means the task is missing or was renamed.' % who)
+    else:
+        head = ('**%s did not come back after a restart.** The watchdog on the '
+                'VPS found it not answering, started it, and it was still not '
+                'answering when it looked again. It tries every five minutes, '
+                'three times an hour at most, and says so here if it gives up.'
+                % who)
+    return ('%s\n```\n%s\n```' % (head, line[:400]))[:1900]
+
+
+def watch_log_news(lines, state):
+    """
+    The messages to send for these new watch.log lines, in order.
+
+    state carries what has been said about each service from one call to the
+    next. Pass the same dict every time, starting from an empty one.
+
+    ONCE PER OUTAGE, per service and per kind of line. A service that will not
+    stay up gets "did not come back" on each of its three restarts an hour and
+    "needs a look" on every run after that, every five minutes. Said every
+    time, one broken service is twelve messages an hour and the channel stops
+    being read, which is the same as nobody being told. So each kind is said
+    the first time in an outage and not again until the outage ends. It ends
+    when the watchdog writes that the service is back, or when WATCH_LOG_QUIET
+    passes with no line about it at all, because the watchdog writes about a
+    service that is down on every run and writes nothing about one that is up.
+
+    AND "NEEDS A LOOK" AGAIN EVERY WATCH_LOG_REMIND while the lines keep
+    coming. A fix made by hand that falls over before the watchdog's next run
+    leaves no gap to end the outage on, so this is what stops that being
+    silence for as long as the service is down.
+
+    No file, no Discord, and no clock but the times in the log itself, so the
+    harness can drive it one line at a time.
+    """
+    last = state.setdefault('last', {})
+    # Per service, each kind already said in this outage and the log time it
+    # was said at.
+    said = state.setdefault('said', {})
+    out = []
+    for raw in lines:
+        m = _WATCH_LINE.match(raw or '')
+        if not m:
+            continue
+        try:
+            when = datetime.datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            continue
+        for kind, rx in _WATCH_KINDS:
+            hit = rx.match(m.group(2))
+            if hit:
+                break
+        else:
+            continue
+        name = hit.group(1)
+        before = last.get(name)
+        last[name] = when
+        # abs, because the only way a line is older than the one before it is
+        # the box's clock going back, and that is better said again than taken
+        # for the same outage with the reminder an hour further off.
+        if (kind == 'back' or before is None
+                or abs((when - before).total_seconds()) > WATCH_LOG_QUIET):
+            said[name] = {}
+        if kind not in ('look', 'refused', 'stuck'):
+            continue
+        done = said.setdefault(name, {})
+        since = None
+        if kind in done:
+            if kind != 'look':
+                continue
+            gone = (when - done[kind]).total_seconds()
+            if gone < WATCH_LOG_REMIND:
+                continue
+            since = int(gone // 60)
+        done[kind] = when
+        out.append(_watch_log_message(kind, name, hit, raw.strip(), since))
+    return out
+
+
+def _watch_log_lines():
+    """
+    Every whole line in watch.log, or None when it could not be read.
+
+    No file is an empty list, because that is the normal state of a quiet box:
+    the watchdog writes nothing until something goes down. Any other failure
+    is None, and the loop skips that round rather than reading an unreadable
+    file as an empty one.
+
+    A last line with no line ending is left for the next read. Add-Content may
+    be halfway through it, and half a line said now is the whole line said
+    again a minute later.
+    """
+    try:
+        with open(WATCH_LOG, 'rb') as f:
+            data = f.read()
+    except FileNotFoundError:
+        return []
+    except Exception:
+        return None
+    # utf-8-sig because the watchdog trims the file with Set-Content -Encoding
+    # UTF8, which on Windows PowerShell puts a byte order mark first.
+    parts = data.decode('utf-8-sig', errors='replace').split('\n')
+    return [p.rstrip('\r') for p in parts[:-1] if p.strip()]
+
+
+async def watch_services():
+    """
+    Read the watchdog's log every WATCH_LOG_EVERY seconds and say what needs a
+    person.
+
+    WHAT IT REMEMBERS AND WHY. The lines already in the file when this starts
+    are treated as said, the same as watch_trouble, or every restart of the
+    bot would say the last thousand again. They still go through
+    watch_log_news, so an outage that was already under way is known to be one
+    and its repeats stay quiet.
+
+    Lines are remembered by their text, time and all, and not by where they
+    sit in the file, because the watchdog cuts the file to its last thousand
+    lines when it passes two thousand and every position moves.
+
+    Nothing in here may end the loop, for the same reason as the site watcher:
+    a watcher that dies quietly looks exactly like everything being fine.
+    """
+    await client.wait_until_ready()
+    loop = asyncio.get_running_loop()
+    state = {}
+    seen = None
+    unreadable = False
+    log('services: reading %s every %ds, speaking in channel %d'
+        % (WATCH_LOG, WATCH_LOG_EVERY, WATCH_ID))
+
+    while not client.is_closed():
+        try:
+            lines = await loop.run_in_executor(None, _watch_log_lines)
+            if lines is None:
+                if not unreadable:
+                    log('services: could not read %s, trying again every %ds'
+                        % (WATCH_LOG, WATCH_LOG_EVERY))
+                unreadable = True
+            elif seen is None:
+                unreadable = False
+                seen = set(lines)
+                watch_log_news(lines, state)
+                log('services: %d line(s) already in the log, treated as said'
+                    % len(lines))
+            else:
+                unreadable = False
+                new = [l for l in lines if l not in seen]
+                seen.update(new)
+                # The file never holds more than two thousand lines, so this
+                # only has to remember what could still be in it.
+                if len(seen) > 10000:
+                    seen = set(lines)
+                for text in watch_log_news(new, state):
+                    log('services: saying ' + text.split('\n', 1)[0])
+                    await watch_say(text)
+        except Exception:
+            log('services: the check itself failed, carrying on:\n'
+                + traceback.format_exc())
+        await asyncio.sleep(WATCH_LOG_EVERY)
+
+
 def report_text(row):
     """
     One report from the public page, as the staff channel reads it.
@@ -2023,6 +2283,7 @@ async def on_ready():
         _watching = True
         asyncio.create_task(watch_site())
         asyncio.create_task(watch_trouble())
+        asyncio.create_task(watch_services())
         asyncio.create_task(watch_reports())
 
     log('up as %s' % client.user)
