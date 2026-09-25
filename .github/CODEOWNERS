@@ -18,11 +18,11 @@
 # tests\test-branch-rules.js checks the two agree.
 #
 # It is a request and nothing more. Branch protection on main, since 25
-# September: enforce_admins is off; there is no required check, since the
-# build check on GitHub was turned off and Patrick removed "Launcher builds"
-# from the rules; required approving reviews is 0; and Require review from
-# Code Owners is off. So a pull request can be merged by its own author as
-# soon as it is opened, whether or not anybody named here has read it.
+# September: enforce_admins is off; the one required check is "Launcher
+# builds", run on the VPS; required approving reviews is 0; and Require
+# review from Code Owners is off. So a pull request can be merged by its own
+# author as soon as its build is green, whether or not anybody named here
+# has read it.
 #
 # Switching the code owner review on is Patrick's decision, and it is not
 # free. With enforce_admins back on, a pull request of his that touches /.github/

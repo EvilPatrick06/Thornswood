@@ -1,9 +1,8 @@
 <#
   Install-Runner.ps1
 
-  Puts a GitHub Actions runner on the VPS, so the build check can run there
-  without paying for minutes; the check itself is off and runs only when
-  started by hand. Run it from this machine; it
+  Puts a GitHub Actions runner on the VPS, so the build check runs on every
+  pull request without paying for minutes. Run it from this machine; it
   does the remote half over ssh, the same way Install-Backup.ps1 does.
 
       .\scripts\deploy\Install-Runner.ps1            install it, or put it right
@@ -299,5 +298,5 @@ $mine = @($r.runners | Where-Object { $_.name -eq $RunnerName })
 if (-not $mine.Count) { Die "The service runs but GitHub does not list a runner called $RunnerName yet. Give it a minute and run -Status." }
 Say ('  ' + $mine[0].name + ' is ' + $mine[0].status) 'Green'
 Say ''
-Say '  The build check is off on GitHub since 25 Sep; started by hand from the Actions tab, it runs here.' 'Gray'
+Say '  The build check runs on it from the next push to a pull request.' 'Gray'
 Done

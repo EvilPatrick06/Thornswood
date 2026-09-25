@@ -5,10 +5,9 @@
 # branch would stop Ship.ps1; a green one means it is worth a person's time
 # to read. It builds only; nothing is published.
 #
-# Everything is one job on purpose. Branch protection named ONE required
-# check, "Launcher builds", until 25 September, and a second job would not
-# be covered by it, so a new job would be a check that blocks nothing if the
-# requirement comes back. Steps are named instead, and
+# Everything is one job on purpose. Branch protection names ONE required
+# check, "Launcher builds", and a second job would not be covered by it, so
+# a new job would be a check that blocks nothing. Steps are named instead, and
 # a failed step names itself in the summary just as a failed job would.
 #
 # The harnesses were all written to be run by hand and none of them had ever
@@ -24,20 +23,17 @@
 # Safe because the repository is private: nobody outside the team can open a
 # pull request that runs code on the box.
 #
-# OFF, AT PATRICK'S WORD, 25 SEPTEMBER: "turn off GitHub's build checker
-# thing too so it stops being flagged as red", then "just turn it all the
-# way off we arent paying to use it anyways". With no runner registered
-# yet, every push and pull request queued a run nothing could pick up. It
-# no longer starts on its own; it can still be started by hand from the
-# Actions tab. The runner on the VPS stays: Install-Runner.ps1 still puts it
-# there. Patrick removed "Launcher builds" from main's required checks the
-# same day. Turning the check back on is his call; it is these lines under
-# on:, "Launcher builds" required again, and enforce_admins on (#437):
-#   pull_request:
-#   push:
-#     branches: [main]
+# ON AGAIN, ON THE VPS, 25 SEPTEMBER. It was off for part of that day while
+# no runner existed. Then Patrick: "I want it set so they can commit+merge
+# as long as the checks on the VPS go through so they don't need me".
+# "Launcher builds" is main's one required check again, no review is
+# required, so anybody on the team merges their own pull request once this
+# is green.
 name: Build check
 on:
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
