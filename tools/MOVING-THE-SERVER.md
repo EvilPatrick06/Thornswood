@@ -149,6 +149,11 @@ Then, in this order:
 12. `.\tools\Set-Vps.ps1`. It asks for the new address and repoints all
     twenty three files in the repo that carry the old one, and adds a line to
     the launcher so copies already installed move themselves across.
+    The deploy scripts check the box's ssh host key (accept-new): the first
+    connection to a new address records its key, and a box rebuilt on the
+    same address is refused until the old key is taken out with
+    `ssh-keygen -R <address>` on each machine that deploys. That refusal is
+    the check working, so confirm the rebuild was yours before removing it.
 13. `.\tools\Ship.ps1 "Server moved"` so a fresh install has the new address
     baked in.
 14. `.\tools\Set-Server.ps1` with the new address. This is the one that moves

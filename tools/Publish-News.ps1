@@ -68,7 +68,7 @@ function PropList($obj, $name) {
   if ($null -eq $p) { return @() }
   return @($p.Value)
 }
-$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
+$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 
