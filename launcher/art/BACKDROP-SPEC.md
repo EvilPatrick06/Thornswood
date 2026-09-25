@@ -1,0 +1,364 @@
+# Thornswood main menu backdrop: exact file specification
+
+The reading you sent is right about the direction and understates it. The horizontal upscale is 2.6666667. The vertical upscale is 2.9316406. And the target the build aims at is itself wrong: the script assumes the menu plane is 3:2, the mesh says it is 1.4807558229, so even a perfect 3:2 source is 1.2829 percent off before anything is resampled.
+
+Two numbers below come from one agent's parse of logo.nif and one independent re-derivation of it, and one premise under section B was never verified by anybody. Both are called out where they matter.
+
+---
+
+## A. THE SOURCE PICTURE
+
+### What to ask for
+
+```
+Width               4466 pixels
+Height              3016 pixels
+Aspect              77:52 = 1.4807692308
+Format              PNG
+Bit depth           8 bits per channel
+Channels            3 (RGB), PNG colour type 2
+Alpha               not allowed
+Colour space        sRGB
+Interlace           0 (non-interlaced)
+Source of pixels    rendered or painted at this size, never an upscale of a smaller file
+```
+
+Absolute floor, below which the build enlarges:
+
+```
+4450 x 3005
+```
+
+### Why 3005 rows and not 3004
+
+The mesh samples V from 0.0005602836609 to 0.7333984375. That maximum is exactly 751/1024, which on a 4096 texture is texel row 3004.000000. A bilinear fetch at 3004.0 blends rows 3003 and 3004, so row 3004 must carry picture, and counting from row 0 that is 3005 rows.
+
+The mesh agent first wrote "4449 by 3004" and its checker marked that WRONG and self-contradictory: `round(0.7333984375 * 4096)` is 3004, which fills rows 0 through 3003 and leaves the last sampled row empty. The corrected figures are the checker's and are used throughout below.
+
+### Why 4450 columns and not 4449
+
+The picture is centre-cropped to the plane's drawn aspect before it is squeezed into the 4096 wide texture window. At 3005 rows that crop is
+
+```
+3005 x 1.4807558229 = 4449.671248 columns
+```
+
+so 4450. At 4449 the crop is a third of a column short and the resample enlarges.
+
+### Why 1.4807558229 and not 1.5
+
+Measured from `C:\Thornswood\Game\Data\meshes\interface\logo\logo.nif`, the only shape in the file, whose texture slot 0 is `textures\interface\objects\MAINMENUWALLPAPER.dds`:
+
+```
+model sheet            136.570236206 x 100.382347107   ratio 1.3605005277
+width scale in matrix  0.9738960266113
+height scale in matrix 0.8948038816452
+as drawn               151.093916699 x 102.038374163   ratio 1.4807558229
+```
+
+The plane is 1.282945 percent narrower than the 3:2 the script and the docstring assume. The nearest clean integer ratio is 77:52 at 0.000905 percent off, which is why the deliverable is 4466 x 3016 rather than the bare floor.
+
+This rests on the NIF Matrix33 convention. The first agent's proof of that convention was circular and its checker marked it WRONG, then proved the same conclusion properly against `meshes\landscape\trees\treepineforestlog01.nif`, where one block has identity rotation and gives an unambiguous world box. So the value stands, but on the second proof, not the first.
+
+### Aspect tolerance
+
+The build centre-crops to the exact aspect. A source wider than 1.4807558229 loses columns off both sides, a taller one loses rows off the top and bottom. At 4466 x 3016 the loss is zero. If you must deliver exact 3:2 instead, the floor rises to 4508 x 3005 and the build discards 58 columns.
+
+### What is in the repo today
+
+```
+launcher\art\thornswood-art-1536.png
+  1536 x 1024          (IHDR bytes 00 00 06 00 / 00 00 04 00, read directly)
+  bit depth 8, colour type 2, interlace 0
+  3,525,902 bytes
+  aspect exactly 1.5
+  chunks: IHDR 13, caBX 23617, IDAT 3502216, IEND 0
+  no gAMA, no iCCP, no sRGB chunk
+```
+
+The `caBX` chunk is C2PA content credentials. The build discards it.
+
+What the build does to it today:
+
+```
+horizontal   4096 / 1536 = 8/3      = 2.6666667
+vertical     3002 / 1024 = 1501/512 = 2.9316406
+area                                = 7.8177083
+```
+
+Against what it should be:
+
+```
+2.8971354 times too narrow
+2.9345703 times too short
+8.5018476 times too few pixels
+```
+
+Two earlier recommendations are superseded and should not be sent to anyone: 4608 x 3072 and 6144 x 4096. Both are exact 3:2 and both inherit the docstring's 3:2 assumption that the mesh refutes.
+
+---
+
+## B. THE SAFE ZONE
+
+**Everything in this section rests on one unverified premise:** the plane is drawn at 105 percent of screen width, whatever the resolution. That figure appears in exactly one place in the whole repo, the `Build-Backdrop.py` docstring at line 9. There is no main menu NIF placement to check it against, and the menu itself is `interface\startmenu.swf`. Nobody across four agents and four checkers could verify it. See section E.
+
+Taking it as given, with the measured plane aspect P = 1.4807558229 and screen aspect A:
+
+```
+visible width fraction   = 20/21 = 95.2381 percent, at every aspect
+visible height fraction  = P / (1.05 A)
+```
+
+| screen | A | height visible |
+|---|---|---|
+| 4:3 | 1.333333 | 105.7683 pct (letterboxes) |
+| 5:4 | 1.250000 | 112.8195 pct (letterboxes) |
+| 16:10, 1920x1200 | 1.600000 | 88.1402 pct |
+| 3:2 | 1.500000 | 94.0162 pct |
+| 16:9 | 1.777778 | 79.3262 pct |
+| 2560x1080 | 2.370370 | 59.4947 pct |
+| 3440x1440 | 2.388889 | 59.0335 pct |
+| 3840x1600 | 2.400000 | 58.7602 pct |
+| 32:9 5120x1440 | 3.555556 | 39.6631 pct |
+
+The docstring's 89 / 80 / 60 were computed from the 3:2 assumption. Corrected they are 88.14 / 79.33 / 58.76, and the 21:9 figure is the worst case of the family, not 2560x1080's 59.49.
+
+### Safe rectangle, 16:10 through 21:9, on a 4466 x 3016 source
+
+Binding case is 3840x1600 at A = 2.4.
+
+```
+left    107
+top     622
+right   4359
+bottom  2394
+size    4252 x 1772 pixels
+        95.2079 pct of the width, 58.7533 pct of the height
+```
+
+### Tighter rectangle that also survives 32:9
+
+```
+left    107
+top     910
+right   4359
+bottom  2106
+size    4252 x 1196 pixels
+        95.2079 pct of the width, 39.6552 pct of the height
+```
+
+Cost of covering 32:9: 576 rows, 288 off the top and 288 off the bottom.
+
+All four edges are rounded inward, so the rectangles are never larger than the true visible area.
+
+### What must sit inside it
+
+The emblem, the title wordmark, any readable text, any face or focal object, and any element whose loss changes the composition. Sky, terrain, atmosphere and vignette are expected to run to the edges and be cut.
+
+The docstring's "middle 55 percent of the height" still holds through 21:9, with 1.8801 points of margin per edge, which is 56.70 pixels on a 3016 tall source. It does not hold at 32:9, where a 55 percent band overhangs by 7.6684 points per edge, 231.28 pixels. If 32:9 counts, the number is 39.66 percent, not 55.
+
+The docstring's "middle 80 percent of the width" is needlessly tight. The true figure is 95.2381 percent at every aspect, so an 80 percent band throws away 340.30 pixels of visible picture on each side of a 4466 wide source.
+
+### Letterboxing at 4:3 and 5:4
+
+The plane is shorter than the screen at these aspects, so bars appear. Fractions of the **screen** height left bare:
+
+```
+4:3   5.4537 pct total, 2.7268 pct per edge
+5:4  11.3628 pct total, 5.6814 pct per edge
+```
+
+The geometry agent reported 7.14 and 14.29 percent here. Its checker marked that WRONG: those are fractions of the plane, not of the screen, and the bare screen fraction is 1 - 1/f. The checker's values are the ones above.
+
+---
+
+## C. THE OUTPUT TEXTURE
+
+```
+Dimensions       4096 x 4096
+Picture rows     0 through 3004 (3005 rows)
+Rows 3005..4095  last picture row repeated, not black (see section D)
+Format           BC7_UNORM   (DXGI_FORMAT 98 = 0x62)
+Mip levels       13
+Alpha            255 everywhere
+File size        22,369,796 bytes
+```
+
+Alpha is not decorative. `NiAlphaProperty` on this shape has flags 0x12EC: blending off, alpha testing **on**, test greater-than, threshold 188. Any texel written with alpha at or below 188 is discarded by the engine.
+
+BC7_UNORM, not BC7_UNORM_SRGB. This install carries 353 of the former and 2 of the latter, and both of those two are 512 x 512 decal glow maps.
+
+Size is not an estimate. Every one of the 39 loose 4096 x 4096 BC7 files on this machine is exactly 22,369,796 bytes, and I read one of them (`textures\actors\character\female\femalebody_1.dds`) field by field as a working template.
+
+### Why BC7 rather than DXT1
+
+BC1 endpoints are RGB565, so red and blue move in steps of 8.2258 out of 255. Decoding the shipped file along y = 60, the sky's blue channel spans 41 units over 1024 texels, 0.0400390625 units per texel, and takes only 17 of the 42 available 8 bit values. The longest flat band measured is 204 texels, against 205.44 predicted from the endpoint spacing. BC7 mode 6 carries 7 bit endpoints plus a P-bit with 16 step interpolation, which puts the same gradient's band at 25 texels, 8.2 times narrower. (The original report said "14 value ladder" and "2,180 of 8,960 blocks"; the checker marked both WRONG. 17 distinct values and 2,475 blocks are the reproduced figures. The 204 and 205.44 both reproduce.)
+
+### Exact header field values
+
+Today's header, read from `C:\Thornswood\Game\Data\textures\interface\objects\Mainmenuwallpaper.dds`:
+
+| offset | field | today | required |
+|---|---|---|---|
+| 4 | dwSize | 0x0000007C | unchanged |
+| 8 | dwFlags | 0x000A1007 | unchanged |
+| 12 | dwHeight | 0x00001000 | unchanged |
+| 16 | dwWidth | 0x00001000 | unchanged |
+| 20 | dwPitchOrLinearSize | 0x00800000 | **0x01000000** |
+| 24 | dwDepth | 0x00000000 | 0x00000001 (optional) |
+| 28 | dwMipMapCount | 0x00000001 | **0x0000000D** |
+| 80 | ddspf.dwFlags | 0x00000004 | unchanged |
+| 84 | ddspf.dwFourCC | 0x31545844 'DXT1' | **0x30315844 'DX10'** |
+| 108 | dwCaps | 0x00001000 | **0x00401008** |
+
+Then a 20 byte DXT10 header at offset 128, which does not exist in the file today:
+
+```
+128  dxgiFormat         0x00000062   (98, BC7_UNORM)
+132  resourceDimension  0x00000003   (TEXTURE2D)
+136  miscFlag           0x00000000
+140  arraySize          0x00000001
+144  miscFlags2         0x00000000
+```
+
+Payload starts at 148 instead of 128.
+
+`dwPitchOrLinearSize` carries the top level only, which for BC7 at 4096 x 4096 is 1024 x 1024 blocks x 16 bytes = 16,777,216 = 0x01000000. `dwCaps` 0x00401008 is DDSCAPS_TEXTURE 0x1000 plus DDSCAPS_COMPLEX 0x8 plus DDSCAPS_MIPMAP 0x400000. `dwFlags` needs no change because 0x000A1007 already carries DDSD_MIPMAPCOUNT and DDSD_LINEARSIZE.
+
+One correction to an earlier report: it called today's header "internally inconsistent" for setting DDSD_MIPMAPCOUNT with a mip count of 1. Its checker marked that WRONG after fetching the Microsoft page: DDSCAPS_MIPMAP is optional and DDSCAPS_COMPLEX applies only to files with more than one surface, so today's header is unconventional but correct. The three fields above change because the file gains 12 more levels, not because it is malformed today.
+
+### If BC7 is ruled out
+
+Staying on DXT1 with a full chain:
+
+```
+Format      DXT1
+Mip levels  13
+File size   11,184,952 bytes
+Changes     dwMipMapCount 0x00000001 -> 0x0000000D
+            dwCaps        0x00001000 -> 0x00401008
+            nothing else
+```
+
+Cost against today's 8,388,736 bytes: +2,796,216 for DXT1, +13,981,060 for BC7.
+
+### Mip levels are worth the bytes
+
+The texture is minified on every common screen. Texels per screen pixel at 105 percent plane width:
+
+```
+1920   2.0317
+2560   1.5238
+3440   1.1340
+3840   1.0159
+5120   0.7619
+```
+
+At 1920 the hardware wants mip 1 and there is no mip 1 to sample.
+
+### Known ceiling
+
+4096 texels are one-to-one up to a 3900 pixel wide screen. At 5120 the texture itself is magnified 1.3125 times no matter what the artist delivers. Closing that means TEX at 8192, which is 33,554,560 bytes in DXT1 and a separate decision.
+
+---
+
+## D. THE SCRIPT CHANGES
+
+`scripts\dev\Build-Backdrop.py`.
+
+### 1. Constants, lines 37 to 39
+
+```python
+TEX = 4096
+VMAX = 751 / 1024        # 0.7333984375, measured V max in logo.nif
+ROWS = 3005              # rows 0..3004; the mesh samples to texel row 3004.0
+ASPECT = 1.4807558229    # the plane as drawn, not the 3:2 the docstring claims
+```
+
+`PLANE = (4096, 2731)` goes away. `rows = round(VMAX * TEX)` at line 82 goes away; it returns 3004 even with the corrected VMAX, which is one row short. If you prefer to keep it derived, the threshold is `VMAX >= 3004.5 / 4096 = 0.7335205078125`.
+
+### 2. The avoidable intermediate, lines 45 to 53 and 83
+
+Today `fill(src, PLANE)` scales to cover 4096 x 2731 and then line 83 stretches those 2731 rows to 3002. 271 rows of vertical detail are thrown away and re-invented by Lanczos on every build, at every source size. The 2731 row intermediate is a hard bottleneck that no art can get past.
+
+Replace `fill` with a crop that does not resample, and do the one resize afterwards:
+
+```python
+def fit(src, aspect):
+    """Crop the middle of the picture to an exact aspect ratio. No resampling."""
+    sw, sh = src.size
+    w = min(sw, round(sh * aspect))
+    h = min(sh, round(sw / aspect))
+    x0 = (sw - w) // 2
+    y0 = (sh - h) // 2
+    return src.crop((x0, y0, x0 + w, y0 + h))
+```
+
+and line 83 becomes
+
+```python
+art = fit(src, ASPECT).resize((TEX, ROWS), Image.LANCZOS)
+```
+
+That is one resample instead of two, and with a 4466 x 3016 source both axes are reductions (0.9172 horizontal, 0.9964 vertical).
+
+### 3. The padding, lines 84 and 85
+
+Today rows 3005 to 4095 are filled with black. With mips that black is averaged into the bottom of the picture at every level, and even at mip 0 the last block row mixes picture with black: in the shipped file the block row covering texel rows 3000 to 3003 has its top endpoint luminance dragged to 190, against 225 to 238 for the block rows above it.
+
+```python
+tex = Image.new("RGB", (TEX, TEX), (0, 0, 0))
+tex.paste(art, (0, 0))
+tex.paste(art.crop((0, ROWS - 1, TEX, ROWS)).resize((TEX, TEX - ROWS)), (0, ROWS))
+```
+
+The mesh never samples below V 0.7334 at mip 0, so this costs nothing and removes the bleed.
+
+### 4. The format and the mip chain, lines 56 to 73
+
+Pillow writes neither BC7 nor a mip chain. The script must stop encoding and hand off:
+
+- delete `write_dxt1`, including the payload length check at lines 63 to 66, which compares against the top level size alone and would reject any multi-level payload;
+- write the composited 4096 x 4096 image as PNG next to the output, named `Mainmenuwallpaper.png` because texconv names its output after its input;
+- run texconv.
+
+```
+texconv.exe -nologo -y -f BC7_UNORM -bc x -m 13 -if CUBIC -o <outdir> Mainmenuwallpaper.png
+```
+
+**This invocation is unverified.** `texconv.exe` is not on this machine (`where texconv` returns nothing), and Pillow is not installed under any of the three Python installs here, so `Build-Backdrop.py` cannot run on this machine as written today either. The expected output size, 22,369,796 bytes, is measured against the 39 BC7 files already on disk.
+
+### 5. The default output path, lines 41 and 42
+
+Today:
+
+```python
+DEFAULT_OUT = Path(r"C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition"
+                   r"\Data\textures\interface\objects\Mainmenuwallpaper.dds")
+```
+
+That writes a loose file straight into the Steam Data folder. It needs elevation, it goes around Vortex, and it leaves no copy anywhere the repo tracks. That is exactly how `logo.nif` ended up here: four hard linked copies on this machine, no Vortex staging folder holding it, and nothing in this repo recording where it came from, so if it is lost nothing puts it back.
+
+```python
+DEFAULT_OUT = Path(__file__).with_name("art") / "Mainmenuwallpaper.dds"
+```
+
+Changing where a shipped file lands is a few lines in #staff-general before the code.
+
+---
+
+## E. WHAT IS STILL UNKNOWN
+
+**1. The 105 percent of screen width figure.** Unverified by four agents and four checkers. It appears once in the repo, at `Build-Backdrop.py` line 9, recorded as measured on 2026-09-16 with a calibration grid. `logo.nif` holds five blocks and no camera, so nothing in the mesh places it on screen, and the menu is `interface\startmenu.swf`. Every percentage and every rectangle in section B scales with it. What would settle it: one dev channel build carrying a backdrop with a ruler burned into it, opened at a known resolution and counted. Nothing short of a run settles it.
+
+**2. Whether the plane's world aspect is its screen aspect.** 1.4807558229 is measured from the mesh transform. Turning that into a screen shape assumes square pixels and a camera that is not anamorphic, looking at a plane that faces it. Nothing here tests that.
+
+**3. Whether the engine honours a mip chain on this slot, and whether it applies a LOD bias.** Not verified. If it does not, 2,796,216 bytes of DXT1 or 5,592,432 bytes of BC7 sit idle.
+
+**4. Whether BC7 loads for an interface texture in this install.** Measured: 353 BC7 files work here, including Cathedral Weathers' 13 sunset gradients at 4096 x 1024 with full chains and an 8192 x 4096 galaxy, which is the same job as this backdrop. Also measured: there is zero BC7 anywhere under `interface`, the only loose texture in that folder is this one, and vanilla `Skyrim - Interface.bsa` is 145 DXT3 and 2 DXT1 with no DX10 headers at all. One dev Ship and one look at the menu settles it.
+
+**5. The texconv command line.** No texconv on this machine, so no flag has been checked against its own help output.
+
+**6. Which of the mesh and the script is authoritative.** They disagree by 1.282945 percent and somebody has to pick. `logo.nif` was edited by hand on 16 Sep, two hours before the texture was built: 13 bytes changed, all inside the shape's translation and rotation (offsets 0x187 to 0x1B1), and the quarantined copy at `C:\Thornswood\_quarantine\20260916-0112` has no non-uniform scale at all and drew at 1.3605005277. Somebody was pushing the plane toward 3:2 by eye and stopped 1.283 percent short. There are two ways to close it: re-fit two floats in the mesh to make the plane exactly 3:2 and keep a 3:2 source, or leave the mesh and make the script match it as specified above. That is a Patrick and Djinn decision in #staff-general, not one for me to settle. Everything in this document assumes the second.
+
+**7. Where `logo.nif` came from.** Its author string is `npurkeypile` and it was processed with SSE NIF Optimizer v3.0.10. None of the 157 Vortex staging folders holds it, so it was dropped into the Steam Data folder by hand. Six copies exist on disk, five sharing md5 `5c3cf5882818bbb0bfe2eefec4344f2a` plus the quarantined one. Nothing restores it if it goes.

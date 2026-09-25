@@ -1,0 +1,416 @@
+<#
+  Build-Launcher.ps1
+  Compiles the launcher into a real Thornswood.exe.
+
+  Uses csc.exe, which is part of the .NET Framework that ships inside Windows.
+  Nothing to install. Your friends never compile anything - they get the
+  finished exe in the bundle.
+
+  It builds into the DEV install by default, not the one you play on. Running
+  this by hand used to overwrite C:\Thornswood\Launcher, so a build nobody had
+  tried yet became the launcher in front of you, and on 17 Sep one did exactly
+  that and wrote a broken setting into the game folder on the next Play. A
+  build you ran to see whether it compiles should never be able to do that.
+
+  Ship.ps1 passes -Root itself, so a real release still builds where it should.
+  Pass -Root 'C:\Thornswood' if you genuinely mean the one you play on.
+
+  IT BUILDS AND DOES NOTHING ELSE. It writes Thornswood.exe into -OutDir, which
+  is <Root>\Launcher unless told otherwise, and the setup stub beside this
+  script. It closes no game and no launcher, and it does not touch the Desktop,
+  the icon cache or Explorer. Those are Install-Launcher.ps1, which Ship.ps1
+  runs after a build that worked. Until 24 September this script did both, so
+  every compile check and every hand build closed whatever Skyrim was running
+  on the machine, matched by name whichever folder it ran from, before csc had
+  even started. That was To Do List entry 243: "A build produces files in an
+  output folder and does not kill processes or write to the Desktop."
+#>
+[CmdletBinding()]
+param(
+    [string]$Src,
+    [string]$Root = 'C:\Thornswood-DevBuild',
+    # Where Thornswood.exe goes. Ship builds into a folder of its own and lets
+    # Install-Launcher put the exe in place, so csc never meets a launcher that
+    # is still running from the install.
+    [string]$OutDir,
+    [switch]$NoPause
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+# $MyInvocation is not usable from inside a param block, so the script folder
+# is worked out here instead.
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+if (-not $Src)  { $Src  = Join-Path $Here '..\..\launcher\app' }
+if (-not $OutDir) { $OutDir = Join-Path $Root 'Launcher' }
+
+function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
+function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
+function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+
+Head 'Thornswood - launcher build'
+Say ("  building into $OutDir") 'DarkGray'
+if ($Root.TrimEnd('\\') -ieq 'C:\Thornswood') {
+    Say '  this is the install you play on, not the dev one' 'Yellow'
+}
+
+# ------------------------------------------------------------ compiler
+$csc = @(
+    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+) | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $csc) { Die 'csc.exe was not found. That means the .NET Framework 4 is missing, which is unusual on Windows 10 or 11.' }
+Say "  $csc" 'DarkGray'
+
+# ------------------------------------------------------------ references
+$refDirs = @(
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
+    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
+    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
+    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
+    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
+) | Where-Object { Test-Path $_ }
+
+function Find-Ref([string]$name) {
+    foreach ($d in $refDirs) {
+        $p = Join-Path $d $name
+        if (Test-Path $p) { return $p }
+    }
+    # WPF assemblies are split across the GAC by architecture. PresentationCore
+    # and friends are not in GAC_MSIL.
+    $stem = [IO.Path]::GetFileNameWithoutExtension($name)
+    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32', 'GAC') {
+        $gac = Join-Path "$env:WINDIR\Microsoft.NET\assembly\$gacRoot" $stem
+        if (Test-Path $gac) {
+            $hit = Get-ChildItem $gac -Filter $name -Recurse -File -EA SilentlyContinue |
+                   Sort-Object FullName -Descending | Select-Object -First 1
+            if ($hit) { return $hit.FullName }
+        }
+    }
+    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32') {
+        $hit = Get-ChildItem (Join-Path "$env:WINDIR\Microsoft.NET\assembly" $gacRoot) -Filter $name -Recurse -File -EA SilentlyContinue |
+               Sort-Object FullName -Descending | Select-Object -First 1
+        if ($hit) { return $hit.FullName }
+    }
+    $null
+}
+
+$needed = @(
+    'System.dll', 'System.Core.dll', 'System.Drawing.dll',
+    'System.Runtime.Serialization.dll',
+    # Config reads and writes its JSON through DataContractJsonSerializer,
+    # whose ReadObject and WriteObject also come in XmlReader and XmlWriter
+    # shapes. csc has to see System.Xml to pick the Stream one, and with
+    # /noconfig nothing adds it for us.
+    'System.Xml.dll',
+    # DPAPI, for the server password and the Discord ticket on disk.
+    'System.Security.dll',
+    'System.IO.Compression.dll', 'System.IO.Compression.FileSystem.dll',
+    'PresentationFramework.dll', 'PresentationCore.dll', 'WindowsBase.dll', 'System.Xaml.dll',
+    'System.Windows.Forms.dll'
+)
+$refs = @()
+$missing = @()
+foreach ($n in $needed) {
+    $p = Find-Ref $n
+    if ($p) { $refs += $p } else { $missing += $n }
+}
+if ($missing.Count) { Die ("Could not find these assemblies: " + ($missing -join ', ')) }
+
+# ------------------------------------------------- WebView2, for voice
+#
+# Not a framework assembly, so the name search above cannot find it. These
+# three files are Microsoft's redistributable WebView2 SDK and they are what
+# gives this launcher a browser, which is what gives it a microphone and
+# WebRTC. The game's own in-game browser has neither a permission prompt nor
+# an autoplay policy anyone can satisfy, which is why voice never carried
+# audio from in there.
+#
+# They are referenced for the compile AND embedded into the exe further down,
+# because the update system publishes exactly one asset and SelfUpdate
+# replaces exactly one file. Sidecar DLLs would need the publisher, the
+# version document and the updater changed together, and would leave every
+# launcher broken in between.
+$wv2Dir = Join-Path $Here '..\..\launcher\lib\webview2'
+$wv2Managed = @('Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.Wpf.dll')
+$wv2Loader  = 'WebView2Loader.dll'
+$wv2Missing = @()
+foreach ($n in ($wv2Managed + $wv2Loader)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $wv2Dir $n))) { $wv2Missing += $n }
+}
+if ($wv2Missing.Count) {
+    Die ("WebView2 files are missing from launcher\lib\webview2: " + ($wv2Missing -join ', '))
+}
+foreach ($n in $wv2Managed) { $refs += (Join-Path $wv2Dir $n) }
+
+Say "  $($refs.Count) references resolved" 'Green'
+foreach ($r in $refs) { Say "    $r" 'DarkGray' }
+
+# ------------------------------------------------------------ sources
+$cs = @(Get-ChildItem (Join-Path $Src '*.cs') -File)
+if (-not $cs.Count) { Die "No .cs files under $Src" }
+$xaml = @((Join-Path $Here '..\..\launcher\ui.xaml'), (Join-Path $Src 'ui.xaml')) | Where-Object { Test-Path $_ } | Select-Object -First 1
+$icon = @((Join-Path $Here '..\..\launcher\app.ico'), (Join-Path $Src 'app.ico')) | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $xaml) { Die "ui.xaml was not found next to this script or in $Src" }
+if (-not $icon) { Die "app.ico was not found next to this script or in $Src" }
+
+# The emblem is compiled in rather than shipped beside the exe, so the update
+# that replaces the launcher brings its own artwork and there is no second file
+# to go missing. Both are optional: without them the launcher falls back to the
+# game's own icon and simply does not draw an emblem.
+$logo    = Join-Path $Here '..\..\launcher\logo.png'
+$logoSml = Join-Path $Here '..\..\launcher\logo-192.png'
+# Optional to the launcher, not to the build: every one of these is tracked in
+# the repository, so a missing one is a path that went wrong in a move, and a
+# warning here would ship a launcher without it (issue #440, phase 0).
+if (-not (Test-Path $logo))    { Die "logo.png is not at $logo. It is in the repository, so the path is wrong; the launcher would ship without its emblem." }
+if (-not (Test-Path $logoSml)) { $logoSml = $logo }
+# The landscape behind the title on the Play page. Optional the same way:
+# without it the band keeps its pattern.
+$headerArt = Join-Path $Here '..\..\launcher\launcher-header.jpg'
+if (-not (Test-Path $headerArt)) { Die "launcher-header.jpg is not at $headerArt. It is in the repository, so the path is wrong." }
+# The same strip moving, over the picture. Optional too: without it the band
+# keeps the still picture.
+$headerVideo = Join-Path $Here '..\..\launcher\launcher-header.mp4'
+if (-not (Test-Path $headerVideo)) { Die "launcher-header.mp4 is not at $headerVideo. It is in the repository, so the path is wrong." }
+Say "  $($cs.Count) source files" 'Green'
+
+$null = New-Item -ItemType Directory -Force -Path $outDir
+# Thornswood.exe since the move off Skyrim Together. An install made before the
+# rename still has the old name, because the launcher replaces itself in place
+# when it updates rather than being reinstalled, so the old one is cleared out
+# here to stop two launchers sitting in the same folder.
+$exe = Join-Path $outDir 'Thornswood.exe'
+$oldExe = Join-Path $outDir 'SkyrimTogether.exe'
+
+# Nothing is closed here any more; Install-Launcher.ps1 does that, after a
+# build that worked. So a launcher still running from this folder holds its own
+# exe and csc cannot replace it. That is said plainly here, before any work,
+# rather than left to csc's CS0016 at the end of a compile.
+if (Test-Path -LiteralPath $exe) {
+    try { $held = [IO.File]::Open($exe, 'Open', 'ReadWrite', 'None'); $held.Close() }
+    catch { Die ("$exe is in use, most likely by the launcher running from that folder. A build closes nothing. " +
+                 "Close it, or build somewhere else with -OutDir. Ship builds into a folder of its own and closes it for you.") }
+}
+
+# ------------------------------------------------------- what Windows shows
+# csc gives an exe no version resource at all, so Windows has nothing to read
+# off it: Explorer's Description column, the hover label, Task Manager and the
+# properties dialog all fall back to the file name, and the file name is
+# not what this is called any more. This writes the one source file that fills
+# that in. It is generated rather than kept, so the version in it cannot drift
+# from the one the updater reports.
+$ver = '1.0.0'
+$updaterCs = Join-Path $Src 'Updater.cs'
+if (Test-Path $updaterCs) {
+    $m = [regex]::Match((Get-Content $updaterCs -Raw), 'Version\s*=\s*"([0-9.]+)"')
+    if ($m.Success) { $ver = $m.Groups[1].Value }
+}
+$verFour = $ver
+while (($verFour -split '\.').Count -lt 4) { $verFour = "$verFour.0" }
+
+function New-Info([string]$path, [string]$title, [string]$desc, [string]$v4, [string]$v) {
+    $body = @"
+using System.Reflection;
+using System.Runtime.InteropServices;
+
+// Written by Build-Launcher.ps1 on every build. Editing it does nothing.
+[assembly: AssemblyTitle("$title")]
+[assembly: AssemblyDescription("$desc")]
+[assembly: AssemblyProduct("Thornswood")]
+[assembly: AssemblyCompany("Thornswood")]
+[assembly: AssemblyCopyright("Thornswood")]
+[assembly: AssemblyVersion("$v4")]
+[assembly: AssemblyFileVersion("$v4")]
+[assembly: AssemblyInformationalVersion("$v")]
+[assembly: ComVisible(false)]
+"@
+    Set-Content -Path $path -Value $body -Encoding UTF8
+}
+
+# Only if nothing in the sources already declares these, because a second copy
+# of an assembly attribute is a compile error rather than a warning.
+$hasInfo = $false
+foreach ($f in $cs) {
+    if ((Get-Content $f.FullName -Raw) -match '(?m)^\s*\[assembly:') { $hasInfo = $true; break }
+}
+$infoApp = $null
+if (-not $hasInfo) {
+    $infoApp = Join-Path $env:TEMP 'ThornswoodInfo.cs'
+    New-Info $infoApp 'Thornswood' 'Thornswood launcher' $verFour $ver
+    Say "  file details say Thornswood $ver" 'DarkGray'
+} else {
+    Say '  a source file already sets the assembly details, leaving them alone' 'DarkGray'
+}
+
+# ------------------------------------------------------------ compile
+Head 'Compiling'
+# /noconfig: csc otherwise reads its own csc.rsp and adds System, System.Core,
+# System.Drawing and a dozen more by name from the framework folder. On a
+# machine with the .NET reference assemblies installed (the GitHub runner, any
+# machine with Visual Studio) the list above found those same assemblies under
+# Reference Assemblies, and csc stopped with CS1703, one identity imported
+# twice. Everything the launcher needs is in $refs by hand, so csc.rsp has
+# nothing to add.
+$cscArgs = @(
+    '/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
+    "/out:$exe",
+    "/win32icon:$((Resolve-Path $icon).Path)",
+    "/resource:$((Resolve-Path $xaml).Path),ui.xaml"
+)
+if (Test-Path $logo) { $cscArgs += "/resource:$((Resolve-Path $logo).Path),logo.png" }
+if (Test-Path $headerArt) { $cscArgs += "/resource:$((Resolve-Path $headerArt).Path),launcher-header.jpg" }
+if (Test-Path $headerVideo) { $cscArgs += "/resource:$((Resolve-Path $headerVideo).Path),launcher-header.mp4" }
+# The artwork goes in as a resource as well as a win32 icon, because the
+# launcher writes it back out beside itself under a name derived from its own
+# contents. That is what stops Windows showing a remembered picture of the old
+# one, and it has to travel with the update rather than sit loose in a folder.
+$cscArgs += "/resource:$((Resolve-Path $icon).Path),app.ico"
+
+# WebView2 travels inside the exe. Voice.cs hands the two managed ones back to
+# the CLR from an AssemblyResolve handler, and writes the native loader out
+# beside the exe on startup, because a native DLL cannot be loaded from memory.
+foreach ($n in ($wv2Managed + $wv2Loader)) {
+    $cscArgs += "/resource:$((Resolve-Path (Join-Path $wv2Dir $n)).Path),$n"
+}
+
+# The voice page rides along too, for the same reason: one published asset.
+$voicePage = Join-Path $Here '..\..\launcher\voice-host.html'
+if (-not (Test-Path -LiteralPath $voicePage)) { Die "Missing launcher\voice-host.html" }
+$cscArgs += "/resource:$((Resolve-Path $voicePage).Path),voice-host.html"
+
+# The template Thornswood.ini, for a machine that has none. The launcher
+# writes it when it is missing
+# (ThornIni.Ensure), so the ini never has to travel in a pack, which is how
+# one machine's binds and field of view landed on everybody on 16 Sep.
+$iniTemplate = Join-Path $Here '..\..\launcher\Thornswood.ini'
+if (Test-Path -LiteralPath $iniTemplate) {
+    $cscArgs += "/resource:$((Resolve-Path $iniTemplate).Path),Thornswood.ini"
+} else {
+    Die "Thornswood.ini is not at $iniTemplate. It is in the repository, so the path is wrong; a machine with no Thornswood.ini would play on the plugins' own defaults."
+}
+
+# The record of which SkyMP client runtime belongs beside this launcher.
+#
+# IT TRAVELS IN THE EXE AND NOT AS A FILE, on purpose. The launcher, the game
+# files and the server go out as one release, so the launcher that is running
+# IS the statement of which client belongs with it, and there is no second copy
+# on disk to drift out of step or to be edited on somebody's machine.
+#
+# ClientRuntime reads it back out and checks the six files by hash. Without it
+# the launcher cannot tell which build of skymp5-client.js it has, which is
+# what the old text search for "THORNSWOOD PATCH" could never answer, and it
+# cannot put a missing one back either. A build without it still runs and says
+# so on the Play page rather than pretending the client is fine.
+$clientRecord = Join-Path $Here '..\..\records\client-build.json'
+if (Test-Path -LiteralPath $clientRecord) {
+    $cscArgs += "/resource:$((Resolve-Path $clientRecord).Path),client-build.json"
+} else {
+    Die "client-build.json is not at $clientRecord. It is in the repository, so the path is wrong; the launcher could not check or repair the client runtime."
+}
+
+foreach ($r in $refs) { $cscArgs += "/reference:$r" }
+foreach ($f in $cs)   { $cscArgs += $f.FullName }
+if ($infoApp) { $cscArgs += $infoApp }
+
+$old = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+& $csc @cscArgs
+$rc = $LASTEXITCODE
+$ErrorActionPreference = $old
+
+if ($rc -ne 0 -or -not (Test-Path $exe)) { Die "csc.exe exited with $rc" }
+Say ("  Thornswood.exe  {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
+if (Test-Path -LiteralPath $oldExe) {
+    try {
+        Remove-Item -LiteralPath $oldExe -Force
+        Say '  removed the old SkyrimTogether.exe' 'DarkGray'
+    } catch {
+        Say '  could not remove the old SkyrimTogether.exe, it is probably still running' 'Yellow'
+    }
+}
+
+# ------------------------------------------------------------ setup stub
+$stubSrc = Join-Path $Here '..\..\installer\setup\Bootstrap.cs'
+if (Test-Path $stubSrc) {
+    Head 'Setup stub'
+    # Built to a scratch name first. Deleting the old one up front meant a
+    # failed compile left no installer at all, and the only sign of it was a
+    # yellow line an hour before anyone noticed the package had no exe in it.
+    $stub = Join-Path $Here '..\..\tools\setup-stub.exe'
+    $stubNew = Join-Path $Here '..\..\tools\setup-stub.new.exe'
+    if (Test-Path $stubNew) { Remove-Item $stubNew -Force }
+    $stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
+                  "/out:$stubNew", "/win32icon:$((Resolve-Path $icon).Path)")
+    if (Test-Path $logoSml) { $stubArgs += "/resource:$((Resolve-Path $logoSml).Path),logo.png" }
+    foreach ($r in $refs) { $stubArgs += "/reference:$r" }
+    $stubInfo = $null
+    if ((Get-Content $stubSrc -Raw) -notmatch '(?m)^\s*\[assembly:') {
+        $stubInfo = Join-Path $env:TEMP 'ThornswoodSetupInfo.cs'
+        New-Info $stubInfo 'Thornswood Setup' 'Thornswood setup' $verFour $ver
+    }
+    $stubArgs += (Resolve-Path $stubSrc).Path
+    if ($stubInfo) { $stubArgs += $stubInfo }
+
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    & $csc @stubArgs
+    $rc2 = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    if ($rc2 -ne 0 -or -not (Test-Path $stubNew)) {
+        Remove-Item $stubNew -Force -EA SilentlyContinue
+        Write-Host ''
+        Say "  csc exited with $rc2. The installer program did NOT build." 'Red'
+        if (Test-Path $stub) {
+            Say '  The last working setup-stub.exe is still here, so packaging carries on with that one.' 'Yellow'
+        } else {
+            Say '  There is no setup-stub.exe at all. A package built now would have no installer in it.' 'Red'
+        }
+        Write-Host ''
+    }
+    else {
+        if (Test-Path $stub) { Remove-Item $stub -Force }
+        Move-Item $stubNew $stub
+        Say ("  setup-stub.exe  {0:n0} KB" -f ((Get-Item $stub).Length / 1KB)) 'Green'
+    }
+}
+
+# ------------------------------------------------------------ signing
+#
+# Both binaries or neither. A signed launcher next to an unsigned installer
+# still warns on the thing a stranger runs first, which is the installer.
+#
+# This does nothing at all unless tools\signing.json exists, so Djinn's machine
+# and the pull request build carry on exactly as before. See the header of
+# Sign-Artifact.ps1 for what that file holds, and Bootstrap.cs:75-95 for why
+# any of this matters.
+$signer = Join-Path $Here 'Sign-Artifact.ps1'
+if (Test-Path -LiteralPath $signer) {
+    Head 'Signing'
+    $toSign = @($exe)
+    if (Test-Path -LiteralPath $stub) { $toSign += $stub }
+    & $signer -Path $toSign
+    if ($LASTEXITCODE -ne 0) { Die 'Signing failed. Nothing was published.' }
+}
+
+# The shortcut, the icon file beside the exe, Explorer's redraw and its icon
+# cache used to follow here. They are Install-Launcher.ps1 now, with the
+# closing of a running game and launcher, because they are what an install
+# does and a build has no business doing them.
+
+Head 'Done'
+Say $exe 'Green'
+Write-Host ''
+if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+
+# Said out loud rather than left to chance.
+#
+# A PowerShell script that runs off the end does not reset $LASTEXITCODE: the
+# caller sees whatever the last native command left behind, and this script runs
+# csc and signtool. Ship.ps1 reads that code to decide whether a release may go
+# out, so a stray value here would either hide a failure or stop a good build
+# for no reason.
+exit 0

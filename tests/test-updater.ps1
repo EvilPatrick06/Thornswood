@@ -1,0 +1,429 @@
+<#
+  test-updater.ps1
+
+      pwsh -NoProfile -File .\tests\test-updater.ps1
+
+  The launcher's updater, asked its own questions.
+
+  WHY THIS EXISTS. Seven functions in launcher\app\Updater.cs decide what counts
+  as an update, where one may come from, and which files a pack may write or
+  delete: IsNewer, Parts, RepoCandidates, Inside, ClaimedElsewhere, Pending and
+  CheckUrl. Each has the incident that shaped it written above it, and until
+  this nothing ran any of them outside a live launcher. The To Do List entry
+  put it as "the easiest thing in the codebase to test and the most expensive
+  to get wrong, because it decides what gets downloaded and where it is allowed
+  to be written". test-dev-version.ps1 carries a PowerShell copy of IsNewer,
+  which answers for the copy and not for the launcher.
+
+  HOW. It compiles launcher\app\*.cs into a library in a temp folder, with the
+  same csc, the same /noconfig and the same references Build-Launcher.ps1
+  uses (the names are read out of Build-Launcher.ps1 itself, so the two cannot
+  drift), loads it, and calls the functions by reflection. Updater is a
+  private static class, and reaching it this way means the launcher's source
+  does not change for the sake of a test. Nothing in the launcher runs: no
+  Main, no window, no network. Pending and ClaimedElsewhere read applied.txt
+  and the Packs folder, so Paths is pointed at the temp folder for those two
+  first, and nothing under C:\Thornswood or the profile is read or written.
+
+  It runs under Windows PowerShell 5.1 and restarts itself there when started
+  from pwsh, which is how the build check starts it. The launcher runs on the
+  .NET Framework, and Uri and Path are not promised to answer the same on the
+  runtime pwsh carries.
+
+  -Src points it at another copy of the sources. That is how it was shown to
+  catch what it is for. MEASURED 24 SEPTEMBER: eight bugs put back into a
+  scratch copy of Updater.cs one at a time, and every one turned this red.
+  IsNewer as a plain "different" test (7 checks fail), Parts reading letters
+  as 0 (7), RepoCandidates forgetting the new name (1), Inside as a plain
+  prefix (4), ClaimedElsewhere counting a pack's own list (3), Pending ignoring
+  applied.txt (1), CheckUrl matching a host suffix without its dot (1), and
+  CheckUrl taking plain http (2).
+
+  KNOWN lines are behaviours that look wrong and are left for Patrick to
+  decide. They print what the launcher returns today and are not counted
+  either way, so fixing one does not turn this red.
+
+  Read only apart from files under its own temp folder.
+#>
+[CmdletBinding()]
+param([string]$Src)
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# The tests are in tests\, what they test is in tools\.
+$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+if (-not $Src) { $Src = Join-Path $Here '..\launcher\app' }
+
+# ---- the launcher's runtime, not pwsh's --------------------------------------
+if ($PSVersionTable.PSEdition -eq 'Core') {
+    $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if (-not (Test-Path -LiteralPath $winps)) {
+        Write-Host 'FAIL  Windows PowerShell is here to run this on the .NET Framework the launcher runs on'
+        Write-Host ''
+        Write-Host '0 passed, 1 failed'
+        exit 1
+    }
+    & $winps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Src $Src
+    exit $LASTEXITCODE
+}
+
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+function Known([string]$what) { Write-Host "KNOWN $what" }
+
+# ---- the compiler and the references, the way Build-Launcher.ps1 finds them --
+$csc = @(
+    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+) | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+$refDirs = @(
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
+    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
+    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
+    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
+    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
+) | Where-Object { Test-Path $_ }
+
+function Find-Ref([string]$name) {
+    foreach ($d in $refDirs) {
+        $p = Join-Path $d $name
+        if (Test-Path $p) { return $p }
+    }
+    $stem = [IO.Path]::GetFileNameWithoutExtension($name)
+    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32', 'GAC') {
+        $gac = Join-Path "$env:WINDIR\Microsoft.NET\assembly\$gacRoot" $stem
+        if (Test-Path $gac) {
+            $hit = Get-ChildItem $gac -Filter $name -Recurse -File -EA SilentlyContinue |
+                   Sort-Object FullName -Descending | Select-Object -First 1
+            if ($hit) { return $hit.FullName }
+        }
+    }
+    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32') {
+        $hit = Get-ChildItem (Join-Path "$env:WINDIR\Microsoft.NET\assembly" $gacRoot) -Filter $name -Recurse -File -EA SilentlyContinue |
+               Sort-Object FullName -Descending | Select-Object -First 1
+        if ($hit) { return $hit.FullName }
+    }
+    $null
+}
+
+# The names are read off the build script rather than copied, so a reference
+# the launcher gains there is one this compile gains too.
+$builder = Join-Path $Here '..\scripts\release\Build-Launcher.ps1'
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
+$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
+function ListIn([string]$name) {
+    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
+    if (-not $a) { return @() }
+    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) |
+             ForEach-Object { $_.Value })
+}
+$needed = @(ListIn 'needed')
+$wv2 = @(ListIn 'wv2Managed')
+
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ('tsupdater-' + [Guid]::NewGuid().ToString('N'))
+$null = New-Item -ItemType Directory -Force -Path $tmp
+
+function Run {
+    Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
+    Yes ('Build-Launcher.ps1 names the references the launcher compiles against, {0} of them' -f ($needed.Count + $wv2.Count)) (
+        $needed.Count -gt 5 -and $wv2.Count -gt 0)
+    if (-not $csc -or $needed.Count -eq 0) { return }
+
+    $refs = @(); $missing = @()
+    foreach ($n in $needed) {
+        $p = Find-Ref $n
+        if ($p) { $refs += $p } else { $missing += $n }
+    }
+    foreach ($n in $wv2) {
+        $p = Join-Path $Here ('lib\webview2\' + $n)
+        if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
+    }
+    Yes ('every one of them is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) (
+        $missing.Count -eq 0)
+    if ($missing.Count) { return }
+
+    # ---- compile ---------------------------------------------------------------
+    #
+    # A library, so no Main is picked and nothing starts. /noconfig for the
+    # reason Build-Launcher.ps1 gives: csc.rsp adds the framework by name, and
+    # on a machine with the reference assemblies installed that is CS1703.
+    $cs = @(Get-ChildItem (Join-Path $Src '*.cs') -File)
+    $dll = Join-Path $tmp 'Thornswood.dll'
+    $cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', "/out:$dll")
+    foreach ($r in $refs) { $cscArgs += "/reference:$r" }
+    foreach ($f in $cs) { $cscArgs += $f.FullName }
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $said = & $csc @cscArgs 2>&1
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    $built = ($rc -eq 0) -and (Test-Path -LiteralPath $dll)
+    Yes ('the launcher''s {0} source files compile' -f $cs.Count) $built
+    if (-not $built) {
+        foreach ($l in @($said | Where-Object { "$_" -match 'error' } | Select-Object -First 20)) { Write-Host "      $l" }
+        return
+    }
+
+    # From bytes, so the file is not held open and the temp folder can go.
+    $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
+    $U = $asm.GetType('Thornswood.Updater')
+    $P = $asm.GetType('Thornswood.Paths')
+    $script:VD = $asm.GetType('Thornswood.VersionDoc')
+    Yes 'Updater, Paths and VersionDoc are in the build' ($null -ne $U -and $null -ne $P -and $null -ne $script:VD)
+    if ($null -eq $U -or $null -eq $P -or $null -eq $script:VD) { return }
+
+    $flags = [Reflection.BindingFlags]'Static, Public, NonPublic'
+    $script:m = @{}
+    $gone = @()
+    foreach ($n in 'IsNewer', 'Parts', 'RepoCandidates', 'Inside', 'ClaimedElsewhere', 'Pending', 'CheckUrl') {
+        $script:m[$n] = $U.GetMethod($n, $flags)
+        if ($null -eq $script:m[$n]) { $gone += $n }
+    }
+    Yes ('the seven functions under test are all there' + $(if ($gone.Count) { ', missing ' + ($gone -join ', ') } else { '' })) (
+        $gone.Count -eq 0)
+    if ($gone.Count) { return }
+
+    # ---- IsNewer: is the published launcher genuinely newer ------------------
+    #
+    # From the comment above it: a machine that had just built a launcher saw
+    # an older number in the release, called that an update, and overwrote the
+    # build it had just made. Different includes older. Newer does not.
+    Yes 'IsNewer: 1.1.93 over 1.1.92 is an update' ((Newer '1.1.93' '1.1.92') -eq $true)
+    Yes 'IsNewer: 1.1.91 over 1.1.92 is not, the case that overwrote a fresh build' ((Newer '1.1.91' '1.1.92') -eq $false)
+    Yes 'IsNewer: the same number is not' ((Newer '1.1.92' '1.1.92') -eq $false)
+    Yes 'IsNewer: numbers compare as numbers, 1.1.10 over 1.1.9 is an update' ((Newer '1.1.10' '1.1.9') -eq $true)
+    Yes 'IsNewer: and 1.1.9 over 1.1.10 is not' ((Newer '1.1.9' '1.1.10') -eq $false)
+    Yes 'IsNewer: a higher middle number wins whatever the last one says, 1.2.0 over 1.1.99' ((Newer '1.2.0' '1.1.99') -eq $true)
+    Yes 'IsNewer: a missing part counts as 0, 1.1.92.0 over 1.1.92 is not an update' ((Newer '1.1.92.0' '1.1.92') -eq $false)
+    Yes 'IsNewer: nor is 1.1.92 over 1.1.92.0' ((Newer '1.1.92' '1.1.92.0') -eq $false)
+
+    # The dev channel's four part numbers, from test-dev-version.ps1 and the
+    # build of 21 September that nobody already on dev could take.
+    Yes 'IsNewer: a dev build 1.1.77.1 is an update over main 1.1.77' ((Newer '1.1.77.1' '1.1.77') -eq $true)
+    Yes 'IsNewer: 1.1.76.1 over 1.1.77 is not, the dev build of 21 September' ((Newer '1.1.76.1' '1.1.77') -eq $false)
+    Yes 'IsNewer: a promoted main release 1.1.79 beats dev 1.1.78.9' ((Newer '1.1.79' '1.1.78.9') -eq $true)
+
+    Yes 'IsNewer: a v in front is read past, v1.1.93 over 1.1.92' ((Newer 'v1.1.93' '1.1.92') -eq $true)
+    Yes 'IsNewer: and V1.1.92 over 1.1.92 is not an update' ((Newer 'V1.1.92' '1.1.92') -eq $false)
+    Yes 'IsNewer: spaces round the number are read past' (
+        (Newer ' 1.1.93 ' '1.1.92') -eq $true -and (Newer '1.1.92 ' '1.1.92') -eq $false)
+    Yes 'IsNewer: a feed with no launcher version offers nothing' (
+        (Newer $null '1.1.92') -eq $false -and (Newer '' '1.1.92') -eq $false)
+    # "rather than refusing an update nobody can then install"
+    Yes 'IsNewer: a version it cannot read is still offered, rather than never installable' ((Newer '1.1.93-rc' '1.1.92') -eq $true)
+
+    $version = [string]$U.GetField('Version', $flags).GetValue($null)
+    Yes "IsNewer: this launcher's own version, $version, is one it can read" ((PartsText $version) -ne 'null')
+    Yes 'IsNewer: and it is never offered to itself' ((Newer $version $version) -eq $false)
+
+    # ---- Parts: the numbers IsNewer compares ---------------------------------
+    Yes 'Parts: 1.1.92 reads as 1 1 92' ((PartsText '1.1.92') -eq '1.1.92')
+    Yes 'Parts: 1.1.77.1 keeps all four' ((PartsText '1.1.77.1') -eq '1.1.77.1')
+    Yes 'Parts: v1.2 reads past the v' ((PartsText 'v1.2') -eq '1.2')
+    foreach ($bad in @($null, '', 'abc', '1.1.x', '1..2', '1.', '1.1.92-dev')) {
+        $shown = if ($null -eq $bad) { 'null' } else { "'$bad'" }
+        Yes "Parts: nothing for $shown, which is not all numbers" ((PartsText $bad) -eq 'null')
+    }
+
+    # ---- RepoCandidates: both sides of the rename ----------------------------
+    #
+    # A config.json written either side of skyrim-together becoming Thornswood
+    # is still on somebody's machine, and rewriting it on load renamed
+    # everybody's before the repository itself was renamed. So both are tried,
+    # the one in the config first.
+    Yes 'RepoCandidates: skyrim-together tries Thornswood next' (
+        (Repos 'EvilPatrick06/skyrim-together') -eq 'EvilPatrick06/skyrim-together then EvilPatrick06/Thornswood')
+    Yes 'RepoCandidates: Thornswood tries skyrim-together next' (
+        (Repos 'EvilPatrick06/Thornswood') -eq 'EvilPatrick06/Thornswood then EvilPatrick06/skyrim-together')
+    Yes 'RepoCandidates: whatever case the config wrote it in' (
+        (Repos 'EvilPatrick06/THORNSWOOD') -eq 'EvilPatrick06/THORNSWOOD then EvilPatrick06/skyrim-together')
+    # The default a fresh install writes (Config.cs). It was never renamed, so
+    # a second name would only be a second request.
+    Yes 'RepoCandidates: Thornswood-Releases is asked on its own' (
+        (Repos 'EvilPatrick06/Thornswood-Releases') -eq 'EvilPatrick06/Thornswood-Releases')
+    Yes 'RepoCandidates: nothing set gives nothing to try' ((Repos $null) -eq '' -and (Repos '') -eq '')
+    Yes 'RepoCandidates: a name with no owner is tried as it is and nothing more' ((Repos 'Thornswood') -eq 'Thornswood')
+
+    # ---- Inside: the fence round every write and delete ----------------------
+    #
+    # From the comment above it: "C:\Thornswood2\anything" starts with
+    # "C:\Thornswood", so a plain prefix test let a pack reach next door.
+    Yes 'Inside: a file under the game folder is inside it' ((Within 'C:\Thornswood\Game\Data\Thornswood.esp' 'C:\Thornswood\Game') -eq $true)
+    Yes 'Inside: C:\Thornswood2\anything is not inside C:\Thornswood' ((Within 'C:\Thornswood2\anything' 'C:\Thornswood') -eq $false)
+    Yes 'Inside: the folder is not inside itself, so nothing can delete the fence' ((Within 'C:\Thornswood\Game' 'C:\Thornswood\Game') -eq $false)
+    Yes 'Inside: a folder given with its separator on the end' (
+        (Within 'C:\Thornswood\Game\x' 'C:\Thornswood\Game\') -eq $true -and (Within 'C:\Thornswood\Game\x' 'C:\Thornswood\Game/') -eq $true)
+    Yes 'Inside: the case of the letters does not matter on Windows' ((Within 'c:\thornswood\game\data\x' 'C:\Thornswood\Game') -eq $true)
+    Yes 'Inside: the same folder on another drive is not inside' ((Within 'D:\Thornswood\Game\x' 'C:\Thornswood\Game') -eq $false)
+    Yes 'Inside: nothing given is inside nothing' (
+        (Within $null 'C:\Thornswood') -eq $false -and (Within 'C:\Thornswood\x' $null) -eq $false -and (Within '' 'C:\Thornswood') -eq $false)
+
+    # Every caller resolves the path first, the way Install does for a line of
+    # delete.txt and RemovePack does for a line of a file list: Combine leaves
+    # a .. where it is, and it is Delete that would resolve it, outside the
+    # game. This is that pattern, on the lines a bad pack would carry.
+    $game = 'C:\Thornswood\Game'
+    foreach ($line in @('..\..\Profile\config.json', '..\Game2\x', 'Data\..\..\x', 'C:\Windows\System32\x.dll', '\Windows\x')) {
+        Yes "Inside: a pack line '$line', resolved as the callers resolve it, stays out" ((Fenced $game $line) -eq $false)
+    }
+    foreach ($line in @('Data\Platform\Plugins\thornswood-front.js', 'Data\..\Data\x.esp')) {
+        Yes "Inside: a pack line '$line', resolved the same way, is let in" ((Fenced $game $line) -eq $true)
+    }
+
+    # ---- CheckUrl: where an update may come from -----------------------------
+    #
+    # Checked before a single byte is fetched, because what is on the other end
+    # gets run. It says no by throwing.
+    foreach ($u in @(
+        'https://github.com/EvilPatrick06/Thornswood-Releases/releases/download/v1.1.92/Thornswood.exe',
+        'https://objects.githubusercontent.com/github-production-release-asset-2e65be/1/2',
+        'https://release-assets.githubusercontent.com/github-production-release-asset/1/2',
+        'https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/1',
+        'https://thornswood.net/files/pack.zip',
+        'https://codeload.github.com/EvilPatrick06/Thornswood-Releases/zip/main',
+        'https://GitHub.com/EvilPatrick06/Thornswood-Releases/releases/download/v1/a.zip')) {
+        $why = Refusal $u
+        Yes ("CheckUrl: lets through $u" + $(if ($null -ne $why) { "  (refused: $why)" } else { '' })) ($null -eq $why)
+    }
+    foreach ($u in @(
+        'http://github.com/EvilPatrick06/Thornswood-Releases/releases/download/v1/a.zip',
+        'ftp://github.com/a.zip',
+        'file:///C:/Windows/System32/cmd.exe',
+        'Thornswood.exe',
+        '',
+        $null,
+        'https://github.com.evil.example/a.zip',
+        'https://evilgithub.com/a.zip',
+        'https://github.com@evil.example/a.zip',
+        'https://evil.example\@github.com/a.zip',
+        'https://evil.example/?u=https://github.com/a.zip',
+        'https://raw.githubusercontent.com/someone/repo/main/a.exe',
+        'https://thornswood.net.evil.example/a.zip')) {
+        $why = Refusal $u
+        $shown = if ($null -eq $u) { 'null' } elseif ($u -eq '') { 'an empty address' } else { $u }
+        Yes ("CheckUrl: refuses $shown" + $(if ($null -ne $why) { "  ($why)" } else { '' })) ($null -ne $why)
+    }
+
+    # ---- Pending: which required packs still want applying -------------------
+    $applied = Join-Path $tmp 'applied.txt'
+    $packs = Join-Path $tmp 'Packs'
+    $P.GetField('AppliedFile').SetValue($null, $applied)
+    $P.GetField('PacksDir').SetValue($null, $packs)
+    Yes 'Paths points at the temp folder, not at an install' (
+        [string]$P.GetField('AppliedFile').GetValue($null) -eq $applied -and [string]$P.GetField('PacksDir').GetValue($null) -eq $packs)
+
+    $three = '{"launcherVersion":"1.1.92","packs":[{"id":"pack-1"},{"id":"pack-2"},{"id":"pack-3"}]}'
+    Yes 'Pending: with no applied.txt every pack is pending, in the order the feed gives' ((PendingIds $three) -eq 'pack-1,pack-2,pack-3')
+    [IO.File]::WriteAllLines($applied, [string[]]@('pack-1', '  PACK-3  ', ''), (New-Object Text.UTF8Encoding($false)))
+    Yes 'Pending: a pack in applied.txt is not offered again, whatever its case or spacing there' ((PendingIds $three) -eq 'pack-2')
+    Yes 'Pending: a pack with no id, or an empty slot, is skipped rather than offered for ever' (
+        (PendingIds '{"packs":[null,{},{"id":""},{"id":"pack-4"}]}') -eq 'pack-4')
+    Yes 'Pending: a feed with no packs list offers nothing' ((PendingIds '{"launcherVersion":"1.1.92"}') -eq '')
+    Yes 'Pending: an optional pack is never applied on its own' ((PendingIds '{"packs":[],"optional":[{"id":"opt-1"}]}') -eq '')
+    Yes 'Pending: no feed at all offers nothing' ((PendingIds $null) -eq '')
+
+    # ---- ClaimedElsewhere: what taking a pack off must leave -----------------
+    #
+    # From the comment above it: a later pack wrote over a file an earlier one
+    # created, so the later list says R| and the earlier one still says N|.
+    # Taking the earlier pack off deleted the file the later one was using.
+    $mine = Join-Path $packs 'pack-early.files'
+    $none = Ask 'ClaimedElsewhere' $mine
+    Yes 'ClaimedElsewhere: with no Packs folder nothing is claimed' ($null -ne $none -and $none.Count -eq 0)
+
+    $null = New-Item -ItemType Directory -Force -Path $packs
+    $utf8 = New-Object Text.UTF8Encoding($false)
+    [IO.File]::WriteAllLines($mine, [string[]]@('# fence=game', 'N|game\Data\Textures\shared.dds', 'N|game\Data\Textures\only-mine.dds'), $utf8)
+    [IO.File]::WriteAllLines((Join-Path $packs 'pack-late.files'), [string[]]@('# fence=game', 'R|game\Data\Textures\shared.dds', 'N|Profile\Default\plugins.txt', 'N|', ''), $utf8)
+    [IO.File]::WriteAllLines((Join-Path $packs 'notes.txt'), [string[]]@('N|game\Data\from-a-note.dds'), $utf8)
+    $claimed = Ask 'ClaimedElsewhere' $mine
+    Yes 'ClaimedElsewhere: the file a later pack wrote over is claimed, the case in the comment' ($claimed.Contains('game\Data\Textures\shared.dds'))
+    Yes 'ClaimedElsewhere: matched whatever the case of the letters' ($claimed.Contains('GAME\DATA\TEXTURES\SHARED.DDS'))
+    Yes 'ClaimedElsewhere: a Root path is claimed as it is written, with no game prefix' ($claimed.Contains('Profile\Default\plugins.txt'))
+    Yes 'ClaimedElsewhere: a pack''s own list does not count against it' (-not $claimed.Contains('game\Data\Textures\only-mine.dds'))
+    Yes 'ClaimedElsewhere: a file in Packs that is not a .files list is not read' (-not $claimed.Contains('game\Data\from-a-note.dds'))
+    Yes ('ClaimedElsewhere: the header and a line with no path are not paths, so exactly 2 are claimed, got {0}' -f $claimed.Count) ($claimed.Count -eq 2)
+    $shouted = Ask 'ClaimedElsewhere' (Join-Path $packs 'PACK-EARLY.FILES')
+    Yes 'ClaimedElsewhere: its own list is known by name whatever the case' (-not $shouted.Contains('game\Data\Textures\only-mine.dds'))
+
+    # ---- known, and left for Patrick ------------------------------------------
+    #
+    # Measured here and written down, not asserted: each is a decision about
+    # Updater.cs, which is one of the six shared files.
+    Write-Host ''
+    Known ("IsNewer('1.1.91-rc', '1.1.92') is {0}. A number it cannot read falls back to ""different means newer"", the rule the comment above IsNewer retired because different includes older. Nothing this toolchain writes has letters in it (Build-Launcher.ps1 reads the version as [0-9.]+), so today's feed cannot reach it." -f (Newer '1.1.91-rc' '1.1.92'))
+    Known ("Inside('C:\Thornswood\Game\..\..\Windows\x', 'C:\Thornswood\Game') is {0}, and Inside('C:\Thornswood\Game\x', 'C:/Thornswood/Game') is {1}. It compares text and resolves neither side. Every caller resolves the path with Path.GetFullPath first, which is why the resolved lines above stay out; a new caller that forgets gets the first answer, and a folder written with forward slashes would fence everything out." -f (Within 'C:\Thornswood\Game\..\..\Windows\x' 'C:\Thornswood\Game'), (Within 'C:\Thornswood\Game\x' 'C:/Thornswood/Game'))
+    $other = Refusal 'https://github.com/someone-else/anything/releases/download/v1/a.zip'
+    Known ("CheckUrl on another account's upload, github.com/someone-else/anything/releases/download/v1/a.zip, is {0}. The list pins the host and not the owner, the checksum comes from the same feed, and ExpectedSigner is empty, so a feed that names somebody else's file is fetched and run." -f $(if ($null -eq $other) { 'let through' } else { "refused ($other)" }))
+}
+
+# ---- how each function is asked ---------------------------------------------
+#
+# Every answer goes back through the comma, so a list or an array comes out
+# as one value rather than being unrolled into the pipeline on the way. Every
+# argument goes in as the value underneath, because a path from Join-Path
+# arrives wrapped and reflection will not turn the wrapper into a string.
+function Ask($name) {
+    $a = New-Object object[] $args.Count
+    for ($i = 0; $i -lt $args.Count; $i++) {
+        if ($null -ne $args[$i]) { $a[$i] = $args[$i].psobject.BaseObject }
+    }
+    return , ($script:m[$name].Invoke($null, $a))
+}
+function Newer($remote, $local) { return [bool](Ask 'IsNewer' $remote $local) }
+function Within($full, $folder) { return [bool](Ask 'Inside' $full $folder) }
+function PartsText($v) {
+    $r = Ask 'Parts' $v
+    if ($null -eq $r) { return 'null' }
+    return ($r -join '.')
+}
+function Repos($repo) {
+    $l = Ask 'RepoCandidates' $repo
+    if ($null -eq $l) { return 'null' }
+    return (@($l) -join ' then ')
+}
+function Fenced([string]$fence, [string]$line) {
+    $full = [IO.Path]::GetFullPath([IO.Path]::Combine($fence, $line))
+    return (Within $full $fence)
+}
+function Refusal($url) {
+    try { $null = Ask 'CheckUrl' $url; return $null }
+    catch {
+        $e = $_.Exception
+        while ($null -ne $e.InnerException) { $e = $e.InnerException }
+        return $e.Message
+    }
+}
+function PendingIds($json) {
+    $doc = $null
+    if ($null -ne $json) {
+        $a = New-Object object[] 1
+        $a[0] = [Text.Encoding]::UTF8.GetBytes($json)
+        $doc = $script:VD.GetMethod('Parse').Invoke($null, $a)
+    }
+    try { $list = Ask 'Pending' $doc }
+    catch { return 'threw: ' + $_.Exception.Message }
+    if ($null -eq $list) { return 'null' }
+    return (@($list | ForEach-Object { $_.id }) -join ',')
+}
+
+try {
+    try { Run }
+    catch { Yes ('the harness ran to the end, and stopped on: ' + $_.Exception.Message) $false }
+}
+finally {
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host ''
+Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+if ($script:fail) { exit 1 }
+exit 0

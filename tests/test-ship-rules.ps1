@@ -1,0 +1,431 @@
+<#
+  test-ship-rules.ps1
+
+  Every file that has ever leaked in a pack or an installer stays out, and the
+  rules that decide what leaves this machine still say what they mean.
+
+  WHY THIS EXISTS. Ship-Rules.ps1 is the one list of what never leaves a
+  machine, and nearly every line in it is there because something already got
+  out: the SkyMP sign in token inside the installer, one machine's
+  Thornswood.ini with Fov=120 in the three packs of 16 and 17 September,
+  a 6 MB vortex.deployment.json in pack-20260916-1217, the voice join token in
+  nine packs from 18 to 20 September, a report and a script from the Claude
+  desktop app in packs 20260916-0130 to 0937, and the front's own 147 fonts
+  and sounds wrongly left out by the dev Ship of 20 September at 13:02. Entry
+  197 on the To Do List: "Ship-Rules is the highest-yield unit test in the
+  repo, seven incidents have already happened inside it".
+
+  So each incident case below is the exact relative path its own comment in
+  Ship-Rules.ps1 names, asked of the real functions, dot-sourced. A rule that
+  is edited away, or a rewrite that turns one list into another, turns a line
+  here red before a pack carries the file again.
+
+  MARKETPLACETEXTURES.BSA. Bethesda's archive for the in-game Creations menu,
+  2.8 MB, which every pack and the installer carried because it was in
+  neither vanilla list and Vortex does not provide it. Both pack baselines on
+  Patrick's machine list it, so the fix has to leave it out WITHOUT the next
+  pack listing it as removed, or every launcher deletes a Bethesda file off
+  every tester. This drives the diff and the removal filter lifted by text out
+  of the shipped Publish-Update.ps1, the same way test-master-flag.ps1 lifts
+  its functions out of Deploy-Gamemode.ps1, so it tests the real code.
+
+  THE LOOSE ART REPORT. Get-ShipLooseArt names, a folder at a time, the loose
+  textures and meshes an installer is about to carry that are neither ours nor
+  the collection's. On 22 September that was 547 MB nobody had accounted for.
+
+  Where this machine has a pack baseline and a Profile\OwnGame\files.txt, it
+  measures against them too, and says SKIP where it cannot.
+
+  -RulesPath runs it against another copy of Ship-Rules.ps1, so a scratch copy
+  with a rule taken out can be shown to turn it red.
+
+  Read only apart from files under its own temp folder.
+#>
+[CmdletBinding()]
+param(
+    [string]$Root = 'C:\Thornswood',
+    [string]$RulesPath
+)
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# The tests are in tests\, what they test is in tools\.
+$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+if (-not $RulesPath) { $RulesPath = Join-Path $Here '..\scripts\release\Ship-Rules.ps1' }
+
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+function Done {
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail) { exit 1 }
+    exit 0
+}
+
+. $RulesPath
+
+# The record of our own client build sits beside the rules, and the rules read
+# it from there. Read here too, so the six files are asked about by name.
+# In records\ since phase 8 of issue #440, two folders up from scripts\release.
+$record = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $RulesPath))) (Join-Path 'records' 'client-build.json')
+$clientFiles = @()
+if (Test-Path -LiteralPath $record) {
+    $clientFiles = @((Get-Content -LiteralPath $record -Raw | ConvertFrom-Json).files.PSObject.Properties.Name)
+}
+
+# ---- somebody's sign in, which the installer carried -------------------------
+#
+# The night Ship-Rules became one file: Package-Thornswood kept its own
+# shorter list and the SkyMP client's saved sign in token from the build
+# machine rode inside the installer.
+$token = 'Data\Platform\PluginsNoLoad\auth-data-no-load.js'
+Yes "$token is never shipped" (Test-ShipOtherServer $token)
+Yes '  and never removed from anybody either' (Test-ShipMachine $token)
+Yes '  and never swept as a runtime file' (-not (Test-ShipRuntime $token))
+Yes 'anything else in PluginsNoLoad is kept out the same way' (Test-ShipOtherServer 'Data\Platform\PluginsNoLoad\other.js')
+
+# ---- one machine's settings, which three packs carried -----------------------
+#
+# 16 and 17 September: the publishing machine's Thornswood.ini went out and put
+# its Fov=120 and its key binds on everyone.
+foreach ($rel in @(
+    'Data\SKSE\Plugins\Thornswood.ini',
+    # SSE Display Tweaks holds the screen resolution; publishing it stamped
+    # one person's monitor onto everyone.
+    'Data\SKSE\Plugins\SSEDisplayTweaks.ini',
+    # One person's character slot.
+    'Data\Platform\Plugins\skymp5-client-settings.txt',
+    'Data\SKSE\Plugins\OpenAnimationReplacer.ini',
+    'Data\SKSE\Plugins\SkyrimPlatform.ini',
+    'Data\SKSE\Plugins\po3_Tweaks.ini',
+    'Data\SKSE\Plugins\CrashLogger.ini',
+    # The launcher and the voice plugin talk through these.
+    'Data\Platform\voice-port.txt',
+    'Data\Platform\voice-status.txt',
+    'Data\Platform\voice-ptt.txt',
+    # Who this person has muted in voice, by profile id (entry 151).
+    'Data\Platform\voice-muted.txt',
+    # Every profile id the install owns.
+    'Data\Platform\thornswood-characters.json',
+    'Data\Platform\thornswood-choice.txt',
+    'Data\Platform\thornswood-forget.txt',
+    'Data\Platform\UI\thornswood-characters.js',
+    'Data\Platform\thornswood-loadorder.txt',
+    'Data\Platform\thornswood-plugins-light.txt',
+    'Data\Platform\thornswood-session.txt',
+    'Data\Platform\menu-music-duck.txt',
+    'Data\Platform\overlay-boot.count',
+    'Data\Platform\thornswood-voice.log'
+)) {
+    Yes "$rel is one machine's own" (Test-ShipMachine $rel)
+    # A runtime path is listed as removed and taken off every install, which
+    # for somebody's own settings would be worse than shipping them.
+    Yes '  and is never swept off anybody as a runtime file' (-not (Test-ShipRuntime $rel))
+}
+# Matched exactly, so a file of ours that merely sits beside one is not caught.
+Yes 'a different ini in the same folder still ships' (-not (Test-ShipMachine 'Data\SKSE\Plugins\ThornswoodExtra.ini'))
+
+# ---- the voice join token, which nine packs carried --------------------------
+#
+# 18 to 20 September, packs 20260918-1615 to 20260920-1124. Kept out of new
+# packs, and deleted from the installs that took one of those nine.
+$voice = 'Data\Platform\voice-token.txt'
+Yes "$voice is never shipped" (Test-ShipMachine $voice)
+$always = @(Get-ShipDeleteAlways)
+Yes '  and every pack deletes it from every install' ($always -contains $voice)
+
+# ---- Vortex's own bookkeeping, which pack-20260916-1217 carried --------------
+foreach ($rel in @(
+    'Data\vortex.deployment.json',
+    'Data\vortex.deployment.dinput.json',
+    'Data\meshes\__folder_managed_by_vortex',
+    'Data\textures\armor\iron.dds.vortex_backup'
+)) {
+    Yes "$rel is Vortex's own and never shipped" (Test-ShipMachine $rel)
+}
+
+# ---- what the Claude desktop app dropped into the game folder ----------------
+#
+# A report, a script and a png rode along in packs 20260916-0130 to 0937, and
+# Data\Platform\Claude outputs held three scripts on 16 September.
+foreach ($rel in @(
+    'Claude outputs\report.md',
+    'Data\Platform\Claude outputs\fix.ps1',
+    '_to_delete\old.dll',
+    'Data\SKSE\Plugins\CharGen\Exported\face.jslot',
+    '.sentry-native\last_crash'
+)) {
+    Yes "$rel is written at runtime and never shipped" (Test-ShipRuntime $rel)
+}
+Yes 'a folder whose name only ends the same way is not taken for it' (-not (Test-ShipRuntime 'Data\NotClaude outputs\x.txt'))
+
+# ---- another server's folders ------------------------------------------------
+#
+# Skyrim Together Reborn's folder moved out of the runtime list on 23
+# September. A runtime path is swept off every install that has it, and this
+# is somebody else's install; the rule is never shipped, never removed.
+$str = 'Data\SkyrimTogetherReborn\logs\client.log'
+Yes "$str is another server's" (Test-ShipOtherServer $str)
+Yes '  and is not swept off anybody as a runtime file' (-not (Test-ShipRuntime $str))
+Yes '  and the folder itself counts' (Test-ShipOtherServer 'Data\SkyrimTogetherReborn')
+Yes 'a sibling folder whose name only starts the same way is not caught' (-not (Test-ShipOtherServer 'Data\SkyrimTogetherRebornExtras\x.esp'))
+Yes 'NirnLab UI Platform is kept out' (Test-ShipOtherServer 'Data\NirnLabUIPlatform\CEFSubprocess.exe')
+Yes '  and its plugin' (Test-ShipOtherServer 'Data\SKSE\Plugins\NirnLabUIPlugin.dll')
+Yes "Keizaal's parked Creation Club archives are kept out" (Test-ShipOtherServer 'Data\_disabledByKzl\ccBGSSSE001-Fish.bsa')
+Yes "  and Keizaal's backup beside the game" (Test-ShipOtherServer 'keizaal-backup-1.7.104.0\Data\Dawnguard.esm')
+Yes '  and the Daedric launcher''s folder' (Test-ShipOtherServer 'DaedricData\skymp-disabled\files\Data\x.bsa')
+Yes '  but not a Data file that merely starts the same way' (-not (Test-ShipOtherServer 'Data\_disabledByKzlNot\x.esp'))
+
+# ---- the loose map.swf and SkyUI's ERROR CODE 5 --------------------------------
+#
+# 22 September: excluded from packs, but the machines that already had it kept
+# it, so every pack deletes it as well.
+$map = 'Data\Interface\map.swf'
+Yes "$map is never shipped" (Test-ShipOtherServer $map)
+Yes '  whatever case it is written in' (Test-ShipOtherServer 'Data\Interface\MAP.SWF')
+Yes '  and every pack deletes it from every install' ($always -contains $map)
+Yes 'the other Interface files still ship' (-not (Test-ShipOtherServer 'Data\Interface\quest_journal.swf'))
+
+# ---- Data\Platform: ours is what we name --------------------------------------
+Yes 'our overlays in Plugins ship' (-not (Test-ShipOtherServer 'Data\Platform\Plugins\thornswood-chat.js'))
+Yes 'anybody else''s plugin script in Plugins does not' (Test-ShipOtherServer 'Data\Platform\Plugins\other-server-chat.js')
+Yes 'a backup file in Data\Platform does not' (Test-ShipOtherServer 'Data\Platform\Plugins\thornswood-chat.js.bak')
+# Somebody else's menu is a Vite build: an assets folder, app.js, vite.svg.
+Yes 'another menu''s assets folder does not ship' (Test-ShipOtherServer 'Data\Platform\UI\assets\index-4f2a.js')
+Yes '  nor its app.js' (Test-ShipOtherServer 'Data\Platform\UI\app.js')
+Yes '  nor its vite.svg' (Test-ShipOtherServer 'Data\Platform\UI\vite.svg')
+# 20 September, 13:02: the first version of the UI rule called the front's own
+# 147 hashed fonts, icons and sounds foreign and the dev Ship left them out.
+foreach ($rel in @(
+    'Data\Platform\UI\index.html',
+    'Data\Platform\UI\build.js',
+    'Data\Platform\UI\thornswood-bridge.js',
+    'Data\Platform\UI\3f9c2a71d0.ttf',
+    'Data\Platform\UI\a81be0c4.svg',
+    'Data\Platform\UI\5d1e77aa.wav',
+    'Data\Platform\UI\menu_theme.mp3',
+    'Data\Platform\UI\thornswood-theme.mp3'
+)) {
+    Yes "$rel is the front's own and ships" (-not (Test-ShipOtherServer $rel) -and -not (Test-ShipMachine $rel) -and -not (Test-ShipRuntime $rel))
+}
+# Held on dev until 22 September, then given to main by Patrick.
+Yes 'the theme is not held back from main any more' (-not (Test-ShipDevOnly 'Data\Platform\UI\thornswood-theme.mp3'))
+
+# ---- our own client, by record -------------------------------------------------
+#
+# Until 20 September the copies in every game folder were another launcher's
+# builds. The six files in client-build.json are ours by hash, and
+# skymp5-client.js in particular would read as somebody else's plugin script
+# by the name rule above.
+#
+# And by the file's bytes, since #306 (entry 128) on 24 September: one of the
+# six is ours only when the file under $GameDir is the recorded build, and
+# when it is missing or anything else it is not ours, so it is neither shipped
+# nor listed as removed. This check was written the day before that, when the
+# path alone made a file ours, and the two landed an hour apart and turned
+# main red. So each file is asked twice here: with bytes the record is told to
+# expect, under a made up $GameDir, and with nothing there.
+# tests\test-client-by-hash.ps1 asks the same of this machine's real bundle.
+Yes 'client-build.json names the six client files' ($clientFiles.Count -eq 6)
+$fakeGame = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ship-rules-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    foreach ($rel in $clientFiles) {
+        $recorded = $ShipClientHashes[$rel]
+        $full = [IO.Path]::Combine($fakeGame, $rel)
+        $null = New-Item -ItemType Directory -Force -Path (Split-Path $full -Parent)
+        [IO.File]::WriteAllText($full, 'the recorded build of ' + $rel)
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $ShipClientHashes[$rel] = -join ($sha.ComputeHash([IO.File]::ReadAllBytes($full)) | ForEach-Object { $_.ToString('x2') }) }
+        finally { $sha.Dispose() }
+        $GameDir = $fakeGame
+        Yes "$rel is ours by record and ships when it is the recorded build" (-not (Test-ShipOtherServer $rel) -and -not (Test-ShipMachine $rel) -and -not (Test-ShipRuntime $rel))
+        [IO.File]::WriteAllText($full, 'somebody else''s build of ' + $rel)
+        Yes "$rel with other bytes is not ours, so it neither ships nor is removed" ((Test-ShipOtherServer $rel) -eq $true)
+        Remove-Item -LiteralPath $full -Force
+        Yes "$rel with nothing there is not ours either" ((Test-ShipOtherServer $rel) -eq $true)
+        $ShipClientHashes[$rel] = $recorded
+        Remove-Variable -Name GameDir -ErrorAction SilentlyContinue
+    }
+}
+finally {
+    Remove-Item -LiteralPath $fakeGame -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# ---- nothing is both shipped and deleted ---------------------------------------
+#
+# A path on the delete-always list that a pack could also carry would arrive
+# and be deleted in the same update.
+foreach ($rel in $always) {
+    Yes "$rel, deleted by every pack, is never carried by one" ((Test-ShipOtherServer $rel) -or (Test-ShipMachine $rel))
+}
+
+# ---- the record that keeps the collection out ---------------------------------
+#
+# 17 September: Profile went, Profile\OwnGame\files.txt with it, and a release
+# counted 29,063 files and 11,368.1 MB of the collection as ours. Only lines
+# whose origin is V are the collection's.
+$work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ship-rules-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path (Join-Path $work 'Profile\OwnGame') -Force | Out-Null
+try {
+    $profileDir = Join-Path $work 'Profile'
+    Yes 'no record answers nothing, so the publisher can refuse' ($null -eq (Get-ShipOwnGameCollection $profileDir))
+
+    $lines = @(
+        'F|V|1024|638000000000000000|Data\SkyUI_SE.esp',
+        'F|V|2048|638000000000000000|Data\textures\sky\clouds.dds',
+        'F|O|4096|638000000000000000|Data\Platform\Plugins\thornswood-chat.js',
+        'not a record line'
+    )
+    [IO.File]::WriteAllLines((Join-Path $profileDir 'OwnGame\files.txt'), $lines)
+    $set = Get-ShipOwnGameCollection $profileDir
+    Yes 'the record reads back as a set' ($null -ne $set)
+    Yes '  holding the two lines Vortex deployed' ($null -ne $set -and $set.Count -eq 2)
+    Yes '  matched without regard to case' ($null -ne $set -and $set.Contains('data\skyui_se.esp'))
+    Yes '  and not the file of ours beside them' ($null -ne $set -and -not $set.Contains('Data\Platform\Plugins\thornswood-chat.js'))
+
+    # Where the reference plugin list comes from, which shipped the ordinary
+    # Skyrim's list once when it was read from AppData with the game closed.
+    $scratchRoot = Join-Path $work 'Root'
+    New-Item -ItemType Directory -Path $scratchRoot -Force | Out-Null
+    Yes 'no Game folder reads the list Vortex writes into AppData' (
+        (Get-ShipLoadOrderDir $scratchRoot $profileDir) -eq (Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition'))
+    New-Item -ItemType Directory -Path (Join-Path $scratchRoot 'Game') -Force | Out-Null
+    Yes 'an older Game folder reads Profile\Default' ((Get-ShipLoadOrderDir $scratchRoot $profileDir) -eq (Join-Path $profileDir 'Default'))
+    [IO.File]::WriteAllText((Join-Path $profileDir 'OwnGame\plugins.txt'), "*SkyUI_SE.esp`r`n")
+    Yes 'a folder made from Vortex reads Profile\OwnGame' ((Get-ShipLoadOrderDir $scratchRoot $profileDir) -eq (Join-Path $profileDir 'OwnGame'))
+}
+finally {
+    Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# ---- MarketplaceTextures.bsa: the rule itself -----------------------------------
+$bsa = 'Data\MarketplaceTextures.bsa'
+Yes 'MarketplaceTextures.bsa is one machine''s own: never shipped, never removed' (Test-ShipMachine $bsa)
+Yes 'whatever the case of the path' (Test-ShipMachine 'data\marketplacetextures.bsa')
+Yes 'only at the Data root, not a file of that name in a mod folder' (-not (Test-ShipMachine 'Data\textures\MarketplaceTextures.bsa'))
+Yes 'and not a name that merely starts the same way' (-not (Test-ShipMachine 'Data\MarketplaceTextures.bsa.bak'))
+Yes 'it is not a runtime path, which would list it as removed' (-not (Test-ShipRuntime $bsa))
+Yes 'it is not on the list every pack deletes' (@(Get-ShipDeleteAlways) -notcontains $bsa)
+Yes 'a mod''s own archive beside it still ships' (-not (Test-ShipMachine 'Data\SkyUI_SE.bsa'))
+Yes 'and so does our own plugin' (-not (Test-ShipMachine 'Data\Thornswood-Content.esp'))
+
+# ---- the shipped diff, lifted out of Publish-Update.ps1 ------------------------
+#
+# From the line that starts the two lists to the line that filters removals by
+# Test-Machine, plus Test-Machine itself. If either is renamed this fails
+# rather than quietly testing nothing.
+$pubPath = Join-Path $Here '..\scripts\release\Publish-Update.ps1'
+$pub = Get-Content -LiteralPath $pubPath -Raw
+$tm = [regex]::Match($pub, '(?m)^function Test-Machine\(.*$')
+$diff = [regex]::Match($pub, '(?ms)^\$changed = @\(\); \$removed = @\(\)\r?$.*?^\$removed\s+= @\(\$removed \| Where-Object \{[^\r\n]*Test-Machine[^\r\n]*\r?$')
+Yes 'Publish-Update.ps1 still defines Test-Machine on one line' $tm.Success
+Yes 'Publish-Update.ps1 still builds the removals and filters them by Test-Machine' $diff.Success
+Yes 'and its scan still leaves out what Test-Machine claims' ($pub -match 'if \(Test-Machine \$rel\) \{ continue \}')
+if (-not $tm.Success -or -not $diff.Success) { Done }
+. ([scriptblock]::Create($tm.Value))
+
+# The last pack carried the archive, a mesh that has since gone, and one of our
+# overlays. The game folder now has the archive and the overlay. The scan
+# leaves out what Test-Machine claims, as Publish-Update's does.
+$prev = @{}
+$prev[$bsa] = '2938167:639246568900000000'
+$prev['Data\meshes\gone\old.nif'] = '100:1'
+$prev['Data\Platform\Plugins\thornswood-hud.js'] = '10:1'
+$onDisk = @($bsa, 'Data\Platform\Plugins\thornswood-hud.js')
+$now = @{}
+foreach ($rel in $onDisk) {
+    if (Test-Machine $rel) { continue }
+    $now[$rel] = $prev[$rel]
+}
+. ([scriptblock]::Create($diff.Value))
+
+Yes 'the next pack does not carry MarketplaceTextures.bsa' (-not $now.ContainsKey($bsa))
+Yes 'and does not list it as changed' ($changed -notcontains $bsa)
+Yes 'and does not list it as removed, so no tester loses it' ($removed -notcontains $bsa)
+Yes 'the lifted diff is live: a mesh that really went is still removed' ($removed -contains 'Data\meshes\gone\old.nif')
+Yes 'and our overlay is neither changed nor removed' (($changed -notcontains 'Data\Platform\Plugins\thornswood-hud.js') -and ($removed -notcontains 'Data\Platform\Plugins\thornswood-hud.js'))
+
+# ---- the installer asks the same question ----------------------------------------
+$pkg = Get-Content -LiteralPath (Join-Path $Here '..\scripts\release\Package-Thornswood.ps1') -Raw
+Yes 'Package-Thornswood.ps1 dot-sources Ship-Rules.ps1' ($pkg -match '\. \(Join-Path \$Here ''Ship-Rules\.ps1''\)')
+Yes 'and its filter loop leaves out what Test-ShipMachine claims' ($pkg -match 'if \(Test-ShipMachine \$rel\) \{')
+Yes 'and it reports the loose art it is about to ship' ($pkg -match '\$loose = Get-ShipLooseArt \$ship')
+
+# ---- the loose art report --------------------------------------------------------
+function Row([string]$rel, [long]$len) { return [pscustomobject]@{ Rel = $rel; Len = $len } }
+$ship = @(
+    (Row 'Data\textures\LoA Reborn Paladin Legendary\body.dds' 5000),
+    (Row 'Data\textures\LoA Reborn Paladin Legendary\sub\hands.dds' 3000),
+    (Row 'Data\Textures\LostArk\a.dds' 1000),
+    (Row 'Data\textures\lostark\b.dds' 500),
+    (Row 'Data\meshes\armor\commonclothes\travel.nif' 4000),
+    (Row 'Data\meshes\animationdatasinglefile.txt' 700),
+    (Row 'Data\meshes\interface\logo\logo.nif' 10562),
+    (Row 'Data\meshes\interface\logo\logo01ae.nif' 10562),
+    (Row 'Data\textures\interface\objects\Mainmenuwallpaper.dds' 8388736),
+    (Row 'Data\Scripts\rp_trapcactusscript.pex' 900),
+    (Row 'Data\Platform\UI\index.html' 2000),
+    (Row 'Data\texturesOld\x.dds' 50),
+    (Row 'Data\Thornswood-Content.esp' 64)
+)
+$loose = Get-ShipLooseArt $ship
+$by = @{}
+foreach ($l in $loose) { $by[$l.Folder] = $l }
+
+Yes 'one row per folder: LoA, LostArk, armor and the loose meshes' ($loose.Count -eq 4)
+Yes 'biggest first' ($loose.Count -ge 1 -and $loose[0].Folder -eq 'Data\textures\LoA Reborn Paladin Legendary')
+Yes 'a folder counts everything under it, subfolders too' ($by.ContainsKey('Data\textures\LoA Reborn Paladin Legendary') -and $by['Data\textures\LoA Reborn Paladin Legendary'].Files -eq 2 -and $by['Data\textures\LoA Reborn Paladin Legendary'].Bytes -eq 8000)
+Yes 'two spellings of one folder are one row' ($by.ContainsKey('Data\Textures\LostArk') -and $by['Data\Textures\LostArk'].Files -eq 2 -and $by['Data\Textures\LostArk'].Bytes -eq 1500)
+Yes 'files straight under Data\meshes are a row of their own' ($by.ContainsKey('Data\meshes') -and $by['Data\meshes'].Files -eq 1)
+Yes 'the menu backdrop is ours and is not reported' (-not $by.ContainsKey('Data\meshes\interface') -and -not $by.ContainsKey('Data\textures\interface'))
+Yes 'scripts, the front and our plugin are not loose art' (-not ($loose | Where-Object { $_.Folder -notlike 'Data\textures*' -and $_.Folder -notlike 'Data\meshes*' }))
+Yes 'a folder that only starts with textures is not textures' (-not ($loose | Where-Object { $_.Folder -like 'Data\texturesOld*' }))
+$none = Get-ShipLooseArt @((Row 'Data\meshes\interface\logo\logo.nif' 1), (Row 'Data\Scripts\a.pex' 1))
+Yes 'nothing to report is an empty list, not nothing' (($null -ne $none) -and $none.Count -eq 0)
+$one = Get-ShipLooseArt @((Row 'Data\meshes\MCE\robe.nif' 29))
+Yes 'one folder is still a list of one' ($one.Count -eq 1 -and $one[0].Folder -eq 'Data\meshes\MCE' -and $one[0].Bytes -eq 29)
+Yes 'the three files Go.ps1 writes are the three called ours' ((@($ShipOwnArt) | Where-Object { (Get-Content -LiteralPath (Join-Path $Here '..\scripts\release\Go.ps1') -Raw).Contains("'" + $_ + "'") }).Count -eq 3)
+
+# ---- measured on this machine, where it can be ------------------------------------
+$baseline = Join-Path $env:LOCALAPPDATA 'Thornswood\published.json'
+if ($env:LOCALAPPDATA -and (Test-Path -LiteralPath $baseline)) {
+    $keys = @(((Get-Content -LiteralPath $baseline -Raw) -replace '^\uFEFF', '' | ConvertFrom-Json).PSObject.Properties.Name)
+    if ($keys -contains $bsa) {
+        Write-Host "      this machine's last pack carried $bsa, so a vanilla rule would have deleted it"
+    }
+    Yes 'whatever the last pack carried, the archive is not removed by the next' (@($keys | Where-Object { $_ -ieq $bsa -and -not (Test-Machine $_) }).Count -eq 0)
+} else {
+    Write-Host 'SKIP  no pack baseline on this machine'
+}
+
+$filesRecord = Join-Path $Root 'Profile\OwnGame\files.txt'
+if (Test-Path -LiteralPath $filesRecord) {
+    # What the installer carries under textures and meshes out of an own game
+    # folder: everything the record does not mark as the collection's (V).
+    $rows = @()
+    foreach ($line in [IO.File]::ReadLines($filesRecord)) {
+        $p = $line.Split([char[]]'|', 5)
+        if ($p.Count -ne 5 -or $p[1] -eq 'V') { continue }
+        $rows += [pscustomobject]@{ Rel = $p[4]; Len = [long]$p[2] }
+    }
+    $measured = Get-ShipLooseArt $rows
+    $mf = 0; $mb = [long]0
+    foreach ($l in $measured) { $mf += $l.Files; $mb += $l.Bytes }
+    Write-Host ("      {0} holds {1:n0} loose file(s), {2:n1} MB, in {3} folder(s) that are not ours:" -f $filesRecord, $mf, ($mb / 1MB), $measured.Count)
+    foreach ($l in $measured) { Write-Host ("        {0,8:n1} MB {1,6:n0} file(s)  {2}" -f ($l.Bytes / 1MB), $l.Files, $l.Folder) }
+    $oursThere = @($rows | Where-Object { @($ShipOwnArt) -contains $_.Rel })
+    Yes ("the record's {0} file(s) of our menu backdrop are not reported" -f $oursThere.Count) ((Get-ShipLooseArt $oursThere).Count -eq 0)
+    $inRecord = @($rows | Where-Object { $_.Rel -ieq $bsa })
+    if ($inRecord.Count) {
+        Yes 'the record''s MarketplaceTextures.bsa is left out' (Test-ShipMachine $inRecord[0].Rel)
+    }
+} else {
+    Write-Host "SKIP  no $filesRecord on this machine"
+}
+
+Done

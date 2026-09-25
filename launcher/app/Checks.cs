@@ -1,0 +1,1059 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Threading;
+
+namespace Thornswood
+{
+    class Check
+    {
+        public string Name, Detail;
+        public bool Ok;
+        // A row that is shown, and turns amber when it fails, but does not
+        // shut Play. A new row starts this way until it has been seen to be
+        // right on every tester's machine, because a row that blocks and is
+        // wrong locks everybody out on the day it ships.
+        public bool Advisory;
+        public Check(string n, bool ok, string d) { Name = n; Ok = ok; Detail = d; }
+        public Check(string n, bool ok, string d, bool advisory) { Name = n; Ok = ok; Detail = d; Advisory = advisory; }
+
+        /// <summary>Whether this row, as it stands, keeps Play shut.</summary>
+        public bool Blocks { get { return !Ok && !Advisory; } }
+    }
+
+    static class Checks
+    {
+        /// <summary>
+        /// Whether the plugin that walks past the main menu is present. Without
+        /// it the character picker still decides which saves exist, the game
+        /// just asks one more question on the way in.
+        /// </summary>
+        public static bool StartOnSaveInstalled()
+        {
+            try
+            {
+                string dll = System.IO.Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\po3_StartOnSave.dll");
+                return System.IO.File.Exists(dll);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// The Address Library row on the Play page.
+        ///
+        /// Script extender plugins look the game's addresses up in this file,
+        /// and one that needs it and cannot find it does not load: EngineFixes
+        /// says "failed to locate an appropriate address library" and stays
+        /// out (see the working directory note in Shell.Play). Until
+        /// 24 September nothing on this page asked, so a missing file read as
+        /// all green while those plugins quietly stayed out of the game.
+        /// Setup-Thornswood.ps1 has checked for it all along; the launcher
+        /// was the one that forgot.
+        ///
+        /// Advisory: it turns amber and does not shut Play. It is a new row,
+        /// and a new row that blocks and is wrong on somebody's machine locks
+        /// them out of the game with nothing they can press.
+        ///
+        /// buildRight is the Game build row's answer. While the exe is the
+        /// wrong build the fix is the downgrade, not Vortex: DrawStatus keeps
+        /// the collection card down until the build is right, so sending
+        /// somebody to Vortex from here would contradict the one card on the
+        /// page that helps them.
+        /// </summary>
+        public static Check AddressLibraryRow(string game, bool buildRight)
+        {
+            string build;
+            string file = AddressLibraryFile(game, out build);
+            bool ok = file.Length > 0 && File.Exists(file);
+            string detail = ok ? "versionlib " + build
+                          : file.Length == 0 ? "cannot tell, SkyrimSE.exe gives no version"
+                          : !buildRight ? "missing for " + build + ", downgrade first"
+                          : "missing for " + build + ", install the collection in Vortex";
+            return new Check("Address Library", ok, detail, true);
+        }
+
+        /// <summary>
+        /// The Address Library file the game in this folder will open, as a
+        /// full path, with the build it is for ("1.6.1170") in build. Both
+        /// are "" when SkyrimSE.exe is missing or carries no version.
+        ///
+        /// Named from the exe's own version rather than from a second copy
+        /// of the pin, because the plugins name it the same way when the game
+        /// starts: the build that actually runs decides which file they open.
+        /// Measured on 24 September: C:\Thornswood\Game\SkyrimSE.exe reads
+        /// 1.6.1170.0, and versionlib-1-6-1170-0.bin is the file beside it
+        /// that Setup-Thornswood.ps1 tests for. So this follows the pin
+        /// wherever it moves without anybody editing it.
+        /// </summary>
+        public static string AddressLibraryFile(string game, out string build)
+        {
+            build = "";
+            try
+            {
+                string exe = Path.Combine(game, "SkyrimSE.exe");
+                if (!File.Exists(exe)) return "";
+                FileVersionInfo v = FileVersionInfo.GetVersionInfo(exe);
+                string name = AddressLibraryName(v.FileMajorPart, v.FileMinorPart, v.FileBuildPart, v.FilePrivatePart);
+                if (name.Length == 0) return "";
+                build = v.FileMajorPart + "." + v.FileMinorPart + "." + v.FileBuildPart;
+                return Path.Combine(game, "Data\\SKSE\\Plugins\\" + name);
+            }
+            catch { build = ""; return ""; }
+        }
+
+        /// <summary>
+        /// Address Library's file name for one build of the game. The mod
+        /// ships one file per build, side by side: version-1-5-97-0.bin for
+        /// the 1.5 builds and versionlib-1-6-1170-0.bin for 1.6 and after.
+        /// </summary>
+        public static string AddressLibraryName(int major, int minor, int build, int rev)
+        {
+            if (major <= 0) return "";
+            string stem = (major == 1 && minor < 6) ? "version-" : "versionlib-";
+            return stem + major + "-" + minor + "-" + build + "-" + rev + ".bin";
+        }
+
+        /// <summary>
+        /// Which revision of the collection this machine has installed, or 0.
+        ///
+        /// Vortex names the collection's own mod folder for it:
+        ///
+        ///     %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
+        ///                                               slug  ^ revision
+        ///
+        /// This replaces asking whether one named file exists, which is what
+        /// decided "your collection is behind" until 22 September. That test
+        /// was wrong in both directions. It named po3_StartOnSave.dll, which
+        /// Add-Characters.ps1 puts into a build BY HAND and which the
+        /// collection has never carried, so anybody who installed the
+        /// collection correctly and never ran that script read as behind, and
+        /// anybody genuinely two revisions behind read as fine as long as the
+        /// file was there.
+        ///
+        /// A number is the honest answer to a question about a revision. The
+        /// newest folder wins, because an upgrade leaves the old one until
+        /// Vortex tidies it.
+        /// </summary>
+        public static int CollectionRevision(Config cfg)
+        {
+            try
+            {
+                string slug = CollectionSlug(cfg);
+                if (slug.Length == 0) return 0;
+                string dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Vortex\\skyrimse\\mods");
+                if (!Directory.Exists(dir)) return 0;
+
+                int best = 0;
+                foreach (string d in Directory.GetDirectories(dir, "collection_" + slug + "_*"))
+                {
+                    string name = Path.GetFileName(d);
+                    // collection_<slug>_<rev>_<when>
+                    string rest = name.Substring(("collection_" + slug + "_").Length);
+                    int cut = rest.IndexOf('_');
+                    if (cut <= 0) continue;
+                    int n = 0;
+                    if (!int.TryParse(rest.Substring(0, cut), out n)) continue;
+                    if (n > best) best = n;
+                }
+                return best;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// The collection's slug out of its address, "ombo2a" from
+        /// .../collections/ombo2a. Read from the config so a machine pointed at
+        /// a different collection still answers about its own.
+        /// </summary>
+        public static string CollectionSlug(Config cfg)
+        {
+            try
+            {
+                string url = cfg == null ? "" : (cfg.CollectionUrl ?? "");
+                int at = url.LastIndexOf("/collections/", StringComparison.OrdinalIgnoreCase);
+                if (at < 0) return "";
+                string s = url.Substring(at + "/collections/".Length).Trim();
+                int q = s.IndexOfAny(new char[] { '/', '?', '#' });
+                if (q >= 0) s = s.Substring(0, q);
+                foreach (char c in s) { if (!char.IsLetterOrDigit(c)) return ""; }
+                return s;
+            }
+            catch { return ""; }
+        }
+
+        /// <summary>
+        /// At or below this many enabled plugins the collection counts as not
+        /// installed. Two things on screen ask it: the Mods row on the checks
+        /// list and the "not installed yet" card above Play, which is
+        /// Shell.CollectionProblem answering "none". Until 24 September each
+        /// had its own 40 written into it, so moving one and not the other
+        /// would have put a green Mods row under a card saying the mods are
+        /// not installed.
+        ///
+        /// Nothing recorded says where 40 came from; it has been the number
+        /// since the first launcher. It sits well under the 94 plugins the
+        /// shipped reference list enables, counted on 24 September, so a full
+        /// install clears it easily and an empty list does not come near it.
+        /// </summary>
+        public const int MostPluginsWithoutCollection = 40;
+
+        public static int EnabledPlugins()
+        {
+            try
+            {
+                string p = Path.Combine(Paths.Live, "plugins.txt");
+                if (!File.Exists(p)) return 0;
+                int n = 0;
+                foreach (string line in File.ReadAllLines(p))
+                    if (line.StartsWith("*")) n++;
+                return n;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// Another server's client, sitting in the Steam game's SKSE folder.
+        ///
+        /// These are not plugins and not mods, so nothing about the plugin list
+        /// notices them. Every check on the Play page can be green while Daedric
+        /// Online's client draws the main menu and asks somebody to log in to a
+        /// server that is not this one, and Skyrim then will not close, so the
+        /// launcher cannot update either.
+        ///
+        /// Vortex does not take them out. It only tracks what it deployed, and
+        /// these were dropped in by somebody else's installer, so Purge Mods
+        /// leaves them exactly where they are.
+        /// </summary>
+        ///
+        /// NirnLabUIPlugin.dll WAS on this list and must never go back on it.
+        /// Listing it here meant every press of Fix deleted the plugin that
+        /// drew the whole in game interface on a machine whose
+        /// Data\SKSE\Plugins\SkyrimPlatform.ini said BackendName = nirnlab, so
+        /// the overlay never booted and nothing put anybody into the creation
+        /// hall.
+        ///
+        /// Which browser backend runs is not decided here, and this note does
+        /// not say which one it is. It used to say this build ran on nirnlab;
+        /// on 24 Sep the ini on Patrick's machine read BackendName = tilted and
+        /// his thornswood-front.log from 23 Sep said "browser backend: tilted".
+        /// Chars.WriteBrowserBackend chooses on every Play from what is in the
+        /// game folder, and thornswood-front.js asks SkyrimPlatform at startup
+        /// and writes the answer to Data\Platform\thornswood-front.log. Those
+        /// two are the record. Keeping NirnLab out of Thornswood's own folder
+        /// is OwnGame.Foreign's job: it leaves out Data\NirnLabUIPlatform and
+        /// NirnLabUIPlugin.dll when the folder is built, the same rule as
+        /// Test-ShipOtherServer in tools\Ship-Rules.ps1.
+        // Empty since 20 September. It held the file names of another
+        // server's client probe, and Thornswood no longer looks for other
+        // servers' files at all: its own folder is built from what belongs,
+        // and anything else is simply left out. The array stays because Fix
+        // walks it; an empty walk is nothing.
+        public static readonly string[] ForeignNames = {
+        };
+
+        /// <summary>
+        /// The rest of another server's client, as exact paths under the game
+        /// folder. The two swf files are the other server's main menu, which
+        /// is what shows their logo and their sign in box in place of
+        /// Skyrim's.
+        ///
+        /// Data\\NirnLabUIPlatform is deliberately NOT here. See the note on
+        /// ForeignNames above: keeping it out of Thornswood's own folder is
+        /// OwnGame.Foreign's job when the folder is built, not Fix's.
+        ///
+        /// Exact paths only. Never a pattern, and never the bare word daedric,
+        /// which is a vanilla Skyrim material that names thousands of ordinary
+        /// armour, weapon and texture files.
+        /// </summary>
+        //
+        // Data\Interface\startmenu.swf and loadwaitspinner.swf are NOT here any
+        // more. From 2026-09-16 Thornswood ships its own copies of both, a main
+        // menu with no Bethesda logo and no button list so the backdrop stands
+        // alone, and an empty spinner. The pack overwrites another server's copy
+        // on the way in, so nothing has to be moved aside, and listing them here
+        // would make Fix quarantine our own files on every scan.
+        public static readonly string[] ForeignPaths = {
+            "Data\\Video\\Interface\\startmenu.swf",
+            "Data\\Video\\Interface\\loadwaitspinner.swf",
+        };
+
+        /// <summary>What is left behind after something is moved aside, so the
+        /// checks do not keep reporting a file that is already disabled.</summary>
+        public const string OffSuffix = ".thornswood-off";
+
+        public static string[] ForeignClients()
+        {
+            var found = new List<string>();
+            try
+            {
+                string dir = Path.Combine(Paths.Game, "Data\\SKSE\\Plugins");
+                foreach (string n in ForeignNames)
+                {
+                    string f = Path.Combine(dir, n);
+                    if (File.Exists(f)) found.Add(f);
+                }
+                foreach (string rel in ForeignPaths)
+                {
+                    string f = Path.Combine(Paths.Game, rel);
+                    if (File.Exists(f) || Directory.Exists(f)) found.Add(f);
+                }
+            }
+            catch { }
+            return found.ToArray();
+        }
+
+        /// <summary>
+        /// Plugins that have to carry the ESL flag for the load order to line up
+        /// with the server's.
+        ///
+        /// SkyMP resolves a form as fileIdx * 0x01000000 + shortFormId, with
+        /// fileIdx the plugin's position in the server's list, and the client
+        /// counts its own with Game.GetModCount, which skips every light plugin.
+        /// The server leaves light plugins out for the same reason, and it also
+        /// has to leave out anything that masters to one, because libespm will
+        /// not load a plugin whose master is absent.
+        ///
+        /// MCMHelper.esp masters to SkyUI_SE.esp, which is light, so the server
+        /// drops it. MCM Helper ships two copies of that plugin in its archive,
+        /// identical to the byte apart from this one flag, and the collection
+        /// installs the one without it. The game hands that one an index, the
+        /// server has no such entry, and from that position on every plugin on
+        /// the client is one place away from the server's copy. On 2026-09-16
+        /// that was the whole of "connects, then sits on the main menu".
+        ///
+        /// The file is 100 bytes and holds no records, so flagging it costs
+        /// nothing and the mod keeps working. This is what the author's own ESL
+        /// variant is.
+        ///
+        /// HOTHTROOPER44_ARMOR_ECKSSTRA.ESP IS THE SAME CASE, found on
+        /// 2026-09-24 from Djinn's dev build: "Your load order is not the
+        /// server's from position 52: you have Hothtrooper44_Armor_Ecksstra.esp
+        /// there, the server has SkyHUD.esp", with Fix, a Vortex purge and a
+        /// redeploy all failing to clear it. Measured: the Nexus archive of
+        /// Immersive Armors, Script Free and Skypatched 1.3.0, ships this file
+        /// light (171 bytes, flags 0x200), and so does the machine the server's
+        /// order is built from, so the server leaves it out and counts SkyHUD at
+        /// 52. A copy without the flag gets an index of its own and pushes every
+        /// plugin after it one place along. Fix only reorders the list, so it
+        /// could never clear it; flagging it is what this list is for.
+        /// </summary>
+        public static readonly string[] MustBeLight = {
+            "MCMHelper.esp",
+            "Hothtrooper44_Armor_Ecksstra.esp",
+        };
+
+        const uint LightFlag = 0x200;
+
+        /// <summary>True when the TES4 header carries the ESL flag. A file that
+        /// cannot be read answers true, so nothing is reported for it.</summary>
+        static bool IsLight(string path)
+        {
+            try
+            {
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var b = new byte[12];
+                    if (fs.Read(b, 0, 12) < 12) return true;
+                    if (b[0] != (byte)'T' || b[1] != (byte)'E' || b[2] != (byte)'S' || b[3] != (byte)'4') return true;
+                    uint flags = BitConverter.ToUInt32(b, 8);
+                    return (flags & LightFlag) != 0;
+                }
+            }
+            catch { return true; }
+        }
+
+        /// <summary>The plugins in MustBeLight that are present and not yet light.</summary>
+        public static List<string> NotLight()
+        {
+            var l = new List<string>();
+            string data = Path.Combine(Paths.Game, "Data");
+            foreach (string n in MustBeLight)
+            {
+                string p = Path.Combine(data, n);
+                try { if (File.Exists(p) && !IsLight(p)) l.Add(n); } catch { }
+            }
+            return l;
+        }
+
+        /// <summary>
+        /// Sets the ESL flag on each plugin in MustBeLight that lacks it. One
+        /// byte, in place, so a Vortex hard link stays a hard link and the
+        /// staging copy is corrected with it. Returns how many were changed.
+        /// </summary>
+        public static int FlagLight(Action<string> say)
+        {
+            int n = 0;
+            string data = Path.Combine(Paths.Game, "Data");
+            foreach (string name in NotLight())
+            {
+                string p = Path.Combine(data, name);
+                try
+                {
+                    // In Thornswood's own folder the plugin is a link to Vortex's
+                    // copy, which every other server's folder may link too.
+                    // Flagging it there would flag it for all of them.
+                    OwnGame.Separate(p);
+                    try { File.SetAttributes(p, FileAttributes.Normal); } catch { }
+                    using (var fs = new FileStream(p, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
+                    {
+                        var b = new byte[4];
+                        fs.Seek(8, SeekOrigin.Begin);
+                        if (fs.Read(b, 0, 4) < 4) continue;
+                        uint flags = BitConverter.ToUInt32(b, 0) | LightFlag;
+                        fs.Seek(8, SeekOrigin.Begin);
+                        fs.Write(BitConverter.GetBytes(flags), 0, 4);
+                    }
+                    n++;
+                    if (say != null) say(name + " is now flagged light, so your load order counts the same way the server's does.");
+                }
+                catch (Exception ex)
+                {
+                    if (say != null) say("Could not flag " + name + " light: " + ex.Message + "  Close Skyrim and Vortex and try again.");
+                }
+            }
+            return n;
+        }
+
+        /// <summary>
+        /// Moves another server's files aside. It never deletes anything.
+        ///
+        /// Somebody who plays Thornswood may also play another server or
+        /// another server, and their install is theirs. Two steps, because the
+        /// game can sit on a different drive from the launcher:
+        ///
+        ///   1. Rename in place with .thornswood-off. Always on the same
+        ///      volume, so it always works, and a renamed dll is not loaded by
+        ///      the script extender and a renamed swf is not read by Skyrim.
+        ///   2. Move the renamed item into Profile\Isolated, best effort. If
+        ///      that fails it stays renamed where it is, still disabled.
+        ///
+        /// Either way restore.txt in the Isolated folder records where each
+        /// item came from and where it went, so it can be put back by hand.
+        ///
+        /// Named files and exact paths only, nothing matched by pattern.
+        /// </summary>
+        public static int IsolateForeign(Action<string> say)
+        {
+            int n = 0;
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
+            string bin = Path.Combine(Paths.Isolated, stamp);
+
+            foreach (string f in ForeignClients())
+            {
+                string name = Path.GetFileName(f);
+                try
+                {
+                    string landed = MoveAside(f, bin, stamp);
+                    n++;
+                    if (say != null)
+                        say(name + " belongs to another server. Moved aside to " + landed +
+                            ". Nothing was deleted, and it can be put back.");
+                }
+                catch (Exception ex)
+                {
+                    if (say != null)
+                        say("Could not move " + name + " aside: " + ex.Message +
+                            "  Close Skyrim and try again.");
+                }
+            }
+            return n;
+        }
+
+        /// <summary>
+        /// The two steps IsolateForeign describes, for one file or folder.
+        /// Returns where it ended up; throws when even the rename fails.
+        /// </summary>
+        static string MoveAside(string f, string bin, string stamp)
+        {
+            bool isDir = Directory.Exists(f);
+            string off = f + OffSuffix;
+            if (File.Exists(off) || Directory.Exists(off)) off = off + "-" + stamp;
+
+            if (isDir)
+            {
+                Directory.Move(f, off);
+            }
+            else
+            {
+                try { File.SetAttributes(f, FileAttributes.Normal); } catch { }
+                File.Move(f, off);
+            }
+
+            string landed = off;
+            try
+            {
+                Directory.CreateDirectory(bin);
+                string dest = Path.Combine(bin, Path.GetFileName(off));
+                if (isDir) Directory.Move(off, dest); else File.Move(off, dest);
+                landed = dest;
+            }
+            catch { }
+
+            NoteIsolated(bin, f, landed);
+            return landed;
+        }
+
+        static void NoteIsolated(string bin, string from, string to)
+        {
+            try
+            {
+                Directory.CreateDirectory(bin);
+                File.AppendAllText(Path.Combine(bin, "restore.txt"),
+                    DateTime.Now.ToString("s") + "  was: " + from + Environment.NewLine +
+                    "                     now: " + to + Environment.NewLine);
+            }
+            catch { }
+        }
+
+        /// <summary>Old name. Kept so nothing that still calls it deletes
+        /// anything, because it never did anything else after this change.</summary>
+        public static int RemoveForeign(Action<string> say) { return IsolateForeign(say); }
+
+        /// <summary>
+        /// Creation Club plugins the game will load without being asked, and
+        /// that <paramref name="wanted"/>, the reference list, does not name.
+        ///
+        /// Skyrim.ccc in the game's root lists the Creation Club's plugins, and
+        /// the game loads every one of them it finds in Data straight after the
+        /// five masters, whatever plugins.txt says. So they are in no plugin
+        /// list and every other row of the scan passes them.
+        ///
+        /// Measured on 19 Sep. another server's launcher put the free ones back
+        /// into Data, Thornswood's folder took them in, and the game loaded two
+        /// full masters the server does not have. Every plugin after
+        /// Dragonborn.esm was two places off, the game showed LOAD ORDER ERROR,
+        /// and this scan said everything checks out.
+        /// </summary>
+        public static List<string> StrayCreations(ICollection<string> wanted)
+        {
+            var l = new List<string>();
+            if (wanted == null || wanted.Count == 0) return l;
+            try
+            {
+                string ccc = Path.Combine(Paths.Game, "Skyrim.ccc");
+                if (!File.Exists(ccc)) return l;
+                string data = Path.Combine(Paths.Game, "Data");
+                // Only a plugin that takes a place in the load order counts.
+                // A light one loaded this way is no different to the server
+                // from the forty odd light plugins in the list itself: the
+                // server's list never holds a light plugin, so none of them
+                // is "content the server has", and none of those draws a
+                // card. Until 20 September _ResourcePack.esl drew one on
+                // every machine: Bethesda's own update 1.6.1130 put it and
+                // its archive in every Data folder and Skyrim.ccc names it,
+                // it is light, and it holds no placed content (statics,
+                // textures and four quests, "additional resources for
+                // Creations"). A card about a file nobody installed, that
+                // changes nothing anyone can touch, was an alarm with no fire.
+                foreach (string raw in File.ReadAllLines(ccc))
+                {
+                    string n = raw.Trim();
+                    if (n.Length == 0 || n.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) continue;
+                    if (wanted.Contains(n) || l.Contains(n)) continue;
+                    if (!File.Exists(Path.Combine(data, n))) continue;
+                    if (TakesNoPlace(n)) continue;
+                    l.Add(n);
+                }
+            }
+            catch { }
+            return l;
+        }
+
+        /// <summary>True when a plugin in Data takes no place in the load
+        /// order: an .esl, or the ESL flag in its header.</summary>
+        public static bool TakesNoPlace(string name)
+        {
+            if (name.EndsWith(".esl", StringComparison.OrdinalIgnoreCase)) return true;
+            return IsLight(Path.Combine(Paths.Game, "Data\\" + name));
+        }
+
+        /// <summary>
+        /// Moves each of StrayCreations aside, the same two steps as
+        /// IsolateForeign, never deleting anything. Steam put these there and
+        /// another server may want them, so each one goes into the Isolated
+        /// folder with a line in restore.txt saying where it came from.
+        /// </summary>
+        public static int IsolateCreations(ICollection<string> wanted, Action<string> say)
+        {
+            int n = 0;
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
+            string bin = Path.Combine(Paths.Isolated, stamp);
+            string data = Path.Combine(Paths.Game, "Data");
+
+            foreach (string name in StrayCreations(wanted))
+            {
+                try
+                {
+                    string landed = MoveAside(Path.Combine(data, name), bin, stamp);
+                    n++;
+                    if (say != null)
+                        say(name + " is a Creation Club plugin the server does not have. Moved aside to " + landed +
+                            ". Nothing was deleted, and it can be put back.");
+                }
+                catch (Exception ex)
+                {
+                    if (say != null)
+                        say("Could not move " + name + " aside: " + ex.Message +
+                            "  Close Skyrim and try again.");
+                }
+            }
+            return n;
+        }
+
+        /// <summary>
+        /// The SkyMP client bundle. Not MpClientPlugin.dll, which is the SKSE
+        /// side: this is the JavaScript that actually dials the server.
+        /// </summary>
+        public static string ClientBundle
+        {
+            get { return Path.Combine(Paths.Game, "Data\\Platform\\Plugins\\skymp5-client.js"); }
+        }
+
+        // ClientPatched WAS HERE until 24 September: it searched the bundle's
+        // text for "THORNSWOOD PATCH" or "Thornswood:" and called any bundle
+        // carrying either one ours. Nothing had called it since a4acb90 (#108)
+        // moved the Client row to ClientRuntime, which compares all six files
+        // with the recorded sha256, and a test that passes because of
+        // something we wrote into the file is not a test (To Do entry 128).
+
+        /// <summary>What the Client row says, green or red.</summary>
+        /// <remarks>
+        /// IT NO LONGER TELLS ANYBODY TO REINSTALL, and that sentence was the
+        /// worst part of this row. The remedy used to be chosen from whether
+        /// Profile\Keep held a copy, and a fresh install never does, so a
+        /// brand new tester was always told to reinstall Thornswood. On
+        /// 22 September one of them did, got the same screen, and only got in
+        /// after purging Vortex twice, running another server's launcher
+        /// repair and logging in to a character there. The installer they
+        /// reinstalled from is a suspect in the same fault, so that advice
+        /// sent them round the loop it came from.
+        ///
+        /// The launcher puts it back itself now. See ClientRuntime.Heal, which
+        /// takes the recorded files out of the kept copies or out of a pack on
+        /// the feed. This row only has to say what is true while that happens.
+        /// </remarks>
+        public static string ClientDetail()
+        {
+            try
+            {
+                // The record is the check now, not a text search for our name.
+                // See ClientRuntime for why the old one could not tell you
+                // WHICH build you had.
+                if (ClientRuntime.Recorded().Count > 0)
+                {
+                    List<string> missing;
+                    List<string> wrong = ClientRuntime.Wrong(out missing);
+                    int bad = missing.Count + wrong.Count;
+                    if (bad == 0) return "client bundle";
+                    string what = (bad == 1)
+                        ? Path.GetFileName(missing.Count > 0 ? missing[0] : wrong[0])
+                        : bad + " client files";
+                    return (missing.Count > 0 && wrong.Count == 0)
+                        ? what + " is missing, the launcher will fetch it"
+                        : what + " is not this build's, the launcher will replace it";
+                }
+
+                // No record embedded. That is a build fault rather than
+                // anything wrong with this machine, so it says so plainly and
+                // falls back to asking whether the bundle is there at all.
+                if (!File.Exists(ClientBundle))
+                    return "skymp5-client.js is missing, and this launcher has no client record to fix it from";
+            }
+            catch { return "client bundle"; }
+            return "client bundle";
+        }
+        public static List<Check> All(Config cfg)
+        {
+            long bytes = 0;
+            try { if (File.Exists(Paths.Exe)) bytes = new FileInfo(Paths.Exe).Length; } catch { }
+            int plugins = EnabledPlugins();
+
+            var l = new List<Check>();
+            l.Add(new Check("Game build", bytes == cfg.ExpectedExeBytes, Downgrade.Describe(cfg)));
+            l.Add(new Check("Script Extender", File.Exists(Path.Combine(Paths.Game, "skse64_1_6_1170.dll")), "skse64 2.2.6"));
+            // Advisory, so it warns and never shuts Play. See AddressLibraryRow.
+            l.Add(AddressLibraryRow(Paths.Game, bytes == cfg.ExpectedExeBytes));
+            l.Add(new Check("Multiplayer", File.Exists(Paths.MpClient), "SkyMP client"));
+            // The other half of the client, and the half that connects.
+            // See ClientRuntime: every row above this one asks whether a
+            // file exists, and a bundle that is present but not ours is
+            // what leaves somebody sitting on the backdrop.
+            l.Add(new Check("Client", ClientRuntime.Good(), ClientDetail()));
+            l.Add(new Check("Mods", plugins > MostPluginsWithoutCollection, plugins + " plugins"));
+
+            // The server does not police plugin lists, so this does. A list that
+            // does not match the one this build shipped with desyncs everyone,
+            // which is worse than a blocked button with a one click fix.
+            int blocking = 0;
+            try { foreach (Issue i in Verify.Run()) if (i.Blocking) blocking++; } catch { }
+            l.Add(new Check("Mod list",
+                            blocking == 0,
+                            blocking == 0 ? "matches the server"
+                                          : (blocking == 1 ? "1 problem, open Mods" : blocking + " problems, open Mods")));
+
+            string[] foreign = ForeignClients();
+            l.Add(new Check("Other servers",
+                            foreign.Length == 0,
+                            foreign.Length == 0
+                                ? "none"
+                                : (foreign.Length == 1 ? "1 client file, open Mods"
+                                                       : foreign.Length + " client files, open Mods")));
+
+            // The plugin that walks past the main menu.
+            //
+            // This helper has existed the whole time and nothing ever showed
+            // its answer, so the launcher said everything checks out while the
+            // one thing that actually puts somebody into the world was missing.
+            // The symptom is not an error: the game opens on NEW, LOAD, QUIT
+            // and waits, which reads as the server ignoring you.
+            //
+            // It is worth its own row rather than folding into Mods, because
+            // neither the installer nor the collection delivers it. The
+            // launcher writes po3_StartOnSave.ini on every Play, so the config
+            // for it is always present and proves nothing about the dll.
+            l.Add(new Check("Auto load",
+                            StartOnSaveInstalled(),
+                            StartOnSaveInstalled()
+                                ? "walks past the main menu"
+                                : "Start On Save is missing, install it in Vortex"));
+
+            l.Add(new Check("Steam", SteamRunning(), "running"));
+            return l;
+        }
+
+        public static bool SteamRunning()
+        {
+            try { return Process.GetProcessesByName("steam").Length > 0; }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Which Skyrim last ran, read back from the script extender's own log.
+        /// Empty until the game has been started at least once.
+        ///
+        /// Worth knowing because the multiplayer client will happily start a
+        /// different copy of Skyrim than the one it is sitting in, and when it
+        /// does, nothing about this build applies and nothing says so.
+        /// </summary>
+        public static string LastRunFrom()
+        {
+            const string key = "plugin directory =";
+            const string tail = "\\Data\\SKSE\\Plugins";
+            try
+            {
+                string log = Path.Combine(Paths.LiveMyGames, "SKSE\\skse64.log");
+                if (!File.Exists(log)) return "";
+                foreach (string line in File.ReadAllLines(log))
+                {
+                    int at = line.IndexOf(key, StringComparison.OrdinalIgnoreCase);
+                    if (at < 0) continue;
+                    string p = line.Substring(at + key.Length).Trim();
+                    int cut = p.IndexOf(tail, StringComparison.OrdinalIgnoreCase);
+                    return (cut > 0 ? p.Substring(0, cut) : p).TrimEnd('\\');
+                }
+            }
+            catch { }
+            return "";
+        }
+
+        /// <summary>False only when we know for certain it ran somewhere else.</summary>
+        public static bool RanFromBuild()
+        {
+            string from = LastRunFrom();
+            if (from.Length == 0) return true;
+            return string.Equals(from, Paths.Game.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// True only while Skyrim itself is up, or something it left behind in
+        /// this build's folder is still holding files open.
+        /// </summary>
+        public static bool GameRunning()
+        {
+            List<Process> ps = GameProcesses();
+            int n = ps.Count;
+            Release(ps);
+            return n > 0;
+        }
+
+        /// <summary>
+        /// The in game browser's helpers. Each one is started by Skyrim and
+        /// usually dies with it, but after a crash they stay behind with no
+        /// window, holding Data\Platform and Data\NirnLabUIPlatform open. Task
+        /// Manager's Processes tab files them under background processes with
+        /// no Skyrim name on them, so they are one way "Skyrim is running" can
+        /// be true with nothing on screen that looks like Skyrim (reported on
+        /// 16 Sep). Counted only when they run out of this build's folder.
+        /// </summary>
+        static readonly string[] Helpers = { "CEFSubprocess", "SkyrimPlatformCEF" };
+
+        /// <summary>
+        /// Everything currently running that counts as the game. The caller owns
+        /// what comes back and should pass it to Release when finished.
+        ///
+        /// The launcher's own name is not on the list any more. It was there
+        /// from the Skyrim Together days, when the multiplayer client was an exe
+        /// of that name; SkyMP has no client exe. Left on, another copy of this
+        /// launcher (the dev build beside the main one) counted as a running
+        /// game, which blocked updates and deleting characters, and Clear then
+        /// tried to close that launcher.
+        /// </summary>
+        public static List<Process> GameProcesses()
+        {
+            var l = new List<Process>();
+            int mine = Process.GetCurrentProcess().Id;
+
+            var names = new List<string> { "SkyrimSE", "skse64_loader" };
+            names.AddRange(Helpers);
+            foreach (string n in names)
+            {
+                bool helper = Array.IndexOf(Helpers, n) >= 0;
+                Process[] found;
+                try { found = Process.GetProcessesByName(n); } catch { continue; }
+                foreach (Process p in found)
+                {
+                    bool skip = p.Id == mine;
+                    // A helper only counts when it provably runs from this
+                    // build. One from another folder is another server's.
+                    if (!skip && helper && Where(p) != true) skip = true;
+                    // SkyrimSE.exe is what every Skyrim install on the machine
+                    // is called. Matching the name alone meant another modlist's
+                    // game counted as this one: Play stayed blocked while it was
+                    // up, and Clear would try to kill somebody else's session
+                    // and then tell them to restart the PC when it could not.
+                    //
+                    // Only skip it when the path says, in as many words, that it
+                    // lives somewhere else. A path we cannot read is the state a
+                    // game that has already fallen over is usually in, and those
+                    // are exactly the ones that need closing: one of them left
+                    // holding the profile folder is what makes the next launch
+                    // fail with access denied.
+                    if (!skip && Where(p) == false) skip = true;
+                    if (skip) { try { p.Dispose(); } catch { } }
+                    else l.Add(p);
+                }
+            }
+            return l;
+        }
+
+        static void Release(List<Process> ps)
+        {
+            foreach (Process p in ps) { try { p.Dispose(); } catch { } }
+        }
+
+        /// <summary>
+        /// True when at least one of them has a window on screen, which is the
+        /// difference between a game somebody is playing and the leftovers of
+        /// one that crashed. Skyrim does not always exit cleanly, and the
+        /// multiplayer client's browser helpers outlive it more often than not,
+        /// so a process with no window is the common case, not the odd one.
+        /// </summary>
+        public static bool GameVisible()
+        {
+            List<Process> ps = GameProcesses();
+            bool seen = false;
+            foreach (Process p in ps)
+            {
+                try { if (p.MainWindowHandle != IntPtr.Zero) { seen = true; break; } }
+                catch { }
+            }
+            Release(ps);
+            return seen;
+        }
+
+        /// <summary>
+        /// Closes everything GameProcesses found and waits for it to actually
+        /// go. Anything with a window is asked first and given six seconds;
+        /// anything without one never had a window to ask, so it is ended
+        /// straight away. Returns how many were closed.
+        /// </summary>
+        public static int CloseGame()
+        {
+            List<Process> ps = GameProcesses();
+            if (ps.Count == 0) return 0;
+            int count = ps.Count;
+
+            bool asked = false;
+            foreach (Process p in ps)
+            {
+                try
+                {
+                    if (p.MainWindowHandle == IntPtr.Zero) continue;
+                    p.CloseMainWindow();
+                    asked = true;
+                }
+                catch { }
+            }
+
+            if (asked)
+            {
+                for (int i = 0; i < 24; i++)
+                {
+                    Thread.Sleep(250);
+                    bool any = false;
+                    foreach (Process p in ps) { try { if (!p.HasExited) any = true; } catch { } }
+                    if (!any) break;
+                }
+            }
+
+            foreach (Process p in ps) { try { if (!p.HasExited) p.Kill(); } catch { } }
+            Release(ps);
+
+            // A process that has been ended can sit in the table for a moment
+            // afterwards, so this waits for it to leave rather than reporting a
+            // failure on the first look.
+            for (int i = 0; i < 12; i++)
+            {
+                Thread.Sleep(250);
+                if (!GameRunning()) break;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// What is still running and why it might not go, as a sentence for a
+        /// person to act on. "Skyrim would not close. Restart your PC" named
+        /// nothing, and with no Skyrim window anywhere nobody could tell what
+        /// the launcher was looking at. Empty when nothing is running.
+        /// </summary>
+        public static string StuckReport()
+        {
+            List<Process> ps = GameProcesses();
+            if (ps.Count == 0) { Release(ps); return ""; }
+            var names = new List<string>();
+            foreach (Process p in ps)
+            {
+                try { names.Add(p.ProcessName + ".exe (process " + p.Id + ")"); } catch { }
+            }
+            Release(ps);
+
+            // Windows writes a crash report for a game that hung, and the game
+            // cannot be ended until that report is finished. With a big mod
+            // list the report is a memory dump of several gigabytes.
+            bool reporting = false;
+            foreach (string n in new string[] { "WerFault", "WerFaultSecure" })
+            {
+                try
+                {
+                    Process[] w = Process.GetProcessesByName(n);
+                    if (w.Length > 0) reporting = true;
+                    foreach (Process x in w) { try { x.Dispose(); } catch { } }
+                }
+                catch { }
+            }
+
+            string said = "Still running: " + string.Join(", ", names.ToArray()) + ".";
+            if (reporting)
+                said += " Windows is still writing a crash report for it, and it cannot be ended until that finishes. That usually takes a few minutes.";
+            else
+                said += " Windows would not let the launcher end it. In Task Manager, open the Details tab, end it there, and try again. If it will not end there either, restart the PC.";
+            return said;
+        }
+
+        /// <summary>
+        /// True when the process is running out of this build's folder, false
+        /// when it is positively somewhere else, and null when the path cannot
+        /// be read at all. The three answers are not the same and the caller
+        /// has to tell them apart: treating "cannot read" as "somebody else's"
+        /// leaves a crashed game running, and a crashed game still holding the
+        /// profile folder is what breaks the next launch.
+        /// </summary>
+        // Asking a hung process for its own path is allowed to take forever,
+        // and this is read from the UI thread on every redraw, so one wedged
+        // Skyrim froze the entire launcher. It gets one bounded attempt per
+        // process and the answer is kept, so a stuck game costs a second and
+        // a half once instead of the window every time it is drawn.
+        static readonly Dictionary<int, string> pathCache = new Dictionary<int, string>();
+
+        static string PathOf(Process p)
+        {
+            int id;
+            try { id = p.Id; } catch { return null; }
+            lock (pathCache)
+            {
+                string had;
+                if (pathCache.TryGetValue(id, out had)) return had;
+            }
+
+            string got = null;
+            try
+            {
+                var t = new Thread(delegate() { try { got = p.MainModule.FileName; } catch { } });
+                t.IsBackground = true;
+                t.Start();
+                if (!t.Join(1500)) got = null;
+            }
+            catch { got = null; }
+
+            lock (pathCache)
+            {
+                if (pathCache.Count > 256) pathCache.Clear();
+                pathCache[id] = got;
+            }
+            return got;
+        }
+
+        static bool? Where(Process p)
+        {
+            string path = PathOf(p);
+            if (string.IsNullOrEmpty(path)) return null;
+            try
+            {
+                string full = Path.GetFullPath(path);
+
+                // Two roots, not one. This tested Paths.Root alone, which is
+                // right for an install that built its own copy of the game
+                // underneath it, and wrong for every collection install: the
+                // game runs out of the Steam folder, which is nowhere near
+                // Root, so the running Skyrim was judged to be somebody else's.
+                //
+                // Everything downstream then went wrong at once. GameRunning
+                // said no while the game was plainly on screen, Close Skyrim
+                // closed nothing and reported nothing to close, the update
+                // refused to start because it could not clear a game it could
+                // not see, and the only thing that did fire was the warning
+                // about a different Skyrim running from another folder.
+                //
+                // The launcher lives under Root. The game lives under
+                // Paths.Game, which is Root\Game in an old install and the
+                // Steam copy in a collection one. Either counts as ours.
+                foreach (string r in new string[] { Paths.Root, Paths.Game })
+                {
+                    if (string.IsNullOrEmpty(r)) continue;
+                    string root = Path.GetFullPath(r).TrimEnd('\\') + "\\";
+                    if (root.Length < 4) continue;
+                    if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return true;
+                }
+                return false;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// A Skyrim that is not this one. Two at once is a losing fight with
+        /// Steam whoever started them, so it is worth saying, but it is not
+        /// ours to close.
+        /// </summary>
+        public static bool OtherSkyrimRunning()
+        {
+            string[] names = { "SkyrimSE", "skse64_loader" };
+            foreach (string n in names)
+            {
+                Process[] found;
+                try { found = Process.GetProcessesByName(n); } catch { continue; }
+                foreach (Process p in found)
+                {
+                    // Only a path we could actually read counts as somebody
+                    // else's game. Anything else stays our problem.
+                    bool foreign = Where(p) == false;
+                    try { p.Dispose(); } catch { }
+                    if (foreign) return true;
+                }
+            }
+            return false;
+        }
+    }
+}
