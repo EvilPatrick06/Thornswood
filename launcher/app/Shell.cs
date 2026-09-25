@@ -535,7 +535,8 @@ namespace Thornswood
         static Thickness MaximizedInset()
         {
             double px = 0;
-            try { px = GetSystemMetrics(32) + GetSystemMetrics(92); } catch { }   // SM_CXSIZEFRAME + SM_CXPADDEDBORDER
+            try { px = GetSystemMetrics(32) + GetSystemMetrics(92); }   // SM_CXSIZEFRAME + SM_CXPADDEDBORDER
+            catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, asking Windows for the frame size", ex); }
             if (px <= 0) px = 8;
             double scale = 1;
             try
@@ -543,7 +544,7 @@ namespace Thornswood
                 PresentationSource src = PresentationSource.FromVisual(win);
                 if (src != null && src.CompositionTarget != null) scale = src.CompositionTarget.TransformToDevice.M11;
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, reading the screen scale", ex); }
             if (scale <= 0) scale = 1;
             return new Thickness(px / scale);
         }
