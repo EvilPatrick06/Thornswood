@@ -4,7 +4,8 @@
   Runs a bit of PowerShell on the VPS, properly.
 
       .\scripts\vps\Remote.ps1 "Get-Content 'C:\Thornswood-Voice\voice.log' -Tail 20"
-      .\scripts\vps\Remote.ps1 -File .\tools\some-check.ps1
+      .\scripts\vps\Remote.ps1 -File .\scripts\vps\some-check.ps1
+      .\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'
       .\scripts\vps\Remote.ps1 "Restart-Service W32Time" -Dev
 
   WHY THIS EXISTS. Every other way of doing it goes wrong, and it goes wrong
@@ -44,6 +45,15 @@ param(
     [Parameter(ParameterSetName = 'File', Mandatory = $true)]
     [string]$File,
 
+    # What the file is run with at the far end, written as it would be typed
+    # after the script's name there: '-IncludeGit', or "-Tail 50". It is text
+    # and goes as text, because a switch passed any other way arrives as a
+    # word. Added 25 September: Install-Runner told Patrick to run
+    # Bootstrap-VPS.ps1 -IncludeGit, which refuses to run anywhere but the
+    # VPS, and -File had no way to pass the switch.
+    [Parameter(ParameterSetName = 'File')]
+    [string]$Arguments = '',
+
     [string]$VpsHost = '192.135.112.23',
     [string]$VpsUser = 'Administrator',
 
@@ -66,6 +76,12 @@ if ($PSCmdlet.ParameterSetName -eq 'File') {
         }
         throw "$File does not parse. Nothing was sent."
     }
+    # The file becomes a script block called with its arguments, so its own
+    # param block takes them as it would on the VPS's command line. Always,
+    # not only with arguments: the line that quiets progress goes in front of
+    # what is sent, and a param block that is not first does not parse, so a
+    # file with one never ran through here before 25 September.
+    $body = "& {`r`n" + $body + "`r`n} " + $Arguments.Trim()
 } else {
     $body = $Script
 }

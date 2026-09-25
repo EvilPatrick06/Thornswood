@@ -182,7 +182,7 @@ $need | ForEach-Object { Say "  $_" }
 $missing = @($need | Where-Object { "$_" -like 'MISSING *' } | ForEach-Object { "$_".Substring(8) })
 if ($missing.Count) {
   $how = @()
-  if ($missing -contains 'pwsh' -or $missing -contains 'node' -or $missing -contains 'git') { $how += '.\scripts\vps\Bootstrap-VPS.ps1 -IncludeGit   (PowerShell 7, Node, Git, for all users)' }
+  if ($missing -contains 'pwsh' -or $missing -contains 'node' -or $missing -contains 'git') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'   (PowerShell 7, Node, Git, for all users; from this machine, it runs on the VPS)" }
   if ($missing -contains 'python') { $how += '.\scripts\deploy\Install-Bot.ps1   (Python for all users; the bot needs it anyway)' }
   if ($missing -contains 'csc' -or $missing -contains 'wpf') { $how += 'the box needs Windows Server with the Desktop Experience and .NET Framework 4.8; that is not a script' }
   Die ("The VPS is missing " + ($missing -join ', ') + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))

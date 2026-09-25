@@ -22,11 +22,21 @@
 # The label is what picks it; change it here and in Install-Runner together.
 # Safe because the repository is private: nobody outside the team can open a
 # pull request that runs code on the box.
+#
+# OFF, AT PATRICK'S WORD, 25 SEPTEMBER: "turn off GitHub's build checker
+# thing too so it stops being flagged as red", then "just turn it all the
+# way off we arent paying to use it anyways". With no runner registered
+# yet, every push and pull request queued a run nothing could pick up. It
+# no longer starts on its own; it can still be started by hand from the
+# Actions tab. The runner on the VPS stays: Install-Runner.ps1 still puts it
+# there. Turning the check back on is Patrick's call; it is these lines
+# under on:, and enforce_admins on again (#437):
+#   pull_request:
+#   push:
+#     branches: [main]
 name: Build check
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 permissions:
   contents: read
 # One run per branch at a time. A newer push cancels the run it replaces, so
