@@ -12,15 +12,35 @@
 #
 # The harnesses were all written to be run by hand and none of them had ever
 # run here: 236 checks across twelve files, sitting in the repo going stale.
+#
+# WHERE IT RUNS. On the VPS, since 25 September: GitHub's own runners were
+# blocked on billing and every run failed in seconds, and Patrick chose a
+# runner on the box over paying for minutes (issue #437).
+# tools\Install-Runner.ps1 puts it there, as its own local account that is
+# shut out of every live Thornswood folder, at below normal priority so a build
+# never takes the processor from the game server, the site, voice or the bot.
+# The label is what picks it; change it here and in Install-Runner together.
+# Safe because the repository is private: nobody outside the team can open a
+# pull request that runs code on the box.
 name: Build check
 on:
   pull_request:
   push:
     branches: [main]
+permissions:
+  contents: read
+# One run per branch at a time. A newer push cancels the run it replaces, so
+# the one runner is not stuck building a commit nobody wants.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   launcher:
     name: Launcher builds
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    # Seven to ten minutes on GitHub's runners; below normal priority on a box
+    # that is also serving people is slower. Past this it is stuck, not slow.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -144,7 +164,17 @@ jobs:
           #
           # From requirements.txt, the file Install-Bot.ps1 installs on the
           # VPS, so the versions tested here are the versions the bot runs.
-          python -m pip install --quiet --disable-pip-version-check -r bot\requirements.txt
+          #
+          # Into a venv of this run's own, never the machine's Python: the
+          # runner is on the VPS, and the live bot runs on that Python.
+          $venv = Join-Path $env:RUNNER_TEMP 'bot-venv'
+          python -m venv $venv
+          $py = Join-Path $venv 'Scripts\python.exe'
+          if (-not (Test-Path $py)) {
+            Write-Host '::warning::could not make a venv for the bot harnesses, so they did not run'
+            exit 0
+          }
+          & $py -m pip install --quiet --disable-pip-version-check -r bot\requirements.txt
           if ($LASTEXITCODE -ne 0) {
             Write-Host '::warning::could not install discord.py, so the bot harnesses did not run'
             exit 0
@@ -153,7 +183,7 @@ jobs:
           $bad = 0
           foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
             Write-Host ("--- {0}" -f $t.Name)
-            & python $t.FullName
+            & $py $t.FullName
             if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
           }
           if ($bad) { exit 1 }
