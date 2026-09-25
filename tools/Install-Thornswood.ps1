@@ -4,7 +4,7 @@
   Everything the client needs, in one run, in the order it has to happen in.
 
   This replaces the sequence you have been typing by hand: the content plugin,
-  the SkyMP client, the emote wheel and the creation menus, the body fix, the
+  the SkyMP client, the creation menus, the body fix, the
   load order alignment, the gamemode, the preflight check and the launcher
   build. Each step names the files it must leave behind, and a step that exits
   cleanly without leaving them is treated as a failure, because those are the
@@ -17,7 +17,7 @@
       .\Install-Thornswood.ps1 -Only launcher,gamemode
 
   Step names for -Only and -Skip:
-      content  client  emotes  body  loadorder  gamemode  check  launcher
+      content  client  body  loadorder  gamemode  check  launcher
 #>
 [CmdletBinding()]
 param(
@@ -101,15 +101,6 @@ $steps = @(
         Args = @{ Dist = $Client }
         Wants = @('SKSE\Plugins\MpClientPlugin.dll', 'Platform\Plugins\skymp5-client.js')
         Why = 'the multiplayer layer itself'
-    },
-    @{
-        Key = 'emotes'; Name = 'Emote wheel'
-        Script = 'Install-Emotes.ps1'
-        Args = @{}
-        Wants = @('Platform\Plugins\thornswood-emotes.js',
-                  'Platform\UI\thornswood-emotes.html',
-                  'SKSE\Plugins\Thornswood.ini')
-        Why = 'the wheel'
     },
     @{
         Key = 'body'; Name = 'Male body fix'
