@@ -38,7 +38,7 @@ a README of their own, which says what the folder is and how to change it.
   design and the words we use. Read it first, every session.
 - [SECOND-DEVELOPER.md](SECOND-DEVELOPER.md): the long form. What the pieces
   are, how a release goes out, how a machine is set up.
-- [HANDOFF.md](HANDOFF.md): open work and what is live.
+- [docs/archive](docs/archive): dated snapshots kept for history, not current.
 - [tools/app/ARCHITECTURE.md](tools/app/ARCHITECTURE.md): how the launcher
   starts, what each class owns and every step between Play and the game.
 - [IT-IS-DOWN.md](IT-IS-DOWN.md): what to do when the server is down.
