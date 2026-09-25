@@ -65,7 +65,7 @@ param(
   # releases moved into their own public repo, and the copy still sitting in
   # this repo stopped being updated the day that happened. Reading the stale
   # one would post a release nobody shipped.
-  [string]$ReleaseDir = 'C:\Users\evilp\Downloads\Thornswood-Releases',
+  [string]$ReleaseDir = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'Thornswood-Releases'),
   [string]$Site = 'https://thornswood.net',
   [switch]$Quiet
 )
@@ -121,18 +121,11 @@ if ($Dev -and -not $PSBoundParameters.ContainsKey('ReleaseDir')) {
   $ReleaseDir = Join-Path (Split-Path -Parent $ReleaseDir) 'Thornswood-Releases-dev'
 }
 
-$repoV = Join-Path (Split-Path -Parent $Here) 'version.json'
-$liveV = Join-Path $ReleaseDir 'version.json'
-$vf = $null
-if (Test-Path -LiteralPath $liveV) { $vf = $liveV }
-elseif (Test-Path -LiteralPath $repoV) {
-  $vf = $repoV
-  if (-not $Quiet) {
-    Write-Host "  no version.json in $ReleaseDir, falling back to the copy in this repo." -ForegroundColor Yellow
-    Write-Host "  That one is stale, so this may post a release that never shipped." -ForegroundColor Yellow
-  }
-} else {
-  if (-not $Quiet) { Write-Host '  no version.json anywhere, nothing posted' -ForegroundColor DarkGray }
+# The live feed only. This repository's own version.json, the stale copy this
+# used to fall back to, was deleted on 25 September.
+$vf = Join-Path $ReleaseDir 'version.json'
+if (-not (Test-Path -LiteralPath $vf)) {
+  if (-not $Quiet) { Write-Host "  no version.json in $ReleaseDir, nothing posted" -ForegroundColor DarkGray }
   return
 }
 
