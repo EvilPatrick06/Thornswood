@@ -178,8 +178,8 @@ function Get-StubRefusal([string]$stub, [string]$src) {
             $built.ToLocalTime().ToString('d MMM HH:mm') + ', before the last change to ' + $src +
             ' (' + $changed.ToLocalTime().ToString('d MMM HH:mm') + '), so the installer would carry ' +
             'the old one. Build-Launcher.ps1 compiles it, into a scratch root so the launcher you play ' +
-            'with is left alone: powershell -NoProfile -File tools\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause ' +
-            'and then run this again.')
+            'with is left alone. From PowerShell 7 in the repo folder, the way Ship runs it: ' +
+            '.\tools\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause and then run this again.')
 }
 $stubNow = @((Join-Path $Here 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
            Where-Object { Test-Path $_ } | Select-Object -First 1
