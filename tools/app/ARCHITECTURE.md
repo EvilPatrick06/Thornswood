@@ -208,8 +208,10 @@ plugin named `thornswood-*.js`. Any other script in
 `Profile\Parked\parked.txt`, until `Keep.cs:406 Unpark()` puts it back. Also
 writes and deletes the session note `Game\Data\Platform\thornswood-session.txt`
 (`Keep.cs:474 LeaveNote()`), which the plugins read to know the session is
-ours. On the machine that ships, `Profile\developer.flag` makes a newer game
-copy win over the kept one.
+ours. `Profile\developer.flag` makes a newer game copy win over the kept one;
+nothing writes it since 25 September, when `Go.ps1` started refreshing the kept
+copies of what it installs, so the machine that ships repairs the way a
+tester's does.
 
 **Hold** (Hold.cs). Owns open file handles, not files. `Hold.cs:56 Take()`
 opens every kept file and `skymp5-client-settings.txt` read only with read

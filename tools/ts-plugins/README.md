@@ -30,10 +30,9 @@ folder that is not ours. It also puts the menu art and the recorded client in
 place. `-SkipServer` matters: without it Go.ps1 also copies
 `tools\voice\voice-server.js` over the live voice service on the VPS and
 restarts it. The game has to be closed because the launcher holds these files
-read only while it runs (Hold). Keep puts its own copy back at every Play
-unless `Profile\developer.flag` is there, which Publish-Update writes on a
-machine that ships, so anywhere else an edit copied in by hand lasts until the
-next Play. A new plugin has to be called `thornswood-*.js`: Keep parks any
+read only while it runs (Hold). Keep puts its own copy back at every Play, so
+Go.ps1 makes what it installs the kept copy, the way a pack does; an edit
+copied in by hand, not through Go.ps1, lasts until the next Play. A new plugin has to be called `thornswood-*.js`: Keep parks any
 other plugin, and a pack carries nothing else from this folder
 (`Ship-Rules.ps1`). There is no build step; `node --check` parses a file, and
 the `tools\test-*.js` harnesses read these files and check them.

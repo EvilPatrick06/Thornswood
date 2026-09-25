@@ -198,14 +198,12 @@ if (Test-Path -LiteralPath $OldDist) {
     Write-Host ("  the old one still holds {0:N1} MB. Check it with .\tools\Measure-Reclaim.ps1 -Path `"$OldDist`", then remove it." -f $oldMb) -ForegroundColor Yellow
 }
 
-# This is the machine that ships, so its launcher must not put the kept copy
-# of a plugin back over an edit that is about to be published. Keep reads this
-# flag and adopts a newer game file instead of reverting it. See Keep.cs.
-try {
-    if (-not (Test-Path $ProfileDir)) { New-Item -ItemType Directory -Path $ProfileDir -Force | Out-Null }
-    $devFlag = Join-Path $ProfileDir 'developer.flag'
-    if (-not (Test-Path $devFlag)) { Set-Content -Path $devFlag -Value 'This machine publishes releases. Keep trusts newer files in the game folder here.' -Encoding ASCII }
-} catch { }
+# Profile\developer.flag was written here until 25 September, so the machine
+# that ships would let a newer game file win over the launcher's kept copy
+# (Keep.cs). It went because it also meant that machine never saw the repair a
+# tester's launcher makes (Patrick: "it will make testing easier"). Go.ps1,
+# which Ship runs to put the plugins and overlays in, now refreshes the kept
+# copies of what it installs, the way a pack does, so nothing here needs it.
 
 # The baseline. What this machine last published, so the next run can pack the
 # difference instead of everything.
@@ -457,9 +455,10 @@ function Test-Machine([string]$rel) { return (Test-ShipMachine $rel) }
 # ---- another server's menu -------------------------------------------------
 #
 # that server's and another launchers write their own Data\Platform\UI\index.html
-# over ours. On a tester's machine Keep puts ours back before Play. On the
-# machine that ships, Keep adopts newer game files (developer.flag), so theirs
-# would go out to everyone as Thornswood's menu and nobody's chat would load.
+# over ours. Keep puts ours back before Play, but a release scans the game
+# folder, not the kept copy, and until 25 September the machine that ships
+# adopted newer game files (developer.flag), so theirs would have gone out to
+# everyone as Thornswood's menu and nobody's chat would load.
 # Ours is the one that loads thornswood-bridge.js, and it lives in the repo,
 # so it is put back here, in the game and in the kept copy, before the scan.
 $menuRel  = 'Data\Platform\UI\index.html'
