@@ -16,6 +16,12 @@ namespace Thornswood
         // install a mod, so offering the button for one of these is worse than
         // not offering it.
         public bool Absent;
+        // The plugin's file is missing from the game folder's Data. Set once per
+        // plugin the server expects but that is not on disk, so the Mods card can
+        // count how many and, when it is most of them, say the collection is not
+        // deployed in one sentence instead of one line per plugin. It changes
+        // only what is shown; the gate still counts Blocking (see Shell Play).
+        public bool FileMissing;
         // The file is there, enabled, in the right place, and its bytes are
         // not the server's. Fix fetches the server's copy. Which file, and what
         // the server says it should be, so Fix does not have to ask twice.
@@ -47,6 +53,11 @@ namespace Thornswood
             return l;
         }
 
+        /// <summary>How many plugins the last Run's reference list enabled, so the
+        /// Mods card can tell "most of them are missing" from "one is". 0 when there
+        /// was no list to compare against.</summary>
+        public static int Expected;
+
         public static List<Issue> Run() { return Run(null); }
 
         /// <summary>
@@ -60,6 +71,7 @@ namespace Thornswood
         public static List<Issue> Run(Config cfg)
         {
             var issues = new List<Issue>();
+            Expected = 0;
             string golden = Path.Combine(Paths.Golden, "plugins.txt");
 
             // Paths.Live, not Paths.LocalAD. Under the collection those are two
@@ -123,6 +135,7 @@ namespace Thornswood
             }
 
             List<string> want = Enabled(golden), have = Enabled(live);
+            Expected = want.Count;
             var wantSet = new HashSet<string>(want, StringComparer.OrdinalIgnoreCase);
             var haveSet = new HashSet<string>(have, StringComparer.OrdinalIgnoreCase);
 
@@ -223,10 +236,21 @@ namespace Thornswood
             }
 
             // A plugin the list references but that is not actually on disk.
+            // One per expected plugin, flagged FileMissing so the card can count
+            // them: when it is most of the list, Vortex has not deployed the
+            // collection, and the card says that once instead of once per plugin.
             string data = Path.Combine(Paths.Game, "Data");
             foreach (string p in want)
             {
-                try { if (!File.Exists(Path.Combine(data, p))) issues.Add(new Issue(p + " is in the list but the file is not in Data.", true)); }
+                try
+                {
+                    if (!File.Exists(Path.Combine(data, p)))
+                    {
+                        var gone = new Issue(p + " is in the list but the file is not in Data.", true);
+                        gone.FileMissing = true;
+                        issues.Add(gone);
+                    }
+                }
                 catch { }
             }
 
