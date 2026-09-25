@@ -143,8 +143,12 @@ Then, in this order:
    UDP, which is the one people forget.
 9. Import the scheduled tasks from the `tasks` folder in the backup, so the
    services come back after a reboot.
-10. Point the DNS A record for thornswood.net at the new address. Wait for the
-    certificate to reissue before telling anyone, or the site shows a warning.
+10. Point the DNS A record for thornswood.net at the new address, then
+    `.\tools\Setup-Domain.ps1 -Vps <new address>`. It installs Caddy and
+    sends `tools\Caddyfile`, the tracked copy with the `/voice` and
+    `/voice-dev` routes; a Caddyfile restored from the backup is kept beside
+    it as `Caddyfile.before-<date>`. Wait for the certificate to reissue
+    before telling anyone, or the site shows a warning.
 11. Check the Discord application's redirect URI. If it names the domain there
     is nothing to do. If it names an address, it has to be changed in the
     Discord developer portal by hand.

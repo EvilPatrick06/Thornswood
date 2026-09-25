@@ -121,7 +121,6 @@ if (-not $SkipDnsCheck -and -not $TaskOnly) {
 # ----------------------------------------------------------------- caddy --
 $caddyWin = $CaddyDir.Replace('/','\')
 $rootWin  = $Root.Replace('/','\')
-$emailLine = if ($Email) { "`n`temail $Email" } else { '' }
 
 # Everything from here to the task block is the one time setup: fetching caddy,
 # writing the Caddyfile, opening 80 and 443, and moving the docs site onto
@@ -132,15 +131,23 @@ if (-not $TaskOnly) {
 Write-Host ''
 Write-Host 'Setting up Caddy on the VPS...'
 
-$caddyfile = @"
-{$emailLine
+# The Caddyfile is tools\Caddyfile, the tracked copy of the live one, and not
+# one written here. This used to write its own four line file that proxied the
+# domain to 3001 and nothing else, so a full run on a new box, as
+# MOVING-THE-SERVER.md says to do, would have taken the /voice and /voice-dev
+# routes off the site and voice from everybody (issue #543). -Domain and
+# -Email still apply: the tracked file names thornswood.net and its own
+# address, and those two are swapped for what was asked.
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$tracked = Join-Path $Here 'Caddyfile'
+if (-not (Test-Path -LiteralPath $tracked)) { throw "not found: $tracked. The site's Caddyfile is kept in the repository, and nothing is sent without it." }
+$caddyfile = [IO.File]::ReadAllText($tracked, [Text.Encoding]::UTF8)
+if ($Domain -ne 'thornswood.net') { $caddyfile = $caddyfile.Replace('thornswood.net', $Domain) }
+if ($Email) { $caddyfile = [regex]::Replace($caddyfile, '(?m)^(\s*email\s+)\S+', { param($m) $m.Groups[1].Value + $Email }) }
+foreach ($need in @('handle_path /voice/*', 'handle_path /voice-dev/*', 'reverse_proxy 127.0.0.1:3001')) {
+  if ($caddyfile.IndexOf($need) -lt 0) { throw "tools\Caddyfile has no '$need' line, so it would take part of the site away. Nothing was sent." }
 }
-
-$Domain, www.$Domain {
-	encode gzip
-	reverse_proxy 127.0.0.1:3001
-}
-"@
 $cfg64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($caddyfile))
 
 Remote @"
@@ -176,9 +183,20 @@ if (-not (Test-Path (Join-Path `$dir 'caddy.exe'))) {
   'caddy already here, ' + `$have + '. A fresh box gets $CaddyVersion.'
 }
 
-[IO.File]::WriteAllBytes((Join-Path `$dir 'Caddyfile'),
-                         [Convert]::FromBase64String('$cfg64'))
-'Caddyfile written'
+# A Caddyfile already on the box is kept beside the new one before it is
+# replaced, so a route somebody added by hand can be put back.
+`$cf = Join-Path `$dir 'Caddyfile'
+`$bytes = [Convert]::FromBase64String('$cfg64')
+if (Test-Path -LiteralPath `$cf) {
+  `$old = [IO.File]::ReadAllBytes(`$cf)
+  if ([Convert]::ToBase64String(`$old) -ne '$cfg64') {
+    `$keep = `$cf + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
+    Copy-Item -LiteralPath `$cf -Destination `$keep -Force
+    'the Caddyfile that was there is kept as ' + (Split-Path -Leaf `$keep)
+  }
+}
+[IO.File]::WriteAllBytes(`$cf, `$bytes)
+'Caddyfile written, from tools\Caddyfile'
 
 foreach (`$p in 80,443) {
   `$n = 'Thornswood Web ' + `$p

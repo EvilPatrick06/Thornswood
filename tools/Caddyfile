@@ -1,10 +1,11 @@
 # Thornswood, the one door on 443.
 #
 # This is the reference copy and it matches the live one as of 18 September.
-# The live one is C:\Thornswood-Caddy\Caddyfile on the VPS, and until something
-# deploys this, the two are kept the same by hand. It lived only on the box
-# until now, which meant the only record of how the site was reachable was the
-# box itself.
+# The live one is C:\Thornswood-Caddy\Caddyfile on the VPS. Setup-Domain.ps1
+# sends this file (since 25 September, issue #543), so a new box gets exactly
+# this; an edit made on the box by hand is lost the next time it runs, so make
+# it here. It lived only on the box until 18 September, which meant the only
+# record of how the site was reachable was the box itself.
 #
 # Caddy gets the certificate and renews it on its own. The email below is what
 # Let's Encrypt writes to if one is about to lapse.
