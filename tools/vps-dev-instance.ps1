@@ -26,8 +26,9 @@ $node = 'C:\Program Files\nodejs\node.exe'
 
 # ------------------------------------------------------------- game server
 if (-not (Test-Path $dev)) { New-Item -ItemType Directory -Path $dev | Out-Null }
-# Program files and plugins, not the world, not the data, not the log.
-& robocopy $live $dev /E /XD data world "world-before-*" /XF server.log /NFL /NDL /NJH /NJS /NP | Out-Null
+# Program files and plugins, not the world, not the data, not the logs. The
+# rolled ones too, server.log.1 and the rest, or dev starts with live's.
+& robocopy $live $dev /E /XD data world "world-before-*" /XF *.log *.log.* /NFL /NDL /NJH /NJS /NP | Out-Null
 Say ("  server files copied (robocopy code {0})" -f $LASTEXITCODE)
 
 # Data: the door, the allowed list, the manifest and the scripts and api
@@ -72,16 +73,20 @@ if (-not (Get-ScheduledTask -TaskName 'Thornswood Dev Server' -ErrorAction Silen
 # ------------------------------------------------------------------- voice
 if (Test-Path $liveVoice) {
     if (-not (Test-Path $devVoice)) { New-Item -ItemType Directory -Path $devVoice | Out-Null }
-    & robocopy $liveVoice $devVoice /E /XF *.log run-dev-voice.cmd /NFL /NDL /NJH /NJS /NP | Out-Null
+    & robocopy $liveVoice $devVoice /E /XF *.log *.log.* run-dev-voice.cmd /NFL /NDL /NJH /NJS /NP | Out-Null
     Say ("  voice files copied (robocopy code {0})" -f $LASTEXITCODE)
     # The port comes from the environment. A run file sets it, so the task
     # command stays free of cmd's quoting rules.
+    # roll-log.ps1 came across with the rest and runs before node opens
+    # voice.log, the one moment nothing holds it. See Roll-Log.ps1.
     $run = Join-Path $devVoice 'run-dev-voice.cmd'
+    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $lines = @(
         '@echo off',
         ('set THORNSWOOD_VOICE_PORT={0}' -f $devVoicePort),
         'set THORNSWOOD_SITE=https://thornswood.net',
         ('cd /d "{0}"' -f $devVoice),
+        ('"{0}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{1}\roll-log.ps1" -Path "{1}\voice.log"' -f $psExe, $devVoice),
         ('"{0}" voice-server.js >> "{1}\voice.log" 2>&1' -f $node, $devVoice)
     )
     [IO.File]::WriteAllLines($run, [string[]]$lines, (New-Object Text.ASCIIEncoding))
