@@ -41,7 +41,7 @@
   if it were all of them, while the param block declared thirteen. -Channel,
   the one the whole dev workflow runs on, was in the param block and nowhere
   else, and Get-Help printed nothing but the syntax line (entry 260 on the To
-  Do List). tools\test-script-index.ps1 now fails the build check when a
+  Do List). tests\test-script-index.ps1 now fails the build check when a
   parameter is declared here without a .PARAMETER of its own.
 
 .PARAMETER Notes

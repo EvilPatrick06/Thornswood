@@ -336,7 +336,7 @@ the Downloads folder, in lower case the way the Downloads page prints it, then
 the file it read. An installer published before the page printed a checksum has
 none there, and then row 15 says so. A checksum is not a key: the page prints it
 for anybody, so both go into row 15 whole, and
-`tools\test-clean-install-run.js` lets a SHA-256 through on a line that says
+`tests\test-clean-install-run.js` lets a SHA-256 through on a line that says
 SHA-256.
 
 ```powershell
@@ -372,7 +372,7 @@ Patrick's own `C:\Thornswood` and pass for the wrong reason.
 For whoever reads the filled-in rows afterwards, not for the tester during the
 run: a tester who knows what is coming is not a stranger any more. Each line is
 text the build puts on screen at that row, copied from the file named beside it.
-`tools\test-clean-install-run.js` checks that every one of them is still in that
+`tests\test-clean-install-run.js` checks that every one of them is still in that
 file, so a label that changes shows up as a stale line here rather than as a
 tester confused by a list that no longer matches.
 
@@ -518,7 +518,7 @@ right or wrong. To Do entries are named by title, because their numbers move.
    question asked, goes on the To Do List: into the entry named above where one
    fits, as a new entry where none does.
 3. Correct this file wherever a row could not be followed as it was written.
-4. Run `node tools\test-clean-install-run.js`. Once the Last run line carries a
+4. Run `node tests\test-clean-install-run.js`. Once the Last run line carries a
    date it fails on any row left without a time and an observation.
 5. Open a pull request with the filled-in file.
 

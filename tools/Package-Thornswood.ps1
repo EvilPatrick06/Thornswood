@@ -589,7 +589,7 @@ foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRS
 # records rather than typed, so it names the commit this payload was built
 # from and no other. Setup-Thornswood.ps1 copies it into the install folder,
 # because the folder the setup program unpacks into is scratch. The same facts
-# are on thornswood.net/credits, and tools\test-source-offer.ps1 fails when
+# are on thornswood.net/credits, and tests\test-source-offer.ps1 fails when
 # the page, this note and the records disagree.
 #
 # Measured 24 September: git ls-remote against the public fork, with no

@@ -15,7 +15,7 @@ unpacks it and starts the `Setup.bat` inside with the chosen folder.
 It never uses a zip it finds on the disk. Until 25 September it took an old
 `SkyrimTogether-Setup.zip` or `Thornswood-Setup*.zip` from beside itself or the
 Downloads folder ahead of everything else, unchecked, and a tester got an old
-install that way. `tools\test-installer-own-payload.ps1` holds it to that.
+install that way. `tests\test-installer-own-payload.ps1` holds it to that.
 
 ## On your machine
 

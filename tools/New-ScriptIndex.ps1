@@ -16,7 +16,7 @@
   after any usage lines indented under it, carried on into the next sentence
   when the first one is too short to say anything ("One command.", "Runs ON
   the VPS."). A script with no comment at its top gets a row that says so,
-  and tools\test-script-index.ps1 fails on that row.
+  and tests\test-script-index.ps1 fails on that row.
 
   Options are deliberately not in the list. Get-Help reads them off each
   script's param block, which is the only list of them that cannot fall
@@ -28,7 +28,7 @@
 .PARAMETER Check
   Writes nothing. Exits 1 when the index is missing or is not what this would
   write, and says which rows differ. The build check runs this through
-  tools\test-script-index.ps1 on every pull request.
+  tests\test-script-index.ps1 on every pull request.
 
 .PARAMETER Tools
   The folder whose scripts are listed. The folder this script is in, unless
@@ -191,7 +191,7 @@ function Get-IndexText([string]$dir) {
     $out.Add('    .\tools\New-ScriptIndex.ps1')
     $out.Add('')
     $out.Add('and commit this file with it. The build check on every pull request runs')
-    $out.Add('tools\test-script-index.ps1, which goes red when this file is not what that')
+    $out.Add('tests\test-script-index.ps1, which goes red when this file is not what that')
     $out.Add('would write.')
     $out.Add('')
     $out.Add('A script''s options are not listed here. Get-Help reads them off its param')

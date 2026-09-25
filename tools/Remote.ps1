@@ -90,7 +90,7 @@ $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
 # 2 KB. Measured 24 September: a 10,266 character script made a 27,526
 # character command line. Where exactly the VPS cuts a line has not been
 # measured. Entry 197 on the To Do List asked for "the remote helper survives
-# a 10 KB script"; tools\test-remote-big-script.ps1 is that.
+# a 10 KB script"; tests\test-remote-big-script.ps1 is that.
 #
 # Under the limit nothing changes. Over it, the script is copied up and run
 # from there. A name of its own, so two of these at once cannot run each

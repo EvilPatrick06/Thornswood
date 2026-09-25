@@ -252,7 +252,7 @@ whether the live server runs the file in this repository, by hash.
 
 ## Tests that read it
 
-CI runs every `tools\test-*` harness (`.github/workflows/build.yml:110-119`).
+CI runs every `tests\test-*` harness (`.github/workflows/build.yml:110-119`).
 These read `gamemode.js`, most by running one block against a stubbed `mp`.
 
 | Area | Tests |

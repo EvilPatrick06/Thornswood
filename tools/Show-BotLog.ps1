@@ -56,7 +56,7 @@ else     { '[state] the bot is NOT running' }
 # bot.log.1 through roll-log.ps1 before a start once it passes 4 MB, so right
 # after a roll the lines that say why the bot restarted are in bot.log.1 and
 # the current file has only the new start. With no bot.log.1 this reads
-# bot.log alone, as it always did. tools\test-show-botlog.ps1 runs it.
+# bot.log alone, as it always did. tests\test-show-botlog.ps1 runs it.
 Get-Content -LiteralPath (`$log + '.1'), `$log -Encoding UTF8 -Tail 3000 -EA SilentlyContinue |
   Where-Object { `$_ -match '$filter' } |
   Select-Object -Last $Lines

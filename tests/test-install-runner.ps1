@@ -1,0 +1,87 @@
+<#
+  test-install-runner.ps1
+
+      pwsh -NoProfile -File .\tests\test-install-runner.ps1
+
+  The build check's runner on the VPS, and build.yml, agree and stay safe.
+
+  WHY. The build check runs on the same box as the live game server, the site,
+  voice and the bot (issue #437). What keeps that safe is in two files that
+  have to agree: build.yml asks for the runner by a label Install-Runner.ps1
+  gives it, and Install-Runner.ps1 makes the account the jobs run as. This
+  holds the parts that matter: the label, an account with no admin rights that
+  is shut out of the live folders, a download checked against GitHub's own
+  SHA-256, a registration token that is never printed, below normal priority,
+  and a bot step that never installs into the machine's Python.
+
+  HOW. Reads both files as text, and parses the script.
+#>
+[CmdletBinding()]
+param([string]$Tools)
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# The tests are in tests\, what they test is in tools\.
+$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+if (-not $Tools) { $Tools = $Here }
+$repo = Split-Path -Parent $Tools
+
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+
+$path = Join-Path $Tools 'Install-Runner.ps1'
+$text = [IO.File]::ReadAllText($path)
+$yml = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
+
+$t = $null; $e = $null
+[void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$t, [ref]$e)
+Yes 'Install-Runner.ps1 parses' (-not $e -or $e.Count -eq 0)
+
+# ---- the label ------------------------------------------------------------------
+$label = [regex]::Match($text, "\[string\]\`$Label\s*=\s*'([^']+)'").Groups[1].Value
+Yes "Install-Runner gives the runner a label ($label)" ($label.Length -gt 0)
+$runsOn = [regex]::Match($yml, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value
+Yes "build.yml asks for a self-hosted Windows runner with that label ($runsOn)" ($runsOn -match 'self-hosted' -and $runsOn -match 'Windows' -and $runsOn -match [regex]::Escape($label))
+Yes '  and no longer for GitHub''s own runners' ($yml -notmatch 'windows-latest')
+Yes '  with a timeout' ($yml -match '(?m)^\s*timeout-minutes:\s*\d+')
+Yes '  one run per branch at a time' ($yml -match 'cancel-in-progress:\s*true')
+Yes '  and a token that can only read' ($yml -match '(?m)^permissions:\s*\r?\n\s+contents:\s*read')
+
+# ---- the bot step never touches the machine's Python ----------------------------
+Yes 'the bot harnesses install into a venv of their own' ($yml -match 'python -m venv' -and $yml -match "Scripts\\python\.exe")
+Yes '  and nothing runs pip with the machine''s python' ($yml -notmatch '(?m)^\s*python -m pip install')
+
+# ---- the account ------------------------------------------------------------------
+Yes 'the account is made as a plain local user' ($text -match 'New-LocalUser')
+Yes '  in Users' ($text -match "Add-LocalGroupMember -Group 'Users'")
+Yes '  and never in Administrators' ($text -notmatch "Add-LocalGroupMember -Group 'Administrators'")
+Yes '  its password is made on the box, not sent from here' ($text -match 'GeneratePassword' -and $text -notmatch '(?m)^\s*\$pw\s*=')
+Yes 'the service runs as that account' ($text -match '--windowslogonaccount')
+Yes 'every live Thornswood folder is denied to it' ($text.Contains('icacls.exe `$d.FullName /deny'))
+Yes '  except its own' ($text -match 'if \(`\$d\.FullName -eq `\$root\) \{ continue \}')
+
+# ---- the download ------------------------------------------------------------------
+Yes 'the runner zip is checked against the SHA-256 in the release notes' ($text -match 'BEGIN SHA win-x64' -and $text -match 'Get-FileHash -LiteralPath `\$zip -Algorithm SHA256')
+Yes '  and a zip that does not match is deleted, not unpacked' ($text.Contains("if (```$got -ne '`$sha')"))
+
+# ---- the token -------------------------------------------------------------------
+$sayToken = @([regex]::Matches($text, '(?m)^.*(Say|Write-Host)[^\r\n]*\$token.*$'))
+Yes 'the registration token is never printed' ($sayToken.Count -eq 0)
+Yes '  and is dropped once used' ($text -match '(?m)^\$token = \$null')
+
+# ---- priority ----------------------------------------------------------------------
+Yes 'the runner is held at below normal priority' ($text -match "PriorityClass = ''BelowNormal''")
+Yes '  by a task that runs at start and every five minutes' ($text -match 'AtStartup' -and $text -match 'RepetitionInterval \(New-TimeSpan -Minutes 5\)')
+
+# ---- ssh ---------------------------------------------------------------------------
+Yes 'it checks the VPS host key' ($text -match 'StrictHostKeyChecking=accept-new')
+
+Write-Host ''
+Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+if ($script:fail) { exit 1 }
+exit 0

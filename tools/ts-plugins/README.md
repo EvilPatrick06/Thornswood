@@ -35,7 +35,7 @@ Go.ps1 makes what it installs the kept copy, the way a pack does; an edit
 copied in by hand, not through Go.ps1, lasts until the next Play. A new plugin has to be called `thornswood-*.js`: Keep parks any
 other plugin, and a pack carries nothing else from this folder
 (`Ship-Rules.ps1`). There is no build step; `node --check` parses a file, and
-the `tools\test-*.js` harnesses read these files and check them.
+the `tests\test-*.js` harnesses read these files and check them.
 
 ## Where it runs
 

@@ -163,7 +163,7 @@ Write-Host ''
 # collection (To Do List entry 133) and was never what did it: the SkyMP
 # client's DisableFastTravelService calls Game.enableFastTravel(false) on
 # every update, and the skymp5-client.js in the game folder carries that call,
-# checked 24 September. tools\test-sunhelm-gone.js looks for it.
+# checked 24 September. tests\test-sunhelm-gone.js looks for it.
 Say '  Fast travel itself is switched off by the SkyMP client on every frame,' 'Gray'
 Say '  so nothing here has to. Carriages are how people get about now.' 'Gray'
 Write-Host ''

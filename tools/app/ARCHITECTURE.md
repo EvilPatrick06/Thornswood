@@ -33,7 +33,7 @@ declared. A name without them is the line that calls it, sets it, or wires it.
 
 Lines move every time somebody edits a file above them. The name is the
 anchor: if the line has moved, search the file for the name. Run
-`node tools\test-architecture.js` and it prints where every moved reference is
+`node tests\test-architecture.js` and it prints where every moved reference is
 now. It fails when this page names something that is no longer in its file,
 or lists the steps of one method in an order the code no longer runs them in.
 A line that has only moved is a NOTE, never a failure, however far it moved:
@@ -187,7 +187,7 @@ the `.old` once its window has drawn (`SelfSwap.cs:192 Settle()`, startup step
 the script moves it aside as `Thornswood.exe.bad`, puts the `.old` back and
 starts that; the launcher that comes back logs which version failed and
 deletes the `.bad`. It is kept apart from Updater so that
-`tools\test-self-update.ps1` can compile it on its own and run the real script
+`tests\test-self-update.ps1` can compile it on its own and run the real script
 against stand-in launchers.
 
 **FeedNotice** (FeedNotice.cs). What the feed says to everybody. Three

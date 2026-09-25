@@ -21,6 +21,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `tools/signing`: the code signing setup, switched off until it is finished.
 - `tools/*.ps1`: the scripts that build, ship and deploy all of the above.
   `tools/Where.ps1` says where the engine and the build output are.
+- `tests`: the test harnesses the build check runs on every pull request.
 - `engine/skymp`: the SkyMP fork our engine changes live in, a git submodule.
   `git submodule update --init engine/skymp` fetches it; it needs Visual
   Studio to build.
@@ -28,7 +29,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
   that never go to GitHub. Both are ignored by git.
 - `lore/`: the world.
 
-`bot`, `site`, `tools/launcher`, `tools/setup`,
+`bot`, `site`, `tests`, `tools/launcher`, `tools/setup`,
 `tools/signing`, `tools/ts-plugins`, `tools/ts-ui` and `voice` each have
 a README of their own, which says what the folder is and how to change it.
 

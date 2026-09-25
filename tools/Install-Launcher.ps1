@@ -187,7 +187,7 @@ if ($isScratch) { Say '  a throwaway build, so the Desktop is left alone entirel
 # that nothing outside its folder changes, and these two were the exception:
 # they ran on every compile check. They stay exactly as they were for the two
 # real installs. Skipping them here is also what lets
-# tools\test-build-vs-install.ps1 run this script on every pull request, and on
+# tests\test-build-vs-install.ps1 run this script on every pull request, and on
 # a machine in the middle of a playtest, without touching the shell.
 if (-not $isScratch) {
     # Telling the shell an association changed is what actually makes Explorer

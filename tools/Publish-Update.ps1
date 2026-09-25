@@ -680,7 +680,7 @@ if ($collectionRemovals) {
 # parts GitHub will take, and the refusal of one oversized part further down
 # looks at one zip, never at the total.
 #
-# Kept between these markers so tools\test-release-size.ps1 can run the real
+# Kept between these markers so tests\test-release-size.ps1 can run the real
 # thing against the incident's own number.
 function Get-ReleaseSizeRefusal([int64]$Bytes, [int64]$CapMB, [bool]$Accepted) {
     if ($Accepted) { return '' }
@@ -1192,7 +1192,7 @@ if (-not $NoPush -and (Test-Path (Join-Path $ReleaseDir '.git'))) {
 }
 Head 'version.json'
 # ==== thornswood feed append ====
-# tools\test-feed-rules.ps1 runs this block on its own. If the markers move,
+# tests\test-feed-rules.ps1 runs this block on its own. If the markers move,
 # it stops rather than quietly testing nothing.
 #
 # The feed as pulled, before anything is added to it. What is already there is
