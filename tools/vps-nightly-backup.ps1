@@ -16,6 +16,7 @@
     gamemode.js           so a restore is a working server and not a puzzle
     the site's data       linked Discord accounts, the boards, the documents
     the bot's config      bot.env.json, and the voice service's choices.json
+    the bot's join record joins.json, which arrival each person was
     the Caddyfile         whatever is answering on 443 for thornswood.net
 
   What it leaves: node_modules, the installer under the site's public folder,
@@ -116,6 +117,14 @@ Grab (Join-Path $SiteRoot 'config.json')          'site\config.json'
 # bot.env.json, not config.json. The first nightly run reported the bot config
 # missing because this asked for a name the bot has never used.
 Grab (Join-Path $BotRoot  'bot.env.json')         'bot\bot.env.json'
+# joins.json is which arrival each person was, written by the bot on every
+# join since the join card fix (#318). Without it a restored bot has no
+# numbers to go on: the next card is numbered from the member count, which is
+# how two cards came to say "The 28th to walk in", and anybody coming back is
+# given a new number. Only Backup-Server.ps1, which takes the whole bot
+# folder, had it until 24 September. A bot that has seen no join since that
+# fix has none yet, and that is a "missing" line, not a failure.
+Grab (Join-Path $BotRoot  'joins.json')           'bot\joins.json'
 # THE CHARACTER REGISTER IS GONE, 23 September, and so are the two files this
 # used to fetch for it: secret.txt, the shared secret it checked against, and
 # owners.json, the register itself. Nothing reads either any more, so backing
