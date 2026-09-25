@@ -10,7 +10,7 @@ how a machine is set up. CLAUDE.md is only what applies to a Claude.
 Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in closed
 playtest. This repo is the launcher (tools\app, C# 5, WPF, built with the
 .NET Framework 4 csc), the game plugins (tools\ts-plugins, Skyrim Platform
-JavaScript), the site (tools\docs-app, node), the Discord bot (tools\discord,
+JavaScript), the site (tools\docs-app, node), the Discord bot (bot,
 Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06). The team is in the table below.
 
 ## Who works here
@@ -242,9 +242,9 @@ machine, from the repo folder.
    - The site's app or `tools\docs-app\public`: `.\tools\Deploy-Docs.ps1`.
      The public pages (`tools\docs-app\data\site\*.md`) need
      `.\tools\Deploy-Docs.ps1 -Site`.
-   - The bot's code or join card art in `tools\discord`:
+   - The bot's code or join card art in `bot`:
      `.\tools\Install-Bot.ps1 -CodeOnly`.
-   - The bot's avatar (`tools\discord\thornswood-bot-*.png`): no script
+   - The bot's avatar (`bot\thornswood-bot-*.png`): no script
      sends it. It is uploaded by hand in the Discord developer portal.
    - `tools\gamemode.js`: `.\tools\Deploy-Gamemode.ps1`, then
      `.\tools\Deploy-Server.ps1`.

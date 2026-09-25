@@ -165,7 +165,7 @@ What the watchdog checks: `https://thornswood.net/` for Caddy, then TCP 3001,
 command line for the bot (`Watch-Services.ps1:165-209,250-310`). It also writes DISK LOW
 under 20 percent free on C: and DISK CRITICAL under 10. The bot reads
 `C:\Thornswood-Watch\watch.log` every minute and posts outages in the staff
-channel (`tools/discord/bot.py:219`, `Watch-Services.ps1:20-29`).
+channel (`bot/bot.py:219`, `Watch-Services.ps1:20-29`).
 
 What the backup takes: the live server's `world`, `private`, `data`,
 `server-settings.json` and `gamemode.js`; the site's data; the bot's config

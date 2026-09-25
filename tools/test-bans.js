@@ -22,7 +22,7 @@ const path = require('path');
 const CR = String.fromCharCode(13);
 const SRC = path.join(__dirname, 'docs-app', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const builder = fs.readFileSync(path.join(__dirname, 'discord', 'Build-Discord.py'), 'utf8')
+const builder = fs.readFileSync(path.join(__dirname, '..', 'bot', 'Build-Discord.py'), 'utf8')
   .split(CR).join('');
 
 let pass = 0, fail = 0;

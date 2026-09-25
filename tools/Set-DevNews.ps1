@@ -14,13 +14,13 @@
 
   The URL is a credential: anyone holding it can post in that channel as the
   bot. It is pasted at a prompt rather than taken on the command line, it is
-  never printed back, and it is written to tools\discord\dev-webhook.txt,
+  never printed back, and it is written to bot\dev-webhook.txt,
   which .gitignore keeps out of the repository. Nothing else on this machine
   reads it except Publish-Discord.ps1 on a dev release.
 
   Before it saves anything it asks Discord what that webhook points at. A
   webhook URL carries its own authority, so this needs no bot token. If it
-  points at a channel other than the one in tools\discord\dev-channel.txt,
+  points at a channel other than the one in bot\dev-channel.txt,
   it says so and saves nothing: posting dev notes into #news by accident is
   the one thing this is here to prevent.
 
@@ -46,8 +46,8 @@ function Done {
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 }
 
-$hookFile    = Join-Path $Here 'discord\dev-webhook.txt'
-$channelFile = Join-Path $Here 'discord\dev-channel.txt'
+$hookFile    = Join-Path $Here '..\bot\dev-webhook.txt'
+$channelFile = Join-Path $Here '..\bot\dev-channel.txt'
 
 $wantChannel = ''
 if (Test-Path -LiteralPath $channelFile) {
@@ -58,7 +58,7 @@ Write-Host ''
 Write-Host '  THORNSWOOD  -  where dev releases are announced' -ForegroundColor White
 Write-Host ''
 if ($wantChannel) { Say "the dev updates channel is $wantChannel" 'DarkGray' }
-else { Say 'no channel id in tools\discord\dev-channel.txt, so the channel cannot be checked' 'Yellow' }
+else { Say 'no channel id in bot\dev-channel.txt, so the channel cannot be checked' 'Yellow' }
 
 # What a webhook points at, asked of Discord. The URL is its own authority, so
 # no token is involved and nothing secret is printed: only the channel it
@@ -170,7 +170,7 @@ if ($wantChannel -and $got.channel -ne $wantChannel) {
 $url = $null
 
 Write-Host ''
-Say "Saved to tools\discord\dev-webhook.txt, which git ignores." 'Green'
+Say "Saved to bot\dev-webhook.txt, which git ignores." 'Green'
 Say 'From now on .\tools\Ship.ps1 -Channel dev posts the release there.' 'Green'
 Say 'It still goes nowhere near #news, the website or the main launcher.' 'DarkGray'
 Done

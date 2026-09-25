@@ -1282,7 +1282,7 @@
             "by": "",
             "cells": {
               "c1bot": "**The four ticket kinds**",
-              "c2bot": "Questions are in `tools\\discord\\bot.py` under QUESTIONS. Tell me what to change rather than editing it, so the wording stays in one place.",
+              "c2bot": "Questions are in `bot\\bot.py` under QUESTIONS. Tell me what to change rather than editing it, so the wording stays in one place.",
               "c3bot": "Apply to play, Report somebody, I need help, Apply for a job."
             }
           },
@@ -1293,7 +1293,7 @@
             "by": "",
             "cells": {
               "c1bot": "**Join cards**",
-              "c2bot": "Drawn from `tools\\discord\\assets\\join-card.png` with their avatar and the member count on it. Goes in `#welcome`, where Discord's own plain join line already goes.",
+              "c2bot": "Drawn from `bot\\assets\\join-card.png` with their avatar and the member count on it. Goes in `#welcome`, where Discord's own plain join line already goes.",
               "c3bot": "If the card fails to draw for any reason, the greeting still goes out as plain text."
             }
           }

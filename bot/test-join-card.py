@@ -31,7 +31,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.dirname(HERE)
+TOOLS = os.path.join(os.path.dirname(HERE), 'tools')
 ROOT = os.path.dirname(TOOLS)
 sys.path.insert(0, HERE)
 # bot.py refuses to load without one, and never uses it unless client.run is
@@ -326,8 +326,8 @@ yes('I4 nothing in Install-Bot that writes, moves or deletes names the '
 with open(os.path.join(ROOT, '.gitignore'), encoding='utf-8') as f:
     ignored = [ln.strip() for ln in f]
 yes('I5 the record and its .tmp are kept out of git',
-    'tools/discord/joins.json' in ignored
-    and 'tools/discord/joins.json.tmp' in ignored)
+    'bot/joins.json' in ignored
+    and 'bot/joins.json.tmp' in ignored)
 
 
 # ------------------------------------------------------- the background --

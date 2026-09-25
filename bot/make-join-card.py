@@ -23,7 +23,7 @@ The art is far brighter and busier than the starfield was, so the area under
 the words is darkened, and the ring round the avatar gets a darker patch to
 sit on. card.render still lays its own wash over the text side, so what these
 numbers are tuned for is what the words end up on, and
-tools/discord/test-join-card.py measures that against the starfield card.
+bot/test-join-card.py measures that against the starfield card.
 Only the background changes: card.py draws the same size, layout, fonts and
 colours it always did.
 

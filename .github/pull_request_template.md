@@ -11,7 +11,7 @@ request is merged", has the command for each. They all run in the same sitting. 
 - [ ] The gamemode (`tools\gamemode.js`): Deploy-DevGamemode, or Deploy-Gamemode then Deploy-Server
 - [ ] The site's app or `tools\docs-app\public`: Deploy-Docs
 - [ ] The public pages (`tools\docs-app\data\site`): Deploy-Docs -Site
-- [ ] The bot (`tools\discord`): Install-Bot -CodeOnly
+- [ ] The bot (`bot`): Install-Bot -CodeOnly
 - [ ] The voice service (`tools\voice`): Install-Voice
 - [ ] Only scripts that run on the machine that ships: nothing more
 - [ ] Docs only

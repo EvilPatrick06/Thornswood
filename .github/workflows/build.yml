@@ -88,9 +88,9 @@ jobs:
       - name: Parse every bot file
         shell: pwsh
         run: |
-          if (-not (Test-Path tools\discord)) { Write-Host 'no bot to parse'; exit 0 }
+          if (-not (Test-Path bot)) { Write-Host 'no bot to parse'; exit 0 }
           $bad = 0
-          foreach ($f in (Get-ChildItem tools\discord -Filter *.py -Recurse -File)) {
+          foreach ($f in (Get-ChildItem bot -Filter *.py -Recurse -File)) {
             & python -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read(), sys.argv[1])" $f.FullName 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {
               $bad++
@@ -144,14 +144,14 @@ jobs:
           #
           # From requirements.txt, the file Install-Bot.ps1 installs on the
           # VPS, so the versions tested here are the versions the bot runs.
-          python -m pip install --quiet --disable-pip-version-check -r tools\discord\requirements.txt
+          python -m pip install --quiet --disable-pip-version-check -r bot\requirements.txt
           if ($LASTEXITCODE -ne 0) {
             Write-Host '::warning::could not install discord.py, so the bot harnesses did not run'
             exit 0
           }
           $env:DISCORD_TOKEN = 'not-a-real-token'
           $bad = 0
-          foreach ($t in (Get-ChildItem tools\discord -Filter 'test-*.py' -File | Sort-Object Name)) {
+          foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
             Write-Host ("--- {0}" -f $t.Name)
             & python $t.FullName
             if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }

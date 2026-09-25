@@ -27,13 +27,13 @@
   so a tracked copy would be a merge conflict on every release.
 
   Called by Ship.ps1 at the end of every release, so it is usually not run on
-  its own. If tools\discord\news-webhook.txt is not there it does nothing and
+  its own. If bot\news-webhook.txt is not there it does nothing and
   says so quietly, so a machine without the Discord set up still ships fine.
 
   -Dev is the dev build's release, and it is a different channel, a different
   feed and a different webhook. It reads the dev release worktree
   (Thornswood-Releases-dev) rather than the live one, and it posts through
-  tools\discord\dev-webhook.txt, which Set-DevNews.ps1 writes and which points
+  bot\dev-webhook.txt, which Set-DevNews.ps1 writes and which points
   at the dev updates channel. Nothing about a dev release reaches #news, the
   website or the main launcher: Ship.ps1 does not run Publish-News.ps1 on a
   dev release, and a dev publish only ever writes the dev feed, which only the
@@ -99,7 +99,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # own, so there is no way for one to arrive in #news by accident.
 $hookName = if ($Dev) { 'dev-webhook.txt' } else { 'news-webhook.txt' }
 if (-not $Webhook) {
-  $f = Join-Path $Here "discord\$hookName"
+  $f = Join-Path $Here "..\bot\$hookName"
   if (Test-Path -LiteralPath $f) { $Webhook = (Get-Content $f -Raw).Trim() }
 }
 if (-not $Webhook) {
@@ -251,7 +251,7 @@ if ($title.Length -gt 250) { $title = $title.Substring(0, 247) + '...' }
 # machines. The version alone is not enough on its own: a dev build can be
 # reshipped under the same number with a different note, and that note is
 # worth saying. The pair is what gets remembered.
-$stateFile = Join-Path $Here 'discord\announced.json'
+$stateFile = Join-Path $Here '..\bot\announced.json'
 $stateKey = if ($Dev) { 'dev' } else { 'main' }
 $said = @{}
 if (Test-Path -LiteralPath $stateFile) {
