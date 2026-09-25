@@ -13,13 +13,13 @@ of its own, and choosing one is Patrick's decision.
 `tools\test-third-party.js` checks this file against the build. It covers every
 resource Build-Launcher.ps1 compiles into the launcher, every file under
 `tools\lib`, every font and minified script the site serves from
-`tools\docs-app\public`, the six client files and the commits in
+`site\public`, the six client files and the commits in
 `tools\client-build.json` and `tools\server-build.json`, and the source
 paragraph on the public credits page. Where Vortex's copy of the Thornswood
 Client Runtime and the launcher's `Profile\OwnGame\files.txt` are on the
 machine, it also holds the section on that mod to every file in it. When a
 rebuild records a new commit, this file and
-`tools\docs-app\data\site\credits.md` have to change in the same pull request,
+`site\data\site\credits.md` have to change in the same pull request,
 or the build check goes red.
 
 ## How it reaches people
@@ -45,7 +45,7 @@ or the build check goes red.
 - **The game server** runs on the VPS. Nobody receives a copy, but the AGPL
   still asks for its source to be offered to everybody who connects.
 - **The site**, thornswood.net, hands every visitor's browser the files in
-  `tools\docs-app\public`, among them the fonts and the markdown renderer
+  `site\public`, among them the fonts and the markdown renderer
   listed under "On the site".
 
 Everything else Build-Launcher.ps1 compiles into the launcher is Thornswood's
@@ -299,7 +299,7 @@ built on 23 September carries every one of them.
 ## On the site
 
 Since entry 247 (#271) the site serves its fonts and its markdown renderer
-itself, from `tools\docs-app\public`, instead of sending every visitor to
+itself, from `site\public`, instead of sending every visitor to
 Google Fonts and cdnjs.cloudflare.com. So each browser that opens a page gets
 these from Thornswood, and server.js runs marked to draw the written pages
 before it sends them.

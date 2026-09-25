@@ -19,7 +19,7 @@ import re
 # and the site's join page moved on without them. Not one of them said
 # Vortex, Nexus or collection.
 #
-# So #start-here is tools\docs-app\data\site\join.md, and the welcome and the
+# So #start-here is site\data\site\join.md, and the welcome and the
 # questions take what you need and what happens to your own Skyrim out of its
 # "What you need" section. Change the page and the next Setup-Discord.ps1
 # -Posts says the same thing. join.md rather than help.md because the site's
@@ -31,7 +31,7 @@ import re
 # ticket goes in and where logs go, as the <#KEY> mentions Build-Discord.py
 # fills in.
 _JOIN = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                     '..', 'tools', 'docs-app', 'data', 'site', 'join.md')
+                     '..', 'site', 'data', 'site', 'join.md')
 _SITE = 'https://thornswood.net'
 
 # Build-Discord.py packs paragraphs into messages of up to 1900 characters

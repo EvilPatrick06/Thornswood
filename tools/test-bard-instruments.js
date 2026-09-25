@@ -27,8 +27,8 @@ const zlib = require('zlib');
 const CR = String.fromCharCode(13);
 const read = (p) => fs.readFileSync(p, 'utf8').split(CR).join('');
 
-const TESTS = process.env.TESTS_MD || path.join(__dirname, 'docs-app', 'data', 'tests.md');
-const KNOWN = path.join(__dirname, 'docs-app', 'data', 'known.md');
+const TESTS = process.env.TESTS_MD || path.join(__dirname, '..', 'site', 'data', 'tests.md');
+const KNOWN = path.join(__dirname, '..', 'site', 'data', 'known.md');
 const EMOTES = path.join(__dirname, 'ts-plugins', 'thornswood-emotes.js');
 const INI = path.join(__dirname, 'emotes', 'Thornswood.ini');
 const GM = process.env.GM || path.join(__dirname, 'gamemode.js');

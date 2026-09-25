@@ -243,7 +243,7 @@ const MCM_PAGES = { 'QuickLoot': 'QuickLootIEMCM.pex', 'Skyrim Unbound': 'Skyrim
 const named = Object.keys(MCM_PAGES).filter(function (k) { return mcmRow.indexOf(k) >= 0; });
 yes('the row gives an example of a mod whose page is there', named.length > 0);
 
-const KNOWN = read(['docs-app', 'data', 'known.md']);
+const KNOWN = read(['..', 'site', 'data', 'known.md']);
 yes('the row does not say the choices are kept in your save, when known.md says menus reset',
     !(/reset every session/i.test(KNOWN) && /kept in your save/i.test(mcmRow)));
 

@@ -18,7 +18,7 @@
   What it reads is the files that are text for people from end to end: the
   README and the security page, the launcher's help and window, the bot's
   channel posts, the public site pages, and the two data pages the site
-  serves in public (PUBLIC_DOCS in tools/docs-app/server.js). Not lore\,
+  serves in public (PUBLIC_DOCS in site/server.js). Not lore\,
   where in-world writing is not operational text. Not the code files either
   (the gamemode, the overlays, the rest of the launcher): a word check there
   fires on identifiers and engine names like player.moveto, and those are
@@ -49,8 +49,8 @@ if (-not $Root) { $Root = Split-Path -Parent $Here }
 
 $Paths = @(
     'README.md', 'SECURITY.md', 'tools/app/Help.cs', 'tools/ui.xaml', 'bot/content.py',
-    'tools/docs-app/data/site/*.md', 'tools/docs-app/data/known.md', 'tools/docs-app/data/help.md',
-    'tools/docs-app/public/home.html'
+    'site/data/site/*.md', 'site/data/known.md', 'site/data/help.md',
+    'site/public/home.html'
 )
 $Rules = @(
     @{ Re = ([string][char]0x2014) + '|&mdash;|&#0*8212;|&#x0*2014;'; Say = 'an em dash. Use a comma, a colon or a full stop.' },

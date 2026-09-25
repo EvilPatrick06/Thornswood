@@ -15,7 +15,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `tools/ts-plugins`: the game plugins, in Skyrim Platform JavaScript.
 - `tools/ts-ui`: the overlays inside the game.
 - `tools/gamemode.js`: the server's gamemode.
-- `tools/docs-app`: the site. Its public pages are `tools/docs-app/data/site`.
+- `site`: the site. Its public pages are `site/data/site`.
 - `voice`: proximity voice.
 - `bot`: the Discord bot, in Python.
 - `tools/signing`: the code signing setup, switched off until it is finished.
@@ -28,7 +28,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
   that never go to GitHub. Both are ignored by git.
 - `lore/`: the world.
 
-`bot`, `tools/docs-app`, `tools/launcher`, `tools/setup`,
+`bot`, `site`, `tools/launcher`, `tools/setup`,
 `tools/signing`, `tools/ts-plugins`, `tools/ts-ui` and `voice` each have
 a README of their own, which says what the folder is and how to change it.
 

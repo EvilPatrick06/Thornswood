@@ -23,7 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const SRC = process.env.HOME_HTML ||
-  path.join(__dirname, 'docs-app', 'public', 'home.html');
+  path.join(__dirname, '..', 'site', 'public', 'home.html');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 

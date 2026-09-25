@@ -4,14 +4,14 @@
 
       node .\tools\test-site-local.js
 
-  The site runs on a machine the way tools\docs-app\README.md says it does, the
+  The site runs on a machine the way site\README.md says it does, the
   README says truly what asks the site for what, and what one process means for
   the door is measured rather than guessed.
 
   WHY THIS EXISTS. To Do List entry 246: "The public site, the installer host
   and the game's identity door are one process, with one instance, and it is
   production". Before anything moves, its first step: "Add a documented
-  one-line local run and a README to tools/docs-app first, with a sample
+  one-line local run and a README to site first, with a sample
   config beside it", so that "a change is seen working first". The README had
   the run line but none of the rest: no sample config, no list of what depends
   on the site, no way to see the door answer. And the entry's proof,
@@ -39,7 +39,7 @@
 
   Every copy is in the temp folder: server.js, public\home.html, and
   config.sample.json as config.json. Nothing here opens
-  tools\docs-app\config.json, which on a machine that has one is that
+  site\config.json, which on a machine that has one is that
   machine's own, and nothing asks Discord: the sample is checked for empty
   Discord settings before any copy that reads it is started.
 */
@@ -52,7 +52,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
-const APP = path.join(__dirname, 'docs-app');
+const APP = path.join(__dirname, '..', 'site');
 const CR = String.fromCharCode(13);
 // A backslash, built rather than typed, so no tool on the way can eat it.
 const BS = String.fromCharCode(92);
@@ -82,10 +82,10 @@ function canon(v) {
   return JSON.stringify(v);
 }
 
-const readme = read('tools/docs-app/README.md') || '';
-const server = read('tools/docs-app/server.js') || '';
+const readme = read('site/README.md') || '';
+const server = read('site/server.js') || '';
 const deploy = read('tools/Deploy-Docs.ps1') || '';
-const sampleText = String(read('tools/docs-app/config.sample.json'));
+const sampleText = String(read('site/config.sample.json'));
 // server.js takes a byte order mark off the front before it parses, so this
 // does too. Built rather than typed, like the backslash.
 const BOM = String.fromCharCode(65279);
@@ -93,7 +93,7 @@ let sample = null;
 try { sample = JSON.parse(sampleText.charAt(0) === BOM ? sampleText.slice(1) : sampleText); } catch (e) { sample = null; }
 
 // ------------------------------------------------------------ the sample --
-yes('tools' + BS + 'docs-app' + BS + 'config.sample.json is there and parses the way server.js reads a config',
+yes('site' + BS + 'config.sample.json is there and parses the way server.js reads a config',
     !!sample && typeof sample === 'object' && !Array.isArray(sample));
 const S = sample || {};
 

@@ -14,7 +14,7 @@ So this checks three things.
 
   1. The words. The dead promises are gone and Vortex, Nexus and the
      collection are there, in the real content.py read against the real
-     tools/docs-app/data/site/join.md.
+     site/data/site/join.md.
   2. That they cannot drift. Every paragraph of join.md is in #start-here,
      and a copy of content.py pointed at an edited join.md follows the edit,
      or refuses to load when the paragraph it quotes has gone.
@@ -39,7 +39,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-JOIN_MD = os.path.join(HERE, '..', 'tools', 'docs-app', 'data', 'site', 'join.md')
+JOIN_MD = os.path.join(HERE, '..', 'site', 'data', 'site', 'join.md')
 sys.path.insert(0, HERE)
 
 PASS = []
@@ -151,11 +151,11 @@ if callable(section):
 TMP = tempfile.mkdtemp(prefix='thornswood-read-channels-')
 try:
     os.makedirs(os.path.join(TMP, 'bot'))
-    os.makedirs(os.path.join(TMP, 'tools', 'docs-app', 'data', 'site'))
+    os.makedirs(os.path.join(TMP, 'site', 'data', 'site'))
     shutil.copy(os.path.join(HERE, 'content.py'), os.path.join(TMP, 'bot', 'content.py'))
 
     def load_with(md, tag):
-        with open(os.path.join(TMP, 'tools', 'docs-app', 'data', 'site', 'join.md'), 'w',
+        with open(os.path.join(TMP, 'site', 'data', 'site', 'join.md'), 'w',
                   encoding='utf-8', newline='\n') as f:
             f.write(md)
         spec = importlib.util.spec_from_file_location(

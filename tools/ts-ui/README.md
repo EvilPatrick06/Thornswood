@@ -26,7 +26,7 @@ From the repo folder, with the game closed:
 unpacks the front from `tools\thornswood-front.zip` into
 `C:\Thornswood\Game\Data\Platform\UI` (`-Game` names another game folder),
 copies every `.js`, every `.mp3` and `index.html` from here over it so ours
-wins, and copies the site's banner from `tools\docs-app\public` in as the
+wins, and copies the site's banner from `site\public` in as the
 menu's painting. It copies nothing else from this folder. The zip is not in
 git and nothing in the repo builds it; without it Go.ps1 says so and leaves
 the front that a release already put in the game folder. `-SkipServer`

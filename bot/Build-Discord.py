@@ -149,7 +149,7 @@ ROLES.append(('Member', 0x8D9682, False, PLAIN))   # everybody, on the way in
 
 # THE ONE A BAN DEPENDS ON, and it was never created.
 #
-# docs-app/server.js has keyed access off a role called Banned since it was
+# site/server.js has keyed access off a role called Banned since it was
 # written: cfg.access.banned is ['Banned'] and standing() takes everything away
 # from anybody holding it. This builder makes eighteen roles and that was not
 # one of them, so the thing being enforced did not exist and a ban was a role

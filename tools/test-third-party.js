@@ -58,7 +58,7 @@ function flat(s) { return String(s).replace(/\s+/g, ' ').trim(); }
 const noticesRaw = read(path.join(ROOT, 'THIRD-PARTY.md'));
 yes('THIRD-PARTY.md exists at the repo root', noticesRaw !== null);
 const N = noticesRaw || '';
-const creditsRaw = read(path.join(TOOLS, 'docs-app', 'data', 'site', 'credits.md'));
+const creditsRaw = read(path.join(TOOLS, '..', 'site', 'data', 'site', 'credits.md'));
 yes('the public credits page is there to read', creditsRaw !== null);
 const C = creditsRaw || '';
 
@@ -211,13 +211,13 @@ yes('the credits page carries the WebView2 licence word for word', flat(C).index
 // ---------------------------------------------------------------- the site
 //
 // Entry 247 (#271) moved the site's fonts and marked off Google Fonts and
-// cdnjs into tools\docs-app\public, so since then the site hands them to every
+// cdnjs into site\public, so since then the site hands them to every
 // visitor itself. Anything there that is somebody else's by its kind, a font
 // file or a minified script, has to be in THIRD-PARTY.md by name and sha256,
 // so a newer marked or another font dropped in without a word fails here.
 // Text is hashed with its CRs taken out: git stores it with LF, a Windows
 // checkout adds them, and the hash in the notices is of what git stores.
-const PUB = path.join(TOOLS, 'docs-app', 'public');
+const PUB = path.join(TOOLS, '..', 'site', 'public');
 function vendoredKind(n) { return /\.(woff2?|ttf|otf)$/i.test(n) || /\.min\.js$/i.test(n); }
 let pubNames = [];
 try { pubNames = fs.readdirSync(PUB); } catch (e) { pubNames = []; }
@@ -237,7 +237,7 @@ yes('THIRD-PARTY.md has a section for the site', siteSection.length > 0);
 siteSection.split('\n').forEach(function (l) {
   const m = /^\| `([^`]+)`/.exec(l);
   if (!m || !vendoredKind(m[1])) { return; }
-  yes(m[1] + ', listed under the site, is still in tools\\docs-app\\public', pubNames.indexOf(m[1]) >= 0);
+  yes(m[1] + ', listed under the site, is still in site\\public', pubNames.indexOf(m[1]) >= 0);
 });
 const markedFile = siteFiles.filter(function (n) { return /^marked-.*\.min\.js$/i.test(n); })[0];
 if (markedFile) {

@@ -1,6 +1,6 @@
 // test-tester-checklist.js
 //
-// The tester checklist (tools/docs-app/data/tests.md, the site's Test These
+// The tester checklist (site/data/tests.md, the site's Test These
 // page) names no build number.
 //
 // WHY THIS EXISTS. Entry 295 on the To Do List: the first thing the checklist
@@ -25,7 +25,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const CHECKLIST = path.join(ROOT, 'tools', 'docs-app', 'data', 'tests.md');
+const CHECKLIST = path.join(ROOT, 'site', 'data', 'tests.md');
 const UI = path.join(ROOT, 'tools', 'ui.xaml');
 const SHELL = path.join(ROOT, 'tools', 'app', 'Shell.cs');
 

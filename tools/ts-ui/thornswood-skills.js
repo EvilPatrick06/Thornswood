@@ -733,7 +733,7 @@
     when what arrives is the stored shape. While creating it has said
     nothing, because there is nobody to say it about, so the two the
     rulebook gives a new mage stand in: "A mage picks two schools, then two
-    starting spells" (tools\docs-app\data\site\classes.md).
+    starting spells" (site\data\site\classes.md).
 
     In the world there is no standing in. A mage the server has sent no
     number for reads as no number: null, and every line that would print one

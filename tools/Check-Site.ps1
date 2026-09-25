@@ -10,7 +10,7 @@
       .\Check-Site.ps1 -NoSsh                      the outside checks only
 
   From the outside, over plain HTTP: GET and HEAD of the front page and every
-  public page (the list is read out of docs-app\server.js so it cannot go
+  public page (the list is read out of site\server.js so it cannot go
   stale here), the public feed and what it carries, the /discord redirect, the
   two old download addresses, robots.txt, the security header, and whether
   the Discord invite the site hands out ever expires. Discord's public invite
@@ -134,7 +134,7 @@ function Line($m) { Write-Host "  $m" -ForegroundColor Gray }
 
 # The public pages, as the site itself lists them, so a page added there is
 # checked here without anybody remembering to add it twice.
-$serverJs = Join-Path $Here 'docs-app\server.js'
+$serverJs = Join-Path $Here '..\site\server.js'
 $pages = @('/')
 if (Test-Path -LiteralPath $serverJs) {
   $js = [IO.File]::ReadAllText($serverJs)

@@ -9,8 +9,8 @@ request is merged", has the command for each. They all run in the same sitting. 
 
 - [ ] The launcher, the game plugins or anything in a pack: a dev Ship
 - [ ] The gamemode (`tools\gamemode.js`): Deploy-DevGamemode, or Deploy-Gamemode then Deploy-Server
-- [ ] The site's app or `tools\docs-app\public`: Deploy-Docs
-- [ ] The public pages (`tools\docs-app\data\site`): Deploy-Docs -Site
+- [ ] The site's app or `site\public`: Deploy-Docs
+- [ ] The public pages (`site\data\site`): Deploy-Docs -Site
 - [ ] The bot (`bot`): Install-Bot -CodeOnly
 - [ ] The voice service (`voice`): Install-Voice
 - [ ] Only scripts that run on the machine that ships: nothing more

@@ -1,4 +1,4 @@
-// Runs the real sign-in ageing out of docs-app\server.js.
+// Runs the real sign-in ageing out of site\server.js.
 //
 // That file opens a port and reads a config when it is required, so the block
 // between the two markers is taken out and driven on its own. It is a pure
@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SRC = path.join(__dirname, 'docs-app', 'server.js');
+const SRC = path.join(__dirname, '..', 'site', 'server.js');
 const text = fs.readFileSync(SRC, 'utf8');
 const a = text.indexOf('// ==== thornswood signin ageing ====');
 const b = text.indexOf('// ==== end thornswood signin ageing ====');

@@ -5,7 +5,7 @@
 
   What people said used to be a page of its own: the whole chat log, a day at a
   time, for everybody at once. Patrick on 22 September: put it under each
-  person on /sessions, split per session. chatSlice in docs-app\server.js does
+  person on /sessions, split per session. chatSlice in site\server.js does
   the splitting and /api/session-logs hands the lines back with the rest of
   that session.
 
@@ -15,7 +15,7 @@
   narrow drops what was actually said. Neither looks like a fault on the page:
   both render as a tidy list. So these check the boundaries, one at a time.
 
-  It reads the real function out of docs-app\server.js rather than a copy.
+  It reads the real function out of site\server.js rather than a copy.
 
   DEV AND LIVE ARE TWO VOICE SERVICES WITH TWO CHAT FOLDERS. Until 24
   September chatSlice read the live folder for every session, so a dev session
@@ -28,12 +28,12 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const SRC = path.join(__dirname, 'docs-app', 'server.js');
+const SRC = path.join(__dirname, '..', 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8');
 
 function grab(name) {
   const at = src.indexOf('function ' + name);
-  if (at < 0) throw new Error('docs-app/server.js has no function ' + name);
+  if (at < 0) throw new Error('site/server.js has no function ' + name);
   const b = src.indexOf('{', at);
   let d = 0;
   for (let i = b; i < src.length; i++) {

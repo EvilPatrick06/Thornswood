@@ -15,7 +15,7 @@
   answer. A failed lookup can neither let somebody in nor turn somebody away.
 
   Two halves, and this drives both of the real ones: the route is lifted out
-  of docs-app\server.js and run against pretend Discord answers, and what it
+  of site\server.js and run against pretend Discord answers, and what it
   sends is handed to the door's refresh(), lifted out of gamemode.js and run
   against a pretend site and a pretend disk. Nothing leaves this machine.
 
@@ -30,7 +30,7 @@ const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 
-const SITE = process.env.SITE || path.join(__dirname, 'docs-app', 'server.js');
+const SITE = process.env.SITE || path.join(__dirname, '..', 'site', 'server.js');
 const GAME = process.env.GAMEMODE || path.join(__dirname, 'gamemode.js');
 const site = fs.readFileSync(SITE, 'utf8').split(CR).join('');
 const game = fs.readFileSync(GAME, 'utf8').split(CR).join('');

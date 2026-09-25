@@ -1,6 +1,6 @@
 // test-todo-board.js
 //
-// The hub's own to do board, the `todo` key in tools/docs-app/data/board.json,
+// The hub's own to do board, the `todo` key in site/data/board.json,
 // says only true things about what is on fire, and its numbering holds.
 //
 // WHY THIS EXISTS. Entry 298 on the To Do List: the board opened with
@@ -36,7 +36,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const APP = path.join(ROOT, 'tools', 'docs-app');
+const APP = path.join(ROOT, 'site');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -159,7 +159,7 @@ const quoting = walk(APP, []).filter(function (p) {
   try { return fs.readFileSync(p).toString('latin1').indexOf('1.0.196') >= 0; } catch (e) { return false; }
 });
 quoting.forEach(function (p) { console.log('      ' + path.relative(ROOT, p)); });
-yes('no file under tools/docs-app quotes launcher 1.0.196', quoting.length === 0);
+yes('no file under site quotes launcher 1.0.196', quoting.length === 0);
 
 let first = '';
 try { first = readText(path.join(APP, 'data', 'todo.md')).split(/\r?\n/)[0]; } catch (e) {}

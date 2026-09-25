@@ -17,7 +17,7 @@
   minutes ago assumes the thing is broken and leaves.
 
   This runs the real standing(), memberOf(), guildMembers(), roleNames() and
-  the real /api/play/join block out of docs-app\server.js, with only
+  the real /api/play/join block out of site\server.js, with only
   discordGet, the ticket, the files and the reply stubbed, so it cannot pass
   against a copy that is no longer what ships. The launcher half is
   test-door-outage.ps1, which compiles the real Door.cs.
@@ -29,7 +29,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SRC = process.argv[2] || path.join(__dirname, 'docs-app', 'server.js');
+const SRC = process.argv[2] || path.join(__dirname, '..', 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8');
 const DOOR = fs.readFileSync(process.argv[3] || path.join(__dirname, 'app', 'Door.cs'), 'utf8');
 
@@ -44,12 +44,12 @@ function braced(at, what) {
 }
 function grab(name) {
   const at = src.indexOf('async function ' + name + '(');
-  if (at < 0) throw new Error('docs-app/server.js has no async function ' + name);
+  if (at < 0) throw new Error('site/server.js has no async function ' + name);
   return braced(at, name);
 }
 function route(head) {
   const at = src.indexOf(head);
-  if (at < 0) throw new Error('docs-app/server.js has no ' + head);
+  if (at < 0) throw new Error('site/server.js has no ' + head);
   return braced(at, head);
 }
 

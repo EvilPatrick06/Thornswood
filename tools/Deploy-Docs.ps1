@@ -78,7 +78,7 @@ $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-$App  = Join-Path $Here 'docs-app'
+$App  = Join-Path $Here '..\site'
 
 if (-not (Test-Path -LiteralPath $App)) { throw "not found: $App" }
 

@@ -1,4 +1,4 @@
-// Runs the real site log out of docs-app\server.js against a temp folder.
+// Runs the real site log out of site\server.js against a temp folder.
 //
 // server.js opens a port and reads a config when it is required, so the block
 // between the two markers is taken out and driven on its own. It needs fs and
@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const SRC = path.join(__dirname, 'docs-app', 'server.js');
+const SRC = path.join(__dirname, '..', 'site', 'server.js');
 const text = fs.readFileSync(SRC, 'utf8');
 const a = text.indexOf('function makeLog(dir, name, maxBytes, keep) {');
 const b = text.indexOf('// Four megabytes is a few days');

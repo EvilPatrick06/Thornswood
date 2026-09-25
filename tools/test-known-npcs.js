@@ -38,7 +38,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const PAGE = process.env.KNOWN || path.join(__dirname, 'docs-app', 'data', 'known.md');
+const PAGE = process.env.KNOWN || path.join(__dirname, '..', 'site', 'data', 'known.md');
 const CR = String.fromCharCode(13);
 let text = null;
 try { text = fs.readFileSync(PAGE, 'utf8').split(CR).join(''); } catch (e) { text = null; }

@@ -378,8 +378,8 @@ tester confused by a list that no longer matches.
 
 | Row | Text | In |
 | --- | --- | --- |
-| 3 | `Anniversary Edition is not required` | `tools\docs-app\data\site\join.md` |
-| 3 | `Thornswood leaves the Skyrim you already have alone.` | `tools\docs-app\data\site\join.md` |
+| 3 | `Anniversary Edition is not required` | `site\data\site\join.md` |
+| 3 | `Thornswood leaves the Skyrim you already have alone.` | `site\data\site\join.md` |
 | 17 | `This puts in the launcher, the script extender and Thornswood's own content.` | `tools\setup\Bootstrap.cs` |
 | 17 | `leaves your own Skyrim alone.` | `tools\setup\Bootstrap.cs` |
 | 17 | `Nothing to unpack yet.` | `tools\setup\Bootstrap.cs` |
