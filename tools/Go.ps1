@@ -205,6 +205,7 @@ if (Test-Path -LiteralPath $uiSrc) {
   # The two pictures of the scroll in front of the character choice.
   foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.webp) {
     Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
   }
   # The painting behind the main menu's character choice: the site's own
