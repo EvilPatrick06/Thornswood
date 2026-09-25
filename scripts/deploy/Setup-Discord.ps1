@@ -101,8 +101,14 @@ if ($code -ne 0) {
 $hook = Join-Path $Here '..\..\bot\news-webhook.txt'
 Write-Host ''
 if (Test-Path -LiteralPath $hook) {
-  Write-Host '  Release notes will post themselves into #news from now on.' -ForegroundColor Green
-  Write-Host '  The webhook that does it is in bot\news-webhook.txt' -ForegroundColor DarkGray
+  # Onto the VPS, where every machine that ships reads it (Discord-Hook.ps1); the
+  # copy here is removed once the VPS has it.
+  & (Join-Path $Here '..\ops\Discord-Hook.ps1') -Name news -Save ((Get-Content -LiteralPath $hook -Raw).Trim())
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host '  Release notes will post themselves into #news from now on.' -ForegroundColor Green
+  } else {
+    Write-Host '  The webhook is in bot\news-webhook.txt here but not on the VPS, so only this machine posts to #news.' -ForegroundColor Yellow
+  }
 } else {
   Write-Host '  Built, but no webhook was made, so releases will not post' -ForegroundColor Yellow
   Write-Host '  themselves into #news yet. Run this again once #news exists.' -ForegroundColor Yellow
