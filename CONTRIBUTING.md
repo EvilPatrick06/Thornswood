@@ -35,30 +35,43 @@ Never "player". No em dashes anywhere written for people. Plain, direct
 sentences, no filler, no placeholders. Secrets (server passwords, site keys,
 Discord tokens, the news webhook, anything out of a config.json or .env on the
 VPS) are named by location only; never printed, pasted, committed or logged.
-## Everything we need to do goes on the To Do List
 
-The Thornswood To Do List is the one record of outstanding work:
-https://claude.ai/artifact/DEaM2aKgAp3RYQnbox4WqY
+## Everything we need to do goes on the board
 
-Decided by Patrick on 25 Sep, approved in #dev: the list moves to GitHub
-Issues and a Project board on this repository, so everybody can read and edit
-it with or without Claude, and the page above is deleted once the move is
-checked. Until then it is the page above; anybody who cannot open it asks in
-#dev.
+The one record of outstanding work is the Thornswood To Do board:
+https://github.com/users/EvilPatrick06/projects/1
 
-Decided by Patrick on 17 Sep. Anything a session turns up goes on it before the
-session ends. A defect, a decision, a correction to something already on there,
-or work started and not finished. Saying it in a reply is not recording it: a
-reply is gone when the window closes and the next person has no way to know it
-was ever found. What prompted this was a Google Ads tag added to the site whose
-only trace was a paragraph on a neighbouring entry, with no step telling anybody
-to deploy it.
+Each piece of work is an issue on this repository, and every issue is on the
+board. Decided by Patrick on 25 Sep and approved in #dev: the list moved there
+from a claude.ai page that nobody without Claude could open. The 169 open
+entries became issues #368 to #536, each keeping its old number as its Order.
+`docs/archive/todo-list-2026-09-25.md` holds every entry as it stood that day,
+the finished ones included, so a comment in the code that says "entry 243 on
+the To Do List" means entry 243 in that file.
 
-The number is the do-order, so a new entry goes where it belongs in that order
-and not on the end. Work that fits an existing entry updates that entry rather
-than making a second one. Write down what was measured and what is left.
-Uncommitted changes sitting in the repo are outstanding work and belong on it
-too. Say in the pull request, or in #dev, which entries moved.
+Decided by Patrick on 17 Sep. Anything a session turns up goes on the board
+before the session ends. A defect, a decision, a correction to something
+already on there, or work started and not finished. Saying it in a chat or a
+reply is not recording it: that is gone when the window closes and the next
+person has no way to know it was ever found. What prompted this was a Google
+Ads tag added to the site whose only trace was a paragraph on a neighbouring
+entry, with no step telling anybody to deploy it.
+
+How to use it:
+
+- Order is the do-order. A new issue gets the Order of where it belongs, not
+  the end; a number between two others (52.5) is fine.
+- Work that fits an existing issue is an edit or a comment on it, not a
+  second issue. Write down what was measured and what is left.
+- Uncommitted changes sitting in the repo are outstanding work and belong on
+  the board too.
+- Labels: `wave:` is the stage, `area:` the part of the project, `needs:` who
+  or what it waits on, and `anyone can start` marks what needs nobody in
+  particular. Assign yourself when you start one.
+- A pull request that finishes an issue says `Closes #N`, so merging closes
+  it and the board moves it to Done. Say in the pull request, or in #dev,
+  which issues moved.
+
 ## Settled design, not up for a quiet rewrite
 
 - Decided by Patrick and Djinn on 17 Sep, after the three launchers kept
