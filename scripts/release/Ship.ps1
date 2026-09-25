@@ -529,9 +529,38 @@ elseif ($Dev) {
         return 0
     }
 
+    # WHAT IS PUBLISHED, READ OFF GITHUB, NOT OFF THIS DISK. Until 25 September
+    # both numbers came from the version.json files in this machine's releases
+    # clones, which nothing here pulls first. Djinn's clone was days old and
+    # still said 1.1.92, so his dev Ship went out as 1.1.92.3 while every dev
+    # launcher was on 1.1.94.x: lower, so never offered. And the count after
+    # the last dot came from the dev feed's current number only, so the next
+    # Ship after it would have restarted at .1 under numbers already out.
+    # Now both feeds are fetched and read from origin, and the dev number
+    # climbs past every launcher version the dev branch has ever published.
+    function Read-Published([string]$dir, [string]$branch) {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try {
+            & git -C $dir fetch --quiet origin $branch 2>$null | Out-Null
+            $j = (& git -C $dir show "origin/$($branch):version.json" 2>$null | Out-String)
+            if ($LASTEXITCODE -eq 0 -and $j.Trim()) { return [string](($j | ConvertFrom-Json).launcherVersion) }
+            $f = Join-Path $dir 'version.json'
+            if (-not (Test-Path -LiteralPath $f)) { return '' }
+            Say "  could not read origin/$branch in $dir, so this uses the copy on disk, which may be old" 'Yellow'
+            return [string]((Get-Content -LiteralPath $f -Raw | ConvertFrom-Json).launcherVersion)
+        } finally { $ErrorActionPreference = $old }
+    }
+    function Read-EverPublished([string]$dir, [string]$branch) {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try {
+            $log = (& git -C $dir log -p -n 400 "origin/$branch" -- version.json 2>$null | Out-String)
+            return @([regex]::Matches($log, '(?m)^[+-]\s*"launcherVersion"\s*:\s*"([0-9.]+)"') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+        } finally { $ErrorActionPreference = $old }
+    }
+
     $base = $current
     try {
-        $mainWas = [string]((Get-Content (Join-Path $MainReleaseDir 'version.json') -Raw | ConvertFrom-Json).launcherVersion)
+        $mainWas = Read-Published $MainReleaseDir 'main'
         # Only the first three parts of main's number. Main never carries a
         # fourth, but reading defensively costs nothing and a 1.1.77.2 base
         # would produce a five part version nobody can read.
@@ -545,16 +574,28 @@ elseif ($Dev) {
         }
     } catch { }
 
+    $seen = @()
+    try { $seen = @(Read-EverPublished $ReleaseDir 'dev') } catch { }
+    try { $was = Read-Published $ReleaseDir 'dev'; if ($was) { $seen += $was } } catch { }
     $n = 1
-    try {
-        $was = [string]((Get-Content (Join-Path $ReleaseDir 'version.json') -Raw | ConvertFrom-Json).launcherVersion)
-        if ($was.StartsWith("$base.")) {
-            $tail = $was.Substring($base.Length + 1)
+    foreach ($v in $seen) {
+        if ($v.StartsWith("$base.")) {
             $k = 0
-            if ([int]::TryParse($tail, [ref]$k)) { $n = $k + 1 }
+            if ([int]::TryParse($v.Substring($base.Length + 1), [ref]$k) -and $k -ge $n) { $n = $k + 1 }
         }
-    } catch { }
+    }
     $target = "$base.$n"
+    # Past every dev number already out, whatever base that was on: a lower
+    # one is never offered to a launcher that took the higher.
+    $top = ''
+    foreach ($v in $seen) { if ($v -and (-not $top -or (Compare-Ver $v $top) -gt 0)) { $top = $v } }
+    if ($top -and (Compare-Ver $top $target) -ge 0) {
+        $tp = @($top -split '\.')
+        if ($tp.Count -ge 4) { $k = 0; [void][int]::TryParse($tp[3], [ref]$k); $next = (($tp[0..2] -join '.') + '.' + ($k + 1)) }
+        else { $next = (($tp[0..2] -join '.') + '.1') }
+        Say "  dev has already published $top, so this goes out as $next rather than $target" 'Yellow'
+        $target = $next
+    }
 }
 else {
     # A MAIN RELEASE NO LONGER BUMPS THE VERSION, and this is the change that

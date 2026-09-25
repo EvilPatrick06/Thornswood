@@ -142,7 +142,32 @@ try {
         '$current = $args[0]; $MainReleaseDir = $args[1]; $ReleaseDir = $args[2];' +
         'function Say($t, $c) { };' + $body + '; return $target')
     $t = & $sb '1.1.76' (Join-Path $tmp 'nothing-here') (Join-Path $tmp 'dev')
-    Yes "S6 an unreadable main feed still produces a version: $t" ($t -eq '1.1.76.1')
+    Yes "S6 an unreadable main feed still produces a version above what dev has out: $t" ($t -eq '1.1.77.2')
+
+    # S7: 25 SEPTEMBER. Djinn's releases clone was days old and said 1.1.92,
+    #     so his dev Ship went out as 1.1.92.3 while dev launchers were on
+    #     1.1.94.3. Both feeds are read off the origin now, and the number
+    #     climbs past everything the dev branch ever published.
+    $origin = Join-Path $tmp 'rel.git'; $seed = Join-Path $tmp 'relseed'; $stale = Join-Path $tmp 'relstale'
+    & git init -q --bare -b main $origin
+    & git init -q -b main $seed
+    & git -C $seed config user.email t@t; & git -C $seed config user.name t
+    function Put($v) { Set-Content -LiteralPath (Join-Path $seed 'version.json') -Value ('{' + [char]10 + '  "launcherVersion": "' + $v + '"' + [char]10 + '}'); & git -C $seed add -A; & git -C $seed commit -q -m $v }
+    Put '1.1.92'
+    & git -C $seed remote add origin $origin; & git -C $seed push -q origin main 2>$null
+    & git clone -q $origin $stale 2>$null
+    & git -C $seed checkout -q -b dev
+    foreach ($v in '1.1.94.1', '1.1.94.2', '1.1.94.3', '1.1.92.3') { Put $v }
+    & git -C $seed push -q origin dev 2>$null
+    & git -C $seed checkout -q main; Put '1.1.94'; & git -C $seed push -q origin main 2>$null
+    & git -C $stale fetch -q origin dev 2>$null
+    & git -C $stale worktree add -q (Join-Path $tmp 'relstale-dev') origin/dev 2>$null
+    $sb = [scriptblock]::Create(
+        '$current = $args[0]; $MainReleaseDir = $args[1]; $ReleaseDir = $args[2];' +
+        'function Say($t, $c) { };' + $body + '; return $target')
+    $t = & $sb '1.1.92' $stale (Join-Path $tmp 'relstale-dev')
+    Yes "S7 a stale releases clone and a dev feed that went back to 1.1.92.3 give $t" ($t -eq '1.1.94.4')
+    Yes 'S7 and a dev launcher on 1.1.94.3 is offered it' (IsNewer $t '1.1.94.3')
 }
 finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
