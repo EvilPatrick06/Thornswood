@@ -14,9 +14,9 @@
 
   The URL is a credential: anyone holding it can post in that channel as the
   bot. It is pasted at a prompt rather than taken on the command line, it is
-  never printed back, and it is written to bot\dev-webhook.txt,
-  which .gitignore keeps out of the repository. Nothing else on this machine
-  reads it except Publish-Discord.ps1 on a dev release.
+  never printed back, and it is stored on the VPS (Discord-Hook.ps1), never in
+  git, so every machine that ships reads it from there. Only
+  Publish-Discord.ps1 reads it, on a dev release.
 
   Before it saves anything it asks Discord what that webhook points at. A
   webhook URL carries its own authority, so this needs no bot token. If it
@@ -94,12 +94,12 @@ function Ask($url) {
 
 # ------------------------------------------------------------------- check
 if ($Check) {
-  if (-not (Test-Path -LiteralPath $hookFile)) {
-    Say 'No dev webhook set. A dev release tells nobody in Discord.' 'Yellow'
+  $url = [string](& (Join-Path $Here 'Discord-Hook.ps1') -Name dev | Select-Object -First 1)
+  if (-not $url) {
+    Say 'No dev webhook set, on the VPS or here. A dev release tells nobody in Discord.' 'Yellow'
     Say 'Run .\scripts\ops\Set-DevNews.ps1 to point it at the dev updates channel.' 'DarkGray'
     Done; exit 0
   }
-  $url = (Get-Content -LiteralPath $hookFile -Raw).Trim()
   $got = Ask $url
   if (-not $got.ok) { Say "The stored webhook does not work: $($got.why)" 'Red'; Done; exit 1 }
   Say "webhook `"$($got.name)`" posts into channel $($got.channel)" 'Green'
@@ -115,10 +115,9 @@ if ($Check) {
 if ($Clear) {
   if (Test-Path -LiteralPath $hookFile) {
     Remove-Item -LiteralPath $hookFile -Force
-    Say 'Forgotten. Dev releases will tell nobody in Discord.' 'Yellow'
-  } else {
-    Say 'There was nothing set.' 'DarkGray'
+    Say 'The copy on this machine is gone.' 'Yellow'
   }
+  Say 'The one on the VPS stays: delete the webhook in Discord to stop it posting.' 'DarkGray'
   Done; exit 0
 }
 
@@ -166,11 +165,15 @@ if ($wantChannel -and $got.channel -ne $wantChannel) {
   Done; exit 1
 }
 
-[IO.File]::WriteAllText($hookFile, $url, (New-Object Text.UTF8Encoding($false)))
+# On the VPS since 25 September, where every machine that ships reads it
+# (Discord-Hook.ps1), rather than in bot\dev-webhook.txt on this machine only.
+& (Join-Path $Here 'Discord-Hook.ps1') -Name dev -Save $url
+$saved = $LASTEXITCODE
 $url = $null
+if ($saved -ne 0) { Done; exit 1 }
 
 Write-Host ''
-Say "Saved to bot\dev-webhook.txt, which git ignores." 'Green'
+Say "Saved on the VPS, where every machine that ships reads it." 'Green'
 Say 'From now on .\scripts\release\Ship.ps1 -Channel dev posts the release there.' 'Green'
 Say 'It still goes nowhere near #news, the website or the main launcher.' 'DarkGray'
 Done
