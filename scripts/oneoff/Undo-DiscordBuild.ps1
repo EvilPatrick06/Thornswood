@@ -78,7 +78,9 @@ try {
         $before = $e[-1].id
     }
 } catch {
-    Say 'STOP. Discord would not show the audit log to the bot. Give its role "View Audit Log" (Server Settings, Roles) and run this again. Nothing was changed.' 'Red'
+    $code = 0; try { $code = [int]$_.Exception.Response.StatusCode } catch { }
+    if ($code -eq 403) { Say 'STOP. Discord says the bot may not read the audit log (403). Give its role "View Audit Log" (Server Settings, Roles), and check that role is not below one that denies it. Nothing was changed.' 'Red' }
+    else { Say ("STOP. Reading the audit log failed{0}: {1}. Nothing was changed." -f $(if ($code) { " ($code)" } else { '' }), $_.Exception.Message) 'Red' }
     exit 1
 }
 Say ("{0} change(s) by the bot in the last {1} hours" -f $entries.Count, $Hours)
