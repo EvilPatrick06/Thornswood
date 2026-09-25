@@ -173,6 +173,73 @@
     beat = null;
   }
 
+  /*
+    THE CHAT GETS OUT OF THE WAY.
+
+    Patrick, 24 September: "can you make the default for the chat to hide
+    after 10 seconds if the server sends a message or someone else or if you
+    do and it come back when you hit enter and add an option in the launcher
+    settings to make it 5, 10, 15, 20 or permeant like it is now."
+
+    Every line goes through thornswoodChat.add, whoever it came from, so a
+    line puts the chat back and starts the clock again. Enter goes through
+    focusInput, which puts it back and stops the clock while the box is open;
+    blurInput starts the clock again when the line is sent or Escape shuts it.
+
+    The number is the launcher's Settings, ChatFade in Thornswood.ini, which
+    thornswood-front.js hands over as window.THORNSWOOD.chatFade. 0 is how it
+    was before, on screen all the time. It is read each time rather than once
+    because that object goes in after this page has loaded.
+
+    The class goes on <html>, not on #chat: React owns #chat and a redraw
+    could take a class back off it, and nothing owns <html>.
+  */
+  var FADE_CLASS = 'thornswood-chat-faded';
+  var FADE_CHOICES = [0, 5, 10, 15, 20];
+  var FADE_DEFAULT = 10;
+  var fadeTimer = null;
+
+  function fadeSeconds() {
+    var c = window.THORNSWOOD;
+    if (!c || c.chatFade === undefined || c.chatFade === null) return FADE_DEFAULT;
+    var n = Number(c.chatFade);
+    return FADE_CHOICES.indexOf(n) >= 0 ? n : FADE_DEFAULT;
+  }
+
+  function unfade() {
+    if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
+    try { document.documentElement.classList.remove(FADE_CLASS); } catch (e) { }
+  }
+
+  function fadeLater() {
+    unfade();
+    var s = fadeSeconds();
+    if (!s) return;
+    fadeTimer = setTimeout(function () {
+      fadeTimer = null;
+      if (window.thornswoodTyping) return;
+      try { document.documentElement.classList.add(FADE_CLASS); } catch (e) { }
+    }, s * 1000);
+  }
+
+  /*
+    The needs bars, hidden from the launcher's Settings (NeedsBars in
+    Thornswood.ini, window.THORNSWOOD.needsBars). The bars are a div the
+    server's own script writes into this page, #ts-hud, and it is rewritten
+    every few seconds, so a rule in the sheet is what keeps it hidden rather
+    than taking the node out. /needs in chat still says every one of them.
+  */
+  var NEEDS_CLASS = 'thornswood-needs-hidden';
+
+  function applyNeedsBars() {
+    var c = window.THORNSWOOD;
+    var hide = !!c && c.needsBars === false;
+    try {
+      if (hide) document.documentElement.classList.add(NEEDS_CLASS);
+      else document.documentElement.classList.remove(NEEDS_CLASS);
+    } catch (e) { }
+  }
+
   /**
    * Put the caret in the chat box, and say whether that worked.
    *
@@ -191,6 +258,7 @@
     window.thornswoodTyping = true;
     openedAt = Date.now();
     lastKey = Date.now();
+    unfade();
     try { el.focus(); } catch (e) { }
     tell('typing-on');
     startBeat();
@@ -208,7 +276,12 @@
         document.activeElement.blur();
       }
     } catch (e) { }
-    if (was) tell('typing-off');
+    if (was) {
+      tell('typing-off');
+      // The box was open and is shut now, sent or not: start the clock. Not
+      // on every call, because draw() calls this after each line as well.
+      fadeLater();
+    }
   }
 
   // Anything that reaches the document while you are not talking is a game key
@@ -404,6 +477,16 @@
   css.textContent = [
     HIDE.join(',') + '{display:none !important}',
 
+    // The chat fading after its last line, and coming straight back. Fading
+    // out slowly and in at once, and hidden outright once it is out, so a
+    // faded chat costs the compositor nothing. See fadeLater.
+    '#chat{transition:opacity .25s ease}',
+    'html.' + FADE_CLASS + ' #chat{opacity:0 !important;visibility:hidden !important;' +
+      'transition:opacity .8s ease,visibility 0s linear .8s !important}',
+
+    // The needs bars, when the launcher's Settings say not to draw them.
+    'html.' + NEEDS_CLASS + ' #ts-hud{display:none !important}',
+
     // Up off the bars.
     //
     // The front puts the chat at bottom:30px, which is underneath SkyHUD's
@@ -514,9 +597,12 @@
      * a chat that was never installed.
      */
     show: function () {
+      applyNeedsBars();
       if (shown) { return draw(); }
       if (draw()) {
         shown = true;
+        // An empty box with nothing said yet goes the same way as a line.
+        fadeLater();
         // The game side waits for this before it will hand over the keyboard
         // on the first press. After it, enter is immediate.
         tell('chat is up');
@@ -561,6 +647,10 @@
       while (window.chatMessages.length > 50) window.chatMessages.shift();
 
       draw();
+      // Back on screen for a new line, whoever sent it, and the clock starts
+      // again. While the box is open it stays up and blurInput starts the
+      // clock when it shuts.
+      if (window.thornswoodTyping) unfade(); else fadeLater();
       try { window.needToScroll = true; } catch (e) { }
       try { if (window.scrollToLastMessage) window.scrollToLastMessage(); } catch (e) { }
       return true;

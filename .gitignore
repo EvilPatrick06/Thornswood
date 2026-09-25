@@ -40,6 +40,13 @@ tools/discord/announced.json
 # stays out of the repo if the bot is ever run from a checkout.
 tools/discord/open-tickets.json
 
+# Which arrival each person was, written by the bot beside itself on the VPS so
+# the number on a join card only ever goes up. A list of Discord ids like the
+# one above, and a copy here would be some other run's numbers. The .tmp is the
+# half of a write that has not been swapped in yet.
+tools/discord/joins.json
+tools/discord/joins.json.tmp
+
 # The dev build's own news webhook, for the dev updates channel. Same rule as
 # news-webhook.txt above: anyone holding the URL can post as the bot.
 tools/discord/dev-webhook.txt

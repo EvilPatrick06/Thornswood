@@ -84,8 +84,9 @@ function rig() {
     }
   };
 
+  const putBacks = [];
   const fn = new Function(
-    'globalThis', 'mp', 'console', 'idOf', 'TOOLS', 'setTimeout',
+    'globalThis', 'mp', 'console', 'idOf', 'TOOLS', 'setTimeout', 'putBack',
     'Math', 'Number', 'String', 'Object', 'Array', 'Date',
     block + '\nreturn globalThis.__thornswoodSpoils;');
   const g = {};
@@ -94,7 +95,9 @@ function rig() {
     idOf,
     { pick: { accept: ['pick:X.esm'] }, shovel: { accept: ['shovel:X.esm'] } },
     function (f, ms) { timers.push({ f: f, ms: ms }); return timers.length; },
+    function (actorId, refrId) { putBacks.push([actorId, refrId]); },
     Math, Number, String, Object, Array, Date);
+  api.putBacks = putBacks;
 
   api.idOf = idOf;
   api.said = said;
@@ -149,6 +152,72 @@ if (block) {
     yes('a sword somebody dropped does', api.activate(1, dropped, 'sword:Skyrim.esm') === null);
     yes('and bread on a table is still bread',
         api.activate(1, placed, 'bread:Skyrim.esm') === null);
+  }
+
+  /*
+    ------------------------------------------------------ COIN PURSES
+
+    Patrick, 24 September, after a playtest: "people can pick up coin pocuhes
+    off the ground that was supposed to be included in no gold lol". A purse is
+    a FLOR whose produce is a leveled list of gold, and the engine rolls it and
+    adds the coin itself, so the press is the only place to stop it.
+  */
+  {
+    const g5 = rig();
+    const flower = g5.kind('flower:Skyrim.esm', 'FLOR');
+    const placed = 0x0001a2b3;
+    let all = Array.isArray(g5.PURSES) && g5.PURSES.length === 6;
+    for (const d of (g5.PURSES || [])) {
+      g5.kind(d, 'FLOR');
+      if (!g5.isSpoil(g5.idOf(d)) || !g5.isPurse || !g5.isPurse(g5.idOf(d))) { all = false; }
+    }
+    yes('all six coin purses are spoils', all);
+    yes('a flower is not a purse and not a spoil', !!g5.isPurse && !g5.isPurse(flower) && !g5.isSpoil(flower));
+
+    const no = g5.activate(7, placed, 'd790c:Skyrim.esm');
+    yes('a coin purse in the world does not come up', /coin purse/.test(no || '') && /not off the ground/.test(no || ''));
+    yes('and it is put back on the screen of the person who pressed it',
+        g5.putBacks.length === 1 && g5.putBacks[0][0] === 7 && g5.putBacks[0][1] === placed);
+    yes('a Thieves Guild purse does not come up either',
+        /coin purse/.test(g5.activate(7, placed + 1, 'd8e8c:Skyrim.esm') || ''));
+    const before = g5.putBacks.length;
+    yes('a flower still picks', g5.activate(7, placed + 2, 'flower:Skyrim.esm') === null);
+    yes('and nothing is put back for it', g5.putBacks.length === before);
+
+    // The same block with no putBack in reach still refuses rather than
+    // throwing.
+    const bare = new Function('globalThis', 'mp', 'console', 'idOf', 'TOOLS', 'setTimeout',
+      block + '\nreturn globalThis.__thornswoodSpoils;')(
+      {}, { makeProperty: function () { }, get: function () { }, set: function () { },
+            lookupEspmRecordById: function () { return { record: { type: 'FLOR' } }; } },
+      { log: function () { } }, function (d) { return d === 'd790c:Skyrim.esm' ? 0xd790c : 0x999; },
+      {}, function () { });
+    let threw = false, ans = null;
+    try { ans = bare.activate(7, placed, 'd790c:Skyrim.esm'); } catch (e) { threw = true; }
+    yes('with no putBack about, a purse is still refused and nothing throws', !threw && /coin purse/.test(ans || ''));
+  }
+
+  /*
+    The list is every FLOR in the load order whose produce is coin, as
+    tools\harvests.json has them. A rebuilt table with a purse this list lacks
+    is a purse that pays out again, so that fails here.
+  */
+  {
+    const hv = path.join(path.dirname(SRC), 'harvests.json');
+    if (fs.existsSync(hv)) {
+      const h = JSON.parse(fs.readFileSync(hv, 'utf8'));
+      const un = h.unranked || {};
+      const coin = Object.keys(un).filter(k => {
+        const r = un[k] || {};
+        return /coin/i.test(r.name || '') || /gold/i.test(r.produceName || '') || /purse/i.test(r.editorId || '');
+      }).sort();
+      const listed = (rig().PURSES || []).slice().sort();
+      yes('every coin-giving flora in harvests.json is on the purse list (' + coin.length + ')',
+          coin.length > 0 && coin.every(k => listed.indexOf(k) >= 0));
+      yes('and every purse on the list is in harvests.json', listed.length > 0 && listed.every(k => coin.indexOf(k) >= 0));
+    } else {
+      yes('tools\\harvests.json is there to check the purse list against', false);
+    }
   }
 
   /*

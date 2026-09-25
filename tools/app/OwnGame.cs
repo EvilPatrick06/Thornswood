@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Win32.SafeHandles;
@@ -101,12 +103,219 @@ namespace Thornswood
             try { Directory.CreateDirectory(Dir); File.WriteAllText(DeclinedFile, DateTime.Now.ToString("o")); } catch { }
         }
 
-        /// <summary>The Skyrim folder Vortex deploys into. The config's VortexGame, else the Steam copy.</summary>
+        /// <summary>
+        /// The Skyrim the game itself comes from: a Steam copy of Skyrim Special
+        /// Edition, the one Downgrade keeps at the server's build. When Vortex
+        /// deploys into a Steam copy it is that folder, which is the ordinary
+        /// case and every install before 24 September. When Vortex deploys into
+        /// any other folder it is still the Steam copy and never that folder
+        /// (see DeploysInto and Gather). Downgrade, Leaks, Uninstall and the
+        /// updater read this, so none of them ever writes into another server's
+        /// copy of the game.
+        /// </summary>
         public static string Source(Config cfg)
         {
-            string s = cfg == null || cfg.VortexGame == null ? "" : cfg.VortexGame.Trim();
-            if (s.Length > 0 && File.Exists(Path.Combine(s, "SkyrimSE.exe"))) return s.TrimEnd('\\');
+            return GameFor(DeploysInto(cfg));
+        }
+
+        /// <summary>
+        /// The Skyrim folder Vortex deploys into, where its record of what it
+        /// deployed is read. In order: the config's VortexGame when it names a
+        /// Skyrim that still holds Vortex's record (Fix and the picker in
+        /// Settings set it; without the record it is passed over, so a choice
+        /// Vortex has since purged cannot pin Thornswood to it); the Steam copy when
+        /// Vortex's record is in it, which is the answer this always gave;
+        /// another folder in a Steam library that has Vortex's record (Find);
+        /// and last the Steam copy anyway, so WhyNot has a folder to name.
+        /// </summary>
+        public static string DeploysInto(Config cfg)
+        {
+            // Fix saves VortexGame by itself, so a tester who later points
+            // Vortex back at the Steam copy would otherwise leave Thornswood
+            // following a folder Vortex has purged, with nothing said and only
+            // Forget in Settings as a way out. Found in review, 24 September.
+            //
+            // Quotes are taken off and nothing here may throw: a path typed
+            // into config.json by hand, pasted from Explorer's Copy as path,
+            // arrives in quotes, and Path.Combine threw on it out of here and
+            // out of the Settings card on the window's thread. Found by the
+            // verification of hotfix 1.1.93.
+            string s = cfg == null || cfg.VortexGame == null ? "" : cfg.VortexGame.Trim().Trim('"').Trim().TrimEnd('\\');
+            bool usable = false;
+            try { usable = s.Length > 0 && File.Exists(Path.Combine(s, "SkyrimSE.exe")) && HasRecord(s); }
+            catch { usable = false; }
+            if (usable)
+            {
+                Chosen(s, "VortexGame in config.json names it");
+                return s;
+            }
+            string steam = "";
+            try { steam = Steam.SkyrimPath(); } catch { /* no Steam copy: "" is the answer, and WhyNot says so */ }
+            if (steam.Length > 0 && HasRecord(steam))
+            {
+                Chosen(steam, "Vortex's record is in the Steam copy");
+                return steam;
+            }
+            string why = null, found = "";
+            try { found = Find(out why); }
+            catch (Exception ex) { Swallow.Note("OwnGame.DeploysInto, looking through Steam's libraries for Vortex's folder", ex); }
+            if (found.Length > 0)
+            {
+                Chosen(found, why);
+                return found;
+            }
+            return steam;
+        }
+
+        /// <summary>
+        /// The folder Vortex deploys into when nothing says, or "".
+        ///
+        /// 24 September, a tester on the main build: "they have purged and
+        /// redeoployed several times, they never got a popup to build their
+        /// own folder", and the launcher said Vortex had nothing deployed in
+        /// S:\SteamLibrary\steamapps\common\Skyrim Special Edition. Their
+        /// Vortex, Mods, Open, Open Game Folder opened
+        /// S:\SteamLibrary\steamapps\common\Keizaal Online, another SkyMP
+        /// server's copy of Skyrim: their Vortex manages that folder and
+        /// deploys the Thornswood collection into it, so the Steam copy had
+        /// none of the 94 plugins. Vortex's own note of its game folder is in
+        /// %APPDATA%\Vortex\state.v2, a LevelDB whose tables are compressed,
+        /// and the path is not readable in it as text. So the folder is found
+        /// by what Vortex leaves in every folder it deploys to, whatever the
+        /// method: Data\vortex.deployment.json.
+        ///
+        /// Every folder directly under each library's steamapps\common is
+        /// looked at, not only Skyrim Special Edition. A Steam copy of Skyrim
+        /// Special Edition comes first when more than one has a record, and
+        /// otherwise the most recently written record wins.
+        /// </summary>
+        static string Find(out string why)
+        {
+            why = null;
+            string best = "";
+            long bestAt = -1;
+            bool bestSteam = false;
+            int count = 0;
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string lib in Steam.Libraries())
+            {
+                string[] dirs;
+                try { dirs = Directory.GetDirectories(Path.Combine(lib, "steamapps\\common")); }
+                catch { continue; }
+                foreach (string d in dirs)
+                {
+                    string full;
+                    try { full = Path.GetFullPath(d).TrimEnd('\\'); } catch { continue; }
+                    if (!seen.Add(full)) continue;
+                    if (!File.Exists(Path.Combine(full, "SkyrimSE.exe")) || !HasRecord(full)) continue;
+                    count++;
+                    bool steam = Steam.IsSkyrimCopy(full);
+                    long at = 0;
+                    try { at = File.GetLastWriteTimeUtc(Path.Combine(full, "Data\\vortex.deployment.json")).Ticks; } catch { /* unreadable: counts as the oldest record */ }
+                    if (best.Length == 0 || (steam && !bestSteam) || (steam == bestSteam && at > bestAt))
+                    {
+                        best = full;
+                        bestAt = at;
+                        bestSteam = steam;
+                    }
+                }
+            }
+            if (best.Length == 0) return "";
+            if (count == 1)
+                why = "found in Steam's libraries, the one folder there with Vortex's record in it";
+            else if (bestSteam)
+                why = "found in Steam's libraries; " + count + " folders there have Vortex's record, and a Steam copy of Skyrim Special Edition comes first";
+            else
+                why = "found in Steam's libraries; " + count + " folders there have Vortex's record and none is a Steam copy of Skyrim Special Edition, so the newest record wins";
+            return best;
+        }
+
+        static readonly object chosenLock = new object();
+        static string lastChosen;
+
+        /// <summary>Which folder Vortex deploys into and why, into the log once each time the answer changes.</summary>
+        static void Chosen(string folder, string why)
+        {
+            string line = "Vortex deploys into " + folder + ": " + why + ".";
+            lock (chosenLock)
+            {
+                if (line == lastChosen) return;
+                lastChosen = line;
+            }
+            try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + line + Environment.NewLine); }
+            catch { /* the log is only a note of the choice; the choice stands without it */ }
+        }
+
+        static bool HasRecord(string dir)
+        {
+            try { return File.Exists(Path.Combine(dir, "Data\\vortex.deployment.json")); }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// The Steam copy the game itself comes from when Vortex deploys into
+        /// <paramref name="into"/>: that folder when it is a Steam copy of
+        /// Skyrim Special Edition, otherwise the first Steam copy and never the
+        /// other folder. "" when the machine has no Steam copy.
+        /// </summary>
+        static string GameFor(string into)
+        {
+            if (string.IsNullOrEmpty(into)) return "";
+            if (Steam.IsSkyrimCopy(into)) return into;
             try { return Steam.SkyrimPath(); } catch { return ""; }
+        }
+
+        /// <summary>
+        /// For Scan: the folder Vortex deploys into, when it has Vortex's
+        /// record and is not the Skyrim this install reads (Paths.Game). That
+        /// is when Fix has somewhere to point the launcher. "" otherwise.
+        /// </summary>
+        public static string DeploysElsewhere(Config cfg)
+        {
+            string into = DeploysInto(cfg);
+            if (into.Length == 0 || !HasRecord(into) || SameFolder(into, Paths.Game)) return "";
+            return into;
+        }
+
+        /// <summary>
+        /// Fix, and the picker in Settings: the launcher takes Vortex's files
+        /// from <paramref name="folder"/> from now on, saved as VortexGame.
+        /// Only a Skyrim Vortex has deployed into is accepted, which is
+        /// SkyrimSE.exe and Vortex's record in Data. "" clears the setting and
+        /// the search takes over again. Returns a sentence for the log saying
+        /// what it did, or why nothing changed; <paramref name="ok"/> says which.
+        /// </summary>
+        public static string PointAt(Config cfg, string folder, out bool ok)
+        {
+            ok = false;
+            // Quotes off, for the same reason as in DeploysInto.
+            string f = (folder ?? "").Trim().Trim('"').Trim();
+            if (f.Length == 0)
+            {
+                cfg.VortexGame = "";
+                cfg.Save(Paths.CfgFile);
+                ok = true;
+                return "Thornswood no longer has a folder chosen for Vortex, so it looks for the one Vortex deploys into by itself again.";
+            }
+            try { f = Path.GetFullPath(f).TrimEnd('\\'); }
+            catch { return f + " is not a folder Thornswood can read, so nothing changed."; }
+            if (!File.Exists(Path.Combine(f, "SkyrimSE.exe")))
+                return f + " has no SkyrimSE.exe in it, so it is not a Skyrim folder and nothing changed. Choose the folder that Open Game Folder opens in Vortex.";
+            if (!HasRecord(f))
+                return "Vortex has not deployed into " + f + ": it has no Data\\vortex.deployment.json, the record Vortex leaves in every folder it deploys to, so nothing changed. Choose the folder that Open Game Folder opens in Vortex.";
+            cfg.VortexGame = f;
+            cfg.Save(Paths.CfgFile);
+            ok = true;
+            string game = GameFor(f);
+            if (SameFolder(game, f)) return "Thornswood now takes what Vortex deployed from " + f + ".";
+            // No Steam copy: saying the game will come from one was untrue on
+            // exactly that machine (verification of hotfix 1.1.93). WhyNot
+            // refuses to build there; this says so up front.
+            if (game.Length == 0)
+                return "Thornswood will take what Vortex deployed into " + f + ", but it takes the game itself only from Steam's own copy of Skyrim Special Edition, " +
+                       "and this machine has none, so the folder cannot be made until Skyrim Special Edition is installed in Steam.";
+            return "Thornswood now takes what Vortex deployed into " + f + " from Vortex's own mods folder, only the files Vortex's record lists, and the game itself from " +
+                   "the Steam copy in " + game + ". Nothing else in " + f + " is used.";
         }
 
         // ------------------------------------------------------------ is it time
@@ -119,34 +328,79 @@ namespace Thornswood
         {
             if (string.IsNullOrEmpty(src) || !File.Exists(Path.Combine(src, "SkyrimSE.exe")))
                 return "There is no Skyrim to make it from. Steam does not list one.";
+            // The game itself comes from a Steam copy whatever Vortex deploys
+            // into (Source). When Vortex deploys into the Steam copy the two are
+            // one folder and every check below reads exactly as it always did.
+            string game = GameFor(src);
+            bool apart = !SameFolder(game, src);
+            if (game.Length == 0)
+                return "Vortex deploys into " + src + ", but Thornswood takes the game itself only from Steam's own copy of Skyrim Special Edition, " +
+                       "never from another folder, and this machine has none, so install Skyrim Special Edition in Steam and try again.";
             // Steam updates the Steam copy by itself. Bringing that build in would
             // put Thornswood on a Skyrim the server does not run, so the Steam
             // copy is put right first and the folder follows it (Downgrade).
             long exeBytes = -1;
-            try { exeBytes = new FileInfo(Path.Combine(src, "SkyrimSE.exe")).Length; } catch { }
+            try { exeBytes = new FileInfo(Path.Combine(game, "SkyrimSE.exe")).Length; } catch { /* unreadable: -1, and the build check is skipped as it always was */ }
             if (exeBytes >= 0 && exeBytes != cfg.ExpectedExeBytes)
-                return "Skyrim in " + src + " is " + Downgrade.Describe(cfg, Path.Combine(src, "SkyrimSE.exe")) +
+                return "Skyrim in " + game + " is " + Downgrade.Describe(cfg, Path.Combine(game, "SkyrimSE.exe")) +
                        ", most likely because Steam updated it. Press Downgrade on the Play page first; the folder is brought up to date from it after that.";
             if (SameFolder(src, Folder))
                 return "Vortex is set to deploy into Thornswood's own folder, which would make it out of itself.";
-            if (!File.Exists(Path.Combine(src, "Data\\vortex.deployment.json")))
-                return "Vortex has nothing deployed in " + src + " right now. In Vortex, enable the Thornswood profile and let it deploy, then try again.";
+            if (!HasRecord(src))
+                return "Vortex has nothing deployed in " + src + " right now. In Vortex, enable the Thornswood profile and let it deploy, then try again. " +
+                       "If it is deployed, Vortex is deploying into another folder: in Vortex, Mods, Open, Open Game Folder shows which, " +
+                       "and Choose Vortex's folder in Settings points Thornswood at it.";
 
             List<string> want = ShippedPlugins();
             if (want.Count == 0)
                 return "This install has no reference plugin list yet, so there is no telling whether Vortex has Thornswood's collection on. Let the launcher update first.";
-            int missing = 0;
+            Record rec = apart ? Staged(src) : null;
+            HashSet<string> stale = null;
+            int missing = 0, unstaged = 0;
             foreach (string p in want)
             {
-                try { if (!File.Exists(Path.Combine(src, "Data", p))) missing++; } catch { missing++; }
+                try
+                {
+                    // Apart, a plugin counts only where Gather will take it
+                    // from: Vortex's mods folder by its record, or the Steam
+                    // copy's own game. One the record lists whose copy in
+                    // Vortex's mods folder is gone is counted apart: the
+                    // Thornswood profile is deployed, the deployment is just
+                    // out of date (verification of hotfix 1.1.93).
+                    string from;
+                    if (!apart) { if (!File.Exists(Path.Combine(src, "Data", p))) missing++; }
+                    else if (!(rec.From.TryGetValue("Data\\" + p, out from) && File.Exists(from)))
+                    {
+                        if (stale == null) stale = Deployed(game);
+                        if (!File.Exists(Path.Combine(game, "Data", p)) || stale.Contains("Data\\" + p))
+                        {
+                            if (from != null) unstaged++; else missing++;
+                        }
+                    }
+                }
+                catch { missing++; }
             }
-            if (missing > 0)
-                return missing + " of Thornswood's " + want.Count + " plugins are not in " + src +
-                       ", so Vortex has another profile deployed. In Vortex, enable the Thornswood profile and let it deploy, then try again.";
+            if (missing == 0 && unstaged > 0)
+                return unstaged + " of Thornswood's " + want.Count + " plugins are in Vortex's record for " + src +
+                       " but no longer in Vortex's own mods folder, so that deployment is out of date. In Vortex, press Deploy Mods, then try again.";
+            // Not only another profile: Vortex may be deploying Thornswood into
+            // a different folder while an old record sits here, which is the
+            // one case the search cannot see past. The picker is the way out.
+            if (missing + unstaged > 0)
+                return (missing + unstaged) + " of Thornswood's " + want.Count + " plugins are not in " + src +
+                       ", so Vortex has another profile deployed, or deploys Thornswood into another folder. In Vortex, enable the Thornswood profile and let it deploy. " +
+                       "If it is deployed, Mods, Open, Open Game Folder in Vortex shows where, and Choose Vortex's folder in Settings points Thornswood at it.";
 
-            if (!SameVolume(src, Paths.Root))
-                return "Skyrim is on " + Volume(src) + " and Thornswood is on " + Volume(Paths.Root) +
+            if (!SameVolume(game, Paths.Root))
+                return "Skyrim is on " + Volume(game) + " and Thornswood is on " + Volume(Paths.Root) +
                        ". Links only work inside one drive, so Thornswood has to be installed on the same drive as Skyrim for this.";
+            if (apart)
+            {
+                foreach (string dir in rec.Staging)
+                    if (!SameVolume(dir, Paths.Root))
+                        return "Vortex keeps its mods in " + dir + " on " + Volume(dir) + " and Thornswood is on " + Volume(Paths.Root) +
+                               ". Links only work inside one drive, so Thornswood has to be installed on the same drive as Vortex's mods for this.";
+            }
             return null;
         }
 
@@ -177,7 +431,7 @@ namespace Thornswood
         public static bool NeedsRefresh(Config cfg)
         {
             if (!Active) return false;
-            string src = Source(cfg);
+            string src = DeploysInto(cfg);
             if (WhyNot(cfg, src) != null) return false;
 
             // The rules changed under a folder that was already made.
@@ -203,6 +457,9 @@ namespace Thornswood
         class Found
         {
             public string Rel;
+            // Where it is brought from: the file itself in a walked folder, or
+            // Vortex's staging copy of it (Gather).
+            public string From;
             public long Size, Ticks;
         }
 
@@ -219,7 +476,7 @@ namespace Thornswood
         /// </summary>
         public static string Make(Config cfg, Action<string> say)
         {
-            string src = Source(cfg);
+            string src = DeploysInto(cfg);
             string why = WhyNot(cfg, src);
             if (why != null) throw new Exception(why);
             if (Directory.Exists(Folder))
@@ -233,7 +490,8 @@ namespace Thornswood
 
             HashSet<string> deployed = Deployed(src);
             wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
-            List<Found> all = Walk(src);
+            var left = new List<string>();
+            List<Found> all = Gather(src, left);
 
             long copyBytes = 0, totalBytes = 0;
             foreach (Found f in all)
@@ -248,7 +506,6 @@ namespace Thornswood
                                     Mb(copyBytes) + " and " + Mb(free) + " is free.");
 
             var lines = new List<string>();
-            var left = new List<string>();
             int linked = 0, copied = 0, fellBack = 0;
             long done = 0; int shown = 0;
             foreach (Found f in all)
@@ -260,7 +517,7 @@ namespace Thornswood
                 bool asLink;
                 try
                 {
-                    Place(Path.Combine(src, f.Rel), Path.Combine(temp, f.Rel), copy, out asLink);
+                    Place(f.From, Path.Combine(temp, f.Rel), copy, out asLink);
                 }
                 catch (Exception ex)
                 {
@@ -297,7 +554,7 @@ namespace Thornswood
         public static string Refresh(Config cfg, Action<string> say)
         {
             if (!Active) throw new Exception("This install is not running from a folder of its own.");
-            string src = Source(cfg);
+            string src = DeploysInto(cfg);
             string why = WhyNot(cfg, src);
             if (why != null) throw new Exception(why);
 
@@ -305,10 +562,10 @@ namespace Thornswood
             HashSet<string> deployed = Deployed(src);
             HashSet<string> owned = Owned(deployed);
             wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
-            List<Found> all = Walk(src);
+            var left = new List<string>();
+            List<Found> all = Gather(src, left);
 
             var lines = new List<string>();
-            var left = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int added = 0, changed = 0, removed = 0, kept = 0;
             long copyBytes = 0;
@@ -342,7 +599,7 @@ namespace Thornswood
                     // Deleting the name here removes this folder's link and
                     // nothing else. The file Vortex has stays where it is.
                     if (exists) DropName(dest);
-                    Place(Path.Combine(src, f.Rel), dest, copy, out asLink);
+                    Place(f.From, dest, copy, out asLink);
                 }
                 catch (Exception ex)
                 {
@@ -870,6 +1127,210 @@ namespace Thornswood
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Every file that goes into Thornswood's folder when Vortex deploys
+        /// into <paramref name="src"/>, each with where it is brought from.
+        /// Anything that cannot be brought in is said in <paramref name="left"/>.
+        ///
+        /// When src is a Steam copy this is what it always was, a walk of src.
+        ///
+        /// When it is not, NO BLEED. Patrick, 24 September, about a tester
+        /// whose Vortex deploys into another server's copy of Skyrim: "can you
+        /// make it so our launcher detcts and fixes this but doesnt have the
+        /// servers bleed still". That folder holds the other server's own
+        /// SkyrimSE.exe, script extender, dlls, ini files, client and whatever
+        /// its installer put in Data, and none of it may reach Thornswood. So
+        /// nothing is read out of src but Vortex's records, and the folder is
+        /// made of exactly two things: the game from the Steam copy (Source),
+        /// walked the same way the Steam copy always has been, and the files
+        /// those records list, from Vortex's staging folder where they live.
+        /// A record's file replaces the Steam copy's at the same path, which is
+        /// what Vortex deploying into the Steam copy does. The result is what
+        /// somebody whose Vortex deploys into the Steam copy gets.
+        /// </summary>
+        static List<Found> Gather(string src, List<string> left)
+        {
+            string game = GameFor(src);
+            if (SameFolder(game, src)) return Walk(src);
+
+            // The game, and not an older deployment Vortex left in the Steam
+            // copy before it moved: those files are its record there, if any.
+            var byRel = new Dictionary<string, Found>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> stale = Deployed(game);
+            foreach (Found f in Walk(game))
+            {
+                if (stale.Contains(f.Rel)) { left.Add(f.Rel + "  (an older Vortex deployment in the Steam copy, not where Vortex deploys now)"); continue; }
+                byRel[f.Rel] = f;
+            }
+
+            Record rec = Staged(src);
+            left.AddRange(rec.Refused);
+            foreach (KeyValuePair<string, string> kv in rec.From)
+            {
+                var f = new Found();
+                f.Rel = kv.Key;
+                f.From = kv.Value;
+                try
+                {
+                    var fi = new FileInfo(kv.Value);
+                    if (!fi.Exists)
+                    {
+                        left.Add(kv.Key + "  (Vortex's record lists it and its mods folder does not have it)");
+                        continue;
+                    }
+                    f.Size = fi.Length;
+                    f.Ticks = fi.LastWriteTimeUtc.Ticks;
+                }
+                catch
+                {
+                    left.Add(kv.Key + "  (Vortex's copy of it could not be read)");
+                    continue;
+                }
+                byRel[f.Rel] = f;
+            }
+            return new List<Found>(byRel.Values);
+        }
+
+        [DataContract]
+        class VortexRecord
+        {
+            [DataMember] public string stagingPath;
+            [DataMember] public VortexFile[] files;
+        }
+
+        [DataContract]
+        class VortexFile
+        {
+            [DataMember] public string relPath;
+            [DataMember] public string source;
+        }
+
+        /// <summary>What Vortex's records in a folder list, and where Vortex keeps each file.</summary>
+        class Record
+        {
+            // Path under the game folder, the same one Deployed gives, to the
+            // file in staging: stagingPath\source\relPath. Measured on
+            // Patrick's machine on 24 September: all 29,964 files the two
+            // records in the Steam copy list are at exactly that path.
+            public Dictionary<string, string> From = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            public List<string> Staging = new List<string>();
+            public List<string> Refused = new List<string>();
+        }
+
+        static readonly object recordLock = new object();
+        static string recordKey;
+        static Record recordCache;
+
+        /// <summary>
+        /// Vortex's records in <paramref name="src"/>, read in full. The one in
+        /// Data is six megabytes on a full collection and takes about half a
+        /// second to read, and the settings card asks WhyNot on the window's
+        /// thread, so the answer is kept until Vortex deploys again.
+        /// </summary>
+        static Record Staged(string src)
+        {
+            string key = src + "|" + DeploymentStamp(src);
+            lock (recordLock) { if (recordCache != null && recordKey == key) return recordCache; }
+
+            var r = new Record();
+            foreach (string[] where in new string[][] { new string[] { Path.Combine(src, "Data"), "Data\\" }, new string[] { src, "" } })
+            {
+                string[] files;
+                try { files = Directory.GetFiles(where[0], "vortex.deployment*.json"); } catch { continue; }
+                Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+                foreach (string f in files)
+                {
+                    VortexRecord doc = null;
+                    try
+                    {
+                        using (var fs = File.OpenRead(f))
+                            doc = (VortexRecord)new DataContractJsonSerializer(typeof(VortexRecord)).ReadObject(fs);
+                    }
+                    catch { /* doc stays null, and the record is refused just below with a line saying so */ }
+                    if (doc == null || doc.files == null || string.IsNullOrEmpty(doc.stagingPath))
+                    {
+                        r.Refused.Add(f.Substring(src.TrimEnd('\\').Length).TrimStart('\\') + "  (Vortex's record could not be read, so nothing it lists was brought in)");
+                        continue;
+                    }
+                    // A mods folder that is the folder Vortex deploys into, or
+                    // sits inside it, would bring that folder's own files in
+                    // whenever the record listed them. Vortex does not accept a
+                    // staging folder inside the game folder, so such a record
+                    // was not written by it; refusing it keeps the no-bleed rule
+                    // true for any record at all. Verification of hotfix 1.1.93.
+                    if (Overlaps(doc.stagingPath, src))
+                    {
+                        r.Refused.Add(f.Substring(src.TrimEnd('\\').Length).TrimStart('\\') + "  (Vortex's record names a mods folder that overlaps " + src + ", so nothing it lists was brought in)");
+                        continue;
+                    }
+                    bool listed = false;
+                    foreach (string s in r.Staging) if (SameFolder(s, doc.stagingPath)) listed = true;
+                    if (!listed) r.Staging.Add(doc.stagingPath);
+                    // Each mod's folder in staging, worked out once per mod
+                    // rather than once per file: thirty thousand entries.
+                    var mods = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (VortexFile e in doc.files)
+                    {
+                        if (e == null || string.IsNullOrEmpty(e.relPath) || string.IsNullOrEmpty(e.source)) continue;
+                        string under = e.relPath.Replace('/', '\\').TrimStart('\\');
+                        string rel = where[1] + under;
+                        string mod;
+                        if (!mods.TryGetValue(e.source, out mod)) { mod = ModFolder(doc.stagingPath, e.source); mods[e.source] = mod; }
+                        if (mod == null || !Tidy(under) || !Tidy(rel))
+                        {
+                            r.Refused.Add(rel + "  (Vortex's record points outside Thornswood's folder or Vortex's mods folder)");
+                            continue;
+                        }
+                        if (!r.From.ContainsKey(rel)) r.From[rel] = mod + under;
+                    }
+                }
+            }
+            lock (recordLock) { recordKey = key; recordCache = r; }
+            return r;
+        }
+
+        /// <summary>
+        /// stagingPath\source\ with a closing separator, or null when the mod's
+        /// name would put it anywhere but directly inside staging. A file under
+        /// it stays inside it as long as its own path is Tidy.
+        /// </summary>
+        static string ModFolder(string staging, string source)
+        {
+            try
+            {
+                if (source.IndexOfAny(new char[] { '\\', '/', ':' }) >= 0 || source.Trim('.', ' ').Length == 0) return null;
+                string root = Path.GetFullPath(staging).TrimEnd('\\') + "\\";
+                string mod = Path.GetFullPath(Path.Combine(staging, source)).TrimEnd('\\') + "\\";
+                if (!mod.StartsWith(root, StringComparison.OrdinalIgnoreCase) || mod.Length <= root.Length) return null;
+                return mod;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// One folder is the other or holds it. Anything that cannot be
+        /// worked out counts as overlapping, because refusing only means
+        /// nothing is brought in from that record.
+        /// </summary>
+        static bool Overlaps(string a, string b)
+        {
+            try
+            {
+                string x = Path.GetFullPath(a).TrimEnd('\\') + "\\";
+                string y = Path.GetFullPath(b).TrimEnd('\\') + "\\";
+                return x.StartsWith(y, StringComparison.OrdinalIgnoreCase) || y.StartsWith(x, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return true; }
+        }
+
+        /// <summary>A path under the game folder that stays under it: no drive, no "..".</summary>
+        static bool Tidy(string rel)
+        {
+            if (rel.Length == 0 || rel.IndexOf(':') >= 0 || rel.StartsWith("\\")) return false;
+            foreach (string part in rel.Split('\\')) if (part == "..") return false;
+            return true;
+        }
+
         /// <summary>When Vortex last deployed, as the newest write time of its records.</summary>
         static long DeploymentStamp(string src)
         {
@@ -890,6 +1351,7 @@ namespace Thornswood
         {
             File.WriteAllLines(MadeFile, new string[] {
                 "source=" + src,
+                "game=" + GameFor(src),
                 "deployment=" + DeploymentStamp(src),
                 "rules=" + Rules,
                 "at=" + DateTime.Now.ToString("o")
@@ -1023,6 +1485,7 @@ namespace Thornswood
                         {
                             var fi = new FileInfo(f);
                             var found = new Found();
+                            found.From = f;
                             found.Rel = f.Substring(fence.Length);
                             found.Size = fi.Length;
                             found.Ticks = fi.LastWriteTimeUtc.Ticks;

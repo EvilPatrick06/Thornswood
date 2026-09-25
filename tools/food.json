@@ -1,53 +1,58 @@
 {
  "builtBy": "toolsBuild-FoodTable.js",
- "builtAt": "2026-09-24T02:36:00.358Z",
+ "builtAt": "2026-09-24T23:03:40.858Z",
  "source": "the ALCH records of the plugins in load order",
  "readFrom": "ENIT for the food and poison flags, FULL for the name",
  "note": "what a kind is WORTH is balance and lives in NEEDS in gamemode.js",
- "count": 614,
+ "count": 458,
  "byKind": {
-  "food": 244,
-  "drink": 34,
-  "ale": 28,
-  "potion": 228,
+  "food": 97,
+  "drink": 38,
+  "ale": 35,
+  "potion": 208,
   "poison": 80
  },
  "items": {
   "10d666:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x10d666",
-   "edid": "FoodGourd",
-   "name": "Z\u001c\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodGourd",
+   "name": "Gourd",
    "kind": "food",
    "gold": 1
   },
   "107a8a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x107a8a",
-   "edid": "MQ101JuniperMead",
-   "name": "\u0007\u0017\u0001",
-   "kind": "food",
+   "from": "Gourmet.esp",
+   "edid": "MAG_MQ101JuniperMead",
+   "name": "Mead with Juniper Berry",
+   "kind": "ale",
    "gold": 5
   },
   "10394d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x10394d",
-   "edid": "FoodHoney",
-   "name": "\n\u0014\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodHoney",
+   "name": "Honey",
    "kind": "food",
    "gold": 2
   },
   "10211a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x10211a",
-   "edid": "DA03FoodMammothMeat",
-   "name": "â\u0011\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodMammothMeatAlt",
+   "name": "Mammoth Snout",
    "kind": "food",
-   "gold": 6
+   "gold": 2
   },
   "10201e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x10201e",
+   "from": "Update.esm",
    "edid": "MS12WPRestoreHealth04",
    "name": "o\u0012\u0001",
    "kind": "potion",
@@ -56,30 +61,34 @@
   "10201d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x10201d",
+   "from": "Update.esm",
    "edid": "MS12WPFortifySkillOneHanded04",
    "name": "à\u0012\u0001",
    "kind": "potion",
-   "gold": 132
+   "gold": 265
   },
   "10201c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x10201c",
+   "from": "Update.esm",
    "edid": "MS12WPFortifyMagicka01",
    "name": "×\u0012\u0001",
    "kind": "potion",
-   "gold": 455
+   "gold": 341
   },
   "10201b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x10201b",
+   "from": "Update.esm",
    "edid": "MS12WPFortifySkillSneak03",
    "name": "õ\u0011\u0001",
    "kind": "potion",
-   "gold": 48
+   "gold": 96
   },
   "10201a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x10201a",
+   "from": "Update.esm",
    "edid": "MS12WPFortifyStamina01",
    "name": "*\u0012\u0001",
    "kind": "potion",
@@ -88,6 +97,7 @@
   "102019:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x102019",
+   "from": "Update.esm",
    "edid": "MS12WPResistMagic50",
    "name": "ò\u0012\u0001",
    "kind": "potion",
@@ -96,6 +106,7 @@
   "ffa02:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xffa02",
+   "from": "Skyrim.esm",
    "edid": "FortifyStaminaRate05",
    "name": "ó\u000f\u0001",
    "kind": "potion",
@@ -104,6 +115,7 @@
   "ffa01:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xffa01",
+   "from": "Skyrim.esm",
    "edid": "FortifyStamina05",
    "name": "\u0010\u0001",
    "kind": "potion",
@@ -112,6 +124,7 @@
   "ffa00:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xffa00",
+   "from": "Skyrim.esm",
    "edid": "FortifyMagickaRate05",
    "name": "(\u0010\u0001",
    "kind": "potion",
@@ -120,6 +133,7 @@
   "ff9ff:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xff9ff",
+   "from": "Skyrim.esm",
    "edid": "FortifyHealRate05",
    "name": "D\u0010\u0001",
    "kind": "potion",
@@ -128,6 +142,7 @@
   "ff9fe:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xff9fe",
+   "from": "Skyrim.esm",
    "edid": "FortifyCarry05",
    "name": "²\u0010\u0001",
    "kind": "potion",
@@ -136,6 +151,7 @@
   "ff9fd:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xff9fd",
+   "from": "Skyrim.esm",
    "edid": "FortifyMagicka05",
    "name": "Q\u0010\u0001",
    "kind": "potion",
@@ -144,6 +160,7 @@
   "ff9fc:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xff9fc",
+   "from": "Skyrim.esm",
    "edid": "FortifyHealth05",
    "name": "\u0010\u0001",
    "kind": "potion",
@@ -152,6 +169,7 @@
   "f9642:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf9642",
+   "from": "Skyrim.esm",
    "edid": "crIceWraithResistFrost25",
    "name": "\r\u0001",
    "kind": "potion",
@@ -160,6 +178,7 @@
   "f84c6:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84c6",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofPlunder06",
    "name": "a\r\u0001",
    "kind": "potion",
@@ -168,6 +187,7 @@
   "f84c5:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84c5",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofPlunder05",
    "name": "\t\u000e\u0001",
    "kind": "potion",
@@ -176,6 +196,7 @@
   "f84c4:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84c4",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofPlunder04",
    "name": "ò\f\u0001",
    "kind": "potion",
@@ -184,6 +205,7 @@
   "f84c3:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84c3",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofPlunder03",
    "name": "\u000b\u000e\u0001",
    "kind": "potion",
@@ -192,6 +214,7 @@
   "f84c2:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84c2",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofPlunder02",
    "name": "Ó\r\u0001",
    "kind": "potion",
@@ -200,6 +223,7 @@
   "f84c1:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84c1",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofPlunder01",
    "name": "±\f\u0001",
    "kind": "potion",
@@ -208,6 +232,7 @@
   "f84c0:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84c0",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofKeenShot06",
    "name": "Ñ\r\u0001",
    "kind": "potion",
@@ -216,6 +241,7 @@
   "f84bf:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84bf",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofKeenShot05",
    "name": "Ö\f\u0001",
    "kind": "potion",
@@ -224,6 +250,7 @@
   "f84be:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84be",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofKeenShot04",
    "name": "\r\u0001",
    "kind": "potion",
@@ -232,6 +259,7 @@
   "f84bd:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84bd",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofKeenShot03",
    "name": "ç\f\u0001",
    "kind": "potion",
@@ -240,6 +268,7 @@
   "f84bc:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84bc",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofKeenShot02",
    "name": "(\r\u0001",
    "kind": "potion",
@@ -248,6 +277,7 @@
   "f84bb:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84bb",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofKeenShot01",
    "name": "­\r\u0001",
    "kind": "potion",
@@ -256,6 +286,7 @@
   "f84ba:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84ba",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofConflict06",
    "name": "Î\r\u0001",
    "kind": "potion",
@@ -264,6 +295,7 @@
   "f84b9:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84b9",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofConflict05",
    "name": "\r\u0001",
    "kind": "potion",
@@ -272,6 +304,7 @@
   "f84b8:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84b8",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofConflict04",
    "name": "%\r\u0001",
    "kind": "potion",
@@ -280,6 +313,7 @@
   "f84b7:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84b7",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofConflict03",
    "name": "\u0012\u000e\u0001",
    "kind": "potion",
@@ -288,6 +322,7 @@
   "f84b6:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84b6",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofConflict02",
    "name": "Ç\r\u0001",
    "kind": "potion",
@@ -296,6 +331,7 @@
   "f84b5:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84b5",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofConflict01",
    "name": "è\r\u0001",
    "kind": "potion",
@@ -304,6 +340,7 @@
   "f84b3:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84b3",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofEscape06",
    "name": "\u0013\u000e\u0001",
    "kind": "potion",
@@ -312,6 +349,7 @@
   "f84b2:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84b2",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofEscape05",
    "name": "\n\u000e\u0001",
    "kind": "potion",
@@ -320,6 +358,7 @@
   "f84b1:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84b1",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofEscape04",
    "name": "\f\u0001",
    "kind": "potion",
@@ -328,6 +367,7 @@
   "f84b0:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84b0",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofEscape03",
    "name": "é\r\u0001",
    "kind": "potion",
@@ -336,6 +376,7 @@
   "f84af:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84af",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofEscape02",
    "name": "\f\u0001",
    "kind": "potion",
@@ -344,6 +385,7 @@
   "f84ae:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84ae",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofEscape01",
    "name": "À\f\u0001",
    "kind": "potion",
@@ -352,6 +394,7 @@
   "f84ac:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84ac",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofLarceny06",
    "name": "\r\u000e\u0001",
    "kind": "potion",
@@ -360,6 +403,7 @@
   "f84ab:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84ab",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofLarceny05",
    "name": "î\r\u0001",
    "kind": "potion",
@@ -368,6 +412,7 @@
   "f84aa:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84aa",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofLarceny04",
    "name": "\f\u0001",
    "kind": "potion",
@@ -376,6 +421,7 @@
   "f84a9:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84a9",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofLarceny03",
    "name": "º\f\u0001",
    "kind": "potion",
@@ -384,6 +430,7 @@
   "f84a8:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84a8",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofLarceny02",
    "name": "\u001d\r\u0001",
    "kind": "potion",
@@ -392,6 +439,7 @@
   "f84a7:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf84a7",
+   "from": "Skyrim.esm",
    "edid": "TGPotionofLarceny01",
    "name": "Ô\f\u0001",
    "kind": "potion",
@@ -400,94 +448,106 @@
   "f693f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf693f",
-   "edid": "FoodBlackBriarMeadPrivateReserve",
-   "name": "\u0011\u0005\u0001",
-   "kind": "food",
-   "gold": 100
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkBlackBriarMeadPrivateReserve",
+   "name": "Black-Briar Reserve",
+   "kind": "ale",
+   "gold": 25
   },
   "f4320:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf4320",
-   "edid": "FoodElsweyrFondue",
-   "name": "J\u0005\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCheeseFondueGoat",
+   "name": "Goat Cheese Fondue",
    "kind": "food",
-   "gold": 5
+   "gold": 14
   },
   "f431e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf431e",
-   "edid": "FoodVegetableSoup",
-   "name": "4\n\u0001",
-   "kind": "food",
-   "gold": 5
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodVegetableSoup",
+   "name": "Vegetable Soup",
+   "kind": "drink",
+   "gold": 14
   },
   "f431d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf431d",
-   "edid": "FoodVenisonStew",
-   "name": "h\u0005\u0001",
-   "kind": "food",
-   "gold": 8
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodVenisonStew",
+   "name": "Venison Stew",
+   "kind": "drink",
+   "gold": 16
   },
   "f431c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf431c",
-   "edid": "FoodTomatoSoup",
-   "name": "7\b\u0001",
-   "kind": "food",
-   "gold": 5
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodTomatoSoup",
+   "name": "Tomato Soup",
+   "kind": "drink",
+   "gold": 6
   },
   "f431b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf431b",
-   "edid": "FoodCabbagePotatoSoup",
-   "name": "²\t\u0001",
-   "kind": "food",
-   "gold": 5
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCabbagePotatoSoup",
+   "name": "Cabbage Potato Soup",
+   "kind": "drink",
+   "gold": 14
   },
   "f4315:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf4315",
-   "edid": "FoodHorkerStew",
-   "name": "1\n\u0001",
-   "kind": "food",
-   "gold": 8
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodHorkerStew",
+   "name": "Horker Stew",
+   "kind": "drink",
+   "gold": 16
   },
   "f4314:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf4314",
-   "edid": "FoodBeefStew",
-   "name": "ø\u0007\u0001",
-   "kind": "food",
-   "gold": 8
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodBeefStew",
+   "name": "Beef Stew",
+   "kind": "drink",
+   "gold": 16
   },
   "f257e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf257e",
-   "edid": "MS14WineAltoA",
-   "name": "ï\u0006\u0001",
-   "kind": "food",
+   "from": "Gourmet.esp",
+   "edid": "MAG_MS14WineAltoA",
+   "name": "Jessica's Wine",
+   "kind": "ale",
    "gold": 12
   },
   "e8947:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xe8947",
-   "edid": "FoodChickenCooked",
-   "name": "p\u0006\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodChickenCooked",
+   "name": "Grilled Chicken Breast",
    "kind": "food",
-   "gold": 4
+   "gold": 8
   },
   "f2011:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf2011",
-   "edid": "FoodChicken",
-   "name": "¬\b\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodChicken",
+   "name": "Chicken Breast",
    "kind": "food",
-   "gold": 3
+   "gold": 2
   },
   "f1464:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xf1464",
+   "from": "Skyrim.esm",
    "edid": "DefaultPotionRackPotionMarker",
    "name": "DefaultPotionRackPotionMarker",
    "kind": "potion",
@@ -496,46 +556,52 @@
   "edb2e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xedb2e",
-   "edid": "FoodDogMeat",
-   "name": "Ú\u0004\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodDogMeat",
+   "name": "Dog Meat",
    "kind": "food",
-   "gold": 3
+   "gold": 2
   },
   "eba03:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xeba03",
-   "edid": "FoodClamMeat",
-   "name": "¯\u0003\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodClamMeat",
+   "name": "Clam Meat",
    "kind": "food",
-   "gold": 1
+   "gold": 2
   },
   "eba02:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xeba02",
-   "edid": "FoodCabbageSoup",
-   "name": "®\u0003\u0001",
-   "kind": "food",
-   "gold": 5
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCabbageSoup",
+   "name": "Cabbage Soup",
+   "kind": "drink",
+   "gold": 6
   },
   "eba01:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xeba01",
-   "edid": "FoodAppleCabbageStew",
-   "name": "4\u0003\u0001",
-   "kind": "food",
-   "gold": 8
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCabbageTomatoSoup",
+   "name": "Cabbage and Tomato Soup",
+   "kind": "drink",
+   "gold": 14
   },
   "e8448:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xe8448",
-   "edid": "FoodCharredSkeeverMeat",
-   "name": "ïÇ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodSkeeverCooked",
+   "name": "Cooked Skeever",
    "kind": "food",
-   "gold": 4
+   "gold": 8
   },
   "d6980:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xd6980",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillPersuasion04",
    "name": "w\u0000",
    "kind": "potion",
@@ -544,6 +610,7 @@
   "d697f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xd697f",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillPersuasion03",
    "name": "éÙ\u0000",
    "kind": "potion",
@@ -552,6 +619,7 @@
   "d6949:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xd6949",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillPersuasion02",
    "name": "Ø>\u0000",
    "kind": "potion",
@@ -560,6 +628,7 @@
   "d6948:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xd6948",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillPersuasion01",
    "name": "F\u0000",
    "kind": "potion",
@@ -568,14 +637,16 @@
   "d055e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xd055e",
-   "edid": "FavorSorexRum",
-   "name": "t\u0000",
-   "kind": "potion",
-   "gold": 12
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkFavorRum",
+   "name": "Stros M'Kai Rum",
+   "kind": "ale",
+   "gold": 25
   },
   "cd883:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xcd883",
+   "from": "Skyrim.esm",
    "edid": "FavorNightshadeExtract",
    "name": "°¬\u0000",
    "kind": "poison",
@@ -584,398 +655,448 @@
   "cd614:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xcd614",
-   "edid": "FoodMarriageMeal",
-   "name": "¾*\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodMarriageMeal",
+   "name": "Homecooked Meal",
    "kind": "food",
-   "gold": 5
+   "gold": 20
   },
   "cadfb:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xcadfb",
-   "edid": "FavorFoodMarkarthSpicedBeef",
-   "name": "W\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodMarkarthSpicedBeef",
+   "name": "Spiced Beef",
    "kind": "food",
-   "gold": 4
+   "gold": 16
   },
   "b91d7:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xb91d7",
-   "edid": "WEDL03CyrodilicBrandy",
-   "name": "ªÀ\u0000",
-   "kind": "potion",
-   "gold": 150
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkColovianBrandy02",
+   "name": "Colovian Brandy",
+   "kind": "ale",
+   "gold": 25
   },
   "85368:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x85368",
-   "edid": "FoodSolitudeSpicedWine",
-   "name": "bé\u0000",
-   "kind": "food",
-   "gold": 7
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkWineSpiced",
+   "name": "Spiced Wine",
+   "kind": "ale",
+   "gold": 25
   },
   "722c7:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x722c7",
-   "edid": "FoodPheasantCooked",
-   "name": "ç\u0001\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodPheasantCooked",
+   "name": "Pheasant Roast",
    "kind": "food",
-   "gold": 4
+   "gold": 8
   },
   "722c2:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x722c2",
-   "edid": "FoodRabbitCooked",
-   "name": "Ò\u0002\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodRabbitCooked",
+   "name": "Rabbit Haunch",
    "kind": "food",
-   "gold": 3
+   "gold": 8
   },
   "722bd:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x722bd",
-   "edid": "FoodVenisonCooked",
-   "name": "°ÿ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodVenisonCooked",
+   "name": "Venison Chop",
    "kind": "food",
-   "gold": 5
+   "gold": 8
   },
   "722bb:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x722bb",
-   "edid": "FoodMammothMeatCooked",
-   "name": "ÿ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodMammothMeatCooked",
+   "name": "Mammoth Steak",
    "kind": "food",
-   "gold": 8
+   "gold": 6
   },
   "722b0:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x722b0",
-   "edid": "FoodHorseMeatCooked",
-   "name": "\u0001\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodHorseMeatCooked",
+   "name": "Horse Haunch",
    "kind": "food",
-   "gold": 4
+   "gold": 8
   },
   "7224e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x7224e",
-   "edid": "FoodHorkerMeatCooked",
-   "name": "þ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodHorkerMeatCooked",
+   "name": "Horker Loaf",
    "kind": "food",
-   "gold": 4
+   "gold": 8
   },
   "7224c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x7224c",
-   "edid": "FoodGoatMeatCooked",
-   "name": "ø\u0001\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodGoatMeatCooked",
+   "name": "Goat Roast",
    "kind": "food",
-   "gold": 4
+   "gold": 8
   },
   "721e8:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x721e8",
-   "edid": "FoodBeefCooked",
-   "name": "Ëç\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodBeefCooked",
+   "name": "Cooked Beef",
    "kind": "food",
-   "gold": 5
+   "gold": 8
   },
   "669a5:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x669a5",
-   "edid": "FoodLeek",
-   "name": "Êç\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodLeek",
+   "name": "Leek",
    "kind": "food",
    "gold": 1
   },
   "669a4:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x669a4",
-   "edid": "FoodMammothMeat",
-   "name": "¨\u0001\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodMammothMeat",
+   "name": "Mammoth Snout",
    "kind": "food",
-   "gold": 6
+   "gold": 2
   },
   "669a3:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x669a3",
-   "edid": "FoodMammothCheeseBowl",
-   "name": "\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodMammothCheeseBowl",
+   "name": "Mammoth Cheese Bowl",
    "kind": "food",
-   "gold": 3
+   "gold": 6
   },
   "669a2:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x669a2",
-   "edid": "FoodVenison",
-   "name": "ì\u0001\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodVenison",
+   "name": "Venison",
    "kind": "food",
-   "gold": 4
+   "gold": 2
   },
   "65c9f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c9f",
-   "edid": "FoodSalmon",
-   "name": "uþ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodSalmon",
+   "name": "Salmon Meat",
    "kind": "food",
-   "gold": 3
+   "gold": 2
   },
   "65c9e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c9e",
-   "edid": "FoodRabbit",
-   "name": "Wþ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodRabbit",
+   "name": "Raw Rabbit Leg",
    "kind": "food",
    "gold": 2
   },
   "65c9d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c9d",
-   "edid": "FoodPheasant",
-   "name": "­þ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodPheasant",
+   "name": "Pheasant Breast",
    "kind": "food",
-   "gold": 3
+   "gold": 2
   },
   "65c9c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c9c",
-   "edid": "FoodHorseMeat",
-   "name": "Ëÿ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodHorseMeat",
+   "name": "Horse Meat",
    "kind": "food",
-   "gold": 3
+   "gold": 2
   },
   "65c9b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c9b",
-   "edid": "FoodHorkerMeat",
-   "name": "Kþ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodHorkerMeat",
+   "name": "Horker Meat",
    "kind": "food",
-   "gold": 3
+   "gold": 2
   },
   "65c9a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c9a",
-   "edid": "FoodGoatMeat",
-   "name": "Õ\u0002\u0001",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodGoatMeat",
+   "name": "Goat Meat",
    "kind": "food",
-   "gold": 3
+   "gold": 2
   },
   "65c99:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c99",
-   "edid": "FoodBeef",
-   "name": "ç \u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodBeef",
+   "name": "Raw Beef",
    "kind": "food",
-   "gold": 4
+   "gold": 2
   },
   "65c98:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c98",
-   "edid": "FoodBread01B",
-   "name": "ðý\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodBread",
+   "name": "Bread",
    "kind": "food",
-   "gold": 2
+   "gold": 1
   },
   "65c97:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c97",
-   "edid": "FoodBread01A",
-   "name": "Ò\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodBreadLoaf",
+   "name": "Bread Loaf",
    "kind": "food",
-   "gold": 2
+   "gold": 6
   },
   "65c39:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c39",
-   "edid": "RiftenSpecial03",
-   "name": "\u0002§\u0000",
-   "kind": "potion",
-   "gold": 5
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkRiftenSpecial03",
+   "name": "Cliff Racer",
+   "kind": "drink",
+   "gold": 25
   },
   "65c38:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c38",
-   "edid": "RiftenSpecial02",
-   "name": "¼;\u0000",
-   "kind": "potion",
-   "gold": 5
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkRiftenSpecial02",
+   "name": "White-Gold Tower",
+   "kind": "drink",
+   "gold": 25
   },
   "65c37:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65c37",
-   "edid": "RiftenSpecial01",
-   "name": "äF\u0000",
-   "kind": "potion",
-   "gold": 5
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkRiftenSpecial01",
+   "name": "Velvet LeChance",
+   "kind": "drink",
+   "gold": 25
   },
   "64b43:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b43",
-   "edid": "FoodPie",
-   "name": "Qå\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodApplePie",
+   "name": "Apple Pie",
    "kind": "food",
-   "gold": 5
+   "gold": 14
   },
   "64b42:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b42",
-   "edid": "FoodTomato",
-   "name": "|\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodTomato",
+   "name": "Tomato",
    "kind": "food",
-   "gold": 4
+   "gold": 1
   },
   "64b41:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b41",
-   "edid": "FoodPotato",
-   "name": "_ú\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodPotato",
+   "name": "Potato",
    "kind": "food",
    "gold": 1
   },
   "64b40:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b40",
-   "edid": "FoodCarrot",
-   "name": "D'\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCarrot",
+   "name": "Carrot",
    "kind": "food",
    "gold": 1
   },
   "64b3f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b3f",
-   "edid": "FoodCabbage",
-   "name": "èñ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCabbage",
+   "name": "Cabbage",
    "kind": "food",
-   "gold": 2
+   "gold": 1
   },
   "64b3e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b3e",
-   "edid": "FoodLeeksGrilled",
-   "name": "ÍR\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodLeekCooked",
+   "name": "Grilled Leeks",
    "kind": "food",
-   "gold": 2
+   "gold": 6
   },
   "64b3d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b3d",
-   "edid": "FoodSweetroll",
-   "name": "\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodSweetroll",
+   "name": "Sweet Roll",
    "kind": "food",
-   "gold": 2
+   "gold": 6
   },
   "64b3c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b3c",
-   "edid": "FoodSlaughterfishCooked",
-   "name": "J\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodSlaughterfishCooked",
+   "name": "Slaughterfish Steak",
    "kind": "food",
-   "gold": 5
+   "gold": 8
   },
   "64b3b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b3b",
-   "edid": "FoodSalmonCooked",
-   "name": "øþ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodSalmonCooked01",
+   "name": "Salmon Steak",
    "kind": "food",
-   "gold": 4
+   "gold": 8
   },
   "64b3a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b3a",
-   "edid": "FoodPotatoesBaked",
-   "name": "Ý\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodPotatoBaked",
+   "name": "Baked Potatoes",
    "kind": "food",
-   "gold": 2
+   "gold": 6
   },
   "64b39:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b39",
-   "edid": "FoodLongTaffyTreat",
-   "name": "bù\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodLongTaffyTreat",
+   "name": "Long Taffy Treat",
    "kind": "food",
-   "gold": 3
+   "gold": 6
   },
   "64b38:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b38",
-   "edid": "FoodHoneyNutTreat",
-   "name": "/é\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodHoneyNutTreat",
+   "name": "Honey Nut Treat",
    "kind": "food",
-   "gold": 2
+   "gold": 6
   },
   "64b36:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b36",
-   "edid": "FoodCheeseWheel02B",
-   "name": "\u0018\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCheeseWheelEidar01",
+   "name": "Sliced Eidar Cheese Wheel",
    "kind": "food",
-   "gold": 10
+   "gold": 6
   },
   "64b35:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b35",
-   "edid": "FoodCheeseWheel01B",
-   "name": "Øé\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCheeseWheelGoat01",
+   "name": "Sliced Goat Cheese Wheel",
    "kind": "food",
-   "gold": 8
+   "gold": 6
   },
   "64b34:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b34",
-   "edid": "FoodCheeseWheel02A",
-   "name": "-\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCheeseWheelEidar02",
+   "name": "Eidar Cheese Wheel",
    "kind": "food",
-   "gold": 13
+   "gold": 6
   },
   "64b33:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b33",
-   "edid": "FoodCheeseWheel01A",
-   "name": "'â\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCheeseWheelGoat02",
+   "name": "Goat Cheese Wheel",
    "kind": "food",
-   "gold": 10
+   "gold": 6
   },
   "64b32:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b32",
-   "edid": "FoodCheeseWedge02",
-   "name": "HÒ\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCheeseWedgeEidar",
+   "name": "Eidar Cheese Wedge",
    "kind": "food",
-   "gold": 5
+   "gold": 1
   },
   "64b31:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b31",
-   "edid": "FoodCheeseWedge01",
-   "name": "\u0019à\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodCheeseWedgeGoat",
+   "name": "Goat Cheese Wedge",
    "kind": "food",
-   "gold": 4
+   "gold": 1
   },
   "64b30:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b30",
-   "edid": "FoodBoiledCremeTreat",
-   "name": "Ü8\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodBoiledCremeTreat",
+   "name": "Boiled Creme Treat",
    "kind": "food",
-   "gold": 4
+   "gold": 6
   },
   "64b2f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b2f",
-   "edid": "FoodApple02",
-   "name": "Fj\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodApple02",
+   "name": "Green Apple",
    "kind": "food",
-   "gold": 3
+   "gold": 1
   },
   "64b2e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x64b2e",
-   "edid": "FoodApple",
-   "name": "1é\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodApple",
+   "name": "Red Apple",
    "kind": "food",
-   "gold": 3
+   "gold": 1
   },
   "5566a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x5566a",
+   "from": "Skyrim.esm",
    "edid": "MarkarthBothelaPotion",
    "name": "\u001c\u0000",
    "kind": "potion",
@@ -984,22 +1105,25 @@
   "555e8:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x555e8",
-   "edid": "FreeformDragonBridgeMead",
-   "name": "ìK\u0000",
-   "kind": "food",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FreeformDragonBridgeMead",
+   "name": "Dragon's Breath Mead",
+   "kind": "ale",
    "gold": 5
   },
   "3f4bd:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3f4bd",
-   "edid": "WindhelmDoubleDistilledSkooma",
-   "name": "-ø\u0000",
-   "kind": "potion",
-   "gold": 55
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrugsDoubleDistilledSkooma",
+   "name": "Double-Distilled Skooma",
+   "kind": "food",
+   "gold": 75
   },
   "e6df5:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xe6df5",
+   "from": "Update.esm",
    "edid": "BladesPotion",
    "name": "$û\u0000",
    "kind": "potion",
@@ -1008,6 +1132,7 @@
   "e41b8:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xe41b8",
+   "from": "Skyrim.esm",
    "edid": "FrostbiteVenom",
    "name": ")\u000b\u0000",
    "kind": "poison",
@@ -1016,6 +1141,7 @@
   "e2d3d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xe2d3d",
+   "from": "Skyrim.esm",
    "edid": "CW01BWraithPoison",
    "name": "3é\u0000",
    "kind": "poison",
@@ -1024,30 +1150,34 @@
   "dc172:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xdc172",
-   "edid": "TGTQ02BalmoraBlue",
-   "name": "ê\u0000",
-   "kind": "potion",
-   "gold": 67
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrugsBalmoraBlue",
+   "name": "Balmora Blue",
+   "kind": "food",
+   "gold": 75
   },
   "c5349:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xc5349",
-   "edid": "FoodWineAltoA",
-   "name": "×\u0000",
-   "kind": "food",
-   "gold": 12
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkWineFruit",
+   "name": "Fruit Wine",
+   "kind": "ale",
+   "gold": 7
   },
   "c5348:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xc5348",
-   "edid": "FoodWineBottle02A",
-   "name": "Sà\u0000",
-   "kind": "food",
-   "gold": 7
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkWineRed",
+   "name": "Red Wine",
+   "kind": "ale",
+   "gold": 5
   },
   "a9661:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xa9661",
+   "from": "Skyrim.esm",
    "edid": "DA14Water",
    "name": "¦\u0000",
    "kind": "potion",
@@ -1056,6 +1186,7 @@
   "5661f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x5661f",
+   "from": "Skyrim.esm",
    "edid": "DefaultPotion",
    "name": "äN\u0000",
    "kind": "potion",
@@ -1064,6 +1195,7 @@
   "5629e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x5629e",
+   "from": "Skyrim.esm",
    "edid": "DefaultPoison",
    "name": "DefaultPoison",
    "kind": "poison",
@@ -1072,14 +1204,16 @@
   "aed90:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xaed90",
-   "edid": "dunSleepingTreeCampSap",
-   "name": "Dê\u0000",
-   "kind": "potion",
-   "gold": 100
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrugsSleepingTreeSap",
+   "name": "Sleeping Tree Sap",
+   "kind": "food",
+   "gold": 75
   },
   "ae723:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0xae723",
+   "from": "Skyrim.esm",
    "edid": "CureDisease",
    "name": "²C\u0000",
    "kind": "potion",
@@ -1088,14 +1222,16 @@
   "9380d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x9380d",
-   "edid": "AleWhiterunQuest",
-   "name": "÷.\u0000",
-   "kind": "potion",
-   "gold": 5
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkAleWhiterunQuest",
+   "name": "Argonian Ale",
+   "kind": "ale",
+   "gold": 7
   },
   "76f17:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x76f17",
+   "from": "Skyrim.esm",
    "edid": "TG00FalmerBlood",
    "name": "\u000f£\u0000",
    "kind": "potion",
@@ -1104,6 +1240,7 @@
   "74a3b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x74a3b",
+   "from": "Skyrim.esm",
    "edid": "Paralyze05",
    "name": "Ú'\u0000",
    "kind": "poison",
@@ -1112,6 +1249,7 @@
   "74a3a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x74a3a",
+   "from": "Skyrim.esm",
    "edid": "Paralyze04",
    "name": "vñ\u0000",
    "kind": "poison",
@@ -1120,6 +1258,7 @@
   "74a39:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x74a39",
+   "from": "Skyrim.esm",
    "edid": "Paralyze03",
    "name": "j\u0000",
    "kind": "poison",
@@ -1128,6 +1267,7 @@
   "74a38:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x74a38",
+   "from": "Skyrim.esm",
    "edid": "Paralyze02",
    "name": "§®\u0000",
    "kind": "poison",
@@ -1136,6 +1276,7 @@
   "73f94:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f94",
+   "from": "Skyrim.esm",
    "edid": "DamageMagickaRecovery05",
    "name": "æ\u0000",
    "kind": "poison",
@@ -1144,6 +1285,7 @@
   "73f93:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f93",
+   "from": "Skyrim.esm",
    "edid": "DamageMagickaRecovery04",
    "name": "Aé\u0000",
    "kind": "poison",
@@ -1152,6 +1294,7 @@
   "73f92:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f92",
+   "from": "Skyrim.esm",
    "edid": "DamageMagickaRecovery03",
    "name": "L\u0007\u0000",
    "kind": "poison",
@@ -1160,6 +1303,7 @@
   "73f91:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f91",
+   "from": "Skyrim.esm",
    "edid": "DamageMagickaRecovery02",
    "name": "Úq\u0000",
    "kind": "poison",
@@ -1168,6 +1312,7 @@
   "73f90:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f90",
+   "from": "Skyrim.esm",
    "edid": "DamageMagickaRecovery01",
    "name": "¤è\u0000",
    "kind": "poison",
@@ -1176,6 +1321,7 @@
   "73f8e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f8e",
+   "from": "Skyrim.esm",
    "edid": "DamageStaminaRate04",
    "name": "¸\u0000",
    "kind": "poison",
@@ -1184,6 +1330,7 @@
   "73f8d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f8d",
+   "from": "Skyrim.esm",
    "edid": "DamageStaminaRate03",
    "name": "@ó\u0000",
    "kind": "poison",
@@ -1192,6 +1339,7 @@
   "73f8c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f8c",
+   "from": "Skyrim.esm",
    "edid": "DamageStaminaRate02",
    "name": "¤n\u0000",
    "kind": "poison",
@@ -1200,6 +1348,7 @@
   "73f8b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f8b",
+   "from": "Skyrim.esm",
    "edid": "DamageStaminaRate01",
    "name": "\u0006D\u0000",
    "kind": "poison",
@@ -1208,6 +1357,7 @@
   "73f61:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f61",
+   "from": "Skyrim.esm",
    "edid": "Fear05",
    "name": "¿\u0003\u0000",
    "kind": "poison",
@@ -1216,6 +1366,7 @@
   "73f60:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f60",
+   "from": "Skyrim.esm",
    "edid": "Fear04",
    "name": "ò\u0000",
    "kind": "poison",
@@ -1224,6 +1375,7 @@
   "73f5f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f5f",
+   "from": "Skyrim.esm",
    "edid": "Fear03",
    "name": "Yé\u0000",
    "kind": "poison",
@@ -1232,6 +1384,7 @@
   "73f5e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f5e",
+   "from": "Skyrim.esm",
    "edid": "Fear02",
    "name": "(»\u0000",
    "kind": "poison",
@@ -1240,6 +1393,7 @@
   "73f5d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f5d",
+   "from": "Skyrim.esm",
    "edid": "Frenzy05",
    "name": ")f\u0000",
    "kind": "poison",
@@ -1248,6 +1402,7 @@
   "73f5c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f5c",
+   "from": "Skyrim.esm",
    "edid": "Frenzy04",
    "name": "½@\u0000",
    "kind": "poison",
@@ -1256,6 +1411,7 @@
   "73f5b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f5b",
+   "from": "Skyrim.esm",
    "edid": "Frenzy03",
    "name": "Â1\u0000",
    "kind": "poison",
@@ -1264,6 +1420,7 @@
   "73f5a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f5a",
+   "from": "Skyrim.esm",
    "edid": "Frenzy02",
    "name": "¦\u0000",
    "kind": "poison",
@@ -1272,6 +1429,7 @@
   "73f59:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f59",
+   "from": "Skyrim.esm",
    "edid": "WeaknessMagic05",
    "name": "mU\u0000",
    "kind": "poison",
@@ -1280,6 +1438,7 @@
   "73f58:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f58",
+   "from": "Skyrim.esm",
    "edid": "WeaknessMagic04",
    "name": "-!\u0000",
    "kind": "poison",
@@ -1288,6 +1447,7 @@
   "73f57:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f57",
+   "from": "Skyrim.esm",
    "edid": "WeaknessMagic03",
    "name": "¹å\u0000",
    "kind": "poison",
@@ -1296,6 +1456,7 @@
   "73f56:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f56",
+   "from": "Skyrim.esm",
    "edid": "WeaknessMagic02",
    "name": "[é\u0000",
    "kind": "poison",
@@ -1304,6 +1465,7 @@
   "73f55:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f55",
+   "from": "Skyrim.esm",
    "edid": "WeaknessShock05",
    "name": "õ\u0003\u0000",
    "kind": "poison",
@@ -1312,6 +1474,7 @@
   "73f54:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f54",
+   "from": "Skyrim.esm",
    "edid": "WeaknessShock04",
    "name": "m\u0000",
    "kind": "poison",
@@ -1320,6 +1483,7 @@
   "73f53:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f53",
+   "from": "Skyrim.esm",
    "edid": "WeaknessShock03",
    "name": "³\u0000",
    "kind": "poison",
@@ -1328,6 +1492,7 @@
   "73f52:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f52",
+   "from": "Skyrim.esm",
    "edid": "WeaknessShock01",
    "name": "òº\u0000",
    "kind": "poison",
@@ -1336,6 +1501,7 @@
   "73f50:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f50",
+   "from": "Skyrim.esm",
    "edid": "WeaknessFrost05",
    "name": "ÒÏ\u0000",
    "kind": "poison",
@@ -1344,6 +1510,7 @@
   "73f4f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f4f",
+   "from": "Skyrim.esm",
    "edid": "WeaknessFrost04",
    "name": "µ\u0000",
    "kind": "poison",
@@ -1352,6 +1519,7 @@
   "73f4e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f4e",
+   "from": "Skyrim.esm",
    "edid": "WeaknessFrost03",
    "name": "\u0000",
    "kind": "poison",
@@ -1360,6 +1528,7 @@
   "73f4d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f4d",
+   "from": "Skyrim.esm",
    "edid": "WeaknessFrost02",
    "name": "ÿ\u001c\u0000",
    "kind": "poison",
@@ -1368,6 +1537,7 @@
   "73f4c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f4c",
+   "from": "Skyrim.esm",
    "edid": "WeaknessFire05",
    "name": "·k\u0000",
    "kind": "poison",
@@ -1376,6 +1546,7 @@
   "73f4b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f4b",
+   "from": "Skyrim.esm",
    "edid": "WeaknessFire04",
    "name": "`Ä\u0000",
    "kind": "poison",
@@ -1384,6 +1555,7 @@
   "73f4a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f4a",
+   "from": "Skyrim.esm",
    "edid": "WeaknessFire03",
    "name": "£å\u0000",
    "kind": "poison",
@@ -1392,6 +1564,7 @@
   "73f49:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f49",
+   "from": "Skyrim.esm",
    "edid": "WeaknessFire02",
    "name": "P|\u0000",
    "kind": "poison",
@@ -1400,6 +1573,7 @@
   "73f48:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f48",
+   "from": "Skyrim.esm",
    "edid": "DamageStaminaLinger05",
    "name": "Õé\u0000",
    "kind": "poison",
@@ -1408,6 +1582,7 @@
   "73f47:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f47",
+   "from": "Skyrim.esm",
    "edid": "DamageStaminaLinger04",
    "name": "Êö\u0000",
    "kind": "poison",
@@ -1416,6 +1591,7 @@
   "73f46:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f46",
+   "from": "Skyrim.esm",
    "edid": "DamageStaminaLinger03",
    "name": "û\u0000",
    "kind": "poison",
@@ -1424,6 +1600,7 @@
   "73f45:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f45",
+   "from": "Skyrim.esm",
    "edid": "DamageStaminaLinger02",
    "name": "ÝË\u0000",
    "kind": "poison",
@@ -1432,6 +1609,7 @@
   "73f44:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f44",
+   "from": "Skyrim.esm",
    "edid": "DamageStamina05",
    "name": "¥\u0015\u0000",
    "kind": "poison",
@@ -1440,6 +1618,7 @@
   "73f43:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f43",
+   "from": "Skyrim.esm",
    "edid": "DamageStamina04",
    "name": "þ+\u0000",
    "kind": "poison",
@@ -1448,6 +1627,7 @@
   "73f42:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f42",
+   "from": "Skyrim.esm",
    "edid": "DamageStamina03",
    "name": "¹B\u0000",
    "kind": "poison",
@@ -1456,6 +1636,7 @@
   "73f41:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f41",
+   "from": "Skyrim.esm",
    "edid": "DamageStamina02",
    "name": "\nÔ\u0000",
    "kind": "poison",
@@ -1464,6 +1645,7 @@
   "73f40:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f40",
+   "from": "Skyrim.esm",
    "edid": "DamageMagickaLinger05",
    "name": "PÚ\u0000",
    "kind": "poison",
@@ -1472,6 +1654,7 @@
   "73f3f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f3f",
+   "from": "Skyrim.esm",
    "edid": "DamageMagickaLinger04",
    "name": "Øû\u0000",
    "kind": "poison",
@@ -1480,6 +1663,7 @@
   "73f3e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f3e",
+   "from": "Skyrim.esm",
    "edid": "DamageMagickaLinger03",
    "name": "È¡\u0000",
    "kind": "poison",
@@ -1488,6 +1672,7 @@
   "73f3d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f3d",
+   "from": "Skyrim.esm",
    "edid": "DamageMagickaLinger02",
    "name": "¢w\u0000",
    "kind": "poison",
@@ -1496,6 +1681,7 @@
   "73f3c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f3c",
+   "from": "Skyrim.esm",
    "edid": "DamageMagicka05",
    "name": "1\u0000",
    "kind": "poison",
@@ -1504,6 +1690,7 @@
   "73f3b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f3b",
+   "from": "Skyrim.esm",
    "edid": "DamageMagicka04",
    "name": "Ç^\u0000",
    "kind": "poison",
@@ -1512,6 +1699,7 @@
   "73f3a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f3a",
+   "from": "Skyrim.esm",
    "edid": "DamageMagicka03",
    "name": "Ñ\u0013\u0000",
    "kind": "poison",
@@ -1520,6 +1708,7 @@
   "73f39:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f39",
+   "from": "Skyrim.esm",
    "edid": "DamageMagicka02",
    "name": "ë!\u0000",
    "kind": "poison",
@@ -1528,6 +1717,7 @@
   "73f38:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f38",
+   "from": "Skyrim.esm",
    "edid": "DamageHealthLinger05",
    "name": "m`\u0000",
    "kind": "poison",
@@ -1536,6 +1726,7 @@
   "73f37:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f37",
+   "from": "Skyrim.esm",
    "edid": "DamageHealthLinger04",
    "name": "\"é\u0000",
    "kind": "poison",
@@ -1544,6 +1735,7 @@
   "73f36:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f36",
+   "from": "Skyrim.esm",
    "edid": "DamageHealthLinger03",
    "name": "Ò`\u0000",
    "kind": "poison",
@@ -1552,6 +1744,7 @@
   "73f35:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f35",
+   "from": "Skyrim.esm",
    "edid": "DamageHealthLinger02",
    "name": "?\u0000",
    "kind": "poison",
@@ -1560,6 +1753,7 @@
   "73f34:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f34",
+   "from": "Skyrim.esm",
    "edid": "DamageHealth05",
    "name": "ð\u0000",
    "kind": "poison",
@@ -1568,6 +1762,7 @@
   "73f33:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f33",
+   "from": "Skyrim.esm",
    "edid": "DamageHealth04",
    "name": "Å\u0000",
    "kind": "poison",
@@ -1576,6 +1771,7 @@
   "73f32:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f32",
+   "from": "Skyrim.esm",
    "edid": "DamageHealth03",
    "name": "B\u0000",
    "kind": "poison",
@@ -1584,6 +1780,7 @@
   "73f31:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x73f31",
+   "from": "Skyrim.esm",
    "edid": "DamageHealth02",
    "name": "HC\u0000",
    "kind": "poison",
@@ -1592,6 +1789,7 @@
   "6a07e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x6a07e",
+   "from": "Skyrim.esm",
    "edid": "DummyPotion",
    "name": "DummyPotion",
    "kind": "potion",
@@ -1600,6 +1798,7 @@
   "663e1:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x663e1",
+   "from": "Skyrim.esm",
    "edid": "IVDGhostPotion",
    "name": "P'\u0000",
    "kind": "potion",
@@ -1608,6 +1807,7 @@
   "65a71:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a71",
+   "from": "Skyrim.esm",
    "edid": "DamageStaminaLinger01",
    "name": "5Z\u0000",
    "kind": "poison",
@@ -1616,6 +1816,7 @@
   "65a70:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a70",
+   "from": "Skyrim.esm",
    "edid": "DamageMagickaLinger01",
    "name": "ô¿\u0000",
    "kind": "poison",
@@ -1624,6 +1825,7 @@
   "65a6f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a6f",
+   "from": "Skyrim.esm",
    "edid": "DamageHealthLinger01",
    "name": "eé\u0000",
    "kind": "poison",
@@ -1632,6 +1834,7 @@
   "65a6e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a6e",
+   "from": "Skyrim.esm",
    "edid": "WeaknessMagic01",
    "name": "üæ\u0000",
    "kind": "poison",
@@ -1640,6 +1843,7 @@
   "65a6d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a6d",
+   "from": "Skyrim.esm",
    "edid": "WeaknessShock02",
    "name": "h,\u0000",
    "kind": "poison",
@@ -1648,6 +1852,7 @@
   "65a6c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a6c",
+   "from": "Skyrim.esm",
    "edid": "WeaknessFrost01",
    "name": "î\u0000",
    "kind": "poison",
@@ -1656,6 +1861,7 @@
   "65a6b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a6b",
+   "from": "Skyrim.esm",
    "edid": "WeaknessFire01",
    "name": "gé\u0000",
    "kind": "poison",
@@ -1664,6 +1870,7 @@
   "65a6a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a6a",
+   "from": "Skyrim.esm",
    "edid": "Paralyze01",
    "name": "b@\u0000",
    "kind": "poison",
@@ -1672,6 +1879,7 @@
   "65a69:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a69",
+   "from": "Skyrim.esm",
    "edid": "Frenzy01",
    "name": "hé\u0000",
    "kind": "poison",
@@ -1680,6 +1888,7 @@
   "65a68:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a68",
+   "from": "Skyrim.esm",
    "edid": "Fear01",
    "name": "\u001eu\u0000",
    "kind": "poison",
@@ -1688,6 +1897,7 @@
   "65a66:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a66",
+   "from": "Skyrim.esm",
    "edid": "DamageStamina01",
    "name": "\u001dÆ\u0000",
    "kind": "poison",
@@ -1696,6 +1906,7 @@
   "65a65:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a65",
+   "from": "Skyrim.esm",
    "edid": "DamageMagicka01",
    "name": "Åë\u0000",
    "kind": "poison",
@@ -1704,6 +1915,7 @@
   "65a64:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x65a64",
+   "from": "Skyrim.esm",
    "edid": "CurePoison",
    "name": "9v\u0000",
    "kind": "potion",
@@ -1712,6 +1924,7 @@
   "5f6df:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x5f6df",
+   "from": "Skyrim.esm",
    "edid": "DA16TorporPotion",
    "name": "\u0003\u0000",
    "kind": "potion",
@@ -1720,22 +1933,25 @@
   "57a7b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x57a7b",
-   "edid": "FreeformAngasMillKordirsSkooma",
-   "name": "êª\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FreeformAngasMillKordirsSkooma",
+   "name": "Kordir's Skooma",
    "kind": "potion",
-   "gold": 25
+   "gold": 0
   },
   "57a7a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x57a7a",
-   "edid": "Skooma",
-   "name": "¢,\u0000",
-   "kind": "potion",
-   "gold": 25
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrugsSkooma",
+   "name": "Skooma",
+   "kind": "food",
+   "gold": 75
   },
   "58cfb:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x58cfb",
+   "from": "Skyrim.esm",
    "edid": "DB03Poison",
    "name": "¼µ\u0000",
    "kind": "poison",
@@ -1744,14 +1960,16 @@
   "508ca:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x508ca",
-   "edid": "FoodHonningbrewMead",
-   "name": "Ê\u0000",
-   "kind": "food",
-   "gold": 20
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkHonningbrewMead",
+   "name": "Honningbrew Mead",
+   "kind": "ale",
+   "gold": 7
   },
   "3ac31:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3ac31",
+   "from": "Skyrim.esm",
    "edid": "Waterbreathing04",
    "name": "ç\u0000",
    "kind": "potion",
@@ -1760,6 +1978,7 @@
   "3ac30:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3ac30",
+   "from": "Skyrim.esm",
    "edid": "Waterbreathing03",
    "name": "<+\u0000",
    "kind": "potion",
@@ -1768,6 +1987,7 @@
   "3ac2f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3ac2f",
+   "from": "Skyrim.esm",
    "edid": "Waterbreathing02",
    "name": "ùr\u0000",
    "kind": "potion",
@@ -1776,6 +1996,7 @@
   "3ac2e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3ac2e",
+   "from": "Skyrim.esm",
    "edid": "Waterbreathing01",
    "name": "\u000b®\u0000",
    "kind": "potion",
@@ -1784,6 +2005,7 @@
   "3a5a4:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3a5a4",
+   "from": "Skyrim.esm",
    "edid": "DamageHealth01",
    "name": "¨ú\u0000",
    "kind": "poison",
@@ -1792,6 +2014,7 @@
   "39e55:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39e55",
+   "from": "Skyrim.esm",
    "edid": "ResistMagic100",
    "name": "&\u0000",
    "kind": "potion",
@@ -1800,6 +2023,7 @@
   "39e54:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39e54",
+   "from": "Skyrim.esm",
    "edid": "ResistMagic75",
    "name": "Nª\u0000",
    "kind": "potion",
@@ -1808,6 +2032,7 @@
   "39e53:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39e53",
+   "from": "Skyrim.esm",
    "edid": "ResistMagic50",
    "name": "&>\u0000",
    "kind": "potion",
@@ -1816,6 +2041,7 @@
   "39e52:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39e52",
+   "from": "Skyrim.esm",
    "edid": "ResistMagic25",
    "name": "nJ\u0000",
    "kind": "potion",
@@ -1824,6 +2050,7 @@
   "39d12:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39d12",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillEnchanting04",
    "name": "º*\u0000",
    "kind": "potion",
@@ -1832,6 +2059,7 @@
   "39d0a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39d0a",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillEnchanting03",
    "name": "[î\u0000",
    "kind": "potion",
@@ -1840,6 +2068,7 @@
   "39d02:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39d02",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillEnchanting02",
    "name": "!\u0000",
    "kind": "potion",
@@ -1848,6 +2077,7 @@
   "39cfb:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39cfb",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillEnchanting01",
    "name": "á\u0000",
    "kind": "potion",
@@ -1856,6 +2086,7 @@
   "39cf3:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39cf3",
+   "from": "Skyrim.esm",
    "edid": "RestoreStamina06",
    "name": ",G\u0000",
    "kind": "potion",
@@ -1864,6 +2095,7 @@
   "39be8:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39be8",
+   "from": "Skyrim.esm",
    "edid": "RestoreStamina02",
    "name": "z$\u0000",
    "kind": "potion",
@@ -1872,6 +2104,7 @@
   "39be7:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39be7",
+   "from": "Skyrim.esm",
    "edid": "RestoreMagicka06",
    "name": "µ\u001c\u0000",
    "kind": "potion",
@@ -1880,6 +2113,7 @@
   "39be6:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39be6",
+   "from": "Skyrim.esm",
    "edid": "RestoreMagicka05",
    "name": "m\u0000",
    "kind": "potion",
@@ -1888,6 +2122,7 @@
   "39be5:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39be5",
+   "from": "Skyrim.esm",
    "edid": "RestoreHealth06",
    "name": "ª\u0000",
    "kind": "potion",
@@ -1896,6 +2131,7 @@
   "39be4:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39be4",
+   "from": "Skyrim.esm",
    "edid": "RestoreHealth05",
    "name": "mé\u0000",
    "kind": "potion",
@@ -1904,6 +2140,7 @@
   "39be3:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39be3",
+   "from": "Skyrim.esm",
    "edid": "ResistShock75",
    "name": "!}\u0000",
    "kind": "potion",
@@ -1912,6 +2149,7 @@
   "39be1:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39be1",
+   "from": "Skyrim.esm",
    "edid": "ResistShock25",
    "name": "Â¹\u0000",
    "kind": "potion",
@@ -1920,6 +2158,7 @@
   "39bdf:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39bdf",
+   "from": "Skyrim.esm",
    "edid": "ResistFrost75",
    "name": "\u0001Î\u0000",
    "kind": "potion",
@@ -1928,6 +2167,7 @@
   "39b8a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39b8a",
+   "from": "Skyrim.esm",
    "edid": "ResistFrost25",
    "name": "äD\u0000",
    "kind": "potion",
@@ -1936,6 +2176,7 @@
   "39b4b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39b4b",
+   "from": "Skyrim.esm",
    "edid": "ResistFire75",
    "name": "år\u0000",
    "kind": "potion",
@@ -1944,6 +2185,7 @@
   "39b4a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39b4a",
+   "from": "Skyrim.esm",
    "edid": "ResistFire25",
    "name": "®\u0000",
    "kind": "potion",
@@ -1952,6 +2194,7 @@
   "39b0c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39b0c",
+   "from": "Skyrim.esm",
    "edid": "FortifyStaminaRate03",
    "name": "ü\u0000",
    "kind": "potion",
@@ -1960,6 +2203,7 @@
   "39aa6:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39aa6",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillTwoHanded04",
    "name": "$\u0000",
    "kind": "potion",
@@ -1968,6 +2212,7 @@
   "39980:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39980",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillTwoHanded03",
    "name": "o\u0016\u0000",
    "kind": "potion",
@@ -1976,6 +2221,7 @@
   "39974:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39974",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillTwoHanded02",
    "name": "ZM\u0000",
    "kind": "potion",
@@ -1984,6 +2230,7 @@
   "39973:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39973",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillBarter04",
    "name": "!\u0018\u0000",
    "kind": "potion",
@@ -1992,6 +2239,7 @@
   "39971:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39971",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillBarter03",
    "name": "rý\u0000",
    "kind": "potion",
@@ -2000,6 +2248,7 @@
   "39970:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39970",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillBarter02",
    "name": "s\u000e\u0000",
    "kind": "potion",
@@ -2008,6 +2257,7 @@
   "3996f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3996f",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillSneak04",
    "name": "\f,\u0000",
    "kind": "potion",
@@ -2016,6 +2266,7 @@
   "39969:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39969",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillSneak03",
    "name": "!î\u0000",
    "kind": "potion",
@@ -2024,6 +2275,7 @@
   "39968:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39968",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillSneak02",
    "name": "\u0000",
    "kind": "potion",
@@ -2032,6 +2284,7 @@
   "39967:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39967",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillSmithing04",
    "name": "à\u0000",
    "kind": "potion",
@@ -2040,6 +2293,7 @@
   "39962:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39962",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillSmithing03",
    "name": "W\u0000",
    "kind": "potion",
@@ -2048,6 +2302,7 @@
   "3995d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3995d",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillSmithing02",
    "name": "MR\u0000",
    "kind": "potion",
@@ -2056,6 +2311,7 @@
   "3995c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3995c",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillRestoration04",
    "name": "\rS\u0000",
    "kind": "potion",
@@ -2064,6 +2320,7 @@
   "3995b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3995b",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillRestoration03",
    "name": "6\u0000",
    "kind": "potion",
@@ -2072,6 +2329,7 @@
   "3995a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3995a",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillRestoration02",
    "name": "Uê\u0000",
    "kind": "potion",
@@ -2080,6 +2338,7 @@
   "39959:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39959",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillPickpocket03",
    "name": "Ú\u0017\u0000",
    "kind": "potion",
@@ -2088,6 +2347,7 @@
   "39958:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39958",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillPickpocket04",
    "name": "\u001e¥\u0000",
    "kind": "potion",
@@ -2096,6 +2356,7 @@
   "39957:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39957",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillPickpocket02",
    "name": "iê\u0000",
    "kind": "potion",
@@ -2104,6 +2365,7 @@
   "39956:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39956",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillOneHanded04",
    "name": "0è\u0000",
    "kind": "potion",
@@ -2112,6 +2374,7 @@
   "39955:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39955",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillOneHanded03",
    "name": "âo\u0000",
    "kind": "potion",
@@ -2120,6 +2383,7 @@
   "39954:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39954",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillOneHanded02",
    "name": "n\u0000",
    "kind": "potion",
@@ -2128,6 +2392,7 @@
   "39951:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39951",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillIllusion04",
    "name": "y%\u0000",
    "kind": "potion",
@@ -2136,6 +2401,7 @@
   "39950:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39950",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillIllusion03",
    "name": "¦\u000e\u0000",
    "kind": "potion",
@@ -2144,6 +2410,7 @@
   "3994f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3994f",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillIllusion02",
    "name": "¡ä\u0000",
    "kind": "potion",
@@ -2152,6 +2419,7 @@
   "3994e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3994e",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillMarksman04",
    "name": "\u0011Ý\u0000",
    "kind": "potion",
@@ -2160,6 +2428,7 @@
   "3994b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3994b",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillMarksman03",
    "name": "t\u0000",
    "kind": "potion",
@@ -2168,6 +2437,7 @@
   "39949:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39949",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillMarksman02",
    "name": "õ~\u0000",
    "kind": "potion",
@@ -2176,6 +2446,7 @@
   "39948:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39948",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillLockpicking04",
    "name": "@o\u0000",
    "kind": "potion",
@@ -2184,6 +2455,7 @@
   "39946:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39946",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillLockpicking03",
    "name": "È8\u0000",
    "kind": "potion",
@@ -2192,6 +2464,7 @@
   "39945:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39945",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillLockpicking02",
    "name": "pº\u0000",
    "kind": "potion",
@@ -2200,6 +2473,7 @@
   "39930:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39930",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillLockpicking01",
    "name": "³ó\u0000",
    "kind": "potion",
@@ -2208,6 +2482,7 @@
   "39904:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39904",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillLightArmor04",
    "name": "e^\u0000",
    "kind": "potion",
@@ -2216,6 +2491,7 @@
   "39903:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39903",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillLightArmor03",
    "name": "úh\u0000",
    "kind": "potion",
@@ -2224,6 +2500,7 @@
   "398fd:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398fd",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillLightArmor02",
    "name": "9q\u0000",
    "kind": "potion",
@@ -2232,6 +2509,7 @@
   "398f6:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398f6",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillHeavyArmor04",
    "name": "ê\u0000",
    "kind": "potion",
@@ -2240,6 +2518,7 @@
   "398f5:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398f5",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillHeavyArmor03",
    "name": "¡É\u0000",
    "kind": "potion",
@@ -2248,6 +2527,7 @@
   "398f4:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398f4",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillHeavyArmor02",
    "name": "I(\u0000",
    "kind": "potion",
@@ -2256,6 +2536,7 @@
   "398f3:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398f3",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillDestruction04",
    "name": "uà\u0000",
    "kind": "potion",
@@ -2264,6 +2545,7 @@
   "398f1:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398f1",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillDestruction03",
    "name": "Ðé\u0000",
    "kind": "potion",
@@ -2272,6 +2554,7 @@
   "398ee:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398ee",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillDestruction02",
    "name": "¡\u0000",
    "kind": "potion",
@@ -2280,6 +2563,7 @@
   "398ed:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398ed",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillConjuration04",
    "name": "#1\u0000",
    "kind": "potion",
@@ -2288,6 +2572,7 @@
   "398ec:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398ec",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillConjuration03",
    "name": "´\u0000",
    "kind": "potion",
@@ -2296,6 +2581,7 @@
   "398ad:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398ad",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillConjuration02",
    "name": "\u001bÖ\u0000",
    "kind": "potion",
@@ -2304,6 +2590,7 @@
   "398ac:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398ac",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillBlock04",
    "name": "éô\u0000",
    "kind": "potion",
@@ -2312,6 +2599,7 @@
   "398ab:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x398ab",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillBlock03",
    "name": "\u0017\u0016\u0000",
    "kind": "potion",
@@ -2320,6 +2608,7 @@
   "3989b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3989b",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillBlock02",
    "name": "©\u0000",
    "kind": "potion",
@@ -2328,6 +2617,7 @@
   "3989a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3989a",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillAlteration04",
    "name": "~é\u0000",
    "kind": "potion",
@@ -2336,6 +2626,7 @@
   "39899:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x39899",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillAlteration03",
    "name": "ÕÆ\u0000",
    "kind": "potion",
@@ -2344,6 +2635,7 @@
   "3988e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3988e",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillAlteration02",
    "name": "\u0004ó\u0000",
    "kind": "potion",
@@ -2352,6 +2644,7 @@
   "3eb41:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb41",
+   "from": "Skyrim.esm",
    "edid": "Invisibility04",
    "name": "\u001f¼\u0000",
    "kind": "potion",
@@ -2360,6 +2653,7 @@
   "3eb40:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb40",
+   "from": "Skyrim.esm",
    "edid": "Invisibility02",
    "name": "é\u0000",
    "kind": "potion",
@@ -2368,6 +2662,7 @@
   "3eb3f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb3f",
+   "from": "Skyrim.esm",
    "edid": "Invisibility03",
    "name": "°}\u0000",
    "kind": "potion",
@@ -2376,6 +2671,7 @@
   "3eb3e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb3e",
+   "from": "Skyrim.esm",
    "edid": "Invisibility01",
    "name": "R\u0000",
    "kind": "potion",
@@ -2384,6 +2680,7 @@
   "3eb3a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb3a",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillRestoration01",
    "name": "æh\u0000",
    "kind": "potion",
@@ -2392,6 +2689,7 @@
   "3eb39:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb39",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillIllusion01",
    "name": "û\u0000",
    "kind": "potion",
@@ -2400,6 +2698,7 @@
   "3eb38:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb38",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillDestruction01",
    "name": "NK\u0000",
    "kind": "potion",
@@ -2408,6 +2707,7 @@
   "3eb37:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb37",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillConjuration01",
    "name": "Æâ\u0000",
    "kind": "potion",
@@ -2416,6 +2716,7 @@
   "3eb36:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb36",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillAlteration01",
    "name": "~P\u0000",
    "kind": "potion",
@@ -2424,6 +2725,7 @@
   "3eb35:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb35",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillBarter01",
    "name": "A&\u0000",
    "kind": "potion",
@@ -2432,6 +2734,7 @@
   "3eb33:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb33",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillSneak01",
    "name": "n\u0000",
    "kind": "potion",
@@ -2440,6 +2743,7 @@
   "3eb32:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb32",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillBlock01",
    "name": "Oi\u0000",
    "kind": "potion",
@@ -2448,6 +2752,7 @@
   "3eb31:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb31",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillPickpocket01",
    "name": "Êä\u0000",
    "kind": "potion",
@@ -2456,6 +2761,7 @@
   "3eb30:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb30",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillLightArmor01",
    "name": "ôö\u0000",
    "kind": "potion",
@@ -2464,6 +2770,7 @@
   "3eb2f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb2f",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillHeavyArmor01",
    "name": "Ç\u0000\u0000",
    "kind": "potion",
@@ -2472,6 +2779,7 @@
   "3eb2e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb2e",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillSmithing01",
    "name": "\nG\u0000",
    "kind": "potion",
@@ -2480,6 +2788,7 @@
   "3eb2c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb2c",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillMarksman01",
    "name": "\u0006M\u0000",
    "kind": "potion",
@@ -2488,6 +2797,7 @@
   "3eb2b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb2b",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillTwoHanded01",
    "name": "µ£\u0000",
    "kind": "potion",
@@ -2496,6 +2806,7 @@
   "3eb2a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb2a",
+   "from": "Skyrim.esm",
    "edid": "FortifySkillOneHanded01",
    "name": "6x\u0000",
    "kind": "potion",
@@ -2504,6 +2815,7 @@
   "3eb14:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb14",
+   "from": "Skyrim.esm",
    "edid": "FortifyStaminaRate04",
    "name": "}D\u0000",
    "kind": "potion",
@@ -2512,6 +2824,7 @@
   "3eb12:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb12",
+   "from": "Skyrim.esm",
    "edid": "FortifyStaminaRate02",
    "name": "ôÔ\u0000",
    "kind": "potion",
@@ -2520,6 +2833,7 @@
   "3eb11:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb11",
+   "from": "Skyrim.esm",
    "edid": "FortifyStaminaRate01",
    "name": "G\u001f\u0000",
    "kind": "potion",
@@ -2528,6 +2842,7 @@
   "3eb10:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb10",
+   "from": "Skyrim.esm",
    "edid": "FortifyMagickaRate04",
    "name": "°ª\u0000",
    "kind": "potion",
@@ -2536,6 +2851,7 @@
   "3eb0f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb0f",
+   "from": "Skyrim.esm",
    "edid": "FortifyMagickaRate03",
    "name": "]\u0000",
    "kind": "potion",
@@ -2544,6 +2860,7 @@
   "3eb0e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb0e",
+   "from": "Skyrim.esm",
    "edid": "FortifyMagickaRate02",
    "name": "À¬\u0000",
    "kind": "potion",
@@ -2552,6 +2869,7 @@
   "3eb0d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb0d",
+   "from": "Skyrim.esm",
    "edid": "FortifyMagickaRate01",
    "name": "ü\u0005\u0000",
    "kind": "potion",
@@ -2560,6 +2878,7 @@
   "3eb0c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb0c",
+   "from": "Skyrim.esm",
    "edid": "FortifyHealRate04",
    "name": "8Û\u0000",
    "kind": "potion",
@@ -2568,6 +2887,7 @@
   "3eb0b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb0b",
+   "from": "Skyrim.esm",
    "edid": "FortifyHealRate03",
    "name": "X\u0013\u0000",
    "kind": "potion",
@@ -2576,6 +2896,7 @@
   "3eb0a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb0a",
+   "from": "Skyrim.esm",
    "edid": "FortifyHealRate02",
    "name": "\u0016\u001b\u0000",
    "kind": "potion",
@@ -2584,6 +2905,7 @@
   "3eb09:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb09",
+   "from": "Skyrim.esm",
    "edid": "FortifyHealRate01",
    "name": "sç\u0000",
    "kind": "potion",
@@ -2592,6 +2914,7 @@
   "3eb05:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb05",
+   "from": "Skyrim.esm",
    "edid": "FortifyCarry02",
    "name": "\u0004Ï\u0000",
    "kind": "potion",
@@ -2600,6 +2923,7 @@
   "3eb04:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb04",
+   "from": "Skyrim.esm",
    "edid": "FortifyCarry04",
    "name": "\u0003µ\u0000",
    "kind": "potion",
@@ -2608,6 +2932,7 @@
   "3eb03:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb03",
+   "from": "Skyrim.esm",
    "edid": "FortifyCarry03",
    "name": "@q\u0000",
    "kind": "potion",
@@ -2616,6 +2941,7 @@
   "3eb02:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb02",
+   "from": "Skyrim.esm",
    "edid": "FortifyCarry01",
    "name": "cö\u0000",
    "kind": "potion",
@@ -2624,6 +2950,7 @@
   "3eb00:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eb00",
+   "from": "Skyrim.esm",
    "edid": "FortifyStamina02",
    "name": "/q\u0000",
    "kind": "potion",
@@ -2632,6 +2959,7 @@
   "3eaff:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaff",
+   "from": "Skyrim.esm",
    "edid": "FortifyStamina04",
    "name": ",\u0000",
    "kind": "potion",
@@ -2640,6 +2968,7 @@
   "3eafe:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eafe",
+   "from": "Skyrim.esm",
    "edid": "FortifyStamina03",
    "name": "em\u0000",
    "kind": "potion",
@@ -2648,6 +2977,7 @@
   "3eafd:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eafd",
+   "from": "Skyrim.esm",
    "edid": "FortifyStamina01",
    "name": "â7\u0000",
    "kind": "potion",
@@ -2656,6 +2986,7 @@
   "3eafc:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eafc",
+   "from": "Skyrim.esm",
    "edid": "FortifyMagicka04",
    "name": "ýz\u0000",
    "kind": "potion",
@@ -2664,6 +2995,7 @@
   "3eafb:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eafb",
+   "from": "Skyrim.esm",
    "edid": "FortifyMagicka03",
    "name": "\u0014\f\u0000",
    "kind": "potion",
@@ -2672,6 +3004,7 @@
   "3eafa:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eafa",
+   "from": "Skyrim.esm",
    "edid": "FortifyMagicka02",
    "name": "é\u0000",
    "kind": "potion",
@@ -2680,6 +3013,7 @@
   "3eaf7:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaf7",
+   "from": "Skyrim.esm",
    "edid": "FortifyMagicka01",
    "name": "\u0015Ú\u0000",
    "kind": "potion",
@@ -2688,6 +3022,7 @@
   "3eaf6:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaf6",
+   "from": "Skyrim.esm",
    "edid": "FortifyHealth03",
    "name": "O\u0000",
    "kind": "potion",
@@ -2696,6 +3031,7 @@
   "3eaf5:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaf5",
+   "from": "Skyrim.esm",
    "edid": "FortifyHealth04",
    "name": "é\u0000",
    "kind": "potion",
@@ -2704,6 +3040,7 @@
   "3eaf4:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaf4",
+   "from": "Skyrim.esm",
    "edid": "FortifyHealth02",
    "name": "ª;\u0000",
    "kind": "potion",
@@ -2712,6 +3049,7 @@
   "3eaf2:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaf2",
+   "from": "Skyrim.esm",
    "edid": "FortifyHealth01",
    "name": "t~\u0000",
    "kind": "potion",
@@ -2720,6 +3058,7 @@
   "3eaf1:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaf1",
+   "from": "Skyrim.esm",
    "edid": "ResistShock100",
    "name": "T'\u0000",
    "kind": "potion",
@@ -2728,6 +3067,7 @@
   "3eaf0:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaf0",
+   "from": "Skyrim.esm",
    "edid": "ResistFrost100",
    "name": "\u001e\u0000",
    "kind": "potion",
@@ -2736,6 +3076,7 @@
   "3eaef:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaef",
+   "from": "Skyrim.esm",
    "edid": "ResistFire100",
    "name": "Ã7\u0000",
    "kind": "potion",
@@ -2744,6 +3085,7 @@
   "3eaee:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaee",
+   "from": "Skyrim.esm",
    "edid": "ResistShock50",
    "name": "©\u0000",
    "kind": "potion",
@@ -2752,6 +3094,7 @@
   "3eaed:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eaed",
+   "from": "Skyrim.esm",
    "edid": "ResistFrost50",
    "name": "(Þ\u0000",
    "kind": "potion",
@@ -2760,6 +3103,7 @@
   "3eae9:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eae9",
+   "from": "Skyrim.esm",
    "edid": "ResistFire50",
    "name": "é\u0000",
    "kind": "potion",
@@ -2768,6 +3112,7 @@
   "3eae8:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eae8",
+   "from": "Skyrim.esm",
    "edid": "RestoreStamina04",
    "name": "Ç²\u0000",
    "kind": "potion",
@@ -2776,6 +3121,7 @@
   "3eae7:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eae7",
+   "from": "Skyrim.esm",
    "edid": "RestoreStamina03",
    "name": "\u001d\u0005\u0000",
    "kind": "potion",
@@ -2784,6 +3130,7 @@
   "3eae6:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eae6",
+   "from": "Skyrim.esm",
    "edid": "RestoreStamina05",
    "name": "ÒÞ\u0000",
    "kind": "potion",
@@ -2792,6 +3139,7 @@
   "3eae5:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eae5",
+   "from": "Skyrim.esm",
    "edid": "RestoreStamina01",
    "name": "°\u0000",
    "kind": "potion",
@@ -2800,6 +3148,7 @@
   "3eae4:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eae4",
+   "from": "Skyrim.esm",
    "edid": "RestoreMagicka04",
    "name": "8ê\u0000",
    "kind": "potion",
@@ -2808,6 +3157,7 @@
   "3eae3:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eae3",
+   "from": "Skyrim.esm",
    "edid": "RestoreHealth04",
    "name": "[Ü\u0000",
    "kind": "potion",
@@ -2816,6 +3166,7 @@
   "3eae2:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eae2",
+   "from": "Skyrim.esm",
    "edid": "RestoreMagicka03",
    "name": "\nx\u0000",
    "kind": "potion",
@@ -2824,6 +3175,7 @@
   "3eae1:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eae1",
+   "from": "Skyrim.esm",
    "edid": "RestoreMagicka02",
    "name": "Àh\u0000",
    "kind": "potion",
@@ -2832,6 +3184,7 @@
   "3eae0:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eae0",
+   "from": "Skyrim.esm",
    "edid": "RestoreMagicka01",
    "name": "+Ú\u0000",
    "kind": "potion",
@@ -2840,6 +3193,7 @@
   "3eadf:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eadf",
+   "from": "Skyrim.esm",
    "edid": "RestoreHealth03",
    "name": "Ú\\\u0000",
    "kind": "potion",
@@ -2848,6 +3202,7 @@
   "3eade:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eade",
+   "from": "Skyrim.esm",
    "edid": "RestoreHealth02",
    "name": "÷\u0000",
    "kind": "potion",
@@ -2856,6 +3211,7 @@
   "3eadd:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3eadd",
+   "from": "Skyrim.esm",
    "edid": "RestoreHealth01",
    "name": "½¸\u0000",
    "kind": "potion",
@@ -2864,270 +3220,70 @@
   "3133c:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3133c",
-   "edid": "FoodWineBottle02",
-   "name": "?´\u0000",
-   "kind": "food",
-   "gold": 7
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkWineWhite",
+   "name": "White Wine",
+   "kind": "ale",
+   "gold": 5
   },
   "3133b:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x3133b",
-   "edid": "FoodWineAlto",
-   "name": "D\u0000",
-   "kind": "food",
-   "gold": 12
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkWineAlto",
+   "name": "Alto Wine",
+   "kind": "ale",
+   "gold": 7
   },
   "36d53:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x36d53",
-   "edid": "MQ201Drink",
-   "name": "N7\u0000",
-   "kind": "food",
-   "gold": 100
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkColovianBrandy01",
+   "name": "Colovian Brandy",
+   "kind": "ale",
+   "gold": 25
   },
   "34c5e:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x34c5e",
-   "edid": "Ale",
-   "name": "¦%\u0000",
-   "kind": "food",
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkAle",
+   "name": "Ale",
+   "kind": "ale",
    "gold": 5
   },
   "34c5d:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x34c5d",
-   "edid": "FoodMead",
-   "name": "¢é\u0000",
-   "kind": "food",
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkMead",
+   "name": "Mead",
+   "kind": "ale",
    "gold": 5
   },
   "1895f:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x1895f",
-   "edid": "FirebrandWine",
-   "name": "Sq\u0000",
-   "kind": "food",
-   "gold": 137
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkFirebrandWine",
+   "name": "Firebrand Wine",
+   "kind": "ale",
+   "gold": 20
   },
   "2c35a:Skyrim.esm": {
    "file": "Skyrim.esm",
    "local": "0x2c35a",
-   "edid": "FoodBlackBriarMead",
-   "name": ">¸\u0000",
-   "kind": "food",
-   "gold": 25
-  },
-  "10d666:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x10d666",
-   "edid": "FoodGourd",
-   "name": "Z\u001c\u0001",
-   "kind": "food",
-   "gold": 1
-  },
-  "eba01:Update.esm": {
-   "file": "Update.esm",
-   "local": "0xeba01",
-   "edid": "FoodAppleCabbageStew",
-   "name": "4\u0003\u0001",
-   "kind": "food",
-   "gold": 8
-  },
-  "dc172:Update.esm": {
-   "file": "Update.esm",
-   "local": "0xdc172",
-   "edid": "TGTQ02BalmoraBlue",
-   "name": "ê\u0000",
-   "kind": "food",
-   "gold": 67
-  },
-  "b91d7:Update.esm": {
-   "file": "Update.esm",
-   "local": "0xb91d7",
-   "edid": "WEDL03CyrodilicBrandy",
-   "name": "ªÀ\u0000",
-   "kind": "food",
-   "gold": 150
-  },
-  "65c39:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x65c39",
-   "edid": "RiftenSpecial03",
-   "name": "\u0002§\u0000",
-   "kind": "food",
-   "gold": 5
-  },
-  "65c38:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x65c38",
-   "edid": "RiftenSpecial02",
-   "name": "¼;\u0000",
-   "kind": "food",
-   "gold": 5
-  },
-  "65c37:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x65c37",
-   "edid": "RiftenSpecial01",
-   "name": "äF\u0000",
-   "kind": "food",
-   "gold": 5
-  },
-  "f257e:Update.esm": {
-   "file": "Update.esm",
-   "local": "0xf257e",
-   "edid": "MS14WineAltoA",
-   "name": "ï\u0006\u0001",
-   "kind": "food",
-   "gold": 12
-  },
-  "d055e:Update.esm": {
-   "file": "Update.esm",
-   "local": "0xd055e",
-   "edid": "FavorSorexRum",
-   "name": "t\u0000",
-   "kind": "potion",
-   "gold": 12
-  },
-  "cadfb:Update.esm": {
-   "file": "Update.esm",
-   "local": "0xcadfb",
-   "edid": "FavorFoodMarkarthSpicedBeef",
-   "name": "W\u0000",
-   "kind": "food",
-   "gold": 4
-  },
-  "c5349:Update.esm": {
-   "file": "Update.esm",
-   "local": "0xc5349",
-   "edid": "FoodWineAltoA",
-   "name": "×\u0000",
-   "kind": "food",
-   "gold": 12
-  },
-  "c5348:Update.esm": {
-   "file": "Update.esm",
-   "local": "0xc5348",
-   "edid": "FoodWineBottle02A",
-   "name": "Sà\u0000",
-   "kind": "food",
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkBlackBriarMead",
+   "name": "Black-Briar Mead",
+   "kind": "ale",
    "gold": 7
-  },
-  "9380d:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x9380d",
-   "edid": "AleWhiterunQuest",
-   "name": "÷.\u0000",
-   "kind": "food",
-   "gold": 5
-  },
-  "85368:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x85368",
-   "edid": "FoodSolitudeSpicedWine",
-   "name": "bé\u0000",
-   "kind": "food",
-   "gold": 7
-  },
-  "508ca:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x508ca",
-   "edid": "FoodHonningbrewMead",
-   "name": "Ê\u0000",
-   "kind": "food",
-   "gold": 20
-  },
-  "34c5e:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x34c5e",
-   "edid": "Ale",
-   "name": "¦%\u0000",
-   "kind": "food",
-   "gold": 5
-  },
-  "34c5d:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x34c5d",
-   "edid": "FoodMead",
-   "name": "¢é\u0000",
-   "kind": "food",
-   "gold": 5
-  },
-  "3133c:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x3133c",
-   "edid": "FoodWineBottle02",
-   "name": "?´\u0000",
-   "kind": "food",
-   "gold": 7
-  },
-  "3133b:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x3133b",
-   "edid": "FoodWineAlto",
-   "name": "D\u0000",
-   "kind": "food",
-   "gold": 12
-  },
-  "10201e:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x10201e",
-   "edid": "MS12WPRestoreHealth04",
-   "name": "o\u0012\u0001",
-   "kind": "potion",
-   "gold": 79
-  },
-  "10201d:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x10201d",
-   "edid": "MS12WPFortifySkillOneHanded04",
-   "name": "à\u0012\u0001",
-   "kind": "potion",
-   "gold": 265
-  },
-  "10201c:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x10201c",
-   "edid": "MS12WPFortifyMagicka01",
-   "name": "×\u0012\u0001",
-   "kind": "potion",
-   "gold": 341
-  },
-  "10201b:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x10201b",
-   "edid": "MS12WPFortifySkillSneak03",
-   "name": "õ\u0011\u0001",
-   "kind": "potion",
-   "gold": 96
-  },
-  "10201a:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x10201a",
-   "edid": "MS12WPFortifyStamina01",
-   "name": "*\u0012\u0001",
-   "kind": "potion",
-   "gold": 341
-  },
-  "102019:Update.esm": {
-   "file": "Update.esm",
-   "local": "0x102019",
-   "edid": "MS12WPResistMagic50",
-   "name": "ò\u0012\u0001",
-   "kind": "potion",
-   "gold": 193
-  },
-  "e6df5:Update.esm": {
-   "file": "Update.esm",
-   "local": "0xe6df5",
-   "edid": "BladesPotion",
-   "name": "$û\u0000",
-   "kind": "potion",
-   "gold": 250
   },
   "18ef3:Dawnguard.esm": {
    "file": "Dawnguard.esm",
    "local": "0x18ef3",
+   "from": "Dawnguard.esm",
    "edid": "DLC1BloodPotion",
    "name": "Æ\u001c\u0000",
    "kind": "potion",
@@ -3136,6 +3292,7 @@
   "15a1e:Dawnguard.esm": {
    "file": "Dawnguard.esm",
    "local": "0x15a1e",
+   "from": "Dawnguard.esm",
    "edid": "DLC1FoodSoulHuskExtract",
    "name": "ú\u0014\u0000",
    "kind": "potion",
@@ -3144,6 +3301,7 @@
   "14dc4:Dawnguard.esm": {
    "file": "Dawnguard.esm",
    "local": "0x14dc4",
+   "from": "Dawnguard.esm",
    "edid": "DLC1FoodSoulHusk",
    "name": "\u001a\u0000",
    "kind": "food",
@@ -3152,286 +3310,232 @@
   "1391d:Dawnguard.esm": {
    "file": "Dawnguard.esm",
    "local": "0x1391d",
-   "edid": "DLC1RedwaterDenSkooma",
-   "name": "®\u0007\u0000",
-   "kind": "potion",
-   "gold": 34
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrugsRedwaterDenSkooma",
+   "name": "Redwater Skooma",
+   "kind": "food",
+   "gold": 75
   },
   "9dc:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x9dc",
-   "edid": "BYOHFoodGarlicBread01",
-   "name": "\u0013\u001d\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodGarlicBread01",
+   "name": "Garlic Bread",
    "kind": "food",
-   "gold": 2
+   "gold": 14
   },
   "9db:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x9db",
-   "edid": "BYOHFoodBraidedBread01",
-   "name": "\u0014\u001d\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodBraidedBread01",
+   "name": "Braided Bread",
    "kind": "food",
-   "gold": 2
+   "gold": 14
   },
   "11801:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x11801",
-   "edid": "BYOHFoodLavenderDumpling01",
-   "name": "4\f\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodSnowberryDumpling",
+   "name": "Snowberry Dumpling",
    "kind": "food",
-   "gold": 3
+   "gold": 6
   },
   "117ff:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x117ff",
-   "edid": "BYOHFoodChickenDumpling01",
-   "name": "«\n\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodJazbayDumpling",
+   "name": "Jazbay Dumpling",
    "kind": "food",
-   "gold": 3
-  },
-  "64b3b:HearthFires.esm": {
-   "file": "HearthFires.esm",
-   "local": "0x64b3b",
-   "edid": "FoodSalmonCooked01",
-   "name": "øþ\u0000",
-   "kind": "food",
-   "gold": 4
-  },
-  "eba01:HearthFires.esm": {
-   "file": "HearthFires.esm",
-   "local": "0xeba01",
-   "edid": "FoodAppleCabbageStew",
-   "name": "4\u0003\u0001",
-   "kind": "food",
-   "gold": 8
-  },
-  "f4314:HearthFires.esm": {
-   "file": "HearthFires.esm",
-   "local": "0xf4314",
-   "edid": "FoodBeefStew",
-   "name": "ø\u0007\u0001",
-   "kind": "food",
-   "gold": 8
-  },
-  "f4315:HearthFires.esm": {
-   "file": "HearthFires.esm",
-   "local": "0xf4315",
-   "edid": "FoodHorkerStew",
-   "name": "1\n\u0001",
-   "kind": "food",
-   "gold": 8
-  },
-  "f431b:HearthFires.esm": {
-   "file": "HearthFires.esm",
-   "local": "0xf431b",
-   "edid": "FoodCabbagePotatoSoup",
-   "name": "²\t\u0001",
-   "kind": "food",
-   "gold": 5
-  },
-  "f431c:HearthFires.esm": {
-   "file": "HearthFires.esm",
-   "local": "0xf431c",
-   "edid": "FoodTomatoSoup",
-   "name": "7\b\u0001",
-   "kind": "food",
-   "gold": 5
-  },
-  "f431d:HearthFires.esm": {
-   "file": "HearthFires.esm",
-   "local": "0xf431d",
-   "edid": "FoodVenisonStew",
-   "name": "h\u0005\u0001",
-   "kind": "food",
-   "gold": 8
-  },
-  "f431e:HearthFires.esm": {
-   "file": "HearthFires.esm",
-   "local": "0xf431e",
-   "edid": "FoodVegetableSoup",
-   "name": "4\n\u0001",
-   "kind": "food",
-   "gold": 5
-  },
-  "f4320:HearthFires.esm": {
-   "file": "HearthFires.esm",
-   "local": "0xf4320",
-   "edid": "FoodElsweyrFondue",
-   "name": "J\u0005\u0001",
-   "kind": "food",
-   "gold": 5
+   "gold": 6
   },
   "3541:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x3541",
-   "edid": "BYOHFoodSalmonCooked02",
-   "name": "ç\u0000\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodSalmonCooked02",
+   "name": "Salmon Steak",
    "kind": "food",
-   "gold": 4
+   "gold": 8
   },
   "3540:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x3540",
-   "edid": "BYOHFoodMudcrabLegs",
-   "name": "Õ\u0000\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodMudcrabLegs",
+   "name": "Mudcrab Legs",
    "kind": "food",
-   "gold": 3
+   "gold": 2
   },
   "353f:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x353f",
-   "edid": "BYOHFoodMudcrabLegsCooked",
-   "name": "P\u0001\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodMudcrabLegsCooked",
+   "name": "Steamed Mudcrab Legs",
    "kind": "food",
-   "gold": 4
+   "gold": 16
   },
   "353e:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x353e",
-   "edid": "BYOHFoodClamChowder",
-   "name": "X\u0001\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodClamChowder",
+   "name": "Clam Chowder",
    "kind": "food",
-   "gold": 5
+   "gold": 16
   },
   "353d:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x353d",
-   "edid": "FoodPotatoSoup",
-   "name": "\u0015\u0000\u0000",
-   "kind": "food",
-   "gold": 5
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodPotatoSoup",
+   "name": "Potato Soup",
+   "kind": "drink",
+   "gold": 6
   },
   "353c:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x353c",
-   "edid": "BYOHFoodButter",
-   "name": "`\u0000\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodButter",
+   "name": "Butter",
    "kind": "food",
    "gold": 1
   },
   "353b:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x353b",
-   "edid": "BYOHFoodSnowberryCrostata",
-   "name": "W\u0001\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodSnowberryCrostata",
+   "name": "Snowberry Crostata",
    "kind": "food",
-   "gold": 5
+   "gold": 14
   },
   "353a:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x353a",
-   "edid": "BYOHFoodJazbayCrostata",
-   "name": ",\u0001\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodJazbayCrostata",
+   "name": "Jazbay Crostata",
    "kind": "food",
-   "gold": 5
+   "gold": 14
   },
   "3539:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x3539",
-   "edid": "BYOHFoodJuniperBerryCrostata",
-   "name": "£\u0001\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodJuniperBerryCrostata",
+   "name": "Juniper Berry Crostata",
    "kind": "food",
-   "gold": 5
+   "gold": 14
   },
   "3538:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x3538",
-   "edid": "BYOHFoodFlour",
-   "name": "T\u0001\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodFlour",
+   "name": "Sack of Flour",
    "kind": "food",
    "gold": 1
   },
   "3537:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x3537",
-   "edid": "BYOHFoodPotatoBread01A",
-   "name": "¥\u0000\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodPotatoBread",
+   "name": "Potato Bread",
    "kind": "food",
-   "gold": 2
+   "gold": 14
   },
   "3536:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x3536",
-   "edid": "BYOHFoodWineBottle03",
-   "name": "¸\u0000\u0000",
-   "kind": "food",
-   "gold": 40
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkSurilieBrothersWine",
+   "name": "Surilie Brothers Wine",
+   "kind": "ale",
+   "gold": 25
   },
   "3535:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x3535",
-   "edid": "BYOHFoodWineBottle04",
-   "name": "S\u0001\u0000",
-   "kind": "food",
-   "gold": 100
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkArgonianBloodwine",
+   "name": "Argonian Bloodwine",
+   "kind": "ale",
+   "gold": 25
   },
   "3534:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x3534",
-   "edid": "BYOHFoodMilk",
-   "name": "µ\u0001\u0000",
-   "kind": "food",
-   "gold": 2
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodMilk",
+   "name": "Jug of Milk",
+   "kind": "drink",
+   "gold": 1
   },
   "3533:HearthFires.esm": {
    "file": "HearthFires.esm",
    "local": "0x3533",
-   "edid": "BYOHFoodAppleDumpling01",
-   "name": "2\u0000\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodAppleDumpling",
+   "name": "Apple Dumpling",
    "kind": "food",
-   "gold": 3
-  },
-  "eba02:Dragonborn.esm": {
-   "file": "Dragonborn.esm",
-   "local": "0xeba02",
-   "edid": "FoodCabbageSoup",
-   "name": "®\u0003\u0001",
-   "kind": "food",
-   "gold": 5
+   "gold": 6
   },
   "3d125:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x3d125",
-   "edid": "DLC2FoodAshHopperLeg",
-   "name": ".\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodAshHopperLeg",
+   "name": "Ash Hopper Leg",
    "kind": "food",
-   "gold": 2
+   "gold": 1
   },
   "3cf72:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x3cf72",
-   "edid": "DLC2FoodBoarMeatCooked",
-   "name": "w.\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodBoarMeatCooked",
+   "name": "Cooked Boar Meat",
    "kind": "food",
-   "gold": 15
+   "gold": 8
   },
   "3cd5b:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x3cd5b",
-   "edid": "DLC2FoodHorkerAshYamStew",
-   "name": "c.\u0000",
-   "kind": "food",
-   "gold": 9
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodAshYamSoup",
+   "name": "Ash Yam Soup",
+   "kind": "drink",
+   "gold": 6
   },
   "3bd15:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x3bd15",
-   "edid": "DLC2FoodAshHopperMeat",
-   "name": "8.\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodAshHopperMeat",
+   "name": "Ash Hopper Meat",
    "kind": "food",
    "gold": 2
   },
   "3bd14:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x3bd14",
-   "edid": "DLC2FoodBoarMeat",
-   "name": "5.\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodBoarMeat",
+   "name": "Boar Meat",
    "kind": "food",
    "gold": 2
   },
   "390e0:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x390e0",
+   "from": "Dragonborn.esm",
    "edid": "DLC2dunBloodskalPotionOfWaterWalking",
    "name": "Ç*\u0000",
    "kind": "potion",
@@ -3440,70 +3544,79 @@
   "3572f:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x3572f",
-   "edid": "DLC2FoodAshfireMead",
-   "name": "\u001e'\u0000",
-   "kind": "food",
-   "gold": 50
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkAshfireMead",
+   "name": "Ashfire Mead",
+   "kind": "ale",
+   "gold": 7
   },
   "320df:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x320df",
-   "edid": "DLC2RRFavor01EmberbrandWine",
-   "name": "÷\"\u0000",
-   "kind": "food",
-   "gold": 15
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkRRFavor01EmberbrandWine",
+   "name": "Emberbrand Wine",
+   "kind": "ale",
+   "gold": 7
   },
   "24e0b:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x24e0b",
-   "edid": "DLC2RRF04Sujamma",
-   "name": "ë\u0010\u0000",
-   "kind": "food",
-   "gold": 0
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkRRF04Sujamma",
+   "name": "Sadri's Sujamma",
+   "kind": "ale",
+   "gold": 25
   },
   "248ce:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x248ce",
-   "edid": "DLC2Matze",
-   "name": "\u0010\u0000",
-   "kind": "food",
-   "gold": 5
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkMazte",
+   "name": "Mazte",
+   "kind": "ale",
+   "gold": 7
   },
   "248cc:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x248cc",
-   "edid": "DLC2Shein",
-   "name": "{\u0010\u0000",
-   "kind": "food",
-   "gold": 10
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkShein",
+   "name": "Shein",
+   "kind": "ale",
+   "gold": 7
   },
   "207e6:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x207e6",
-   "edid": "DLC2Sujamma",
-   "name": "ï\r\u0000",
-   "kind": "food",
-   "gold": 10
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkSujamma",
+   "name": "Sujamma",
+   "kind": "ale",
+   "gold": 7
   },
   "207e5:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x207e5",
-   "edid": "DLC2Flin",
-   "name": "\u000e\u0010\u0000",
-   "kind": "food",
-   "gold": 15
+   "from": "Gourmet.esp",
+   "edid": "MAG_DrinkFlin",
+   "name": "Flin",
+   "kind": "ale",
+   "gold": 7
   },
   "206e7:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x206e7",
-   "edid": "DLC2FoodAshYam",
-   "name": "C\f\u0000",
+   "from": "Gourmet.esp",
+   "edid": "MAG_FoodAshYam",
+   "name": "Ash Yam",
    "kind": "food",
    "gold": 1
   },
   "1cd7d:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x1cd7d",
+   "from": "Dragonborn.esm",
    "edid": "DLC2NetchPoison",
    "name": "¥\u0007\u0000",
    "kind": "poison",
@@ -3512,6 +3625,7 @@
   "1aae2:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x1aae2",
+   "from": "Dragonborn.esm",
    "edid": "DLC2RestoreAll06",
    "name": "G\u0004\u0000",
    "kind": "potion",
@@ -3520,6 +3634,7 @@
   "1aae1:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x1aae1",
+   "from": "Dragonborn.esm",
    "edid": "DLC2RestoreAll05",
    "name": "©\u0005\u0000",
    "kind": "potion",
@@ -3528,6 +3643,7 @@
   "1aae0:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x1aae0",
+   "from": "Dragonborn.esm",
    "edid": "DLC2RestoreAll04",
    "name": "\u000f\u0002\u0000",
    "kind": "potion",
@@ -3536,6 +3652,7 @@
   "1aadf:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x1aadf",
+   "from": "Dragonborn.esm",
    "edid": "DLC2RestoreAll03",
    "name": "\u0004\u0000",
    "kind": "potion",
@@ -3544,6 +3661,7 @@
   "1aade:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x1aade",
+   "from": "Dragonborn.esm",
    "edid": "DLC2RestoreAll02",
    "name": "¸\u0004\u0000",
    "kind": "potion",
@@ -3552,6 +3670,7 @@
   "1aadd:Dragonborn.esm": {
    "file": "Dragonborn.esm",
    "local": "0x1aadd",
+   "from": "Dragonborn.esm",
    "edid": "DLC2RestoreAll01",
    "name": "C\u0005\u0000",
    "kind": "potion",
@@ -3560,6 +3679,7 @@
   "4477e9:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x4477e9",
+   "from": "WindhelmSSE.esp",
    "edid": "MIMRulltarta",
    "name": "Nord Rolled Cake",
    "kind": "food",
@@ -3568,6 +3688,7 @@
   "12f9c4:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x12f9c4",
+   "from": "WindhelmSSE.esp",
    "edid": "BYOHFoodFlourWindhelm",
    "name": "Sack of Frostwheat Flour",
    "kind": "food",
@@ -3576,14 +3697,16 @@
   "367fbe:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x367fbe",
+   "from": "WindhelmSSE.esp",
    "edid": "FoodMeadWHGuard",
    "name": "Windhelm Homebrew",
-   "kind": "food",
+   "kind": "ale",
    "gold": 5
   },
   "13f585:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x13f585",
+   "from": "WindhelmSSE.esp",
    "edid": "FoodMeadWHSnowberry",
    "name": "Snowberry Mead",
    "kind": "ale",
@@ -3592,6 +3715,7 @@
   "36d1e5:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x36d1e5",
+   "from": "WindhelmSSE.esp",
    "edid": "FoodMeadWHGuardScene",
    "name": "Windhelm Homebrew",
    "kind": "potion",
@@ -3600,6 +3724,7 @@
   "15cc6e:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x15cc6e",
+   "from": "WindhelmSSE.esp",
    "edid": "BYOHFoodWineBottle03WHSnow",
    "name": "Snowberry Wine",
    "kind": "ale",
@@ -3608,6 +3733,7 @@
   "13f593:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x13f593",
+   "from": "WindhelmSSE.esp",
    "edid": "FoodMeadWHBBReserve",
    "name": "Battle-Brew Reserve",
    "kind": "drink",
@@ -3616,6 +3742,7 @@
   "17167b:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x17167b",
+   "from": "WindhelmSSE.esp",
    "edid": "BYOHFoodWineBottle03WHSnowJuice",
    "name": "Snowberry Juice",
    "kind": "drink",
@@ -3624,6 +3751,7 @@
   "4477ea:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x4477ea",
+   "from": "WindhelmSSE.esp",
    "edid": "MIMMadesomething",
    "name": "Nord Chocolate",
    "kind": "food",
@@ -3632,6 +3760,7 @@
   "13f598:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x13f598",
+   "from": "WindhelmSSE.esp",
    "edid": "FoodMeadWHIceWater",
    "name": "Glacier Water",
    "kind": "drink",
@@ -3640,6 +3769,7 @@
   "4d543:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x4d543",
+   "from": "WindhelmSSE.esp",
    "edid": "FoodWineBottle02WHNew",
    "name": "Nord Spiced Wine",
    "kind": "ale",
@@ -3648,6 +3778,7 @@
   "3206fc:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x3206fc",
+   "from": "WindhelmSSE.esp",
    "edid": "FoodMeadWHBBSpecial",
    "name": "Battle-Brew Special",
    "kind": "drink",
@@ -3656,6 +3787,7 @@
   "12010f:WindhelmSSE.esp": {
    "file": "WindhelmSSE.esp",
    "local": "0x12010f",
+   "from": "WindhelmSSE.esp",
    "edid": "WHWindhelmBread",
    "name": "Frostwheat Bread",
    "kind": "food",
@@ -3664,6 +3796,7 @@
   "936:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x936",
+   "from": "Gourmet.esp",
    "edid": "MAG_DrugsEversnow",
    "name": "Eversnow",
    "kind": "food",
@@ -3672,6 +3805,7 @@
   "981:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x981",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodJellyDumpling",
    "name": "Jelly Dumpling",
    "kind": "food",
@@ -3680,6 +3814,7 @@
   "9df:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x9df",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodHotGoatStew",
    "name": "Hot Goat Stew",
    "kind": "drink",
@@ -3688,6 +3823,7 @@
   "9e0:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x9e0",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodHotMammothStew",
    "name": "Hot Mammoth Stew",
    "kind": "drink",
@@ -3696,6 +3832,7 @@
   "9e1:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x9e1",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodHotPheasantStew",
    "name": "Hot Pheasant Stew",
    "kind": "drink",
@@ -3704,6 +3841,7 @@
   "9e2:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x9e2",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodHotRabbitStew",
    "name": "Hot Rabbit Stew",
    "kind": "drink",
@@ -3712,6 +3850,7 @@
   "9e3:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x9e3",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodHotMushroomStew01",
    "name": "Hot Mushroom Stew",
    "kind": "drink",
@@ -3720,6 +3859,7 @@
   "9e4:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x9e4",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodHotMushroomStew02",
    "name": "Hot Wild Mushroom Stew",
    "kind": "drink",
@@ -3728,6 +3868,7 @@
   "9e5:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x9e5",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodHotMushroomStew03",
    "name": "Hot Glowing Mushroom Stew",
    "kind": "drink",
@@ -3736,974 +3877,16 @@
   "9e6:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x9e6",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodHotAshHopperStew",
    "name": "Hot Ash Hopper Stew",
    "kind": "drink",
    "gold": 20
   },
-  "1895f:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x1895f",
-   "edid": "MAG_DrinkFirebrandWine",
-   "name": "Firebrand Wine",
-   "kind": "ale",
-   "gold": 20
-  },
-  "2c35a:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x2c35a",
-   "edid": "MAG_DrinkBlackBriarMead",
-   "name": "Black-Briar Mead",
-   "kind": "ale",
-   "gold": 7
-  },
-  "3133b:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3133b",
-   "edid": "MAG_DrinkWineAlto",
-   "name": "Alto Wine",
-   "kind": "ale",
-   "gold": 7
-  },
-  "3133c:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3133c",
-   "edid": "MAG_DrinkWineWhite",
-   "name": "White Wine",
-   "kind": "ale",
-   "gold": 5
-  },
-  "34c5d:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x34c5d",
-   "edid": "MAG_DrinkMead",
-   "name": "Mead",
-   "kind": "ale",
-   "gold": 5
-  },
-  "34c5e:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x34c5e",
-   "edid": "MAG_DrinkAle",
-   "name": "Ale",
-   "kind": "ale",
-   "gold": 5
-  },
-  "36d53:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x36d53",
-   "edid": "MAG_DrinkColovianBrandy01",
-   "name": "Colovian Brandy",
-   "kind": "ale",
-   "gold": 25
-  },
-  "3f4bd:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3f4bd",
-   "edid": "MAG_DrugsDoubleDistilledSkooma",
-   "name": "Double-Distilled Skooma",
-   "kind": "food",
-   "gold": 75
-  },
-  "508ca:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x508ca",
-   "edid": "MAG_DrinkHonningbrewMead",
-   "name": "Honningbrew Mead",
-   "kind": "ale",
-   "gold": 7
-  },
-  "555e8:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x555e8",
-   "edid": "MAG_FreeformDragonBridgeMead",
-   "name": "Dragon's Breath Mead",
-   "kind": "ale",
-   "gold": 5
-  },
-  "57a7a:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x57a7a",
-   "edid": "MAG_DrugsSkooma",
-   "name": "Skooma",
-   "kind": "food",
-   "gold": 75
-  },
-  "57a7b:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x57a7b",
-   "edid": "MAG_FreeformAngasMillKordirsSkooma",
-   "name": "Kordir's Skooma",
-   "kind": "potion",
-   "gold": 0
-  },
-  "64b2e:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b2e",
-   "edid": "MAG_FoodApple",
-   "name": "Red Apple",
-   "kind": "food",
-   "gold": 1
-  },
-  "64b2f:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b2f",
-   "edid": "MAG_FoodApple02",
-   "name": "Green Apple",
-   "kind": "food",
-   "gold": 1
-  },
-  "64b30:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b30",
-   "edid": "MAG_FoodBoiledCremeTreat",
-   "name": "Boiled Creme Treat",
-   "kind": "food",
-   "gold": 6
-  },
-  "64b31:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b31",
-   "edid": "MAG_FoodCheeseWedgeGoat",
-   "name": "Goat Cheese Wedge",
-   "kind": "food",
-   "gold": 1
-  },
-  "64b32:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b32",
-   "edid": "MAG_FoodCheeseWedgeEidar",
-   "name": "Eidar Cheese Wedge",
-   "kind": "food",
-   "gold": 1
-  },
-  "64b33:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b33",
-   "edid": "MAG_FoodCheeseWheelGoat02",
-   "name": "Goat Cheese Wheel",
-   "kind": "food",
-   "gold": 6
-  },
-  "64b34:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b34",
-   "edid": "MAG_FoodCheeseWheelEidar02",
-   "name": "Eidar Cheese Wheel",
-   "kind": "food",
-   "gold": 6
-  },
-  "64b35:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b35",
-   "edid": "MAG_FoodCheeseWheelGoat01",
-   "name": "Sliced Goat Cheese Wheel",
-   "kind": "food",
-   "gold": 6
-  },
-  "64b36:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b36",
-   "edid": "MAG_FoodCheeseWheelEidar01",
-   "name": "Sliced Eidar Cheese Wheel",
-   "kind": "food",
-   "gold": 6
-  },
-  "64b38:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b38",
-   "edid": "MAG_FoodHoneyNutTreat",
-   "name": "Honey Nut Treat",
-   "kind": "food",
-   "gold": 6
-  },
-  "64b39:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b39",
-   "edid": "MAG_FoodLongTaffyTreat",
-   "name": "Long Taffy Treat",
-   "kind": "food",
-   "gold": 6
-  },
-  "64b3a:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b3a",
-   "edid": "MAG_FoodPotatoBaked",
-   "name": "Baked Potatoes",
-   "kind": "food",
-   "gold": 6
-  },
-  "64b3b:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b3b",
-   "edid": "MAG_FoodSalmonCooked01",
-   "name": "Salmon Steak",
-   "kind": "food",
-   "gold": 8
-  },
-  "64b3c:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b3c",
-   "edid": "MAG_FoodSlaughterfishCooked",
-   "name": "Slaughterfish Steak",
-   "kind": "food",
-   "gold": 8
-  },
-  "64b3d:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b3d",
-   "edid": "MAG_FoodSweetroll",
-   "name": "Sweet Roll",
-   "kind": "food",
-   "gold": 6
-  },
-  "64b3e:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b3e",
-   "edid": "MAG_FoodLeekCooked",
-   "name": "Grilled Leeks",
-   "kind": "food",
-   "gold": 6
-  },
-  "64b3f:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b3f",
-   "edid": "MAG_FoodCabbage",
-   "name": "Cabbage",
-   "kind": "food",
-   "gold": 1
-  },
-  "64b40:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b40",
-   "edid": "MAG_FoodCarrot",
-   "name": "Carrot",
-   "kind": "food",
-   "gold": 1
-  },
-  "64b41:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b41",
-   "edid": "MAG_FoodPotato",
-   "name": "Potato",
-   "kind": "food",
-   "gold": 1
-  },
-  "64b42:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b42",
-   "edid": "MAG_FoodTomato",
-   "name": "Tomato",
-   "kind": "food",
-   "gold": 1
-  },
-  "64b43:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x64b43",
-   "edid": "MAG_FoodApplePie",
-   "name": "Apple Pie",
-   "kind": "food",
-   "gold": 14
-  },
-  "65c37:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c37",
-   "edid": "MAG_DrinkRiftenSpecial01",
-   "name": "Velvet LeChance",
-   "kind": "food",
-   "gold": 25
-  },
-  "65c38:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c38",
-   "edid": "MAG_DrinkRiftenSpecial02",
-   "name": "White-Gold Tower",
-   "kind": "food",
-   "gold": 25
-  },
-  "65c39:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c39",
-   "edid": "MAG_DrinkRiftenSpecial03",
-   "name": "Cliff Racer",
-   "kind": "food",
-   "gold": 25
-  },
-  "65c97:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c97",
-   "edid": "MAG_FoodBreadLoaf",
-   "name": "Bread Loaf",
-   "kind": "food",
-   "gold": 6
-  },
-  "65c98:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c98",
-   "edid": "MAG_FoodBread",
-   "name": "Bread",
-   "kind": "food",
-   "gold": 1
-  },
-  "65c99:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c99",
-   "edid": "MAG_FoodBeef",
-   "name": "Raw Beef",
-   "kind": "food",
-   "gold": 2
-  },
-  "65c9a:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c9a",
-   "edid": "MAG_FoodGoatMeat",
-   "name": "Goat Meat",
-   "kind": "food",
-   "gold": 2
-  },
-  "65c9b:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c9b",
-   "edid": "MAG_FoodHorkerMeat",
-   "name": "Horker Meat",
-   "kind": "food",
-   "gold": 2
-  },
-  "65c9c:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c9c",
-   "edid": "MAG_FoodHorseMeat",
-   "name": "Horse Meat",
-   "kind": "food",
-   "gold": 2
-  },
-  "65c9d:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c9d",
-   "edid": "MAG_FoodPheasant",
-   "name": "Pheasant Breast",
-   "kind": "food",
-   "gold": 2
-  },
-  "65c9e:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c9e",
-   "edid": "MAG_FoodRabbit",
-   "name": "Raw Rabbit Leg",
-   "kind": "food",
-   "gold": 2
-  },
-  "65c9f:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x65c9f",
-   "edid": "MAG_FoodSalmon",
-   "name": "Salmon Meat",
-   "kind": "food",
-   "gold": 2
-  },
-  "669a2:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x669a2",
-   "edid": "MAG_FoodVenison",
-   "name": "Venison",
-   "kind": "food",
-   "gold": 2
-  },
-  "669a3:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x669a3",
-   "edid": "MAG_FoodMammothCheeseBowl",
-   "name": "Mammoth Cheese Bowl",
-   "kind": "food",
-   "gold": 6
-  },
-  "669a4:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x669a4",
-   "edid": "MAG_FoodMammothMeat",
-   "name": "Mammoth Snout",
-   "kind": "food",
-   "gold": 2
-  },
-  "669a5:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x669a5",
-   "edid": "MAG_FoodLeek",
-   "name": "Leek",
-   "kind": "food",
-   "gold": 1
-  },
-  "721e8:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x721e8",
-   "edid": "MAG_FoodBeefCooked",
-   "name": "Cooked Beef",
-   "kind": "food",
-   "gold": 8
-  },
-  "7224c:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x7224c",
-   "edid": "MAG_FoodGoatMeatCooked",
-   "name": "Goat Roast",
-   "kind": "food",
-   "gold": 8
-  },
-  "7224e:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x7224e",
-   "edid": "MAG_FoodHorkerMeatCooked",
-   "name": "Horker Loaf",
-   "kind": "food",
-   "gold": 8
-  },
-  "722b0:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x722b0",
-   "edid": "MAG_FoodHorseMeatCooked",
-   "name": "Horse Haunch",
-   "kind": "food",
-   "gold": 8
-  },
-  "722bb:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x722bb",
-   "edid": "MAG_FoodMammothMeatCooked",
-   "name": "Mammoth Steak",
-   "kind": "food",
-   "gold": 6
-  },
-  "722bd:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x722bd",
-   "edid": "MAG_FoodVenisonCooked",
-   "name": "Venison Chop",
-   "kind": "food",
-   "gold": 8
-  },
-  "722c2:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x722c2",
-   "edid": "MAG_FoodRabbitCooked",
-   "name": "Rabbit Haunch",
-   "kind": "food",
-   "gold": 8
-  },
-  "722c7:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x722c7",
-   "edid": "MAG_FoodPheasantCooked",
-   "name": "Pheasant Roast",
-   "kind": "food",
-   "gold": 8
-  },
-  "85368:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x85368",
-   "edid": "MAG_DrinkWineSpiced",
-   "name": "Spiced Wine",
-   "kind": "ale",
-   "gold": 25
-  },
-  "9380d:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x9380d",
-   "edid": "MAG_DrinkAleWhiterunQuest",
-   "name": "Argonian Ale",
-   "kind": "ale",
-   "gold": 7
-  },
-  "aed90:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xaed90",
-   "edid": "MAG_DrugsSleepingTreeSap",
-   "name": "Sleeping Tree Sap",
-   "kind": "food",
-   "gold": 75
-  },
-  "b91d7:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xb91d7",
-   "edid": "MAG_DrinkColovianBrandy02",
-   "name": "Colovian Brandy",
-   "kind": "ale",
-   "gold": 25
-  },
-  "c5348:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xc5348",
-   "edid": "MAG_DrinkWineRed",
-   "name": "Red Wine",
-   "kind": "ale",
-   "gold": 5
-  },
-  "c5349:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xc5349",
-   "edid": "MAG_DrinkWineFruit",
-   "name": "Fruit Wine",
-   "kind": "ale",
-   "gold": 7
-  },
-  "cadfb:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xcadfb",
-   "edid": "MAG_FoodMarkarthSpicedBeef",
-   "name": "Spiced Beef",
-   "kind": "food",
-   "gold": 16
-  },
-  "cd614:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xcd614",
-   "edid": "MAG_FoodMarriageMeal",
-   "name": "Homecooked Meal",
-   "kind": "food",
-   "gold": 20
-  },
-  "d055e:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xd055e",
-   "edid": "MAG_DrinkFavorRum",
-   "name": "Stros M'Kai Rum",
-   "kind": "ale",
-   "gold": 25
-  },
-  "dc172:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xdc172",
-   "edid": "MAG_DrugsBalmoraBlue",
-   "name": "Balmora Blue",
-   "kind": "food",
-   "gold": 75
-  },
-  "e8448:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xe8448",
-   "edid": "MAG_FoodSkeeverCooked",
-   "name": "Cooked Skeever",
-   "kind": "food",
-   "gold": 8
-  },
-  "e8947:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xe8947",
-   "edid": "MAG_FoodChickenCooked",
-   "name": "Grilled Chicken Breast",
-   "kind": "food",
-   "gold": 8
-  },
-  "eba01:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xeba01",
-   "edid": "MAG_FoodCabbageTomatoSoup",
-   "name": "Cabbage and Tomato Soup",
-   "kind": "drink",
-   "gold": 14
-  },
-  "eba02:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xeba02",
-   "edid": "MAG_FoodCabbageSoup",
-   "name": "Cabbage Soup",
-   "kind": "drink",
-   "gold": 6
-  },
-  "eba03:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xeba03",
-   "edid": "MAG_FoodClamMeat",
-   "name": "Clam Meat",
-   "kind": "food",
-   "gold": 2
-  },
-  "edb2e:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xedb2e",
-   "edid": "MAG_FoodDogMeat",
-   "name": "Dog Meat",
-   "kind": "food",
-   "gold": 2
-  },
-  "f2011:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xf2011",
-   "edid": "MAG_FoodChicken",
-   "name": "Chicken Breast",
-   "kind": "food",
-   "gold": 2
-  },
-  "f257e:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xf257e",
-   "edid": "MAG_MS14WineAltoA",
-   "name": "Jessica's Wine",
-   "kind": "ale",
-   "gold": 12
-  },
-  "f4314:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xf4314",
-   "edid": "MAG_FoodBeefStew",
-   "name": "Beef Stew",
-   "kind": "drink",
-   "gold": 16
-  },
-  "f4315:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xf4315",
-   "edid": "MAG_FoodHorkerStew",
-   "name": "Horker Stew",
-   "kind": "drink",
-   "gold": 16
-  },
-  "f431b:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xf431b",
-   "edid": "MAG_FoodCabbagePotatoSoup",
-   "name": "Cabbage Potato Soup",
-   "kind": "drink",
-   "gold": 14
-  },
-  "f431c:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xf431c",
-   "edid": "MAG_FoodTomatoSoup",
-   "name": "Tomato Soup",
-   "kind": "drink",
-   "gold": 6
-  },
-  "f431d:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xf431d",
-   "edid": "MAG_FoodVenisonStew",
-   "name": "Venison Stew",
-   "kind": "drink",
-   "gold": 16
-  },
-  "f431e:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xf431e",
-   "edid": "MAG_FoodVegetableSoup",
-   "name": "Vegetable Soup",
-   "kind": "drink",
-   "gold": 14
-  },
-  "f4320:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xf4320",
-   "edid": "MAG_FoodCheeseFondueGoat",
-   "name": "Goat Cheese Fondue",
-   "kind": "food",
-   "gold": 14
-  },
-  "f693f:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0xf693f",
-   "edid": "MAG_DrinkBlackBriarMeadPrivateReserve",
-   "name": "Black-Briar Reserve",
-   "kind": "ale",
-   "gold": 25
-  },
-  "10211a:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x10211a",
-   "edid": "MAG_FoodMammothMeatAlt",
-   "name": "Mammoth Snout",
-   "kind": "food",
-   "gold": 2
-  },
-  "10394d:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x10394d",
-   "edid": "MAG_FoodHoney",
-   "name": "Honey",
-   "kind": "food",
-   "gold": 2
-  },
-  "107a8a:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x107a8a",
-   "edid": "MAG_MQ101JuniperMead",
-   "name": "Mead with Juniper Berry",
-   "kind": "ale",
-   "gold": 5
-  },
-  "10d666:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x10d666",
-   "edid": "MAG_FoodGourd",
-   "name": "Gourd",
-   "kind": "food",
-   "gold": 1
-  },
-  "1391d:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x1391d",
-   "edid": "MAG_DrugsRedwaterDenSkooma",
-   "name": "Redwater Skooma",
-   "kind": "food",
-   "gold": 75
-  },
-  "9db:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x9db",
-   "edid": "MAG_FoodBraidedBread01",
-   "name": "Braided Bread",
-   "kind": "food",
-   "gold": 14
-  },
-  "9dc:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x9dc",
-   "edid": "MAG_FoodGarlicBread01",
-   "name": "Garlic Bread",
-   "kind": "food",
-   "gold": 14
-  },
-  "3533:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3533",
-   "edid": "MAG_FoodAppleDumpling",
-   "name": "Apple Dumpling",
-   "kind": "food",
-   "gold": 6
-  },
-  "3534:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3534",
-   "edid": "MAG_FoodMilk",
-   "name": "Jug of Milk",
-   "kind": "drink",
-   "gold": 1
-  },
-  "3535:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3535",
-   "edid": "MAG_DrinkArgonianBloodwine",
-   "name": "Argonian Bloodwine",
-   "kind": "food",
-   "gold": 25
-  },
-  "3536:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3536",
-   "edid": "MAG_DrinkSurilieBrothersWine",
-   "name": "Surilie Brothers Wine",
-   "kind": "ale",
-   "gold": 25
-  },
-  "3537:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3537",
-   "edid": "MAG_FoodPotatoBread",
-   "name": "Potato Bread",
-   "kind": "food",
-   "gold": 14
-  },
-  "3538:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3538",
-   "edid": "MAG_FoodFlour",
-   "name": "Sack of Flour",
-   "kind": "food",
-   "gold": 1
-  },
-  "3539:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3539",
-   "edid": "MAG_FoodJuniperBerryCrostata",
-   "name": "Juniper Berry Crostata",
-   "kind": "food",
-   "gold": 14
-  },
-  "353a:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x353a",
-   "edid": "MAG_FoodJazbayCrostata",
-   "name": "Jazbay Crostata",
-   "kind": "food",
-   "gold": 14
-  },
-  "353b:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x353b",
-   "edid": "MAG_FoodSnowberryCrostata",
-   "name": "Snowberry Crostata",
-   "kind": "food",
-   "gold": 14
-  },
-  "353c:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x353c",
-   "edid": "MAG_FoodButter",
-   "name": "Butter",
-   "kind": "food",
-   "gold": 1
-  },
-  "353d:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x353d",
-   "edid": "MAG_FoodPotatoSoup",
-   "name": "Potato Soup",
-   "kind": "drink",
-   "gold": 6
-  },
-  "353e:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x353e",
-   "edid": "MAG_FoodClamChowder",
-   "name": "Clam Chowder",
-   "kind": "food",
-   "gold": 16
-  },
-  "353f:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x353f",
-   "edid": "MAG_FoodMudcrabLegsCooked",
-   "name": "Steamed Mudcrab Legs",
-   "kind": "food",
-   "gold": 16
-  },
-  "3540:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3540",
-   "edid": "MAG_FoodMudcrabLegs",
-   "name": "Mudcrab Legs",
-   "kind": "food",
-   "gold": 2
-  },
-  "3541:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3541",
-   "edid": "MAG_FoodSalmonCooked02",
-   "name": "Salmon Steak",
-   "kind": "food",
-   "gold": 8
-  },
-  "117ff:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x117ff",
-   "edid": "MAG_FoodJazbayDumpling",
-   "name": "Jazbay Dumpling",
-   "kind": "food",
-   "gold": 6
-  },
-  "11801:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x11801",
-   "edid": "MAG_FoodSnowberryDumpling",
-   "name": "Snowberry Dumpling",
-   "kind": "food",
-   "gold": 6
-  },
-  "206e7:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x206e7",
-   "edid": "MAG_FoodAshYam",
-   "name": "Ash Yam",
-   "kind": "food",
-   "gold": 1
-  },
-  "207e5:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x207e5",
-   "edid": "MAG_DrinkFlin",
-   "name": "Flin",
-   "kind": "food",
-   "gold": 7
-  },
-  "207e6:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x207e6",
-   "edid": "MAG_DrinkSujamma",
-   "name": "Sujamma",
-   "kind": "food",
-   "gold": 7
-  },
-  "248cc:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x248cc",
-   "edid": "MAG_DrinkShein",
-   "name": "Shein",
-   "kind": "food",
-   "gold": 7
-  },
-  "248ce:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x248ce",
-   "edid": "MAG_DrinkMazte",
-   "name": "Mazte",
-   "kind": "food",
-   "gold": 7
-  },
-  "24e0b:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x24e0b",
-   "edid": "MAG_DrinkRRF04Sujamma",
-   "name": "Sadri's Sujamma",
-   "kind": "food",
-   "gold": 25
-  },
-  "320df:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x320df",
-   "edid": "MAG_DrinkRRFavor01EmberbrandWine",
-   "name": "Emberbrand Wine",
-   "kind": "ale",
-   "gold": 7
-  },
-  "3572f:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3572f",
-   "edid": "MAG_DrinkAshfireMead",
-   "name": "Ashfire Mead",
-   "kind": "ale",
-   "gold": 7
-  },
-  "3bd14:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3bd14",
-   "edid": "MAG_FoodBoarMeat",
-   "name": "Boar Meat",
-   "kind": "food",
-   "gold": 2
-  },
-  "3bd15:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3bd15",
-   "edid": "MAG_FoodAshHopperMeat",
-   "name": "Ash Hopper Meat",
-   "kind": "food",
-   "gold": 2
-  },
-  "3cd5b:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3cd5b",
-   "edid": "MAG_FoodAshYamSoup",
-   "name": "Ash Yam Soup",
-   "kind": "drink",
-   "gold": 6
-  },
-  "3cf72:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3cf72",
-   "edid": "MAG_FoodBoarMeatCooked",
-   "name": "Cooked Boar Meat",
-   "kind": "food",
-   "gold": 8
-  },
-  "3d125:Gourmet.esp": {
-   "file": "Gourmet.esp",
-   "local": "0x3d125",
-   "edid": "MAG_FoodAshHopperLeg",
-   "name": "Ash Hopper Leg",
-   "kind": "food",
-   "gold": 1
-  },
   "80d:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x80d",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodJuniperDumpling",
    "name": "Juniper Berry Dumpling",
    "kind": "food",
@@ -4712,6 +3895,7 @@
   "810:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x810",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodMammothCheeseFondue",
    "name": "Mammoth Cheese Fondue",
    "kind": "food",
@@ -4720,6 +3904,7 @@
   "815:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x815",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodCheeseFondueEidar",
    "name": "Eidar Cheese Fondue",
    "kind": "food",
@@ -4728,6 +3913,7 @@
   "816:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x816",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodAshHopperStew",
    "name": "Ash Hopper Stew",
    "kind": "drink",
@@ -4736,6 +3922,7 @@
   "817:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x817",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodBoarStew",
    "name": "Boar Stew",
    "kind": "drink",
@@ -4744,6 +3931,7 @@
   "818:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x818",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodMammothStew",
    "name": "Mammoth Stew",
    "kind": "drink",
@@ -4752,6 +3940,7 @@
   "81c:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x81c",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodGoatStew",
    "name": "Goat Stew",
    "kind": "drink",
@@ -4760,6 +3949,7 @@
   "821:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x821",
+   "from": "Gourmet.esp",
    "edid": "MAG_DrinkWrothgarianRum",
    "name": "Wrothgarian Rum",
    "kind": "ale",
@@ -4768,14 +3958,16 @@
   "822:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x822",
+   "from": "Gourmet.esp",
    "edid": "MAG_DrinkRedEaglesRye",
    "name": "Red Eagle's Rye",
-   "kind": "food",
+   "kind": "drink",
    "gold": 25
   },
   "8aa:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8aa",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodDogCooked",
    "name": "Cooked Dog",
    "kind": "food",
@@ -4784,6 +3976,7 @@
   "8ac:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8ac",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodSkeever",
    "name": "Skeever Meat",
    "kind": "food",
@@ -4792,6 +3985,7 @@
   "8ae:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8ae",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodSlaughterfishMeat",
    "name": "Slaughterfish Meat",
    "kind": "food",
@@ -4800,6 +3994,7 @@
   "8b1:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8b1",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodGourdSoup",
    "name": "Gourd Soup",
    "kind": "drink",
@@ -4808,6 +4003,7 @@
   "8b3:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8b3",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodCarrotSoup",
    "name": "Carrot Soup",
    "kind": "drink",
@@ -4816,6 +4012,7 @@
   "8e2:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8e2",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodCarrotCooked",
    "name": "Roasted Carrots",
    "kind": "food",
@@ -4824,6 +4021,7 @@
   "8e4:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8e4",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodAshYamCooked",
    "name": "Roasted Yams",
    "kind": "food",
@@ -4832,6 +4030,7 @@
   "8ea:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8ea",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodRabbitStew",
    "name": "Rabbit Stew",
    "kind": "drink",
@@ -4840,6 +4039,7 @@
   "8eb:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8eb",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodPheasantStew",
    "name": "Pheasant Stew",
    "kind": "drink",
@@ -4848,6 +4048,7 @@
   "8f5:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8f5",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodMushroomStew01",
    "name": "Mushroom Stew",
    "kind": "drink",
@@ -4856,6 +4057,7 @@
   "8f6:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8f6",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodMushroomStew02",
    "name": "Wild Mushroom Stew",
    "kind": "drink",
@@ -4864,6 +4066,7 @@
   "8f7:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x8f7",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodMushroomStew03",
    "name": "Glowing Mushroom Stew",
    "kind": "drink",
@@ -4872,6 +4075,7 @@
   "901:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x901",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodMushroomsCooked01",
    "name": "Roasted Mushrooms",
    "kind": "food",
@@ -4880,6 +4084,7 @@
   "902:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x902",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodMushroomsCooked02",
    "name": "Roasted Wild Mushrooms",
    "kind": "food",
@@ -4888,6 +4093,7 @@
   "903:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x903",
+   "from": "Gourmet.esp",
    "edid": "MAG_FoodMushroomsCooked03",
    "name": "Roasted Glowing Mushroom",
    "kind": "food",
@@ -4896,6 +4102,7 @@
   "919:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x919",
+   "from": "Gourmet.esp",
    "edid": "MAG_DrinkHonningbrewMeadLimited",
    "name": "Honningbrew Limited",
    "kind": "ale",
@@ -4904,6 +4111,7 @@
   "91c:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x91c",
+   "from": "Gourmet.esp",
    "edid": "MAG_DrinkHonningbrewMeadSpecial",
    "name": "Honningbrew Special",
    "kind": "ale",
@@ -4912,6 +4120,7 @@
   "91d:Gourmet.esp": {
    "file": "Gourmet.esp",
    "local": "0x91d",
+   "from": "Gourmet.esp",
    "edid": "MAG_DrinkBlackBriarMeadSpecial",
    "name": "Black-Briar Special",
    "kind": "ale",
@@ -4920,6 +4129,7 @@
   "2844d3:Triumvirate - Mage Archetypes.esp": {
    "file": "Triumvirate - Mage Archetypes.esp",
    "local": "0x2844d3",
+   "from": "Triumvirate - Mage Archetypes.esp",
    "edid": "TVR_Healing_Potion_Goodberry",
    "name": "Goodberry",
    "kind": "food",

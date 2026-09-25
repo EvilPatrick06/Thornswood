@@ -32,7 +32,8 @@ their own, which says what the folder is and how to change it.
 - [SECOND-DEVELOPER.md](SECOND-DEVELOPER.md): the long form. What the pieces
   are, how a release goes out, how a machine is set up.
 - [HANDOFF.md](HANDOFF.md): open work and what is live.
-- [tools/app/HOOKUP.md](tools/app/HOOKUP.md): how the launcher classes fit.
+- [tools/app/ARCHITECTURE.md](tools/app/ARCHITECTURE.md): how the launcher
+  starts, what each class owns and every step between Play and the game.
 - [IT-IS-DOWN.md](IT-IS-DOWN.md): what to do when the server is down.
 - [SECURITY.md](SECURITY.md): how to report a hole quietly.
 

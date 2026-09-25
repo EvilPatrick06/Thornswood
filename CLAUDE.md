@@ -61,6 +61,15 @@ too. Say in the reply which entries moved.
   Profile\launcher.log records "runs from the new folder". A session reading
   the old wording would have believed the wrong layout was live, which is the
   one thing this section exists to prevent.
+  Decided by Patrick on 24 Sep, for a tester whose Vortex deploys into
+  another server's copy of Skyrim (`steamapps\common\Keizaal Online`), in
+  his words "detcts and fixes this but doesnt have the servers bleed": when
+  Vortex deploys anywhere but the Steam copy, `Thornswood\Game` is the Steam
+  copy's game plus exactly the files Vortex's record in that folder lists,
+  taken from Vortex's own mods folder, and nothing else of that folder is
+  read. Scan names the folder, Fix and Settings point the launcher at it,
+  and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
+  Gather, tools\test-vortex-folder.ps1). Djinn to agree it in #dev.
 - Whichever folder the game runs from, the launcher looks after its own
   files: Keep puts its files back before Play and parks any plugin in
   `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
@@ -95,6 +104,17 @@ before code; a Claude does not settle it for them.
   machine can `git pull` exactly what shipped. Corrected 24 Sep: this bullet
   used to say a main Ship committed and pushed the source after the release,
   which stopped being true on 22 Sep (f917dd8).
+- The one live release that does not come off main is a hotfix, decided by
+  Patrick on 24 Sep for a tester who could not get in while a day of dev work
+  sat on main: "the only thing that should be going to main now is the fix
+  for him". A branch named `hotfix/...` starts from the commit the live
+  release was built from, carries only the fix and its `Bump-Version.ps1`
+  commit, is pushed, and Ship runs from a checkout of it; every other gate
+  above still applies, and Ship refuses a hotfix branch that is not on
+  GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
+  through its own pull request, or the next main release loses it. 1.1.93 was
+  the first, built from 55ac6ef. A hotfix is Patrick's call, like any live
+  release.
 - Nobody pushes to main any more, Patrick included. Everything goes through a
   pull request. This replaces the 18 Sep decision that his own work went
   straight to main, which held while `enforce_admins` was off and stopped
@@ -249,7 +269,8 @@ this section exists for.
 ## Where things are
 
 HANDOFF.md (the open work list and what is live, as of 17 Sep),
-SECOND-DEVELOPER.md (the long form), README.md, tools\app\HOOKUP.md
-(launcher classes), tools\MOVING-THE-SERVER.md (the VPS), lore\ (the world),
+SECOND-DEVELOPER.md (the long form), README.md,
+tools\app\ARCHITECTURE.md (the launcher: startup, what each class owns, and
+the Play sequence), tools\MOVING-THE-SERVER.md (the VPS), lore\ (the world),
 tools\docs-app\data\site\*.md (public pages), tools\Ship-Rules.ps1 (what
 never leaves a machine in a release).
