@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 205 of them, with the one line that says
+Every `.ps1` in this folder, 194 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -26,10 +26,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Add-Bodies.ps1](Add-Bodies.ps1) | Bodies, genitals and physics. Skeleton, female body, male body, and the jiggle that hangs off both. |
 | [Add-CartTravel.ps1](Add-CartTravel.ps1) | Carriages and ferries between the holds, so turning fast travel off leaves people with a way to get about. |
 | [Add-Characters.ps1](Add-Characters.ps1) | Installs Start On Save into the build. |
-| [Add-JContainers.ps1](Add-JContainers.ps1) | Installs JContainers SE and switches on the MCM recording that sets everyone's survival meters up for them. |
 | [Add-McmShortcut.ps1](Add-McmShortcut.ps1) | Installs MCM Shortcut NG, which is what lets Skyrim Unbound open its own config menu. |
-| [Add-SkyrimUnbound.ps1](Add-SkyrimUnbound.ps1) | Installs Skyrim Unbound Reborn and PapyrusUtil into the isolated build, so nobody has to sit through the Helgen cart ride. |
-| [Add-TempleRespawn.ps1](Add-TempleRespawn.ps1) | Stops people respawning on the spot where they died. |
 | [Add-VoiceFeed.ps1](Add-VoiceFeed.ps1) | Adds the position feed to gamemode.js and redeploys it. |
 | [Add-VpsKey.ps1](Add-VpsKey.ps1) | Puts another person's public SSH key on the VPS, so they can run the scripts that talk to it from their own machine without ever holding the Administrator password. |
 | [Align-LoadOrder.ps1](Align-LoadOrder.ps1) | The client counts its own plugins with Game.GetModCount, which skips every ESL-flagged one because Skyrim gives those no normal index. |
@@ -62,14 +59,12 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Check-Outside.ps1](Check-Outside.ps1) | Walks the path a first install takes through the things this project does not run itself, and says which of them is broken or has moved. |
 | [Check-Plugins.ps1](Check-Plugins.ps1) | What is enabled that should not be, and what is missing that should be there. |
 | [Check-Roster.ps1](Check-Roster.ps1) | What is in each server's private folder, by name and size only. |
-| [Check-RosterScript.ps1](Check-RosterScript.ps1) | Expand Check-Roster's here-string exactly as the script does and parse the text that would actually be sent. |
 | [Check-Secrets.ps1](Check-Secrets.ps1) | Read only. Looks for anything that must never leave a machine: in the files this repository tracks, in a pack or installer zip, in the installer's staged folder, or in a built program. |
 | [Check-ShipReady.ps1](Check-ShipReady.ps1) | Whether THIS machine can run a release, and what is missing if it cannot. |
 | [Check-Site.ps1](Check-Site.ps1) | Asks whether thornswood.net is actually working: from the outside first, the way a visitor or an uptime monitor sees it, and then from the box, the way the site sees Discord. |
 | [Check-Swallow.ps1](Check-Swallow.ps1) | Counts the silent catches in the launcher, file by file, and fails when any file has more than tools\swallow-baseline.txt allows. |
 | [Check-VoiceInstall.ps1](Check-VoiceInstall.ps1) | Expand Install-Voice's here-string exactly as the script does and look at the text that would actually be sent. |
 | [Check-Words.ps1](Check-Words.ps1) | The Words section of CLAUDE.md, checked instead of hoped for: no em dashes anywhere written for people, never the word player, and the owner is Patrick. |
-| [Clean-Downloads.ps1](Clean-Downloads.ps1) | Moves known-safe clutter out of Downloads into a quarantine folder. |
 | [Clean-Everything.ps1](Clean-Everything.ps1) | Finds the old installers, build leftovers, temp files, stale backups and old GitHub release assets across this machine, the server and both repositories, adds up what they are costing, and prints it. |
 | [Clean-Leftovers.ps1](Clean-Leftovers.ps1) | The other half of Audit-Leftovers.ps1. That one measures and never touches anything; this one removes what it found. |
 | [Close-Launcher.ps1](Close-Launcher.ps1) | Shared by every script that writes into the build. |
@@ -84,9 +79,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Find-MissingMasters.ps1](Find-MissingMasters.ps1) | Reads the TES4 header of every plugin in Data and reports any master that is no longer present. |
 | [Fix-Icons.ps1](Fix-Icons.ps1) | Windows keeps the picture it once drew for a shortcut in a cache, and goes on showing it long after the icon inside the exe changed. |
 | [Fix-MaleBody.ps1](Fix-MaleBody.ps1) | The male body mesh in the game folder is a genital-slotted one, left behind when The New Gentleman was taken out. |
-| [Fix-PluginProblems.ps1](Fix-PluginProblems.ps1) | Removes two plugins that are actively breaking things. |
 | [Fix-QuickLoot.ps1](Fix-QuickLoot.ps1) | Turn MCMHelper.esp on, on both sides, in one go. |
-| [Fix-Voice.ps1](Fix-Voice.ps1) | Get the voice service running on the VPS and keep it running. |
 | [Get-Logs.ps1](Get-Logs.ps1) | Brings the server's own logs down to this machine so they can be read whole. |
 | [Go.ps1](Go.ps1) | Installs the front, the overlays and the plugins, then reports what the server is doing. |
 | [Install-Backup.ps1](Install-Backup.ps1) | Puts the nightly backup on the VPS: sends vps-nightly-backup.ps1 up, makes a passphrase if there is not one yet, and registers the scheduled task that runs it. |
@@ -102,7 +95,6 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Mark-Spot.ps1](Mark-Spot.ps1) | Reads the spots you marked in game and prints them in the shape the content table wants. |
 | [MaxOnline.ps1](MaxOnline.ps1) | How many people a Thornswood server seats: read from the one place it is written, and put into server-settings.json as the engine's own maxPlayers. |
 | [Measure-Reclaim.ps1](Measure-Reclaim.ps1) | How much disk deleting a folder would ACTUALLY free. |
-| [Move-Install.ps1](Move-Install.ps1) | Moves the build off the old name. Run it once. |
 | [New-Character.ps1](New-Character.ps1) | Throws the test character away so the next connect builds a fresh one. |
 | [New-ClientBuildRecord.ps1](New-ClientBuildRecord.ps1) | Records what the client runtime is and which fork commit it was built from, into tools\client-build.json. |
 | [New-ScriptIndex.ps1](New-ScriptIndex.ps1) | Writes tools\README.md, the list of every PowerShell script in tools and the one line that says what each one is for. |
@@ -116,9 +108,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Publish-Update.ps1](Publish-Update.ps1) | Diffs the current build against the last published state, packs only what changed, uploads it as a release asset, and updates version.json so everyone's launcher picks it up. |
 | [Read-Load.ps1](Read-Load.ps1) | Says which service is using the box, from the record vps-load.ps1 keeps on it. |
 | [Remote.ps1](Remote.ps1) | Runs a bit of PowerShell on the VPS, properly. |
-| [Remove-BodyMods.ps1](Remove-BodyMods.ps1) | Pulls the male and female genitalia mods out of the Thornswood game folder. |
 | [Remove-DeadRecords.ps1](Remove-DeadRecords.ps1) | Deletes records from Thornswood-Content.esp that nothing uses any more, and refuses to delete one that anything still points at. |
-| [Remove-FomodLeftovers.ps1](Remove-FomodLeftovers.ps1) | Clears the FOMOD option folders that the body mod install left sitting in Game\Data. |
 | [Remove-Plugin.ps1](Remove-Plugin.ps1) | Takes one plugin out of the Thornswood build, reversibly. |
 | [Rename-ContentRecords.ps1](Rename-ContentRecords.ps1) | Renames the editor ids in Thornswood-Content.esp that still carry the naming of the server the content came from, and changes nothing else about the file. |
 | [Repair-Manifest.ps1](Repair-Manifest.ps1) | Takes packs with no download url back out of version.json and pushes the fix. |
@@ -130,7 +120,6 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Revert.ps1](Revert.ps1) | Put the game back to the state it was working in. |
 | [Roll-Log.ps1](Roll-Log.ps1) | Rolls a log just before the service that writes it starts. |
 | [Rotate-ServerPassword.ps1](Rotate-ServerPassword.ps1) | Changes the server password and hands the new one to the site, so the launcher can fetch it after checking Discord. |
-| [Run-Everything.ps1](Run-Everything.ps1) | One run that installs everything waiting, checks each piece actually landed, and publishes once at the end instead of once per mod. |
 | [Set-Collection.ps1](Set-Collection.ps1) | Asks for the collection address and publishes it, in the two places that decide it, the same two Set-Server.ps1 uses. |
 | [Set-DevNews.ps1](Set-DevNews.ps1) | Points dev releases at the Discord channel for dev build updates, so they stop being something only the dev launcher ever mentions and stay out of #news, where everybody reads about the build they actually play. |
 | [Set-DiscordLogin.ps1](Set-DiscordLogin.ps1) | Points the site at your Discord, which is what decides who gets in anywhere. |

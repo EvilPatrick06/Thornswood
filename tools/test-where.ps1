@@ -98,9 +98,8 @@ try {
 
     # ---- the scripts --------------------------------------------------------
     # A string naming C:\Thornswood-Dev, other than in Where.ps1 itself, in
-    # Move-Install.ps1 (the older move, from C:\Thornswood into it) and in the
-    # release test's made-up asset names.
-    $allowed = @('Where.ps1', 'Move-Install.ps1', 'test-release-prerelease.ps1', 'test-where.ps1')
+    # the release test's made-up asset names.
+    $allowed = @('Where.ps1', 'test-release-prerelease.ps1', 'test-where.ps1')
     $named = @()
     $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip')
     $badKeys = @()
