@@ -1036,6 +1036,18 @@
                 <StackPanel x:Name="ThemeRow" Margin="0,0,0,6"/>
                 <TextBlock x:Name="TxtThemeNote" Style="{StaticResource Small}" Margin="0,0,0,30"/>
 
+                <TextBlock Text="Music" Style="{StaticResource Eyebrow}"/>
+                <StackPanel Margin="0,0,0,30">
+                  <CheckBox x:Name="ChkMusic" Content="Play music while the launcher is open"/>
+                  <StackPanel Orientation="Horizontal" Margin="28,12,0,0">
+                    <Slider x:Name="SldMusic" Style="{StaticResource ThornSlider}" Width="260" Minimum="0" Maximum="100"
+                            TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtMusic" Style="{StaticResource Small}" Margin="14,0,0,0" VerticalAlignment="Center" Text="45%"/>
+                  </StackPanel>
+                  <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0"
+                             Text="It stops when the game starts and comes back when the game closes. The dev build plays its test track; the main build has no music yet."/>
+                </StackPanel>
+
                 <TextBlock Text="Updates" Style="{StaticResource Eyebrow}"/>
                 <StackPanel Margin="0,0,0,30">
                   <CheckBox x:Name="ChkAutoUpdate" Content="Check for updates when the launcher opens"/>
