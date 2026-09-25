@@ -207,6 +207,12 @@ the team before code; nobody settles it alone, and a Claude never does.
   the scripts parse, the launcher compiles with the .NET Framework csc). Red
   means the branch would stop Ship at the build step; fix that before asking
   for a read.
+  It runs on the VPS, on a runner `.\tools\Install-Runner.ps1` puts there
+  (issue #437): GitHub's own runners were blocked on billing from 25 Sep.
+  Until that runner is up, the check waits and nothing can be merged by its
+  author; on 25 Sep `enforce_admins` was turned off so Patrick could merge
+  meanwhile, and it goes back on once the runner has run a check green.
+  `.\tools\Install-Runner.ps1 -Status` says whether GitHub sees it.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
 ## After a pull request is merged

@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 197 of them, with the one line that says
+Every `.ps1` in this folder, 199 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -85,6 +85,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Install-Backup.ps1](Install-Backup.ps1) | Puts the nightly backup on the VPS: sends vps-nightly-backup.ps1 up, makes a passphrase if there is not one yet, and registers the scheduled task that runs it. |
 | [Install-Bot.ps1](Install-Bot.ps1) | Puts the Thornswood bot on the VPS and keeps it running. |
 | [Install-Launcher.ps1](Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
+| [Install-Runner.ps1](Install-Runner.ps1) | Puts a GitHub Actions runner on the VPS, so the build check runs on every pull request again without paying for minutes. |
 | [Install-SkyMPClient.ps1](Install-SkyMPClient.ps1) | Switches the game folder from Skyrim Together Reborn to SkyMP. |
 | [Install-Thornswood.ps1](Install-Thornswood.ps1) | Everything the client needs, in one run, in the order it has to happen in. |
 | [Install-ThornswoodContent.ps1](Install-ThornswoodContent.ps1) | Drops Thornswood-Content.esp into the game folder and inserts it into the load order ahead of the city overhauls. |
@@ -169,6 +170,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-feed-notice.ps1](test-feed-notice.ps1) | What the update feed says to everybody, and when it may hold Play. |
 | [test-feed-rules.ps1](test-feed-rules.ps1) | No pack goes onto the update feed that a launcher cannot download, and the ones already there can be taken off. |
 | [test-go-keeps.ps1](test-go-keeps.ps1) | Go.ps1 makes what it installs under Data\Platform the launcher's kept copy, and drops the kept copy of what it takes out, so Play does not put an older copy back; nothing else in the game folder is adopted; and Publish-Update no longer writes Profile\developer.flag. |
+| [test-install-runner.ps1](test-install-runner.ps1) | The build check's runner on the VPS, and build.yml, agree and stay safe. |
 | [test-installer-own-payload.ps1](test-installer-own-payload.ps1) | The installer unpacks its own payload or the site's, never a zip it finds lying about. |
 | [test-live-parse-check.ps1](test-live-parse-check.ps1) | The live gamemode deploys check gamemode.js parses before anything is written or sent. |
 | [test-load-order.ps1](test-load-order.ps1) | The rule the pack's plugin list is put through before it ships, driven with stubs so it needs no game folder, no Data and no server. |
