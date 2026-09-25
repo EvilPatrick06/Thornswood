@@ -13,10 +13,12 @@ nothing breaks. If you do not, nothing is missing.
 **Vortex**, with a free Nexus Mods account. The mods come from a collection on
 Nexus, and a collection is a Vortex thing: Mod Organizer cannot install it.
 
-Thornswood goes into the Skyrim you already have. It does not make a second
-copy of the game. Vortex keeps the mods in a profile of their own, so switching
-back to your usual profile and running Purge Mods leaves your own Skyrim the
-way it was.
+Thornswood leaves the Skyrim you already have alone. The launcher builds a
+game folder of its own, `C:\Thornswood\Game`, out of your Steam copy and what
+Vortex put into it. Most of it is hard links to your own files, which take no
+extra space, and the few files other programs rewrite are real copies. Vortex keeps the mods in a profile of their own, so
+switching back to your usual profile and running Purge Mods leaves your own
+Skyrim the way it was.
 
 ## 1. Apply
 
@@ -107,8 +109,6 @@ If it is not there, say so in the Discord with what you were doing, what you
 expected, and what happened instead, or use the [report](/report) page.
 
 The launcher's own log is at `C:\Thornswood\Profile\launcher.log`. Crash logs,
-if the game closed itself, are in the `SKSE` folder under
-`Documents\My Games\Skyrim Special Edition`. If Thornswood runs from a Skyrim
-folder of its own (the card in Settings), they are under
-`C:\Thornswood\Profile\MyGames\SKSE` instead. The launcher's Logs page lists
-both and opens them. Drag either straight into the channel.
+if the game closed itself, are in `C:\Thornswood\Profile\MyGames\SKSE`,
+because Thornswood keeps its own My Games folder. The launcher's Logs page
+lists them and opens them. Drag either straight into the channel.

@@ -1,5 +1,5 @@
 @echo off
-title Skyrim Together - Installer
+title Thornswood - Installer
 rem PowerShell 7 when it is installed, Windows PowerShell otherwise. The two
 rem differ in ways that matter here, most of all whether a text file gets a
 rem byte order mark, and the game stops dead on one.
