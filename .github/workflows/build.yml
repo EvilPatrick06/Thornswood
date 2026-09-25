@@ -136,19 +136,12 @@ jobs:
           # Written to be run by hand, and until now never run anywhere else.
           # A harness that reads this machine's game folder says SKIP for the
           # parts it cannot measure on a runner and still checks the rest.
-          # IN PARALLEL, since 25 September. One after another the ~190 took
-          # five and a half minutes on the VPS; Patrick wanted a check in about
-          # five. Each harness is its own process with its own temp folder and
-          # a free port, so they do not meet. The output of each is printed
-          # whole, in name order, and the ones that failed are listed together
-          # at the end, where the tail of the log shows them.
+          # ONE AT A TIME, timed. Run in parallel on the VPS on 25 September the
+          # step hung for twenty minutes where one at a time it finished in five
+          # and a half, so it stays serial. Each harness's time is printed, and
+          # the step ends with the ten slowest and the ones that failed.
           $all = @(Get-ChildItem tests -File | Where-Object { $_.Name -like 'test-*.js' -or $_.Name -like 'test-*.ps1' } | Sort-Object Name)
-          # As many at once as the box has cores: four on a small VPS was slower
-          # than one at a time, because each start is scanned and they queue.
-          $cores = [Math]::Max(1, [Environment]::ProcessorCount)
-          Write-Host ("{0} core(s), so {0} harness(es) at a time" -f $cores)
-          $results = $all | ForEach-Object -ThrottleLimit $cores -Parallel {
-            $t = $_
+          $results = foreach ($t in $all) {
             $sw = [Diagnostics.Stopwatch]::StartNew()
             $out = if ($t.Extension -eq '.js') { & node $t.FullName 2>&1 | Out-String } else { & pwsh -NoProfile -File $t.FullName 2>&1 | Out-String }
             [pscustomobject]@{ Name = $t.Name; Path = $t.FullName; Code = $LASTEXITCODE; Out = $out; Secs = [Math]::Round($sw.Elapsed.TotalSeconds, 1) }
