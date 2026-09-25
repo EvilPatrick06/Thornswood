@@ -402,7 +402,15 @@
     </Style>
   </Window.Resources>
 
-  <Border BorderBrush="{DynamicResource Line}" BorderThickness="1" Background="{DynamicResource Bg}">
+  <!-- The window draws its own title bar. Without WindowChrome, WindowStyle None
+       with a resizable window shows the system resize border as a light strip
+       along the top edge (#596). The edges still resize the window. -->
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="0" ResizeBorderThickness="6" GlassFrameThickness="0"
+                  CornerRadius="0" UseAeroCaptionButtons="False"/>
+  </WindowChrome.WindowChrome>
+
+  <Border x:Name="WindowFrame" BorderBrush="{DynamicResource Line}" BorderThickness="1" Background="{DynamicResource Bg}">
     <Grid>
       <Grid.RowDefinitions>
         <RowDefinition Height="46"/>
@@ -604,20 +612,26 @@
                   <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <Image x:Name="Emblem" Width="84" Height="84" Margin="0,0,22,0" VerticalAlignment="Center"
                            RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed"/>
-                    <StackPanel VerticalAlignment="Center">
+                    <StackPanel x:Name="BannerTitle" VerticalAlignment="Center">
                       <TextBlock x:Name="TxtBrandBig" Text="ThornsWood" Style="{StaticResource Display}"/>
-                      <StackPanel Orientation="Horizontal" Margin="2,8,0,0">
+                      <!-- The dash and the plugins / game / launcher line under the name are not shown
+                           on the banner (#596). Kept in the tree because the code still fills the line. -->
+                      <StackPanel Orientation="Horizontal" Margin="2,8,0,0" Visibility="Collapsed">
                         <Rectangle Width="26" Height="2" Fill="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                         <TextBlock x:Name="TxtHeroLine" Style="{StaticResource Small}" FontSize="12" VerticalAlignment="Center"/>
                       </StackPanel>
                     </StackPanel>
                   </StackPanel>
-                  <StackPanel x:Name="StatRow" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"/>
+                  <StackPanel x:Name="StatRow" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel.Effect>
+                      <DropShadowEffect Color="Black" ShadowDepth="0" BlurRadius="8" Opacity="0.95"/>
+                    </StackPanel.Effect>
+                  </StackPanel>
                 </Grid>
               </Grid>
             </Border>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
               <Grid Margin="36,28,36,10">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="1.9*" MinWidth="330"/>
