@@ -83,8 +83,8 @@ The version moves first and on its own. `Bump-Version.ps1` changes `Version`
 in `launcher\app\Updater.cs` (1.1.35 to 1.1.36), commits that one file, and
 prints the rest. main refuses a push from everybody, so it prints the
 commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
-push it and open the pull request, which is merged once `Launcher builds` is
-green (see How work moves, the long form). Then, back on main:
+push it and open the pull request, which is then merged (see How work
+moves, the long form). Then, back on main:
 
 ```
 git checkout main
@@ -140,13 +140,14 @@ Several people, several machines, one repo. The short rules are in
   older ones `gavin/`), small
   commits with plain messages, `git push -u origin <branch>`, then
   `gh pr create --fill` standing on the branch. Nothing is force pushed.
-- **What GitHub enforces on main, and what it does not.** Read off GitHub on
-  23 Sep, and the same on 24 Sep: `enforce_admins` is on, so the rules bind
-  the owner too; the one required check is `Launcher builds`, the one job in
-  `.github/workflows/build.yml`; required approving reviews is 0; the code
-  owner review is off. So a pull request can be merged by its own author as
-  soon as `Launcher builds` is green, and a red one cannot be merged by
-  anybody. Nothing merges by itself: auto-merge is off on the repository, so
+- **What GitHub enforces on main, and what it does not.** Since 25 Sep:
+  `enforce_admins` is off; there is no required check, because the build
+  check on GitHub was turned off and Patrick removed `Launcher builds` from
+  the rules the same day; required approving reviews is 0; the code owner
+  review is off. So a pull request can be merged by its own author as soon
+  as it is opened, and nothing on GitHub has built it first: run the
+  harnesses you touched, and `Build-Launcher.ps1` into a scratch root if you
+  touched the launcher, before you merge. Nothing merges by itself: auto-merge is off on the repository, so
   somebody presses merge or runs `gh pr merge --squash`. Each of us merges
   our own. Somebody else on the team reading a pull request first is a habit,
   not a setting. `.github/CODEOWNERS` asks the rest of the team for a review when
