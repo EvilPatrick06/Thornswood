@@ -344,6 +344,28 @@ if (block !== null && idOfSrc && FOODS) {
   }
 
   /*
+    A POTION SOMEBODY BREWED. The alchemy lab makes the record, so its id is
+    above 0xff000000 and in no plugin, and the food table cannot have it. It
+    fell through to food until 25 September. It is a potion: a mouthful
+    towards thirst, NEEDS.potion, and not a meal.
+  */
+  {
+    const r = rig();
+    r.seed(ME);
+    r.clock.now += 2 * HOUR;
+    const was = r.settle(ME);
+    const food0 = was.food, drink0 = was.drink;
+    r.consumed(ME, 0xff000812);
+    const now = r.settle(ME);
+    yes('B3b a brewed potion (ff000812) goes towards thirst: ' + drink0.toFixed(1) + ' to ' + now.drink.toFixed(1),
+        now.drink > drink0);
+    yes('B3b and is not a meal: ' + food0.toFixed(1) + ' to ' + now.food.toFixed(1),
+        now.food <= food0);
+    yes('B3b and is a mouthful, less than a drink of water would be',
+        now.drink - drink0 < 20);
+  }
+
+  /*
     EVERY VANILLA DRINK GOURMET TAKES OVER. Gourmet calls each drink it
     touches MAG_Drink..., and food.json says whose version each line was read
     from. On 24 September that is 27 records, and before this change every one
