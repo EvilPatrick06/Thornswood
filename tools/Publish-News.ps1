@@ -5,9 +5,10 @@
   the same list of changes people see in the launcher rather than a second one
   written by hand that immediately falls behind.
 
-  version.json is not sent as it stands, because it also carries the server
-  password and the update repository. Only the news entries and the version
-  number go, into data/news.json.
+  version.json is not sent as it stands, because it also carries the update
+  repository and the pack list. Only the news entries and the version number
+  go, into data/news.json. (The server password used to ride in it too;
+  Publish-Update.ps1 takes it out of version.json now.)
 
     .\Publish-News.ps1
     .\Publish-News.ps1 -OutFile news.json    writes the page here, sends nothing

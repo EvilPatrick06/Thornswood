@@ -29,8 +29,8 @@ param(
   [string]$VpsUser  = 'Administrator',
   [string]$Root     = 'C:\Thornswood-Backup',
   [string]$TaskName = 'Thornswood Backup',
-  # Quarter past three in the morning. After the nightly restart and well
-  # clear of when anybody is playing.
+  # Quarter past three in the morning, well clear of when anybody is playing.
+  # (It used to say "after the nightly restart"; no script here registers one.)
   [string]$At       = '03:15',
   # Where the copy of the passphrase lands on this machine. Outside the repo
   # on purpose: it must never be committed.

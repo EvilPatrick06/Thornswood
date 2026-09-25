@@ -6,7 +6,8 @@
 
   WHY THIS EXISTS
 
-  Every engine change we make lives in C:\Thornswood-Dev\skymp on the branch
+  Every engine change we make lives in the fork, engine\skymp in this
+  repository (tools\Where.ps1 Engine says where), on the branch
   thornswood/engine-changes, and until now the only way to turn one into a
   running server was to remember a cmake line and a Visual Studio project name
   and type them by hand. That is fine once. It is not fine when the next
@@ -100,7 +101,7 @@ if ($dirty.Count) {
 if (-not (Test-Path -LiteralPath (Join-Path $BuildDir 'CMakeCache.txt'))) {
     Die ("$BuildDir has no CMakeCache.txt, so it has never been configured. " +
          "Configuring is a separate job with its own arguments and this script will not guess at them. " +
-         "See DEVELOPING.md.")
+         "engine\README.md has the configure line.")
 }
 Say ("  build       " + $BuildDir)
 
@@ -188,8 +189,8 @@ if ($NoRecord) {
 }
 
 Head 'Next'
-Say '  Nothing has left this machine. To put it on the live server:'
-Say '      .\tools\Publish-Server.ps1 "what changed"' 'White'
+Say '  Nothing has left this machine. To put it on the live server, as engine\README.md says:'
+Say '      .\tools\Deploy-Server.ps1' 'White'
 Say '  That is the one that goes outside, and it is Patrick''s to run.'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

@@ -20,7 +20,9 @@
     the Caddyfile         whatever is answering on 443 for thornswood.net
 
   What it leaves: node_modules, the installer under the site's public folder,
-  and anything over the size cap. All of those come back from the repo.
+  and anything over the size cap. All of those come back from the repo. It
+  also leaves the dev server and the dev voice service on purpose: the dev
+  world is thrown away, and docs\RESTORING.md says so.
 
   Encrypted, because the point of a backup is that it lives somewhere other
   than the box, and everything above is either somebody's account or a
