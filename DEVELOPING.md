@@ -66,7 +66,7 @@ dev worktree and branch of the releases repo, the dev baseline
 (`published-dev.json`), the dev ports, and the dev server told. It runs from
 any branch on any developer's machine. There is no installer for it, and it
 posts to the dev updates channel in Discord and the dev launcher's News tab,
-never #news. There is one dev feed and the last dev Ship wins, so say in #dev
+never #news. There is one dev feed and the last dev Ship wins, so say in #staff-general
 when you take it. A main Ship afterwards resets the dev feed and baseline to
 match main, so dev starts at .1 again.
 
@@ -160,14 +160,14 @@ Several people, several machines, one repo. The short rules are in
   push means pull first; never `--force`.
 - **The dev channel is for trying.** `.\tools\Ship.ps1 -Channel dev "..."`
   runs from any branch on any machine and puts that build on the dev
-  server. There is one dev feed and the last dev Ship wins, so say in #dev
+  server. There is one dev feed and the last dev Ship wins, so say in #staff-general
   when you take it. A main Ship resets dev to match main.
 - **Settled design is a proposal first.** Where the game runs from (its own
   folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
   client built from the fork and recorded, C# 5 only, one complete release at
-  a time: changing any of these starts as a few lines in #dev, agreed by the
+  a time: changing any of these starts as a few lines in #staff-general, agreed by the
   team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
-  `Updater.cs` or `Publish-Update.ps1` gets a line in #dev too; every
+  `Updater.cs` or `Publish-Update.ps1` gets a line in #staff-general too; every
   machine touches them.
 - **The publisher pulls the feed** before `version.json` is edited, so a
   release is added on top of whatever another machine just published; a

@@ -6,7 +6,7 @@ moves and what to run after a merge. Read it first, every session, whoever
 you are working with; every rule in it binds a Claude. This file adds only
 what is about a Claude.
 
-Decided by Patrick on 25 Sep and approved in #dev: the rules moved from this
+Decided by Patrick on 25 Sep and approved in #staff-general: the rules moved from this
 file to CONTRIBUTING.md, because the team grew past two people and not all of
 them use AI, and one copy of the rules is the only copy that stays true.
 

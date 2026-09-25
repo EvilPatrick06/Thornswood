@@ -42,7 +42,7 @@ The one record of outstanding work is the Thornswood To Do board:
 https://github.com/users/EvilPatrick06/projects/1
 
 Each piece of work is an issue on this repository, and every issue is on the
-board. Decided by Patrick on 25 Sep and approved in #dev: the list moved there
+board. Decided by Patrick on 25 Sep and approved in #staff-general: the list moved there
 from a claude.ai page that nobody without Claude could open. The 169 open
 entries became issues #368 to #536, each keeping its old number as its Order.
 `docs/archive/todo-list-2026-09-25.md` holds every entry as it stood that day,
@@ -69,7 +69,7 @@ How to use it:
   or what it waits on, and `anyone can start` marks what needs nobody in
   particular. Assign yourself when you start one.
 - A pull request that finishes an issue says `Closes #N`, so merging closes
-  it and the board moves it to Done. Say in the pull request, or in #dev,
+  it and the board moves it to Done. Say in the pull request, or in #staff-general,
   which issues moved.
 
 ## Settled design, not up for a quiet rewrite
@@ -101,7 +101,7 @@ How to use it:
   taken from Vortex's own mods folder, and nothing else of that folder is
   read. Scan names the folder, Fix and Settings point the launcher at it,
   and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
-  Gather, tools\test-vortex-folder.ps1). Djinn to agree it in #dev.
+  Gather, tools\test-vortex-folder.ps1). Djinn to agree it in #staff-general.
 - Whichever folder the game runs from, the launcher looks after its own
   files: Keep puts its files back before Play and parks any plugin in
   `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
@@ -131,8 +131,8 @@ How to use it:
 - Every change goes out as one complete release: launcher, game files and
   server together, never a half.
 
-Anything that changes one of these is a few lines in #dev first: the
-problem, the approach, what it touches. Agreed in #dev by
+Anything that changes one of these is a few lines in #staff-general first: the
+problem, the approach, what it touches. Agreed in #staff-general by
 the team before code; nobody settles it alone, and a Claude never does.
 ## How work moves
 
@@ -199,7 +199,7 @@ the team before code; nobody settles it alone, and a Claude never does.
   says which.
 - The dev channel (`.\tools\Ship.ps1 -Channel dev "what changed"`) may be
   run from any branch, from any developer's machine, to try work on the dev server.
-  Say in #dev when you take it, because there is one dev feed and the last
+  Say in #staff-general when you take it, because there is one dev feed and the last
   dev Ship wins. A main Ship resets it.
 - One fix per pull request. A branch that changes eight things is eight
   reviews nobody has time for; split it.
@@ -208,7 +208,7 @@ the team before code; nobody settles it alone, and a Claude never does.
   means the branch would stop Ship at the build step; fix that before asking
   for a read.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
-  Publish-Update.ps1 without a line in #dev first; every machine touches those.
+  Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
 ## After a pull request is merged
 
 Merging on GitHub changes nothing anybody sees. Patrick runs the rest on his

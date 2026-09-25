@@ -152,7 +152,7 @@
 
   THERE IS ONE DEV FEED AND THE LAST DEV SHIP WINS. Both machines publish to
   the same one, so a dev Ship replaces whatever the other machine put there.
-  Say in #dev before taking it. A main Ship resets dev to match main. A
+  Say in #staff-general before taking it. A main Ship resets dev to match main. A
   hotfix does not, because the work on dev was not in it.
 
   Everything goes to dev first, decided by Patrick on 23 September: "even
@@ -164,7 +164,7 @@
   .\tools\Ship.ps1 -Channel dev "The map marker points at the right door now"
 
   Puts this branch on the dev build and the dev server for testing. Say in
-  #dev first: the last dev Ship wins.
+  #staff-general first: the last dev Ship wins.
 
 .EXAMPLE
   .\tools\Ship.ps1 -DryRun "The map marker points at the right door now"
