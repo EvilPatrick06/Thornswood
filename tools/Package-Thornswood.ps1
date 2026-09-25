@@ -236,13 +236,15 @@ if ($optionalPrefixes.Count) {
 # there are exactly two routes: this installer, and a pack.
 #
 # Ship-Rules.ps1 has read this record for packs all along, and Test-ShipOtherServer
-# returns false for any path in it so a pack always carries all six. Nothing
-# here did the same, and a brand new install arrived with "skymp5-client.js is
-# missing" and a Play button that would not press. Same record, same rule, both
-# ends.
+# calls a path in it ours when the file there is the recorded build, so a pack
+# carries all six. Nothing here did the same, and a brand new install arrived
+# with "skymp5-client.js is missing" and a Play button that would not press.
+# Same record, same rule, both ends.
 #
 # This is a KEEP list, not a leave-out list: whatever the Vortex record or the
-# vanilla patterns in Ship-Rules.ps1 decide, a path in the record ships.
+# vanilla patterns in Ship-Rules.ps1 decide, the recorded build at a path in
+# the record ships. Anything else at one of those paths stops the build; see
+# the note over $clientWrong below.
 $clientRecordPath = Join-Path $PSScriptRoot 'client-build.json'
 $shipClientFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
 try {
@@ -318,12 +320,16 @@ $prefix = $GameDir.TrimEnd('\') + '\'
 $ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0
 $collectionBytes = 0; $collectionCount = 0
 $clientShipped = 0
+$clientWrong = @()
 foreach ($f in $all) {
     $rel = $f.FullName.Substring($prefix.Length)
     # Ours by record, before any filter is asked. See the note over
     # $shipClientFiles: these six are the only files a tester cannot get from
     # anywhere else, and a missing one is a Play button that will not press.
+    # Only the recorded build of each: anything else is named below and stops
+    # the build.
     if ($shipClientFiles.Contains($rel)) {
+        if (-not (Test-ShipClientRecorded $rel $f.FullName)) { $clientWrong += $rel; continue }
         $ship += [pscustomobject]@{ Rel = $rel; Full = $f.FullName; Len = $f.Length; Time = $f.LastWriteTimeUtc }
         $shipBytes += $f.Length
         $clientShipped++
@@ -342,6 +348,34 @@ foreach ($f in $all) {
 }
 Say ("  {0:n0} files kept ({1:n1} GB), {2:n0} left out ({3:n1} GB of Bethesda files and debug symbols)" -f `
     $ship.Count, ($shipBytes / 1GB), ($all.Count - $ship.Count), ($skipBytes / 1GB)) 'Green'
+
+# AND IT STOPS IF ANY OF THEM IS NOT THE RECORDED BUILD (To Do entry 128).
+#
+# Being at the path is not being ours. Ship refuses a release whose client is
+# not the recorded build, through Sync-Client.ps1 -Check, but it checks
+# Root\Game, and this can build out of the Steam copy (-Vortex, or no
+# SkyrimSE.exe under Root\Game), where until 20 September another launcher's
+# bundle and DLLs sat at these very paths. This loop kept whatever was there,
+# by path, without a word. It asks Ship-Rules now, the same sha256 the packs
+# are held to.
+#
+# Die rather than throw. Measured 24 September: a throw in a script Ship calls
+# with & stops Ship itself, and Ship runs this after the release is already
+# out, where its note says a failed installer must be reported, not fatal.
+# Die exits 1, which Ship reads.
+if ($clientWrong.Count) {
+    Write-Host ''
+    Say ("  STOP. {0} of the {1} client runtime files in {2} are not the recorded build:" -f `
+        $clientWrong.Count, $shipClientFiles.Count, $GameDir) 'Red'
+    foreach ($c in $clientWrong) { Say ("    " + $c) 'Red' }
+    if ([string]::Equals($GameDir.TrimEnd('\'), (Join-Path $Root 'Game').TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) {
+        Say '  Run .\tools\Sync-Client.ps1 to put the recorded build in place, then package again.' 'Red'
+    } else {
+        Say '  This is building out of the Steam copy, and the client there is not ours.' 'Red'
+        Say ('  Package from ' + (Join-Path $Root 'Game') + ' once .\tools\Sync-Client.ps1 has put the recorded build in it.') 'Red'
+    }
+    Die 'the client runtime is not the recorded build, so this installer was not built'
+}
 
 # AND IT STOPS IF THE CLIENT RUNTIME IS NOT ALL THERE.
 #
