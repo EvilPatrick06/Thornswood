@@ -312,14 +312,17 @@
   }
   // Keys while the scroll is up. The slots are not on screen yet, so no
   // other key reaches them; Space on the checkbox still ticks it.
+  /*
+    The scroll moves only for a click, Djinn, 25 September. Enter, Space and
+    Escape used to open it, continue or skip it, and on 25 September at
+    16:23:50 it opened with nobody at the game: four key presses typed into
+    another window reached the game (thornswood-input.log, fg another
+    window, keys 4). So while the scroll is up every key is swallowed and
+    only the mouse opens it, ticks the box and presses Continue.
+  */
   function introKey(ev) {
     if (!introPhase) return false;
-    if (ev.key === 'Escape') { introEnd('skipped with Escape'); ev.preventDefault(); return true; }
-    if (ev.key === ' ' && ev.target && ev.target.className === 'skipnext') return true;
-    if (ev.key === 'Enter' || ev.key === ' ') {
-      if (introPhase === 1) introOpen(); else introEnd('');
-      ev.preventDefault();
-    }
+    ev.preventDefault();
     return true;
   }
   if (elIntro && LIST.intro !== false) {
