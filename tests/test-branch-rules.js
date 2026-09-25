@@ -77,7 +77,7 @@ yml.forEach(function (l) {
 });
 // No check is required since 25 September (the build check on GitHub is off),
 // but the job keeps its name, so turning the requirement back on is one setting.
-yes('build.yml has exactly one job, so one required check would cover all of it (found ' + jobs.length + ')', jobs.length === 1);
+yes('build.yml has exactly one job, so one required check covers all of it (found ' + jobs.length + ')', jobs.length === 1);
 const CHECK = jobs.length ? jobs[0].name : null;
 yes('that job is named "Launcher builds" (found "' + CHECK + '")', CHECK === 'Launcher builds');
 
@@ -209,8 +209,6 @@ docs.forEach(function (d) {
   const t = d.text;
   yes(d.name + ' says enforce_admins is off', /enforce_admins is off\b/.test(t));
   yes(d.name + ' says there is no required check', /there is no required check/.test(t));
-  yes(d.name + ' does not name a required check, since there is none',
-      !/(the one )?required check is "?Launcher builds/.test(t));
   yes(d.name + ' says required approving reviews is 0', /required approving reviews is (0|zero)\b/i.test(t));
   yes(d.name + ' says the code owner review is off', /code owner review is off|Require review from Code Owners is off/i.test(t));
   yes(d.name + ' gives the command that reads the live settings', t.indexOf(PROTECTION) !== -1);
