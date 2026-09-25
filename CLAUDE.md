@@ -290,7 +290,8 @@ this section exists for.
 
 ## Where things are
 
-HANDOFF.md (the open work list and what is live, as of 17 Sep),
+The To Do List (above) for open work, docs\archive (dated snapshots:
+HANDOFF, the 17 Sep audit and WORKING-NOTES, history only),
 SECOND-DEVELOPER.md (the long form), README.md,
 tools\app\ARCHITECTURE.md (the launcher: startup, what each class owns, and
 the Play sequence), tools\MOVING-THE-SERVER.md (the VPS), lore\ (the world),

@@ -16,7 +16,7 @@
 // What it checks:
 //   1. the page is there and the old note is gone;
 //   2. CLAUDE.md and SECOND-DEVELOPER.md point at the page, and no tracked
-//      document still points at the old note (WORKING-NOTES.md is exempt:
+//      document still points at the old note (docs/archive is exempt:
 //      it is the dated 17 September audit, a record of what was true then);
 //   3. Shell.cs carries a class summary that names the page;
 //   4. every `File.cs:123 Name` reference on the page resolves: the file is in
@@ -76,7 +76,7 @@ try {
 if (tracked) {
   const pointing = tracked.filter(function (f) {
     if (!/\.md$/i.test(f)) return false;
-    if (/^WORKING-NOTES\.md$/i.test(f)) return false;
+    if (/^docs\/archive\//i.test(f)) return false;
     if (/^tools\/app\/ARCHITECTURE\.md$/i.test(f)) return false;
     const t = read(path.join(ROOT, f));
     return t !== null && /HOOKUP\.md/i.test(t);

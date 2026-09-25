@@ -46,7 +46,7 @@ function read(rel) {
 const EM_DASH = /—/;
 const OLD_NAME = /skyrim\s*together/i;
 const PLAYER = /\bplayers?\b/i;
-// A link, not the words: WORKING-NOTES.md quotes the search that looks for it.
+// A link, not the words: docs/archive/WORKING-NOTES.md quotes the search that looks for it.
 const DRIVE = /:\/\/drive\.google\.com/i;
 // Problems go to the Discord or the report page, never to one person by name.
 const PERSON = /\b(Patrick|Gavin)\b/;
