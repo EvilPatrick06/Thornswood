@@ -90,7 +90,7 @@ function glob(f) {
 
 const SIX = ['docs-app', 'voice', 'ts-plugins', 'ts-ui', 'setup', 'launcher'];
 // Where each lives: voice left tools for the repository root on 25 September.
-const AT = { 'voice': 'voice', 'docs-app': 'site' };
+const AT = { 'voice': 'voice', 'docs-app': 'site', 'ts-plugins': 'game/plugins', 'ts-ui': 'game/ui' };
 function at(d) { return AT[d] || ('tools/' + d); }
 const HEADS = ['## What it is', '## On your machine', '## Where it runs'];
 const readme = {};
@@ -148,7 +148,7 @@ SIX.forEach(function (d) {
     return s.replace(/`/g, '');
   }));
   const nowhere = ours.filter(function (n) {
-    return !exists('tools/ts-plugins/' + n) && !exists('tools/ts-ui/' + n);
+    return !exists('game/plugins/' + n) && !exists('game/ui/' + n);
   });
   yes(name + ': every plugin or overlay file it names exists (' + ours.length + ' named)' +
       (nowhere.length ? ', missing ' + nowhere.join(', ') : ''), nowhere.length === 0);
@@ -203,7 +203,7 @@ SIX.forEach(function (d) {
   // The README says the gamemode's copy of the feed has moved on from
   // gamemode-voice.js. If the two are ever brought back together, this fails
   // and the paragraph in voice\README.md is what to change.
-  const gm = read('tools/gamemode.js') || '';
+  const gm = read('game/gamemode.js') || '';
   const a = gm.indexOf('// ==== thornswood voice feed, added by Add-VoiceFeed.ps1 ====');
   const b = gm.indexOf('// ==== end thornswood voice feed ====');
   const block = (a >= 0 && b > a) ? gm.slice(a, b) : '';
@@ -232,13 +232,13 @@ SIX.forEach(function (d) {
       keep.indexOf('StartsWith("thornswood-"') >= 0 && rules.indexOf("'thornswood-*.js'") >= 0 &&
       t.indexOf('`thornswood-*.js`') >= 0);
   yes('plugins: the retired thornswood-chargen.js is gone, and the README no longer names it',
-      read('tools/ts-plugins/thornswood-chargen.js') === null && t.indexOf('thornswood-chargen') < 0);
+      read('game/plugins/thornswood-chargen.js') === null && t.indexOf('thornswood-chargen') < 0);
 }
 
 // ---------------------------------------------------------------- overlays --
 {
   const t = readme['ts-ui'] || '';
-  const front = read('tools/ts-plugins/thornswood-front.js') || '';
+  const front = read('game/plugins/thornswood-front.js') || '';
   const go = read('tools/Go.ps1') || '';
   yes('overlays: thornswood-front.js still has the OVERLAYS list a new overlay has to join',
       /const OVERLAYS = \[/.test(front) && t.indexOf('`OVERLAYS`') >= 0);

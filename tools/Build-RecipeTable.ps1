@@ -1,7 +1,7 @@
 ﻿<#
   Build-RecipeTable.ps1
 
-  Builds tools\recipes.json: the table the server needs to answer "may this
+  Builds game\data\recipes.json: the table the server needs to answer "may this
   person make this". Nothing in it is typed from memory. It is read out of the
   plugins of the build on this machine, and every judgement it makes is in the
   knob block at the top of this file rather than buried in the code.
@@ -280,7 +280,7 @@
   THE REVERSE INDEX. ores.json, harvests.json with its four maps and hunts.json
   are all keyed by the base that gets worked and carry the item it hands over.
   The two stations this server put in the world are in no table at all: the salt
-  quarry and the charcoal kiln are answered in tools\gamemode.js, so the items
+  quarry and the charcoal kiln are answered in game\gamemode.js, so the items
   and the ranks are READ out of mineSalt() and burnCharcoal() by
   ReadStationVerbs below rather than copied into a list here, which is what
   stops the index and the server drifting apart in silence. This script needs
@@ -383,7 +383,7 @@
   HALVES_NOBODY_CAN_START, if a half named there turns out to have something,
   if one of the producing tables named in PRODUCER_TABLES is missing or has no
   map of that name, if a function named in STATION_VERBS is not in
-  tools\gamemode.js or hands over an item that is in no record, if that file's
+  game\gamemode.js or hands over an item that is in no record, if that file's
   RANK_LADDER is not this script's RANKS, if the hop does not settle inside
   HOP_ROUND_LIMIT, if any half is left with an empty rung below a full one
   after both ranking rules have run, counting every owned row and counting only
@@ -402,7 +402,7 @@ param(
     [string[]] $Plugins    = @(),
     [string]   $Out        = '',
     [string]   $JsOut      = '',
-    # Print the block and leave tools\gamemode.js alone.
+    # Print the block and leave game\gamemode.js alone.
     [switch]   $NoInstall
 )
 
@@ -707,13 +707,13 @@ $RANK_SHARE = @(
 # names them as crops by hand. tools\Build-HarvestTable.ps1 leaving them in both
 # maps is correct and this list reading both is what was wrong.
 #
-# The server does not let a gatherer near either of them. tools\gamemode.js
+# The server does not let a gatherer near either of them. game\gamemode.js
 # harvest() opens with `if (isCrop(baseDesc)) return null;`, and onActivate
 # sends a crop base to farmActivate before it ever offers it to the plants. So
 # a gatherer pressing a wheat plant gets nothing, at any rank, and the only way
 # anybody in this world obtains Wheat or Tundra Cotton is a farmer at advanced.
 #
-# WHAT READING THEM AS THE GATHERER'S COST, measured off tools\recipes.json as
+# WHAT READING THEM AS THE GATHERER'S COST, measured off game\data\recipes.json as
 # it stood before this line existed. Sack of Flour read suppliedBy gatherer on
 # 36 Cook input entries plus 1 raw Wheat entry, and Thread read suppliedBy
 # gatherer on 188 Tailor entries plus 1 raw Tundra Cotton entry: 226 of the 820
@@ -732,7 +732,7 @@ $PRODUCER_TABLES = @(
     @{ File = 'ores.json';     Map = 'ores';     Who = 'miner';    Item = 'ore';     List = ''      },
     @{ File = 'harvests.json'; Map = 'harvests'; Who = 'gatherer'; Item = 'produce'; List = '';
        NotAlsoIn = 'crops';
-       NotAlsoWhy = 'tools\gamemode.js harvest() refuses a crop base outright and onActivate routes it to farmActivate, so a gatherer gets nothing from it at any rank' },
+       NotAlsoWhy = 'game\gamemode.js harvest() refuses a crop base outright and onActivate routes it to farmActivate, so a gatherer gets nothing from it at any rank' },
     @{ File = 'harvests.json'; Map = 'crops';    Who = 'farmer';   Item = 'produce'; List = ''      },
     @{ File = 'harvests.json'; Map = 'fish';     Who = 'fisher';   Item = 'produce'; List = ''      },
     # The hunter has two tables and not one, as of 21 September. hunts.json is
@@ -743,7 +743,7 @@ $PRODUCER_TABLES = @(
     # the fish rows, one produce each, so they are read the same way.
     #
     # WITHOUT THIS LINE THE CHANGE WOULD HAVE COST THE CHAIN RATHER THAN FIXED
-    # IT. Measured over tools\recipes.json on 21 September, before the food rule
+    # IT. Measured over game\data\recipes.json on 21 September, before the food rule
     # ran, Pheasant Breast was 4 of the Cook's inputs and came back producedBy
     # gatherer. The rule moves that row out of the harvests map, and a producer
     # index that only reads harvests, crops, fish and hunts would then answer
@@ -754,7 +754,7 @@ $PRODUCER_TABLES = @(
 )
 
 # THE SIXTH LADDER IS THE SERVER'S OWN STATIONS, AND IT IS READ OUT OF
-# tools\gamemode.js RATHER THAN COPIED OUT OF IT BY HAND.
+# game\gamemode.js RATHER THAN COPIED OUT OF IT BY HAND.
 #
 # PATRICK, 21 September, on the whole chain: "the farmer would supply the cook,
 # gatherer would supply tailor and alchemist, miner smith, hunter tailor and
@@ -773,7 +773,7 @@ $PRODUCER_TABLES = @(
 # list is a copy, and a copy goes stale the first time somebody changes what a
 # verb hands over or what rank it hands it over at, with nothing anywhere to
 # say the table and the server now disagree. ReadStationVerbs below opens
-# tools\gamemode.js, parses its ITEMS and RANK_LADDER lines, takes the body of
+# game\gamemode.js, parses its ITEMS and RANK_LADDER lines, takes the body of
 # each function named here and reads the items out of the body itself. Change
 # mineSalt and the index changes with it; rename an item and the build fails
 # saying so rather than quietly dropping a producer.
@@ -830,7 +830,7 @@ $STATION_VERBS = @(
 # WHERE THE STATIONS ARE READ FROM. The shipped gamemode, in this folder, which
 # is the same file Deploy-Gamemode.ps1 sends to the server, so what the index
 # believes and what the server does are one file and not two.
-$GAMEMODE_JS = Join-Path $PSScriptRoot 'gamemode.js'
+$GAMEMODE_JS = Join-Path $PSScriptRoot '..\game\gamemode.js'
 
 # LOWEST WINS IN THE REVERSE INDEX, and this is a judgement rather than an
 # obvious truth, so it is a knob with the argument written next to it.
@@ -1029,7 +1029,7 @@ $FINISHED_GOOD_TYPES = @('ARMO', 'WEAP', 'AMMO')
 # already holding, and Skyrim will not offer the row to somebody with no iron
 # armour in their pack. Nobody has ever obtained an Iron Armor by tempering one.
 #
-# WHAT READING THEM AS SOURCES COST, measured off tools\recipes.json before this
+# WHAT READING THEM AS SOURCES COST, measured off game\data\recipes.json before this
 # knob existed. Iron Armor settled at cost 0 and was recorded as 'miner, novice,
 # hops 2, via TemperArmorIronCuirass'. 002RecipeCommonArmor10 in
 # CommonClothes.esp asks for 1 Iron Armor, 1 Leather and 2 Leather Strips, is
@@ -1280,7 +1280,7 @@ $INSTRUMENT_WORDS = @('Flute', 'Lute', 'Drum')
 # right: locking a recipe to a race nobody can choose is deleting the recipe
 # by a longer road.
 #
-# So the list comes out of tools/races.json, which reads the playable bit off
+# So the list comes out of game/data/races.json, which reads the playable bit off
 # the RACE record itself, at an offset measured against ten races everybody
 # knows are playable rather than looked up. Twelve races are playable on this
 # build: the ten vanilla ones, and two from Playable Rieklings.esp, which is
@@ -1366,7 +1366,7 @@ $RACE_OWN_SETS = [ordered]@{
 # Word to look for in an item name -> the race word the lock is recorded as.
 $RACE_LOCK_WORDS = [ordered]@{}
 $RACE_WORDS = @()
-$racesJson = Join-Path $PSScriptRoot 'races.json'
+$racesJson = Join-Path $PSScriptRoot '..\game\data\races.json'
 if ($RACE_LOCKED -and (Test-Path -LiteralPath $racesJson)) {
     try {
         $raceDoc = Get-Content -LiteralPath $racesJson -Raw | ConvertFrom-Json
@@ -1757,7 +1757,7 @@ $BENCH_OWNER = [ordered]@{
     # and all four charcoal rows fell through to 'a MISC off a bench nobody has
     # claimed'. The build failed on it the first time the table was rebuilt,
     # with 'Woodworker/Charburner owns no recipes at all', and refused to write
-    # tools\recipes.json, which is the check doing its job.
+    # game\data\recipes.json, which is the check doing its job.
     'ThornswoodCraftingCharcoalKiln' = @{ Owner = 'Woodworker'; Half = 'Charburner'; Why = 'the charcoal kiln Thornswood-Content.esp already ships. classes.md gives the Charburner firewood through to coke in as many words, and this bench is that chain.' }
     'MCE_CraftingLoom'        = @{ Owner = 'Tailor';     Why = 'a loom, from MoreCraftableEquipment' }
     'DLC2StaffEnchanter'      = @{ Owner = 'Enchanter';  Half = 'Bladebinder'; Why = 'the Dragonborn staff enchanter. Every one of its recipes outputs a staff, and a staff is a weapon, so it is the Bladebinder''s by the same rule that gives him swords.' }
@@ -1766,7 +1766,7 @@ $BENCH_OWNER = [ordered]@{
 
 $ErrorActionPreference = 'Stop'
 
-if (-not $Out) { $Out = Join-Path $PSScriptRoot 'recipes.json' }
+if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\game\data\recipes.json' }
 
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
@@ -1983,7 +1983,7 @@ function ReadStationVerbs([string]$path) {
     # ITEMS is one generated line: every item gamemode.js names, key -> desc.
     $m = [regex]::Match($text, '(?m)^const ITEMS = (\{.*\});\s*$')
     if (-not $m.Success) {
-        $bad.Add('tools\gamemode.js has no "const ITEMS = {...};" line, so no station item can be resolved to a record')
+        $bad.Add('game\gamemode.js has no "const ITEMS = {...};" line, so no station item can be resolved to a record')
         return $res
     }
     $itemsJs = @{}
@@ -1996,7 +1996,7 @@ function ReadStationVerbs([string]$path) {
     # on the two lists being the same list.
     $m2 = [regex]::Match($text, '(?m)^const RANK_LADDER = \[(.*)\];\s*$')
     if (-not $m2.Success) {
-        $bad.Add('tools\gamemode.js has no "const RANK_LADDER = [...];" line, so a rankStep index cannot be turned into a rank')
+        $bad.Add('game\gamemode.js has no "const RANK_LADDER = [...];" line, so a rankStep index cannot be turned into a rank')
         return $res
     }
     $ladder = @()
@@ -2006,7 +2006,7 @@ function ReadStationVerbs([string]$path) {
     foreach ($v in $STATION_VERBS) {
         $at = $text.IndexOf('function ' + $v.Fn + '(')
         if ($at -lt 0) {
-            $bad.Add(("tools\gamemode.js has no function {0}(), which STATION_VERBS names as a producer" -f $v.Fn))
+            $bad.Add(("game\gamemode.js has no function {0}(), which STATION_VERBS names as a producer" -f $v.Fn))
             continue
         }
         $open = $text.IndexOf('{', $at)
@@ -2057,7 +2057,7 @@ function ReadStationVerbs([string]$path) {
                     $out.Add([pscustomobject]@{
                         Fn = $v.Fn; Who = $v.Who; Key = $k; Desc = $itemsJs[$k]
                         Rank = $ladder[$ki]; At = $ki
-                        Where = ('tools\gamemode.js ' + $v.Fn + '(), ' + $v.What + ', grade ' + ($ki + 1) +
+                        Where = ('game\gamemode.js ' + $v.Fn + '(), ' + $v.What + ', grade ' + ($ki + 1) +
                                  ' of ' + $keys.Count + ' off ' + $line.Trim())
                     })
                     $found++
@@ -2080,7 +2080,7 @@ function ReadStationVerbs([string]$path) {
                     $out.Add([pscustomobject]@{
                         Fn = $v.Fn; Who = $v.Who; Key = $k; Desc = $itemsJs[$k]
                         Rank = $ladder[$step]; At = $step
-                        Where = ('tools\gamemode.js ' + $v.Fn + '(), ' + $v.What + ', off ' + $line.Trim())
+                        Where = ('game\gamemode.js ' + $v.Fn + '(), ' + $v.What + ', off ' + $line.Trim())
                     })
                     $found++
                 }
@@ -2236,7 +2236,7 @@ function OtherInputMeasure($row) {
 # what it is called, what kind of record it is, how many the recipe wants, and
 # which class produces it at which rank, and which class SUPPLIES it once the
 # hop is followed. producedBy null means no table in this folder and no verb in
-# tools\gamemode.js hands that item over, which is the case for anything bought
+# game\gamemode.js hands that item over, which is the case for anything bought
 # from a shop and for everything made at a bench; suppliedBy null means nothing
 # in this world gets it to you at all, at any number of benches. Both are
 # written down rather than left out so that a reader can tell "nobody produces
@@ -3632,7 +3632,7 @@ foreach ($t in $PRODUCER_TABLES) {
 }
 
 # The stations this repository put in the world, which are in no json table at
-# all. Read out of tools\gamemode.js by ReadStationVerbs above rather than
+# all. Read out of game\gamemode.js by ReadStationVerbs above rather than
 # copied into a list here, argued for at STATION_VERBS.
 $stationRead = ReadStationVerbs $GAMEMODE_JS
 foreach ($b in $stationRead.Bad) { Bad $b }
@@ -3647,7 +3647,7 @@ if ($stationRead.Ladder.Count -gt 0) {
         }
     }
     if (-not $sameLadder) {
-        Bad ("tools\gamemode.js RANK_LADDER is {0} and this script's RANKS is {1}. A rankStep index cannot be turned into a rank while those disagree, so nothing was read off the stations." -f `
+        Bad ("game\gamemode.js RANK_LADDER is {0} and this script's RANKS is {1}. A rankStep index cannot be turned into a rank while those disagree, so nothing was read off the stations." -f `
              ($stationRead.Ladder -join ', '), ($RANKS -join ', '))
         $stationRead.Rows.Clear()
     }
@@ -3665,7 +3665,7 @@ foreach ($s in $stationRead.Rows) {
     Note ("  {0}() gives {1} ({2}) to a {3} at {4}" -f $s.Fn, $nm, $s.Desc, $s.Who, $s.Rank)
 }
 if ($stationRead.Rows.Count -gt 0) {
-    Note ("the server's own stations: {0} item(s) read out of tools\gamemode.js, {1} of them the first to name the item" -f `
+    Note ("the server's own stations: {0} item(s) read out of game\gamemode.js, {1} of them the first to name the item" -f `
           $stationRead.Rows.Count, $stationAdded)
 } else {
     Loud 'nothing was read off the server''s own stations, so the salt quarry and the charcoal kiln hand out items this table believes nobody produces'
@@ -4401,7 +4401,7 @@ if ($crossRows -eq 0) {
     }
     foreach ($s in $crossSaid) { Note ("  " + $s) }
     if ($crossRows -gt $crossSaid.Count) {
-        Note ("  ... and {0} more, every one of them in tools\recipes.json with the other producers on the input" -f ($crossRows - $crossSaid.Count))
+        Note ("  ... and {0} more, every one of them in game\data\recipes.json with the other producers on the input" -f ($crossRows - $crossSaid.Count))
     }
 }
 
@@ -5040,7 +5040,7 @@ if ($secondRuleHalves.Count -gt 0) {
     $lines.Add('     and only where the first two leave a rung with nothing on it, which no')
     $lines.Add('     half in this build did.')
 }
-$lines.Add('     Every row carries rankFrom in tools\recipes.json saying which of the')
+$lines.Add('     Every row carries rankFrom in game\data\recipes.json saying which of the')
 $lines.Add('     three answered for it. Nothing in here is the script''s opinion of what a')
 $lines.Add('     thing is worth: classes.md sets no numbers for any of it, and every')
 $lines.Add('     judgement is a named knob at the top of the script that wrote this.')
@@ -5051,19 +5051,19 @@ $lines.Add('     the book not to be very specific and a tailor owns hundreds of'
 $lines.Add('     garments. It is read off the output record: a weapon type keyword, one')
 $lines.Add('     of the five armour slot keywords, a clothing slot keyword or a Gourmet')
 $lines.Add('     food type keyword. An output naming two kinds names none and falls to')
-$lines.Add('     its record type with the ones naming none at all. tools\recipes.json')
+$lines.Add('     its record type with the ones naming none at all. game\data\recipes.json')
 $lines.Add('     carries familyFrom on every row saying which reading answered, and')
 $lines.Add('     this build has ' + $famRows.Count + ' families across the whole table.')
 $lines.Add('')
 $lines.Add('     open is true when the recipe carries no condition of its own. A row')
 $lines.Add('     with open false needs something first, an item, a spell or a vanilla')
 $lines.Add('     perk nobody here can hold, and Skyrim''s own crafting menu decides that')
-$lines.Add('     before the server is ever asked. tools\recipes.json says which.')
+$lines.Add('     before the server is ever asked. game\data\recipes.json says which.')
 $lines.Add('')
 $lines.Add('     A recipe id that is not in here is one nobody owns and anybody may')
 $lines.Add('     make. Tempering is not in here either: the server is never asked about')
 $lines.Add('     it, because CraftService throws the armour table and the sharpening')
-$lines.Add('     wheel out before it looks at a recipe. tools\recipes.json carries')
+$lines.Add('     wheel out before it looks at a recipe. game\data\recipes.json carries')
 $lines.Add('     every row, owned and unowned, with the reason for each. */')
 $lines.Add('  var RECIPES_BY_ID = {')
 foreach ($row in $blockRows) { $lines.Add($row) }
@@ -5090,7 +5090,7 @@ $literal = $lines -join [Environment]::NewLine
 # Whatever prose is still hand written sits above the opening marker, where it
 # is about the block rather than about the fields.
 if (-not $NoInstall -and $fail -eq 0) {
-    $gm = Join-Path $PSScriptRoot 'gamemode.js'
+    $gm = Join-Path $PSScriptRoot '..\game\gamemode.js'
     $open  = '  // ==== RECIPES_BY_ID ===='
     $close = '  // ==== end RECIPES_BY_ID ===='
     if (-not (Test-Path -LiteralPath $gm)) {

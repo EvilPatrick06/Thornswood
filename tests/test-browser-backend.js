@@ -66,7 +66,7 @@ const checks = read('app/Checks.cs');
 const chars = read('app/Chars.cs');
 const ownGame = read('app/OwnGame.cs');
 const shipRules = read('Ship-Rules.ps1');
-const front = read('ts-plugins/thornswood-front.js');
+const front = read('../game/plugins/thornswood-front.js');
 
 // The note on ForeignNames: from its warning line to the ForeignPaths array.
 const noteFrom = checks.indexOf('NirnLabUIPlugin.dll WAS on this list');

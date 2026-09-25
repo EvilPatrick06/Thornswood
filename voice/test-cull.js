@@ -11,7 +11,7 @@
 //
 // This drives both halves for real, with no game:
 //
-//   the gamemode  the voice feed block out of tools/gamemode.js runs against a
+//   the gamemode  the voice feed block out of game/gamemode.js runs against a
 //                 stand-in mp, with the real social block keeping the parties,
 //                 and what it would POST is captured. Each row has to carry
 //                 the person's party, because the service cannot know it.
@@ -35,7 +35,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const SERVER = process.env.VOICE_SERVER || path.join(__dirname, 'voice-server.js');
-const GM = process.env.GM || path.join(__dirname, '..', 'tools', 'gamemode.js');
+const GM = process.env.GM || path.join(__dirname, '..', 'game', 'gamemode.js');
 const PORT = 7911;
 const UNITS_PER_METRE = 70;
 const CR = String.fromCharCode(13);
@@ -55,7 +55,7 @@ function read(p) { return fs.readFileSync(p, 'utf8').split(CR).join(''); }
 */
 const reaches = [];
 {
-  const overlay = read(path.join(__dirname, '..', 'tools', 'ts-ui', 'thornswood-voice.js'));
+  const overlay = read(path.join(__dirname, '..', 'game', 'ui', 'thornswood-voice.js'));
   const modes = /var MODES = \{([\s\S]*?)\};/.exec(overlay);
   const got = modes ? (modes[1].match(/max:\s*[\d.]+/g) || []).map(s => Number(s.split(':')[1])) : [];
   yes('the overlay range table is where it was (' + got.join(', ') + ' m)', got.length === 3);

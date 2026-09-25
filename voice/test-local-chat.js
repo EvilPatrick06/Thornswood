@@ -39,7 +39,7 @@ const os = require('os');
 const net = require('net');
 
 const SERVER = process.env.VOICE_SERVER || path.join(__dirname, 'voice-server.js');
-const PAGE = process.env.CHAT_PAGE || path.join(__dirname, '..', 'tools', 'ts-ui', 'thornswood-chat.js');
+const PAGE = process.env.CHAT_PAGE || path.join(__dirname, '..', 'game', 'ui', 'thornswood-chat.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

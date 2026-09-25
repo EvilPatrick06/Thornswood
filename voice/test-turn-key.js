@@ -137,7 +137,7 @@ function leaks(r, key) {
   // Each page starts from its own list and swaps in whatever /ice answers, so
   // an unchanged answer leaves every page exactly where it started.
   const pages = [
-    ['the in-game page', path.join(TOOLS, 'ts-ui', 'thornswood-voice.js')],
+    ['the in-game page', path.join(TOOLS, '..', 'game', 'ui', 'thornswood-voice.js')],
     ['the launcher overlay', path.join(TOOLS, 'launcher', 'voice-host.html')],
     ['the plain page the service serves', path.join(__dirname, 'public', 'voice.js')]
   ];

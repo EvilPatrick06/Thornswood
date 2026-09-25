@@ -24,7 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const SRC = path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const text = fs.readFileSync(SRC, 'utf8');
 const a = text.indexOf('let logFile = null;');
 const idAt = text.indexOf('Which gamemode.js this is.');

@@ -41,11 +41,11 @@ function read(...bits) {
   return fs.readFileSync(path.join(TOOLS_DIR, ...bits), 'utf8').split(CR).join('');
 }
 const SRC = {
-  party: read('ts-ui', 'thornswood-party.js'),
-  trade: read('ts-ui', 'thornswood-trade.js'),
-  journal: read('ts-ui', 'thornswood-journal.js')
+  party: read('..', 'game', 'ui', 'thornswood-party.js'),
+  trade: read('..', 'game', 'ui', 'thornswood-trade.js'),
+  journal: read('..', 'game', 'ui', 'thornswood-journal.js')
 };
-const skillsSrc = read('ts-ui', 'thornswood-skills.js');
+const skillsSrc = read('..', 'game', 'ui', 'thornswood-skills.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

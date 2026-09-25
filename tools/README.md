@@ -35,13 +35,13 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Audit-Mods.ps1](Audit-Mods.ps1) | Measures the build and says which parts carry a plugin and which are pure assets, because only the second kind can ever be optional. |
 | [Backup-Server.ps1](Backup-Server.ps1) | Pulls everything off the server that could not be rebuilt from the repo, and puts it in a dated folder on this machine. |
 | [Bootstrap-VPS.ps1](Bootstrap-VPS.ps1) | Run this ON THE VPS, once, in the PowerShell 5.1 that ships with Windows Server 2022. |
-| [Build-HarvestTable.ps1](Build-HarvestTable.ps1) | Builds tools\harvests.json: the table the server needs to say who may pick which plant. |
-| [Build-HuntTable.ps1](Build-HuntTable.ps1) | Builds tools\hunts.json: the table the server needs to answer a carcass. |
+| [Build-HarvestTable.ps1](Build-HarvestTable.ps1) | Builds game\data\harvests.json: the table the server needs to say who may pick which plant. |
+| [Build-HuntTable.ps1](Build-HuntTable.ps1) | Builds game\data\hunts.json: the table the server needs to answer a carcass. |
 | [Build-Launcher.ps1](Build-Launcher.ps1) | Compiles the launcher into a real Thornswood.exe. |
-| [Build-OreTable.ps1](Build-OreTable.ps1) | Builds tools\ores.json: the table the server needs to answer an ore vein. |
-| [Build-RecipeTable.ps1](Build-RecipeTable.ps1) | Builds tools\recipes.json: the table the server needs to answer "may this person make this". |
+| [Build-OreTable.ps1](Build-OreTable.ps1) | Builds game\data\ores.json: the table the server needs to answer an ore vein. |
+| [Build-RecipeTable.ps1](Build-RecipeTable.ps1) | Builds game\data\recipes.json: the table the server needs to answer "may this person make this". |
 | [Build-Server.ps1](Build-Server.ps1) | Compiles the game server out of our fork and puts the result where Deploy-Server.ps1 and Publish-Server.ps1 expect to find it. |
-| [Build-SpellTable.ps1](Build-SpellTable.ps1) | Builds tools\spells.json: the table the server needs to hand somebody a spell. |
+| [Build-SpellTable.ps1](Build-SpellTable.ps1) | Builds game\data\spells.json: the table the server needs to hand somebody a spell. |
 | [BuildStamp.ps1](BuildStamp.ps1) | What a server's gamemode is, written down beside it. |
 | [Bump-Version.ps1](Bump-Version.ps1) | Moves the launcher's version number, commits that one file, and stops. |
 | [Chargen-Log.ps1](Chargen-Log.ps1) | What the server thinks is happening to your character. |
@@ -68,7 +68,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Clean-Everything.ps1](Clean-Everything.ps1) | Finds the old installers, build leftovers, temp files, stale backups and old GitHub release assets across this machine, the server and both repositories, adds up what they are costing, and prints it. |
 | [Clean-Leftovers.ps1](Clean-Leftovers.ps1) | The other half of Audit-Leftovers.ps1. That one measures and never touches anything; this one removes what it found. |
 | [Close-Launcher.ps1](Close-Launcher.ps1) | Shared by every script that writes into the build. |
-| [Deploy-DevGamemode.ps1](Deploy-DevGamemode.ps1) | Sends tools\gamemode.js to the dev server on the VPS and restarts only that server. |
+| [Deploy-DevGamemode.ps1](Deploy-DevGamemode.ps1) | Sends game\gamemode.js to the dev server on the VPS and restarts only that server. |
 | [Deploy-Docs.ps1](Deploy-Docs.ps1) | Puts the Thornswood docs site on the VPS and keeps it running. |
 | [Deploy-Gamemode.ps1](Deploy-Gamemode.ps1) | Puts gamemode.js into the built server and writes a server load order that actually lines up with the client's. |
 | [Deploy-Server.ps1](Deploy-Server.ps1) | Sends the built server up to the VPS and restarts it. |

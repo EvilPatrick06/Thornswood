@@ -11,7 +11,7 @@ writes to `chat\`, one file a day. The audio goes straight between people and
 never passes through it. `public\` is the plain browser page it serves, and
 the `test-*.js` files beside it are its harnesses. `gamemode-voice.js` is the
 gamemode's half of the position feed as `Add-VoiceFeed.ps1` first added it.
-The copy between the voice feed markers in `tools\gamemode.js` has moved on
+The copy between the voice feed markers in `game\gamemode.js` has moved on
 since: it reads its port from `server-settings.json`, so the dev server feeds
 the dev service, where this file still has 7778 written in.
 `Add-VoiceFeed.ps1` writes this file over that block and redeploys the live
@@ -58,7 +58,7 @@ on 7778, task `Thornswood Voice`, and the dev one in `C:\Thornswood-Voice-Dev`
 on 7789, task `Thornswood Dev Voice`. Caddy carries
 https://thornswood.net/voice/ and /voice-dev/ to them. Its clients are the
 launcher's hidden voice page (`tools\launcher`), the in-game overlays
-(`tools\ts-ui`) and the two gamemodes. `.\tools\Install-Voice.ps1` copies
+(`game\ui`) and the two gamemodes. `.\tools\Install-Voice.ps1` copies
 `voice-server.js` and the two files in `public\`, restarts the task and waits
 for `/health`; the dev service is the same script with
 `-Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'`.

@@ -21,7 +21,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repoMenu = Join-Path $Here 'art\menu'
+$repoMenu = Join-Path $Here '..\game\menu'
 
 function Md5([string]$p) { (Get-FileHash -LiteralPath $p -Algorithm MD5).Hash.Substring(0, 8).ToLowerInvariant() }
 function ScaleAt([string]$p) {
@@ -67,9 +67,9 @@ foreach ($f in $files) {
         if ($d -match ', 1 mip level') { $line += ' (NO MIPS: soft at any size but its own)'; $bad++ }
     }
     if (Test-Path -LiteralPath $ours) {
-        if ((Md5 $p) -eq (Md5 $ours)) { $line += ' = the repo copy' } else { $line += ' <> the repo copy in tools\art\menu'; $bad++ }
+        if ((Md5 $p) -eq (Md5 $ours)) { $line += ' = the repo copy' } else { $line += ' <> the repo copy in game\menu'; $bad++ }
     } else {
-        $line += ' (nothing to compare with in tools\art\menu)'
+        $line += ' (nothing to compare with in game\menu)'
     }
     Write-Host $line -ForegroundColor $(if ($bad) { 'Yellow' } else { 'Green' })
 }

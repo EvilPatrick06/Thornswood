@@ -25,8 +25,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const BRIDGE = process.env.BRIDGE || path.join(TOOLS_DIR, 'ts-ui', 'thornswood-bridge.js');
-const FRONT = process.env.FRONT || path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-front.js');
+const BRIDGE = process.env.BRIDGE || path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-bridge.js');
+const FRONT = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

@@ -178,7 +178,7 @@ $oldCeiling = $env:GIT_CEILING_DIRECTORIES
 $env:GIT_CEILING_DIRECTORIES = $tmp
 
 try {
-    $gm = Join-Path $repo 'tools\gamemode.js'
+    $gm = Join-Path $repo 'game\gamemode.js'
     Put $gm "'use strict';`nconsole.log('gamemode');`n"
     Put (Join-Path $repo 'tools\app\Updater.cs') "namespace T {`n    public static class Updater {`n        public const string Version = `"1.2.3`";`n    }`n}`n"
     Put (Join-Path $repo 'version.json') '{ "launcherVersion": "0.9.9" }'
@@ -266,15 +266,15 @@ try {
     $wt = Join-Path $tmp 'wt\deeper\Thornswood-Repo-wt'
     Run-Git -C $repo worktree add -q $wt
     $w = $null
-    if (Test-Path -LiteralPath (Join-Path $wt 'tools\gamemode.js')) {
-        $w = New-ThornswoodBuildStamp -Gamemode (Join-Path $wt 'tools\gamemode.js') -Channel main -RepoDir $wt
+    if (Test-Path -LiteralPath (Join-Path $wt 'game\gamemode.js')) {
+        $w = New-ThornswoodBuildStamp -Gamemode (Join-Path $wt 'game\gamemode.js') -Channel main -RepoDir $wt
     }
     Yes 'worktree: the scratch worktree is there' ($null -ne $w)
     Yes 'worktree: main finds Thornswood-Releases beside the main checkout' ($w -and $w.feedVersion -eq '1.2.3')
     Yes 'worktree: the commit and the launcher are the worktree''s own' (
         $w -and $w.commit -eq $head -and $w.launcherVersion -eq '1.2.3' -and $w.gamemodeMatchesCommit -eq $true)
     if ($w) {
-        $w = New-ThornswoodBuildStamp -Gamemode (Join-Path $wt 'tools\gamemode.js') -Channel dev -RepoDir $wt
+        $w = New-ThornswoodBuildStamp -Gamemode (Join-Path $wt 'game\gamemode.js') -Channel dev -RepoDir $wt
     }
     Yes 'worktree: dev finds Thornswood-Releases-dev the same way' ($w -and $w.feedVersion -eq '1.2.3.4')
 

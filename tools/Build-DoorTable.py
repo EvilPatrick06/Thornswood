@@ -39,7 +39,7 @@ compressed record is a four byte uncompressed length and then a zlib stream, and
 zlib is two header bytes and raw deflate after them. Nothing about a door can be
 learned without inflating them, so this does, and counts how many it could not.
 
-WHAT IT WRITES. tools\\doors.json, and nothing else. It does not touch
+WHAT IT WRITES. game\\data\\doors.json, and nothing else. It does not touch
 gamemode.js: how much of this the server should carry is a decision that wants
 the numbers in front of it, and the numbers are what this prints.
 
@@ -230,8 +230,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default=r'C:\Thornswood\Game\Data')
     ap.add_argument('--plugins', default=r'C:\Thornswood\Profile\Default\plugins.txt')
-    ap.add_argument('--out', default=os.path.join(here, 'doors.json'))
-    ap.add_argument('--gamemode', default=os.path.join(here, 'gamemode.js'))
+    ap.add_argument('--out', default=os.path.join(here, '..', 'game', 'data', 'doors.json'))
+    ap.add_argument('--gamemode', default=os.path.join(here, '..', 'game', 'gamemode.js'))
     ap.add_argument('--check', action='store_true', help='say what it found, write nothing')
     args = ap.parse_args()
 

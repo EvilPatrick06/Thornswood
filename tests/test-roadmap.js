@@ -4,7 +4,7 @@
 // about the emote wheel is read off the files that decide it.
 //
 // WHY THIS EXISTS. The roadmap's Later section said "Emote wheel | Wanted
-// since the start, never started", while tools/ts-plugins/thornswood-emotes.js,
+// since the start, never started", while game/plugins/thornswood-emotes.js,
 // 593 lines, went out in every release and testers were asked to use it. From
 // the To Do List: "Verified: it exists and works. Move it to Done. Also check
 // the rest of Later the same way, because a roadmap that lists a shipped
@@ -166,7 +166,7 @@ yes('the launcher\'s Controls page does list WheelKey, PageKey and StopKey, as t
     }));
 
 // ------------------------------------------------------------ the emotes ----
-const plugin = read('ts-plugins/thornswood-emotes.js');
+const plugin = read('../game/plugins/thornswood-emotes.js');
 const a = plugin.indexOf('const CATEGORIES = [');
 const b = a < 0 ? -1 : plugin.indexOf('\n];', a);
 let cats = null;

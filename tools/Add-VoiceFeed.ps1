@@ -26,7 +26,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $Gamemode) { $Gamemode = Join-Path $Here 'gamemode.js' }
+if (-not $Gamemode) { $Gamemode = Join-Path $Here '..\game\gamemode.js' }
 if (-not $Block)    { $Block    = Join-Path $Here '..\voice\gamemode-voice.js' }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

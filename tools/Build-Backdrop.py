@@ -3,7 +3,7 @@ Build-Backdrop.py
 
 Turns a picture into the main menu backdrop texture,
 Data\\textures\\interface\\objects\\Mainmenuwallpaper.dds, and writes it into
-the repo at tools\\art\\menu, where Go.ps1 picks it up for every game folder
+the repo at game\\menu, where Go.ps1 picks it up for every game folder
 and Ship carries it to everybody.
 
 The numbers are tools\\art\\BACKDROP-SPEC.md's, measured from logo.nif on
@@ -29,7 +29,7 @@ arrives.
 Usage:
   py Build-Backdrop.py [<picture.png>] [<out.dds>]
 
-Defaults: tools\\art\\thornswood-mainmenu-1535.png in, tools\\art\\menu\\
+Defaults: tools\\art\\thornswood-mainmenu-1535.png in, game\\menu\\
 Mainmenuwallpaper.dds out.
 
 Needs Pillow 11 or newer for the DXT1 encoder:  py -m pip install pillow

@@ -433,7 +433,7 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
                  "and through a pull request, or put them back, then Ship.")
         }
         # The uncommitted count above never saw a NEW file, and a new file
-        # ships all the same: Go.ps1 copies every tools\ts-plugins\*.js into
+        # ships all the same: Go.ps1 copies every game\plugins\*.js into
         # the game folder and the build compiles every tools\app\*.cs, whether
         # git knows them or not. So a scratch plugin would pass this gate and go
         # out in the pack while GitHub had never seen it, which is where the
@@ -708,7 +708,7 @@ if ($LASTEXITCODE -ne 0) {
 # rather than the exit code. This is the guard that makes the step worth having:
 # a plugin that did not land stops the release instead of shipping stale.
 if ($GameDir) {
-    $plugSrc = Join-Path $Here 'ts-plugins'
+    $plugSrc = Join-Path $Here '..\game\plugins'
     $plugDst = Join-Path $GameDir 'Data\Platform\Plugins'
     $stale = @()
     $seen  = 0
@@ -727,7 +727,7 @@ if ($GameDir) {
     }
     if ($seen -eq 0) {
         Unbump 'there are no in game plugins to ship'
-        Die 'tools\ts-plugins has no .js in it. Nothing was published.'
+        Die 'game\plugins has no .js in it. Nothing was published.'
     }
     Say "  $seen plugin(s) in the game folder match this source" 'Green'
 } else {

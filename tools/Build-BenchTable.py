@@ -3,7 +3,7 @@ Build-BenchTable.py
 
 Works out, for every crafting bench in the load order, which furniture in the
 world IS that bench and who can make anything at it, and writes both answers
-into tools\\gamemode.js as generated blocks.
+into game\\gamemode.js as generated blocks.
 
 WHY
 
@@ -25,7 +25,7 @@ craft gate runs after a craft, when the recipe is already known. Refusing to OPE
 one has to happen before any recipe exists, from the base alone. That join is the
 first block below.
 
-WHAT IT READS. tools\\recipes.json, which Build-RecipeTable.ps1 already wrote and
+WHAT IT READS. game\\data\\recipes.json, which Build-RecipeTable.ps1 already wrote and
 which carries the bench, owner, half and rank of all 3,439 owned rows and the
 bench of all 1,679 unowned ones. Then the FURN and ACTI records of every plugin
 in the load order, for the keywords those benches are named by. It is Python
@@ -215,8 +215,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default=r'C:\Thornswood\Game\Data')
     ap.add_argument('--plugins', default=r'C:\Thornswood\Profile\Default\plugins.txt')
-    ap.add_argument('--recipes', default=os.path.join(here, 'recipes.json'))
-    ap.add_argument('--gamemode', default=os.path.join(here, 'gamemode.js'))
+    ap.add_argument('--recipes', default=os.path.join(here, '..', 'game', 'data', 'recipes.json'))
+    ap.add_argument('--gamemode', default=os.path.join(here, '..', 'game', 'gamemode.js'))
     ap.add_argument('--check', action='store_true', help='say what it found, write nothing')
     args = ap.parse_args()
 

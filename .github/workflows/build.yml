@@ -93,8 +93,10 @@ jobs:
         shell: pwsh
         run: |
           $bad = 0
-          $files = @(Get-ChildItem -Path tools -Filter *.js -File) +
-                   @(Get-ChildItem -Path tools\ts-plugins, tools\ts-ui -Filter *.js -File -ErrorAction SilentlyContinue)
+          # game\ since the reorganisation's phase 6 (issue #440): the gamemode,
+          # the plugins and the overlays.
+          $files = @(Get-ChildItem -Path tools, game -Filter *.js -File) +
+                   @(Get-ChildItem -Path game\plugins, game\ui -Filter *.js -File -ErrorAction SilentlyContinue)
           foreach ($f in $files) {
             & node --check $f.FullName 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {

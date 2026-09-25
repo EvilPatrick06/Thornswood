@@ -35,7 +35,7 @@
 const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 // The fork is the engine/skymp submodule once it has files in it, and
 // C:/Thornswood-Dev/skymp until then (tools/Where.ps1 has the same rule).
 const REPO_FORK = path.join(TOOLS_DIR, '..', 'engine', 'skymp');

@@ -20,10 +20,10 @@
 const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const page = fs.readFileSync(path.join(TOOLS_DIR, 'ts-ui', 'thornswood-chat.js'), 'utf8');
+const page = fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-chat.js'), 'utf8');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

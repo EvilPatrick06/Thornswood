@@ -410,7 +410,7 @@ function page() {
   // widget list later, because it is deferred and this file is not.
   win.skyrimPlatform = { sendMessage: function () { told.push([].slice.call(arguments)); } };
   vm.createContext(win);
-  vm.runInContext(read('ts-ui/thornswood-bridge.js'), win, { filename: 'thornswood-bridge.js' });
+  vm.runInContext(read('../game/ui/thornswood-bridge.js'), win, { filename: 'thornswood-bridge.js' });
 
   const front = makeFront(dom, win);
   win.skyrimPlatform.widgets = front.widgets;
@@ -430,7 +430,7 @@ function page() {
   }
   function loadChat(cfg) {
     win.THORNSWOOD = cfg;
-    vm.runInContext(read('ts-ui/thornswood-chat.js'), win, { filename: 'thornswood-chat.js' });
+    vm.runInContext(read('../game/ui/thornswood-chat.js'), win, { filename: 'thornswood-chat.js' });
     settle();
   }
   return {
@@ -590,7 +590,7 @@ const PORT_PROFILE = '../Profile/voice-port.txt';
 const PTT = 'Data/Platform/voice-ptt.txt';
 const PTT_PROFILE = '../Profile/voice-ptt.txt';
 
-const PLUGIN = read('ts-plugins/thornswood-voice.js');
+const PLUGIN = read('../game/plugins/thornswood-voice.js');
 const oursMatch = /const ours = \['([^']+)'\];/.exec(PLUGIN);
 const OURS = oursMatch ? oursMatch[1] : '';
 yes('the plugin names the address it calls ours', !!OURS);

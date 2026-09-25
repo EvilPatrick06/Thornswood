@@ -1,7 +1,7 @@
 <#
   Build-SpellTable.ps1
 
-  Builds tools\spells.json: the table the server needs to hand somebody a
+  Builds game\data\spells.json: the table the server needs to hand somebody a
   spell. Nothing in it is typed from memory. It is read out of the game's own
   master files on this machine.
 
@@ -15,7 +15,7 @@
   so this reads the SPEL records instead.
 
   What it does, in order:
-    - reads the spell names out of the book in tools\ts-ui\thornswood-skills.js
+    - reads the spell names out of the book in game\ui\thornswood-skills.js
       (DATA.spells), so the table covers exactly what the panel offers
     - reads the five master files, walks the SPEL top group in each, and pulls
       each record's editor id, name and kind
@@ -24,7 +24,7 @@
       machine rather than loose in Data\Strings, so the BSA is read for them.
       A record whose name cannot be resolved falls back to its editor id and
       is reported as such
-    - picks one record per name (see the knobs below), writes tools\spells.json
+    - picks one record per name (see the knobs below), writes game\data\spells.json
       and prints the same table as a JavaScript object literal, because the
       server ships as one file and cannot read the json
 
@@ -44,7 +44,7 @@ param(
     [string]   $Out      = '',
     [string]   $JsOut    = '',
     [string[]] $Plugins  = @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'),
-    # Print the table and leave tools\gamemode.js alone.
+    # Print the table and leave game\gamemode.js alone.
     [switch]   $NoInstall
 )
 
@@ -76,8 +76,8 @@ $PICK_ORDER = @('tome', 'edid', 'only')
 
 $ErrorActionPreference = 'Stop'
 
-if (-not $Book) { $Book = Join-Path $PSScriptRoot 'ts-ui\thornswood-skills.js' }
-if (-not $Out)  { $Out  = Join-Path $PSScriptRoot 'spells.json' }
+if (-not $Book) { $Book = Join-Path $PSScriptRoot '..\game\ui\thornswood-skills.js' }
+if (-not $Out)  { $Out  = Join-Path $PSScriptRoot '..\game\data\spells.json' }
 
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
@@ -619,7 +619,7 @@ $literal = $lines -join [Environment]::NewLine
 # this repo are written. -NoInstall prints it and leaves the file alone.
 #
 if (-not $NoInstall -and $fail -eq 0) {
-    $gm = Join-Path $PSScriptRoot 'gamemode.js'
+    $gm = Join-Path $PSScriptRoot '..\game\gamemode.js'
     if (-not (Test-Path -LiteralPath $gm)) {
         Bad "no gamemode.js beside this script, so the table was not installed"
     } else {

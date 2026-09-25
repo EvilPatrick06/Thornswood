@@ -9,7 +9,7 @@ how a machine is set up. CLAUDE.md is only what applies to a Claude.
 
 Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in closed
 playtest. This repo is the launcher (tools\app, C# 5, WPF, built with the
-.NET Framework 4 csc), the game plugins (tools\ts-plugins, Skyrim Platform
+.NET Framework 4 csc), the game plugins (game\plugins, Skyrim Platform
 JavaScript), the site (site, node), the Discord bot (bot,
 Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06). The team is in the table below.
 
@@ -224,7 +224,7 @@ machine, from the repo folder.
    that is behind origin, so the pull comes first.
 2. Then one command for each part the pull request touched:
    - The launcher (`tools\app`, `tools\ui.xaml`, the art and video that
-     Build-Launcher.ps1 embeds), the game plugins (`tools\ts-plugins`), or
+     Build-Launcher.ps1 embeds), the game plugins (`game\plugins`), or
      anything else that goes out in a pack:
      `.\tools\Ship.ps1 -Channel dev "what changed"`. The dev build is where
      it goes first, by the rule above. `.\tools\Ship.ps1 "what changed"`
@@ -252,7 +252,7 @@ machine, from the repo folder.
      `.\tools\Install-Bot.ps1 -CodeOnly`.
    - The bot's avatar (`bot\thornswood-bot-*.png`): no script
      sends it. It is uploaded by hand in the Discord developer portal.
-   - `tools\gamemode.js`: `.\tools\Deploy-Gamemode.ps1`, then
+   - `game\gamemode.js`: `.\tools\Deploy-Gamemode.ps1`, then
      `.\tools\Deploy-Server.ps1`.
    - The voice service (`voice\voice-server.js`, `voice\public`):
      `.\tools\Install-Voice.ps1`.

@@ -18,7 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SRC = process.env.GM || path.join(__dirname, 'gamemode.js');
+const SRC = process.env.GM || path.join(__dirname, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 

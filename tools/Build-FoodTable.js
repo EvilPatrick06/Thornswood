@@ -1,6 +1,6 @@
 // Build-FoodTable.js
 //
-// Builds tools\food.json: every ALCH record in the load order that somebody
+// Builds game\data\food.json: every ALCH record in the load order that somebody
 // can eat or drink, what kind it is, and whether it is alcohol.
 //
 // WHY THERE IS ANYTHING TO BUILD
@@ -64,7 +64,7 @@ function opt(name, def) {
 }
 const PRINT = args.indexOf('--print') !== -1;
 const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
-const OUT = opt('out', path.join(__dirname, 'food.json'));
+const OUT = opt('out', path.join(__dirname, '..', 'game', 'data', 'food.json'));
 
 /* The load order, the same way Build-FireTable reads it. */
 function loadOrder() {
@@ -321,7 +321,7 @@ if (PRINT) {
   and nothing else.
 */
 function install() {
-  const gm = path.join(__dirname, 'gamemode.js');
+  const gm = path.join(__dirname, '..', 'game', 'gamemode.js');
   let src;
   try { src = fs.readFileSync(gm, 'utf8'); } catch (e) {
     console.error('FAIL  no gamemode.js to install into');
@@ -337,13 +337,13 @@ function install() {
     // Run twice on the same load order, the line is already there and is the
     // same line. That is the table being generated, not a failure to find it,
     // and it used to say FAIL and exit 1.
-    if (re.test(src)) { console.log('tools\\gamemode.js already holds this table'); return; }
+    if (re.test(src)) { console.log('game\\gamemode.js already holds this table'); return; }
     console.error('FAIL  could not find anywhere in gamemode.js to put the table');
     process.exitCode = 1;
     return;
   }
   fs.writeFileSync(gm, next);
-  console.log('installed ' + Object.keys(items).length + ' rows into tools\gamemode.js');
+  console.log('installed ' + Object.keys(items).length + ' rows into game\\gamemode.js');
 }
 
 if (!Object.keys(items).length) {

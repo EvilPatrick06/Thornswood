@@ -46,9 +46,9 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const gm = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const skills = read(path.join('ts-ui', 'thornswood-skills.js'));
+const skills = read(path.join('..', 'game', 'ui', 'thornswood-skills.js'));
 const known = read(path.join('..', 'site', 'data', 'known.md'));
 const help = read(path.join('..', 'site', 'data', 'help.md'));
 

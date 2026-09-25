@@ -184,7 +184,7 @@ Ready 'node is on the path' ($null -ne $node) $(if ($node) { (& node --version 2
 # ------------------------------------------------------------- the plugins --
 Head 'The game plugins'
 if ($hasGame) {
-  $plugSrc = Join-Path $Here 'ts-plugins'
+  $plugSrc = Join-Path $Here '..\game\plugins'
   $plugDst = Join-Path $GameDir 'Data\Platform\Plugins'
   $seen = 0; $stale = @()
   foreach ($f in @(Get-ChildItem -LiteralPath $plugSrc -Filter '*.js' -File -EA SilentlyContinue)) {
@@ -195,7 +195,7 @@ if ($hasGame) {
     $b = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
     if ($a -ne $b) { $stale += ($f.Name + ' in the game folder is not this source') }
   }
-  Ready 'tools\ts-plugins has plugins to ship' ($seen -gt 0) "$seen file(s)" 'Nothing to do; the repo is missing its plugins'
+  Ready 'game\plugins has plugins to ship' ($seen -gt 0) "$seen file(s)" 'Nothing to do; the repo is missing its plugins'
   Ready 'the game folder holds this source' ($stale.Count -eq 0) $(if ($stale.Count) { $stale[0] } else { "$seen match" }) `
     '.\tools\Go.ps1     copies the repo''s plugins into the game folder'
 } else {

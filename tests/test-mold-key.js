@@ -39,8 +39,8 @@ const path = require('path');
 const CR = String.fromCharCode(13);
 const read = function (p) { return fs.readFileSync(p, 'utf8').split(CR).join(''); };
 
-const FRONT_PATH = process.env.FRONT || path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-front.js');
-const GM_PATH = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const FRONT_PATH = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
+const GM_PATH = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const front = read(FRONT_PATH);
 const gm = read(GM_PATH);
 const ini = read(path.join(TOOLS_DIR, 'emotes', 'Thornswood.ini'));
@@ -100,13 +100,13 @@ yes('the shipped Thornswood.ini carries MoldKey = 22', !!iniM && Number(iniM[1])
   while ((m = rxFront.exec(front)) !== null) {
     if (m[1] !== 'MoldKey' && m[1] !== 'VoicePort') { take(Number(m[2]), 'front ' + m[1]); }
   }
-  const emotes = read(path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-emotes.js'));
+  const emotes = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-emotes.js'));
   const rxEm = /key\('(\w+)', (\d+)\)/g;
   while ((m = rxEm.exec(emotes)) !== null) { take(Number(m[2]), 'emotes ' + m[1]); }
-  const voice = read(path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-voice.js'));
+  const voice = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-voice.js'));
   const rxVo = /^let (\w+_KEY) = (\d+);/gm;
   while ((m = rxVo.exec(voice)) !== null) { take(Number(m[2]), 'voice ' + m[1]); }
-  const mark = read(path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-mark.js'));
+  const mark = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-mark.js'));
   const rxMk = /^let (\w+Key) = (\d+);/gm;
   while ((m = rxMk.exec(mark)) !== null) { take(Number(m[2]), 'mark ' + m[1]); }
   const rxIni = /^\s*(\w+)\s*=\s*(\d+)\s*$/gm;

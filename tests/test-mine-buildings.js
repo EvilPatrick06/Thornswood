@@ -17,7 +17,7 @@
 // every answer: a vein in a building, a vein on open ground, a vein in a room
 // no door leads to, a deleted vein, a disabled one, a compressed record, the
 // only road in and a road with a second way round. Then it reads the committed
-// tools/mine-buildings.json against the real gamemode's tables, so the list
+// game/data/mine-buildings.json against the real gamemode's tables, so the list
 // Patrick reads is the list /claim would act on.
 //
 // The made-up world has worldspaces of its own too, because the first version
@@ -351,12 +351,12 @@ fs.rmSync(ROOT, { recursive: true, force: true });
 // ---------------------------------------------------------------------------
 // The committed measurement against the real gamemode
 
-const COMMITTED = path.join(TOOLS, 'mine-buildings.json');
+const COMMITTED = path.join(TOOLS, '..', 'game', 'data', 'mine-buildings.json');
 let real = null;
 try { real = JSON.parse(fs.readFileSync(COMMITTED, 'utf8')); } catch (e) { real = null; }
-yes('tools/mine-buildings.json is committed and reads', !!real);
+yes('game/data/mine-buildings.json is committed and reads', !!real);
 if (!real) done();
-const gm = fs.readFileSync(path.join(TOOLS, 'gamemode.js'), 'utf8');
+const gm = fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8');
 function table(name) {
   const m = new RegExp('^const ' + name + ' = (\\{.*\\});[ \\t\\r]*$', 'm').exec(gm);
   return m ? JSON.parse(m[1]) : null;
@@ -370,7 +370,7 @@ Object.keys(realByDoor).forEach(function (k) { claimable[realByDoor[k]] = true; 
 
 const rb = real.buildings || {};
 const rk = Object.keys(rb);
-const stale = 'if this fails, the door table moved: run python tools/Measure-MineBuildings.py --out tools/mine-buildings.json';
+const stale = 'if this fails, the door table moved: run python tools/Measure-MineBuildings.py --out game/data/mine-buildings.json';
 yes('every building in it is one /claim would take (' + stale + ')',
     rk.length > 0 && rk.every(function (k) { return claimable[k]; }));
 yes('every building in it is named the way BUILDING_NAME names it',

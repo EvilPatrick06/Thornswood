@@ -1,6 +1,6 @@
 // test-whose-game-gate.js
 //
-// Every copy of the whose-game gate in tools/ts-plugins is the same code, and
+// Every copy of the whose-game gate in game/plugins is the same code, and
 // the address it calls ours is the one Set-Vps.ps1 moves.
 //
 // WHY THIS EXISTS. To Do List entry 293, "The same thirty-four lines are
@@ -25,7 +25,7 @@
 // copy is for Patrick and Djinn in #dev. Until then this holds the copies
 // together, and CI runs it on every pull request.
 //
-// What it checks, for every .js in tools/ts-plugins (Ship.ps1 sends every one
+// What it checks, for every .js in game/plugins (Ship.ps1 sends every one
 // of them to Data/Platform/Plugins, so a sixth plugin is checked too):
 //   - the gate is the first statement inside the plugin's wrapper, and
 //     nothing sits outside the wrapper, so nothing the plugin does runs first;
@@ -55,7 +55,7 @@ function yes(what, cond) {
 }
 
 const TOOLS = TOOLS_DIR;
-const PLUGINS = path.join(TOOLS, 'ts-plugins');
+const PLUGINS = path.join(TOOLS, '..', 'game', 'plugins');
 const REFERENCE = 'thornswood-front.js';
 const GUARD = 'if (!thornswoodGame()) { return; }';
 const HEAD = 'function thornswoodGame() {';
@@ -195,7 +195,7 @@ const MAX = sizeMatch ? Number(sizeMatch[1]) * 1024 * 1024 : 0;
 
 // ------------------------------------------------------------- the copies
 const names = fs.readdirSync(PLUGINS).filter(function (n) { return /\.js$/i.test(n); }).sort();
-yes('tools/ts-plugins has the four plugins left of the five the entry names, ' + names.length + ' .js in all',
+yes('game/plugins has the four plugins left of the five the entry names, ' + names.length + ' .js in all',
     ['thornswood-emotes.js', 'thornswood-front.js', 'thornswood-mark.js', 'thornswood-voice.js']
       .every(function (n) { return names.indexOf(n) >= 0; }));
 
@@ -236,7 +236,7 @@ names.forEach(function (n) {
       !!OURS && list.length === 1 && list[0] === OURS);
   if (list.length !== 1 || list[0] !== OURS) { console.log('      ours is [' + list.join(', ') + ']'); }
 
-  const rel = ['tools', 'ts-plugins', n];
+  const rel = ['game', 'plugins', n];
   const reached = EXTS.indexOf(path.extname(n)) >= 0 &&
     rel.every(function (p) { return SKIP.indexOf(p) < 0; }) &&
     MAX > 0 && c.size <= MAX;

@@ -29,7 +29,7 @@ const path = require('path');
 // Beside this file, not a path off one machine. The harness this was modelled
 // on shipped pointing at /mnt/user-data/outputs, a sandbox that exists nowhere,
 // and would not run for anybody who checked it out.
-const SRC = process.env.GM || path.join(TOOLS_DIR, 'gamemode.js');
+const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -397,7 +397,7 @@ function tickAs(state, now, cameOn) {
 //      menu opens, once a minute while it stays, not before the overlays are in,
 //      and /face done when it closes.
 {
-  const FRONT = process.env.FRONT || path.join(TOOLS_DIR, 'ts-plugins', 'thornswood-front.js');
+  const FRONT = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
   const fsrc = fs.readFileSync(FRONT, 'utf8').split(CR).join('');
   const a = fsrc.indexOf('  let raceWasOpen = false;');
   // To the end of the race menu's own handler, and no further: the code after

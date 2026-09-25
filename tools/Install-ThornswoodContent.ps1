@@ -22,7 +22,7 @@ param(
 # turns every one of these into a broken command the first time it does.
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $Esp) { $Esp = Join-Path $Here 'Thornswood-Content.esp' }
+if (-not $Esp) { $Esp = Join-Path $Here '..\game\content\Thornswood-Content.esp' }
 
 $name = 'Thornswood-Content.esp'
 

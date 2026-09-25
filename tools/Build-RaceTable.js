@@ -1,6 +1,6 @@
 // Build-RaceTable.js
 //
-// Builds tools\races.json and installs it into gamemode.js: every RACE record
+// Builds game\data\races.json and installs it into gamemode.js: every RACE record
 // in the load order, by descriptor, with the name the record calls itself.
 //
 // WHY THERE IS ANYTHING TO BUILD
@@ -36,7 +36,7 @@
 // 43 lines nobody could reach. It matters the day a plugin in the order
 // changes a race.
 //
-// Read only. It opens the plugins of the build, writes tools\races.json, and
+// Read only. It opens the plugins of the build, writes game\data\races.json, and
 // replaces one generated line in tools\gamemode.js.
 //
 // Usage:
@@ -53,7 +53,7 @@ function opt(name, def) {
 }
 const PRINT = args.indexOf('--print') !== -1;
 const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
-const OUT = opt('out', path.join(__dirname, 'races.json'));
+const OUT = opt('out', path.join(__dirname, '..', 'game', 'data', 'races.json'));
 
 /* The load order, the same way the other builders read it. */
 function loadOrder() {
@@ -271,7 +271,7 @@ if (PRINT) {
   editor id alone.
 */
 function install() {
-  const gm = path.join(__dirname, 'gamemode.js');
+  const gm = path.join(__dirname, '..', 'game', 'gamemode.js');
   let src;
   try { src = fs.readFileSync(gm, 'utf8'); } catch (e) {
     console.error('FAIL  no gamemode.js to install into');
@@ -291,13 +291,13 @@ function install() {
     // Run twice on the same load order, the line is already there and is the
     // same line. That is the table being generated, not a failure to find it,
     // and it used to say FAIL and exit 1, the way Build-FoodTable.js did.
-    if (re.test(src)) { console.log('tools\\gamemode.js already holds this table'); return; }
+    if (re.test(src)) { console.log('game\\gamemode.js already holds this table'); return; }
     console.error('FAIL  could not find anywhere in gamemode.js to put the table');
     process.exitCode = 1;
     return;
   }
   fs.writeFileSync(gm, next);
-  console.log('installed ' + Object.keys(thin).length + ' races into tools\\gamemode.js');
+  console.log('installed ' + Object.keys(thin).length + ' races into game\\gamemode.js');
 }
 
 if (!Object.keys(rows).length) {
@@ -309,7 +309,7 @@ if (!Object.keys(rows).length) {
     builtBy: 'tools\\Build-RaceTable.js',
     builtAt: new Date().toISOString(),
     source: 'the RACE records of the plugins in load order',
-    note: 'which recipes a race owns is in tools\\recipes.json; this only says what the races are',
+    note: 'which recipes a race owns is in game\\data\\recipes.json; this only says what the races are',
     count: Object.keys(rows).length,
     items: rows
   }, null, 1));

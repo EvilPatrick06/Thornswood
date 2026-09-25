@@ -11,10 +11,10 @@
 // It was written as OwnGame\files.txt. Somewhere between a session and the
 // file, a tool that eats backslashes turned "\f" into the form feed character,
 // and the file parsed, ran, and passed every check there was, because nothing
-// looks at bytes. The same thing happened to tools/gamemode.js the same night
+// looks at bytes. The same thing happened to game/gamemode.js the same night
 // and was only caught by reading the line back. And a "\n" in a comment in
 // that file became a real line break at some point before that, splitting
-// tools\recipes.json across two lines.
+// game\data\recipes.json across two lines.
 //
 // So this reads every tracked text file and fails on any byte below 32 that is
 // not a tab, a line feed or a carriage return. A form feed, a vertical tab, a

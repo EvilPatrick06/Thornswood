@@ -5,7 +5,7 @@
 // Patrick, 23 September, playing on dev: "Also the journal menu works but is
 // ugly asf and doesn't match the theme we use with our other menus".
 //
-// MEASURED before the change: the K panel (tools/ts-ui/thornswood-skills.js)
+// MEASURED before the change: the K panel (game/ui/thornswood-skills.js)
 // is the game's theme, a Palatino serif, parchment text #d9cfb4, gold #c6aa6d
 // and #e9d19b, gold hairline borders, square corners, a dark vignette behind a
 // near black panel, uppercase gold buttons with a gold primary, and gold
@@ -34,8 +34,8 @@ const CR = String.fromCharCode(13);
 function read(...bits) {
   return fs.readFileSync(path.join(TOOLS_DIR, ...bits), 'utf8').split(CR).join('');
 }
-const journalSrc = read('ts-ui', 'thornswood-journal.js');
-const skillsSrc = read('ts-ui', 'thornswood-skills.js');
+const journalSrc = read('..', 'game', 'ui', 'thornswood-journal.js');
+const skillsSrc = read('..', 'game', 'ui', 'thornswood-skills.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
