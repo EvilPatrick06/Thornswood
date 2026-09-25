@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -488,6 +488,54 @@ setInterval(() => {
   }
 }, PING_EVERY);
 
+/*
+  ONE SLOW CONNECTION MUST NOT GROW THIS PROCESS WITHOUT LIMIT.
+
+  Every message went out through send(), which ignored what socket.write
+  returns. When somebody's link cannot keep up, or their machine stops
+  reading, node does not refuse a write: it keeps the bytes in memory and
+  answers false. Nothing listened, so the position feed piled up behind that
+  one socket five times a second. Measured on 24 September with a copy of
+  this service on loopback and one websocket that joined and never read, at
+  1,500 rows: once the loopback buffers were full the queue grew about
+  0.75 MB a second, 15 MB after twenty seconds, and nothing ever gave it back.
+
+  The To Do List entry: "For state that is superseded every tick, dropping is
+  the correct answer and is what unreliable transport means." So a socket that
+  has said false is marked backed until it drains, and the position tick skips
+  it (sendLossy): the next tick carries newer positions anyway. Everything else
+  stays on send, because welcome, chat, signalling and voice modes each say
+  something that is not said again.
+
+  The roster sits between the two (sendLatest). Every join and every leave
+  sends the whole room to everybody, so when a room fills at once, as it does
+  when the service restarts and every page reconnects, each socket is sent a
+  roster per arrival: about 1.3 MB for the first in at two hundred people.
+  Queued in full, that tripped the ceiling below for anybody slow to read,
+  and those closed sockets would reconnect into another burst. On
+  24 September test-cull.js, whose two hundred sockets join together, had 42
+  of them closed that way in one run on a busy machine.
+
+  Only the newest roster means anything, so a backed socket keeps just that
+  one and is sent it when it drains, or ahead of the next message it is sent,
+  so nothing arrives out of order.
+
+  What is left to grow is that reliable traffic, for a socket that never
+  reads. Past QUEUE_CEILING it is closed and left to reconnect, which all
+  three pages already do: voice.js after five seconds, the launcher's voice
+  host after two, the chat overlay on its own retry. The gamemode's rows come
+  out about the size they went in, so the 200,000 byte /positions limit keeps
+  one position message under about 200 KB, a fifth of the ceiling, and a
+  single tick does not trip it. Since each person is sent only the people
+  they could hear (viewsOf), most ticks are far smaller than that. Reaching
+  the ceiling takes a couple of thousand chat lines, or hundreds of call
+  offers, that nobody has read.
+*/
+const QUEUE_CEILING = 1024 * 1024;
+let droppedPositions = 0;   // ticks not sent to a backed socket, for /health
+let skippedRosters = 0;     // rosters replaced by a newer one unsent, for /health
+let closedBacklogged = 0;   // sockets closed at the ceiling, for /health
+
 class Sock {
   constructor(socket) {
     this.socket = socket;
@@ -495,8 +543,13 @@ class Sock {
     this.onmessage = null;
     this.onclose = null;
     this.closed = false;
+    // True from a write that returned false until the socket drains.
+    this.backed = false;
+    // The newest roster not yet written, while backed. See sendLatest.
+    this.latest = null;
     live.add(this);
 
+    socket.on('drain', () => { this.backed = false; this.flushLatest(); });
     socket.on('data', (d) => this.feed(d));
     socket.on('error', () => this.close());
     socket.on('close', () => {
@@ -510,12 +563,60 @@ class Sock {
   /* A ping frame: FIN, opcode 9, no body. See the note over `live`. */
   ping() {
     if (this.closed) return;
-    try { this.socket.write(Buffer.from([0x89, 0])); } catch (e) { this.close(); }
+    try { this.write(Buffer.from([0x89, 0])); } catch (e) { this.close(); }
+  }
+
+  /* Where what socket.write says is heard. See the note over QUEUE_CEILING. */
+  write(buf) {
+    if (this.socket.write(buf) === false) this.backed = true;
+    const queued = this.socket.writableLength;
+    if (queued > QUEUE_CEILING) {
+      closedBacklogged++;
+      console.log('[voice] closed a connection whose queue passed ' + QUEUE_CEILING +
+                  ' bytes (' + queued + ' waiting). It can reconnect.');
+      this.close();
+    }
   }
 
   send(obj) {
     if (this.closed) return;
-    try { this.socket.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
+    // A roster held back while this socket was backed goes out first, so
+    // every message still arrives after the roster that was current when it
+    // was sent, as it did before rosters were held back.
+    this.flushLatest();
+    if (this.closed) return;
+    try { this.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
+  }
+
+  /* For the position tick only: skipped while backed, and counted. */
+  sendLossy(obj) {
+    if (this.backed) { droppedPositions++; return; }
+    this.send(obj);
+  }
+
+  /*
+    For the roster only. Each one is the whole room, so while this socket is
+    backed only the newest is worth keeping: it waits here, replacing any
+    older one, and goes out when the socket drains or ahead of the next
+    message sent to it, whichever comes first. Unlike a position it is never
+    dropped, because the next roster only comes when somebody joins or
+    leaves. See the note over QUEUE_CEILING.
+  */
+  sendLatest(obj) {
+    if (this.closed) return;
+    if (this.backed) {
+      if (this.latest) skippedRosters++;
+      this.latest = obj;
+      return;
+    }
+    this.send(obj);
+  }
+
+  flushLatest() {
+    if (!this.latest || this.closed) return;
+    const obj = this.latest;
+    this.latest = null;
+    try { this.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
   }
 
   close() {
@@ -531,6 +632,17 @@ class Sock {
     // A frame can arrive split across reads, and several can arrive in one, so
     // this loops until what is left is not a whole frame.
     for (;;) {
+      /*
+        And stops the moment the socket is closed, whatever is left. The
+        ceiling closes a socket from inside write, so a message that comes
+        back to its own sender (their chat line, an offer addressed to
+        themselves, a notice) can close it partway through this loop. The
+        frames after that belong to somebody onclose has already taken out
+        of the room: they used to be handled anyway, and chat from them went
+        past the chat limit to the room and the log as profile 0 with no
+        name. tools/voice/test-backpressure.js sends exactly that.
+      */
+      if (this.closed) return;
       if (this.buf.length < 2) return;
       const b0 = this.buf[0], b1 = this.buf[1];
       const op = b0 & 0x0f;
@@ -577,8 +689,26 @@ class Sock {
         this.close();
         return;
       }
-      if (op === 0x9) {                                 // ping -> pong
-        try { this.socket.write(Buffer.concat([Buffer.from([0x8a, 0]), Buffer.alloc(0)])); } catch (e) { }
+      /*
+        A ping is answered with a pong, but not while this socket is backed.
+
+        The pong used to be written straight to the socket, past write and
+        so past the ceiling, and each one is a separate two byte write that
+        node holds as its own queued request. On 24 September a socket that
+        never read sent 9 MB of pings in one go: 1.4 million pongs queued,
+        2.8 MB by writableLength, and the service went from 50 MB to 447 MB
+        before the next position tick reached the ceiling and closed it.
+
+        RFC 6455 section 5.5.3 allows answering only the most recent of
+        several pings, and a socket that is backed is not reading its pongs
+        anyway, so while it is backed they are not written. Through write,
+        the first one the kernel refuses marks it backed, which caps what a
+        flood of pings can queue at one buffer's worth.
+      */
+      if (op === 0x9) {
+        if (!this.backed) {
+          try { this.write(Buffer.from([0x8a, 0])); } catch (e) { this.close(); }
+        }
         continue;
       }
       // A pong is the answer to OUR ping. Nothing to do with it: it has
@@ -620,7 +750,7 @@ function roster() {
 
 function announce() {
   const list = roster();
-  for (const [, p] of peers) p.ws.send({ t: 'peers', peers: list });
+  for (const [, p] of peers) p.ws.sendLatest({ t: 'peers', peers: list });
 }
 
 function onJoin(ws, msg) {
@@ -771,7 +901,7 @@ function viewsOf(snap) {
 setInterval(() => {
   if (peers.size === 0) return;
   const viewOf = viewsOf(snapshot());
-  for (const [, p] of peers) p.ws.send({ t: 'pos', at: Date.now(), who: viewOf(p.profileId) });
+  for (const [, p] of peers) p.ws.sendLossy({ t: 'pos', at: Date.now(), who: viewOf(p.profileId) });
 }, 200);
 
 function isLoopback(req) {
@@ -1257,6 +1387,13 @@ const server = http.createServer((req, res) => {
       with the same counts. A number that resets is the only thing that says
       which.
     */
+    // How far behind the slowest connections are, so a backlog can be seen
+    // from outside rather than only as the process growing.
+    let backed = 0, largestQueue = 0;
+    for (const s of live) {
+      if (s.backed) backed++;
+      if (s.socket.writableLength > largestQueue) largestQueue = s.socket.writableLength;
+    }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: true, build: BUILD, auth: AUTH,
                             uptimeSeconds: Math.round(process.uptime()),
@@ -1265,7 +1402,11 @@ const server = http.createServer((req, res) => {
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             chatRange: CHAT_RANGE,
                             peers: peers.size, tracked: positions.size,
-                            queuedCommands: commands.length }));
+                            queuedCommands: commands.length,
+                            backed: backed, largestQueueBytes: largestQueue,
+                            droppedPositions: droppedPositions,
+                            skippedRosters: skippedRosters,
+                            closedBacklogged: closedBacklogged }));
     return;
   }
 
