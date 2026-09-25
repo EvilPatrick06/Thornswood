@@ -16,6 +16,26 @@
 // only thing that can make one: nothing else in the gamemode has ever read a
 // race for any purpose.
 //
+// ONE LINE PER RACE, UNDER THE PLUGIN THAT MADE IT, WORTH WHAT THE LAST
+// PLUGIN SAYS. Found on 24 September by the ale fix (#322), which had the same
+// fault in Build-FoodTable.js. This used to key every version of a record by
+// the plugin it was read out of, so UndeadDragonRace was three lines,
+// 1052a3:Skyrim.esm, 1052a3:Update.esm and 1052a3:Dragonborn.esm. An override
+// keeps the form id of the plugin that first made the record, so the game
+// reports that race as 1052a3 of Skyrim.esm, and the server read Skyrim.esm's
+// version of it rather than the one the game uses. The other two lines
+// resolved to ids nothing ever reports. So a record's high byte is read
+// through the plugin's own MAST list, the way Build-FoodTable.js and
+// Build-FireTable.js do it, and the version kept is the last one in the load
+// order. races.json rows say which plugin's version they were read from.
+//
+// Measured on this build on 24 September: 258 versions are 215 races. 32 of
+// them are overridden, every one by Update.esm, Dawnguard.esm or
+// Dragonborn.esm, and none of those overrides changes the editor id or the
+// playable bit, so no race the game reports answers differently. What went is
+// 43 lines nobody could reach. It matters the day a plugin in the order
+// changes a race.
+//
 // Read only. It opens the plugins of the build, writes tools\races.json, and
 // replaces one generated line in tools\gamemode.js.
 //
@@ -72,7 +92,7 @@ function loadOrder() {
   NordRace and BretonRace carry bit 0 and FalmerRace, DremoraRace and
   DraugrRace do not.
 
-  WHAT IT ANSWERS ON THIS BUILD: 214 races, twelve playable. The ten vanilla
+  WHAT IT ANSWERS ON THIS BUILD: 215 races, twelve playable. The ten vanilla
   ones, and 1RieklingBlueRace and 1RieklingPurpleRace out of Playable
   Rieklings.esp, which is why riekling gear can be locked to rieklings at all.
 */
@@ -95,6 +115,40 @@ const PLAYABLE_BIT = 1;
   missing and a number reads as a name.
 */
 const LOCALISED = 0x80;
+
+/*
+  The masters a plugin declares, in order. A record's high byte is an index
+  into this list, and anything past the end is the plugin's own. The same
+  reading as Build-FireTable.js and Build-FoodTable.js.
+*/
+function mastersOf(b) {
+  const out = [];
+  let k = 24;
+  const end = 24 + b.readUInt32LE(4);
+  while (k + 6 <= end) {
+    const sub = b.toString('ascii', k, k + 4);
+    const sz = b.readUInt16LE(k + 4);
+    k += 6;
+    if (sub === 'MAST' && sz > 1) { out.push(b.toString('latin1', k, k + sz - 1)); }
+    k += sz;
+  }
+  return out;
+}
+
+/*
+  A master named the way the load order names it. The server turns a
+  descriptor into a form id by looking the file up in its own list with an
+  exact match (FormDesc::ToFormId in the fork), so a plugin that happens to
+  write "skyrim.esm" in its MAST must not put a line in the table the server
+  cannot find.
+*/
+function asLoaded(name, order) {
+  const low = name.toLowerCase();
+  for (const n of order) {
+    if (n.toLowerCase() === low) { return n; }
+  }
+  return name;
+}
 
 function subrecords(rec, localised) {
   const got = { EDID: '', FULL: '', playable: false };
@@ -120,8 +174,21 @@ function subrecords(rec, localised) {
 }
 
 const rows = {};
-const here = { file: '', localised: false };
+// Which plugin the walk is inside, and what it declares as its masters.
+const here = { file: '', localised: false, masters: [], order: [] };
 let scanned = 0;
+
+/*
+  Which record this is: the plugin that made it and the id within that
+  plugin. An index inside the master list means the record belongs to that
+  master and this plugin is only changing it. See ONE LINE PER RACE.
+*/
+function ownerOf(formId) {
+  const idx = (formId >>> 24) & 0xff;
+  const local = formId & 0x00ffffff;
+  const file = idx < here.masters.length ? asLoaded(here.masters[idx], here.order) : here.file;
+  return local.toString(16) + ':' + file;
+}
 
 function walk(b, start, end) {
   let j = start;
@@ -145,8 +212,11 @@ function walk(b, start, end) {
       } catch (e) { rec = null; }
       if (rec) {
         const s = subrecords(rec, here.localised);
-        const desc = (formId & 0x00ffffff).toString(16) + ':' + here.file;
-        rows[desc] = { e: s.EDID, n: s.FULL || s.EDID, p: s.playable };
+        // Every version of a record has the same key, and the plugins are
+        // walked in load order, so the one left standing is the last one,
+        // which is the one the game uses. from names it.
+        const desc = ownerOf(formId);
+        rows[desc] = { e: s.EDID, n: s.FULL || s.EDID, p: s.playable, from: here.file };
       }
     }
     j += 24 + dataSize;
@@ -154,6 +224,7 @@ function walk(b, start, end) {
 }
 
 const order = loadOrder();
+here.order = order;
 const missing = [];
 for (const file of order) {
   const full = path.join(DATA, file);
@@ -168,6 +239,11 @@ for (const file of order) {
       here.localised = !!(buf.readUInt32LE(8) & LOCALISED);
     }
   } catch (e) { here.localised = false; }
+  // See ONE LINE PER RACE.
+  here.masters = [];
+  try {
+    if (buf.length > 24 && buf.toString('ascii', 0, 4) === 'TES4') { here.masters = mastersOf(buf); }
+  } catch (e) { here.masters = []; }
   try { walk(buf, 0, buf.length); } catch (e) {
     console.error('FAIL  ' + file + ' would not parse: ' + e.message);
     process.exitCode = 1;
@@ -189,9 +265,10 @@ if (PRINT) {
 /*
   INSTALLED INTO gamemode.js, thinner than the json.
 
-  races.json keeps the editor id and the display name because "why did this
-  count as a riekling" has to be answerable. The server compares words, so the
-  line that goes in carries the editor id alone.
+  races.json keeps the editor id, the display name and the plugin whose
+  version was kept, because "why did this count as a riekling" has to be
+  answerable. The server compares words, so the line that goes in carries the
+  editor id alone.
 */
 function install() {
   const gm = path.join(__dirname, 'gamemode.js');
@@ -211,6 +288,10 @@ function install() {
     ? src.replace(re, line)
     : src.replace(/^(const FOODS = .*;)$/m, '$1\n' + line);
   if (next === src) {
+    // Run twice on the same load order, the line is already there and is the
+    // same line. That is the table being generated, not a failure to find it,
+    // and it used to say FAIL and exit 1, the way Build-FoodTable.js did.
+    if (re.test(src)) { console.log('tools\\gamemode.js already holds this table'); return; }
     console.error('FAIL  could not find anywhere in gamemode.js to put the table');
     process.exitCode = 1;
     return;
