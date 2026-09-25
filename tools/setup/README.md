@@ -25,7 +25,7 @@ compile keeps the last working stub and says so. Build into a scratch root, as
 for the launcher:
 
 ```
-powershell -NoProfile -File tools\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
+.\tools\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
 ```
 
 `tools\Package-Thornswood.ps1` copies the stub to `Thornswood-Setup.exe`
