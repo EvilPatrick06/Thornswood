@@ -1,0 +1,516 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ThornsWood voice</title>
+<body style="background:#111;color:#ccc;font:12px sans-serif">
+<div id="s">starting</div>
+<script>
+/*
+  Proximity voice, running in the launcher instead of the game.
+
+  Everything this page does used to happen inside SkyrimPlatform's in-game CEF
+  overlay: getUserMedia, WebRTC, the panner, playback. That browser has no
+  permission UI, an autoplay policy that will not start audio without a click
+  nobody can give it, and a focus flag that takes the keyboard off the game
+  when raised. Signalling worked in there, which is why names, distances and
+  the speaking indicator were always right. Audio never did.
+
+  Here there is a real browser, the microphone is granted by the host because
+  nothing is ever on screen to prompt, and nothing this page does can touch the
+  game's input. The page talks to the same voice server on the same protocol.
+  The only thing it needs from the game is push to talk, which arrives from the
+  launcher over a local socket.
+*/
+'use strict';
+
+var S = document.getElementById('s');
+var cfg = null;          // {host, port, profileId, name, token}
+var ws = null, myPeer = 0, myProfile = 0;
+var ctx = null, mic = null, micTrack = null;
+var talking = false, mode = 'local';
+var conns = new Map();   // peerId -> record
+var places = {};         // profileId -> {pos, angleZ, cell, name}
+var lastMode = {};       // peerId -> the last mode heard for them
+
+/*
+  Who this person has muted, by profile id: profileId -> true.
+
+  The mute from #133 lived only in the game's own page, and that page carries
+  no audio once the launcher has it. A reviewer measured it on 23 September:
+  profile 123 muted in the game, standing beside you, and this page still
+  played them at full level, because nothing here had ever heard of a mute.
+  So a muted person went on being heard.
+
+  The list comes from the server, through the game's page, the voice plugin
+  and a file the launcher watches (voice-muted.txt), and arrives here as a
+  'muted' message. place() reads it before anything else.
+*/
+var muted = {};
+
+var UNITS_PER_METRE = 70;
+
+/*
+  Whisper, local and yell, and why the level is worked out here rather than
+  left to the panner.
+
+  The three modes used to set panner.maxDistance and nothing else, and all
+  three sounded identical because WebAudio's inverse distance model never
+  reads maxDistance. Only the linear model does. So every voice in the world
+  carried the same distance whichever mode the speaker was in, and changing
+  mode moved a number nothing looked at.
+
+  Linear is the model that would have honoured it, and it is the wrong shape
+  for a voice: the volume falls at a fixed rate and then stops dead. So the
+  panner keeps HRTF for direction and is told to apply no distance
+  attenuation of its own (rolloffFactor 0 makes the inverse model return 1 at
+  every distance), and the level is worked out below from the speaker's mode.
+
+  Three numbers per mode, metres except the last:
+
+    full   inside this you hear them at the mode's own level
+    quiet  by this you hear nothing, and between the two it fades
+    level  how loud the mode is at all, because a yell across a square is
+           louder than a whisper in your ear and not only further
+
+  Brought in on 19 September, heard in game rather than worked out here: the
+  first set carried too far in all three. Whisper is cut to a third of what it
+  was, local and yell to two thirds, which is what Djinn asked for after
+  listening to it. The levels are untouched; it was the distance that was
+  wrong, not the loudness.
+
+  Local halved again on 20 September, asked for by Patrick after hearing the
+  19 September set in game: 2.7 and 12 become 1.35 and 6. Whisper and yell are
+  left where they are, so the three modes separate more sharply than they did,
+  which is the point of having three.
+
+  Skyrim is 70 units to the metre, so a whisper dies by about 120 units, local
+  by about 420 and a yell by about 2100.
+*/
+var RANGE = {
+  whisper: { full: 0.5,  quiet: 1.7, level: 0.85 },
+  local:   { full: 1.35, quiet: 6,   level: 1.0  },
+  yell:    { full: 5.3,  quiet: 30,  level: 1.35 }
+};
+
+// How far through the fade they are, the mode's level at the near edge and
+// nothing at the far one. Squared, because halfway between the two should not
+// sound like half volume: a yell at the edge of its range is meant to be a
+// voice in the distance rather than somebody in the conversation.
+function levelFor(name, metres) {
+  var r = RANGE[name] || RANGE.local;
+  if (metres <= r.full) { return r.level; }
+  if (metres >= r.quiet) { return 0; }
+  var t = 1 - (metres - r.full) / (r.quiet - r.full);
+  return r.level * t * t;
+}
+
+// Ramped rather than assigned. Positions arrive a few times a second and a
+// gain that steps from one value to the next clicks.
+function setGain(rec, value) {
+  try {
+    rec.gain.gain.setTargetAtTime(value, ctx.currentTime, 0.05);
+  } catch (e) {
+    try { rec.gain.gain.value = value; } catch (e2) { }
+  }
+}
+
+function host(kind, text) {
+  try {
+    window.chrome.webview.postMessage(JSON.stringify({ t: kind, text: String(text) }));
+  } catch (e) { }
+  if (kind === 'status') { S.textContent = text; }
+}
+
+function say(text) { host('log', text); }
+
+// Goes to launcher.log and nowhere else. The launcher has one status line and
+// it is the only thing most people ever read, so the running commentary of a
+// WebRTC connection does not get to sit on it.
+function quiet(text) { host('debug', text); }
+
+// Somebody whose name has not arrived yet is a person, not a peer id.
+function who(rec) { return (rec && rec.name) ? rec.name : 'someone nearby'; }
+
+// ------------------------------------------------------------------ audio --
+function audio() {
+  if (ctx) return ctx;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  return ctx;
+}
+
+function openMic() {
+  if (mic || !navigator.mediaDevices) return;
+  navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  }).then(function (str) {
+    mic = str;
+    micTrack = str.getAudioTracks()[0] || null;
+    // Held closed until push to talk says otherwise. The track stays in every
+    // connection so that talking does not need renegotiation.
+    if (micTrack) { micTrack.enabled = false; }
+    say('microphone open: ' + (micTrack ? (micTrack.label || 'unnamed') : 'no track'));
+    host('status', 'mic ready');
+    // Any connection built before the microphone existed needs the track now.
+    conns.forEach(function (rec) {
+      try { mic.getAudioTracks().forEach(function (t) { rec.pc.addTrack(t, mic); }); }
+      catch (e) { }
+    });
+  }).catch(function (e) {
+    say('microphone refused: ' + e);
+    host('status', 'no microphone');
+  });
+}
+
+// ------------------------------------------------------------ signalling --
+function send(o) {
+  try { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); } catch (e) { }
+}
+
+/*
+Where to look for each other, asked for rather than typed in.
+
+This was a Google STUN server written into three separate pages. STUN
+alone only works when both ends can be reached once they know where to
+look; behind a symmetric NAT, some mobile networks and a lot of corporate
+ones, they cannot, and that pair of people never hear each other while
+everybody else sounds fine. TURN fixes it and needs a relay, which cannot
+be typed into a page, so the service hands the list out at /ice.
+
+The old value stays here as the fallback, so a service that has not been
+told about a relay, or one that cannot be reached for a moment, behaves
+exactly as this did before.
+*/
+/*
+  Where the voice service is, for this page.
+
+  The launcher sends base and socket now. Older configs, and anything that has
+  not been rebuilt, send only host and port, so those are still what this falls
+  back to and the behaviour is unchanged for them.
+
+  Two of them because they are not the same string: a base of
+  https://thornswood.net/voice gives wss://thornswood.net/voice/ for the
+  socket, and getting that wrong is a mixed content error that says nothing
+  useful about why.
+*/
+function voiceBase() {
+  if (cfg && cfg.base) { return String(cfg.base).replace(/\/+$/, ''); }
+  if (!cfg) { return ''; }
+  return 'http://' + cfg.host + ':' + cfg.port;
+}
+
+function voiceSocket() {
+  if (cfg && cfg.socket) { return String(cfg.socket); }
+  var b = voiceBase();
+  if (b.indexOf('https://') === 0) { return 'wss://' + b.slice(8) + '/'; }
+  if (b.indexOf('http://') === 0) { return 'ws://' + b.slice(7) + '/'; }
+  return b + '/';
+}
+
+var ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
+function refreshIce() {
+  if (!cfg || !cfg.host) { return; }
+  try {
+    fetch(voiceBase() + '/ice')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.iceServers && d.iceServers.length) {
+          ICE = d.iceServers;
+          say('ice: ' + ICE.length + ' server(s), relay ' +
+              (ICE.some(function (s) { return /^turns?:/.test([].concat(s.urls)[0]); }) ? 'yes' : 'no'));
+        }
+      })
+      .catch(function () { });
+  } catch (e) { }
+}
+
+function connect() {
+  refreshIce();
+  if (!cfg) return;
+
+  // A second config (a new character on Play) calls this with the first
+  // socket still open. Left there, the service keeps both as peers, this page
+  // takes its own old peer for somebody nearby, and offers for one person
+  // arrive on both sockets into the same connection. The handlers go first so
+  // closing it does not schedule a reconnect of its own.
+  if (ws) {
+    var old = ws;
+    ws = null;
+    old.onopen = old.onclose = old.onerror = old.onmessage = null;
+    try { old.close(); } catch (e) { }
+    conns.forEach(function (rec, id) { drop(id); });
+    myPeer = 0;
+  }
+
+  var url = voiceSocket();
+  say('connecting to ' + url);
+  try { ws = new WebSocket(url); } catch (e) { say('socket refused: ' + e); return; }
+
+  ws.onopen = function () {
+    // The token is what says who we are. profileId goes with it only so an
+    // older service that has never heard of tokens still works; the new one
+    // reads the token and ignores the number.
+    send({ t: 'join', profileId: cfg.profileId, name: cfg.name, mode: mode,
+           token: cfg.token || '' });
+    host('status', 'connected');
+  };
+  ws.onclose = function () {
+    host('status', 'disconnected');
+    conns.forEach(function (rec, id) { drop(id); });
+    setTimeout(connect, 2000);
+  };
+  ws.onerror = function () { };
+  ws.onmessage = function (ev) {
+    var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.t === 'welcome') { myPeer = m.peer; myProfile = cfg.profileId; return; }
+    if (m.t === 'peers') { onPeers(m.peers || []); return; }
+    if (m.t === 'pos') { places = m.who || {}; place(); return; }
+    if (m.t === 'sdp') { onSdp(m); return; }
+    if (m.t === 'ice') { onIce(m); return; }
+    if (m.t === 'vmode') {
+      var r = conns.get(m.from);
+      // A mode can arrive before the connection it belongs to, so it is kept
+      // by peer as well: a whisper announced during the handshake used to be
+      // dropped and the speaker was heard at local range until they changed
+      // mode again.
+      lastMode[m.from] = m.mode;
+      if (r) { r.mode = m.mode; place(); }
+      return;
+    }
+  };
+}
+
+function onPeers(list) {
+  var seen = {};
+  list.forEach(function (p) {
+    if (p.peer === myPeer) return;
+    seen[p.peer] = true;
+    var had = conns.get(p.peer);
+    if (p.mode) { lastMode[p.peer] = p.mode; }
+    if (had) { had.mode = p.mode || had.mode; had.profileId = p.profileId; had.name = p.name; return; }
+    // Only the lower peer id offers, so two offers never cross on a new pair.
+    open(p.peer, p, myPeer < p.peer);
+  });
+  conns.forEach(function (rec, id) { if (!seen[id]) drop(id); });
+  host('peers', String(conns.size));
+}
+
+function open(id, info, initiator) {
+  var pc = new RTCPeerConnection({ iceServers: ICE });
+  var a = audio();
+  var gain = a.createGain();
+  // A gain node starts at full level and the next position is up to a fifth
+  // of a second away, so somebody already muted starts silent instead.
+  if (muted[info.profileId]) { gain.gain.value = 0; }
+  var panner = a.createPanner();
+  panner.panningModel = 'HRTF';
+  // Direction only. The distance is the gain node's job, above: with no
+  // rolloff the inverse model returns 1 at every distance, so the panner
+  // places the voice and never quietens it.
+  panner.distanceModel = 'inverse';
+  panner.refDistance = 1;
+  panner.rolloffFactor = 0;
+  panner.connect(gain).connect(a.destination);
+
+  var rec = {
+    pc: pc, panner: panner, gain: gain, el: null,
+    profileId: info.profileId, name: info.name,
+    mode: info.mode || lastMode[id] || 'local',
+    polite: !initiator, makingOffer: false, haveRemote: false,
+    pendingIce: [], restarts: 0
+  };
+  conns.set(id, rec);
+
+  if (mic) {
+    mic.getAudioTracks().forEach(function (t) { pc.addTrack(t, mic); });
+  } else {
+    try { pc.addTransceiver('audio', { direction: 'recvonly' }); } catch (e) { }
+  }
+
+  pc.onicecandidate = function (e) {
+    if (e.candidate) send({ t: 'ice', to: id, candidate: e.candidate });
+  };
+
+  pc.oniceconnectionstatechange = function () {
+    var st = pc.iceConnectionState;
+    quiet('peer ' + id + ' (' + (rec.name || 'no name yet') + ') is ' + st);
+    if (st !== 'failed') return;
+    if (rec.restarts >= 1) {
+      // The launcher puts "Voice: " on the front of anything this sends.
+      say('could not reach ' + who(rec) + '. One of you is behind a router ' +
+          'that will not let the two of you talk directly.');
+      return;
+    }
+    rec.restarts++;
+    quiet('peer ' + id + ' failed, trying again');
+    try { pc.restartIce(); } catch (e) { }
+  };
+
+  pc.ontrack = function (e) {
+    var src = a.createMediaStreamSource(e.streams[0]);
+    src.connect(panner);
+    // Chromium will not pump a WebRTC stream through WebAudio unless it is
+    // also attached to an element. Muted: the panner is the audible path.
+    var el = new Audio();
+    el.srcObject = e.streams[0];
+    el.muted = true;
+    el.play().catch(function () { });
+    rec.el = el;
+    if (a.state === 'suspended') { a.resume().catch(function () { }); }
+    say('receiving from ' + who(rec));
+  };
+
+  // Both sides, because the microphone is opened after connections exist and
+  // adding a track needs renegotiation. Perfect negotiation settles collisions.
+  pc.onnegotiationneeded = function () {
+    rec.makingOffer = true;
+    Promise.resolve()
+      .then(function () { return pc.setLocalDescription(); })
+      .then(function () { send({ t: 'sdp', to: id, sdp: pc.localDescription }); })
+      .catch(function (e) { say('offer failed: ' + e); })
+      .then(function () { rec.makingOffer = false; });
+  };
+}
+
+function onSdp(m) {
+  var rec = conns.get(m.from);
+  if (!rec) return;
+  var collision = m.sdp.type === 'offer' &&
+                  (rec.makingOffer || rec.pc.signalingState !== 'stable');
+  if (collision && !rec.polite) return;
+
+  rec.pc.setRemoteDescription(m.sdp).then(function () {
+    rec.haveRemote = true;
+    var queued = rec.pendingIce; rec.pendingIce = [];
+    queued.forEach(function (c) { rec.pc.addIceCandidate(c).catch(function () { }); });
+    if (m.sdp.type !== 'offer') return null;
+    return rec.pc.setLocalDescription().then(function () {
+      send({ t: 'sdp', to: m.from, sdp: rec.pc.localDescription });
+    });
+  }).catch(function (e) { say('sdp failed: ' + e); });
+}
+
+function onIce(m) {
+  var rec = conns.get(m.from);
+  if (!rec) return;
+  // Candidates routinely arrive before the description they belong to.
+  if (!rec.haveRemote) { rec.pendingIce.push(m.candidate); return; }
+  rec.pc.addIceCandidate(m.candidate).catch(function () { });
+}
+
+function drop(id) {
+  var rec = conns.get(id);
+  if (!rec) return;
+  try { rec.pc.close(); } catch (e) { }
+  try { if (rec.el) { rec.el.srcObject = null; } } catch (e) { }
+  conns.delete(id);
+  delete lastMode[id];
+  host('peers', String(conns.size));
+}
+
+// ------------------------------------------------------------- positions --
+function place() {
+  var me = places[myProfile];
+  if (!me || !me.pos) {
+    // Nowhere to measure from, so distance is left as it was. A mute is not a
+    // distance and does not wait for one.
+    conns.forEach(function (rec) { if (muted[rec.profileId]) { setGain(rec, 0); } });
+    return;
+  }
+  var rad = (Number(me.angleZ) || 0) * Math.PI / 180;
+  var cos = Math.cos(rad), sin = Math.sin(rad);
+
+  conns.forEach(function (rec) {
+    // Muted beats distance: somebody standing next to you and muted is silent.
+    if (muted[rec.profileId]) { setGain(rec, 0); return; }
+    var them = places[rec.profileId];
+    // A wall is not a distance. Another cell is silence whatever the maths says.
+    if (!them || !them.pos || them.cell !== me.cell) { setGain(rec, 0); return; }
+
+    var dx = them.pos[0] - me.pos[0];
+    var dy = them.pos[1] - me.pos[1];
+    var dz = them.pos[2] - me.pos[2];
+
+    // Skyrim's angle is a compass bearing, so rotate the world into the
+    // listener's frame rather than moving the listener.
+    var forward = (dy * cos + dx * sin) / UNITS_PER_METRE;
+    var right   = (dx * cos - dy * sin) / UNITS_PER_METRE;
+    var up      = dz / UNITS_PER_METRE;
+
+    // Their mode, not ours: you decide how far your own voice carries and
+    // everybody else hears the result at whatever range that choice reaches.
+    var metres = Math.sqrt(right * right + forward * forward + up * up);
+    setGain(rec, levelFor(rec.mode, metres));
+
+    // WebAudio looks down -z, so what is in front is negative.
+    if (rec.panner.positionX) {
+      rec.panner.positionX.value = right;
+      rec.panner.positionY.value = up;
+      rec.panner.positionZ.value = -forward;
+    } else {
+      rec.panner.setPosition(right, up, -forward);
+    }
+  });
+}
+
+// ------------------------------------------------------ the launcher talks --
+window.chrome.webview.addEventListener('message', function (e) {
+  var m; try { m = JSON.parse(e.data); } catch (err) { return; }
+
+  if (m.t === 'config') {
+    cfg = { host: m.host, port: m.port, profileId: Number(m.profileId) || 0,
+            name: String(m.name || ''), token: String(m.token || ''),
+            base: String(m.base || ''), socket: String(m.socket || '') };
+    myProfile = cfg.profileId;
+    say('configured as profile ' + cfg.profileId +
+        (cfg.token ? '' : ', with no join token'));
+    audio();
+    openMic();
+    connect();
+    return;
+  }
+
+  /*
+    A fresh join token, sent by the launcher part way through a session.
+
+    The one handed over at config expires, and the launcher renews it at half
+    its life. Kept for the next socket rather than acted on: the connection
+    that is already up was let in with the old one and is not rechecked, so
+    there is nothing to do until we reconnect.
+  */
+  if (m.t === 'token') {
+    if (cfg) { cfg.token = String(m.token || ''); }
+    return;
+  }
+
+  if (m.t === 'ptt') {
+    talking = !!m.on;
+    if (micTrack) micTrack.enabled = talking;
+    host('talking', talking ? '1' : '0');
+    return;
+  }
+
+  if (m.t === 'mode') {
+    mode = m.mode || 'local';
+    send({ t: 'vmode', mode: mode });
+    return;
+  }
+
+  /*
+    The mute list, as the line the game wrote: profile ids with spaces between.
+    The whole list every time, never a change to it, so a message that is
+    missed is put right by the next one. Anything that is not a profile id is
+    dropped rather than trusted.
+  */
+  if (m.t === 'muted') {
+    var next = {};
+    String(m.list || '').split(/\s+/).forEach(function (id) {
+      var n = Number(id);
+      if (n > 0 && Math.floor(n) === n) { next[n] = true; }
+    });
+    muted = next;
+    place();
+    return;
+  }
+});
+
+host('status', 'waiting for config');
+</script>

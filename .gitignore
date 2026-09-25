@@ -1,0 +1,101 @@
+# Never commit build output or credentials.
+config.json
+server-secret.txt
+*.7z
+*.zip
+*.exe
+_dist/
+published.json
+
+# Copies of the server's own logs, pulled down by scripts\vps\Get-Logs.ps1 to be
+# read. They belong to whichever run made them, not to the repo.
+logs/
+*.log
+
+# Scratch that has been committed by accident before.
+tools/thornswood-probe.js
+# What Audit-Mods.ps1 writes. A report of one machine at one moment, not source.
+tools/mod-audit.json
+
+# The Discord webhook is a credential: anyone holding the URL can post as the
+# bot. Publish-Discord reads it from here on the machine that ships.
+bot/news-webhook.txt
+
+# Scratch beside the repo, and the local patch runs that made 1.1.35.
+_to_delete/
+
+# Python's bytecode cache. Running the bot once leaves bot\__pycache__
+# behind, and it then shows up as untracked in every git status after, which is
+# how it nearly went into an unrelated pull request on 2026-09-17.
+__pycache__/
+*.pyc
+
+# What Publish-Discord.ps1 has already announced, one line per channel. Not a
+# credential, and not shared either: the two builds announce different
+# versions and each shipping machine has its own history, so a tracked copy
+# would be a conflict on every release. Ship commits nothing now, but it used
+# to commit the whole working tree, which is the other reason this stays out.
+bot/announced.json
+
+# Which ticket each person has open, written by the bot beside itself on the
+# VPS. It is a list of the Discord ids of everybody waiting on staff, so it
+# stays out of the repo if the bot is ever run from a checkout.
+bot/open-tickets.json
+
+# Which arrival each person was, written by the bot beside itself on the VPS so
+# the number on a join card only ever goes up. A list of Discord ids like the
+# one above, and a copy here would be some other run's numbers. The .tmp is the
+# half of a write that has not been swapped in yet.
+bot/joins.json
+bot/joins.json.tmp
+
+# The dev build's own news webhook, for the dev updates channel. Same rule as
+# news-webhook.txt above: anyone holding the URL can post as the bot.
+bot/dev-webhook.txt
+
+# Where a certificate lives and how to drive it. Never a password or a key,
+# but it names a machine's own signing setup and only that machine needs it.
+# scripts\release\Sign-Artifact.ps1 does nothing when this is absent, which is how a
+# machine without a certificate still builds.
+tools/signing.json
+# and any copy of it kept beside it while the setup is being changed.
+tools/signing.json.*
+
+# Microsoft's signing client, Azure.CodeSigning.Dlib.dll and what comes with
+# it, fetched from NuGet. records\signing\metadata.json beside it is tracked on
+# purpose (records\signing\README.md).
+records/signing/client/
+
+# The passphrase the nightly backups are encrypted with. Restore-Backup.ps1
+# looks for it beside itself, so the name has to be unable to land in here.
+# Where it really lives is Documents on Patrick's machine and
+# C:\Thornswood-Backup on the VPS, and it must be in both.
+tools/backup-key.txt
+thornswood-backup-key.txt
+
+# What the voice service makes beside itself the first time it runs. On the VPS
+# it lives in its own folder, so these only appear here when somebody runs it
+# out of a checkout to try something, which is exactly when nobody is watching
+# git status: token-key.txt signs the join tokens, secret.txt is the password
+# the account routes check, and owners.json is the register it keeps. Found on
+# 23 September by running the service locally to prove a header, which left a
+# signing key sitting untracked in voice.
+voice/token-key.txt
+# Not made by the service: the TURN relay's key, put beside it by hand. Ignored
+# here so a copy made to try the relay out of a checkout never reaches git.
+voice/turn-key.txt
+voice/secret.txt
+voice/owners.json
+voice/owners.json.tmp
+voice/chat/
+
+# Build output, in the repository folder since 25 September rather than in
+# C:\Thornswood-Dev (scripts\release\Where.ps1): the packs, the launcher and the
+# installer under out\dist, the server payload and thornswood-server.zip.
+# A release is what keeps them, on GitHub and the VPS.
+/out/
+
+# Things kept beside the repository that never go to GitHub: other servers'
+# launcher scripts, a copy of the VPS server settings, backups of old files.
+# Everything C:\Thornswood-Dev held that was not the fork or build output.
+/local/

@@ -1,0 +1,195 @@
+<#
+  test-publish-refusals.ps1
+
+  The publisher refuses, whole and for real, the releases it exists to refuse.
+
+  WHY THIS EXISTS. 17 September: an uninstall test removed Profile from the
+  machine that ships. Profile\OwnGame\files.txt, the only record of which
+  files in the game folder came from Vortex, went with it, and the next
+  release counted "29,063 added or changed (11,368.1 MB)" before it was
+  stopped by hand. Two refusals answer that now: no record, no release; and
+  no release over the size cap. Entry 197 on the To Do List asks for "the
+  publisher refuses without files.txt" as a test, and nothing ran either one.
+
+  So this runs the real Publish-Update.ps1, in a child PowerShell, against a
+  made up install in a temp folder, and reads what it did:
+
+    no files.txt                   refused, naming files.txt
+    a files.txt naming nothing     refused
+    a release over -MaxReleaseMB   refused by the size gate, nothing zipped
+    the same with -AcceptSize      goes past the size gate
+    a release under the cap        goes past the size gate
+
+  Every run also checks that the feed and the baseline are byte for byte what
+  they were, because a refusal that has already written either one is the
+  dry run fault of 17 September over again.
+
+  WHY IT IS SAFE TO RUN ANYWHERE. The script is copied into the temp folder
+  with the two files it dot-sources, and the third, Close-Launcher.ps1, is
+  replaced by a stub: the real Stop-Game closes any Skyrim on the machine,
+  whatever folder it runs from, and nothing here may do that. LOCALAPPDATA
+  points into the temp folder, so the real baseline is never read or written.
+  -NoUpload and -NoPush, no config.json and no gh, so it cannot reach GitHub
+  or a server. Every case stops before the pack is built.
+#>
+[CmdletBinding()]
+param([string]$PublishPath)
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# The tests are in tests\, what they test is in tools\.
+$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+if (-not $PublishPath) { $PublishPath = Join-Path $Here '..\scripts\release\Publish-Update.ps1' }
+$ToolsDir = Split-Path -Parent $PublishPath
+
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+
+# The same PowerShell that runs this, so pwsh tests under pwsh and Windows
+# PowerShell under itself.
+$Shell = (Get-Process -Id $PID).Path
+
+$work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-refusals-' + [Guid]::NewGuid().ToString('N'))
+$tools = Join-Path $work 'repo\tools'
+New-Item -ItemType Directory -Path $tools -Force | Out-Null
+
+function Hash([string]$path) {
+    if (-not (Test-Path -LiteralPath $path)) { return 'absent' }
+    return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+}
+
+# One made up install per case, so nothing one case writes reaches the next.
+function New-Install([string]$name, [string[]]$record, [int64]$bytes) {
+    $root = Join-Path $work $name
+    foreach ($d in 'Game\Data', 'Profile\OwnGame', 'rel', 'dist', 'appdata\Thornswood') {
+        New-Item -ItemType Directory -Path (Join-Path $root $d) -Force | Out-Null
+    }
+    [IO.File]::WriteAllText((Join-Path $root 'rel\version.json'), '{"packs":[],"news":[]}')
+    # A baseline, so the run is not stopped for having none, naming one file
+    # that is gone so the release has something to remove.
+    [IO.File]::WriteAllText((Join-Path $root 'appdata\Thornswood\published.json'), '{"Data\\gone.esp":"10:1"}')
+    if ($null -ne $record) {
+        [IO.File]::WriteAllLines((Join-Path $root 'Profile\OwnGame\files.txt'), $record)
+    }
+    # One file of ours, the size the case asks for.
+    $fs = [IO.File]::Create((Join-Path $root 'Game\Data\ours.bsa'))
+    try { $fs.SetLength($bytes) } finally { $fs.Dispose() }
+    return $root
+}
+
+function Invoke-Publish([string]$root, [string[]]$extra) {
+    $before = @{
+        feed     = Hash (Join-Path $root 'rel\version.json')
+        baseline = Hash (Join-Path $root 'appdata\Thornswood\published.json')
+    }
+    $oldAppData = $env:LOCALAPPDATA
+    $oldEap = $ErrorActionPreference
+    $env:LOCALAPPDATA = Join-Path $root 'appdata'
+    # Windows PowerShell turns a child's stderr into a terminating error under
+    # Stop, which would end this harness on the first refusal it is testing.
+    $ErrorActionPreference = 'Continue'
+    try {
+        $argv = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+                  '-File', (Join-Path $tools '..\scripts\release\Publish-Update.ps1'),
+                  '-Root', $root,
+                  '-ReleaseDir', (Join-Path $root 'rel'),
+                  '-DistRoot', (Join-Path $root 'dist'),
+                  '-NoUpload', '-NoPush', '-NoPause') + @($extra)
+        $out = (& $Shell @argv 2>&1 | Out-String)
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $env:LOCALAPPDATA = $oldAppData
+        $ErrorActionPreference = $oldEap
+    }
+    $zips = @(Get-ChildItem -LiteralPath (Join-Path $root 'dist') -Recurse -Filter *.zip -File -ErrorAction SilentlyContinue)
+    return [pscustomobject]@{
+        Code      = $code
+        Out       = $out
+        FeedSame  = ($before.feed -eq (Hash (Join-Path $root 'rel\version.json')))
+        BaseSame  = ($before.baseline -eq (Hash (Join-Path $root 'appdata\Thornswood\published.json')))
+        Zips      = $zips.Count
+        StoppedGame = (Test-Path -LiteralPath (Join-Path $root 'stop-game-was-called.txt'))
+    }
+}
+
+function Unchanged($r) {
+    Yes '  version.json is byte for byte what it was' $r.FeedSame
+    Yes '  the baseline is byte for byte what it was' $r.BaseSame
+    Yes '  and no pack was zipped' ($r.Zips -eq 0)
+}
+
+try {
+    # ---- the real script, and a Close-Launcher that closes nothing -------------
+    # Each where it is in the repository since phase 8 of issue #440.
+    $repoRoot = Split-Path -Parent (Split-Path -Parent $ToolsDir)
+    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
+                   'scripts\release\Where.ps1', 'records\client-build.json') {
+        $from = Join-Path $repoRoot $f
+        $to = Join-Path (Split-Path -Parent $tools) $f
+        New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
+        if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $to -Force }
+    }
+    New-Item -ItemType Directory -Path (Join-Path $tools '..\scripts\dev') -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $tools '..\scripts\dev\Close-Launcher.ps1'), (
+        "function Stop-Game { param([string]`$Root)`r`n" +
+        "    [IO.File]::WriteAllText((Join-Path `$Root 'stop-game-was-called.txt'), 'yes')`r`n" +
+        "    return `$false`r`n" +
+        "}`r`n"))
+
+    $vortex = @('F|V|1024|638000000000000000|Data\collection.esp')
+    $big = [int64](2 * 1MB + 1)
+    $small = [int64](512KB)
+
+    # ---- no record, no release ------------------------------------------------
+    $r = Invoke-Publish (New-Install 'no-record' $null $small) @()
+    Yes 'with no files.txt the publisher stops' ($r.Code -eq 1)
+    Yes '  and says files.txt is missing' ($r.Out -match 'OwnGame\\files\.txt is missing')
+    Yes '  before it touches a running game' (-not $r.StoppedGame)
+    Unchanged $r
+
+    # ---- a record that names nothing from Vortex is no record ------------------
+    $r = Invoke-Publish (New-Install 'empty-record' @('F|O|4096|638000000000000000|Data\ours.bsa') $small) @()
+    Yes 'with a files.txt that names nothing from Vortex the publisher stops' ($r.Code -eq 1)
+    Yes '  and says the record lists nothing' ($r.Out -match 'lists nothing')
+    Unchanged $r
+
+    # ---- over the cap -----------------------------------------------------------
+    #
+    # The cap is lowered to 1 MB so the case is 2 MB on disk rather than eleven
+    # gigabytes; test-release-size.ps1 holds the gate itself to the incident's
+    # own number at the default cap.
+    $r = Invoke-Publish (New-Install 'over-cap' $vortex $big) @('-MaxReleaseMB', '1')
+    Yes 'a release over -MaxReleaseMB is refused' ($r.Code -eq 1)
+    Yes '  by the size gate, which names the cap' ($r.Out -match 'the cap is 1 MB')
+    Yes '  and lists what made it big' ($r.Out -match 'ours\.bsa')
+    Yes '  and says nothing was published' ($r.Out -match 'Nothing was published')
+    Yes '  after the record check let it through' ($r.StoppedGame)
+    Unchanged $r
+
+    # ---- -AcceptSize, and under the cap -----------------------------------------
+    #
+    # Both are stopped a step later by the removals gate, -MaxRemovals 0 against
+    # the file the baseline names that is gone. That is the point: the run got
+    # past the size gate, and it still builds nothing and touches nothing.
+    $r = Invoke-Publish (New-Install 'accepted' $vortex $big) @('-MaxReleaseMB', '1', '-AcceptSize', '-MaxRemovals', '0')
+    Yes 'with -AcceptSize the same release goes past the size gate' ($r.Out -notmatch 'the cap is' -and $r.Out -match 'would delete')
+    Unchanged $r
+
+    $r = Invoke-Publish (New-Install 'under-cap' $vortex $small) @('-MaxReleaseMB', '1', '-MaxRemovals', '0')
+    Yes 'a release under the cap goes past the size gate' ($r.Out -notmatch 'the cap is' -and $r.Out -match 'would delete')
+    Unchanged $r
+}
+finally {
+    Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host ''
+Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+if ($script:fail) { exit 1 }
+exit 0

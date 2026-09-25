@@ -1,0 +1,17 @@
+# Thornswood. The public pages are meant to be found. Nothing behind them is.
+User-agent: *
+Disallow: /hub
+Disallow: /api/
+Disallow: /auth/
+Disallow: /up/
+Disallow: /file/
+Disallow: /uploads
+Disallow: /inbox
+Disallow: /linked
+Disallow: /patrick
+Disallow: /active
+Disallow: /archive
+Disallow: /testthese
+Disallow: /suggestions
+Disallow: /link
+Disallow: /.well-known/

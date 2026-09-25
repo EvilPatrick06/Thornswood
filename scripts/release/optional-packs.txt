@@ -1,0 +1,35 @@
+# Optional packs: what comes OUT of the installer and goes up as a download.
+#
+# Package-Thornswood.ps1 reads this file and leaves every path listed here out
+# of the installer. Publish-Pack.ps1 reads the same file and builds the zips
+# from it. One list, so the two can never drift apart and ship an installer
+# that is missing something nobody can get back.
+#
+# Format, one path per line:
+#
+#     id | name shown in the launcher | path under Game
+#
+# Repeat the id to give a pack more than one path. Anything under the path goes
+# in, folders and all.
+#
+# THE ONE RULE: a pack may not contain a plugin. No .esp, .esm or .esl, and no
+# .bsa that a plugin loads. The server compares plugin lists and nothing else,
+# so textures, meshes, sounds, weather, shaders and ENB files are all safe and
+# a plugin is not. Publish-Pack.ps1 refuses to build a pack with one in it, so
+# this is checked rather than remembered.
+#
+# A .bsa is the trap worth naming. "Something - Textures.bsa" is loaded by
+# "Something.esp", and taking the bsa out while leaving the esp in does not
+# desync anybody, it just makes that mod's armour show up purple. That is a
+# worse first impression than a bigger download, so do not list a bsa unless
+# you have loaded the game without it and looked.
+#
+# Safe to list, in order of how much they save:
+#
+#     Data\textures\        loose textures
+#     Data\meshes\          loose meshes
+#     Data\Shaders\         shader overrides
+#     enbseries\            ENB, if it is ever added
+#
+# Add a line, run Package-Thornswood.ps1, then Publish-Pack.ps1. Nothing here
+# yet, so today's installer is exactly what it was.
