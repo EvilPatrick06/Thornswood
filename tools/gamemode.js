@@ -3238,7 +3238,24 @@ function mineOre(actorId, refrId, baseDesc) {
     0x10F575  WoodChoppingBlockCOPY0000  a stray duplicate, and the one that is
                                          missing FurnitureWoodChoppingBlock
 
-  All three are here because a person cannot tell one chopping block from
+  AND A FOURTH, IN Dragonborn.esm, added 24 September:
+
+    0x03828B  DLC2WoodChoppingBlockAsh   Solstheim's, three placed, all in
+                                         DLC2SolstheimWorld
+
+  The chopping blocks fix of 24 September read every placed block in the load
+  order and found this base missing here, so the three on Solstheim were
+  outside the Woodwright rules: a press fell through every branch of the
+  activate chain to loot(), which answers nothing for a thing that is not an
+  actor, and the engine sat whoever pressed it down to swing, whatever their
+  trade, while chopWood never ran and no Woodwright was paid. Read out of the
+  plugins the same day (C:\Thornswood\Game\Data and the profile's plugins.txt,
+  last one wins, nothing overrides it): the same model as WoodChoppingBlock,
+  the same three keywords including FurnitureWoodChoppingBlock, the same WBDT
+  00ff, the same markers and the same ResourceFurnitureScript. It is the common
+  block with ash on it.
+
+  All four are here because a person cannot tell one chopping block from
   another, which is the same reason TOOLS.farmer accepts both shovels.
 
   WHY IT IS THE WOODWRIGHT'S AND NOT THE WOODWORKER'S. The kiln gates on
@@ -3248,9 +3265,10 @@ function mineOre(actorId, refrId, baseDesc) {
   novice. Until today the Woodwright had no verb and no bench in the entire load
   order, so half of the Woodworker was a title with nothing behind it.
 */
-const CHOPPING_BLOCKS = ['7022e:Skyrim.esm', 'a91bf:Skyrim.esm', '10f575:Skyrim.esm'];
+const CHOPPING_BLOCKS = ['7022e:Skyrim.esm', 'a91bf:Skyrim.esm', '10f575:Skyrim.esm',
+                         '3828b:Dragonborn.esm'];
 
-/** True when this base is one of the three chopping blocks. */
+/** True when this base is one of the four chopping blocks. */
 function isChoppingBlock(baseDesc) {
   for (let i = 0; i < CHOPPING_BLOCKS.length; i++) {
     if (CHOPPING_BLOCKS[i] === baseDesc) { return true; }
@@ -3263,8 +3281,8 @@ function isChoppingBlock(baseDesc) {
  *
  * NOT a bench and not a crafting menu. Patrick, 21 September: it is "just for
  * getting the firewood and not usable by non woodworkers". So it is answered
- * here the way the quarry and the kiln are, and the three records in Skyrim.esm
- * are left exactly as Bethesda wrote them. See CHOPPING_BLOCKS.
+ * here the way the quarry and the kiln are, and the four records in Skyrim.esm
+ * and Dragonborn.esm are left exactly as Bethesda wrote them. See CHOPPING_BLOCKS.
  *
  * THE YIELD RISES WITH THE RANK, the same shape mineSalt uses, because the whole
  * of the wood chain hangs off this: firewood is what the kiln burns and what a
@@ -3332,7 +3350,7 @@ function choppedSwing(actorId) {
     Solitude Stables:  -76193.3, 96600.6, -11435
     Dragon Bridge:     -101780.7, 80484.5, -12522.7
 
-  BY POSITION, BECAUSE THE BASE IS SHARED. CHOPPING_BLOCKS is three BASE
+  BY POSITION, BECAUSE THE BASE IS SHARED. CHOPPING_BLOCKS is four BASE
   records and every block in Skyrim is one of them, so there is no way to name
   one block without naming all of them. A placed reference cannot be deleted
   from here either: that is a change to a plugin, which is a rebuild and a
@@ -7188,7 +7206,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   let message = null;
   if (baseDesc === STATIONS.saltQuarry) message = mineSalt(casterRefrId, refrId);
   else if (baseDesc === STATIONS.charcoalKiln) message = burnCharcoal(casterRefrId, refrId);
-  // The three chopping blocks. Before the STATIONS branches would not matter,
+  // The four chopping blocks. Before the STATIONS branches would not matter,
   // because these are not ours, but before the FURN fallthrough further down
   // very much does: a chopping block is a FURN, and a FURN that reaches
   // ProcessActivateNormal sits the person down on it.
