@@ -42,7 +42,10 @@ $headers = @{ Authorization = "Bot $token"; 'X-Audit-Log-Reason' = 'Undo of the 
 function Api([string]$method, [string]$path, $body) {
     for ($try = 0; $try -lt 6; $try++) {
         try {
-            $p = @{ Method = $method; Uri = "$api$path"; Headers = $headers; UseBasicParsing = $true }
+            # Discord answers 40333 "internal network error" to a request that does
+            # not name itself as a bot; PowerShell's own User-Agent reads like a
+            # browser. This is the form Discord's API documentation asks for.
+            $p = @{ Method = $method; Uri = "$api$path"; Headers = $headers; UseBasicParsing = $true; UserAgent = 'DiscordBot (https://thornswood.net, 1.0)' }
             if ($null -ne $body) { $p.Body = ($body | ConvertTo-Json -Depth 6 -Compress); $p.ContentType = 'application/json' }
             return Invoke-RestMethod @p
         } catch {
