@@ -97,7 +97,7 @@ function Die($m)  { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; i
 #                 launcher.log before claiming a cause, which needs this.
 #
 $WantDirs = @(
-    @{ Path = 'C:\Thornswood-Dev\skymp'; Why = 'the fork: our engine changes' },
+    @{ Path = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine); Why = 'the fork: our engine changes' },
     @{ Path = 'C:\Thornswood\Game';      Why = 'the built game: the records the tables are read out of' },
     @{ Path = 'C:\Thornswood\Profile';   Why = 'launcher.log and plugins.txt' }
 )

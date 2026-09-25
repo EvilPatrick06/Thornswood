@@ -123,7 +123,7 @@ param(
   [switch]$LoadOrder,
   # Where Deploy-Gamemode.ps1 leaves the built server. Its server-settings.json
   # is the one authority on what the load order is and in what order.
-  [string]$Dist = 'C:\Thornswood-Dev\skymp\build\dist\server',
+  [string]$Dist = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
   # Where the other plugins live on this machine. Ours is taken from the repo
   # instead; see the header.
   [string]$Data = 'C:\Thornswood\Game\Data',

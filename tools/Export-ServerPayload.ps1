@@ -21,10 +21,10 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Dist    = 'C:\Thornswood-Dev\skymp\build\dist\server',
-    [string]$OutDir  = 'C:\Thornswood-Dev\_payload',
+    [string]$Dist    = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
+    [string]$OutDir  = (& (Join-Path $PSScriptRoot 'Where.ps1') Payload),
     [string]$VpsRoot = 'C:\Thornswood-Server',
-    [string]$Zip     = 'C:\Thornswood-Dev\thornswood-server.zip'
+    [string]$Zip     = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerZip)
 )
 
 $ErrorActionPreference = 'Stop'

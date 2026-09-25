@@ -22,8 +22,8 @@
 [CmdletBinding()]
 param(
     [string]$Root   = 'C:\Thornswood',
-    [string]$Server = 'C:\Thornswood-Dev\skymp\build\dist\server',
-    [string]$Client = 'C:\Thornswood-Dev\skymp\build\dist\client',
+    [string]$Server = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
+    [string]$Client = (& (Join-Path $PSScriptRoot 'Where.ps1') ClientDist),
     [string]$ServerIp = '192.135.112.23',
     [string]$ServerPort = '7777',
     [string[]]$Only = @(),

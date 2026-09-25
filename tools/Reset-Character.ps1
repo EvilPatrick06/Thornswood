@@ -25,7 +25,7 @@ param(
     [string]$VpsUser  = 'Administrator',
     [string]$VpsRoot  = 'C:\Thornswood-Server',
     [string]$TaskName = 'Thornswood Server',
-    [string]$Local    = 'C:\Thornswood-Dev\skymp\build\dist\server',
+    [string]$Local    = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
     [switch]$UseLocal,
     [switch]$NoPause
 )

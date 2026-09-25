@@ -245,6 +245,7 @@ namespace Thornswood
                     log("Part " + (i + 1) + " of 3 (depot " + depot + ") is already downloaded.");
                     continue;
                 }
+                if (!ClearLeftover(folder, i + 1, log, status)) return false;
 
                 SteamLog steamLog = new SteamLog(steam);
                 bool hadFolder = Directory.Exists(folder);
@@ -254,17 +255,18 @@ namespace Thornswood
                 bool typed = TypeIntoConsole(cmd, log);
                 bool pasted = !typed;
                 if (!typed)
-                    OnClipboard(cmd, i + 1, "Steam's window would not come to the front, so nothing was typed. ", log, status);
+                    OnClipboard(cmd, i + 1, "Steam's window would not come to the front (the window in front belongs to " + InFront() + "), so nothing was typed. ", log, status);
 
                 // Steam makes the depot folder within seconds of taking the
                 // command. No folder after a while means it did not take.
                 //
                 // The folder and the log are kept apart from here on. A folder
-                // an aborted attempt left behind is there before Steam has been
-                // asked anything, which is enough to carry on watching but is
-                // no proof that this run's download ever started. The log is
-                // that proof, and so is a folder that was not there before the
-                // command and is now; the fallback below needs one of them.
+                // an aborted attempt left behind would be there before Steam had
+                // been asked anything and prove nothing, which is why
+                // ClearLeftover removes it above; hadFolder stays as the guard
+                // should one ever get through. The log is proof, and so is a
+                // folder that was not there before the command and is now; the
+                // fallback below needs one of them.
                 DateTime askedAt = DateTime.Now;
                 bool started = false;
                 bool sawStart = false;
@@ -583,10 +585,22 @@ namespace Thornswood
         /// Windows only lets the foreground process hand the foreground on, and
         /// this runs on a worker thread of a launcher that stopped being the
         /// foreground process the moment Steam's window appeared. A plain
-        /// SetForegroundWindow is refused then, quietly. Attaching to Steam's
-        /// input thread for the call is the documented way through; a tap of
-        /// Alt is the other, because a key press from us counts as the person's
-        /// and the system lets the next SetForegroundWindow through after one.
+        /// SetForegroundWindow is refused then, quietly. Three ways through, in
+        /// order. Attaching to Steam's input thread, which is enough while
+        /// Steam or the launcher is the one in front. A tap of Alt, because a
+        /// key press from us counts as the person's and the system lets the
+        /// next SetForegroundWindow through after one. And attaching to the
+        /// thread of the window that is in front, whatever it is, because that
+        /// is the input the foreground belongs to.
+        ///
+        /// The third was missing until 25 September. A tester on 1.1.94 got
+        /// part 1 typed and nothing for part 2: part 1 is asked for straight
+        /// after the button is pressed, with the launcher in front, and part 2
+        /// twenty minutes later, when the person is somewhere else. Attaching to
+        /// Steam's thread does nothing then, and the Alt tap does nothing when
+        /// the window in front is one our keys cannot reach, a program running
+        /// as administrator for one. A window that has stopped answering is
+        /// never attached to: joining a hung thread's input can hang this one.
         /// </summary>
         static void BringToFront(IntPtr h)
         {
@@ -613,8 +627,42 @@ namespace Thornswood
                 Key(VK_MENU);
                 Thread.Sleep(50);
                 SetForegroundWindow(h);
+                if (SteamInFront(h)) return;
+                IntPtr fg = GetForegroundWindow();
+                uint fgPid;
+                uint fgThread = fg == IntPtr.Zero ? 0 : GetWindowThreadProcessId(fg, out fgPid);
+                bool joined = fgThread != 0 && fgThread != me && !IsHungAppWindow(fg) && AttachThreadInput(me, fgThread, true);
+                try
+                {
+                    BringWindowToTop(h);
+                    SetForegroundWindow(h);
+                }
+                finally
+                {
+                    if (joined) AttachThreadInput(me, fgThread, false);
+                }
             }
             catch { }
+        }
+
+        /// <summary>
+        /// The program that owns the window in front, for the launcher log when
+        /// Steam's would not come forward, so the next report says what was in
+        /// the way. The process name only and never the window's title: the log
+        /// is sent to the Discord for help, and a title can be an email subject
+        /// or a page somebody has open.
+        /// </summary>
+        static string InFront()
+        {
+            try
+            {
+                IntPtr fg = GetForegroundWindow();
+                if (fg == IntPtr.Zero) return "no window at all, which is how a locked screen looks";
+                uint pid;
+                GetWindowThreadProcessId(fg, out pid);
+                return Process.GetProcessById((int)pid).ProcessName;
+            }
+            catch { return "a program that could not be read"; }
         }
 
         /// <summary>
@@ -1068,6 +1116,49 @@ namespace Thornswood
             catch { return false; }
         }
 
+        /// <summary>
+        /// Removes a depot folder that is here without this build's marker,
+        /// before Steam is asked for the part, so everything in it afterwards is
+        /// what Steam fetched this time. False, with the reason on the card and
+        /// in the log, when it cannot be removed.
+        ///
+        /// A tester on 1.1.94, 25 September: part 1 came down, the launcher
+        /// opened Steam's console for part 2 and nothing was typed, and the card
+        /// said "8,169 MB down so far" and never moved. Depot 489832 is 7,260 MB
+        /// at 1.6.1170, so that folder was left by an attempt at another build.
+        /// With it there the run went wrong three ways. Whether Steam had taken
+        /// the command was answered yes by the folder being there before Steam
+        /// was asked anything, so the second try at the console never ran. The
+        /// card showed the old folder's size in place of the line saying the
+        /// command was on the clipboard, which is the line that says what to do.
+        /// And Steam fills a depot folder without emptying it, so the other
+        /// build's files would have gone over the game with the 1.6.1170 ones.
+        /// The launcher used to tell the person to delete such a folder by hand,
+        /// twenty minutes in; this does it before the part starts.
+        /// </summary>
+        static bool ClearLeftover(string folder, int part, Action<string> log, Action<string> status)
+        {
+            if (!Directory.Exists(folder)) return true;
+            log("Part " + part + " of 3: " + folder + " is left over from an earlier attempt (" + (FolderSize(folder) / 1048576).ToString("n0") +
+                " MB) and is not this build's, so it is removed and Steam fetches this part afresh.");
+            try
+            {
+                // A read only file stops Directory.Delete, so they are cleared first.
+                foreach (string f in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
+                    File.SetAttributes(f, FileAttributes.Normal);
+                Directory.Delete(folder, true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string why = "Could not remove " + folder + ", left over from an earlier attempt: " + ex.Message +
+                             " If Steam is still downloading into it, let that finish or restart Steam. Then delete that folder and press the button again.";
+                log(why);
+                status(why);
+                return false;
+            }
+        }
+
         static long FolderSize(string folder)
         {
             long n = 0;
@@ -1130,6 +1221,7 @@ namespace Thornswood
         [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+        [DllImport("user32.dll")] static extern bool IsHungAppWindow(IntPtr hWnd);
         [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
         [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int cmd);
         [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);

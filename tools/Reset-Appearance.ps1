@@ -21,7 +21,7 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$World = 'C:\Thornswood-Dev\skymp\build\dist\server\world\changeForms',
+    [string]$World = (& (Join-Path $PSScriptRoot 'Where.ps1') ChangeForms),
     [int]   $ProfileId = 1,
     [switch]$All,
     [switch]$KeepTrade      # leave the trade and starting town already chosen

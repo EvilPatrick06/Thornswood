@@ -16,7 +16,7 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$Dist    = 'C:\Thornswood-Dev\skymp\build\dist\client',
+    [string]$Dist    = (& (Join-Path $PSScriptRoot 'Where.ps1') ClientDist),
     [string]$Data    = 'C:\Thornswood\Game\Data',
     [string]$Profile = 'C:\Thornswood\Profile',
     [string]$ServerIp = '127.0.0.1',

@@ -19,7 +19,7 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$World = 'C:\Thornswood-Dev\skymp\build\dist\server\world\changeForms',
+    [string]$World = (& (Join-Path $PSScriptRoot 'Where.ps1') ChangeForms),
     [switch]$NoBackup
 )
 
