@@ -78,16 +78,20 @@ help.replace(/new HelpItem\("Joining",\s*"((?:[^"\\]|\\.)*)",\s*"((?:[^"\\]|\\.)
   function (m, title, body) { joining.push({ title: title, body: body }); return m; });
 yes('Help.cs has its Joining items, ' + joining.length + ' of them', joining.length >= 5);
 
-const first = joining.length ? joining[0] : { title: '', body: '' };
-yes('the first Joining item is the one about picking a character',
-    /pick your character/i.test(first.title));
+// Found by its title rather than its place. It was the first item while the
+// items were numbered; entry 164 rebuilt the page so Joining runs in the order
+// things happen (open the launcher, Discord, Play, then the menu), which puts
+// the character pick fourth. The rule it has to give is the same either way.
+const picks = joining.filter(function (j) { return /pick your character/i.test(j.title); });
+const first = picks.length ? picks[0] : { title: '', body: '' };
+yes('one Joining item is the one about picking a character', picks.length === 1);
 yes('no Joining item says to name the character after yourself',
     joining.every(function (j) { return !/after yourself/i.test(j.title + ' ' + j.body); }));
-yes('the first Joining item gives the same rule as the card: ' + RULE_SKYRIM,
+yes('the character pick item gives the same rule as the card: ' + RULE_SKYRIM,
     first.body.indexOf(RULE_SKYRIM) >= 0);
-yes('the first Joining item gives the same rule as the card: ' + RULE_SHAPE,
+yes('the character pick item gives the same rule as the card: ' + RULE_SHAPE,
     first.body.indexOf(RULE_SHAPE) >= 0);
-yes('the first Joining item gives the same rule as the card: ' + RULE_NOT_OWN,
+yes('the character pick item gives the same rule as the card: ' + RULE_NOT_OWN,
     first.body.indexOf(RULE_NOT_OWN) >= 0);
 
 // The save item: it has to say what the site says, and it cannot start from
