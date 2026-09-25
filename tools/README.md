@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 196 of them, with the one line that says
+Every `.ps1` in this folder, 197 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -201,6 +201,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-ship-lists.ps1](test-ship-lists.ps1) | Whether a pack and the installer leave out the same files. |
 | [test-ship-rules.ps1](test-ship-rules.ps1) | Every file that has ever leaked in a pack or an installer stays out, and the rules that decide what leaves this machine still say what they mean. |
 | [test-show-botlog.ps1](test-show-botlog.ps1) | Show-BotLog.ps1 reads bot.log.1 before bot.log, so the lines just before a roll are not hidden by it, and with no bot.log.1 it reads bot.log exactly as it did before. |
+| [test-signing-folder.ps1](test-signing-folder.ps1) | The signing setup lives in tools\signing, and Sign-Artifact.ps1 finds a dlib or metadata that signing.json names relative to the repository. |
 | [test-site-account.ps1](test-site-account.ps1) | Deploy-Docs.ps1 -RunAs chooses the account the site's scheduled task runs as. |
 | [test-source-offer.ps1](test-source-offer.ps1) | Where the source of the SkyMP files Thornswood ships is, said on the site and in the installed folder, and said truthfully. |
 | [test-steam-updates.ps1](test-steam-updates.ps1) | Steam's Updates setting for Skyrim, which nothing in the launcher read or set until 24 September (entry 271 on the To Do List, "Nothing stops Steam putting Skyrim back on the wrong build"). |

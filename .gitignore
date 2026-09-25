@@ -59,6 +59,11 @@ tools/signing.json
 # and any copy of it kept beside it while the setup is being changed.
 tools/signing.json.*
 
+# Microsoft's signing client, Azure.CodeSigning.Dlib.dll and what comes with
+# it, fetched from NuGet. tools\signing\metadata.json beside it is tracked on
+# purpose (tools\signing\README.md).
+tools/signing/client/
+
 # The passphrase the nightly backups are encrypted with. Restore-Backup.ps1
 # looks for it beside itself, so the name has to be unable to land in here.
 # Where it really lives is Documents on Patrick's machine and
