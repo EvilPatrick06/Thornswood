@@ -203,7 +203,8 @@ check('another farmer cannot claim over it',
       say(function () { F.command('/claim', [], 101, 22, toProfile); }), 'already held by Brynja');
 
 // 4. Work on the far half refreshes the claim (finding 1, second half).
-var claimFile = path.join('data', 'farm-claims.json');
+// private, not data: issue #541. The resources port serves data to anybody.
+var claimFile = path.join('private', 'farm-claims.json');
 var rec = JSON.parse(fs.readFileSync(claimFile, 'utf8'));
 rec.claims['11'].at = Date.now() - 13 * 86400000;
 fs.writeFileSync(claimFile, JSON.stringify(rec));
@@ -340,6 +341,35 @@ check('a stranger cannot take the standing crop off a held farm',
 check('the holder can',
       F.activate(210, 411, CABBAGE), 'that was standing here');
 
+
+// 9. The claims live in private, never in the folder the server hands out
+// (issue #541, 25 September: the live farm-claims.json answered 200).
+check('the claims are written to private', fs.existsSync(path.join('private', 'farm-claims.json')) ? 'yes' : 'no', 'yes');
+check('and nothing is left in data', fs.existsSync(path.join('data', 'farm-claims.json')) ? 'still there' : 'gone', 'gone');
+// A server that ran the code before this has its claims in data. The first
+// load carries them across, so nobody loses a farm, and takes the public copy
+// away.
+var held = fs.readFileSync(claimFile, 'utf8');
+fs.unlinkSync(claimFile);
+fs.writeFileSync(path.join('data', 'farm-claims.json'), held);
+delete globalThis.__thornswoodFarmClaims;
+delete globalThis.__thornswoodFarmSeeded;
+eval(farmCode);
+F = globalThis.__thornswoodFarming;
+check('an old copy in data is carried into private on the first load',
+      fs.existsSync(claimFile) && fs.readFileSync(claimFile, 'utf8') === held ? 'carried' : 'lost', 'carried');
+check('and the public copy is gone', fs.existsSync(path.join('data', 'farm-claims.json')) ? 'still there' : 'gone', 'gone');
+check('and the claims still say who holds what',
+      say(function () { F.command('/plant', [], 211, 32, toProfile); }), 'held by Cadwell');
+// Both copies there (the old code wrote data after the new code moved it):
+// private wins and the public one is removed.
+fs.writeFileSync(path.join('data', 'farm-claims.json'), '{"claims":{}}');
+delete globalThis.__thornswoodFarmClaims;
+eval(farmCode);
+check('with both there, private is kept and data is removed',
+      (fs.existsSync(path.join('data', 'farm-claims.json')) ? 'data left' : 'data gone') + ', ' +
+      (fs.readFileSync(claimFile, 'utf8') === held ? 'private kept' : 'private changed'),
+      'data gone, private kept');
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
