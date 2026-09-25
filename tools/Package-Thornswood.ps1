@@ -158,6 +158,35 @@ if (-not (Test-Path -LiteralPath $vLive)) {
 }
 # ==== end thornswood release feed ====
 
+# ==== thornswood setup stub ====
+# The setup program is compiled by Build-Launcher.ps1 into tools\setup-stub.exe,
+# which git ignores, and this only copies it (Building the installer, below).
+# So it is as new as the last Build-Launcher on this machine, whatever
+# setup\Bootstrap.cs now says. On 25 September the installer went on the site
+# straight after the pull that brought #340, the fix for old zips in the
+# Downloads folder, with no Build-Launcher between them, and nothing here could
+# say which Bootstrap.cs the stub it shipped was built from. A stub older than
+# its source is refused here, before anything is staged or any game is closed.
+# No stub at all is left to the stop further down, which already says so.
+function Get-StubRefusal([string]$stub, [string]$src) {
+    if (-not (Test-Path -LiteralPath $src)) { return '' }
+    if (-not $stub -or -not (Test-Path -LiteralPath $stub)) { return '' }
+    $built = (Get-Item -LiteralPath $stub).LastWriteTimeUtc
+    $changed = (Get-Item -LiteralPath $src).LastWriteTimeUtc
+    if ($built -ge $changed) { return '' }
+    return ('The setup program, ' + $stub + ', was compiled ' +
+            $built.ToLocalTime().ToString('d MMM HH:mm') + ', before the last change to ' + $src +
+            ' (' + $changed.ToLocalTime().ToString('d MMM HH:mm') + '), so the installer would carry ' +
+            'the old one. Build-Launcher.ps1 compiles it, into a scratch root so the launcher you play ' +
+            'with is left alone: powershell -NoProfile -File tools\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause ' +
+            'and then run this again.')
+}
+$stubNow = @((Join-Path $Here 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
+           Where-Object { Test-Path $_ } | Select-Object -First 1
+$stubWhy = Get-StubRefusal $stubNow (Join-Path $Here 'setup\Bootstrap.cs')
+if ($stubWhy) { Die $stubWhy }
+# ==== end thornswood setup stub ====
+
 . (Join-Path $Here 'Close-Launcher.ps1')
 
 Head 'Packaging'
