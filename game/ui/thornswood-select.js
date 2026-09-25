@@ -142,6 +142,14 @@
     // Well below the hint and centred, so it is nowhere near the characters.
     '#ts-select .quitrow{display:flex;justify-content:center;margin-top:18px}',
     '#ts-select .quit{opacity:.72}',
+    // Show the sealed scroll next time: an inked tick box, quieter than Close the game.
+    '#ts-select .backrow{display:flex;justify-content:center;margin-top:16px;margin-bottom:4px}',
+    '#ts-select .backbox{display:inline-flex;align-items:center;gap:9px;padding:5px 13px 5px 10px;background:rgba(0,0,0,.62);',
+    'border:1px solid rgba(150,82,64,.32);font-style:italic;font-size:14px;letter-spacing:.02em;color:#a2584a;',
+    'text-shadow:0 1px 0 rgba(0,0,0,.8)}',
+    '#ts-select .backbox input{-webkit-appearance:none;appearance:none;flex:none;width:15px;height:15px;margin:0;',
+    'border:1.5px solid rgba(162,88,74,.7);border-radius:1px 3px 1px 3px;background:rgba(0,0,0,.45)}',
+    '#ts-select .backbox input:checked{background:rgba(0,0,0,.45) url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 20 20\'><path d=\'M3.5 10.5 C5.5 11.5 7 13.5 8.2 16 C10.5 10.5 13.5 6 17.5 2.5\' fill=\'none\' stroke=\'%23b0604f\' stroke-width=\'2.6\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/></svg>") center/140% no-repeat}',
     '#ts-select .quit:hover{opacity:1}',
     /*
       The scroll in front of the choice, Djinn, 24 September. The painting
@@ -337,12 +345,25 @@
     };
     tell('intro: the scroll is up');
   } else if (LIST.intro === false) {
-    var introBack = el('div', 'hint', 'The scroll at the start is off. Click here to have it back next time.');
-    introBack.onclick = function () {
-      introSay = 'intro on'; tell(introSay);
-      introBack.textContent = 'The scroll will be back next time.';
+    /*
+      Bring the scroll back, Djinn, 25 September: the faint hint line that did
+      this was easy to miss, and a full button looked more important than
+      Close the game. So it is a small inked tick box on a black strip, red
+      lettering in the page's own italic, like the tick box on the open scroll.
+      Ticked says 'intro on', unticked 'intro off', each time it changes.
+    */
+    var backRow = el('div', 'backrow');
+    var backBox = el('label', 'backbox');
+    var backTick = document.createElement('input');
+    backTick.type = 'checkbox';
+    backBox.appendChild(backTick);
+    backBox.appendChild(document.createTextNode('Show the sealed scroll next time'));
+    backTick.onchange = function () {
+      introSay = backTick.checked ? 'intro on' : 'intro off';
+      tell(introSay);
     };
-    root.querySelector('.foot').insertBefore(introBack, root.querySelector('.quitrow'));
+    backRow.appendChild(backBox);
+    root.querySelector('.foot').insertBefore(backRow, root.querySelector('.quitrow'));
   }
 
   /*
