@@ -70,7 +70,7 @@ played since.
 Order matters here. The game server must not start before its world is in
 place, or it writes fresh empty characters over the top.
 
-1. **A new box, and the repo.** `tools\MOVING-THE-SERVER.md` is the long form
+1. **A new box, and the repo.** `docs\MOVING-THE-SERVER.md` is the long form
    of standing one up: Windows, node, the firewall rules, the scheduled tasks.
    Do all of that first and start nothing.
 2. **Unpack the newest backup that opens.**

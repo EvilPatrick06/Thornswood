@@ -45,7 +45,7 @@ a README of their own, which says what the folder is and how to change it.
 - [docs/archive](docs/archive): dated snapshots kept for history, not current.
 - [tools/app/ARCHITECTURE.md](tools/app/ARCHITECTURE.md): how the launcher
   starts, what each class owns and every step between Play and the game.
-- [IT-IS-DOWN.md](IT-IS-DOWN.md): what to do when the server is down.
+- [docs/IT-IS-DOWN.md](docs/IT-IS-DOWN.md): what to do when the server is down.
 - [SECURITY.md](SECURITY.md): how to report a hole quietly.
 
 Everything reaches `main` through a pull request, and `main` is what ships.

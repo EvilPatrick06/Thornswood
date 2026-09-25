@@ -33,7 +33,7 @@
   Sunday. Nothing else is deleted, ever, including anything a person put in
   that folder by hand.
 
-  Restoring one is tools\RESTORING.md, which is also how you check that any of
+  Restoring one is docs\RESTORING.md, which is also how you check that any of
   this works. A backup nobody has restored is a guess.
 #>
 [CmdletBinding()]

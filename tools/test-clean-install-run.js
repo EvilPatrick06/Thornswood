@@ -1,7 +1,7 @@
 /*
   test-clean-install-run.js
 
-  tools\CLEAN-INSTALL-RUN.md is the checklist for installing Thornswood on a
+  docs\CLEAN-INSTALL-RUN.md is the checklist for installing Thornswood on a
   machine that has never seen it. This keeps it honest in the ways a runbook
   goes wrong without anybody noticing.
 
@@ -52,7 +52,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const DOC = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, 'CLEAN-INSTALL-RUN.md');
+const DOC = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'docs', 'CLEAN-INSTALL-RUN.md');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -98,7 +98,7 @@ function unquote(c) { return /^`[^`]*`$/.test(c) ? c.slice(1, -1) : null; }
 // ---- the status line -------------------------------------------------------
 const LAST_RUN = /\*\*Last run: ([^*]+?)\.?\*\*/;
 const status = LAST_RUN.exec(doc);
-yes('there is a Last run line, the way tools\\RESTORING.md has one', !!status);
+yes('there is a Last run line, the way docs\\RESTORING.md has one', !!status);
 const runAt = doc.indexOf('## The run');
 yes('the Last run line comes before the run, where the reader meets it first', !!status && runAt > 0 && status.index < runAt);
 const neverRun = !!status && /^never$/i.test(status[1].trim());

@@ -118,5 +118,5 @@ if (-not (Test-Path -LiteralPath $restore)) {
 
 Write-Host ''
 Say "  They are in $To" 'DarkGray'
-Say '  Restoring one for real is tools\RESTORING.md.' 'DarkGray'
+Say '  Restoring one for real is docs\RESTORING.md.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

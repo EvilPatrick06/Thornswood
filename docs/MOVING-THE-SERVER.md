@@ -126,7 +126,7 @@ Then, in this order:
    scripts can reach it without a password.
 4. `.\tools\Bootstrap-VPS.ps1` against the new address. Node, Python, git,
    the folders.
-5. Restore from the backup, by hand, as `tools\RESTORING.md` says, into:
+5. Restore from the backup, by hand, as `docs\RESTORING.md` says, into:
    `C:\Thornswood-Docs\data`, `C:\Thornswood-Bot`, `C:\Thornswood-Voice`,
    the game server's own folder and `C:\Thornswood-Caddy`. The dev roots
    (`C:\Thornswood-Server-Dev`, `C:\Thornswood-Voice-Dev`) are made fresh,
