@@ -18,12 +18,19 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `tools/docs-app`: the site. Its public pages are `tools/docs-app/data/site`.
 - `tools/voice`: proximity voice.
 - `tools/discord`: the Discord bot, in Python.
+- `tools/signing`: the code signing setup, switched off until it is finished.
 - `tools/*.ps1`: the scripts that build, ship and deploy all of the above.
+  `tools/Where.ps1` says where the engine and the build output are.
+- `engine/skymp`: the SkyMP fork our engine changes live in, a git submodule.
+  `git submodule update --init engine/skymp` fetches it; it needs Visual
+  Studio to build.
+- `out` and `local`: the build output, and things kept beside the repository
+  that never go to GitHub. Both are ignored by git.
 - `lore/`: the world.
 
 `tools/discord`, `tools/docs-app`, `tools/launcher`, `tools/setup`,
-`tools/ts-plugins`, `tools/ts-ui` and `tools/voice` each have a README of
-their own, which says what the folder is and how to change it.
+`tools/signing`, `tools/ts-plugins`, `tools/ts-ui` and `tools/voice` each have
+a README of their own, which says what the folder is and how to change it.
 
 ## Before changing anything
 
