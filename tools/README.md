@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 196 of them, with the one line that says
+Every `.ps1` in this folder, 198 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -211,10 +211,12 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-vortex-folder.ps1](test-vortex-folder.ps1) | Scan finds the Skyrim folder Vortex really deploys into, Fix builds Thornswood's own folder from it, and nothing of another server's install comes with it. |
 | [test-watch-disk.ps1](test-watch-disk.ps1) | The watchdog on the VPS watches the disk, and says so once when a line is crossed rather than on every five minute run. |
 | [test-watch-load.ps1](test-watch-load.ps1) | The load record the VPS keeps, and the note read out of it. |
+| [test-where.ps1](test-where.ps1) | Where.ps1 finds the engine fork and the build output in the repository once they are there, in C:\Thornswood-Dev while they are still there, and in the repository on a machine that never had that folder; and no script names C:\Thornswood-Dev for itself any more. |
 | [vps-dev-instance.ps1](vps-dev-instance.ps1) | Runs ON the VPS. Makes the dev game server and the dev voice server beside the live ones, from copies of the live installs, on their own ports, with their own scheduled tasks, firewall rules and watchdog entries. |
 | [vps-load.ps1](vps-load.ps1) | Runs ON the VPS, every five minutes, as the scheduled task that Watch-Load.ps1 -Install puts there. |
 | [vps-nightly-backup.ps1](vps-nightly-backup.ps1) | Runs on the VPS, once a night, as the scheduled task that Install-Backup.ps1 puts there. |
 | [Watch-Foreground.ps1](Watch-Foreground.ps1) | Which window Windows is giving the keyboard to, sampled from outside the game. |
 | [Watch-Load.ps1](Watch-Load.ps1) | The website, the game server, the voice service and the bot share one five core box, and nothing kept a number for any of them. |
 | [Watch-Services.ps1](Watch-Services.ps1) | Everything runs on one box now. The website, the game, the bot and the voice server are four things that can stop on their own, and nothing up there notices when one does. |
+| [Where.ps1](Where.ps1) | Says where the engine fork and the build output are on this machine, so every script asks one place instead of carrying its own copy of a path. |
 | [Wipe-Saves.ps1](Wipe-Saves.ps1) | Starts the world over. Everybody begins again, nothing is claimed, nothing has been looted, and every container in the province is holding what Bethesda put in it. |

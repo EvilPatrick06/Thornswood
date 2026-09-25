@@ -38,8 +38,8 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Dist  = 'C:\Thornswood-Dev\skymp\build\dist\client',
-  [string]$Clone = 'C:\Thornswood-Dev\skymp',
+  [string]$Dist  = (& (Join-Path $PSScriptRoot 'Where.ps1') ClientDist),
+  [string]$Clone = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine),
   [string]$Out
 )
 $ErrorActionPreference = 'Stop'

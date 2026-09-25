@@ -78,12 +78,22 @@ too. Say in the reply which entries moved.
   and nothing else (Ship-Rules.ps1, by what is ours rather than by whose
   anything is). No wrapper scripts around the launcher, nothing moved by hand
   in Data\Platform, nothing touches Vortex's own files.
-- The SkyMP client runtime is built from the fork, `C:\Thornswood-Dev\skymp`
-  on `thornswood/engine-changes`, and recorded in `tools\client-build.json`
-  by `New-ClientBuildRecord.ps1`. `Sync-Client.ps1` puts the six recorded
-  files in the game folder and refuses any that is not the recorded build;
-  Ship refuses a release whose client is not. Every change Patch-Client.ps1
-  used to make by text is in the fork's source, and that script is gone.
+- The SkyMP client runtime is built from the fork, the `engine\skymp`
+  submodule of this repository on `thornswood/engine-changes`, and recorded
+  in `tools\client-build.json` by `New-ClientBuildRecord.ps1`.
+  `Sync-Client.ps1` puts the six recorded files in the game folder and
+  refuses any that is not the recorded build; Ship refuses a release whose
+  client is not. Every change Patch-Client.ps1 used to make by text is in the
+  fork's source, and that script is gone.
+  Decided by Patrick and Djinn on 25 Sep, so the second machine has
+  everything and GitHub holds it: the fork, its build and the release output
+  live in the repository folder, not in `C:\Thornswood-Dev`. The fork is the
+  `engine\skymp` submodule, pinned to the commit the build records name; the
+  output (packs, launcher, installer, server payload) is `out`, ignored by
+  git; anything else that folder held and that never goes to GitHub is
+  `local`, ignored too. Scripts ask `tools\Where.ps1` where each of these is
+  rather than naming a path, and it falls back to `C:\Thornswood-Dev` on a
+  machine that still has it, so nothing breaks halfway through the move.
 - Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
   no expression bodied members, no out var.
 - Every change goes out as one complete release: launcher, game files and

@@ -14,7 +14,7 @@
   itself. Can be run on its own if a push failed.
 
     .\Publish-Installer.ps1
-    .\Publish-Installer.ps1 -OutDir 'C:\Thornswood-Dev\dist\Thornswood\_dist'
+    .\Publish-Installer.ps1 -OutDir .\out\dist\Thornswood\_dist
     .\Publish-Installer.ps1 -KeepOld     keep the previous pair as a rollback
 
   Only the current pair is kept by default. At a gigabyte each, three
@@ -37,7 +37,7 @@ param(
     were still reading C:\SkyrimTogether: a default that points at a machine
     nobody has any more, waiting for the one day somebody needs it.
   #>
-  [string]$OutDir = 'C:\Thornswood-Dev\dist\Thornswood\_dist',
+  [string]$OutDir = (& (Join-Path $PSScriptRoot 'Where.ps1') Package),
   [string]$Version,
   [string]$Note,
   [string]$Vps  = '192.135.112.23',

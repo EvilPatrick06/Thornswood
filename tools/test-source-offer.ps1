@@ -50,7 +50,7 @@
   Read only apart from files under its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$Fork = 'C:\Thornswood-Dev\skymp')
+param([string]$Fork = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine))
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot

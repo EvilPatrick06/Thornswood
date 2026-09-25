@@ -31,7 +31,7 @@
   Read only, here and there. It changes nothing on either machine.
 #>
 param(
-    [string]$Dist = 'C:\Thornswood-Dev\skymp\build\dist\server',
+    [string]$Dist = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
     [string]$Data = 'C:\Thornswood\Game\Data',
     # Whose settings to read: the build on this machine, or a server's own.
     [ValidateSet('build', 'live', 'dev')][string]$From = 'build',

@@ -49,7 +49,7 @@
 [CmdletBinding()]
 param(
     # Our fork. The branch is checked and reported, never changed.
-    [string]$Fork = 'C:\Thornswood-Dev\skymp',
+    [string]$Fork = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine),
     # The already configured CMake build folder inside it.
     [string]$BuildDir = '',
     [ValidateSet('Release', 'Debug', 'RelWithDebInfo')]

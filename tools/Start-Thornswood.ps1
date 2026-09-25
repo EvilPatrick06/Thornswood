@@ -155,7 +155,7 @@ if (-not $SkipServerCheck) {
         Write-Host ''
         Write-Host ("Nothing is answering at {0}:{1}." -f $ip, $port) -ForegroundColor Red
         Write-Host 'Start the server first, in its own window:' -ForegroundColor Yellow
-        Write-Host "  Set-Location 'C:\Thornswood-Dev\skymp\build\dist\server'" -ForegroundColor Yellow
+        Write-Host ("  Set-Location '{0}'" -f (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist)) -ForegroundColor Yellow
         Write-Host '  node dist_back/skymp5-server.js' -ForegroundColor Yellow
         Write-Host ''
         Write-Host 'Launching anyway gives you a long wait, a black screen, and single player' -ForegroundColor DarkGray

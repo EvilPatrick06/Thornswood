@@ -21,7 +21,7 @@
 // MpClientPlugin.dll is built from skymp5-server, which is AGPL, not GPL.
 //
 // Where a clone of the fork that holds the recorded commit is on this machine
-// (C:\Thornswood-Dev\skymp, or THORNSWOOD_SKYMP), it also reads each
+// (engine\skymp, C:\Thornswood-Dev\skymp, or THORNSWOOD_SKYMP), it also reads each
 // subproject's LICENSE and package.json at that commit, and the build files
 // that say which subproject each client file comes from. On a runner without
 // the fork those lines say SKIP and the rest still runs.
@@ -347,7 +347,11 @@ if (sb && sb.source) {
 //
 // Only where the fork is cloned here and holds the recorded commit. This is
 // what makes the licence column a measurement rather than a memory.
-const FORK = process.env.THORNSWOOD_SKYMP || 'C:\\Thornswood-Dev\\skymp';
+// The engine/skymp submodule once it has files in it, and the old clone until
+// then: the same rule as tools\Where.ps1.
+const REPO_FORK = path.join(__dirname, '..', 'engine', 'skymp');
+const FORK = process.env.THORNSWOOD_SKYMP ||
+  (fs.existsSync(path.join(REPO_FORK, 'CMakeLists.txt')) ? REPO_FORK : 'C:\\Thornswood-Dev\\skymp');
 function git(args) {
   return execFileSync('git', ['-C', FORK].concat(args),
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 }).split(CR).join('');

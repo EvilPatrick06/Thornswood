@@ -41,10 +41,16 @@ a half.
 | Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour |
 
 The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
-`thornswood/engine-changes`), so its source survives any one machine. Its
-configured build tree and toolchain (`C:\Thornswood-Dev\skymp\build`) are on
-Patrick's machine alone for now; server binaries are copied, not rebuilt, on a
-second machine. Who holds each thing Thornswood cannot run without, and who the
+`thornswood/engine-changes`), so its source survives any one machine, and since
+25 September it is the `engine\skymp` submodule of this repository, pinned to
+the commit the build records name: `git submodule update --init engine/skymp`
+fetches it into the repository folder. It is large and needs Visual Studio to
+build, so a machine that only copies server binaries can leave it unfetched.
+Its configured build tree and toolchain (`engine\skymp\build`, and
+`C:\Thornswood-Dev\skymp\build` until Patrick's machine has moved) are on
+Patrick's machine alone for now. The release output is `out` in the repository
+folder, ignored by git. `tools\Where.ps1` says where each of these is on the
+machine it runs on. Who holds each thing Thornswood cannot run without, and who the
 second holder is, is `tools\OWNERSHIP.md`.
 
 ## How a release goes out
@@ -327,8 +333,8 @@ records in that folder list, linked or copied from Vortex's staging folder.
 With no Steam copy on the machine the folder is not made.
 `tools\test-vortex-folder.ps1` proves it.
 
-**The client.** The SkyMP client runtime is built from the fork,
-`C:\Thornswood-Dev\skymp` on `thornswood/engine-changes`: `npx webpack` in
+**The client.** The SkyMP client runtime is built from the fork, the
+`engine\skymp` submodule on `thornswood/engine-changes`: `npx webpack` in
 `skymp5-client` for the bundle and the native build for the rest. After a
 rebuild, `tools\New-ClientBuildRecord.ps1` records the six files that build
 produces which differ from upstream, by hash, against the fork commit, into

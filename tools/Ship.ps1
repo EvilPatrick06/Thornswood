@@ -204,7 +204,7 @@ param(
     # Where releases are staged and zipped, passed straight through to
     # Publish-Update and Package-Thornswood so all three agree. Not under
     # $Root: that is the folder people play from.
-    ,[string]$DistRoot = 'C:\Thornswood-Dev\dist'
+    ,[string]$DistRoot = (& (Join-Path $PSScriptRoot 'Where.ps1') Dist)
     ,[switch]$MoveServer
     # Passed straight to Publish-Update, which refuses a release bigger than
     # its cap because the one that nearly went out on 17 September was the

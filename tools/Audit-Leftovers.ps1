@@ -40,7 +40,7 @@ function MB($b) { '{0,8:n1} MB' -f ($b / 1MB) }
 $roots = @(
     @{ Path = 'C:\SkyrimTogether';                                                   Note = 'the old Skyrim Together build' }
     @{ Path = 'C:\Thornswood';                                                       Note = 'the live build' }
-    @{ Path = 'C:\Thornswood-Dev\skymp';                                             Note = 'the SkyMP source and build tree' }
+    @{ Path = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine);                                             Note = 'the SkyMP source and build tree' }
     @{ Path = 'C:\SkyrimRP';                                                         Note = 'older attempt?' }
     @{ Path = 'C:\Users\evilp\Downloads';                                            Note = 'downloads and the repo' }
     @{ Path = 'C:\Users\evilp\AppData\Roaming\skyrim-rp-launcher';                   Note = 'an old launcher''s data' }
