@@ -56,11 +56,40 @@ function Read-Git([string[]]$a) {
   return ($o | Out-String).Trim()
 }
 
+# The fork is a submodule now, which checks out a commit and not a branch, and
+# a fresh clone of it has no upstream remote. Both used to leave the record
+# with an empty branch, or "HEAD", and no base (issue #546). These fall back
+# to what the clone itself can say.
+function Get-ForkBranch([string]$clone, [string]$now) {
+  if ($now -and $now -ne 'HEAD') { return $now }
+  $remote = @(& git -C $clone branch -r --contains HEAD 2>$null | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch '->' })
+  if ($remote -contains 'origin/thornswood/engine-changes') { return 'thornswood/engine-changes' }
+  if ($remote.Count) { return ($remote[0] -replace '^origin/', '') }
+  # A clone fetched with one branch knows no other: the branch the repository
+  # follows it on, from .gitmodules, when that is where it lives.
+  $top = (& git -C $clone rev-parse --show-superproject-working-tree 2>$null | Out-String).Trim()
+  if ($top) {
+    $b = (& git -C $top config -f .gitmodules --get submodule.engine/skymp.branch 2>$null | Out-String).Trim()
+    if ($b) { return $b }
+  }
+  return $now
+}
+function Get-UpstreamBase([string]$clone, [string]$now, [string]$recorded) {
+  if ($now) { return $now }
+  if ($recorded) {
+    & git -C $clone merge-base --is-ancestor $recorded HEAD 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { return $recorded }
+  }
+  return ''
+}
+
 $commit = Read-Git @('rev-parse', 'HEAD')
-$branch = Read-Git @('rev-parse', '--abbrev-ref', 'HEAD')
+$branch = Get-ForkBranch $Clone (Read-Git @('rev-parse', '--abbrev-ref', 'HEAD'))
 $origin = Read-Git @('remote', 'get-url', 'origin')
 $upstream = Read-Git @('remote', 'get-url', 'upstream')
-$base = Read-Git @('merge-base', 'HEAD', 'upstream/main')
+$recordedBase = ''
+try { $recordedBase = [string]((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'server-build.json') -Raw | ConvertFrom-Json).source.upstreamBase) } catch { }
+$base = Get-UpstreamBase $Clone (Read-Git @('merge-base', 'HEAD', 'upstream/main')) $recordedBase
 $dirty = Read-Git @('status', '--porcelain')
 
 if (-not $commit) { throw "cannot read a commit from $Clone. Is it a git clone?" }

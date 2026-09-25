@@ -20,9 +20,11 @@
      every other plugin's log: chargen's lines were being written into the
      probe's file under the probe's prefix. Every plugin is wrapped now.
 
-  4. Voice runs inside the game. It cannot run in a window beside it: served
-     from http on a remote address, Chromium does not expose a microphone at
-     all, whatever flags it is given. That is an origin rule, not a permission.
+  4. Voice runs in the launcher now, in a hidden WebView2 window
+     (launcher\app\Voice.cs and launcher\voice-host.html, which
+     launcher\app\ARCHITECTURE.md walks through). It first ran inside the
+     game, because the game's browser, served from http on a remote address,
+     never exposed a microphone, and it moved out for the same reason.
 #>
 
 [CmdletBinding()]
