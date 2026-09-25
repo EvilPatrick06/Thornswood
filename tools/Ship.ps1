@@ -36,6 +36,8 @@
       -ModsOnly        skip the launcher, publish only changed mod files
       -DryRun          build and diff, but upload nothing
       -Package         also rebuild the two installer files for new people
+      -AcceptSize      let through a release over Publish-Update's size cap,
+                       once you have read what made it that big
 
   The installer package is the one thing publishing does not touch, and that is
   on purpose: it is a 21 GB copy and a 13 GB compress, twenty minutes or more,
@@ -62,6 +64,11 @@ param(
     # $Root: that is the folder people play from.
     ,[string]$DistRoot = 'C:\Thornswood-Dev\dist'
     ,[switch]$MoveServer
+    # Passed straight to Publish-Update, which refuses a release bigger than
+    # its cap because the one that nearly went out on 17 September was the
+    # whole mod collection. Without this here the refusal could only be
+    # answered by running the publisher by hand, around everything Ship checks.
+    ,[switch]$AcceptSize
     # So this can be chained after something else without stopping to wait for
     # a keypress nobody is there to give.
     ,[switch]$NoPause
@@ -602,6 +609,7 @@ Head 'Publishing'
 # so '-Notes' binds as a value rather than a parameter name.
 $pubArgs = @{ Notes = $Notes; Root = $Root; RepoDir = $RepoDir; ReleaseDir = $ReleaseDir; DistRoot = $DistRoot; NoPause = $true }
 if ($MoveServer) { $pubArgs['MoveServer'] = $true }
+if ($AcceptSize) { $pubArgs['AcceptSize'] = $true }
 if (-not $ModsOnly) { $pubArgs['Launcher'] = $true }
 if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
 # A dry run has to leave nothing behind, and NoUpload plus NoPush is not that.
