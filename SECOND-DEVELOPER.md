@@ -406,7 +406,8 @@ it per session and ignores which profile Vortex has on.
 - `README.md`: what the repo is and where to start. A customer's install is
   the site's join page, `tools\docs-app\data\site\join.md`; setting up a
   developer's machine is "Setting up a machine" above.
-- `tools\app\HOOKUP.md`: how the launcher classes hang together.
+- `tools\app\ARCHITECTURE.md`: how the launcher starts, what each class owns
+  on disk, and every step between pressing Play and the game starting.
 - `tools\MOVING-THE-SERVER.md`, `tools\COLLECTION-METHOD.md`: the VPS and the
   mod collection.
 - `lore\`: history and the Accord. `tools\docs-app\data\site\*.md`: the public
