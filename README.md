@@ -38,7 +38,7 @@ a README of their own, which says what the folder is and how to change it.
   without. Who is on the team, the words we use, the settled design, how work
   moves and what to run after a merge. Read it before your first change.
 - [CLAUDE.md](CLAUDE.md): what applies to a Claude on top of those rules.
-- [SECOND-DEVELOPER.md](SECOND-DEVELOPER.md): the long form. What the pieces
+- [DEVELOPING.md](DEVELOPING.md): the long form. What the pieces
   are, how a release goes out, how a machine is set up.
 - [docs/archive](docs/archive): dated snapshots kept for history, not current.
 - [tools/app/ARCHITECTURE.md](tools/app/ARCHITECTURE.md): how the launcher

@@ -81,7 +81,7 @@ this section exists for.
 ## Where things are
 
 CONTRIBUTING.md (the rules, for everybody), the board for open work,
-SECOND-DEVELOPER.md (the long form), README.md,
+DEVELOPING.md (the long form), README.md,
 tools\app\ARCHITECTURE.md (the launcher: startup, what each class owns, and
 the Play sequence), tools\MOVING-THE-SERVER.md (the VPS), lore\ (the world),
 tools\docs-app\data\site\*.md (public pages), tools\Ship-Rules.ps1 (what

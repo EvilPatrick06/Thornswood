@@ -2,7 +2,7 @@
 
 The rules for everybody who works in this repository, with AI or without.
 Read it before your first change and again when something here changes.
-SECOND-DEVELOPER.md is the long form: what the pieces are, how a release goes out,
+DEVELOPING.md is the long form: what the pieces are, how a release goes out,
 how a machine is set up. CLAUDE.md is only what applies to a Claude.
 
 ## What this is

@@ -1,10 +1,11 @@
-# Thornswood for a second developer
+# Developing Thornswood
 
-Read this first if you are working on Thornswood from a machine that is not
-Patrick's, or if you are the Claude working with somebody who is. It says what
-Thornswood is, how the pieces fit, how a release goes out, and what has to be
-true on a machine before it can ship one. Nothing in here is a secret; the
-secrets are listed by name near the end with where each one lives.
+The long form, for everybody on the team, with AI or without.
+CONTRIBUTING.md has the rules and the team; this says what Thornswood is, how
+the pieces fit, how a release goes out, and what has to be true on a machine
+before it can ship one. Nothing in here is a secret; the secrets are listed by
+name near the end with where each one lives. It was called
+SECOND-DEVELOPER.md until 25 September, when the team grew past two.
 
 ## What Thornswood is
 
@@ -17,11 +18,8 @@ the Stormcloaks won, a High King over the Jarls, the Thalmor expelled, the
 Empire back under a trade treaty with one embassy). Characters live on the
 server, not in save files. During the playtest they are throwaway.
 
-Words: the people in the world are customers, clients, people, testers,
-partners. Never "players". Writing anywhere public is plain and direct, no
-em dashes, no placeholders, no AI sounding phrasing. Every change ships as
-one complete release covering launcher, game files and server together, never
-a half.
+The words we use, and the rule that every change ships as one complete
+release, launcher, game files and server together, are in CONTRIBUTING.md.
 
 ## The pieces
 
@@ -31,7 +29,7 @@ a half.
 | Releases repo | github.com/EvilPatrick06/Thornswood-Releases (public), clone beside the source repo as `Thornswood-Releases`, dev branch as a worktree `Thornswood-Releases-dev` | `version.json` per branch (main, dev) and the release assets: packs and launcher exes |
 | Launcher | `tools\app\*.cs` + `tools\ui.xaml`, built by `tools\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Settings page | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Owner and Dev roles only |
-| Game | The Steam copy of Skyrim Special Edition, mods deployed by Vortex from the Nexus collection, or `<Root>\Game` once the launcher has made Thornswood's own folder from that deployment (see Separate Skyrim folders) | Without its own folder, every launcher shares the Steam copy. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
+| Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
 | Plugins | `tools\ts-plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `tools\ts-ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
 | Game server | VPS 192.135.112.23, `C:\Thornswood-Server`, UDP/TCP 7777, resources 3000, task `Thornswood Server` | skymp5-server with `gamemode.js`; the door reads its allowed list from the site |
 | Dev game server | `C:\Thornswood-Server-Dev`, 7787, resources 7788, task `Thornswood Dev Server` | Same binaries, fresh world, door list is Owner and Dev only (`https://thornswood.net/dev`) |
@@ -54,6 +52,25 @@ machine it runs on. Who holds each thing Thornswood cannot run without, and who 
 second holder is, is `tools\OWNERSHIP.md`.
 
 ## How a release goes out
+
+**Everything goes to the dev build first** (CONTRIBUTING.md, decided 23 Sep).
+A main release is for a security fix, for something that leaves the game
+untestable, or for work Patrick has said goes live, and it is his call.
+
+```
+.\tools\Ship.ps1 -Channel dev "what changed, in plain words"
+```
+
+That is the dev release: version 1.1.36.1, .2, .3, pack ids ending `-dev`, the
+dev worktree and branch of the releases repo, the dev baseline
+(`published-dev.json`), the dev ports, and the dev server told. It runs from
+any branch on any developer's machine. There is no installer for it, and it
+posts to the dev updates channel in Discord and the dev launcher's News tab,
+never #news. There is one dev feed and the last dev Ship wins, so say in #dev
+when you take it. A main Ship afterwards resets the dev feed and baseline to
+match main, so dev starts at .1 again.
+
+A main release, on Patrick's machine:
 
 ```
 cd C:\Users\<you>\Downloads\Thornswood-Repo
@@ -90,33 +107,36 @@ uploads pack and launcher as a GitHub release in the releases repo, rewrites
 and the game server are told; the server warns the room for five minutes and
 puts everyone back to the launcher to update.
 
-The dev channel is the same with `-Channel dev`: version 1.1.36.1, .2, .3,
-pack ids ending `-dev`, the dev worktree and branch, the dev baseline
-(`published-dev.json`), the dev ports, the dev server told. No installer, no
-news, no Discord post. A plain Ship afterwards promotes everything to main and
-resets the dev feed and baseline to match main, so dev starts at .1 again.
+**A hotfix** is the one live release that does not come off main (decided by
+Patrick on 24 Sep). A branch named `hotfix/...` starts from the commit the live
+release was built from, carries only the fix and its `Bump-Version.ps1`
+commit, is pushed, and Ship runs from a checkout of it. Every other check
+above still applies, Ship refuses a hotfix branch that is not on GitHub, and
+the dev feed is left alone. The fix also goes to main through its own pull
+request, or the next main release loses it.
 
-Everything else: `Deploy-Server.ps1` pushes a server build, `Deploy-Gamemode.ps1`
-the gamemode, `Deploy-Docs.ps1` the site, `Install-Bot.ps1` the bot,
+Everything else, and which one each change needs, is the list under "After a
+pull request is merged" in CONTRIBUTING.md: `Deploy-Server.ps1` pushes a server
+build, `Deploy-Gamemode.ps1` the gamemode (`Deploy-DevGamemode.ps1` for dev), `Deploy-Docs.ps1` the site, `Install-Bot.ps1` the bot,
 `Request-Restart.ps1` an announcement. `Rotate-ServerPassword.ps1` changes a
 password nothing checks any more; the secrets table below says why. Every
 script closes the launcher and Skyrim itself when it needs to.
 
-## Two machines shipping
+## How work moves, the long form
 
-Two people, two machines, one repo. The short rules are in `CLAUDE.md` at the
-repo root, which every Claude Code session reads on its own; this is the long
-form.
+Several people, several machines, one repo. The short rules are in
+`CONTRIBUTING.md`; this is the long form.
 
 - **main is what ships.** Only Patrick's machine ships main. `Ship.ps1`
   refuses a main release that is not on the `main` branch, is behind or
   ahead of `origin/main`, has anything uncommitted, or has a file under
   `tools` that git does not know. It commits and pushes nothing, so what
-  shipped is already on GitHub and the other machine can `git pull` exactly
+  shipped is already on GitHub and every other machine can `git pull` exactly
   that.
 - **Every change goes through a pull request, Patrick's included.** Nobody
-  pushes to main from either machine; GitHub refuses it. `git checkout -b
-  djinn/what-it-is` (Patrick's start `patrick/`, older ones `gavin/`), small
+  pushes to main from any machine; GitHub refuses it. `git checkout -b
+  <name>/what-it-is` (`patrick/`, `djinn/`, `ataxayk/`, `claude/`; Djinn's
+  older ones `gavin/`), small
   commits with plain messages, `git push -u origin <branch>`, then
   `gh pr create --fill` standing on the branch. Nothing is force pushed.
 - **What GitHub enforces on main, and what it does not.** Read off GitHub on
@@ -126,9 +146,9 @@ form.
   owner review is off. So a pull request can be merged by its own author as
   soon as `Launcher builds` is green, and a red one cannot be merged by
   anybody. Nothing merges by itself: auto-merge is off on the repository, so
-  somebody presses merge or runs `gh pr merge --squash`. Patrick merges his
-  own. He reads Djinn's before they are merged, and that read is a habit,
-  not a setting. `.github/CODEOWNERS` asks the other person for a review when
+  somebody presses merge or runs `gh pr merge --squash`. Each of us merges
+  our own. Somebody else on the team reading a pull request first is a habit,
+  not a setting. `.github/CODEOWNERS` asks the rest of the team for a review when
   a pull request touches one of the shared files, and blocks nothing while
   the code owner review is off. The settings change without a commit, so
   read them rather than this paragraph:
@@ -139,24 +159,27 @@ form.
   branch (`git fetch`, `git rebase origin/main`), never on main. A rejected
   push means pull first; never `--force`.
 - **The dev channel is for trying.** `.\tools\Ship.ps1 -Channel dev "..."`
-  runs from any branch on either machine and puts that build on the dev
+  runs from any branch on any machine and puts that build on the dev
   server. There is one dev feed and the last dev Ship wins, so say in #dev
   when you take it. A main Ship resets dev to match main.
-- **Settled design is a proposal first.** Where the game runs from (see the
-  three launchers section: the own game folder is the decided direction),
-  Keep and Hold for the shared Data\Platform, the patched client bundle,
-  C# 5 only, one complete release at a time: changing any of these starts
-  as a few lines in #dev, agreed between Patrick and Djinn before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
-  `Updater.cs` or `Publish-Update.ps1` gets a line in #dev too; both
-  machines touch them.
+- **Settled design is a proposal first.** Where the game runs from (its own
+  folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
+  client built from the fork and recorded, C# 5 only, one complete release at
+  a time: changing any of these starts as a few lines in #dev, agreed by the
+  team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
+  `Updater.cs` or `Publish-Update.ps1` gets a line in #dev too; every
+  machine touches them.
 - **The publisher pulls the feed** before `version.json` is edited, so a
-  release is added on top of whatever the other machine just published; a
+  release is added on top of whatever another machine just published; a
   refused push means NOT SHIPPED, pull and run Ship again.
 - **The baseline is per machine.** A machine that did not ship the last
   release ships those files again once; wasted bytes, never wrong files.
-- **Keep trusts the game folder** over its kept copies on any machine with
-  `Profile\developer.flag` (Publish-Update writes it), so an edit you are
-  testing is not put back before you can ship it.
+- **Keep puts its kept copies back at every Play**, on every machine. Go.ps1,
+  which Ship runs to put the plugins and overlays in, makes what it installs
+  the kept copy, the way a pack does, so a Ship is never undone by the next
+  Play. An edit copied into the game folder by hand is. Since 25 September
+  nothing writes `Profile\developer.flag`, which used to let the machine that
+  ships keep newer game files instead.
 - **What never leaves a machine** in a pack or an installer is one list,
   `tools\Ship-Rules.ps1`, read by `Publish-Update.ps1` and
   `Package-Thornswood.ps1` both: runtime folders, one machine's own files,
@@ -416,6 +439,9 @@ it per session and ignores which profile Vortex has on.
 
 ## Where things are written down
 
+- `CONTRIBUTING.md`: the rules and the team. `CLAUDE.md`: what applies to a
+  Claude on top of them. The To Do board,
+  https://github.com/users/EvilPatrick06/projects/1: all outstanding work.
 - `README.md`: what the repo is and where to start. A customer's install is
   the site's join page, `tools\docs-app\data\site\join.md`; setting up a
   developer's machine is "Setting up a machine" above.
@@ -426,6 +452,10 @@ it per session and ignores which profile Vortex has on.
 - `tools\OWNERSHIP.md`: who holds each credential, account and build, and who
   the second holder is.
 - `lore\`: history and the Accord. `tools\docs-app\data\site\*.md`: the public
-  pages (world, rules, join, classes, credits, support), also live on the site.
-- The site's hub boards: Active Issues, Known Issues, Test These, Suggestions,
-  Archive, and the Patrick runbook.
+  pages (join, rules, classes, world, credits, privacy, terms), also live on
+  the site.
+- The site's hub boards (Active Issues, Known Issues, Test These, Suggestions,
+  Archive, the Patrick runbook) are older than the board and are being retired
+  (issue #433); where they disagree with the board, the board is right.
+- `docs\archive`: dated snapshots (HANDOFF, the 17 September audit,
+  WORKING-NOTES and the old To Do List), history only.

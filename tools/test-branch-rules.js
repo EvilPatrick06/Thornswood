@@ -9,7 +9,7 @@
 // 22 September, and each time the documents were a step behind. Read off GitHub
 // on 23 September: enforce_admins on, one required check "Launcher builds",
 // required approving reviews 0, code owner review off. CLAUDE.md was corrected
-// in #196. SECOND-DEVELOPER.md still said a main Ship commits and pushes the
+// in #196. DEVELOPING.md still said a main Ship commits and pushes the
 // source when the release is out, and that the other person reads every pull
 // request. .github/CODEOWNERS still said Patrick's own work goes straight to
 // main and never becomes a pull request. CLAUDE.md itself still said a main
@@ -194,7 +194,7 @@ yes('each of the six shared files has a CODEOWNERS line naming the whole team ('
 // ------------------------------------------------------------ the documents
 const docs = [
   { name: 'CONTRIBUTING.md', text: flat(claudeRaw, false) },
-  { name: 'SECOND-DEVELOPER.md', text: flat(read('SECOND-DEVELOPER.md'), false) },
+  { name: 'DEVELOPING.md', text: flat(read('DEVELOPING.md'), false) },
   { name: '.github/CODEOWNERS', text: flat(coRaw, true) }
 ];
 const PROTECTION = 'gh api repos/EvilPatrick06/Thornswood/branches/main/protection';
@@ -219,13 +219,13 @@ docs.forEach(function (d) {
 });
 
 const sd = docs[1].text;
-yes('SECOND-DEVELOPER.md does not say Ship bumps the version; Bump-Version.ps1 does, as its own commit',
+yes('DEVELOPING.md does not say Ship bumps the version; Bump-Version.ps1 does, as its own commit',
     !/Ship bumps/i.test(sd) && /Bump-Version\.ps1/.test(sd));
-yes('SECOND-DEVELOPER.md does not say Ship patches the client; it checks it with Sync-Client.ps1 -Check',
+yes('DEVELOPING.md does not say Ship patches the client; it checks it with Sync-Client.ps1 -Check',
     !/patches the client/i.test(sd) && /Sync-Client\.ps1 -Check/.test(sd));
-yes('SECOND-DEVELOPER.md does not say the other person reads every pull request, which nothing enforces',
+yes('DEVELOPING.md does not say the other person reads every pull request, which nothing enforces',
     !/The other person reads the pull request/i.test(sd));
-yes('SECOND-DEVELOPER.md says Patrick\'s own work goes through a pull request too',
+yes('DEVELOPING.md says Patrick\'s own work goes through a pull request too',
     /Every change goes through a pull request, Patrick's included/.test(sd));
 [docs[0], docs[1]].forEach(function (d) {
   yes(d.name + ' says a main release stops on a file under tools that git does not know, as Ship.ps1 does',
