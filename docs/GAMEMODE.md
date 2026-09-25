@@ -59,7 +59,7 @@ at load, which is why it can reach blocks that sit below it.
 | 10994-11515 | The door | The allowed list. See "The door". |
 | 11517-11671 | Server manifest | `data\manifest.json` (11564), `publish` (11570). |
 | 11674-13071 | Progression | The rulebook: `RANKS` (11715), `SPELL_IDS` (11826-11930), `TUNING` (11945), state (12365), rules (12577), the spell book (12885), `TABLE` (12361), `canDo` (13052). |
-| 13073-14363 | Farming | Plots, rank and time (13360), the land (13425), claims in `data\farm-claims.json` (13527), pressing (13746), commands `/plant`, `/claim`, `/plot` (14031). |
+| 13073-14363 | Farming | Plots, rank and time (13360), the land (13425), claims in `private\farm-claims.json` (13527), pressing (13746), commands `/plant`, `/claim`, `/plot` (14031). |
 | 14365-16818 | Property | See "Property, offices and rent". |
 | 16820-17238 | Spoils | Nothing weapon, armour, tool or gold is spawned in the world; `strip` (17029), purses (`isPurse` 16990, `purse` 17191), where gold comes from (17157). |
 | 17242-18512 | Character | Stores the answer as `thornswoodCharacter` (17291) and pushes the panel; `gate` (18061), `gateHalf` (18076), `credit` (18129), `/pick` and `/spend` in `command` (18212). |
@@ -127,7 +127,7 @@ and otherwise which profession halves may, from which rank. `craftAnswer`
 
 ## Property, offices, rent and gold
 
-The register is `data\property.json` (`registerPath`, `gamemode.js:14504`;
+The register is `private\property.json` (`registerPath`, `gamemode.js:14529`;
 `save`, 14591). A claim is made at the door (`touched` 14730, `claim` 14888)
 and carried by the deed (`giveDeed` 14869). Locks and keys start at 14958
 (`lockScript` 15032, `mold` 15284, `cutKey` 15525). A Jarl, the one admin
@@ -194,13 +194,13 @@ In the server's folder, `C:\Thornswood-Server` live and
 
 | Folder | What the gamemode keeps there | Served to anybody? |
 |---|---|---|
-| `data` | `online.json`, `manifest.json`, `server-bases.json`, `thornswood-log.json`, `restart.json`, `property.json`, `farm-claims.json` | Yes: the resources port (3000 live, 7788 dev) hands out anything under it over plain HTTP (`gamemode.js:55-58`) |
-| `private` | `characters.json`, `allowed.json`, `door.json`, `door.log` | No |
+| `data` | `online.json`, `manifest.json`, `server-bases.json`, `thornswood-log.json`, `restart.json` | Yes: the resources port (3000 live, 7788 dev) hands out anything under it over plain HTTP (`gamemode.js:55-58`) |
+| `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json` (moved from `data` on 25 September, issue #541, because they carry profile ids; the gamemode carries an old copy across on first load) | No |
 | `world` | Not the gamemode's: SkyMP's changeform database, every reference the server has written to (`tools\Wipe-Saves.ps1:19-24`, `tools\Where.ps1:77`) | No |
 | the folder itself | `thornswood.log`, rolled at 4 MB with five kept (`gamemode.js:74-108`) | No |
 
 `tools\Wipe-Saves.ps1` starts the world over by moving `world`,
-`private\characters.json`, `data\property.json` and `data\farm-claims.json`.
+`private\characters.json`, `private\property.json` and `private\farm-claims.json` (and the old copies in `data`, for a server still on the older gamemode).
 
 ## Generated tables
 
