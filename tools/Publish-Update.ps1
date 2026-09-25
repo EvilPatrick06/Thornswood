@@ -1684,8 +1684,19 @@ if ($profileChanged.Count) {
             Say '  Until the server has them, everybody who follows its order carries an extra plugin and is refused.' 'Yellow'
             Say '  Put it right with, in this order:' 'Yellow'
             Say '      .\tools\Deploy-Gamemode.ps1' 'Yellow'
-            Say '      .\tools\Publish-Server.ps1 "the plugin list gained ' + $missing[0] + '"' 'Yellow'
+            Say ('      .\tools\Publish-Server.ps1 "the plugin list gained ' + $missing[0] + '"') 'Yellow'
             Say '  Deploy-Gamemode keeps the order the server already runs and puts the new ones on the end.' 'Yellow'
+            # Stopped here, before the push, Djinn, 25 September. Until then the
+            # line above had its + outside brackets, so PowerShell read '+' as a
+            # colour and threw, and that throw was the only thing between two dev
+            # releases and every tester being refused at connect: the list had 7
+            # Keizaal plugins switched on (KeizaalStart, KzlHorses, SunHelm...),
+            # taken from Vortex's deployment because the Keizaal collection is
+            # deployed to the same Steam copy. version.json is written and not
+            # pushed, so nobody has it; the assets are up and nothing points at
+            # them. If the server really should gain these, deploy it first and
+            # ship again.
+            Die ("the pack's plugin list switches on " + $missing.Count + " plugin(s) the server does not have (" + (($missing | Select-Object -First 3) -join ', ') + "). Nothing was pushed. Switch them off in the reference list, or give the server them first, then ship again.")
         } else {
             Say ("  The server has every one of the {0} full plugins this list enables, in the order the pack ships. Nothing to deploy." -f $game.Count) 'Gray'
         }
