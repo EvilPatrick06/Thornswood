@@ -97,10 +97,13 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 
 # A dev release is announced somewhere else entirely, through a webhook of its
 # own, so there is no way for one to arrive in #news by accident.
-$hookName = if ($Dev) { 'dev-webhook.txt' } else { 'news-webhook.txt' }
+# Both live on the VPS since 25 September, read through Discord-Hook.ps1, which
+# falls back to bot\dev-webhook.txt or bot\news-webhook.txt on this machine. Until then this read
+# only that file, and since the scripts moved into scripts\ops it looked for it
+# in scripts\bot, which does not exist, so no Ship posted anything at all.
+$hookName = if ($Dev) { 'dev' } else { 'news' }
 if (-not $Webhook) {
-  $f = Join-Path $Here "..\bot\$hookName"
-  if (Test-Path -LiteralPath $f) { $Webhook = (Get-Content $f -Raw).Trim() }
+  try { $Webhook = [string](& (Join-Path $Here 'Discord-Hook.ps1') -Name $hookName | Select-Object -First 1) } catch { $Webhook = '' }
 }
 if (-not $Webhook) {
   if (-not $Quiet) {
