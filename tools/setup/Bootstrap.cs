@@ -410,7 +410,7 @@ namespace SkyrimTogetherSetup
         <TextBlock x:Name=""TxtBody""
                    Foreground=""{StaticResource Muted}"" FontSize=""13"" LineHeight=""21""
                    TextWrapping=""Wrap""
-                   Text=""This puts Thornswood into the Skyrim you already have on Steam: the launcher, the script extender, and Thornswood's own content. It does not make a second copy of the game.&#10;&#10;The mods themselves come from a collection on Nexus. Vortex installs them into a profile of their own, so switching back to your usual profile and running Purge Mods leaves your Skyrim where you started. The launcher has the link and walks you through it.&#10;&#10;Nothing of Bethesda's is renamed or deleted. You need Steam running and Skyrim on build 1.6.1170.""/>
+                   Text=""This puts in the launcher, the script extender and Thornswood's own content. The launcher then builds a game folder of its own from the Skyrim you already have on Steam, most of it as hard links that take no extra space, and leaves your own Skyrim alone.&#10;&#10;The mods themselves come from a collection on Nexus. Vortex installs them into a profile of their own, so switching back to your usual profile and running Purge Mods leaves your Skyrim where you started. The launcher has the link and walks you through it.&#10;&#10;Nothing of Bethesda's is renamed or deleted. You need Steam running and Skyrim on build 1.6.1170.""/>
 
         <Border Grid.Row=""1"" Margin=""0,20,0,0"" Padding=""17,14"" CornerRadius=""2""
                 Background=""{StaticResource Card}"" BorderBrush=""{StaticResource Line}"" BorderThickness=""1"">

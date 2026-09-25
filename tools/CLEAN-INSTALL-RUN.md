@@ -379,9 +379,9 @@ tester confused by a list that no longer matches.
 | Row | Text | In |
 | --- | --- | --- |
 | 3 | `Anniversary Edition is not required` | `tools\docs-app\data\site\join.md` |
-| 3 | `It does not make a second copy of the game.` | `tools\docs-app\data\site\join.md` |
-| 17 | `This puts Thornswood into the Skyrim you already have on Steam` | `tools\setup\Bootstrap.cs` |
-| 17 | `It does not make a second copy of the game.` | `tools\setup\Bootstrap.cs` |
+| 3 | `Thornswood leaves the Skyrim you already have alone.` | `tools\docs-app\data\site\join.md` |
+| 17 | `This puts in the launcher, the script extender and Thornswood's own content.` | `tools\setup\Bootstrap.cs` |
+| 17 | `leaves your own Skyrim alone.` | `tools\setup\Bootstrap.cs` |
 | 17 | `Nothing to unpack yet.` | `tools\setup\Bootstrap.cs` |
 | 17 | `C:\Thornswood` | `tools\setup\Bootstrap.cs` |
 | 18 | `I am 18 or over. Thornswood is an adult server.` | `tools\setup\Bootstrap.cs` |
@@ -456,12 +456,10 @@ right or wrong. To Do entries are named by title, because their numbers move.
   first, because Steam writes its own setting back when it closes. No leaves
   it as it is. Either way Steam still updates the game when it is started from
   Steam. Owned by "Nothing stops Steam putting Skyrim back on the wrong build".
-- **"It does not make a second copy of the game" (rows 3 and 17).** The setup
-  window and the join page both say so. Then the launcher makes
-  `C:\Thornswood\Game`: hard links for most of it, but real copies of the master
-  files, the settings, the scripts and the programs (`MustCopy` in
-  `tools\app\OwnGame.cs`). Rows 38 and 40 record what it did and row 46 what it
-  cost. The wording needs a To Do entry of its own.
+- **"It does not make a second copy of the game" (rows 3 and 17).** Fixed on
+  25 September: the setup window, the join page, the help page, READ ME FIRST
+  and the home page now say the launcher builds `C:\Thornswood\Game`, most of
+  it as hard links, and leaves your own Skyrim alone.
 - **Other servers, on a machine that has none (rows 23 and 38).** A log line on
   the first start and the own folder question both say Thornswood is sharing one Skyrim
   with other servers. On a clean machine there are none, and a stranger reads

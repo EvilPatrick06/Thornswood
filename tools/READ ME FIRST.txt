@@ -17,8 +17,10 @@ What you need
   Nexus, and only Vortex can install a collection.
 - Steam signed in and running.
 
-Thornswood goes into the Skyrim you already have. It does not make a second
-copy of the game.
+Thornswood leaves the Skyrim you already have alone. The launcher builds a game
+folder of its own, C:\Thornswood\Game, from your Steam copy and what Vortex
+put into it. Most of it is hard links to your own files, which take no extra
+space, and the few files other programs rewrite are real copies.
 
 
 Installing
