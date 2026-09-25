@@ -84,21 +84,23 @@ mage who was taught a trade sees both.
 The numbers move on their own as your rank climbs. Nothing in the book is
 clicked, marked or sent: it is what the server already knows about you, drawn.
 
-### The five halves that gate nothing
-
-Five of the fourteen halves gate nothing, and that is the game rather than a
-decision anybody took.
+### The two halves that gate nothing
 
 **Bulwark** and **Berserker**. Warriors do not make things. Their half is how
 they fight, and there is nothing at a workbench for it to be about.
 
-**Blightbrewer** and **Physicker**. Skyrim has no alchemy recipes. A potion is
-worked out from what your ingredients have in common, inside the alchemy menu,
-and no recipe exists anywhere for the server to hold you to. An Alchemist is
-still an Alchemist and the two halves still say what you are; there is just
-nothing at the bench to catch.
+### The alchemy lab and the arcane enchanter
 
-**Wardweaver**. Enchanting is the same shape. A menu, not a recipe.
+Skyrim has no alchemy or enchanting recipes. A potion is worked out from what
+your ingredients have in common, and an enchantment from what you have learned
+by breaking things down, inside the menu, so there is no recipe for the server
+to hold you to. The bench is held instead.
+
+An **alchemy lab** works for an Alchemist, either a **Blightbrewer** or a
+**Physicker**. An **arcane enchanter** works for an Enchanter, either a
+**Bladebinder** or a **Wardweaver**. Anybody else is turned away at the bench.
+Somebody who has not chosen a profession yet can use both, so nobody is shut
+out on their first evening.
 
 Tempering is the other gap worth knowing about. Improving a weapon or a piece of
 armour at a grindstone or an armour table never reaches the server at all, so
@@ -146,7 +148,7 @@ verb that nobody else in the game has.
 | Class | What only they can do |
 |---|---|
 | **Hunter** | Loot an animal body. Everyone else walks past the carcass |
-| **Fisher** | Fish |
+| **Fisher** | Fish: press E at salmon, clams, pearl oysters, horker meat and slaughterfish egg nests in the water. No rod or net is needed, and the ones from the Fishing in Skyrim mod do nothing here |
 | **Gatherer** | Gather material out of the world |
 | **Miner** | Mine |
 | **Farmer** | Farm |
