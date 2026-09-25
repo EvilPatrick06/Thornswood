@@ -169,6 +169,13 @@ $logoSml = Join-Path $Here '..\..\launcher\logo-192.png'
 # warning here would ship a launcher without it (issue #440, phase 0).
 if (-not (Test-Path $logo))    { Die "logo.png is not at $logo. It is in the repository, so the path is wrong; the launcher would ship without its emblem." }
 if (-not (Test-Path $logoSml)) { $logoSml = $logo }
+# The dev build's own emblem and icon (Djinn, 25 Sep). The same exe serves both
+# builds, so both go in and Art.Dev picks at run time. The exe's own file icon
+# (/win32icon) stays app.ico: Windows reads that from the file, not at run time.
+$logoDev = Join-Path $Here '..\..\launcher\logo-dev.png'
+$iconDev = Join-Path $Here '..\..\launcher\app-dev.ico'
+if (-not (Test-Path $logoDev)) { Die "logo-dev.png is not at $logoDev. It is in the repository, so the path is wrong; the dev launcher would show the main emblem." }
+if (-not (Test-Path $iconDev)) { Die "app-dev.ico is not at $iconDev. It is in the repository, so the path is wrong; dev shortcuts would show the main icon." }
 # The landscape behind the title on the Play page. Optional the same way:
 # without it the band keeps its pattern.
 $headerArt = Join-Path $Here '..\..\launcher\launcher-header.jpg'
@@ -263,6 +270,7 @@ $cscArgs = @(
     "/resource:$((Resolve-Path $xaml).Path),ui.xaml"
 )
 if (Test-Path $logo) { $cscArgs += "/resource:$((Resolve-Path $logo).Path),logo.png" }
+$cscArgs += "/resource:$((Resolve-Path $logoDev).Path),logo-dev.png"
 if (Test-Path $headerArt) { $cscArgs += "/resource:$((Resolve-Path $headerArt).Path),launcher-header.jpg" }
 if (Test-Path $headerVideo) { $cscArgs += "/resource:$((Resolve-Path $headerVideo).Path),launcher-header.mp4" }
 # The artwork goes in as a resource as well as a win32 icon, because the
@@ -270,6 +278,7 @@ if (Test-Path $headerVideo) { $cscArgs += "/resource:$((Resolve-Path $headerVide
 # contents. That is what stops Windows showing a remembered picture of the old
 # one, and it has to travel with the update rather than sit loose in a folder.
 $cscArgs += "/resource:$((Resolve-Path $icon).Path),app.ico"
+$cscArgs += "/resource:$((Resolve-Path $iconDev).Path),app-dev.ico"
 
 # WebView2 travels inside the exe. Voice.cs hands the two managed ones back to
 # the CLR from an AssemblyResolve handler, and writes the native loader out
