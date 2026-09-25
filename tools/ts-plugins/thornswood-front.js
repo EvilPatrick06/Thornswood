@@ -2034,16 +2034,54 @@
     takes out of the world. Every person running this plugin stops seeing them,
     which is everybody.
 
-    BY BASE AND POSITION, because CHOPPING_BLOCKS is three BASE records shared
-    by every block in Skyrim: the cell is walked for those bases and only a
-    reference within a short radius of one of Djinn's three points is touched,
-    so nothing else can be caught. The radius is small for the same reason the
-    server's is.
+    BY FORM ID, MEASURED FROM THE PLUGINS. Djinn, 24 September, on dev, with
+    three screenshots of a Wood Chopping Block and "E Use" under the
+    crosshair: "The ones I gave you coords for are not removed". So every
+    placed reference in the load order was read (99 plugins, last one wins)
+    for what stands at each of his points:
 
-    ONCE PER SITE PER SESSION, and only when somebody is near enough for the
-    reference to be loaded at all. A disable on an unloaded cell finds
-    nothing, so this waits until they are close rather than firing at startup
-    and reporting three failures.
+      Solitude          d6ae9:Skyrim.esm, 103 units from the point, in
+                        SolitudeWorld. Skyrim.esm files it in the cell at
+                        -16,25; Populated Cities Towns Villages
+                        Legendary.esp overrides it into a PERSISTENT
+                        reference in that worldspace's persistent cell.
+      Solitude Stables  a9ee1:Skyrim.esm, 61 units away, Tamriel, an
+                        ordinary reference in the cell at -19,23.
+      Dragon Bridge     abf83:Skyrim.esm, 132 units away, Tamriel, a
+                        PERSISTENT reference in Tamriel's persistent cell,
+                        standing in the cell at -25,19.
+
+    All three are base 7022e, WoodChoppingBlock. No other of the 128 placed
+    blocks on the three chopping block bases is within 400 units of any
+    point; the nearest is 4,638 units from Dragon Bridge.
+
+    So the walk of the cell somebody stands in was the wrong question twice
+    over. Two of the three are filed under a persistent cell rather than
+    the cell they stand in, and the third could only be found from inside
+    its own cell, not from the one next to it. Asking for the three by form id
+    finds each one wherever the person stands and cannot catch a fourth.
+    Whether the engine also lists a persistent reference under its exterior
+    cell at run time was not measured, because that needs the game running;
+    asking by form id does not depend on it. The base and the position are
+    still checked, once, so an override that moved one or made it something
+    else leaves it alone and says so.
+
+    AGAIN WHENEVER IT COMES BACK, which is the other half of the report.
+    SkyMP's own client puts it back. Every time the server streams a
+    Skyrim.esm reference to this machine (walking into range, coming back
+    after leaving, reconnecting), the fork's skymp5-client remoteServer.ts
+    onCreateActorMessage calls ModelApplyUtils.applyModelIsDisabled(refr,
+    !!msg.props['disabled']), and the server writes that flag as
+    "isDisabled" (skymp5-server CreateActorMessage.h), so it always reads
+    false and the client calls refr.enable(true). The old code marked a
+    site done after its first disable and never looked again. Now each
+    site is checked every four seconds while somebody is near it, and
+    taken out again when it is back, with one line each time.
+
+    ONLY WHEN SOMEBODY IS NEAR. An ordinary reference is not in memory until
+    its cell loads, and nothing is asked of the game from anywhere else, so
+    away from these three places the cost is one distance sum per site every
+    four seconds.
   */
   /*
     ======================= WALKING A CELL FOR A BASE =======================
@@ -2062,7 +2100,8 @@
 
     Neither was a table problem or a radius problem. Cell.getNumRefs and
     getNthRef see everything in the cell, temporary references included, so
-    that is what both use now.
+    that is what the fire probe uses now. The chopping blocks moved on again,
+    to their own form ids: see the note above this one.
 
     THE FORM TYPES ARE THE FILTER AND THEY MATTER: walking every reference in
     an exterior cell is thousands of native calls. Activator 24, static 34,
@@ -2105,14 +2144,20 @@
   }
 
   const BLOCK_BASES = [0x7022e, 0xa91bf, 0x10f575];
+  // ref is the placed reference at the point, read out of the plugins on
+  // 24 September (see "three chopping blocks, taken away" above). All three
+  // are Skyrim.esm's own, which is always load index 00, so the local id is
+  // the id the game uses.
   const BLOCKS_GONE = [
-    { where: 'Solitude', pos: [-64263, 106003.5, -8377.8] },
-    { where: 'Solitude Stables', pos: [-76193.3, 96600.6, -11435] },
-    { where: 'Dragon Bridge', pos: [-101780.7, 80484.5, -12522.7] }
+    { where: 'Solitude', pos: [-64263, 106003.5, -8377.8], ref: 0xd6ae9 },
+    { where: 'Solitude Stables', pos: [-76193.3, 96600.6, -11435], ref: 0xa9ee1 },
+    { where: 'Dragon Bridge', pos: [-101780.7, 80484.5, -12522.7], ref: 0xabf83 }
   ];
   const BLOCK_FIND = 400;      // how close to the point the block has to be
   const BLOCK_NEAR = 6000;     // how close YOU have to be for it to be loaded
-  const blockDone = {};
+  const blockDone = {};        // never again this session: not ours, or it threw
+  const blockChecked = {};     // base and position read once and right
+  const blockTook = {};        // how many times each has been taken out
   let blockAt = 0;
 
   sp.on('update', guard('blocksgone', () => {
@@ -2134,42 +2179,63 @@
       if (Math.sqrt(dx * dx + dy * dy + dz * dz) > BLOCK_NEAR) { continue; }
 
       /*
-        WALKED, NOT ASKED FOR. This used findClosestReferenceOfType and never
-        removed a single block: not one "took the chopping block out of the
-        world" line exists in any log on this machine. See the note over
-        refsInCell. The position test is kept exactly as it was, because
-        these three bases are shared by every chopping block in Skyrim and
-        only the ones at Djinn's three points are ours to remove.
+        ASKED FOR BY FORM ID, NOT WALKED FOR. A walk of the parent cell can
+        only find a block filed under the cell the person stands in, and two
+        of these three are filed under a persistent cell instead. See the
+        note over BLOCKS_GONE. Nothing back is an ordinary reference whose
+        cell has not loaded yet, which is not a failure: it is asked for
+        again in four seconds.
       */
-      {
-        const want = {};
-        for (let b = 0; b < BLOCK_BASES.length; b++) {
-          try {
-            const base = sp.Form.from(sp.Game.getFormEx(BLOCK_BASES[b]));
-            if (base) { want[base.getFormID()] = true; }
-          } catch (e) { }
-        }
-        let cell = null;
-        try { cell = pc.getParentCell(); } catch (e) { cell = null; }
-        const found = refsInCell(cell, want, null, null);
-        for (let k = 0; k < found.length; k++) {
-          const dx2 = found[k].x - site.pos[0];
-          const dy2 = found[k].y - site.pos[1];
-          const dz2 = found[k].z - site.pos[2];
-          if (Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2) > BLOCK_FIND) { continue; }
-          try {
-            // disable answers a promise. Nothing waits on it: the block either
-            // goes or it does not, and a failure is worth one line, not a stall.
-            const p = found[k].ref.disable(false);
-            if (p && typeof p.then === 'function') { p.then(function () { }, function () { }); }
-            blockDone[i] = true;
-            say('took the chopping block at ' + site.where + ' out of the world');
-          } catch (e) {
-            say('could not take the ' + site.where + ' chopping block out: ' + e);
-            blockDone[i] = true;   // do not try it every four seconds forever
+      let ref = null;
+      try { ref = sp.ObjectReference.from(sp.Game.getFormEx(site.ref)); } catch (e) { ref = null; }
+      if (!ref) { continue; }
+
+      // Checked once: the id was measured, and a load order that changes
+      // what stands there must leave it alone rather than take something
+      // else out of the world.
+      if (!blockChecked[i]) {
+        let why = '';
+        try {
+          const base = ref.getBaseObject();
+          const id = base ? base.getFormID() : 0;
+          const dx2 = ref.getPositionX() - site.pos[0];
+          const dy2 = ref.getPositionY() - site.pos[1];
+          const dz2 = ref.getPositionZ() - site.pos[2];
+          const off = Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2);
+          if (BLOCK_BASES.indexOf(id) < 0) {
+            why = 'its base is ' + id.toString(16) + ', which is not a chopping block';
+          } else if (off > BLOCK_FIND) {
+            why = 'it stands ' + Math.round(off) + ' units from the point';
           }
-          break;
+        } catch (e) {
+          why = 'it could not be read: ' + e;
         }
+        if (why) {
+          say('left the ' + site.where + ' reference ' + site.ref.toString(16) + ' alone: ' + why);
+          blockDone[i] = true;
+          continue;
+        }
+        blockChecked[i] = true;
+      }
+
+      let gone = false;
+      try { gone = ref.isDisabled(); } catch (e) { gone = false; }
+      if (gone) { continue; }
+      try {
+        // disable answers a promise. Nothing waits on it: the block either
+        // goes or it does not, and a failure is worth one line, not a stall.
+        const p = ref.disable(false);
+        if (p && typeof p.then === 'function') { p.then(function () { }, function () { }); }
+        blockTook[i] = (blockTook[i] || 0) + 1;
+        if (blockTook[i] === 1) {
+          say('took the chopping block at ' + site.where + ' out of the world');
+        } else {
+          say('the ' + site.where + ' chopping block came back and was taken out again (' +
+              blockTook[i] + ' times this session)');
+        }
+      } catch (e) {
+        say('could not take the ' + site.where + ' chopping block out: ' + e);
+        blockDone[i] = true;   // do not try it every four seconds forever
       }
     }
   }));
