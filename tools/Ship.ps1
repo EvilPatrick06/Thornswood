@@ -85,15 +85,18 @@
   <Root>\Launcher. It copies the plugins into the game folder. The pack it
   makes stays in -DistRoot, and every pack-*.zip there older than the ten
   newest is deleted. The first -Channel dev run on a machine makes the dev
-  branch of the releases repo and pushes it to GitHub, dry run or not.
+  branch of the releases repo and pushes it to GitHub, so a dry run on a
+  machine whose releases repo has no dev branch stops rather than make one:
+  run -Channel dev once without -DryRun.
 
-  DO NOT GIVE IT -Package. The installer step does not look at -DryRun, so on
-  the main channel it rebuilds the installer and Package-Thornswood.ps1 puts
-  it on the site, which is a real publish.
+  With -Package the installer is not rebuilt, because Package-Thornswood.ps1
+  puts what it builds on the site. The dry run says so and prints the
+  -NoPublish line that builds one and publishes nothing.
 
 .PARAMETER Package
   Also rebuilds the two installer files for new people, after the release is
-  out. Twenty minutes or more. A dev release never touches the installer.
+  out, and puts them on the site. Twenty minutes or more. Not on a -DryRun,
+  and a dev release never touches the installer.
 
 .PARAMETER Root
   The Thornswood install whose launcher is built and whose files are
@@ -305,6 +308,10 @@ function Ensure-DevReleases([string]$mainRel) {
         if ($remoteDev) {
             & git -C $mainRel worktree add $devRel dev 2>&1 | Out-Host
         } else {
+            # Making the dev branch means pushing it to the releases repository,
+            # and a dry run pushes nothing. Stopped before the branch is made,
+            # so nothing is left half done on this disk either.
+            if ($DryRun) { Die 'The releases repository has no dev branch that git could see, and making one means pushing it. A dry run pushes nothing. Run .\tools\Ship.ps1 -Channel dev once without -DryRun.' }
             & git -C $mainRel worktree add -b dev $devRel origin/main 2>&1 | Out-Host
             & git -C $devRel push -u origin dev 2>&1 | Out-Host
         }
@@ -968,6 +975,22 @@ if ($published -eq 2) {
 if ($Dev) {
     Head 'The installer'
     Say '  dev release, the installer is not touched' 'DarkGray'
+}
+elseif ($Package -and $DryRun) {
+    # A DRY RUN DOES NOT REBUILD THE INSTALLER. Package-Thornswood.ps1 puts
+    # what it builds on the site, through Publish-Installer.ps1 over ssh, unless
+    # it is given -NoPublish, and this called it without. So -DryRun -Package
+    # put a new installer in front of every new person, which is the opposite
+    # of a dry run. Found on 24 September by the script index run (entry 260).
+    #
+    # Skipped rather than built with -NoPublish. That build is twenty minutes,
+    # and it would leave a Thornswood-Setup.zip in the staging folder that the
+    # site does not have, so the next Ship would call the installer current
+    # while the one people download is not. A dry run leaves nothing behind
+    # that changes what the next release says; see the Publishing section.
+    Show-Installer
+    Say '  dry run, so not rebuilt: Package-Thornswood.ps1 puts what it builds on the site' 'Yellow'
+    Say ('  .\tools\Package-Thornswood.ps1 -NoPublish -OutDir "' + $DistDir + '"   builds it and publishes nothing') 'DarkGray'
 }
 elseif ($Package) {
     Head 'Rebuilding the installer'
