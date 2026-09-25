@@ -205,6 +205,25 @@ the team before code; nobody settles it alone, and a Claude never does.
   dev Ship wins. A main Ship resets it.
 - One fix per pull request. A branch that changes eight things is eight
   reviews nobody has time for; split it.
+- No stray branches and no stray pull requests. Decided by Patrick on
+  25 Sep, after a count found 70 branches on GitHub, two of them holding
+  work that had never been merged and was nearly deleted with the rest:
+  "we need to make sure in the docs that we don't leave a bunch of stray
+  branches and PRs and fix+merge them everytime or delete if old".
+  - A branch is deleted once its pull request is merged. GitHub does that
+    by itself (the repository setting "Automatically delete head branches", on since 25 Sep);
+    delete it by hand if it was not.
+  - Work goes into a pull request the day it is done, never left on a
+    pushed branch without one. That is how the two above were lost track of.
+  - At the start of a session, and before anything is shipped, look at what
+    is open: `gh pr list --state open` and `git ls-remote --heads origin`.
+    Everything there other than main, the current `hotfix/` branch and work
+    somebody is doing today gets one of two things: fixed and merged, or,
+    when it is old or no longer wanted, its pull request closed with a line
+    saying why and its branch deleted. Somebody else's branch is theirs to
+    decide on: ask them, and put it on the board if they cannot be asked.
+    Check whether its work is already in main before deleting it; a
+    squashed merge leaves the branch looking unmerged to git.
 - The build check on GitHub (.github/workflows/build.yml: the scripts parse,
   the harnesses pass, the launcher compiles with the .NET Framework csc) is
   off, at Patrick's word on 25 Sep: it no longer starts on a push or a pull
