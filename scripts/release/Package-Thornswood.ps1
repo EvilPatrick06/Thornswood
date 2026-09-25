@@ -325,15 +325,21 @@ elseif (-not $NoVortex) {
             Say ("  the collection provides {0:n0} file(s), which are left out" -f $vortexFiles.Count) 'Green'
         }
         catch {
-            Say '  the Vortex record is there but could not be read, so nothing is left out for it:' 'Yellow'
-            Say ('    ' + $_.Exception.Message) 'Yellow'
-            $vortexFiles = $null
+            # A record that is there but unreadable used to warn and carry on,
+            # which builds the old standalone payload with no collection.txt: the
+            # shape whose installer copies mid-download after an early Enter and
+            # gives testers the wrong files (issue #369 F2). Refuse it, the same
+            # as an empty own-game record above; -NoVortex is the way to ship
+            # everything on purpose.
+            Die ("The Vortex record at $VortexManifest is there but could not be read, so the collection files cannot be left out and this installer would carry every mod file: " +
+                 $_.Exception.Message + " Fix the record, or pass -NoVortex to ship everything on purpose.")
         }
     }
     else {
-        Say '  no Vortex record found, so this installer carries every mod file.' 'Yellow'
-        Say "  looked for: $VortexManifest" 'DarkGray'
-        Say '  Deploy once in Vortex and it appears.' 'DarkGray'
+        # No record and no -NoVortex used to warn and build a full standalone
+        # payload without collection.txt, which is the dangerous installer shape
+        # (issue #369 F2). Refuse rather than warn.
+        Die ("No Vortex record found at $VortexManifest, so the collection files cannot be left out and this installer would carry every mod file and build the old standalone shape (no collection.txt). Deploy once in Vortex so the record appears, or pass -NoVortex to ship everything on purpose.")
     }
 }
 
