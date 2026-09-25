@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 193 of them, with the one line that says
+Every `.ps1` in this folder, 194 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -64,7 +64,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [Check-Site.ps1](Check-Site.ps1) | Asks whether thornswood.net is actually working: from the outside first, the way a visitor or an uptime monitor sees it, and then from the box, the way the site sees Discord. |
 | [Check-Swallow.ps1](Check-Swallow.ps1) | Counts the silent catches in the launcher, file by file, and fails when any file has more than tools\swallow-baseline.txt allows. |
 | [Check-VoiceInstall.ps1](Check-VoiceInstall.ps1) | Expand Install-Voice's here-string exactly as the script does and look at the text that would actually be sent. |
-| [Check-Words.ps1](Check-Words.ps1) | The Words section of CLAUDE.md, checked instead of hoped for: no em dashes anywhere written for people, never the word player, and the owner is Patrick. |
+| [Check-Words.ps1](Check-Words.ps1) | The Words section of CONTRIBUTING.md, checked instead of hoped for: no em dashes anywhere written for people, never the word player, and the owner is Patrick. |
 | [Clean-Everything.ps1](Clean-Everything.ps1) | Finds the old installers, build leftovers, temp files, stale backups and old GitHub release assets across this machine, the server and both repositories, adds up what they are costing, and prints it. |
 | [Clean-Leftovers.ps1](Clean-Leftovers.ps1) | The other half of Audit-Leftovers.ps1. That one measures and never touches anything; this one removes what it found. |
 | [Close-Launcher.ps1](Close-Launcher.ps1) | Shared by every script that writes into the build. |
@@ -186,6 +186,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-remote-length.ps1](test-remote-length.ps1) | No script sends the VPS more than a command line can hold. |
 | [test-roll-log.ps1](test-roll-log.ps1) | Roll-Log.ps1, and every command line that runs it, driven for real in a temp folder. |
 | [test-script-index.ps1](test-script-index.ps1) | Ship.ps1 says every option it takes where Get-Help can read it, and tools\README.md lists every script in this folder exactly as New-ScriptIndex.ps1 writes it. |
+| [test-script-paths.ps1](test-script-paths.ps1) | Every path a script builds from its own folder or the repository points at something that is in the repository, apart from the files that are made at run time or kept out of git on purpose, which are listed below with why. |
 | [test-self-update.ps1](test-self-update.ps1) | The launcher's self update keeps the old exe until the new one has started, and puts it back when the new one does not. |
 | [test-setup-stub-age.ps1](test-setup-stub-age.ps1) | Package-Thornswood.ps1 refuses a setup program compiled before the last change to the source it is compiled from. |
 | [test-ship-dry-run.ps1](test-ship-dry-run.ps1) | A dry run publishes nothing, and a real Ship still publishes the installer. |
