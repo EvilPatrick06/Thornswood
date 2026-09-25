@@ -378,7 +378,12 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
     # 14 files under tools on Patrick's machine that git does not track are
     # ignored (the webhooks, signing.json, __pycache__, a log, the front's zip),
     # and counting them would stop every main release.
-    $loose = @(& git -C $RepoDir ls-files --others --exclude-standard -- tools 2>$null | Where-Object { $_ })
+    # tools, and every other folder a release is built from as the
+    # reorganisation moves them out of it (issue #440): the site's art goes
+    # into the menu, and game, launcher and installer are where the plugins,
+    # the launcher source and the installer are going.
+    $moreRoots = @(@('site', 'game', 'launcher', 'installer') | Where-Object { Test-Path -LiteralPath (Join-Path $RepoDir $_) })
+    $loose = @(& git -C $RepoDir ls-files --others --exclude-standard -- tools @moreRoots 2>$null | Where-Object { $_ })
     & git -C $RepoDir fetch --quiet origin 2>$null | Out-Null
     $behind = 0
     $ahead = 0
@@ -442,7 +447,7 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
         # not a question this gate can settle.
         if ($loose.Count) {
             foreach ($d in $loose | Select-Object -First 10) { Say "    $d" 'Yellow' }
-            Die ("There are $($loose.Count) file(s) under tools that git does not know about. The build " +
+            Die ("There are $($loose.Count) file(s) under tools, or another folder a release is built from, that git does not know about. The build " +
                  "and Go.ps1 take them anyway, so they would go out in this release without being on GitHub. " +
                  "Put them through a pull request, delete them, or add them to .gitignore, then Ship.")
         }
@@ -689,11 +694,17 @@ $goArgs = @{ SkipServer = $true }
 if ($GameDir) { $goArgs['Game'] = $GameDir } else { $goArgs['Vortex'] = $true }
 # Write-Host does not go down the pipeline, so Out-Null does not quiet it.
 # 6 is the information stream Write-Host actually uses. Nothing is lost:
-# Go.ps1 reports in colour and exits 0 either way, and the check below is
+# Go.ps1 reports in colour, and the check below is
 # what decides whether this step passed.
 & (Join-Path $Here 'Go.ps1') @goArgs 6>$null | Out-Null
+# Except for one thing: a file this repository tracks that Go.ps1 could not
+# find, which is a path gone wrong and exits 1 (issue #440, phase 0).
+if ($LASTEXITCODE -ne 0) {
+    Unbump 'Go.ps1 could not find files this repository has'
+    Die 'Go.ps1 could not find files this repository has. Run .\tools\Go.ps1 -SkipServer to see which. Nothing was published.'
+}
 
-# Go.ps1 reports trouble in yellow and still exits 0, so the files are checked
+# Other trouble Go.ps1 reports in yellow and still exits 0 on, so the files are checked
 # rather than the exit code. This is the guard that makes the step worth having:
 # a plugin that did not land stops the release instead of shipping stale.
 if ($GameDir) {
