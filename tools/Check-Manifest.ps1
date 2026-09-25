@@ -39,7 +39,7 @@ param(
 if (-not $Client) { $Client = if ($Dev) { 'C:\Thornswood-DevBuild' } else { 'C:\Thornswood' } }
 
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 
 # The one rule for what the game loads and in what order, shared with the
 # launcher's LoadOrder.cs and with Publish-Update.ps1. This script used to

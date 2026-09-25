@@ -43,7 +43,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $docsWin = $DocsRoot.Replace('/','\')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

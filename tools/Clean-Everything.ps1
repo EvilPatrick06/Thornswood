@@ -50,7 +50,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=no')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }

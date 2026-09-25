@@ -116,15 +116,15 @@ if ($cmd.Length -gt 6000) {
     $rc = 1
     try {
         [IO.File]::WriteAllText($tmp, $full, (New-Object Text.UTF8Encoding($true)))
-        & scp -o BatchMode=yes -o StrictHostKeyChecking=no $tmp "${VpsUser}@${VpsHost}:$far" 2>&1 | Out-Null
+        & scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new $tmp "${VpsUser}@${VpsHost}:$far" 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "Could not copy the script to $VpsHost. Nothing was run." }
-        & ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$VpsUser@$VpsHost" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
+        & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$VpsUser@$VpsHost" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
         $rc = $LASTEXITCODE
-        & ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$VpsUser@$VpsHost" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
+        & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$VpsUser@$VpsHost" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
     }
     finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
     exit $rc
 }
 
-& ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$VpsUser@$VpsHost" "powershell -NoProfile -EncodedCommand $encoded" 2>&1
+& ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$VpsUser@$VpsHost" "powershell -NoProfile -EncodedCommand $encoded" 2>&1
 exit $LASTEXITCODE

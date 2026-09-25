@@ -46,4 +46,4 @@ if ($e) { $e | ForEach-Object { $_.Line } } else { 'none' }
 '@ -replace 'LINES', $Lines
 
 $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-& ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc"
+& ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc"

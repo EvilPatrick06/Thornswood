@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 192 of them, with the one line that says
+Every `.ps1` in this folder, 193 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -197,6 +197,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-signing-folder.ps1](test-signing-folder.ps1) | The signing setup lives in tools\signing, and Sign-Artifact.ps1 finds a dlib or metadata that signing.json names relative to the repository. |
 | [test-site-account.ps1](test-site-account.ps1) | Deploy-Docs.ps1 -RunAs chooses the account the site's scheduled task runs as. |
 | [test-source-offer.ps1](test-source-offer.ps1) | Where the source of the SkyMP files Thornswood ships is, said on the site and in the installed folder, and said truthfully. |
+| [test-ssh-host-keys.ps1](test-ssh-host-keys.ps1) | No script talks to the VPS with host key checking switched off. |
 | [test-steam-updates.ps1](test-steam-updates.ps1) | Steam's Updates setting for Skyrim, which nothing in the launcher read or set until 24 September (entry 271 on the To Do List, "Nothing stops Steam putting Skyrim back on the wrong build"). |
 | [test-swallow.ps1](test-swallow.ps1) | The silent catches in the launcher, entry 239 on the To Do List, and the rule that stops their number growing. |
 | [test-updater.ps1](test-updater.ps1) | The launcher's updater, asked its own questions. |
