@@ -202,6 +202,21 @@ the team before code; nobody settles it alone, and a Claude never does.
   run from any branch, from any developer's machine, to try work on the dev server.
   Say in #staff-general when you take it, because there is one dev feed and the last
   dev Ship wins. A main Ship resets it.
+- Every release note has a title and details, dev included. Patrick, 25 Sep,
+  after two dev posts went out as "The scroll glows" and "Dev build: ...":
+  they must have details and be as good as the ones before them. The notes
+  are what people read in the launcher, on the site and in Discord, so write
+  them from the side of the person playing: a title that says what changed
+  for them, then one "- " line for each thing they will notice, saying what
+  it does and what to do if anything. Ship refuses a title under three words
+  or notes with no "- " line. The shape:
+
+  ```
+  .\scripts\release\Ship.ps1 -Channel dev "The Downgrade button shows its progress and says why it stopped
+  - A bar under the Downgrade button shows how far the downgrade has got: each of the three downloads with its size, then the copy into your game.
+  - When the downgrade stops for any reason, the line under the button says why and what to do next.
+  - If Windows will not open Steam's links, the launcher asks Steam directly, so Steam's console still opens."
+  ```
 - One fix per pull request. A branch that changes eight things is eight
   reviews nobody has time for; split it.
 - No stray branches and no stray pull requests. Decided by Patrick on
