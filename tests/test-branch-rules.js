@@ -208,9 +208,7 @@ const PROTECTION = 'gh api repos/EvilPatrick06/Thornswood/branches/main/protecti
 docs.forEach(function (d) {
   const t = d.text;
   yes(d.name + ' says enforce_admins is off', /enforce_admins is off\b/.test(t));
-  const said = /required check is "?([^",;.]+?)"?[,;.]/.exec(t);
-  yes(d.name + ' names the required check exactly as build.yml names the job (says "' + (said ? said[1] : '') + '")',
-      !!said && said[1] === CHECK);
+  yes(d.name + ' says there is no required check', /there is no required check/.test(t));
   yes(d.name + ' says required approving reviews is 0', /required approving reviews is (0|zero)\b/i.test(t));
   yes(d.name + ' says the code owner review is off', /code owner review is off|Require review from Code Owners is off/i.test(t));
   yes(d.name + ' gives the command that reads the live settings', t.indexOf(PROTECTION) !== -1);
@@ -254,8 +252,7 @@ if (!LIVE) {
     const checks = (p.required_status_checks && p.required_status_checks.contexts) || [];
     const reviews = p.required_pull_request_reviews || {};
     yes('live: enforce_admins is off, as the documents say', !(p.enforce_admins && p.enforce_admins.enabled));
-    yes('live: the one required check is "' + CHECK + '" (GitHub says ' + JSON.stringify(checks) + ')',
-        checks.length === 1 && checks[0] === CHECK);
+    yes('live: there is no required check (GitHub says ' + JSON.stringify(checks) + ')', checks.length === 0);
     yes('live: required approving reviews is 0 (GitHub says ' + reviews.required_approving_review_count + ')',
         (reviews.required_approving_review_count || 0) === 0);
     yes('live: the code owner review is off', !reviews.require_code_owner_reviews);

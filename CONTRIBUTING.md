@@ -161,12 +161,12 @@ the team before code; nobody settles it alone, and a Claude never does.
   straight to main, which held while `enforce_admins` was off and stopped
   holding the moment it went on.
 - What branch protection on main actually enforces, since 25 Sep:
-  `enforce_admins` is **off**, the one required check is `Launcher builds`,
-  required approving reviews is **0**, and the code owner review is
-  **off**. Patrick, that day: "I want it set so they can commit+merge as long as the checks on the VPS go through so they don't need me". So anybody on the team merges their
-  own pull request once `Launcher builds` is green, with a line in
-  #staff-general saying what it is; nobody waits for Patrick. Force pushes
-  are refused.
+  `enforce_admins` is **off**, there is no required check, required
+  approving reviews is **0**, and the code owner review is **off**.
+  Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
+  anybody on the team merges their own pull request once `Launcher builds`
+  (the build check, on the VPS) is green and they have said what it is in
+  #staff-general. Nobody waits for Patrick. Force pushes are refused.
   What changed on 23 Sep, since 22 Sep: the review requirement was one
   approving review, which Patrick could not give himself and had to override
   with `--admin` on every one of his own pull requests, and it is now zero.
@@ -226,7 +226,8 @@ the team before code; nobody settles it alone, and a Claude never does.
 - Every pull request gets the build check (.github/workflows/build.yml: the
   scripts parse, the harnesses pass, the launcher compiles with the .NET
   Framework csc). Red means the branch would stop Ship at the build step;
-  fix that, and merge once it is green. It runs on the VPS, on a runner
+  fix that, and merge once it is green and you have said so in
+  #staff-general. It runs on the VPS, on a runner
   `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
   GitHub's own runners were blocked on billing from 25 Sep.
   `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.

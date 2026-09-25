@@ -7,7 +7,7 @@ launcher, the plugins, the gamemode or the site promise, by reading the files
 or by running a piece of them against a scratch copy. None of them talks to
 the VPS or to GitHub unless it says so at the top (`test-branch-rules.js
 --live` is the one that does). The build check (`.github/workflows/build.yml`) runs every one of them on
-each pull request, on the VPS runner, and a red one stops the merge.
+each pull request, on the VPS runner; the team merges only once it is green.
 
 The voice service's own harnesses stay beside it in `voice\`, and the bot's in
 `bot\`, because they are run from there.

@@ -26,9 +26,10 @@
 # ON AGAIN, ON THE VPS, 25 SEPTEMBER. It was off for part of that day while
 # no runner existed. Then Patrick: "I want it set so they can commit+merge
 # as long as the checks on the VPS go through so they don't need me".
-# "Launcher builds" is main's one required check again, no review is
-# required, so anybody on the team merges their own pull request once this
-# is green.
+# Then: "we don't need the required check/reviewer at all anymore for
+# anyone as long as we give verbal agreement and the VPS check goes
+# through". So nothing is required in GitHub's settings; the team merges
+# once this is green and it has been said in #staff-general.
 name: Build check
 on:
   pull_request:
