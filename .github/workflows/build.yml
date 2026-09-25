@@ -137,18 +137,26 @@ jobs:
           # Written to be run by hand, and until now never run anywhere else.
           # A harness that reads this machine's game folder says SKIP for the
           # parts it cannot measure on a runner and still checks the rest.
-          $bad = 0
-          # In tests\ since the reorganisation's phase 5 (issue #440).
-          foreach ($t in (Get-ChildItem tests -Filter 'test-*.js' -File | Sort-Object Name)) {
-            Write-Host ("--- {0}" -f $t.Name)
-            & node $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          # FOUR AT A TIME, since 25 September. One after another the ~190 took
+          # five and a half minutes on the VPS; Patrick wanted a check in about
+          # five. Each harness is its own process with its own temp folder and
+          # a free port, so they do not meet. The output of each is printed
+          # whole, in name order, and the ones that failed are listed together
+          # at the end, where the tail of the log shows them.
+          $all = @(Get-ChildItem tests -File | Where-Object { $_.Name -like 'test-*.js' -or $_.Name -like 'test-*.ps1' } | Sort-Object Name)
+          $results = $all | ForEach-Object -ThrottleLimit 4 -Parallel {
+            $t = $_
+            $out = if ($t.Extension -eq '.js') { & node $t.FullName 2>&1 | Out-String } else { & pwsh -NoProfile -File $t.FullName 2>&1 | Out-String }
+            [pscustomobject]@{ Name = $t.Name; Path = $t.FullName; Code = $LASTEXITCODE; Out = $out }
           }
-          foreach ($t in (Get-ChildItem tests -Filter 'test-*.ps1' -File | Sort-Object Name)) {
-            Write-Host ("--- {0}" -f $t.Name)
-            & pwsh -NoProfile -File $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+          $failed = @()
+          foreach ($r in ($results | Sort-Object Name)) {
+            Write-Host ("--- {0}" -f $r.Name)
+            Write-Host $r.Out
+            if ($r.Code -ne 0) { $failed += $r.Name; Write-Host ("::error file={0}::harness failed" -f $r.Path) }
           }
+          $bad = $failed.Count
+          $voiceFailed = @()
           # The five in voice, which run nowhere else. They spawn the
           # real service in a temp folder and drive it over HTTP, so they need
           # node and nothing else, and node is already here. Added 23
@@ -157,9 +165,13 @@ jobs:
           foreach ($t in (Get-ChildItem voice -Filter 'test-*.js' -File | Sort-Object Name)) {
             Write-Host ("--- voice/{0}" -f $t.Name)
             & node $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+            if ($LASTEXITCODE -ne 0) { $bad++; $voiceFailed += ('voice/' + $t.Name); Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
           }
-          if ($bad) { exit 1 }
+          if ($bad) {
+            Write-Host ''
+            Write-Host ("{0} harness(es) failed: {1}" -f $bad, (($failed + $voiceFailed) -join ', '))
+            exit 1
+          }
           Write-Host 'every harness passed'
 
       - name: Run the bot harnesses
@@ -196,7 +208,7 @@ jobs:
           foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
             Write-Host ("--- {0}" -f $t.Name)
             & $py $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+            if ($LASTEXITCODE -ne 0) { $bad++; $voiceFailed += ('voice/' + $t.Name); Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
           }
           if ($bad) { exit 1 }
           Write-Host 'every bot harness passed'
