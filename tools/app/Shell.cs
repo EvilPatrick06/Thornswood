@@ -128,6 +128,7 @@ namespace Thornswood
         static Border downgradeBar;
         static TextBlock txtDowngradeNote, txtDowngradeTitle;
         static Button btnDowngrade;
+        static ProgressBar prgDowngrade;
         // The feed's word to everybody and whether it holds Play (entry 262).
         // Empty until a document has actually been read, so nothing here can
         // hold Play on a check that failed. See FeedNotice.cs.
@@ -562,6 +563,7 @@ namespace Thornswood
             chkAutoUpdate = F<CheckBox>("ChkAutoUpdate");
             updateBar = F<Border>("UpdateBar"); titleBar = F<Grid>("TitleBar");
             downgradeBar = F<Border>("DowngradeBar"); txtDowngradeNote = F<TextBlock>("TxtDowngradeNote"); btnDowngrade = F<Button>("BtnDowngrade");
+            prgDowngrade = F<ProgressBar>("PrgDowngrade");
             txtDowngradeTitle = F<TextBlock>("TxtDowngradeTitle");
             noticeBar = F<Border>("NoticeBar"); txtNoticeTitle = F<TextBlock>("TxtNoticeTitle"); txtNoticeNote = F<TextBlock>("TxtNoticeNote");
 
@@ -1994,6 +1996,24 @@ namespace Thornswood
             if (r != MessageBoxResult.Yes) { Log("Left Skyrim on the build it is on."); return; }
             btnDowngrade.IsEnabled = false;
             btnDowngrade.Content = "Working...";
+            // The bar under the note: a share while Steam downloads a part
+            // whose size it has given, moving without a number while it has
+            // not, and gone when the run ends. Downgrade.Progress in Downgrade.cs.
+            Downgrade.OnProgress = delegate (int p)
+            {
+                try
+                {
+                    win.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        if (prgDowngrade == null) return;
+                        if (p == -1) { prgDowngrade.Visibility = Visibility.Collapsed; return; }
+                        prgDowngrade.Visibility = Visibility.Visible;
+                        prgDowngrade.IsIndeterminate = p < 0;
+                        if (p >= 0) prgDowngrade.Value = Math.Min(100, p);
+                    }));
+                }
+                catch (Exception ex) { Swallow.Note("RunDowngrade, the progress bar", ex); }
+            };
             Downgrade.Start(cfg,
                 PresenceLog,
                 delegate (string s) { try { win.Dispatcher.BeginInvoke(new Action(delegate { txtDowngradeNote.Text = s; })); } catch { } },
@@ -2005,6 +2025,7 @@ namespace Thornswood
                         {
                             btnDowngrade.Content = ok ? "Done" : "Try again";
                             btnDowngrade.IsEnabled = !ok;
+                            if (prgDowngrade != null) { prgDowngrade.IsIndeterminate = false; prgDowngrade.Visibility = Visibility.Collapsed; }
                             if (ok && OwnGame.Active) StartOwnGame(false, true);
                             DrawStatus();
                             DrawBuildLine();

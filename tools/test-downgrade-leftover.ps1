@@ -134,6 +134,13 @@ __LIFTED__
 '@
 $body = New-Object System.Text.StringBuilder
 foreach ($k in 'ClearLeftover', 'MarkerIs', 'FolderSize') { [void]$body.AppendLine($lifted[$k]) }
+# Since #343 an early stop goes through Stop, which also hides the Downgrade
+# card's bar. Stop is lifted as it is; the bar is a stand-in that counts.
+$stop = Get-Member $text 'static bool Stop(string why, Action<string> log, Action<string> status)'
+if ($stop) {
+    [void]$body.AppendLine($stop)
+    [void]$body.AppendLine('        public static int BarHidden; static void Progress(int percent) { if (percent == -1) BarHidden++; }')
+}
 $probe = $probe.Replace('__LIFTED__', $body.ToString())
 
 $csc = @(
@@ -219,6 +226,7 @@ try {
     Yes 'a folder that cannot be removed stops the run' (-not $ok)
     Yes 'and the card says so, and what to do' ($script:shown.Count -eq 1 -and $script:shown[0].Contains('Could not remove') -and $script:shown[0].Contains('press the button again'))
     Yes 'and the log says the same' ($script:logged.Count -ge 2 -and $script:logged[$script:logged.Count - 1] -eq $script:shown[0])
+    if ($stop) { Yes 'and the card''s bar is hidden, as every other early stop hides it' (([int]$T.GetField('BarHidden', $flags).GetValue($null)) -ge 1) }
 }
 finally {
     if ($held) { $held.Dispose() }

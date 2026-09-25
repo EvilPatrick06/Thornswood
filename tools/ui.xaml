@@ -708,6 +708,12 @@
                   <TextBlock x:Name="TxtDowngradeTitle" Style="{StaticResource H2}" Text="Skyrim is on the wrong build"/>
                   <TextBlock x:Name="TxtDowngradeNote" Style="{StaticResource Small}" Margin="0,2,0,0" TextWrapping="Wrap"
                              Text="The server runs 1.6.1170 and this Skyrim is newer. Press the button: Steam downloads the 1.6.1170 files under your own account and the launcher puts them in place. About 11 GB, and Steam has to be signed in."/>
+                  <!-- How far the downgrade is: each part of three by the size Steam
+                       gives for it, then the copy. Set through Downgrade.OnProgress
+                       by RunDowngrade in Shell.cs; hidden until a run starts. -->
+                  <ProgressBar x:Name="PrgDowngrade" Height="6" Minimum="0" Maximum="100" Margin="0,10,0,0"
+                               Background="{DynamicResource Line}" Foreground="{DynamicResource Accent}" BorderThickness="0"
+                               Visibility="Collapsed"/>
                 </StackPanel>
                 <Button x:Name="BtnDowngrade" Grid.Column="1" Style="{StaticResource Solid}" Content="Downgrade to 1.6.1170" VerticalAlignment="Center" Margin="18,0,0,0"/>
               </Grid>

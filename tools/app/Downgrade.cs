@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace Thornswood
@@ -177,7 +178,7 @@ namespace Thornswood
             {
                 bool ok = false;
                 try { ok = Run(cfg, log, status); }
-                catch (Exception ex) { log("Downgrade stopped: " + ex.Message); }
+                catch (Exception ex) { Stop("The downgrade stopped: " + ex.Message, log, status); }
                 finally { running = false; }
                 try { done(ok); } catch { }
             });
@@ -187,21 +188,47 @@ namespace Thornswood
             catch { running = false; throw; }
         }
 
+        /// <summary>
+        /// The bar on the Downgrade card, set by Shell before Start: 0 to 100,
+        /// -1 hides it, and -2 is a bar that moves without a number, for the
+        /// stretches with nothing to measure against. Keizaal's launcher shows
+        /// one, and a line of megabytes that nobody knows the end of is not
+        /// the same thing (Patrick, 24 September).
+        /// </summary>
+        public static Action<int> OnProgress;
+
+        static void Progress(int percent)
+        {
+            Action<int> p = OnProgress;
+            if (p == null) return;
+            try { p(percent); }
+            catch (Exception ex) { Swallow.Note("Downgrade.Progress", ex); }
+        }
+
+        /// <summary>
+        /// Stops the run and says why in both places. Until 24 September every
+        /// early stop went to the launcher log alone, so the line under the
+        /// button kept the words it had and pressing Downgrade looked like
+        /// nothing at all: a tester on 1.1.94, "the dowgrader this time didnt
+        /// even upon the steam console let alone put the commands in for you".
+        /// </summary>
+        static bool Stop(string why, Action<string> log, Action<string> status)
+        {
+            log(why);
+            status(why);
+            Progress(-1);
+            return false;
+        }
+
         static bool Run(Config cfg, Action<string> log, Action<string> status)
         {
             string steam = Steam.Path_();
             if (string.IsNullOrEmpty(steam) || !Directory.Exists(steam))
-            {
-                log("Could not find where Steam is installed, so Steam cannot be asked for the files.");
-                return false;
-            }
+                return Stop("Could not find where Steam is installed, so Steam cannot be asked for the files. Open Steam once, then press the button again.", log, status);
             string content = Path.Combine(steam, "steamapps\\content\\app_" + AppId);
 
             if (Checks.GameRunning())
-            {
-                log("Skyrim is running. Close it, then press the button again.");
-                return false;
-            }
+                return Stop("Skyrim is running. Close it, then press the button again.", log, status);
 
             string target = Target(cfg);
             string targetExe = Path.Combine(target, "SkyrimSE.exe");
@@ -211,14 +238,16 @@ namespace Thornswood
                 // Another server's session plays out of the Steam copy, and its
                 // files cannot be replaced while that runs.
                 if (Checks.OtherSkyrimRunning())
-                {
-                    log("A Skyrim from another folder is running, most likely another server's session in the Steam copy. Close it, then press the button again.");
-                    return false;
-                }
+                    return Stop("A Skyrim from another folder is running, most likely another server's session in the Steam copy. Close it, then press the button again.", log, status);
                 if (File.Exists(targetExe) && !Wrong(cfg, targetExe))
                 {
+                    // Steam is not asked for anything here, and the line under
+                    // the button has to say so: a copy another server's tool
+                    // already downgraded is exactly this case, and it used to
+                    // read as a button that did nothing.
                     log("The Steam copy in " + target + " is already on 1.6.1170, so nothing needs downloading. Thornswood's own folder is brought up to date from it next.");
-                    status("The Steam copy is already on 1.6.1170.");
+                    status("The Steam copy of Skyrim is already on 1.6.1170, so nothing needs downloading. Thornswood's own folder is being brought up to date from it now.");
+                    Progress(-2);
                     return true;
                 }
                 log("Thornswood runs from its own folder, which is made from the Steam copy in " + target + ". The Steam copy is downgraded, then the folder is brought up to date from it.");
@@ -284,7 +313,7 @@ namespace Thornswood
                     // command line did not have the focus. Click it and try once
                     // more, then fall back to the clipboard.
                     log("Steam has not started the download. Trying the console's command line once more.");
-                    FocusConsole();
+                    FocusConsole(log);
                     Thread.Sleep(400);
                     typed = TypeIntoConsole(cmd, log);
                     askedAt = DateTime.Now;
@@ -313,6 +342,7 @@ namespace Thornswood
                 // Wait for "Depot download complete" for this depot. Progress
                 // is the size of the folder Steam is filling.
                 long lastSize = -1;
+                long total = 0;
                 DateTime lastGrowth = DateTime.Now;
                 bool warned = false;
                 string downloading = Path.Combine(steam, "steamapps\\downloading\\" + AppId);
@@ -323,7 +353,11 @@ namespace Thornswood
                     if (Refused(said, depot, i + 1, cmd, log, status)) return false;
                     long size = FolderSize(folder);
                     if (size != lastSize) { lastSize = size; lastGrowth = DateTime.Now; warned = false; }
-                    status(ProgressLine(i + 1, Depots.Length, size, pasted));
+                    // Steam says how big the part is when it starts it; until
+                    // then the bar moves without a number.
+                    if (total <= 0) total = DepotBytes(said, depot);
+                    status(SizedLine(i + 1, Depots.Length, size, total, pasted));
+                    Progress(total > 0 ? Percent(i, Depots.Length, size, total) : -2);
                     double quiet = (DateTime.Now - lastGrowth).TotalMinutes;
                     if (!warned && quiet > 10)
                     {
@@ -348,8 +382,7 @@ namespace Thornswood
                             log("Steam's log never said the download finished, but the folder has been complete and still for twenty minutes, so it is taken as done.");
                             break;
                         }
-                        log("Steam never started this download, and " + folder + " is left over from an earlier attempt, so what is in it cannot be trusted. Delete that folder, then press the button again.");
-                        return false;
+                        return Stop("Steam never started this download, and " + folder + " is left over from an earlier attempt, so what is in it cannot be trusted. Delete that folder, then press the button again.", log, status);
                     }
 
                     /*
@@ -380,20 +413,19 @@ namespace Thornswood
                             log("Nothing was downloaded at all, which usually means Steam refused the command. Its console window says why: look for a line about a manifest, a licence or no connection.");
                         log(ByHand(cmd));
                         status("Steam did not answer. See the log for what to do by hand.");
+                        Progress(-1);
                         return false;
                     }
                     Thread.Sleep(2000);
                 }
                 try { File.WriteAllText(Path.Combine(folder, ".thornswood-complete"), manifest); } catch { }
                 log("Part " + (i + 1) + " of 3 is down (depot " + depot + ", " + (FolderSize(folder) / 1048576).ToString("n0") + " MB).");
+                Progress((i + 1) * 100 / Depots.Length);
             }
 
             // ---- apply ------------------------------------------------------
             if (Checks.GameRunning())
-            {
-                log("Skyrim started while the files were coming down. Close it and press the button again; the downloads are kept.");
-                return false;
-            }
+                return Stop("Skyrim started while the files were coming down. Close it and press the button again; the downloads are kept.", log, status);
 
             // The downloaded exe is checked before a single file of the Steam
             // copy is replaced. This used to be checked only after the copy,
@@ -415,10 +447,16 @@ namespace Thornswood
                 }
                 log("Press the button again and Steam is asked for the files once more. If it ends here again, send your launcher log to the Discord.");
                 status("The download was not the 1.6.1170 build. Nothing was replaced; see the log.");
+                Progress(-1);
                 return false;
             }
 
             status("Putting the 1.6.1170 files in place...");
+            // The copy has a size to measure against too: everything the three
+            // downloads hold.
+            long toCopy = 0;
+            foreach (string[] d in Depots) toCopy += FolderSize(Path.Combine(content, "depot_" + d[0]));
+            Progress(0);
             // A file a mod replaces is the collection's, and in the Steam copy it
             // is a hard link to Vortex's own copy: writing the vanilla file over
             // it would change the mod inside Vortex. Those are left as they are.
@@ -446,12 +484,15 @@ namespace Thornswood
                         if (File.Exists(dest)) OwnGame.DropName(dest);
                         File.Copy(f, dest, false);
                         copied += new FileInfo(f).Length; files++;
-                        if (files % 25 == 0) status("Putting the 1.6.1170 files in place: " + (copied / 1048576).ToString("n0") + " MB");
+                        if (files % 25 == 0)
+                        {
+                            status("Putting the 1.6.1170 files in place: " + (copied / 1048576).ToString("n0") + " of " + (toCopy / 1048576).ToString("n0") + " MB");
+                            if (toCopy > 0) Progress((int)Math.Min(99, copied * 100 / toCopy));
+                        }
                     }
                     catch (Exception ex)
                     {
-                        log("Could not replace " + rel + ": " + ex.Message);
-                        return false;
+                        return Stop("Could not replace " + rel + ": " + ex.Message, log, status);
                     }
                 }
             }
@@ -461,8 +502,7 @@ namespace Thornswood
             bool right = File.Exists(targetExe) && !Wrong(cfg, targetExe);
             if (!right)
             {
-                log("SkyrimSE.exe is still not the 1.6.1170 build after the copy (" + Describe(cfg, targetExe) + "). Send your launcher log to the Discord.");
-                return false;
+                return Stop("SkyrimSE.exe is still not the 1.6.1170 build after the copy (" + Describe(cfg, targetExe) + "). Send your launcher log to the Discord.", log, status);
             }
 
             status("Cleaning up the downloaded copies...");
@@ -476,6 +516,7 @@ namespace Thornswood
             log("Skyrim is on 1.6.1170. " + (freed / 1048576).ToString("n0") + " MB of downloaded copies removed from Steam's folder.");
             log("Do not start Skyrim through Steam from here on: Steam would update it back, and you would be here again. Play from this launcher.");
             status("Done. Skyrim is on 1.6.1170.");
+            Progress(100);
             return true;
         }
 
@@ -491,15 +532,63 @@ namespace Thornswood
             return null;
         }
 
+        /// <summary>
+        /// Asks Steam to open one of its steam:// links. Through Windows first,
+        /// the way a person clicking the link would, and when Windows cannot
+        /// open it, through steam.exe itself with the link as its argument,
+        /// which is the command Windows runs for a steam:// link anyway.
+        ///
+        /// Every request used to be a bare Process.Start inside catch { }. On a
+        /// machine whose steam:// link does not open (the association missing,
+        /// or taken by something else), that threw, the throw was thrown away,
+        /// Steam was never asked anything, and nothing was written anywhere:
+        /// "didnt even upon the steam console" (Patrick, 24 September, a tester
+        /// on 1.1.94). Keizaal Online's launcher opens the console on those
+        /// machines, so it is possible, and this is how.
+        /// </summary>
+        static bool AskSteam(string link, Action<string> log)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(link) { UseShellExecute = true });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                log("Windows would not open " + link + " (" + ex.Message + "), so steam.exe is asked directly.");
+            }
+            string root = "";
+            try { root = Steam.Path_() ?? ""; }
+            catch (Exception ex) { Swallow.Note("Downgrade.AskSteam, finding Steam", ex); }
+            string exe = root.Length > 0 ? Path.Combine(root, "steam.exe") : "";
+            if (exe.Length == 0 || !File.Exists(exe))
+            {
+                log("steam.exe is not where Steam's install says it is (" + (root.Length > 0 ? root : "no install found") + "), so Steam cannot be asked for " + link + ".");
+                return false;
+            }
+            try
+            {
+                // The same arguments Windows registers for the link: steam.exe -- "steam://...".
+                Process.Start(new ProcessStartInfo(exe, "-- \"" + link + "\"") { UseShellExecute = false });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                log("steam.exe would not take " + link + " either: " + ex.Message);
+                return false;
+            }
+        }
+
         static bool WaitForSteam(Action<string> log, Action<string> status)
         {
             if (SteamProcess() == null)
             {
                 log("Steam is not running. Starting it; sign in if it asks.");
-                try { Process.Start(new ProcessStartInfo("steam://open/main") { UseShellExecute = true }); } catch { }
+                status("Starting Steam. Sign in if it asks...");
+                AskSteam("steam://open/main", log);
                 DateTime t = DateTime.Now;
                 while (SteamProcess() == null && (DateTime.Now - t).TotalSeconds < 90) Thread.Sleep(1000);
-                if (SteamProcess() == null) { log("Steam did not start."); return false; }
+                if (SteamProcess() == null) { Stop("Steam did not start. Start Steam yourself, sign in, then press the button again.", log, status); return false; }
                 // Give it time to sign in and draw its window.
                 status("Waiting for Steam to sign in...");
                 DateTime t2 = DateTime.Now;
@@ -515,7 +604,7 @@ namespace Thornswood
         /// </summary>
         static bool TypeIntoConsole(string cmd, Action<string> log)
         {
-            try { Process.Start(new ProcessStartInfo("steam://open/console") { UseShellExecute = true }); } catch { }
+            AskSteam("steam://open/console", log);
 
             // Steam's window can take a while to come up, longer still when the
             // client was sitting in the tray, and the first request for the
@@ -528,18 +617,25 @@ namespace Thornswood
             while (!front && (DateTime.Now - start).TotalSeconds < 20)
             {
                 Thread.Sleep(500);
+                // Asked again halfway whether or not a window has turned up.
+                // This used to sit below the check for a window, so Steam in
+                // the tray with no window at all was never asked a second time
+                // and the whole twenty seconds went by on the first request.
+                if (!reopened && (DateTime.Now - start).TotalSeconds > 8)
+                {
+                    reopened = true;
+                    AskSteam(MainWindow() == IntPtr.Zero ? "steam://open/main" : "steam://open/console", log);
+                    if (MainWindow() == IntPtr.Zero) { Thread.Sleep(1500); AskSteam("steam://open/console", log); }
+                }
                 h = MainWindow();
                 if (h == IntPtr.Zero) continue;
                 SayWindow(h, log);
                 BringToFront(h);
                 Thread.Sleep(400);
                 front = SteamInFront(h);
-                if (!front && !reopened && (DateTime.Now - start).TotalSeconds > 8)
-                {
-                    reopened = true;
-                    try { Process.Start(new ProcessStartInfo("steam://open/console") { UseShellExecute = true }); } catch { }
-                }
             }
+            if (!front && h == IntPtr.Zero)
+                log("Steam never showed a window in twenty seconds, so its console could not be brought up. It may be signed out or stuck behind a sign in box.");
             if (!front) return false;
 
             // A moment for the console page to finish drawing.
@@ -674,9 +770,9 @@ namespace Thornswood
         /// anything. Opening the console again focuses its command line, and
         /// nothing is clicked.
         /// </summary>
-        static void FocusConsole()
+        static void FocusConsole(Action<string> log)
         {
-            try { Process.Start(new ProcessStartInfo("steam://open/console") { UseShellExecute = true }); } catch { }
+            AskSteam("steam://open/console", log);
             Thread.Sleep(1500);
             IntPtr h = MainWindow();
             if (h == IntPtr.Zero) return;
@@ -859,6 +955,47 @@ namespace Thornswood
             if (pasted && bytes <= 0) return ClipboardLine(part, of);
             string line = "Part " + part + " of " + of + ": " + (bytes / 1048576).ToString("n0") + " MB down so far (Steam shows the rest in its console)";
             return pasted ? line + ". " + Next(part, of) : line;
+        }
+
+        /// <summary>
+        /// The line on the card once Steam has said how big the part is: how
+        /// much of it is down, of how much, and the share. Before Steam says,
+        /// it is ProgressLine's line.
+        /// </summary>
+        static string SizedLine(int part, int of, long bytes, long total, bool pasted)
+        {
+            if (total <= 0 || (pasted && bytes <= 0)) return ProgressLine(part, of, bytes, pasted);
+            long pct = Math.Min(99, Math.Max(0, bytes * 100 / total));
+            string line = "Part " + part + " of " + of + ": " + (bytes / 1048576).ToString("n0") + " of " +
+                          (total / 1048576).ToString("n0") + " MB (" + pct + "%)";
+            return pasted ? line + ". " + Next(part, of) : line;
+        }
+
+        /// <summary>
+        /// How far through all the parts the download is, 0 to 99: the parts
+        /// before this one are whole, and this one counts by its share. It
+        /// never says 100 until the files are in place.
+        /// </summary>
+        static int Percent(int index, int of, long bytes, long total)
+        {
+            if (of <= 0) return 0;
+            double part = total > 0 ? Math.Min(0.99, Math.Max(0.0, bytes / (double)total)) : 0.0;
+            return (int)Math.Min(99.0, (index + part) * 100.0 / of);
+        }
+
+        /// <summary>
+        /// The size Steam gave this depot when it started on it, in bytes, from
+        /// its console line "Downloading depot 489832 (26 files, 7260 MB) ...",
+        /// or 0 when it has not said yet. The line is SteamLog's, read in
+        /// console_log.txt.
+        /// </summary>
+        static long DepotBytes(string said, string depot)
+        {
+            Match m = Regex.Match(said ?? "", "Downloading depot " + Regex.Escape(depot) + @" \(\d+ files?, ([\d,]+) MB\)");
+            if (!m.Success) return 0;
+            long mb;
+            if (!long.TryParse(m.Groups[1].Value.Replace(",", ""), out mb)) return 0;
+            return mb * 1048576L;
         }
 
         static string Next(int part, int of)
@@ -1153,9 +1290,8 @@ namespace Thornswood
             {
                 string why = "Could not remove " + folder + ", left over from an earlier attempt: " + ex.Message +
                              " If Steam is still downloading into it, let that finish or restart Steam. Then delete that folder and press the button again.";
-                log(why);
-                status(why);
-                return false;
+                // Through Stop, so the bar goes too, as every other early stop does.
+                return Stop(why, log, status);
             }
         }
 
