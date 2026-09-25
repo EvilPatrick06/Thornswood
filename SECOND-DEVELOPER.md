@@ -40,9 +40,12 @@ a half.
 | Bot | `tools\discord`, on the VPS at `C:\Thornswood-Bot`, task `Thornswood Bot` | discord.py: tickets, join cards, staff tools |
 | Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour |
 
-The server's SkyMP fork and its build tree are Patrick's alone for now
-(`C:\Thornswood-Dev\skymp`); server binaries are copied, not rebuilt, on a
-second machine.
+The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
+`thornswood/engine-changes`), so its source survives any one machine. Its
+configured build tree and toolchain (`C:\Thornswood-Dev\skymp\build`) are on
+Patrick's machine alone for now; server binaries are copied, not rebuilt, on a
+second machine. Who holds each thing Thornswood cannot run without, and who the
+second holder is, is `tools\OWNERSHIP.md`.
 
 ## How a release goes out
 
@@ -309,6 +312,21 @@ brings it in by itself. The offer to make the folder is made at startup
 whenever it is possible; it used to wait for another server's files to be
 found, and no longer looks for any.
 
+**When Vortex deploys somewhere else.** Vortex can manage a Skyrim that is not
+the Steam copy: on 24 September a tester's Vortex deployed the collection into
+another SkyMP server's copy of the game, `steamapps\common\Keizaal Online`. The
+launcher finds that folder by itself (`OwnGame.DeploysInto`: any folder
+directly under a Steam library's `steamapps\common` with `SkyrimSE.exe` and
+`Data\vortex.deployment.json`, a Steam copy of Skyrim Special Edition first,
+otherwise the newest record). `VortexGame` in config.json wins over the search;
+Fix and Settings' Choose Vortex's folder set it. Scan names the folder and Fix
+points the launcher at it. Nothing of that folder's own reaches `<Root>\Game`:
+the game itself comes from the Steam copy (`OwnGame.Source`, the one Downgrade
+keeps on the server's build), and the mods are exactly the files Vortex's
+records in that folder list, linked or copied from Vortex's staging folder.
+With no Steam copy on the machine the folder is not made.
+`tools\test-vortex-folder.ps1` proves it.
+
 **The client.** The SkyMP client runtime is built from the fork,
 `C:\Thornswood-Dev\skymp` on `thornswood/engine-changes`: `npx webpack` in
 `skymp5-client` for the bundle and the native build for the rest. After a
@@ -319,8 +337,12 @@ build output into the game folder and refuses any file that is not the
 recorded one; `Go.ps1` runs it beside the overlays and the plugins. Ship runs
 `Sync-Client.ps1 -Check` and refuses a release whose client is not the recorded
 build. `OwnGame.Foreign` never takes those six paths from the Steam copy. The
-launcher's Client row on the Play page tests the bundle for the
-`THORNSWOOD PATCH` marker the fork's source carries.
+launcher's Client row on the Play page compares all six with the same record
+(`ClientRuntime`), and `ClientRuntime.Heal` puts back any that is missing or
+not the recorded build.
+`Ship-Rules.ps1` counts one of them as ours, for a pack or the installer, only
+when its sha256 is the recorded one, and `Package-Thornswood.ps1` stops rather
+than build an installer around any other.
 
 **Links, not copies.** Big files (archives, textures, meshes, plugins) are hard
 links to Vortex's copies, so a collection is not on the disk twice; this needs
@@ -391,9 +413,12 @@ it per session and ignores which profile Vortex has on.
 - `README.md`: what the repo is and where to start. A customer's install is
   the site's join page, `tools\docs-app\data\site\join.md`; setting up a
   developer's machine is "Setting up a machine" above.
-- `tools\app\HOOKUP.md`: how the launcher classes hang together.
+- `tools\app\ARCHITECTURE.md`: how the launcher starts, what each class owns
+  on disk, and every step between pressing Play and the game starting.
 - `tools\MOVING-THE-SERVER.md`, `tools\COLLECTION-METHOD.md`: the VPS and the
   mod collection.
+- `tools\OWNERSHIP.md`: who holds each credential, account and build, and who
+  the second holder is.
 - `lore\`: history and the Accord. `tools\docs-app\data\site\*.md`: the public
   pages (world, rules, join, classes, credits, support), also live on the site.
 - The site's hub boards: Active Issues, Known Issues, Test These, Suggestions,

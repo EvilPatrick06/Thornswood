@@ -17,11 +17,13 @@ namespace Thornswood
     /// console: there is no URL or command line for it. So this opens that
     /// console (steam://open/console), makes sure Steam's window is the one
     /// in front, types the command into it the way a person would, and then
-    /// watches Steam's own content_log.txt for "Depot download complete".
-    /// Three depots make up the game; they go one at a time, as Steam wants.
-    /// When all three are down, the files are copied over the Steam copy,
-    /// the exe is checked against the size 1.6.1170 has, and the downloaded
-    /// copies are removed so eleven gigabytes do not stay behind.
+    /// watches Steam's console_log.txt for "Depot download complete" (see
+    /// SteamLog for why that file). Three depots make up the game; they go
+    /// one at a time, as Steam wants. When all three are down, the downloaded
+    /// exe is checked against the size 1.6.1170 has before anything is
+    /// replaced, the files are copied over the Steam copy, the exe there is
+    /// checked again, and the downloaded copies are removed so eleven
+    /// gigabytes do not stay behind.
     ///
     /// Nothing is typed unless Steam's window is confirmed to be the one in
     /// the foreground. If it cannot be brought there, the command goes on the
@@ -52,6 +54,22 @@ namespace Thornswood
         };
         /// <summary>SkyrimSE.exe at 1.7.104, the Steam build we never want.</summary>
         public const long NewerExeBytes = 37910440;
+
+        // The processes whose windows are Steam's. Only "steam" was looked for
+        // until 24 September, and a tester on 1.1.91 got every part on the
+        // clipboard with Steam's console open behind the launcher: "its not
+        // going into the console by itself its going to your clipboard"
+        // (Patrick). Measured on Patrick's machine that day, with Steam in the
+        // tray: Steam's main window (class SDL_app, titled "Steam", 2308 x 927)
+        // belongs to steamwebhelper.exe, and steam.exe owns three small popups,
+        // none bigger than 149 x 77, so a window that is really Steam's never
+        // counted as Steam in front.
+        // steamwebhelper is Steam's own and nothing else ships one.
+        static readonly string[] SteamNames = { "steam", "steamwebhelper" };
+
+        // The last window the log named as Steam's, so it is said once a run
+        // and again only if a different one is found.
+        static string saidWindow;
 
         static Thread worker;
         // Cleared before done is called, not when the thread ends, so what done
@@ -178,7 +196,6 @@ namespace Thornswood
                 return false;
             }
             string content = Path.Combine(steam, "steamapps\\content\\app_" + AppId);
-            string logFile = Path.Combine(steam, "logs\\content_log.txt");
 
             if (Checks.GameRunning())
             {
@@ -208,6 +225,7 @@ namespace Thornswood
             }
 
             log("Downgrading Skyrim to 1.6.1170. Steam downloads the build's files under your own account; nothing is touched until all three parts are down.");
+            saidWindow = null;
             status("Opening Steam...");
             if (!WaitForSteam(log, status)) return false;
 
@@ -228,17 +246,15 @@ namespace Thornswood
                     continue;
                 }
 
-                long logStart = 0;
-                try { if (File.Exists(logFile)) logStart = new FileInfo(logFile).Length; } catch { }
+                SteamLog steamLog = new SteamLog(steam);
+                bool hadFolder = Directory.Exists(folder);
 
                 status("Part " + (i + 1) + " of 3: asking Steam for depot " + depot + "...");
                 log("Part " + (i + 1) + " of 3, depot " + depot + ": " + cmd);
                 bool typed = TypeIntoConsole(cmd, log);
+                bool pasted = !typed;
                 if (!typed)
-                {
-                    TryClipboard(cmd);
-                    log("Steam's window would not come to the front, so nothing was typed. The command is on your clipboard: click in the Steam console's command line, press Ctrl+V and Enter. This keeps watching.");
-                }
+                    OnClipboard(cmd, i + 1, "Steam's window would not come to the front, so nothing was typed. ", log, status);
 
                 // Steam makes the depot folder within seconds of taking the
                 // command. No folder after a while means it did not take.
@@ -246,14 +262,17 @@ namespace Thornswood
                 // The folder and the log are kept apart from here on. A folder
                 // an aborted attempt left behind is there before Steam has been
                 // asked anything, which is enough to carry on watching but is
-                // no proof that this run's download ever started. Only the log
-                // is that proof, and the fallback below needs it.
+                // no proof that this run's download ever started. The log is
+                // that proof, and so is a folder that was not there before the
+                // command and is now; the fallback below needs one of them.
                 DateTime askedAt = DateTime.Now;
                 bool started = false;
                 bool sawStart = false;
                 while ((DateTime.Now - askedAt).TotalSeconds < 45)
                 {
-                    if (LogSays(logFile, logStart, "depot_" + depot)) sawStart = true;
+                    string said = steamLog.Since();
+                    if (Refused(said, depot, i + 1, cmd, log, status)) return false;
+                    if (LogStarted(said, depot) || (!hadFolder && Directory.Exists(folder))) sawStart = true;
                     if (Directory.Exists(folder) || sawStart) { started = true; break; }
                     Thread.Sleep(1000);
                 }
@@ -269,21 +288,23 @@ namespace Thornswood
                     askedAt = DateTime.Now;
                     while ((DateTime.Now - askedAt).TotalSeconds < 30)
                     {
-                        if (LogSays(logFile, logStart, "depot_" + depot)) sawStart = true;
+                        string said = steamLog.Since();
+                        if (Refused(said, depot, i + 1, cmd, log, status)) return false;
+                        if (LogStarted(said, depot) || (!hadFolder && Directory.Exists(folder))) sawStart = true;
                         if (Directory.Exists(folder) || sawStart) { started = true; break; }
                         Thread.Sleep(1000);
                     }
                     if (!started)
                     {
-                        // Whatever Steam put in its own content log since the
-                        // command. A real refusal ("No connection", a manifest
-                        // error) shows here; nothing here means the command
-                        // never reached the console's command line at all.
-                        string tail = NewLog(logFile, logStart);
-                        if (tail.Length > 0) log("Steam's content log since the command:" + Environment.NewLine + tail);
-                        else log("Steam wrote nothing to its content log, so the command did not reach the console's command line. Steam's console has to be the window in front with its command line clicked.");
-                        TryClipboard(cmd);
-                        log("The command is on your clipboard: click in the Steam console's command line, press Ctrl+V and Enter. This keeps watching for it.");
+                        // Whatever Steam put in its logs since the command. A
+                        // real refusal ("No connection", a manifest error) shows
+                        // here; nothing here means the command never reached
+                        // the console's command line at all.
+                        string tail = steamLog.Tail(12);
+                        if (tail.Length > 0) log("Steam's log since the command:" + Environment.NewLine + tail);
+                        else log("Steam wrote nothing to its logs, so the command did not reach the console's command line. Steam's console has to be the window in front with its command line clicked.");
+                        OnClipboard(cmd, i + 1, "", log, status);
+                        pasted = true;
                     }
                 }
 
@@ -295,10 +316,12 @@ namespace Thornswood
                 string downloading = Path.Combine(steam, "steamapps\\downloading\\" + AppId);
                 while (true)
                 {
-                    if (LogHasCompletion(logFile, logStart, depot)) break;
+                    string said = steamLog.Since();
+                    if (LogHasCompletion(said, depot)) break;
+                    if (Refused(said, depot, i + 1, cmd, log, status)) return false;
                     long size = FolderSize(folder);
                     if (size != lastSize) { lastSize = size; lastGrowth = DateTime.Now; warned = false; }
-                    status("Part " + (i + 1) + " of 3: " + (size / 1048576).ToString("n0") + " MB down so far (Steam shows the rest in its console)");
+                    status(ProgressLine(i + 1, Depots.Length, size, pasted));
                     double quiet = (DateTime.Now - lastGrowth).TotalMinutes;
                     if (!warned && quiet > 10)
                     {
@@ -317,7 +340,7 @@ namespace Thornswood
                     // skips the depot as already downloaded.
                     if (size > 0 && quiet > 20 && !Directory.Exists(downloading))
                     {
-                        if (!sawStart && LogSays(logFile, logStart, "depot_" + depot)) sawStart = true;
+                        if (!sawStart && LogStarted(said, depot)) sawStart = true;
                         if (sawStart)
                         {
                             log("Steam's log never said the download finished, but the folder has been complete and still for twenty minutes, so it is taken as done.");
@@ -353,7 +376,7 @@ namespace Thornswood
                         log("Steam has done nothing for " + GiveUpMinutes + " minutes and this part is still " + (size / 1048576).ToString("n0") + " MB, so it is being given up on rather than waited on for ever.");
                         if (size == 0)
                             log("Nothing was downloaded at all, which usually means Steam refused the command. Its console window says why: look for a line about a manifest, a licence or no connection.");
-                        log("To do it by hand: open Steam, press Ctrl+Shift+D or start it with -console, click the console's command line, and paste " + cmd);
+                        log(ByHand(cmd));
                         status("Steam did not answer. See the log for what to do by hand.");
                         return false;
                     }
@@ -369,6 +392,30 @@ namespace Thornswood
                 log("Skyrim started while the files were coming down. Close it and press the button again; the downloads are kept.");
                 return false;
             }
+
+            // The downloaded exe is checked before a single file of the Steam
+            // copy is replaced. This used to be checked only after the copy,
+            // by which point a wrong download had already gone over the game.
+            // The Downgrader Tool on Nexus checks first, and that is right.
+            string gotExe = DownloadedExe(content);
+            if (gotExe.Length == 0 || Wrong(cfg, gotExe))
+            {
+                if (gotExe.Length == 0)
+                    log("None of the three downloads has SkyrimSE.exe in it, so they are not the 1.6.1170 build. Nothing in " + target + " has been replaced.");
+                else
+                    log("The SkyrimSE.exe Steam downloaded is " + Describe(cfg, gotExe) + ", not the 1.6.1170 build. Nothing in " + target + " has been replaced.");
+                // The next press asks Steam again rather than trusting these.
+                foreach (string[] d in Depots)
+                {
+                    string folder = Path.Combine(content, "depot_" + d[0]);
+                    if (gotExe.Length > 0 && !SameFolder(Path.GetDirectoryName(gotExe), folder)) continue;
+                    try { File.Delete(Path.Combine(folder, ".thornswood-complete")); } catch (Exception ex) { Swallow.Note("Downgrade, dropping the marker in " + folder, ex); }
+                }
+                log("Press the button again and Steam is asked for the files once more. If it ends here again, send your launcher log to the Discord.");
+                status("The download was not the 1.6.1170 build. Nothing was replaced; see the log.");
+                return false;
+            }
+
             status("Putting the 1.6.1170 files in place...");
             // A file a mod replaces is the collection's, and in the Steam copy it
             // is a hard link to Vortex's own copy: writing the vanilla file over
@@ -474,15 +521,17 @@ namespace Thornswood
             // seconds, and the console is asked for again halfway.
             bool front = false;
             bool reopened = false;
+            IntPtr h = IntPtr.Zero;
             DateTime start = DateTime.Now;
             while (!front && (DateTime.Now - start).TotalSeconds < 20)
             {
                 Thread.Sleep(500);
-                IntPtr h = MainWindow();
+                h = MainWindow();
                 if (h == IntPtr.Zero) continue;
+                SayWindow(h, log);
                 BringToFront(h);
                 Thread.Sleep(400);
-                front = ForegroundIsSteam();
+                front = SteamInFront(h);
                 if (!front && !reopened && (DateTime.Now - start).TotalSeconds > 8)
                 {
                     reopened = true;
@@ -493,7 +542,7 @@ namespace Thornswood
 
             // A moment for the console page to finish drawing.
             Thread.Sleep(1200);
-            if (!ForegroundIsSteam()) return false;
+            if (!SteamInFront(h)) return false;
 
             // Then a click on the command line. Opening the console puts the
             // keyboard there when the page is new, and not when the tab was
@@ -503,9 +552,9 @@ namespace Thornswood
             // not to its input. The command line sits along the bottom of the
             // console page, above the status bar, and that is where this
             // clicks, scaled for the monitor Steam is on.
-            ClickCommandLine(MainWindow());
+            ClickCommandLine(h);
             Thread.Sleep(150);
-            if (!ForegroundIsSteam()) return false;
+            if (!SteamInFront(h)) return false;
 
             // Whatever is on the command line goes first. The retry used to
             // type the command a second time onto the first one, and Steam ran
@@ -543,7 +592,10 @@ namespace Thornswood
         {
             try
             {
-                ShowWindow(h, SW_RESTORE);
+                // Restored only when it is minimised. Restoring a maximised
+                // window un-maximises it, which every attempt did to Steam once
+                // its real window was the one found (review, 24 September).
+                if (IsIconic(h)) ShowWindow(h, SW_RESTORE);
                 uint pid;
                 uint steamThread = GetWindowThreadProcessId(h, out pid);
                 uint me = GetCurrentThreadId();
@@ -557,7 +609,7 @@ namespace Thornswood
                 {
                     if (attached) AttachThreadInput(me, steamThread, false);
                 }
-                if (ForegroundIsSteam()) return;
+                if (SteamInFront(h)) return;
                 Key(VK_MENU);
                 Thread.Sleep(50);
                 SetForegroundWindow(h);
@@ -582,7 +634,7 @@ namespace Thornswood
             if (h == IntPtr.Zero) return;
             BringToFront(h);
             Thread.Sleep(300);
-            if (ForegroundIsSteam()) ClickCommandLine(h);
+            if (SteamInFront(h)) ClickCommandLine(h);
         }
 
         /// <summary>
@@ -627,18 +679,45 @@ namespace Thornswood
                 uint pid;
                 GetWindowThreadProcessId(fg, out pid);
                 if (pid == 0) return false;
-                return string.Equals(Process.GetProcessById((int)pid).ProcessName, "steam", StringComparison.OrdinalIgnoreCase);
+                return IsSteam(Process.GetProcessById((int)pid).ProcessName);
             }
             catch { return false; }
         }
 
-        /// <summary>Steam's biggest visible top level window.</summary>
+        /// <summary>
+        /// Steam is in front, and it is the window this brought forward or a
+        /// window inside it. Any Steam window was not enough once windows drawn
+        /// by steamwebhelper counted as Steam's: the Friends list, a chat window
+        /// or the sign-in box can be the one in front, and a download_depot line
+        /// and two Enters typed into a chat would go to a friend as a message.
+        /// Found in review, 24 September.
+        /// </summary>
+        static bool SteamInFront(IntPtr h)
+        {
+            if (h == IntPtr.Zero || !ForegroundIsSteam()) return false;
+            try
+            {
+                IntPtr fg = GetForegroundWindow();
+                return fg == h || GetAncestor(fg, GA_ROOT) == h;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>A process named steam or steamwebhelper, in any case.</summary>
+        static bool IsSteam(string processName)
+        {
+            foreach (string name in SteamNames)
+                if (string.Equals(processName, name, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        /// <summary>Steam's biggest visible top level window, drawn by steam or by steamwebhelper.</summary>
         static IntPtr MainWindow()
         {
             IntPtr best = IntPtr.Zero;
             long bestArea = 0;
             var pids = new HashSet<uint>();
-            try { foreach (Process p in Process.GetProcessesByName("steam")) pids.Add((uint)p.Id); } catch { }
+            try { foreach (string name in SteamNames) foreach (Process p in Process.GetProcessesByName(name)) pids.Add((uint)p.Id); } catch { }
             if (pids.Count == 0) return IntPtr.Zero;
             EnumWindows(delegate (IntPtr h, IntPtr l)
             {
@@ -659,6 +738,116 @@ namespace Thornswood
             return best;
         }
 
+        /// <summary>
+        /// Names the window taken for Steam's, the process that drew it, its
+        /// title and its size, the first time it is found in a run and again
+        /// only if another one is found. When the clipboard fallback comes up
+        /// on somebody's machine, this line says whether Steam's window was
+        /// found at all and which one it was.
+        /// </summary>
+        static void SayWindow(IntPtr h, Action<string> log)
+        {
+            string key = h.ToString();
+            if (key == saidWindow) return;
+            saidWindow = key;
+            log("Found Steam's window: " + WindowWords(h) + ".");
+        }
+
+        static string WindowWords(IntPtr h)
+        {
+            uint pid;
+            GetWindowThreadProcessId(h, out pid);
+            string owner = "process " + pid;
+            try { owner = Process.GetProcessById((int)pid).ProcessName + ", process " + pid; }
+            catch { /* The process has gone; its number is still worth saying. */ }
+            var title = new StringBuilder(256);
+            try { GetWindowText(h, title, title.Capacity); }
+            catch { /* No title is said as an empty one. */ }
+            RECT r;
+            string size = GetWindowRect(h, out r) ? (r.Right - r.Left) + " x " + (r.Bottom - r.Top) : "size unknown";
+            return owner + ", titled \"" + title + "\", " + size;
+        }
+
+        /// <summary>
+        /// A part's command goes on the clipboard, and the log, the line on the
+        /// card and the launcher's taskbar button all say so.
+        ///
+        /// The parts go one at a time, so each command is put on the clipboard
+        /// only when the part before it is down, in place of whatever was there.
+        /// Until 24 September nothing said so, and a tester believed only the
+        /// first command was ever given: "it only give you the fiurst one to
+        /// yuor clipboards and not all of them" (Patrick). So the line names the
+        /// part of three and says the rest follow here.
+        ///
+        /// The launcher is flashed rather than brought forward: a later part
+        /// lands while the person is looking at Steam, and putting the launcher
+        /// over Steam's console would cover the place they have to paste into.
+        /// </summary>
+        static void OnClipboard(string cmd, int part, string why, Action<string> log, Action<string> status)
+        {
+            TryClipboard(cmd);
+            string line = ClipboardLine(part, Depots.Length);
+            log(why + line + " This keeps watching for it.");
+            status(line);
+            FlashLauncher();
+        }
+
+        /// <summary>What the log and the card say when part <paramref name="part"/> of <paramref name="of"/> is on the clipboard.</summary>
+        static string ClipboardLine(int part, int of)
+        {
+            string before = part > 1 ? Parts(1, part - 1, "is down.", "are down.") + " " : "";
+            return before + "Part " + part + " of " + of + " is on your clipboard" + (part > 1 ? " now" : "") +
+                ": click in Steam's console command line, press Ctrl+V and Enter. " + Next(part, of);
+        }
+
+        /// <summary>
+        /// The line on the card while a part downloads. It stays there for the
+        /// whole part, so a part that went on the clipboard keeps saying so:
+        /// the paste itself while nothing has come down, and after that what
+        /// follows.
+        /// </summary>
+        static string ProgressLine(int part, int of, long bytes, bool pasted)
+        {
+            if (pasted && bytes <= 0) return ClipboardLine(part, of);
+            string line = "Part " + part + " of " + of + ": " + (bytes / 1048576).ToString("n0") + " MB down so far (Steam shows the rest in its console)";
+            return pasted ? line + ". " + Next(part, of) : line;
+        }
+
+        static string Next(int part, int of)
+        {
+            if (part >= of) return "It is the last one.";
+            return Parts(part + 1, of, "follows here when it is down.", "follow here when it is down.");
+        }
+
+        /// <summary>"Part 2 follows", "Parts 2 and 3 follow", "Parts 2 to 5 follow".</summary>
+        static string Parts(int from, int to, string one, string many)
+        {
+            if (from >= to) return "Part " + from + " " + one;
+            return "Parts " + from + (to == from + 1 ? " and " : " to ") + to + " " + many;
+        }
+
+        /// <summary>
+        /// Flashes the launcher's taskbar button until the person comes back to
+        /// it. FlashWindowEx only draws attention: it takes nothing from Steam's
+        /// window and sends no input anywhere.
+        /// </summary>
+        static void FlashLauncher()
+        {
+            try
+            {
+                IntPtr me = Process.GetCurrentProcess().MainWindowHandle;
+                if (me == IntPtr.Zero) return;
+                var f = new FLASHWINFO();
+                f.cbSize = (uint)Marshal.SizeOf(typeof(FLASHWINFO));
+                f.hwnd = me;
+                f.dwFlags = FLASHW_ALL | FLASHW_TIMERNOFG;
+                f.uCount = uint.MaxValue;
+                f.dwTimeout = 0;
+                FlashWindowEx(ref f);
+            }
+            catch (Exception ex) { Swallow.Note("Downgrade.FlashLauncher", ex); }
+        }
+
         static void TryClipboard(string text)
         {
             try { System.Windows.Clipboard.SetText(text); } catch { }
@@ -666,72 +855,199 @@ namespace Thornswood
 
         // ---------------------------------------------------------- watching
 
-        /// <summary>The last few lines Steam wrote to its content log since <paramref name="from"/>, for the launcher log when a depot will not start.</summary>
-        static string NewLog(string logFile, long from)
+        /// <summary>
+        /// Steam's logs from the moment a command was given. What
+        /// download_depot does is written by Steam's console to
+        /// logs\console_log.txt, a line for each step:
+        ///
+        ///   Downloading depot 489832 (26 files, 7260 MB) ...
+        ///   Depot download complete : "C:\...\app_489830\depot_489832" (manifest 8042843504692938467)
+        ///   Depot download failed : Failed updating depot 489831 while downloading chunk "..." (Failure) (Content unavailable)
+        ///
+        /// Those three are real lines, recorded on 24 August by the author of
+        /// a Skyrim downgrader for RP servers (Mosalah992/Skyrim-downgrader,
+        /// logwatch.py) running these same three depots, and
+        /// JackifyGameDowngrader reads the same file for the same words.
+        ///
+        /// Until 24 September this read content_log.txt alone, and took
+        /// "depot_489831" as the sign a download had started, which the start
+        /// line does not say. So a download that finished was never seen to
+        /// finish: the next part was never asked for, which is what a tester
+        /// on 1.1.91 got ("it only give you the fiurst one", Patrick), and
+        /// twenty minutes on the person was told to delete the folder Steam
+        /// had just filled. Both logs are read now, so whichever of them Steam
+        /// writes to counts.
+        /// </summary>
+        sealed class SteamLog
         {
-            try
+            readonly string[] files;
+            readonly long[] from;
+
+            public SteamLog(string steam)
             {
-                if (!File.Exists(logFile)) return "";
-                using (var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                files = new[] {
+                    Path.Combine(steam, "logs\\console_log.txt"),
+                    Path.Combine(steam, "logs\\content_log.txt"),
+                };
+                from = new long[files.Length];
+                for (int i = 0; i < files.Length; i++)
                 {
-                    if (fs.Length <= from) return "";
-                    fs.Seek(from, SeekOrigin.Begin);
-                    var buf = new byte[fs.Length - from];
-                    int n = fs.Read(buf, 0, buf.Length);
-                    string[] lines = Encoding.UTF8.GetString(buf, 0, n).Replace("\r", "").Trim().Split('\n');
-                    int take = Math.Min(lines.Length, 12);
-                    return string.Join(Environment.NewLine, lines, lines.Length - take, take).Trim();
+                    try { if (File.Exists(files[i])) from[i] = new FileInfo(files[i]).Length; }
+                    catch (Exception ex) { Swallow.Note("Downgrade, measuring " + files[i], ex); }
                 }
             }
-            catch { return ""; }
+
+            /// <summary>
+            /// What Steam wrote to one log since the command. A log shorter
+            /// than it was then has been started again, which Steam does when
+            /// it restarts (the old one becomes .previous), so that one is read
+            /// from the top.
+            /// </summary>
+            string Read(int i)
+            {
+                try
+                {
+                    if (!File.Exists(files[i])) return "";
+                    using (var fs = new FileStream(files[i], FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    {
+                        long start = fs.Length < from[i] ? 0 : from[i];
+                        if (fs.Length <= start) return "";
+                        fs.Seek(start, SeekOrigin.Begin);
+                        var buf = new byte[fs.Length - start];
+                        int n = fs.Read(buf, 0, buf.Length);
+                        return Encoding.UTF8.GetString(buf, 0, n);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Steam holds these open and rotates them; the next turn
+                    // of the loop reads again.
+                    Swallow.Note("Downgrade, reading " + files[i], ex);
+                    return "";
+                }
+            }
+
+            /// <summary>Everything Steam wrote to either log since the command.</summary>
+            public string Since()
+            {
+                var sb = new StringBuilder();
+                for (int i = 0; i < files.Length; i++) sb.Append(Read(i)).Append('\n');
+                return sb.ToString();
+            }
+
+            /// <summary>
+            /// The last few lines of each log since the command, under the
+            /// log's name, for the launcher log when a depot will not start.
+            /// Each log gets its own lines because one of them can be full of
+            /// something else: on Patrick's machine content_log.txt says it
+            /// could not write Skyrim's appmanifest every six seconds.
+            /// </summary>
+            public string Tail(int lines)
+            {
+                var sb = new StringBuilder();
+                for (int i = 0; i < files.Length; i++)
+                {
+                    var kept = new List<string>();
+                    foreach (string line in Read(i).Replace("\r", "").Split('\n'))
+                        if (line.Trim().Length > 0) kept.Add(line.Trim());
+                    if (kept.Count == 0) continue;
+                    int take = Math.Min(kept.Count, lines);
+                    if (sb.Length > 0) sb.Append(Environment.NewLine);
+                    sb.Append(Path.GetFileName(files[i])).Append(':').Append(Environment.NewLine);
+                    sb.Append(string.Join(Environment.NewLine, kept.GetRange(kept.Count - take, take).ToArray()));
+                }
+                return sb.ToString();
+            }
         }
 
-        static bool LogSays(string logFile, long from, string needle)
+        /// <summary>
+        /// True once Steam has said it is downloading this depot
+        /// ("Downloading depot 489832 (26 files, 7260 MB) ..."), or has
+        /// written any line naming its folder.
+        /// </summary>
+        static bool LogStarted(string said, string depot)
         {
-            try
-            {
-                if (!File.Exists(logFile)) return false;
-                using (var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                {
-                    if (fs.Length <= from) return false;
-                    fs.Seek(from, SeekOrigin.Begin);
-                    var buf = new byte[fs.Length - from];
-                    int n = fs.Read(buf, 0, buf.Length);
-                    string s = Encoding.UTF8.GetString(buf, 0, n);
-                    return s.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
-                }
-            }
-            catch { return false; }
+            return said.IndexOf("Downloading depot " + depot, StringComparison.OrdinalIgnoreCase) >= 0
+                || said.IndexOf("depot_" + depot, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>
         /// True once Steam has logged this depot's download as complete, after
-        /// the point in the log where the command was given. The line Steam
-        /// writes names the folder, so both the words and the depot have to be
-        /// on the same line.
+        /// the point where the command was given. The line Steam writes names
+        /// the folder, so both the words and the depot have to be on the same
+        /// line.
         /// </summary>
-        static bool LogHasCompletion(string logFile, long from, string depot)
+        static bool LogHasCompletion(string said, string depot)
         {
-            try
+            foreach (string line in said.Split('\n'))
             {
-                if (!File.Exists(logFile)) return false;
-                using (var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                {
-                    if (fs.Length <= from) return false;
-                    fs.Seek(from, SeekOrigin.Begin);
-                    var buf = new byte[fs.Length - from];
-                    int n = fs.Read(buf, 0, buf.Length);
-                    string s = Encoding.UTF8.GetString(buf, 0, n);
-                    foreach (string line in s.Split('\n'))
-                    {
-                        if (line.IndexOf("Depot download complete", StringComparison.OrdinalIgnoreCase) < 0) continue;
-                        if (line.IndexOf("depot_" + depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-                        if (line.IndexOf(depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-                    }
-                }
+                if (line.IndexOf("Depot download complete", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (line.IndexOf("depot_" + depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                if (line.IndexOf(depot, StringComparison.OrdinalIgnoreCase) >= 0) return true;
             }
-            catch { }
             return false;
+        }
+
+        /// <summary>
+        /// Steam's line saying this depot's download failed, or "" when there
+        /// is none. A failure line that names none of the three depots counts
+        /// as this one's, since this one is the only download asked for since
+        /// the command; one naming another depot does not.
+        /// </summary>
+        static string FailedLine(string said, string depot)
+        {
+            foreach (string raw in said.Split('\n'))
+            {
+                string line = raw.Trim();
+                if (line.IndexOf("Depot download failed", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (line.IndexOf(depot, StringComparison.Ordinal) >= 0) return line;
+                bool other = false;
+                foreach (string[] d in Depots)
+                    if (d[0] != depot && line.IndexOf(d[0], StringComparison.Ordinal) >= 0) other = true;
+                if (!other) return line;
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// When Steam has said this depot's download failed, says so with
+        /// Steam's own line and returns true. Until 24 September a refusal was
+        /// only noticed after GiveUpMinutes with nothing moving.
+        /// </summary>
+        static bool Refused(string said, string depot, int part, string cmd, Action<string> log, Action<string> status)
+        {
+            string line = FailedLine(said, depot);
+            if (line.Length == 0) return false;
+            log("Steam could not download part " + part + " of 3 (depot " + depot + "). Steam's log says: " + line);
+            log("Nothing in the game folder has been replaced. Press the button again in a few minutes to ask Steam once more. If it fails the same way twice, send your launcher log to the Discord.");
+            log(ByHand(cmd));
+            status("Steam could not download part " + part + " of 3. See the log.");
+            return true;
+        }
+
+        /// <summary>
+        /// The way to do one part by hand. steam://open/console is what this
+        /// opens too, and the Downgrader Tool on Nexus gives the same way in:
+        /// it works whether Steam is already running or not.
+        /// </summary>
+        static string ByHand(string cmd)
+        {
+            return "To do it by hand: press Windows+R, type steam://open/console and press Enter, click the command line at the bottom of Steam's console, paste " + cmd + " and press Enter, then wait for Steam to say Depot download complete before the next part.";
+        }
+
+        /// <summary>
+        /// The SkyrimSE.exe among the downloaded depots, or "" when none of
+        /// them has one. It sits at the top of its depot, as it does in the
+        /// game folder.
+        /// </summary>
+        static string DownloadedExe(string content)
+        {
+            foreach (string[] d in Depots)
+            {
+                string exe = Path.Combine(Path.Combine(content, "depot_" + d[0]), "SkyrimSE.exe");
+                if (File.Exists(exe)) return exe;
+            }
+            return "";
         }
 
         /// <summary>
@@ -770,6 +1086,7 @@ namespace Thornswood
         // ------------------------------------------------------------ win32
 
         const int SW_RESTORE = 9;
+        const uint GA_ROOT = 2;
         const ushort VK_RETURN = 0x0D;
         const ushort VK_MENU = 0x12;
         const ushort VK_CONTROL = 0x11;
@@ -797,6 +1114,9 @@ namespace Thornswood
         }
         [StructLayout(LayoutKind.Sequential)]
         struct INPUT { public uint type; public INPUTUNION u; }
+        [StructLayout(LayoutKind.Sequential)]
+        struct FLASHWINFO { public uint cbSize; public IntPtr hwnd; public uint dwFlags, uCount, dwTimeout; }
+        const uint FLASHW_ALL = 3, FLASHW_TIMERNOFG = 12;
 
         delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
@@ -805,6 +1125,8 @@ namespace Thornswood
         [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
         [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
         [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
+        [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
@@ -814,6 +1136,8 @@ namespace Thornswood
         [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr hWnd);
         [DllImport("user32.dll")] static extern uint GetDpiForSystem();
         [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint n, INPUT[] inputs, int size);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int max);
+        [DllImport("user32.dll")] static extern bool FlashWindowEx(ref FLASHWINFO info);
 
         static void Type(string text)
         {

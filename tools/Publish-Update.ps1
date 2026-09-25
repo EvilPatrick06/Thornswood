@@ -25,6 +25,10 @@ param(
     # a mistake until somebody says otherwise.
     [int]$MaxRemovals = 200,
     [switch]$AcceptRemovals,
+    # And a release sending more than this many MB to everybody, the same way.
+    # See the release size block for the number and the night it came from.
+    [int64]$MaxReleaseMB = 3072,
+    [switch]$AcceptSize,
     [string]$RepoDir,
     [string]$Repo,
     # Releases live in their own PUBLIC repository now, holding version.json
@@ -653,6 +657,55 @@ Say ("  {0:n0} added or changed ({1:n1} MB)" -f $changed.Count, ($changedBytes /
 Say ("  {0:n0} removed" -f $removed.Count) $(if ($removed.Count) { 'Yellow' } else { 'DarkGray' })
 if ($collectionRemovals) {
     Say ("  {0:n0} more were the collection's files, left alone" -f $collectionRemovals) 'DarkGray'
+}
+
+# ==== thornswood release size ====
+#
+# A RELEASE THE SIZE OF THE COLLECTION IS THE COLLECTION, NOT AN UPDATE.
+#
+# 17 September: an uninstall test took Profile off this machine, and with it
+# Profile\OwnGame\files.txt, the one record of which files came from Vortex.
+# The next release counted "29,063 added or changed (11,368.1 MB)" and was one
+# step from sending the whole mod collection to everybody when it was stopped
+# by hand. The files.txt refusal further up stops that one cause. This stops
+# the size, whatever the cause is next time, before anything is zipped or
+# uploaded, instead of relying on somebody reading the number as it scrolls
+# past.
+#
+# The cap sits far above anything real. Everything the packs have ever
+# shipped, the whole baseline, measured 891 files and 661.9 MB on 24
+# September, so a release of every file we own is a fifth of the cap and an
+# ordinary one is a few MB. The incident is 3.7 times over it.
+#
+# $ChunkCap below is not this and cannot be: it only splits a release into
+# parts GitHub will take, and the refusal of one oversized part further down
+# looks at one zip, never at the total.
+#
+# Kept between these markers so tools\test-release-size.ps1 can run the real
+# thing against the incident's own number.
+function Get-ReleaseSizeRefusal([int64]$Bytes, [int64]$CapMB, [bool]$Accepted) {
+    if ($Accepted) { return '' }
+    if ($Bytes -le ($CapMB * 1MB)) { return '' }
+    return ("This release would send {0:n1} MB to every machine that takes it, and the cap is {1:n0} MB." -f ($Bytes / 1MB), $CapMB)
+}
+# ==== end thornswood release size ====
+
+$tooBig = Get-ReleaseSizeRefusal $changedBytes $MaxReleaseMB $AcceptSize.IsPresent
+if ($tooBig) {
+    Write-Host ''
+    Say $tooBig 'Red'
+    Say 'That is the size of the mod collection, not of an update. The last release' 'Red'
+    Say 'this big had lost Profile\OwnGame\files.txt, so every file Vortex provides' 'Yellow'
+    Say 'looked like one of ours.' 'Yellow'
+    Write-Host ''
+    Say 'The biggest here are:' 'DarkGray'
+    foreach ($c in @($changed | Sort-Object { [int64](($now[$_] -split ':')[0]) } -Descending | Select-Object -First 12)) {
+        Say ("    {0,10:n1} MB  {1}" -f ([int64](($now[$c] -split ':')[0]) / 1MB), $c) 'DarkGray'
+    }
+    Write-Host ''
+    Say 'If every one of those really should go to everybody, run Ship again with' 'Yellow'
+    Say '-AcceptSize. If not, find out what the build has started counting as ours.' 'Yellow'
+    Die 'Nothing was published.'
 }
 
 # Whatever survives that, a release does not delete hundreds of files by

@@ -1074,6 +1074,16 @@
                   <Button x:Name="BtnSaveDisplay" Style="{StaticResource Ghost}" Content="Apply display settings" HorizontalAlignment="Left" Margin="0,14,0,0"/>
                 </StackPanel>
 
+                <TextBlock Text="Chat and needs" Style="{StaticResource Eyebrow}"/>
+                <StackPanel Margin="0,0,0,30">
+                  <TextBlock Style="{StaticResource Small}" Text="Hide the chat after a new line"/>
+                  <StackPanel x:Name="ChatFadeRow" Orientation="Horizontal" Margin="0,8,0,0"/>
+                  <TextBlock x:Name="TxtChatFadeNote" Style="{StaticResource Small}" Margin="0,8,0,0"/>
+                  <CheckBox x:Name="ChkNeedsBars" Content="Show the needs bars on screen" Margin="0,16,0,0"/>
+                  <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0"
+                             Text="Hunger, Thirst, Rest and Temp. Hidden, your needs carry on as before, and typing /needs in chat tells you all of them."/>
+                </StackPanel>
+
 
                 <TextBlock Text="Folders" Style="{StaticResource Eyebrow}"/>
                 <StackPanel x:Name="PathRows" Margin="0,0,0,16"/>
@@ -1093,6 +1103,11 @@
                       <StackPanel Orientation="Horizontal" Margin="0,13,0,0">
                         <Button x:Name="BtnOwnGameMake" Style="{StaticResource Ghost}" Content="Make it" Margin="0,0,8,0"/>
                         <Button x:Name="BtnOwnGameRefresh" Style="{StaticResource Ghost}" Content="Bring it up to date from Vortex"/>
+                      </StackPanel>
+                      <TextBlock Style="{StaticResource Small}" Margin="0,13,0,0" Text="The launcher finds the folder Vortex deploys into when it is in a Steam library. If it is somewhere else, choose it here: in Vortex, Mods, Open, Open Game Folder shows which one. Only the files Vortex lists in it are used, and the game itself always comes from the Steam copy."/>
+                      <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button x:Name="BtnOwnGamePick" Style="{StaticResource Ghost}" Content="Choose Vortex's folder" Margin="0,0,8,0"/>
+                        <Button x:Name="BtnOwnGameForget" Style="{StaticResource Ghost}" Content="Forget the chosen folder"/>
                       </StackPanel>
 
                       <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>

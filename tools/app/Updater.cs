@@ -338,16 +338,19 @@ namespace Thornswood
 
         /// <summary>
         /// Every path Vortex says it has deployed into the game folder. Under
-        /// a folder of Thornswood's own the record lives in the Steam copy the
-        /// folder was made from, never in the folder, because the refresh
-        /// leaves Vortex's own records behind. Empty when there is nothing to
-        /// read, which leaves the removal as it was.
+        /// a folder of Thornswood's own the record lives in the folder Vortex
+        /// deploys into (OwnGame.DeploysInto), never in Thornswood's folder,
+        /// because the refresh leaves Vortex's own records behind. That is the
+        /// Steam copy, unless Vortex deploys into another folder, and then the
+        /// record is there and not in the Steam copy (OwnGame.Source), which is
+        /// why this does not read Source (review, 24 September). Empty when
+        /// there is nothing to read, which leaves the removal as it was.
         /// </summary>
         static HashSet<string> DeployedNow(Config cfg)
         {
             try
             {
-                string src = OwnGame.Active ? OwnGame.Source(cfg) : Paths.Game;
+                string src = OwnGame.Active ? OwnGame.DeploysInto(cfg) : Paths.Game;
                 if (string.IsNullOrEmpty(src)) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 return OwnGame.DeployedIn(src);
             }

@@ -36,6 +36,8 @@
       -ModsOnly        skip the launcher, publish only changed mod files
       -DryRun          build and diff, but upload nothing
       -Package         also rebuild the two installer files for new people
+      -AcceptSize      let through a release over Publish-Update's size cap,
+                       once you have read what made it that big
 
   The installer package is the one thing publishing does not touch, and that is
   on purpose: it is a 21 GB copy and a 13 GB compress, twenty minutes or more,
@@ -62,6 +64,11 @@ param(
     # $Root: that is the folder people play from.
     ,[string]$DistRoot = 'C:\Thornswood-Dev\dist'
     ,[switch]$MoveServer
+    # Passed straight to Publish-Update, which refuses a release bigger than
+    # its cap because the one that nearly went out on 17 September was the
+    # whole mod collection. Without this here the refusal could only be
+    # answered by running the publisher by hand, around everything Ship checks.
+    ,[switch]$AcceptSize
     # So this can be chained after something else without stopping to wait for
     # a keypress nobody is there to give.
     ,[switch]$NoPause
@@ -103,6 +110,9 @@ $script:InstallerFailed = 0
 # What Publish-Discord.ps1 did, read back after it runs. It sets this in the
 # global scope; seeded here so strict mode has something to read either way.
 $global:ThornswoodDiscordResult = ''
+# Set by the git gate when a live release comes from a hotfix/ branch, and
+# read again where dev is reset to match main. Seeded for strict mode.
+$hotfix = $false
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -231,8 +241,27 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
     $ErrorActionPreference = $oldEap
     Say ("  branch {0}, {1} uncommitted change(s), {2} behind and {3} ahead of origin/{0}" -f $branch, $dirty.Count, $behind, $ahead) 'DarkGray'
     if (-not $Dev) {
-        if ($branch -ne 'main') { Die "A main release ships from main. This is $branch. Merge it into main first, or use -Channel dev to try it on the dev server." }
-        if ($behind -gt 0) { Die "main is $behind commit(s) behind origin/main. Run git pull first, so the other machine's work is in this release." }
+        # A HOTFIX is the one live release that does not come off main.
+        # Patrick, 24 September, with a tester on the main build who could not
+        # get in and a day of dev work sitting on main: "the only thing that
+        # should be going to main now is the fix for him". A branch named
+        # hotfix/... starts from the commit the live release was built from and
+        # carries only the fix and its version bump; 1.1.93 went out that way.
+        # Every other check below still applies to it: nothing uncommitted,
+        # nothing unknown under tools, nothing that is not on GitHub.
+        $hotfix = $branch -like 'hotfix/*'
+        if ($branch -ne 'main' -and -not $hotfix) { Die "A main release ships from main. This is $branch. Merge it into main first, or use -Channel dev to try it on the dev server." }
+        if ($hotfix) {
+            # The counts above come out 0 and 0 when origin has no such branch,
+            # because git refuses the range and prints nothing. For main that
+            # cannot happen; for a hotfix it would let a branch that exists on
+            # one disk only go out to everyone. Found by the verification of
+            # hotfix 1.1.93.
+            & git -C $RepoDir rev-parse --verify --quiet "refs/remotes/origin/$branch" *> $null
+            if ($LASTEXITCODE -ne 0) { Die "$branch is not on GitHub. A release ships only what is already there: git push -u origin $branch, then Ship." }
+            Say "  a hotfix: a live release from $branch, which is the live build plus its fix and nothing else from main" 'Yellow'
+        }
+        if ($behind -gt 0) { Die "$branch is $behind commit(s) behind origin/$branch. Run git pull first, so the other machine's work is in this release." }
 
         # A MAIN RELEASE NOW SHIPS ONLY WHAT IS ALREADY ON GITHUB, and these
         # three refusals are the whole of that rule.
@@ -274,7 +303,7 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
         if ($ahead -gt 0) {
             # Not "git push": main refuses a push from everybody since
             # enforce_admins went on, so that advice sent people into a refusal.
-            Die ("main is $ahead commit(s) ahead of origin/main. A release has to be buildable from what " +
+            Die ("$branch is $ahead commit(s) ahead of origin/$branch. A release has to be buildable from what " +
                  "everybody else can see, and main takes commits only through a pull request: move them to " +
                  "a branch, push that, merge its pull request, git pull, then Ship.")
         }
@@ -580,6 +609,7 @@ Head 'Publishing'
 # so '-Notes' binds as a value rather than a parameter name.
 $pubArgs = @{ Notes = $Notes; Root = $Root; RepoDir = $RepoDir; ReleaseDir = $ReleaseDir; DistRoot = $DistRoot; NoPause = $true }
 if ($MoveServer) { $pubArgs['MoveServer'] = $true }
+if ($AcceptSize) { $pubArgs['AcceptSize'] = $true }
 if (-not $ModsOnly) { $pubArgs['Launcher'] = $true }
 if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
 # A dry run has to leave nothing behind, and NoUpload plus NoPush is not that.
@@ -910,7 +940,13 @@ if (-not $DryRun -and -not $NoAnnounce) {
 # feed is set to exactly what main now has, with the dev ports and the dev
 # voice address kept, and the dev baseline becomes main's. Dev launchers take the main pack and the main
 # launcher version, and the next Ship -Channel dev starts at .1 again.
-if (-not $DryRun -and -not $Dev) {
+#
+# NOT AFTER A HOTFIX. A hotfix is the live build plus one fix, and the work
+# sitting on dev was not in it, so "everything on dev was in this release" is
+# false and the reset would take dev testers back to the hotfix until the next
+# dev Ship. Dev is left as it was; its next Ship still climbs from the hotfix's
+# number, because the dev version is read off main's published feed.
+if (-not $DryRun -and -not $Dev -and -not $hotfix) {
     $devRel = Join-Path (Split-Path -Parent $MainReleaseDir) 'Thornswood-Releases-dev'
     if (Test-Path (Join-Path $devRel 'version.json')) {
         Head 'Resetting dev to match'

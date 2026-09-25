@@ -92,7 +92,13 @@ function Remote($script) {
     # The path goes across as it is. Windows PowerShell takes forward
     # slashes, and converting them was how this shipped with the slashes
     # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File '$far'" 2>&1
+    # And bare, with no quotes round it; the path above is ours and has no
+    # spaces. Measured on this machine on 24 September, not on the VPS: bare
+    # runs whether cmd.exe or Windows PowerShell hands the line on, and the
+    # old form, the path in single quotes, fails under cmd.exe. The old form
+    # did run on the VPS on 20 and 21 September, so which shell sshd uses
+    # there is not known, and bare is the form that works under either.
+    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
     & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
   }
   finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }

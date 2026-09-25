@@ -353,7 +353,10 @@ $order = @(
     'bool exists = File.Exists(dest);',
     'if (exists && (',
     'if (exists) DropName(dest);',
-    'Place(Path.Combine(src, f.Rel), dest, copy, out asLink);'
+    # f.From since the Vortex folder fix: each file is placed from where Gather
+    # found it, which is the Steam copy for the game and Vortex's mods folder
+    # for what Vortex deployed. The loop's shape, and so this model, is the same.
+    'Place(f.From, dest, copy, out asLink);'
 )
 $inOrder = $null -ne $refresh
 $from = 0

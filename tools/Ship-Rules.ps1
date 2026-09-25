@@ -17,6 +17,8 @@
       Test-ShipRuntime $rel        written by the game or a tool at runtime; never shipped, listed as removed when it goes
       Test-ShipMachine $rel        one machine's own; never shipped, never removed
       Test-ShipOtherServer $rel    not one of ours, or somebody's sign in; never shipped, never removed
+      Test-ShipClientRecorded $rel [$full]
+                                   one of the six client runtime files, and byte for byte the recorded build
       Test-ShipVanilla $rel        Bethesda's own files; never shipped, never removed
       Test-ShipForeignFramework $rel
                                    somebody else's framework or modding tool under Data; never shipped, never removed
@@ -162,28 +164,77 @@ function Test-ShipRuntime([string]$rel) {
 # folder; change the two together.
 #
 # The client runtime is the exception in the other direction. The six files in
-# client-build.json are ours by recorded hash: the bundle, MpClientPlugin.dll,
-# both SkyrimPlatform DLLs, the CEF host and TESModPlatform.pex, built from the
-# fork. Until 20 September the copies in every game folder were another
-# launcher's builds, told apart from ours by nothing but a comment we had
-# written into them. A path in that record is ours whatever else this says.
+# client-build.json are the bundle, MpClientPlugin.dll, both SkyrimPlatform
+# DLLs, the CEF host and TESModPlatform.pex, built from the fork. Until 20
+# September the copies in every game folder were another launcher's builds,
+# told apart from ours by nothing but a comment we had written into them.
+#
+# One of them is ours when its bytes are the recorded build, and then it ships
+# whatever else this says. Until 24 September this note said "ours by recorded
+# hash" while the rule never opened the file: a path in the record was ours
+# whatever sat there, so a bundle with one byte changed, or another launcher's
+# bundle at the same path, went into a pack as ours (To Do entry 128, "a test
+# that passes because of something we did to the file is not a test").
+# Test-ShipClientRecorded below hashes the file against the record, the same
+# sha256 Sync-Client.ps1 and the launcher's ClientRuntime compare. Anything
+# else at one of those six paths, and a file that is not there at all, counts
+# as not ours: never shipped, and never listed as removed, so no release
+# deletes the client off a tester.
 #
 # PluginsNoLoad is where the SkyMP client keeps its saved sign in
 # (auth-data-no-load.js, a token). It is one person's login to whichever
 # master issued it and has no place in a pack or an installer, and it is not
 # ours to delete off a machine either.
 $ShipClientFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+$ShipClientHashes = @{}
 try {
     $clientRecord = Join-Path $PSScriptRoot 'client-build.json'
     if (Test-Path -LiteralPath $clientRecord) {
         $rec = Get-Content -LiteralPath $clientRecord -Raw | ConvertFrom-Json
-        foreach ($p in $rec.files.PSObject.Properties.Name) { [void]$ShipClientFiles.Add($p) }
+        foreach ($p in $rec.files.PSObject.Properties.Name) {
+            [void]$ShipClientFiles.Add($p)
+            $ShipClientHashes[$p] = ([string]$rec.files.$p.sha256).ToLowerInvariant()
+        }
     }
 } catch { }
 
+# Whether the file at one of the six recorded paths is the recorded build, byte
+# for byte. $full is the file when the caller has it. Without it the file is
+# $rel under $GameDir: Publish-Update and Package-Thornswood both name the
+# folder they scan $GameDir, and dot-sourcing this puts these functions in their
+# scope, so their existing calls, which pass only the path, are answered by the
+# bytes on disk. With no file and no $GameDir there is nothing to hash, and the
+# answer is no.
+#
+# Hashed with .NET rather than Get-FileHash, for the reason Package-Thornswood
+# gives over its own Get-Sha256: a script started with -NoProfile can find
+# itself without the module Get-FileHash lives in.
+function Test-ShipClientRecorded([string]$rel, [string]$full = '') {
+    if (-not $ShipClientHashes.ContainsKey($rel)) { return $false }
+    if (-not $full) {
+        $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
+        if (-not $game) { return $false }
+        # Not Join-Path, which throws on a drive that is not there rather than
+        # answering that the file is not.
+        $full = [IO.Path]::Combine([string]$game, $rel)
+    }
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return $false }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        # ReadWrite, the way ClientRuntime.Sha256Of opens it: SkyrimPlatform
+        # holds these open while the game runs.
+        $fs = New-Object IO.FileStream($full, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+        try { $have = ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '').ToLowerInvariant() }
+        finally { $fs.Dispose() }
+    }
+    finally { $sha.Dispose() }
+    return ($have -eq $ShipClientHashes[$rel])
+}
+
 function Test-ShipOtherServer([string]$rel) {
-    # Ours by record, before anything else is asked.
-    if ($ShipClientFiles.Contains($rel)) { return $false }
+    # The client runtime, before anything else is asked: ours when it is the
+    # recorded build, and not ours when it is anything else or is not there.
+    if ($ShipClientFiles.Contains($rel)) { return (-not (Test-ShipClientRecorded $rel)) }
     # NirnLab UI Platform. SkyrimPlatform will not start on its own browser
     # while this is in the game folder, and it is what brings CEFSubprocess.exe,
     # the second program Windows Firewall asks about. Package-Thornswood has
@@ -218,7 +269,7 @@ function Test-ShipOtherServer([string]$rel) {
     # pack takes it off the machines that have it. OwnGame.Foreign carries the
     # same rule; change the two together.
     if ($rel -ieq 'Data\Platform\Plugins\thornswood-chargen.js') { return $true }
-    # In Plugins only our overlays belong. The bundle is ours by record above.
+    # In Plugins only our overlays belong. The bundle was decided by its hash above.
     if ($rel -like 'Data\Platform\Plugins\*.js') {
         if ($leaf -like 'thornswood-*.js') { return $false }
         return $true

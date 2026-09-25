@@ -292,7 +292,7 @@ Pressing the console key opens it for a moment and it closes again. That is us,
 it is the same for everybody including the people who run the server, and it is
 not your game going wrong.
 
-The console is how a single player game is edited. On a server where what you
+The console is how a game you play alone is edited. On a server where what you
 own, what you have made and what rank you hold are all real to other people, one
 person typing a command is everybody else's evening rewritten. So it is shut.
 
