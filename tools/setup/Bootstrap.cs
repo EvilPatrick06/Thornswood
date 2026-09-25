@@ -251,7 +251,7 @@ namespace SkyrimTogetherSetup
             try
             {
                 var dlg = new System.Windows.Forms.FolderBrowserDialog();
-                dlg.Description = "Where should Thornswood go? A folder called SkyrimTogether is made inside whatever you pick.";
+                dlg.Description = "Where should Thornswood go? A folder called Thornswood is made inside whatever you pick.";
                 dlg.ShowNewFolderButton = true;
                 if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
 
