@@ -223,6 +223,15 @@ if (-not (Test-Path -LiteralPath $Dist)) {
 if (-not $LauncherRoot) { $LauncherRoot = Find-LauncherRoot }
 $maxOnline = Get-MaxOnline $LauncherRoot
 
+# Syntax first, as Deploy-DevGamemode.ps1 does. A gamemode that does not parse
+# stops the live server at start, and a live deploy is not always preceded by a
+# dev one with the same file. Here node is required, not optional: the live
+# server is the one that cannot be left down.
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'node is not on this machine, so gamemode.js cannot be checked before it goes live. Nothing was written.' }
+& node --check $Gamemode
+if ($LASTEXITCODE -ne 0) { throw 'gamemode.js does not parse. Nothing was written.' }
+Write-Host '  gamemode.js parses'
+
 Copy-Item -LiteralPath $Gamemode -Destination (Join-Path $Dist 'gamemode.js') -Force
 $kb = [math]::Round((Get-Item (Join-Path $Dist 'gamemode.js')).Length / 1KB)
 Write-Host "gamemode.js -> $Dist  ($kb KB)" -ForegroundColor Cyan
