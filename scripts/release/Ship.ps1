@@ -51,6 +51,8 @@
   position, so it can come first without its name. The first line is the
   title, a line starting with a dash becomes a bullet, and the rest becomes
   the body. The server's warning before the restart carries the title only.
+  Since 25 September Ship refuses notes without a title of three words or
+  more and at least one "- " detail line.
 
 .PARAMETER Version
   A dev build's number, for example 1.2.0.1, in place of the one Ship would
@@ -342,22 +344,28 @@ Write-Host '  SHIP' -ForegroundColor White
 # and one card a person on the sessions page". Patrick, fairly: that does not
 # tell people what was actually added. It names where the work came from.
 #
-# This does not refuse a one-line note. Refusing to publish over the wording of
-# a release note would be worse than the note. It says so once, with the shape
-# to copy, at the top where there is still time to stop.
-if ($Notes -notmatch "`n") {
+# IT REFUSES NOW. Patrick, 25 September, after two dev posts in a row went
+# out as "The scroll glows" and "Dev build: ...", beside earlier ones with a
+# title and three bullets each: every post must have details and be as good
+# as those. A title of at least three words that is not a placeholder, and
+# at least one "- " line saying what somebody will notice. Checked before
+# anything is built, so nothing is half done when it stops.
+$noteLines = @($Notes -split "`r?`n")
+$noteTitle = (@($noteLines | Where-Object { $_.Trim() }) + @(''))[0].Trim()
+$noteBullets = @($noteLines | Where-Object { $_ -match '^\s*-\s*\S' -and ($_ -replace '^\s*-\s*', '').Trim().Length -ge 12 })
+$placeholder = $noteTitle -match '^[\W_]*$' -or $noteTitle -match '^(test|testing|wip|update|updates|fix|fixes|changes|stuff|dev|build|misc)\W*$'
+if ($placeholder -or @($noteTitle -split '\s+' | Where-Object { $_ }).Count -lt 3 -or $noteBullets.Count -lt 1) {
     Write-Host ''
-    Say '  This note is one line, so the release goes out with no body and no' 'Yellow'
-    Say '  details beyond the version and the download size. That is what people' 'Yellow'
-    Say '  see in the launcher, on the site and in Discord.' 'Yellow'
+    Say '  STOP. These notes are what people read in the launcher, on the site and' 'Red'
+    Say '  in Discord, and they need a real title and details. Nothing was built.' 'Red'
+    if ($placeholder -or @($noteTitle -split '\s+' | Where-Object { $_ }).Count -lt 3) { Say "  The title '$noteTitle' is too short to say what changed." 'Yellow' }
+    if ($noteBullets.Count -lt 1) { Say '  There is no detail line: at least one line starting with "- ".' 'Yellow' }
     Write-Host ''
-    Say '  The shape that fills them in:' 'DarkGray'
-    Say '      .\scripts\release\Ship.ps1 "A title, written from their side' 'DarkGray'
-    Say '      A sentence or two of what changed and why anybody would care.' 'DarkGray'
-    Say '      - one thing they will notice' 'DarkGray'
-    Say '      - another thing they will notice"' 'DarkGray'
-    Write-Host ''
-    Say '  Carrying on with the one line.' 'DarkGray'
+    Say '  The shape, written from the side of the person playing:' 'DarkGray'
+    Say '      .\scripts\release\Ship.ps1 -Channel dev "The scroll''s Continue gives you the full three minutes' 'DarkGray'
+    Say '      - Time spent reading the sealed scroll no longer counts against choosing a character.' 'DarkGray'
+    Say '      - After you press Continue you get the whole three minutes to pick one."' 'DarkGray'
+    exit 1
 }
 Write-Host "  $Notes" -ForegroundColor DarkGray
 
