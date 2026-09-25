@@ -12,8 +12,18 @@ message. No new messages, no new pings.
     python redraw.py --all    every card, not only the ones that had boxes
 
 Reads the same bot.env.json as the bot (run.ps1 puts it in the environment).
-The number on the card is the person's place in the join order among the
-members still here, the same rule backfill.py used.
+The number on the card is the one joins.json holds for that person, read
+through bot.py's own functions, so a redrawn card says what the bot gave
+them. Somebody the record has no number for, because their card went up
+before the bot kept one, gets the old rule, their place in the join order
+among the members still here, and the line for them says so. A record that is
+there and cannot be read stops the run: redrawing with guesses is how two
+cards came to say "The 28th to walk in".
+
+It reads joins.json and never writes it. Redrawing swaps a picture on a card
+that is already up; it gives nobody a number, so it has nothing to record.
+The record is the one beside this file, so run it in the bot's folder on the
+VPS; anywhere else there is none and every number is the old rule.
 """
 import asyncio
 import os
@@ -23,6 +33,7 @@ import traceback
 
 import discord
 
+import bot
 import card
 
 TOKEN = os.environ.get('DISCORD_TOKEN', '').strip()
@@ -48,6 +59,20 @@ def dressed(name):
     return bool(re.search(r'[^\u0000-\u024F\u2000-\u206F]', name or ''))
 
 
+def number(who, given, order):
+    """The number joins.json holds for this member, and '' to go with it. For
+       somebody it has no number for, their place in the join order, and why,
+       including when that number is one the record gave somebody else."""
+    n = given.get(who.id)
+    if n is not None:
+        return n, ''
+    n = order.get(who.id)
+    why = ' (not in joins.json, so by join order among the members still here'
+    if n in given.values():
+        why += ', which repeats a number joins.json gave somebody else'
+    return n, why + ')'
+
+
 @client.event
 async def on_ready():
     try:
@@ -71,6 +96,18 @@ async def work():
     byid = {}
     for m in members:
         byid[m.id] = m
+
+    try:
+        given = bot.joins_given(guild)
+    except Exception:
+        say('could not read %s, so nothing is redrawn: every number would be '
+            'a guess that can disagree with it.\n%s'
+            % (bot.JOINS, traceback.format_exc()))
+        return
+    if os.path.exists(bot.JOINS):
+        say('%d numbers in %s' % (len(given), bot.JOINS))
+    else:
+        say('no %s here, so every number below is by join order' % bot.JOINS)
 
     todo = []
     for n in CHANNELS:
@@ -100,8 +137,9 @@ async def work():
         return
     for ch, msg, who in todo:
         name = who.display_name or who.name
-        say('#%s %s -> card will read %r, number %d' % (
-            ch.name, msg.jump_url, card.shown_name(name, who.name), order.get(who.id, 0)))
+        n, why = number(who, given, order)
+        say('#%s %s -> card will read %r, number %d%s' % (
+            ch.name, msg.jump_url, card.shown_name(name, who.name), n or 0, why))
 
     if not GO:
         say('dry run, nothing changed. Run with --go to redraw them.')
@@ -109,16 +147,21 @@ async def work():
 
     for ch, msg, who in todo:
         name = who.display_name or who.name
+        n, why = number(who, given, order)
         try:
             avatar = who.display_avatar.replace(size=256, format='png')
             data = await avatar.read()
             png = await asyncio.get_running_loop().run_in_executor(
-                None, card.render, name, data, order.get(who.id) or None, None, who.name)
+                None, card.render, name, data, n or None, None, who.name)
             await msg.edit(attachments=[discord.File(png, 'welcome.png')])
-            say('redrew the card for %s' % who)
+            say('redrew the card for %s, number %d%s' % (who, n or 0, why))
         except Exception:
             say('failed for %s:\n%s' % (who, traceback.format_exc()))
         await asyncio.sleep(1.5)
 
 
-client.run(TOKEN, log_handler=None)
+# Under a main guard, as bot.py is, so test-join-scripts.py can import this
+# and run work() against a stand-in server. `python redraw.py` runs it as
+# before.
+if __name__ == '__main__':
+    client.run(TOKEN, log_handler=None)

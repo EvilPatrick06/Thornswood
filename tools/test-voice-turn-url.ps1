@@ -143,6 +143,12 @@ Write-Host 'the command line the scheduled task runs:'
 $root = Join-Path $script:temp 'root'
 New-Item -ItemType Directory -Force -Path $root | Out-Null
 $logPath = Join-Path $root 'voice.log'
+# The roller the task runs in front of node (entry 220, tools\test-roll-log.ps1
+# drives it). The real one, beside the stand-in, so the relay line is shown to
+# reach node through the whole line the box runs and not a line without it.
+$psExePath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$rollPath = Join-Path $root 'roll-log.ps1'
+Copy-Item -LiteralPath (Join-Path $ToolsPath 'Roll-Log.ps1') -Destination $rollPath
 # Stands in for the service: writes down what cmd.exe handed it and stops.
 $seenPath = Join-Path $root 'seen.json'
 Set-Content -LiteralPath (Join-Path $root 'voice-server.js') -Encoding ASCII -Value @'
@@ -168,6 +174,8 @@ function CommandFor([string]$url) {
     if ($line.Count -ne 1) { return $null }
     $node = [pscustomobject]@{ Source = $nodeExe }
     $log = $logPath
+    $psExe = $psExePath
+    $roll = $rollPath
     $cmd = $null
     . ([scriptblock]::Create($line[0]))
     return [pscustomobject]@{ Cmd = $cmd; Remote = $remote }
@@ -192,8 +200,9 @@ function RunCommand([string]$cmd) {
 
 # Every install before -TurnUrl existed sent exactly this. The chat range
 # came onto the line with local chat (tools\test-chat-range-install.ps1), and
-# off is what an install that does not mention it hands over.
-$before = '/c "set THORNSWOOD_SITE=https://thornswood.net&& set THORNSWOOD_VOICE_PORT=7778&& set THORNSWOOD_VOICE_BIND=0.0.0.0&& set THORNSWOOD_VOICE_AUTH=log&& set THORNSWOOD_CHAT_RANGE=off&& "{0}" voice-server.js >> "{1}" 2>&1"' -f $nodeExe, $logPath
+# off is what an install that does not mention it hands over. The roller in
+# front of node came with entry 220, so voice.log is rolled before each start.
+$before = '/c "set THORNSWOOD_SITE=https://thornswood.net&& set THORNSWOOD_VOICE_PORT=7778&& set THORNSWOOD_VOICE_BIND=0.0.0.0&& set THORNSWOOD_VOICE_AUTH=log&& set THORNSWOOD_CHAT_RANGE=off&& "{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f $nodeExe, $logPath, $psExePath, $rollPath
 
 $none = CommandFor ''
 Yes 'with no relay the command line is the one every install sent before, to the character' (

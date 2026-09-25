@@ -163,3 +163,40 @@ one month at the old price and saves a week of people asking why nothing works.
 
 `.\tools\Check-Load.ps1` against the old address shows whether anyone is still
 landing there. When that is zero for a few days, cancel it.
+
+## The logs on the box, and how big they get
+
+Each service writes its log in its own folder, and each service's log is
+rolled: at 4 MB `x.log` becomes `x.log.1`, what was `.1` becomes `.2`, and five
+are kept. The oldest past five is the only thing that is ever removed. The
+watchdog's files and the door's log are kept a different way, or not at all,
+and are listed below.
+
+- `server.log` (game server, live and dev), `voice.log` (live and dev) and
+  `bot.log` are written by cmd's `>>` from the scheduled task, and Windows
+  will not move a file held that way while the service runs. So
+  `roll-log.ps1`, beside each service, rolls it just before the service
+  starts. A service that runs for days grows one file until its next restart.
+  An install of the game server or of voice rolls its log whatever the size,
+  so the run it starts has a file of its own and the one before is `.1`.
+- `thornswood.log` (the gamemode) and `site.log` (the website) roll
+  themselves.
+- `C:\Thornswood-Watch\watch.log` and `restarts.txt` beside it are not
+  rolled. Past 2,000 lines the watcher keeps the last 1,000 of each and the
+  rest is gone.
+- `load.csv` in the same folder, the five minute load record, rolls itself to
+  `load.1.csv` at 4 MB, one kept, which is about five weeks. Its `load.log`
+  keeps the last 500 lines once it passes 256 KB.
+- `private\door.log` in the game server's folder is not rolled or trimmed.
+  The gamemode appends a line each time the door decides about somebody, and
+  the file grows until somebody moves it.
+- `.\tools\Get-Logs.ps1` reads only the current file. After a restart, last
+  night's crash may be in `.1` beside it.
+- The site's /sessions page reads a session's game server lines out of
+  `server.log` and, when that is shorter than 4 MB, out of the end of
+  `server.log.1` and the older ones behind it, so a session from before a
+  restart, the crash session included, is still on the page.
+- Whether the gamemode can write its log at all is at
+  `http://192.135.112.23:3000/thornswood-log.json`, and on 7788 for dev.
+  `"ok": false` means thornswood.log has stopped, and `why` says what the
+  write was refused with.

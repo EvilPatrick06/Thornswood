@@ -137,15 +137,36 @@ async function queued(svc) {
   return doc.commands || [];
 }
 
-/* Send one line from c, wait for it to land, and return who got a line. */
-async function say(svc, c, text) {
+/* Send one line from c and return who got a line.
+
+   With expect, the names that should hear it, it first waits until each of
+   them has something, for up to three seconds, and then the same 350 ms as
+   before for anybody who should not. A flat 350 ms for every line missed the
+   whisper on the Windows runner on #337, on 24 and again 25 September: Dagny
+   and Eorlund had joined 25 ms before it, and the next line reached Dagny
+   the usual way. Nothing in the service holds a line back, so it was late,
+   not lost. A line nobody else should hear has nothing to wait for and keeps
+   the flat wait. */
+async function say(svc, c, text, expect) {
   for (const s of svc.socks) { s.got.length = 0; }
   c.ws.send(JSON.stringify({ t: 'chat', text: text }));
+  if (expect) {
+    const want = svc.socks.filter((s) => expect.indexOf(s.name) >= 0);
+    const until = Date.now() + 3000;
+    while (Date.now() < until && !want.every((s) => s.got.length > 0)) { await sleep(20); }
+  }
   await sleep(350);
   return svc.socks.filter((s) => s.got.length > 0).map((s) => s.name).sort();
 }
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/* Whether a line reached exactly these, and who it did reach when not, so a
+   red run says what happened rather than only that it did. */
+function heardBy(heard, want) {
+  const ok = same(heard, want);
+  if (!ok) { console.log('      heard by ' + (heard.join(', ') || 'nobody') + ', not ' + want.join(', ')); }
+  return ok;
+}
 const lineOf = (c) => c.got.filter((m) => m.from !== 0)[0] || null;
 const noteOf = (c) => c.got.filter((m) => m.from === 0)[0] || null;
 
@@ -177,9 +198,9 @@ async function off() {
     await join(svc, 103, 'Cass');
     yes('OFF positions are taken', await place(svc, rows(['Aela', 'Brand', 'Cass'])) === 204);
 
-    const heard = await say(svc, a, 'Hand over the purse.');
+    const heard = await say(svc, a, 'Hand over the purse.', ['Aela', 'Brand', 'Cass']);
     yes('OFF a plain line reaches every socket, near or far, as it always has',
-        same(heard, ['Aela', 'Brand', 'Cass']));
+        heardBy(heard, ['Aela', 'Brand', 'Cass']));
     const m = lineOf(svc.socks[2]);
     yes('OFF and the object on the wire is the same six keys it always was, with no kind',
         !!m && same(Object.keys(m).sort(), ['at', 'from', 'name', 'profileId', 't', 'text']));
@@ -212,11 +233,11 @@ async function on() {
     const c = await join(svc, 103, 'Cass');
     yes('ON positions are taken', await place(svc, rows(['Aela', 'Brand', 'Cass'])) === 204);
 
-    let heard = await say(svc, a, 'Hand over the purse.');
+    let heard = await say(svc, a, 'Hand over the purse.', ['Aela', 'Brand']);
     yes('ON one plain line from the first of three sockets reaches exactly two',
         heard.length === 2);
     yes('ON and they are the sender and the one standing beside them',
-        same(heard, ['Aela', 'Brand']));
+        heardBy(heard, ['Aela', 'Brand']));
     yes('ON and the one eighty metres up the road does not see it', c.got.length === 0);
     const m = lineOf(b);
     yes('ON the line is marked as said', !!m && m.kind === 'say' && m.text === 'Hand over the purse.');
@@ -224,8 +245,8 @@ async function on() {
 
     // A shout carries three times as far.
     await place(svc, rows(['Aela', 'Brand', 'Cass']));
-    heard = await say(svc, a, '/s Guards! Over here!');
-    yes('ON a shout reaches the one up the road too', same(heard, ['Aela', 'Brand', 'Cass']));
+    heard = await say(svc, a, '/s Guards! Over here!', ['Aela', 'Brand', 'Cass']);
+    yes('ON a shout reaches the one up the road too', heardBy(heard, ['Aela', 'Brand', 'Cass']));
     const sm = lineOf(c);
     yes('ON and it arrives as a shout, without the /s',
         !!sm && sm.kind === 'shout' && sm.text === 'Guards! Over here!');
@@ -233,52 +254,52 @@ async function on() {
     // /me and /do are actions, local like any other line.
     await place(svc, rows(['Aela', 'Brand', 'Cass']));
     await queued(svc);
-    heard = await say(svc, a, '/me draws a knife');
-    yes('ON /me reaches the same two a plain line does', same(heard, ['Aela', 'Brand']));
+    heard = await say(svc, a, '/me draws a knife', ['Aela', 'Brand']);
+    yes('ON /me reaches the same two a plain line does', heardBy(heard, ['Aela', 'Brand']));
     const mm = lineOf(b);
     yes('ON and arrives as an action, without the /me',
         !!mm && mm.kind === 'me' && mm.text === 'draws a knife');
     yes('ON and it is not also queued for the game server', (await queued(svc)).length === 0);
 
-    heard = await say(svc, b, '/do The purse is empty.');
+    heard = await say(svc, b, '/do The purse is empty.', ['Aela', 'Brand']);
     const dm = lineOf(a);
     yes('ON /do reaches the people near the one who sent it',
-        same(heard, ['Aela', 'Brand']) && !!dm && dm.kind === 'do' && dm.text === 'The purse is empty.');
+        heardBy(heard, ['Aela', 'Brand']) && !!dm && dm.kind === 'do' && dm.text === 'The purse is empty.');
 
     // Two more: one at Aela's elbow, one a hundred units away in the inn.
     const d = await join(svc, 104, 'Dagny');
     const e = await join(svc, 105, 'Eorlund');
     await place(svc, rows(['Aela', 'Brand', 'Cass', 'Dagny', 'Eorlund']));
-    heard = await say(svc, a, '/w run');
-    yes('ON a whisper reaches only the one at the elbow', same(heard, ['Aela', 'Dagny']));
+    heard = await say(svc, a, '/w run', ['Aela', 'Dagny']);
+    yes('ON a whisper reaches only the one at the elbow', heardBy(heard, ['Aela', 'Dagny']));
     const wm = lineOf(d);
     yes('ON and arrives as a whisper', !!wm && wm.kind === 'whisper' && wm.text === 'run');
 
     await place(svc, rows(['Aela', 'Brand', 'Cass', 'Dagny', 'Eorlund']));
-    heard = await say(svc, a, 'Quiet, somebody is coming.');
+    heard = await say(svc, a, 'Quiet, somebody is coming.', ['Aela', 'Brand', 'Dagny']);
     yes('ON somebody a hundred units away in another cell hears nothing',
-        e.got.length === 0 && same(heard, ['Aela', 'Brand', 'Dagny']));
+        e.got.length === 0 && heardBy(heard, ['Aela', 'Brand', 'Dagny']));
 
     // Alone.
     await place(svc, rows(['Aela', 'Brand', 'Cass', 'Dagny', 'Eorlund']));
-    heard = await say(svc, c, 'Hello?');
-    yes('ON a line nobody is near enough for goes back to the sender alone', same(heard, ['Cass']));
+    heard = await say(svc, c, 'Hello?', ['Cass']);
+    yes('ON a line nobody is near enough for goes back to the sender alone', heardBy(heard, ['Cass']));
     yes('ON and they are told nobody heard it',
         !!noteOf(c) && /Nobody near enough/.test(noteOf(c).text));
 
     // Somebody at the menu, while everybody else is in the world.
     const f = await join(svc, 106, 'Frea');
     await place(svc, rows(['Aela', 'Brand', 'Cass', 'Dagny', 'Eorlund']));
-    heard = await say(svc, f, 'is anyone there');
+    heard = await say(svc, f, 'is anyone there', ['Frea']);
     yes('ON somebody with no position reaches nobody else, not the whole server',
-        same(heard, ['Frea']));
+        heardBy(heard, ['Frea']));
     yes('ON and is told their character is not in the world yet',
         !!noteOf(f) && /not in the world/.test(noteOf(f).text));
 
     // A verb with nothing after it.
     await place(svc, rows(['Aela', 'Brand', 'Cass', 'Dagny', 'Eorlund']));
-    heard = await say(svc, a, '/me');
-    yes('ON /me on its own goes to nobody else', same(heard, ['Aela']));
+    heard = await say(svc, a, '/me', ['Aela']);
+    yes('ON /me on its own goes to nobody else', heardBy(heard, ['Aela']));
     yes('ON and says how it is used', !!noteOf(a) && /\/me draws a sword/.test(noteOf(a).text));
     yes('ON and is not queued either', (await queued(svc)).length === 0);
 
@@ -307,9 +328,9 @@ async function on() {
 
     // The gamemode's feed stops: the position list comes back empty.
     await place(svc, []);
-    heard = await say(svc, a, 'Still there?');
+    heard = await say(svc, a, 'Still there?', ['Aela', 'Brand', 'Cass', 'Dagny', 'Eorlund', 'Frea']);
     yes('ON with no positions at all, a line goes to everybody rather than nobody',
-        same(heard, ['Aela', 'Brand', 'Cass', 'Dagny', 'Eorlund', 'Frea']));
+        heardBy(heard, ['Aela', 'Brand', 'Cass', 'Dagny', 'Eorlund', 'Frea']));
   } finally { await svc.stop(); }
 }
 

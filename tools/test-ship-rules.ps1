@@ -215,9 +215,38 @@ Yes 'the theme is not held back from main any more' (-not (Test-ShipDevOnly 'Dat
 # builds. The six files in client-build.json are ours by hash, and
 # skymp5-client.js in particular would read as somebody else's plugin script
 # by the name rule above.
+#
+# And by the file's bytes, since #306 (entry 128) on 24 September: one of the
+# six is ours only when the file under $GameDir is the recorded build, and
+# when it is missing or anything else it is not ours, so it is neither shipped
+# nor listed as removed. This check was written the day before that, when the
+# path alone made a file ours, and the two landed an hour apart and turned
+# main red. So each file is asked twice here: with bytes the record is told to
+# expect, under a made up $GameDir, and with nothing there.
+# tools\test-client-by-hash.ps1 asks the same of this machine's real bundle.
 Yes 'client-build.json names the six client files' ($clientFiles.Count -eq 6)
-foreach ($rel in $clientFiles) {
-    Yes "$rel is ours by record and ships" (-not (Test-ShipOtherServer $rel) -and -not (Test-ShipMachine $rel) -and -not (Test-ShipRuntime $rel))
+$fakeGame = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ship-rules-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    foreach ($rel in $clientFiles) {
+        $recorded = $ShipClientHashes[$rel]
+        $full = [IO.Path]::Combine($fakeGame, $rel)
+        $null = New-Item -ItemType Directory -Force -Path (Split-Path $full -Parent)
+        [IO.File]::WriteAllText($full, 'the recorded build of ' + $rel)
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $ShipClientHashes[$rel] = -join ($sha.ComputeHash([IO.File]::ReadAllBytes($full)) | ForEach-Object { $_.ToString('x2') }) }
+        finally { $sha.Dispose() }
+        $GameDir = $fakeGame
+        Yes "$rel is ours by record and ships when it is the recorded build" (-not (Test-ShipOtherServer $rel) -and -not (Test-ShipMachine $rel) -and -not (Test-ShipRuntime $rel))
+        [IO.File]::WriteAllText($full, 'somebody else''s build of ' + $rel)
+        Yes "$rel with other bytes is not ours, so it neither ships nor is removed" ((Test-ShipOtherServer $rel) -eq $true)
+        Remove-Item -LiteralPath $full -Force
+        Yes "$rel with nothing there is not ours either" ((Test-ShipOtherServer $rel) -eq $true)
+        $ShipClientHashes[$rel] = $recorded
+        Remove-Variable -Name GameDir -ErrorAction SilentlyContinue
+    }
+}
+finally {
+    Remove-Item -LiteralPath $fakeGame -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # ---- nothing is both shipped and deleted ---------------------------------------
