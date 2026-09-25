@@ -173,6 +173,10 @@ Yes '  and the folder itself counts' (Test-ShipOtherServer 'Data\SkyrimTogetherR
 Yes 'a sibling folder whose name only starts the same way is not caught' (-not (Test-ShipOtherServer 'Data\SkyrimTogetherRebornExtras\x.esp'))
 Yes 'NirnLab UI Platform is kept out' (Test-ShipOtherServer 'Data\NirnLabUIPlatform\CEFSubprocess.exe')
 Yes '  and its plugin' (Test-ShipOtherServer 'Data\SKSE\Plugins\NirnLabUIPlugin.dll')
+Yes "Keizaal's parked Creation Club archives are kept out" (Test-ShipOtherServer 'Data\_disabledByKzl\ccBGSSSE001-Fish.bsa')
+Yes "  and Keizaal's backup beside the game" (Test-ShipOtherServer 'keizaal-backup-1.7.104.0\Data\Dawnguard.esm')
+Yes '  and the Daedric launcher''s folder' (Test-ShipOtherServer 'DaedricData\skymp-disabled\files\Data\x.bsa')
+Yes '  but not a Data file that merely starts the same way' (-not (Test-ShipOtherServer 'Data\_disabledByKzlNot\x.esp'))
 
 # ---- the loose map.swf and SkyUI's ERROR CODE 5 --------------------------------
 #
