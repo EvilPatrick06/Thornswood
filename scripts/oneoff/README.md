@@ -27,4 +27,3 @@ set up today. Read the header before running anything.
 | `Fix-PluginProblems.ps1` | Removed CFTO-JK-Patch.esp and RaceMenuPlugin.esp. | **Do not run it.** The JK's patch went into the collection on 15 September, so this would now take out a plugin that belongs. |
 | `Install-Emotes.ps1` | Copied the emote wheel from `tools\emotes` into a game folder. | The wheel is `tools\ts-plugins` and `tools\ts-ui` now, and `Go.ps1` installs it; the copies it read were 13 September's and are deleted. |
 | `Revert.ps1` | Put one day's game folder back after MCMHelper.esp shifted the load order. | Done, and it read the same deleted copies. |
-| `Move-TodoToIssues.ps1`, `todo-open-2026-09-25.json` | Moves the open entries of the claude.ai To Do List into GitHub Issues and a Project board, in do-order. | Run once by Patrick with gh; they can go once the board is checked. |

@@ -12,10 +12,10 @@ them use AI, and one copy of the rules is the only copy that stays true.
 
 ## Recording what a session finds
 
-Everything a session turns up goes on the To Do List (CONTRIBUTING.md says
-where it is and how the order works) before the session ends. Saying it in a
-reply is not recording it: a reply is gone when the window closes. Say in the
-reply which entries moved.
+Everything a session turns up goes on the board as an issue, or on the issue
+it belongs to, before the session ends (CONTRIBUTING.md says where the board
+is and how its order works). Saying it in a reply is not recording it: a
+reply is gone when the window closes. Say in the reply which issues moved.
 
 ## What a Claude here does itself and what the person does
 
@@ -80,7 +80,7 @@ this section exists for.
 
 ## Where things are
 
-CONTRIBUTING.md (the rules, for everybody), the To Do List for open work,
+CONTRIBUTING.md (the rules, for everybody), the board for open work,
 SECOND-DEVELOPER.md (the long form), README.md,
 tools\app\ARCHITECTURE.md (the launcher: startup, what each class owns, and
 the Play sequence), tools\MOVING-THE-SERVER.md (the VPS), lore\ (the world),
