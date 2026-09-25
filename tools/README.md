@@ -1,6 +1,6 @@
 # The PowerShell scripts in tools
 
-Every `.ps1` in this folder, 194 of them, with the one line that says
+Every `.ps1` in this folder, 195 of them, with the one line that says
 what each one is for. New-ScriptIndex.ps1 writes this file from the scripts
 themselves: the line is a script's .SYNOPSIS where it has one, and otherwise
 the first sentence of the comment at its top. Do not edit it by hand. Change
@@ -188,6 +188,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [test-script-index.ps1](test-script-index.ps1) | Ship.ps1 says every option it takes where Get-Help can read it, and tools\README.md lists every script in this folder exactly as New-ScriptIndex.ps1 writes it. |
 | [test-script-paths.ps1](test-script-paths.ps1) | Every path a script builds from its own folder or the repository points at something that is in the repository, apart from the files that are made at run time or kept out of git on purpose, which are listed below with why. |
 | [test-self-update.ps1](test-self-update.ps1) | The launcher's self update keeps the old exe until the new one has started, and puts it back when the new one does not. |
+| [test-setup-domain-caddyfile.ps1](test-setup-domain-caddyfile.ps1) | Setup-Domain.ps1 sends tools\Caddyfile rather than writing its own. |
 | [test-setup-stub-age.ps1](test-setup-stub-age.ps1) | Package-Thornswood.ps1 refuses a setup program compiled before the last change to the source it is compiled from. |
 | [test-ship-dry-run.ps1](test-ship-dry-run.ps1) | A dry run publishes nothing, and a real Ship still publishes the installer. |
 | [test-ship-gate.ps1](test-ship-gate.ps1) | A main release ships what is on GitHub, and nothing else. |
