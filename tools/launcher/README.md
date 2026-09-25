@@ -24,7 +24,7 @@ change here takes a launcher build. A build writes the exe into
 installed launcher, build into a scratch root:
 
 ```
-powershell -NoProfile -File tools\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
+.\tools\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
 ```
 
 What the page reports goes to the launcher's log, `Profile\launcher.log`,
