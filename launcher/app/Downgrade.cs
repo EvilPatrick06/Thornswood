@@ -365,24 +365,31 @@ namespace Thornswood
                         log("Steam has not written anything for ten minutes. Check that Steam is still open and signed in; the download carries on where it left off.");
                     }
                     // Steam's log has always said "Depot download complete" so
-                    // far. If a Steam build stops saying it, a full folder that
-                    // has been still for a long while with nothing left in
-                    // Steam's downloading folder is the next best proof.
+                    // far. If a Steam build stops saying it, a folder that has
+                    // reached the size Steam announced for this part and been
+                    // still for a long while, with nothing left in Steam's
+                    // downloading folder, is the next best proof.
                     //
-                    // Only for a download this run started, though. A folder an
-                    // aborted run left half written is also full and still, and
-                    // taking that as done writes the marker and copies truncated
-                    // files over the Steam copy, after which every later attempt
-                    // skips the depot as already downloaded.
+                    // Only at the announced size, and only for a download this
+                    // run started. A folder an aborted run left half written is
+                    // also still, and a part Steam stopped writing to part way is
+                    // still too; taking either as done writes the marker and
+                    // copies truncated files over the Steam copy, after which
+                    // every later attempt skips the depot as already downloaded.
+                    // Steam gives the size when it starts the part (total, from
+                    // DepotBytes), so a folder short of it is a stall, not a
+                    // finish, and the deadline below gives up rather than trust
+                    // it. See #369 F4.
                     if (size > 0 && quiet > 20 && !Directory.Exists(downloading))
                     {
                         if (!sawStart && LogStarted(said, depot)) sawStart = true;
-                        if (sawStart)
+                        if (sawStart && total > 0 && size >= total)
                         {
-                            log("Steam's log never said the download finished, but the folder has been complete and still for twenty minutes, so it is taken as done.");
+                            log("Steam's log never said the download finished, but the folder has reached the " + (total / 1048576).ToString("n0") + " MB Steam announced for this part and been still for twenty minutes, so it is taken as done.");
                             break;
                         }
-                        return Stop("Steam never started this download, and " + folder + " is left over from an earlier attempt, so what is in it cannot be trusted. Delete that folder, then press the button again.", log, status);
+                        if (!sawStart)
+                            return Stop("Steam never started this download, and " + folder + " is left over from an earlier attempt, so what is in it cannot be trusted. Delete that folder, then press the button again.", log, status);
                     }
 
                     /*
@@ -462,6 +469,17 @@ namespace Thornswood
             // it would change the mod inside Vortex. Those are left as they are.
             HashSet<string> modded = OwnGame.DeployedIn(target);
             long copied = 0; int files = 0, leftForMods = 0;
+            // SkyrimSE.exe is held back and copied last, after every other file
+            // is in place. The build is read from that one file (Wrong, Needed,
+            // Describe all measure SkyrimSE.exe), so the moment it lands the
+            // copy reads as 1.6.1170. A copy that then stops part way on a file
+            // it cannot replace used to leave the exe already on the new build,
+            // which took the Downgrade card and its Try again button away with
+            // the job not finished (Shell.cs, DrawStatus). Copied last, a stop
+            // part way leaves the exe on the old build, so the card and the
+            // button stay for the next press. See #369 F3.
+            string exeSrc = "";
+            string exeRel = "";
             foreach (string[] d in Depots)
             {
                 string folder = Path.Combine(content, "depot_" + d[0]);
@@ -472,6 +490,7 @@ namespace Thornswood
                     string rel = f.Substring(prefix.Length);
                     if (rel.StartsWith(".thornswood", StringComparison.OrdinalIgnoreCase)) continue;
                     if (modded.Contains(rel)) { leftForMods++; continue; }
+                    if (string.Equals(rel, "SkyrimSE.exe", StringComparison.OrdinalIgnoreCase)) { exeSrc = f; exeRel = rel; continue; }
                     string dest = Path.Combine(target, rel);
                     try
                     {
@@ -494,6 +513,23 @@ namespace Thornswood
                     {
                         return Stop("Could not replace " + rel + ": " + ex.Message, log, status);
                     }
+                }
+            }
+            // The exe, last. gotExe was checked as the right build above, so a
+            // failure here is the file being locked, not the wrong file.
+            if (exeSrc.Length > 0)
+            {
+                string dest = Path.Combine(target, exeRel);
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                    if (File.Exists(dest)) OwnGame.DropName(dest);
+                    File.Copy(exeSrc, dest, false);
+                    copied += new FileInfo(exeSrc).Length; files++;
+                }
+                catch (Exception ex)
+                {
+                    return Stop("Could not replace " + exeRel + ": " + ex.Message, log, status);
                 }
             }
             log("Copied " + files + " files, " + (copied / 1048576).ToString("n0") + " MB, into " + target + "." +

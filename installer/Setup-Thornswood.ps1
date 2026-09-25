@@ -179,8 +179,9 @@ if ($Collection) {
     if ($bytesNow -ne $TARGET_EXE_BYTES) {
         Write-Host ''
         Say '  This Skyrim is not build 1.6.1170, which is the one the server runs.' 'Yellow'
-        Say '  Thornswood installs anyway, but the launcher will hold Play until the' 'Yellow'
-        Say '  build matches. In Steam: Properties, Betas, and pick 1.6.1170.' 'Yellow'
+        Say '  Thornswood installs anyway. Open the launcher and press Downgrade;' 'Yellow'
+        Say '  it puts your Steam copy back on 1.6.1170 for you. Play stays held' 'Yellow'
+        Say '  until the build matches.' 'Yellow'
         Write-Host ''
     }
 } else {
@@ -607,6 +608,13 @@ foreach ($k in $checks.Keys) {
         Say "  [ok]   $k" 'Green'
     } elseif ($Collection -and ($fromCollection -contains $k)) {
         Say "  [next] $k  the collection installs this" 'Yellow'
+        $later++
+    } elseif ($Collection -and $k -eq 'Game 1.6.1170') {
+        # A wrong build is not a failed install: the launcher's Downgrade
+        # button puts the Steam copy back on 1.6.1170. Counting it as a miss
+        # kept the window shut on a screenshot and never opened the launcher
+        # that fixes it. So count it as next and let the launcher open.
+        Say "  [next] $k  the launcher's Downgrade button fixes this" 'Yellow'
         $later++
     } else {
         Say "  [MISS] $k" 'Red'
