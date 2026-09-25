@@ -21997,6 +21997,16 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   function consumed(actorId, baseId) {
     if (!baseId) { return ''; }
     var kind = foodKind(baseId);
+    /*
+      A POTION SOMEBODY BREWED IS NOT IN ANY PLUGIN. The game makes its record
+      at the alchemy lab, above 0xff000000 (see RUNTIME in recipelessCraft),
+      so the food table never has it, and until 25 September it fell through
+      to food: a brewed potion of healing counted as a meal. Alchemy is the
+      only thing here that makes something to swallow that way; cooking works
+      from recipes, and a recipe's result is a plugin's record. So it is what
+      Patrick said potions are, a mouthful towards thirst.
+    */
+    if (!kind && baseId >= 0xff000000) { kind = 'potion'; }
     if (!kind) { kind = 'food'; }
     if (kind === 'potion' || kind === 'poison') {
       // A mouthful, not a drink. See NEEDS.potion.
