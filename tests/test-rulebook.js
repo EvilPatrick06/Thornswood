@@ -232,6 +232,52 @@ if (pageLit && classesLit && profLit && treeLit && schoolsM) {
   }
 }
 
+
+// ------------------------------------- RP-only: the five retired trades
+/*
+  Patrick, 26 September 2026: bard, merchant, priest, scholar and thief are
+  RP-only. Not Class, not Profession, not offered on the panel, and migrate
+  clears them so nobody keeps old privileges.
+*/
+{
+  const rpLit = lift(src, '  var RP_ONLY = {');
+  yes('the server names the RP-only trades', !!rpLit);
+  if (rpLit) {
+    const RP = evalObject(rpLit);
+    const five = ['bard', 'merchant', 'priest', 'scholar', 'thief'];
+    const keys = Object.keys(RP);
+    yes('exactly those five are RP-only' +
+        (keys.length !== 5 || five.some(k => keys.indexOf(k) === -1)
+          ? ' (got: ' + keys.join(', ') + ')' : ''),
+        keys.length === 5 && five.every(k => keys.indexOf(k) !== -1));
+
+    const classesLit2 = lift(src, '  var CLASSES = {');
+    const profLit2 = lift(src, '  var PROFESSIONS = {');
+    const CLASSES2 = classesLit2 ? evalObject(classesLit2) : {};
+    const PROFESSIONS2 = profLit2 ? evalObject(profLit2) : {};
+    const pageLit2 = lift(page, '  var DATA = {');
+    const PAGE2 = pageLit2 ? evalObject(pageLit2) : { class: { rows: [] }, profession: { rows: [] } };
+    const offeredC = (PAGE2['class'].rows || []).map(r => r.key);
+    const offeredP = (PAGE2.profession.rows || []).map(r => r.key);
+
+    five.forEach(function (k) {
+      yes(k + ' is RP-only, not Class or Profession',
+          !!RP[k] && !CLASSES2[k] && !PROFESSIONS2[k]);
+      yes(k + ' is not offered as a class on the panel', offeredC.indexOf(k) === -1);
+      yes(k + ' is not offered as a profession on the panel', offeredP.indexOf(k) === -1);
+    });
+
+    yes('Gatherer stays a class', !!CLASSES2.gatherer);
+    yes('Tailor stays a profession', !!PROFESSIONS2.tailor);
+  }
+
+  yes('TABLE exposes rpOnly', /rpOnly:\s*RP_ONLY/.test(src));
+  yes('migrate clears an RP-only trade',
+      /P\.has\(P\.TABLE\.rpOnly, trade\)/.test(src) &&
+      /is RP-only; cleared, they must pick a class and profession/.test(src) &&
+      /old\['class'\]\s*=\s*''/.test(src));
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
