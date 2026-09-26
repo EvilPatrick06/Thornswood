@@ -1,0 +1,215 @@
+﻿<#
+  test-mustcopy-distribution.ps1
+
+      pwsh -NoProfile -File .\tests\test-mustcopy-distribution.ps1
+
+  OwnGame.MustCopy hard-links Vortex's Data\Platform\Distribution redistributables
+  (the 68 CEF and Node files the collection carries) and keeps copying the two
+  recorded client-build files under that folder, and everything else under
+  Data\Platform. Issue #392 / rules 6.
+
+  WHAT IT CHECKS.
+    1. Rules is 6 and the history comment names Distribution redistributables,
+       so every folder made under 5 refreshes once.
+    2. MustCopy, ClientFile, ClientFiles, CopyTypes, Masters and Generated,
+       lifted from launcher\app\OwnGame.cs and compiled, over files.txt-shaped
+       inputs: the 68 Distribution rows marked V come out linked; the two
+       recorded Distribution paths come out copied whether or not they are in
+       the deployed set; other Data\Platform paths stay copied.
+    3. On this machine, where Profile\OwnGame\files.txt exists, the real 68
+       Distribution V rows are asked the same way.
+
+  Read only apart from Add-Type in this process.
+#>
+[CmdletBinding()]
+param(
+    [string]$FilesList = 'C:\Thornswood\Profile\OwnGame\files.txt',
+    [string]$AppPath
+)
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$Repo = Split-Path -Parent $Here
+if (-not $AppPath) { $AppPath = Join-Path $Repo 'launcher\app' }
+
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+function Done {
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail -gt 0) { exit 1 }
+    exit 0
+}
+
+$ogPath = Join-Path $AppPath 'OwnGame.cs'
+Yes 'launcher\app\OwnGame.cs is there' (Test-Path -LiteralPath $ogPath)
+if (-not (Test-Path -LiteralPath $ogPath)) { Done }
+$og = [IO.File]::ReadAllText($ogPath)
+
+$rulesNum = [regex]::Match($og, '(?m)^\s*const int Rules = (\d+);')
+$rulesDoc = [regex]::Match($og, '(?m)^\s*/// (\d+): Vortex''s Data\\Platform\\Distribution redistributables')
+Yes 'OwnGame.Rules is 6 for the Distribution hard-link change' (
+    $rulesNum.Success -and [int]$rulesNum.Groups[1].Value -eq 6)
+Yes 'and the history comment names Distribution redistributables under that number' (
+    $rulesDoc.Success -and $rulesDoc.Groups[1].Value -eq '6')
+
+function Get-CsMember([string]$text, [string]$declaration) {
+    $at = $text.IndexOf($declaration, [StringComparison]::Ordinal)
+    if ($at -lt 0) { return $null }
+    $i = $text.IndexOf('{', $at + $declaration.Length)
+    if ($i -lt 0) { return $null }
+    $depth = 0
+    while ($i -lt $text.Length) {
+        $c = $text[$i]
+        $n = if ($i + 1 -lt $text.Length) { $text[$i + 1] } else { [char]0 }
+        if ($c -eq '/' -and $n -eq '/') { $i = $text.IndexOf("`n", $i); if ($i -lt 0) { return $null }; continue }
+        if ($c -eq '/' -and $n -eq '*') { $i = $text.IndexOf('*/', $i + 2); if ($i -lt 0) { return $null }; $i += 2; continue }
+        if ($c -eq '@' -and $n -eq '"') {
+            $i += 2
+            while ($i -lt $text.Length) {
+                if ($text[$i] -eq '"') { if ($i + 1 -lt $text.Length -and $text[$i + 1] -eq '"') { $i += 2; continue }; break }
+                $i++
+            }
+            $i++; continue
+        }
+        if ($c -eq '"' -or $c -eq "'") {
+            $q = $c; $i++
+            while ($i -lt $text.Length -and $text[$i] -ne $q) { if ($text[$i] -eq '\') { $i++ }; $i++ }
+            $i++; continue
+        }
+        if ($c -eq '{') { $depth++ }
+        elseif ($c -eq '}') {
+            $depth--
+            if ($depth -eq 0) { return $text.Substring($at, $i + 1 - $at) }
+        }
+        $i++
+    }
+    return $null
+}
+
+$clientFiles = Get-CsMember $og 'public static readonly string[] ClientFiles ='
+if ($clientFiles -and -not $clientFiles.TrimEnd().EndsWith(';')) { $clientFiles = $clientFiles.TrimEnd() + ';' }
+$lifted = [ordered]@{
+    'ClientFiles' = $clientFiles
+    'ClientFile'  = Get-CsMember $og 'public static bool ClientFile(string rel)'
+    'CopyTypes'   = ((Get-CsMember $og 'static readonly string[] CopyTypes =') + ';')
+    'Masters'     = ((Get-CsMember $og 'static readonly string[] Masters =') + ';')
+    'Generated'   = Get-CsMember $og 'static bool Generated(string rel)'
+    'MustCopy'    = Get-CsMember $og 'public static bool MustCopy(string rel, HashSet<string> deployed)'
+}
+foreach ($k in @($lifted.Keys)) {
+    Yes "lifted $k from OwnGame.cs" ([bool]$lifted[$k])
+}
+if (@($lifted.Values | Where-Object { -not $_ }).Count -gt 0) { Done }
+
+$ns = 'MustCopyDist_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+$cs = @"
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.RegularExpressions;
+namespace $ns {
+    public static class OwnGame {
+        $($lifted['ClientFiles'])
+        $($lifted['ClientFile'])
+        $($lifted['CopyTypes'])
+        $($lifted['Masters'])
+        $($lifted['Generated'])
+        $($lifted['MustCopy'])
+    }
+}
+"@
+$compiled = $true
+try {
+    if ($PSVersionTable.PSEdition -eq 'Core') { Add-Type -TypeDefinition $cs -Language CSharp }
+    else { Add-Type -TypeDefinition $cs -Language CSharp -ReferencedAssemblies 'System.Core' }
+} catch {
+    $compiled = $false
+    Write-Host ('      ' + $_.Exception.Message)
+    if ($_.Exception.InnerException) { Write-Host ('      ' + $_.Exception.InnerException.Message) }
+}
+Yes 'MustCopy and its helpers compile as lifted' $compiled
+if (-not $compiled) { Done }
+
+$T = [type]("$ns.OwnGame")
+$impl = 'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformImpl.dll'
+$cef  = 'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformCEF.exe.hidden'
+
+# Synthetic files.txt-shaped set: 68 redistributables + 2 recorded + other Platform.
+$redis = @(
+    'Data\Platform\Distribution\___systemPolyfill.js',
+    'Data\Platform\Distribution\RuntimeDependencies\chrome_elf.dll',
+    'Data\Platform\Distribution\RuntimeDependencies\d3dcompiler_47.dll',
+    'Data\Platform\Distribution\RuntimeDependencies\icudtl.dat',
+    'Data\Platform\Distribution\RuntimeDependencies\libcef.dll',
+    'Data\Platform\Distribution\RuntimeDependencies\libEGL.dll',
+    'Data\Platform\Distribution\RuntimeDependencies\libGLESv2.dll',
+    'Data\Platform\Distribution\RuntimeDependencies\libnode.dll',
+    'Data\Platform\Distribution\RuntimeDependencies\snapshot_blob.bin',
+    'Data\Platform\Distribution\RuntimeDependencies\v8_context_snapshot.bin'
+)
+# Pad to 68 with distinct fake names under Distribution so the count matches the issue.
+while ($redis.Count -lt 68) {
+    $redis += ('Data\Platform\Distribution\RuntimeDependencies\pad{0:d2}.dll' -f $redis.Count)
+}
+$otherPlatform = @(
+    'Data\Platform\Plugins\skymp5-client.js',
+    'Data\Platform\UI\index.html',
+    'Data\Platform\overlay-boot.count',
+    'Data\Platform\Modules\skyrimPlatform.ts'
+)
+
+$deployed = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+foreach ($r in $redis) { [void]$deployed.Add($r) }
+
+$linked = @($redis | Where-Object { -not $T::MustCopy($_, $deployed) })
+Yes ("the 68 Distribution redistributables from Vortex are linked ({0} of 68)" -f $linked.Count) ($linked.Count -eq 68)
+
+Yes 'SkyrimPlatformImpl.dll is copied when not in the deployed set' ($T::MustCopy($impl, $deployed))
+Yes 'SkyrimPlatformCEF.exe.hidden is copied when not in the deployed set' ($T::MustCopy($cef, $deployed))
+
+# Even if Vortex somehow listed them, ClientFile keeps them copied.
+$withRec = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+foreach ($r in $redis) { [void]$withRec.Add($r) }
+[void]$withRec.Add($impl); [void]$withRec.Add($cef)
+Yes 'SkyrimPlatformImpl.dll stays copied even if Vortex listed it' ($T::MustCopy($impl, $withRec))
+Yes 'SkyrimPlatformCEF.exe.hidden stays copied even if Vortex listed it' ($T::MustCopy($cef, $withRec))
+
+$otherStay = @($otherPlatform | Where-Object { $T::MustCopy($_, $deployed) })
+Yes ("everything else under Data\Platform stays copied ({0} of {1})" -f $otherStay.Count, $otherPlatform.Count) (
+    $otherStay.Count -eq $otherPlatform.Count)
+
+# Real files.txt when present.
+if (Test-Path -LiteralPath $FilesList) {
+    $rows = @(Get-Content -LiteralPath $FilesList | ForEach-Object {
+        $p = $_ -split '\|', 5
+        if ($p.Count -eq 5) {
+            [pscustomobject]@{ Kind = $p[0]; Origin = $p[1]; Rel = $p[4] }
+        }
+    })
+    $realDist = @($rows | Where-Object { $_.Rel -like 'Data\Platform\Distribution\*' -and $_.Origin -eq 'V' })
+    Yes ("this machine's files.txt has 68 Distribution rows from Vortex (has {0})" -f $realDist.Count) ($realDist.Count -eq 68)
+    if ($realDist.Count -gt 0) {
+        $realDeployed = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+        foreach ($r in $realDist) { [void]$realDeployed.Add($r.Rel) }
+        $realLinked = @($realDist | Where-Object { -not $T::MustCopy($_.Rel, $realDeployed) })
+        Yes ("and MustCopy links all {0} of them" -f $realDist.Count) ($realLinked.Count -eq $realDist.Count)
+        $realOther = @($rows | Where-Object {
+            $_.Rel -like 'Data\Platform\*' -and $_.Rel -notlike 'Data\Platform\Distribution\*'
+        } | Select-Object -First 20)
+        if ($realOther.Count -gt 0) {
+            $realOtherCopy = @($realOther | Where-Object { $T::MustCopy($_.Rel, $realDeployed) })
+            Yes ("and other Data\Platform rows on this machine stay copied ({0} of {1})" -f $realOtherCopy.Count, $realOther.Count) (
+                $realOtherCopy.Count -eq $realOther.Count)
+        }
+    }
+} else {
+    Write-Host "SKIP  no files.txt at $FilesList (synthetic 68 still checked)"
+}
+
+Done
