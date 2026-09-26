@@ -432,8 +432,14 @@ namespace Thornswood
         ///    starts with an underscore, such as _Parked or _disabledByKzl) are
         ///    left out, and taken out of a folder that already has them. See
         ///    Generated and Parked.
+        /// 6: Vortex's Data\Platform\Distribution redistributables (the 68 CEF
+        ///    and Node files the collection carries, not the two recorded in
+        ///    records\client-build.json) are hard linked, even though they are
+        ///    .dll/.exe. A folder that still holds its own copy of each gets
+        ///    the link instead, giving the disk the second copy back. See
+        ///    MustCopy.
         /// </summary>
-        const int Rules = 5;
+        const int Rules = 6;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -505,7 +511,7 @@ namespace Thornswood
             {
                 if (Skip(f.Rel) != null) continue;
                 totalBytes += f.Size;
-                if (MustCopy(f.Rel)) copyBytes += f.Size;
+                if (MustCopy(f.Rel, deployed)) copyBytes += f.Size;
             }
             long free = FreeSpace(Paths.Root);
             if (free >= 0 && free < copyBytes + 512L * 1024 * 1024)
@@ -520,7 +526,7 @@ namespace Thornswood
                 string skip = Skip(f.Rel);
                 if (skip != null) { left.Add(f.Rel + "  (" + skip + ")"); continue; }
 
-                bool copy = MustCopy(f.Rel);
+                bool copy = MustCopy(f.Rel, deployed);
                 bool asLink;
                 try
                 {
@@ -574,7 +580,7 @@ namespace Thornswood
 
             var lines = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            int added = 0, changed = 0, removed = 0, kept = 0, separated = 0;
+            int added = 0, changed = 0, removed = 0, kept = 0, separated = 0, relinked = 0;
             long copyBytes = 0;
 
             foreach (Found f in all)
@@ -596,12 +602,22 @@ namespace Thornswood
                     char kind = had ? r.Kind : 'C';
                     // Rules 5: a generated file this folder still shares with
                     // the Steam copy gets a copy of its own, as it is now.
+                    // Rules 6: a Distribution redistributable this folder still
+                    // holds as its own copy becomes a hard link to Vortex's.
                     try
                     {
-                        if (MustCopy(f.Rel) && Links(dest) > 1)
+                        if (MustCopy(f.Rel, deployed) && Links(dest) > 1)
                         {
                             Separate(dest);
                             if (Links(dest) <= 1) { kind = 'C'; separated++; }
+                        }
+                        else if (!MustCopy(f.Rel, deployed) && origin == 'V' && Links(dest) <= 1)
+                        {
+                            bool nowLink;
+                            DropName(dest);
+                            Place(f.From, dest, false, out nowLink);
+                            if (nowLink) { kind = 'L'; relinked++; }
+                            else kind = 'C';
                         }
                     }
                     catch { /* unreadable right now: left as it was */ }
@@ -610,7 +626,7 @@ namespace Thornswood
                     continue;
                 }
 
-                bool copy = MustCopy(f.Rel);
+                bool copy = MustCopy(f.Rel, deployed);
                 bool asLink;
                 try
                 {
@@ -654,7 +670,9 @@ namespace Thornswood
             WriteMade(src);
             SettleSettings(false);
 
-            string own = separated > 0 ? " " + separated.ToString("n0") + " animation file(s) it shared with the Steam copy are its own copies now." : "";
+            string own = "";
+            if (separated > 0) own += " " + separated.ToString("n0") + " animation file(s) it shared with the Steam copy are its own copies now.";
+            if (relinked > 0) own += " " + relinked.ToString("n0") + " Distribution redistributable(s) it held as its own copies are hard links now.";
             if (added + changed + removed == 0)
                 return "Thornswood's own Skyrim folder already matches what Vortex has deployed." + own;
             return "Thornswood's own Skyrim folder is up to date with Vortex: " + added.ToString("n0") + " new, " +
@@ -1109,10 +1127,26 @@ namespace Thornswood
         /// client and browser folders, the script extender's folder and MCM's
         /// settings, any settings, script or program file wherever it is, the
         /// game's master files. Those are what gets rewritten in place.
+        ///
+        /// Exception under Data\Platform\Distribution: a file Vortex deployed
+        /// that is not one of the six recorded in records\client-build.json
+        /// (ClientFile) is hard linked, even when it is a .dll or .exe. Those
+        /// are the 68 CEF and Node redistributables the collection carries;
+        /// nothing rewrites them in place. The two recorded Distribution
+        /// files (SkyrimPlatformImpl.dll and SkyrimPlatformCEF.exe.hidden)
+        /// stay copied. Everything else under Data\Platform keeps being
+        /// copied. Issue #392.
         /// </summary>
-        static bool MustCopy(string rel)
+        public static bool MustCopy(string rel, HashSet<string> deployed)
         {
             if (rel.IndexOf('\\') < 0) return true;
+            // Vortex redistributables under Distribution: link, even .dll/.exe.
+            // The two recorded client-build files stay copied (ClientFile).
+            if (rel.StartsWith("Data\\Platform\\Distribution\\", StringComparison.OrdinalIgnoreCase)
+                && deployed != null
+                && deployed.Contains(rel)
+                && !ClientFile(rel))
+                return false;
             foreach (string d in new string[] { "Data\\Platform\\", "Data\\SKSE\\", "Data\\MCM\\", "Data\\Video\\" })
                 if (rel.StartsWith(d, StringComparison.OrdinalIgnoreCase)) return true;
             foreach (string m in Masters)
