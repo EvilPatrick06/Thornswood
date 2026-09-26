@@ -165,10 +165,12 @@ namespace Thornswood
                     "and asks you to sign in to them. Fix moves it aside into Thornswood's " +
                     "Isolated folder and nothing is deleted, so that server still works.", true));
 
-            // The collection installs MCM Helper's plugin without its light flag,
-            // which gives it a load order index the server does not have and
-            // shifts everything after it by one. See Checks.MustBeLight.
-            foreach (string p in Checks.NotLight())
+            // A plugin the server counts as light but this machine's copy does
+            // not, which gives it a load order index the server does not have and
+            // shifts everything after it by one. The set is derived from the
+            // server's manifest against the collection reference, so a new one is
+            // caught without editing Checks. See Verify.MustBeLight.
+            foreach (string p in Checks.NotLight(MustBeLight(cfg)))
                 issues.Add(new Issue(
                     p + " is not flagged light, so from there on your load order counts " +
                     "one place differently from the server's. Fix flags it; nothing else changes.", true));
@@ -416,6 +418,52 @@ namespace Thornswood
             foreach (ServerMod m in mods)
                 if (m != null && !string.IsNullOrEmpty(m.filename)) l.Add(m.filename);
             return l;
+        }
+
+        /// <summary>
+        /// The plugins that have to carry the ESL flag on this machine, worked
+        /// out from the server rather than kept by hand.
+        ///
+        /// The server's manifest names every plugin it counts, in order; the
+        /// shipped reference list (Paths.Golden) enables the whole collection,
+        /// its light plugins and all. A plugin the reference enables that the
+        /// manifest leaves out is one the server treats as light: it drops light
+        /// plugins, and anything mastering to one, because Game.GetModCount gives
+        /// them no index. So this machine has to leave it out of the count too,
+        /// or from that plugin on its load order sits one place off the server's
+        /// and the game shows LOAD ORDER ERROR. That is Djinn's position 52 on
+        /// 2026-09-24 exactly: his Immersive Armors copy was not light, so it
+        /// took an index the server does not have.
+        ///
+        /// Derived, so the next plugin that ships light on the server but not on
+        /// a tester's disk is caught without a name being added to Checks. The
+        /// hand list in Checks.MustBeLight is always folded in: it is the answer
+        /// when the server cannot be asked (no manifest to derive from), and belt
+        /// and braces for the two names found by hand. Bethesda's masters and the
+        /// Creation Club files are left out the way Bytes leaves them out, and an
+        /// .esl takes no place in the order to begin with, so neither is flagged.
+        /// </summary>
+        public static List<string> MustBeLight(Config cfg)
+        {
+            var names = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string n in Checks.MustBeLight)
+                if (!string.IsNullOrEmpty(n) && seen.Add(n)) names.Add(n);
+
+            ServerMod[] mods = null;
+            try { mods = Manifest(cfg); }
+            catch (Exception ex) { Swallow.Note("Verify.MustBeLight, asking the server for its manifest", ex); }
+            if (mods != null)
+            {
+                var counted = new HashSet<string>(Names(mods), StringComparer.OrdinalIgnoreCase);
+                foreach (string p in Enabled(Path.Combine(Paths.Golden, "plugins.txt")))
+                {
+                    if (p.EndsWith(".esl", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (counted.Contains(p) || Storefront.Contains(p)) continue;
+                    if (seen.Add(p)) names.Add(p);
+                }
+            }
+            return names;
         }
 
         // ------------------------------------------------------------ order
@@ -737,7 +785,7 @@ namespace Thornswood
             // from that anything gets. It is moved aside, never deleted,
             // because somebody who plays here may also play there.
             n += Checks.IsolateForeign(null);
-            n += Checks.FlagLight(null);
+            n += Checks.FlagLight(MustBeLight(cfg), null);
 
             // Creation Club plugins the game would load because Skyrim.ccc
             // names them. Moved aside the same way, and said, because these are
