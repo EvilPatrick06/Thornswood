@@ -62,6 +62,14 @@ $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# The bot sources live at the repo root, in bot\. This script sits two levels
+# down, in scripts\deploy, since #440 sorted the scripts into scripts\<area> on
+# 25 September, so the repo root is two up from here. The copy loop below kept
+# the old one-level ..\bot from before the move, which pointed at scripts\bot
+# and found nothing on a -CodeOnly deploy. Anchoring the repo root once and
+# joining bot\ to it keeps every bot path right whatever this folder's depth is,
+# and test-script-paths.ps1 follows a $Repo path from the root the same way.
+$Repo = Split-Path -Parent (Split-Path -Parent $Here)
 $rootWin = $Root.Replace('/','\')
 $docsWin = $DocsRoot.Replace('/','\')
 
@@ -181,7 +189,7 @@ $null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\a
 #
 # requirements.txt too, because the full run installs the libraries from it.
 foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
-  $src = Join-Path $Here "..\bot\$f"
+  $src = Join-Path $Repo "bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   & scp @ssh $src "${User}@${Vps}:$Root/$f" | Out-Null
   Say "  $f" 'Green'
@@ -199,14 +207,14 @@ Say '  roll-log.ps1' 'Green'
 # only when exactly one channel carries that name, so a missing file leaves a
 # working bot rather than a silent one. Put an id in it the moment two
 # channels ever share that name, which has already happened here with news.
-$staff = Join-Path $Here '..\..\bot\staff-channel.txt'
+$staff = Join-Path $Repo 'bot\staff-channel.txt'
 if (Test-Path $staff) {
   & scp @ssh $staff "${User}@${Vps}:$Root/staff-channel.txt" | Out-Null
   Say '  staff-channel.txt' 'Green'
 } else {
   Say '  no staff-channel.txt, so the bot resolves staff-general by name' 'DarkGray'
 }
-$art = Join-Path $Here '..\..\bot\assets\join-card.png'
+$art = Join-Path $Repo 'bot\assets\join-card.png'
 if (Test-Path $art) {
   & scp @ssh $art "${User}@${Vps}:$Root/assets/join-card.png" | Out-Null
   Say '  assets\join-card.png' 'Green'
