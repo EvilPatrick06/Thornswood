@@ -186,6 +186,8 @@ namespace Thornswood
         }
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern bool GetFileInformationByHandle(SafeFileHandle h, out Info info);
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        static extern bool CreateHardLink(string newName, string existing, IntPtr security);
 
         static string Id(string path)
         {
@@ -431,6 +433,7 @@ namespace Thornswood
                     Preference();
                     StagingInside();
                     Ordinary();
+                    SoloLeftovers();
                     Picker();
                     NothingDeployed();
                     NoSteamCopy();
@@ -772,6 +775,81 @@ namespace Thornswood
             string again = null;
             try { again = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
             Yes("and a refresh with nothing new changes nothing", again != null && again.IndexOf("already matches", StringComparison.Ordinal) >= 0);
+        }
+
+        // ---- 8: a Solo setup in the same Steam copy ----------------------------
+        //
+        // 26 September, Djinn's machine: Nemesis run for a Solo profile rewrote
+        // the Steam copy's behavior files in place and both Thornswood folders,
+        // which linked them, played the Solo animations from that moment; a
+        // refresh then brought in _Parked, _Solo Mods and _Profile Switch, and
+        // the next dev Ship tried to send them all to every tester.
+        static void SoloLeftovers()
+        {
+            Scene s = NewScene("solo", true);
+            string steam = SteamCopy(s, s.Steam, "STEAM");
+            Staging(s);
+            Put(Path.Combine(steam, "Data\\TsOne.esp"), "DEPLOYED-TSONE");
+            Put(Path.Combine(steam, "Data\\TsTwo.esm"), "DEPLOYED-TSTWO");
+            string beh = "Data\\Meshes\\actors\\character\\behaviors\\1hm_behavior.hkx";
+            string male = "Data\\Meshes\\actors\\character\\characters\\defaultmale.hkx";
+            string fnis = "Data\\Scripts\\FNIS.pex";
+            string anim = "Data\\Meshes\\actors\\character\\animations\\walk.hkx";
+            Put(Path.Combine(steam, beh), "TS-BEHAVIOR");
+            Put(Path.Combine(steam, male), "TS-MALE");
+            Put(Path.Combine(steam, fnis), "TS-FNIS");
+            Put(Path.Combine(steam, anim), "ANIMATION");
+            Put(Path.Combine(steam, "_Parked\\Multiplayer\\Platform\\voice-token.txt"), "PARKED-TOKEN");
+            Put(Path.Combine(steam, "_Profile Switch\\Switch.ps1"), "SWITCH");
+            Put(Path.Combine(steam, "Data\\_disabledByKzl\\ccParked.esm"), "PARKED-CC");
+            Put(Path.Combine(steam, "Data\\_ResourcePack.esl"), "GAME-RESOURCEPACK");
+            Record(Path.Combine(steam, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(steam, "Data"),
+                   new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" } }, DateTime.UtcNow);
+            Paths.Game = steam;
+            string made = null;
+            try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
+            string game = OwnGame.Folder;
+            bool parked = false;
+            foreach (string r in Rels(game)) if (r.StartsWith("_") || r.StartsWith("Data\\_d", StringComparison.OrdinalIgnoreCase)) parked = true;
+            Yes("Solo leftovers: folders parked in the Steam copy stay out of Thornswood's folder", made != null && !parked);
+            Yes("but a game file whose name starts with an underscore comes in", Text(Path.Combine(game, "Data\\_ResourcePack.esl")) == "GAME-RESOURCEPACK");
+            Yes("the behavior file, the character default and FNIS.pex are copies of their own",
+                made != null && Id(Path.Combine(game, beh)) != Id(Path.Combine(steam, beh)) &&
+                Id(Path.Combine(game, male)) != Id(Path.Combine(steam, male)) && Id(Path.Combine(game, fnis)) != Id(Path.Combine(steam, fnis)));
+            Yes("an ordinary animation is still linked, so the collection is not on the disk twice",
+                made != null && Id(Path.Combine(game, anim)) == Id(Path.Combine(steam, anim)));
+            // Nemesis for another profile, written into the Steam copy in place.
+            using (var fs = new FileStream(Path.Combine(steam, beh), FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
+            {
+                byte[] b = Encoding.ASCII.GetBytes("SOLO-BEHAVIOR");
+                fs.SetLength(0); fs.Write(b, 0, b.Length);
+            }
+            Yes("Nemesis rewriting the Steam copy's behavior file does not reach Thornswood", Text(Path.Combine(game, beh)) == "TS-BEHAVIOR");
+
+            // A folder made under rules 4: the behavior file linked, a parked folder brought in.
+            string dest = Path.Combine(game, beh);
+            File.Delete(dest);
+            Yes("(an older folder is set up with the behavior file linked)", CreateHardLink(dest, Path.Combine(steam, beh), IntPtr.Zero));
+            string oldPark = Path.Combine(game, "_Parked\\Multiplayer\\Platform\\voice-token.txt");
+            Put(oldPark, "PARKED-TOKEN");
+            string files = Path.Combine(OwnGame.Dir, "files.txt");
+            var lines = new List<string>(File.ReadAllLines(files));
+            for (int i = 0; i < lines.Count; i++)
+                if (lines[i].EndsWith("|" + beh, StringComparison.OrdinalIgnoreCase)) lines[i] = "L" + lines[i].Substring(1);
+            lines.Add("C|O|12|0|_Parked\\Multiplayer\\Platform\\voice-token.txt");
+            File.WriteAllLines(files, lines.ToArray());
+            string madeFile = Path.Combine(OwnGame.Dir, "made.txt");
+            var made4 = new List<string>();
+            foreach (string l in File.ReadAllLines(madeFile)) made4.Add(l.StartsWith("rules=") ? "rules=4" : l);
+            File.WriteAllLines(madeFile, made4.ToArray());
+            Paths.Collection = false;
+            Paths.Game = game;
+            Yes("a folder made under the old rules asks to refresh", OwnGame.NeedsRefresh(s.Cfg));
+            string again = null;
+            try { again = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
+            Yes("and the refresh gives it its own copy of the linked behavior file",
+                again != null && Id(dest) != Id(Path.Combine(steam, beh)));
+            Yes("and takes the parked folder out", again != null && !File.Exists(oldPark));
         }
 
         // ---- 4: the picker -----------------------------------------------------
