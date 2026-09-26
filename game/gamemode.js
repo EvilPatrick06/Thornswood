@@ -3823,9 +3823,6 @@ const FACE_CAP_MS = 1800000;
 
 const firstSeen = new Map();
 
-// Bards already handed the ability to play, this run of the server.
-const armed = new Set();   // actorId -> when it first appeared online
-
 /* Skyrim Unbound's own character generation room, which is where a new game
  * already puts everybody, and the marker it stands them on. Falling back to the
  * configured start point is deliberate: if Unbound is ever removed from the load
@@ -4649,21 +4646,11 @@ function chargenTick() {
     }
 
     /*
-      A bard who finished creation before any of this existed.
-
-      The ability that turns holding an instrument into playing one was only
-      ever handed out at the moment a kit was confirmed. That is once, ever, and
-      only for somebody created after it was written. Every bard who finished
-      before it, and every bard whose session ended before the kit read back
-      complete, has been carrying three instruments and no way to use them.
-
-      AddSpell on a spell an actor already has does nothing, so this costs a
-      call per bard per session and nothing else.
+      Bard is RP-only now (see RP_ONLY), not a Class. The old instrument
+      ability that was handed out for that class key is gone: nobody gets
+      PlayInstrumentSpell for having been a bard. Playing for rest is /bard;
+      instruments themselves are woodwright craft and the emote wheel.
     */
-    if (state.class === 'bard' && !armed.has(actorId)) {
-      armed.add(actorId);
-      try { armBard(actorId); } catch (e) { }
-    }
 
     // 'arriving' was the kit top-up after the teleport. There are no kits, so
     // anybody still marked arriving from before 20 September is simply done.
@@ -4671,7 +4658,6 @@ function chargenTick() {
       state.stage = 'done';
       setChargen(actorId, state);
       closeRaceMenu(actorId);
-      if (state.class === 'bard') { try { armBard(actorId); } catch (e) { } }
       log('chargen', actorId.toString(16), 'was marked arriving from before the kits went; closed');
       continue;
     }
@@ -6111,25 +6097,11 @@ function spellOn(actorId, spellDesc, on) {
 }
 
 /*
- * The bard's instruments, and why they needed two fixes rather than one.
- *
- * The kit used to hand out Skyrim's own lute, drum and flute: 0xDABAB, 0xDABA7
- * and 0xDABA9. Those are MISC records. Vanilla has no way to hold one, so they
- * cannot be equipped and Use does nothing, which is exactly what a bard found
- * when they looked in their pack.
- *
- * PlayFluteLuteDrum.esp, which is already in the load order, does not override
- * those. It adds three WEAP records of its own, FluteWeapon, LuteWeapon and
- * DrumWeapon, and those are the ones you can actually hold. The kit now hands
- * out those instead.
- *
- * It also ships PlayInstrumentSpell, the ability that turns holding one into
- * playing one, and that ability is handed out by a start-game-enabled quest.
- * A quest is exactly the kind of thing not to rely on here: the character is a
- * change form the server hands back rather than a game somebody started, so
- * whether that quest ever ran for them is not something this can know. Adding
- * it directly costs nothing when it is already there, because AddSpell on a
- * spell an actor already has does nothing at all.
+ * Instruments (PlayFluteLuteDrum.esp) used to be handed out as a Class
+ * privilege for the old bard trade. That trade is RP-only now: chargen no
+ * longer calls armBard for it. The WEAP records and PlayInstrumentSpell stay
+ * in the load order for anyone who has an instrument (Woodwright craft, the
+ * emote wheel Revelry). The helper remains so a stray call cannot throw.
  */
 const INSTRUMENT_SPELL = '9456:PlayFluteLuteDrum.esp';
 
@@ -13821,13 +13793,13 @@ log('gamemode loaded:',
   book below. The numbers none of that had, because the rulebook does not set
   them, are together in TUNING.
 
-  ON THE FLAT SIXTEEN. The old CHARGEN table has sixteen trades with a kit
-  each, and five of them, bard, merchant, priest, scholar and thief, have no
-  home in the rulebook. Characters exist carrying them. Nothing here deletes
-  that: the old class key stays on the actor untouched, and in THIS system
-  such a character simply has nothing chosen yet and is asked, the same as a
-  new one. What those five become is a decision for the list, entry 6, and
-  this block does not make it.
+  ON THE FLAT SIXTEEN. The old CHARGEN table had sixteen trades with a kit
+  each. Five of them, bard, merchant, priest, scholar and thief, have no
+  home in the rulebook as Class or Profession. Patrick decided on 26
+  September 2026: they are RP-only. You may roleplay as one; you do not pick
+  them as a class or a profession, and they grant no class or profession
+  privileges. RP_ONLY names them so migrate and the harnesses can tell a
+  retired trade from an unknown one. Gatherer and Tailor stay.
 */
 (function () {
   'use strict';
@@ -13842,6 +13814,20 @@ log('gamemode loaded:',
     gatherer: { name: 'Gatherer', only: 'harvest flora and materials out of the world' },
     miner:    { name: 'Miner',    only: 'mine ore veins' },
     farmer:   { name: 'Farmer',   only: 'plant and harvest crops' }
+  };
+
+  /*
+    Old chargen trades that are not Class or Profession. Roleplay only:
+    no pick, no verb, no craft half, no instrument privilege. migrate()
+    clears them off a character so they re-pick from CLASSES / PROFESSIONS.
+    Do not add them back to either table.
+  */
+  var RP_ONLY = {
+    bard:     { name: 'Bard' },
+    merchant: { name: 'Merchant' },
+    priest:   { name: 'Priest' },
+    scholar:  { name: 'Scholar' },
+    thief:    { name: 'Thief' }
   };
 
   var SCHOOLS = ['destruction', 'restoration', 'alteration', 'conjuration', 'illusion'];
@@ -14482,7 +14468,7 @@ log('gamemode loaded:',
 
   var TABLE = { ranks: RANKS, classes: CLASSES, schools: SCHOOLS,
                 professions: PROFESSIONS, tree: TREE, limits: LIMITS,
-                spells: SPELLS, tuning: TUNING };
+                spells: SPELLS, tuning: TUNING, rpOnly: RP_ONLY };
 
   // ------------------------------------------------------------ the state --
   /*
@@ -19446,11 +19432,11 @@ log('gamemode loaded:',
   launcher's own names: tank, brawler, harm, mend, dinner, dessert, armour,
   weapons, weapon, apparel, robes, common. The rulebook's names are the ones
   on the public page and the ones the rules use, so the launcher's are mapped
-  on first sight and never written back. Five old trades have no home in the
-  rulebook, bard, merchant, priest, scholar, thief: a character carrying one
-  keeps it on the old property untouched and starts this system with no
-  profession, the same as somebody new. That is entry 6's decision to make
-  and this block does not make it.
+  on first sight and never written back. Five old trades are RP-only (see
+  RP_ONLY in the progression block): bard, merchant, priest, scholar, thief.
+  A character carrying one does not keep Class or Profession privileges;
+  migrate clears the old class key and starts them with nothing chosen, so
+  they pick again from the real tables. Gatherer and Tailor stay.
 */
 (function () {
   'use strict';
@@ -20179,6 +20165,14 @@ log('gamemode loaded:',
         } else {
           clog('migrate', actorId.toString(16), 'old trade', trade, 'had no half recorded, so it will be asked for');
         }
+      } else if (trade && P.has(P.TABLE.rpOnly, trade)) {
+        /*
+          RP-only: not a Class, not a Profession. Clear the old key so no
+          leftover privilege (bard instruments, etc.) reads it, and leave
+          the progression state empty so they re-pick like somebody new.
+        */
+        clog('migrate', actorId.toString(16), 'old trade', trade, 'is RP-only; cleared, they must pick a class and profession');
+        try { old['class'] = ''; mp.set(actorId, 'thornswoodChargen', old); } catch (eClear) { }
       } else if (trade) {
         clog('migrate', actorId.toString(16), 'old trade', trade, 'has no home in the rulebook; left on the old property, nothing chosen here');
       }

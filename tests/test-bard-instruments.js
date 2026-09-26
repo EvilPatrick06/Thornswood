@@ -208,6 +208,24 @@ if (!fs.existsSync(espPath)) {
   });
 }
 
+
+// ------------------------------------- bard is RP-only, not a class privilege
+/*
+  Issue #391: bard is roleplay only. Chargen must not hand PlayInstrumentSpell
+  for state.class === bard any more.
+*/
+{
+  const gm = read(GM);
+  const code = gm
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ');
+  yes('chargen no longer arms instruments for the old bard class key',
+      !/if\s*\(\s*state\.class\s*===\s*['"]bard['"]/.test(code));
+  yes('armBard is not called from an arriving-stage bard privilege',
+      !/state\.class\s*===\s*['"]bard['"][\s\S]{0,80}armBard/.test(code));
+  yes('RP_ONLY lists bard', /var RP_ONLY = \{[\s\S]*?\bbard:\s*\{/.test(gm));
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
