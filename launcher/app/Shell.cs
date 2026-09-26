@@ -2091,6 +2091,26 @@ namespace Thornswood
                                      "\n\nRead from " + Verify.LiveFile;
                 btnFix.IsEnabled = false;
             }
+            else if (CollectionNotDeployed(issues, elsewhere))
+            {
+                // Vortex has not deployed the collection into the folder the
+                // launcher reads, so most of the plugins the server expects are
+                // simply not there. One line per missing plugin is a screenful
+                // of noise with the one fact that matters left out, so say that
+                // fact once and point at Vortex and the collection. The gate is
+                // untouched: Play still counts the blocking issues and refuses
+                // (Shell Play, Verify.Run). Fix cannot install a mod, so it is
+                // greyed, the same as any other run of missing files.
+                dotVerify.Fill = Res("Bad");
+                txtVerifyTitle.Text = "The collection is not deployed";
+                string dataFolder = Path.Combine(Paths.Game, "Data");
+                txtVerifyNote.Text =
+                    "Thornswood's mods are not in " + dataFolder + ", so almost none of the " +
+                    "collection the server expects is installed where the launcher looks. Open " +
+                    "Vortex and press Deploy, and install the collection first if you have not. " +
+                    "The collection card above opens it. Then press Scan again.";
+                btnFix.IsEnabled = false;
+            }
             else
             {
                 dotVerify.Fill = Res(blocking > 0 ? "Bad" : "Warn");
@@ -2191,6 +2211,27 @@ namespace Thornswood
                 if (named.Count > shown)
                     Log("  and " + (named.Count - shown) + " more, not written out to keep the log readable.");
             }
+        }
+
+        /// <summary>
+        /// True when Vortex has not deployed the collection into the folder the
+        /// launcher reads: most of the plugins the server expects are simply not
+        /// in Data, so the card should say that once rather than list every one.
+        /// Not when Vortex deploys somewhere else (that has its own line and Fix
+        /// helps), and only past a floor so a couple of missing files is still
+        /// read plugin by plugin. This decides only what the card shows; the Play
+        /// gate is unchanged and still counts the blocking issues.
+        /// </summary>
+        static bool CollectionNotDeployed(List<Issue> issues, bool elsewhere)
+        {
+            if (elsewhere) return false;
+            if (Verify.Expected <= 0) return false;
+            int missing = 0;
+            foreach (Issue i in issues) if (i.FileMissing) missing++;
+            // A handful of missing files is a mod or two, not the whole
+            // collection. Half of what the server expects, and at least ten,
+            // is the collection not being there at all.
+            return missing >= 10 && missing * 2 >= Verify.Expected;
         }
 
         static void BuildModList()
