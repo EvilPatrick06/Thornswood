@@ -159,6 +159,24 @@ do for a living, and a Hunter cannot pull a flower out of the ground. If you
 want leather you know a hunter, and if you do not know one yet, that is the
 game telling you to go and meet people.
 
+## Roleplay only (not Class or Profession)
+
+Five names from the old flat list of trades are **not** a Class and **not** a
+Profession. You may roleplay as any of them. You do not pick them on K, and
+they grant no exclusive verb, craft half, or other class or profession
+privilege.
+
+| Name | What that means |
+|---|---|
+| **Bard** | Play and perform; rest music is `/bard`, not a class ability |
+| **Merchant** | Trade and keep shop in character |
+| **Priest** | Faith and rites in character |
+| **Scholar** | Study and lore in character |
+| **Thief** | Larceny and stealth in character |
+
+Characters who still carry one of those old keys are asked to pick a real
+Class and Profession. **Gatherer** and **Tailor** remain in the tables above.
+
 ## The tools
 
 Three picks need a tool in your pack before the work happens: two of the classes
