@@ -339,6 +339,15 @@ namespace Thornswood
         /// 52. A copy without the flag gets an index of its own and pushes every
         /// plugin after it one place along. Fix only reorders the list, so it
         /// could never clear it; flagging it is what this list is for.
+        ///
+        /// This is now the HAND FALLBACK, not the whole answer. Verify.MustBeLight
+        /// derives the real set from the server: any plugin the collection
+        /// reference (Paths.Golden) enables that the server leaves out of its
+        /// manifest is one the server counts as light, so this machine must too.
+        /// That catches the next plugin that ships light on the server but not on
+        /// a tester's disk without a name being added here. This list is folded
+        /// into that set, so the two cases below are still caught when the server
+        /// cannot be asked and there is no manifest to derive from.
         /// </summary>
         public static readonly string[] MustBeLight = {
             "MCMHelper.esp",
@@ -365,13 +374,26 @@ namespace Thornswood
             catch { return true; }
         }
 
-        /// <summary>The plugins in MustBeLight that are present and not yet light.</summary>
-        public static List<string> NotLight()
+        /// <summary>The plugins in the hand list that are present and not yet light.</summary>
+        public static List<string> NotLight() { return NotLight(MustBeLight); }
+
+        /// <summary>
+        /// The plugins in <paramref name="mustBeLight"/> that are in Data and do
+        /// not yet carry the ESL flag. The set is the server's to decide:
+        /// Verify.MustBeLight works it out from the plugins the collection
+        /// reference enables that the server leaves out of its manifest, folding
+        /// the hand list above in for when the server cannot be asked. A file
+        /// that cannot be read, or is not there, is left alone.
+        /// </summary>
+        public static List<string> NotLight(IEnumerable<string> mustBeLight)
         {
             var l = new List<string>();
+            if (mustBeLight == null) return l;
             string data = Path.Combine(Paths.Game, "Data");
-            foreach (string n in MustBeLight)
+            foreach (string n in mustBeLight)
             {
+                if (string.IsNullOrEmpty(n)) continue;
+                if (l.Contains(n)) continue;
                 string p = Path.Combine(data, n);
                 try { if (File.Exists(p) && !IsLight(p)) l.Add(n); } catch { }
             }
@@ -379,15 +401,23 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Sets the ESL flag on each plugin in MustBeLight that lacks it. One
-        /// byte, in place, so a Vortex hard link stays a hard link and the
-        /// staging copy is corrected with it. Returns how many were changed.
+        /// Sets the ESL flag on each plugin in the hand list that lacks it. The
+        /// server-derived overload below is what Fix calls; this stays for a
+        /// caller with no Config to hand and for the fallback list.
         /// </summary>
-        public static int FlagLight(Action<string> say)
+        public static int FlagLight(Action<string> say) { return FlagLight(MustBeLight, say); }
+
+        /// <summary>
+        /// Sets the ESL flag on each plugin in <paramref name="mustBeLight"/>
+        /// that lacks it. One byte, in place, so a Vortex hard link stays a hard
+        /// link and the staging copy is corrected with it. Returns how many were
+        /// changed.
+        /// </summary>
+        public static int FlagLight(IEnumerable<string> mustBeLight, Action<string> say)
         {
             int n = 0;
             string data = Path.Combine(Paths.Game, "Data");
-            foreach (string name in NotLight())
+            foreach (string name in NotLight(mustBeLight))
             {
                 string p = Path.Combine(data, name);
                 try
