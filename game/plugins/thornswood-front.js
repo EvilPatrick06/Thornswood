@@ -2275,7 +2275,25 @@
     Both answers are cheap and both are wrapped, because a build without one
     of these natives must not take the watchdog down with it.
   */
-  function notOurs() {
+
+  /* Same reason as the menu cache above: nine native calls a frame for an
+     answer that only matters once it has held for five seconds. Death and
+     furniture get the same rate: a five-second watchdog does not need them
+     thirty times a frame.
+
+     MEASURED 26 September after MENU_CACHE_MS and CONTROLS_CACHE_MS were
+     already 250: controls was still #1 in 11/13 heartbeats (366-736 ms per
+     ~30 s). The residual was this handler still calling getPlayer and
+     notOurs (getPlayer again, isDead, getFurnitureReference) on every
+     update. The whole tick now shares that quarter-second rate. */
+  const CONTROLS_CACHE_MS = 250;
+  let controlsCachedAt = 0;
+  let controlsCached = [];
+  let notOursCachedAt = 0;
+  let notOursCached = '';
+  let controlsTickAt = 0;
+
+  function notOursNow() {
     let pc = null;
     try { pc = sp.Game.getPlayer(); } catch (e) { return ''; }
     if (!pc) { return ''; }
@@ -2287,11 +2305,13 @@
     return '';
   }
 
-  /* Same reason as the menu cache above: nine native calls a frame for an
-     answer that only matters once it has held for five seconds. */
-  const CONTROLS_CACHE_MS = 250;
-  let controlsCachedAt = 0;
-  let controlsCached = [];
+  function notOurs() {
+    const now = Date.now();
+    if (now - notOursCachedAt < CONTROLS_CACHE_MS) { return notOursCached; }
+    notOursCachedAt = now;
+    notOursCached = notOursNow();
+    return notOursCached;
+  }
 
   function readControlsNow() {
     const off = [];
@@ -2313,7 +2333,14 @@
     return controlsCached;
   }
 
-  sp.on('update', guard('controls', () => {
+  function controlsTick() {
+    const now = Date.now();
+    // Happy path and stuck countdown both: four times a second is enough
+    // for a five-second threshold, and keeps getPlayer / isDead /
+    // getFurnitureReference / isMenuOpen off the every-frame path.
+    if (now - controlsTickAt < CONTROLS_CACHE_MS) { return; }
+    controlsTickAt = now;
+
     let pc = null;
     try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
     if (!pc || busyMenuOpen()) { controlsOffNow = []; controlsSince = 0; return; }
@@ -2325,7 +2352,6 @@
     controlsOffNow = off;
     if (!off.length) { controlsSince = 0; return; }
 
-    const now = Date.now();
     if (!controlsSince) { controlsSince = now; return; }
     if (now - controlsSince < 5000) { return; }
     controlsSince = 0;
@@ -2342,7 +2368,9 @@
     } catch (e) {
       say('tried to turn controls back on and it threw: ' + e);
     }
-  }));
+  }
+
+  sp.on('update', guard('controls', controlsTick));
 
   /*
    * Keys arriving and the character not moving. The lock, finally stated as
