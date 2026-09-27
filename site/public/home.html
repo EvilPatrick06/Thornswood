@@ -1267,6 +1267,10 @@ if (AGE_PATHS[here] && !ageOk()) {
   fetch('/api/public').then(function (r) { return r.json(); }).then(function (d) {
     var files = d.files || [];
 
+    // VirusTotal refuses uploads over 650 MB. Declared inside this branch
+    // so the lift-test in test-download-hash.js can run it alone.
+    var VT_CAP = 650 * 1024 * 1024;
+
     // The stamp under the download button, read the way a clock is read.
     //
     // Publish-Installer writes it as a 24 hour time and it is shown to people,
@@ -1324,13 +1328,23 @@ if (AGE_PATHS[here] && !ageOk()) {
       // orphaning that a plain &nbsp; alone did not stop. The non-breaking space
       // then keeps the whole label riding on the same line as the hash's start,
       // the hash wraps within itself if the column is narrow (overflow-wrap only
-      // on the hash, never the label), and the third line, the report or the
-      // line saying there is not one yet, stands alone rather than trailing the
-      // hash's last row after a middot.
-      var report = vt(f)
-        ? '<a href="' + vt(f) + '" target="_blank" rel="noopener">VirusTotal report</a>'
-        : 'No VirusTotal report for this build yet. One shows here once the file ' +
-          'has been sent to VirusTotal, and a new file takes a few minutes to scan.';
+      // on the hash, never the label), and the third line (the report, the
+      // over-cap line, or the waiting line) stands alone rather than trailing
+      // the hash's last row after a middot.
+      // Three copy states under the button: a real report link, a clear over-cap
+      // line when the file cannot be sent to VirusTotal, or the waiting line
+      // when it still might be. Never invent a clean or detection verdict, and
+      // never echo a skip-reason string from files.json into the page.
+      var report;
+      if (vt(f)) {
+        report = '<a href="' + vt(f) + '" target="_blank" rel="noopener">VirusTotal report</a>';
+      } else if ((f.size || 0) > VT_CAP) {
+        report = 'This file is over VirusTotal\'s 650 MB upload cap, so there cannot ' +
+                 'be a report for it.';
+      } else {
+        report = 'No VirusTotal report for this build yet. One shows here once the file ' +
+                 'has been sent to VirusTotal, and a new file takes a few minutes to scan.';
+      }
       return '<br><span style="white-space:nowrap">SHA-256</span>&nbsp;' +
              '<span style="overflow-wrap:anywhere">' + h + '</span>' +
              '<br>' + report;
