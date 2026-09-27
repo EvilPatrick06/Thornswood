@@ -98,6 +98,16 @@ This page is in the repository with the rest of the site, so every change to it
 has a date and an author in the history. If something material changes it will
 be said in the Discord rather than quietly edited.
 
+## Cookies
+
+These cookies make the site and the age gate work. They are not advertising and they are not analytics.
+
+- **tw**. Signed member cookie after Discord sign-in. HttpOnly. Set by the site when you sign in; cleared when you sign out.
+- **twa**. Signed admin cookie for people who run the hub. HttpOnly. Same idea as tw, for staff only.
+- **tw-age-18**. Records that this browser confirmed eighteen or older on the age gate. Also kept in localStorage on the same browser. Not HttpOnly. Clearing it means the gate asks again.
+
+There is no advertising cookie and no analytics cookie on this site. A longer list of what is stored about play (Discord id, character, chat, launcher logs) is in the sections above.
+
 ## Asking about any of this
 
 The Discord, which is linked on every page. For a security problem rather than
