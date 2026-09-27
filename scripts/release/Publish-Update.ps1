@@ -8,6 +8,7 @@
   First time:   .\Publish-Update.ps1 -Baseline
   After that:   .\Publish-Update.ps1 -Notes "Swapped the map mod"
   Launcher:     .\Publish-Update.ps1 -Launcher -Notes "New launcher"
+  Host urls:    .\Publish-Update.ps1 -HostAssetUrls   # rewrite pack urls to thornswood.net (#649)
 #>
 [CmdletBinding()]
 param(
@@ -52,6 +53,12 @@ param(
     # the one written in app\Updater.cs. Ship uses it for dev builds, whose
     # number lives only in the exe.
     ,[string]$VersionOverride
+    # After uploading to GitHub, rewrite pack/launcher/clientRuntime urls in
+    # version.json to https://thornswood.net/feed/assets/<sha256> (or
+    # /feed-dev/assets/<sha256> on the dev channel) for the #649 host cutover.
+    # Uploads still go to Thornswood-Releases so rollback stays hot; Website
+    # must have mirrored the bytes at those paths. No secrets invented.
+    ,[switch]$HostAssetUrls
 )
 
 
@@ -1172,6 +1179,39 @@ if (-not $NoUpload -and $gh) {
         Die 'version.json has not been touched, so the feed still points at the last launcher that actually uploaded. Usually the token or a GitHub hiccup: run Ship again.'
     }
     if ($exeUrl)  { Say "  launcher asset ready" 'Green' }
+
+# ==== thornswood host asset urls ====
+# Optional rewrite for the #649 site feed. GitHub release assets remain uploaded
+# above; this only changes the urls written into version.json. Website mirrors
+# the bytes to /feed/assets/<sha256> (or /feed-dev/...). Feed-Rules.ps1 already
+# accepts those urls. Without -HostAssetUrls the feed keeps GitHub asset urls.
+if ($HostAssetUrls) {
+    function Rewrite-HostUrl([string]$sha, [string]$was) {
+        $u = Get-HostFeedAssetUrl $sha -Dev:$Dev
+        if (-not $u) { return $was }
+        return $u
+    }
+    foreach ($c in $chunks) {
+        if ($c.Url -and $c.Sha) {
+            $was = $c.Url
+            $c.Url = Rewrite-HostUrl $c.Sha $c.Url
+            if ($c.Url -ne $was) { Say ("  pack {0} url -> host feed asset" -f $c.Id) 'Green' }
+        }
+    }
+    if ($clientRel -and $clientRel.url -and $clientRel.sha256) {
+        $was = $clientRel.url
+        $clientRel.url = Rewrite-HostUrl $clientRel.sha256 $clientRel.url
+        if ($clientRel.url -ne $was) { Say '  client runtime url -> host feed asset' 'Green' }
+    }
+    if ($exeUrl -and (Test-Path $exePath)) {
+        $exeSha = (Get-FileHash $exePath -Algorithm SHA256).Hash.ToLower()
+        $was = $exeUrl
+        $exeUrl = Rewrite-HostUrl $exeSha $exeUrl
+        if ($exeUrl -ne $was) { Say '  launcher url -> host feed asset' 'Green' }
+    }
+    Say '  host asset urls on (Thornswood-Releases upload kept for rollback)' 'DarkGray'
+}
+# ==== end thornswood host asset urls ====
 } elseif (-not $NoUpload) {
     Say '  The GitHub CLI is not installed, so nothing was uploaded.' 'Yellow'
     Say '  winget install GitHub.cli   then   gh auth login' 'Yellow'
@@ -1318,7 +1358,7 @@ if (Test-Path $cfgPath) {
         # card in Discord and its two buttons. Facts about the project, not
         # choices, so they travel the same way.
         foreach ($pair in @(@('ServerAddress', 'serverAddress'), @('ServerPort', 'serverPort'),
-                            @('UpdateRepo', 'updateRepo'), @('VoicePort', 'voicePort'),
+                            @('UpdateRepo', 'updateRepo'), @('UpdateFeedUrl', 'updateFeedUrl'), @('VoicePort', 'voicePort'),
                             @('DiscordAppId', 'discordAppId'), @('SiteUrl', 'siteUrl'),
                             @('PresenceImage', 'presenceImage'))) {
             if ($cfg.PSObject.Properties.Name -contains $pair[0]) { Set-Prop $doc $pair[1] ([string]$cfg.($pair[0])) }
@@ -1344,6 +1384,14 @@ if (Test-Path $cfgPath) {
             }
             Set-Prop $doc 'voiceUrl' $vu
         }
+
+        # Site feed URL (#649). Same announce-a-rename pattern as updateRepo:
+        # ship the new URL under the old feed first. Default from channel when
+        # the shipping machine's config.json has not set UpdateFeedUrl yet.
+        $feedUrl = ''
+        if ($cfg.PSObject.Properties.Name -contains 'UpdateFeedUrl') { $feedUrl = [string]$cfg.UpdateFeedUrl }
+        if (-not $feedUrl) { $feedUrl = Get-HostFeedVersionUrl -Dev:$Dev }
+        Set-Prop $doc 'updateFeedUrl' $feedUrl
 
         # How many the room holds. A number, not a string, because the launcher
         # reads it as one and a quoted "25" comes back as zero, which reads as

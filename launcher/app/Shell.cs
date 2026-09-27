@@ -5081,6 +5081,12 @@ namespace Thornswood
             {
                 cfg.UpdateRepo = v.updateRepo; quiet = true;
             }
+            // Same announce-a-rename pattern as updateRepo (#649): a feed can
+            // ship the new site URL under the old one, then move.
+            if (!string.IsNullOrEmpty(v.updateFeedUrl) && v.updateFeedUrl != cfg.UpdateFeedUrl)
+            {
+                cfg.UpdateFeedUrl = v.updateFeedUrl; quiet = true;
+            }
             // The Discord presence card's application, the site its buttons
             // point at, and the picture on it.
             if (!string.IsNullOrEmpty(v.discordAppId) && v.discordAppId != cfg.DiscordAppId) { cfg.DiscordAppId = v.discordAppId; quiet = true; }
