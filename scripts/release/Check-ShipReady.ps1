@@ -202,6 +202,30 @@ if ($hasGame) {
   Say '  skip  no own game folder, so there is nothing to compare the plugins against' 'DarkGray'
 }
 
+# -------------------------------------------------------- required data --
+Head 'Required data'
+$reqSrc = Join-Path $Here '..\..\game\required-data'
+$reqFiles = @()
+if (Test-Path -LiteralPath $reqSrc) {
+  $reqFiles = @(Get-ChildItem -LiteralPath $reqSrc -File -EA SilentlyContinue | Where-Object { $_.Name -ne 'README.md' })
+}
+Ready 'game\required-data has plugins to place' ($reqFiles.Count -gt 0) ("$($reqFiles.Count) file(s)") `
+  'Nothing to do; the repo is missing its required-data plugins'
+if ($hasGame -and $reqFiles.Count -gt 0) {
+  $stale = @()
+  foreach ($f in $reqFiles) {
+    $dst = Join-Path $GameDir ('Data\' + $f.Name)
+    if (-not (Test-Path -LiteralPath $dst)) { $stale += ($f.Name + ' never arrived'); continue }
+    $a = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash
+    $b = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
+    if ($a -ne $b) { $stale += ($f.Name + ' in the game folder is not this source') }
+  }
+  Ready 'the game folder holds required-data' ($stale.Count -eq 0) $(if ($stale.Count) { $stale[0] } else { "$($reqFiles.Count) match" }) `
+    '.\scripts\release\Go.ps1 -SkipServer     copies game\required-data into Data\'
+} elseif (-not $hasGame) {
+  Say '  skip  no own game folder, so there is nothing to compare required-data against' 'DarkGray'
+}
+
 # -------------------------------------------------------- the client build --
 Head 'The client runtime'
 $rec = Join-Path $Here '..\..\records\client-build.json'
