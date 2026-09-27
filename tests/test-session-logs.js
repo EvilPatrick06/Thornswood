@@ -413,6 +413,55 @@ yes('and the line it points at is the exception',
 yes('the ordinary platform log of a clean session does not colour it',
     readTrouble({ 'launcher.log': 'started\nclosed\n', 'skyrim-platform.log': PLATFORM }) === null);
 
+// ---- the row the bot reads (issue #532) ------------------------------------
+/*
+  noteTrouble writes the row the bot turns into a Discord line. A late upload
+  must not read as a fresh failure: a 401 held Patrick's 23 September logs
+  until 14:09 the next day, and the alert fired ~14:10 as if the crash had just
+  happened. The fix rests on the session's OWN window surviving into the row,
+  apart from the arrival time, so the bot can name the start and call out a
+  late arrival. Without start and end the bot has only "at" and every backlog
+  looks new. noteTrouble is lifted whole, so a rename fails here.
+*/
+const TROUBLE_FILE = path.join(TMP, 'trouble.json');
+const TROUBLE_KEEP = 200;
+const jsonFile = (p, fb) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fb; } };
+const putJson = (p, o) => { try { fs.writeFileSync(p, JSON.stringify(o, null, 2), 'utf8'); return true; } catch (e) { return false; } };
+eval(grab('noteTrouble'));
+
+const started = new Date(2026, 8, 23, 20, 7, 0).getTime();
+const ended = new Date(2026, 8, 23, 21, 30, 0).getTime();
+noteTrouble(
+  { session: 'late1111late1111', who: '111', name: 'Patrick Thornwood',
+    channel: 'dev', profile: 3, version: '1.1.91.10', start: started, end: ended },
+  { why: 'a script hit a ReferenceError', file: 'thornswood-front.log',
+    line: 'ReferenceError: x is not defined', level: 'bad' });
+const troubled = () => jsonFile(TROUBLE_FILE, []);
+const late = troubled().find(r => r.session === 'late1111late1111');
+yes('the row the bot reads carries the session start', !!late && late.start === started);
+yes('and the session end', !!late && late.end === ended);
+yes('and the arrival time, which is when the logs actually landed', !!late && late.at > 0);
+yes('so the start and the arrival are separate numbers, the whole point of #532',
+    !!late && late.start !== late.at);
+
+// A session whose start was never seen writes 0, so the bot drops the phrase
+// rather than naming a wrong time.
+noteTrouble(
+  { session: 'nostart0nostart0', who: '111', channel: 'main', end: ended },
+  { why: 'the game crashed', file: 'crash.log', line: 'EXCEPTION', level: 'bad' });
+const noStart = troubled().find(r => r.session === 'nostart0nostart0');
+yes('a session with no start writes start 0 rather than guessing',
+    !!noStart && noStart.start === 0);
+
+// Write once per session id here too: a second note for the same session does
+// not overwrite the first, the way it must not on the box.
+noteTrouble(
+  { session: 'late1111late1111', who: '111', name: 'Someone Else',
+    start: started + 1, end: ended + 1 },
+  { why: 'a different thing', file: 'launcher.log', line: 'x', level: 'bad' });
+const again = troubled().filter(r => r.session === 'late1111late1111');
+yes('a second note for the same session is not added twice', again.length === 1);
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { }
