@@ -393,6 +393,8 @@ try {
     Yes '  having asked for that hash and sent nothing' (
         @($r.Seen).Count -eq 1 -and $r.Seen[0] -match ('^GET /api/v3/files/' + $smallSha + ' '))
     Yes '  with the key in the x-apikey header' (@($r.Seen).Count -ge 1 -and $r.Seen[0] -match ' key=ours ')
+    Yes '  and no comment on an already-has path' (
+        @($r.Seen | Where-Object { $_ -match '/comments' }).Count -eq 0)
     NoKey '  ' $r
 
     $r = Invoke-Against 'refused' $small
@@ -407,24 +409,30 @@ try {
     Yes '  saying it was sent, with the report address' (
         $r.Out -match '(?m)VirusTotal: sent ' -and
         $r.Out.Contains('https://www.virustotal.com/gui/file/' + $smallSha))
-    $post = @($r.Seen | Where-Object { $_ -match '^POST ' })
-    Yes '  to POST /files, once' (@($post).Count -eq 1 -and $post[0] -match '^POST /api/v3/files ')
-    Yes '  with the key in the x-apikey header' (@($post).Count -eq 1 -and $post[0] -match ' key=ours ')
+    $upload = @($r.Seen | Where-Object { $_ -match '^POST /api/v3/files ' })
+    Yes '  to POST /files, once' (@($upload).Count -eq 1)
+    Yes '  with the key in the x-apikey header' (@($upload).Count -eq 1 -and $upload[0] -match ' key=ours ')
     Yes '  and the file''s own bytes under its own name' (
-        @($post).Count -eq 1 -and $post[0] -match ' name=harness-small\.bin ' -and $post[0] -match ' bytes=ours$')
+        @($upload).Count -eq 1 -and $upload[0] -match ' name=harness-small\.bin ' -and $upload[0] -match ' bytes=ours$')
+    $comment = @($r.Seen | Where-Object { $_ -match ('^POST /api/v3/files/' + $smallSha + '/comments ') })
+    Yes '  and then comments on the report, once' (@($comment).Count -eq 1)
+    Yes '  with the key on the comment too' (@($comment).Count -eq 1 -and $comment[0] -match ' key=ours ')
+    Yes '  saying it commented' ($r.Out -match '(?m)VirusTotal: commented on ')
     NoKey '  ' $r
 
     # Over 32 MB, which every installer is, goes to the one-time address
     # VirusTotal hands out rather than to POST /files.
     $big = New-File 'harness-big.bin' (33MB)
+    $bigSha = Sha $big
     $r = Invoke-Against 'missing' $big
     Yes 'a file over 32 MB exits 0' ($r.Code -eq 0)
     Yes '  having asked for an upload address' (
         @($r.Seen | Where-Object { $_ -match '^GET /api/v3/files/upload_url ' }).Count -eq 1)
-    $post = @($r.Seen | Where-Object { $_ -match '^POST ' })
-    Yes '  and sent it there, not to POST /files' (
-        @($post).Count -eq 1 -and $post[0] -match '^POST /one-time-upload ')
+    $upload = @($r.Seen | Where-Object { $_ -match '^POST /one-time-upload ' })
+    Yes '  and sent it there, not to POST /files' (@($upload).Count -eq 1)
     Yes '  and said it was sent' ($r.Out -match '(?m)VirusTotal: sent ')
+    $comment = @($r.Seen | Where-Object { $_ -match ('^POST /api/v3/files/' + $bigSha + '/comments ') })
+    Yes '  and then comments on the report' (@($comment).Count -eq 1)
     NoKey '  ' $r
 
     # Over what VirusTotal takes at all. Its cap, not ours, and the one-file
@@ -661,6 +669,16 @@ if (`$mark.ContainsKey('vtUrl')) {
 
 
     # ============================================ Publish-Installer calls it
+
+    # Publish-VirusTotal leaves a comment after a successful upload only.
+    Yes 'Publish-VirusTotal.ps1 calls Add-VirusTotalComment.ps1 after a send' (
+        $text -match "(?s)Write-Outcome -Status 'sent'.{0,800}Add-VirusTotalComment\.ps1")
+    Yes '  with the same -Path and measured sha' (
+        $text -match [regex]::Escape('-Path $file.FullName -Sha256 $sha'))
+    Yes '  fail-soft in try/catch so a comment failure still exits 0' (
+        $text -match "(?s)try \{.{0,200}Add-VirusTotalComment\.ps1.{0,200}catch")
+    Yes '  and the already-has path does not call it' (
+        -not [regex]::IsMatch($text, "(?s)already has this build.{0,400}Add-VirusTotalComment"))
 
     Yes 'Publish-Installer.ps1 is there' (Test-Path -LiteralPath $Installer)
     $pub = [IO.File]::ReadAllText($Installer, (New-Object Text.UTF8Encoding($false)))
