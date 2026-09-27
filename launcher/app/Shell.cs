@@ -2982,8 +2982,22 @@ namespace Thornswood
         // ------------------------------------------------------------- settings
         // Nine of them now, so they wrap instead of running off the side, and
         // each one says what it is rather than making you click to find out.
+        // DIY is a card in the same strip as the presets; its editor panel
+        // shows only while that card is selected (#601 follow-up).
+        static bool diyPanelOpen;
+        static bool diyPanelStateReady;
+
+        static void SyncDiyPanelOpenFromConfig()
+        {
+            if (diyPanelStateReady) return;
+            diyPanelStateReady = true;
+            diyPanelOpen = string.Equals(cfg.Theme, Themes.CustomName, StringComparison.OrdinalIgnoreCase)
+                && Themes.HasCustom(cfg.CustomColors);
+        }
+
         static void BuildThemeRow()
         {
+            SyncDiyPanelOpenFromConfig();
             themeRow.Children.Clear();
 
             var wrap = new WrapPanel();
@@ -2992,21 +3006,26 @@ namespace Thornswood
             foreach (Theme t in Themes.All)
                 AddThemeButton(wrap, t);
 
-            // The theme the person built themselves sits after the built-ins,
-            // once there is one to sit there. Picking it puts their colours
-            // back without retyping them; the editor below is only for making
-            // or changing them.
-            if (Themes.HasCustom(cfg.CustomColors))
-                AddThemeButton(wrap, Themes.Custom(cfg.CustomColors, cfg.CustomLight));
+            // DIY sits after the built-ins in the same strip. Clicking it shows
+            // the make-your-own panel; clicking a preset hides that panel again.
+            AddDiyButton(wrap);
 
-            Theme cur = Themes.Resolve(cfg);
-            txtThemeNote.Text = cur.Name + ". " + cur.Note;
+            if (diyPanelOpen)
+                txtThemeNote.Text = "DIY. Make your own colours below.";
+            else
+            {
+                Theme cur = Themes.Resolve(cfg);
+                txtThemeNote.Text = cur.Name + ". " + cur.Note;
+            }
         }
 
         static void AddThemeButton(WrapPanel wrap, Theme t)
         {
             Theme captured = t;
-            bool on = string.Equals(t.Name, cfg.Theme, StringComparison.OrdinalIgnoreCase);
+            // A preset is not lit while the DIY card is selected, even if the
+            // saved theme name still matches that preset (editing before save).
+            bool on = !diyPanelOpen
+                && string.Equals(t.Name, cfg.Theme, StringComparison.OrdinalIgnoreCase);
 
             var sw = new Border();
             sw.Width = 15; sw.Height = 15;
@@ -3035,6 +3054,7 @@ namespace Thornswood
             if (on) b.Background = Res("CardHover");
             b.Click += delegate
             {
+                diyPanelOpen = false;
                 cfg.Theme = captured.Name;
                 cfg.Save(Paths.CfgFile);
                 Themes.Apply(win, Themes.Resolve(cfg));
@@ -3044,19 +3064,81 @@ namespace Thornswood
             wrap.Children.Add(b);
         }
 
+        static void AddDiyButton(WrapPanel wrap)
+        {
+            bool on = diyPanelOpen;
+
+            string swatchHex;
+            if (Themes.HasCustom(cfg.CustomColors))
+                swatchHex = Themes.Custom(cfg.CustomColors, cfg.CustomLight).Swatch;
+            else
+                swatchHex = Themes.Resolve(cfg).Swatch;
+
+            var sw = new Border();
+            sw.Width = 15; sw.Height = 15;
+            sw.CornerRadius = new CornerRadius(2);
+            sw.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(swatchHex));
+            sw.Margin = new Thickness(0, 0, 10, 0);
+            sw.VerticalAlignment = VerticalAlignment.Center;
+
+            var label = new TextBlock();
+            label.Text = "DIY";
+            label.VerticalAlignment = VerticalAlignment.Center;
+            label.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+
+            var sp = new StackPanel();
+            sp.Orientation = Orientation.Horizontal;
+            sp.Children.Add(sw);
+            sp.Children.Add(label);
+
+            var b = new Button();
+            b.Content = sp;
+            b.Style = (Style)win.Resources["Ghost"];
+            b.Margin = new Thickness(0, 0, 9, 9);
+            b.Padding = new Thickness(12, 9, 16, 9);
+            b.MinWidth = 148;
+            b.HorizontalContentAlignment = HorizontalAlignment.Left;
+            if (on) b.Background = Res("CardHover");
+            b.Click += delegate
+            {
+                diyPanelOpen = true;
+                if (Themes.HasCustom(cfg.CustomColors))
+                {
+                    cfg.Theme = Themes.CustomName;
+                    cfg.Save(Paths.CfgFile);
+                    Themes.Apply(win, Themes.Resolve(cfg));
+                    Redraw();
+                    Log("Theme set to DIY.");
+                }
+                else
+                {
+                    BuildThemeRow();
+                    BuildThemeEditor();
+                }
+            };
+            wrap.Children.Add(b);
+        }
+
         // The boxes the editor draws, kept so their text can be read back when
         // the person presses Use these colours. Rebuilt whenever the editor is.
         static readonly Dictionary<string, TextBox> themeBoxes = new Dictionary<string, TextBox>();
         static CheckBox themeLightBox;
 
-        // The make-your-own editor, under the swatch row. It fills its boxes
-        // from whatever theme is on right now, so the way to start from a
-        // built-in is to pick it above first and then change what you want.
+        // The make-your-own editor under the strip. Shown only while the DIY
+        // card is selected. It fills from whatever theme is on, so start from
+        // a preset, open DIY, change what you want, then Use these colours.
         static void BuildThemeEditor()
         {
             if (themeEditor == null) return;
             themeEditor.Children.Clear();
             themeBoxes.Clear();
+
+            if (!diyPanelOpen)
+            {
+                themeEditor.Visibility = Visibility.Collapsed;
+                return;
+            }
+            themeEditor.Visibility = Visibility.Visible;
 
             Theme cur = Themes.Resolve(cfg);
 
@@ -3069,9 +3151,9 @@ namespace Thornswood
             themeEditor.Children.Add(head);
 
             var blurb = new TextBlock();
-            blurb.Text = "Pick a theme above to start from, change any colour to a hex value like #C8763A, "
+            blurb.Text = "Start from the colours on screen, change any to a hex value like #C8763A, "
                        + "then press Use these colours. The two soft ones put the opacity first, so "
-                       + "#3CC8763A is that accent at low opacity.";
+                       + "#3CC8763A is that accent at low opacity. Pick a preset above to leave DIY.";
             blurb.FontSize = 11.5; blurb.Foreground = Res("Faint");
             blurb.TextWrapping = TextWrapping.Wrap; blurb.LineHeight = 17;
             blurb.Margin = new Thickness(0, 0, 0, 12);
@@ -3142,10 +3224,11 @@ namespace Thornswood
             cfg.CustomColors = pairs.ToArray();
             cfg.CustomLight = themeLightBox != null && themeLightBox.IsChecked == true;
             cfg.Theme = Themes.CustomName;
+            diyPanelOpen = true;
             cfg.Save(Paths.CfgFile);
             Themes.Apply(win, Themes.Resolve(cfg));
             Redraw();
-            Log("Your own theme is on. Change the colours any time, or pick another theme to leave it.");
+            Log("Your own theme is on. Change the colours any time, or pick a preset to leave DIY.");
         }
 
         // Everything that paints itself from the theme brushes rather than
