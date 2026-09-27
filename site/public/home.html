@@ -68,7 +68,7 @@
   --edge2:#3D4733;
   --page:#E4E7DA;       /* not white. nothing here is white */
   --quiet:#96A084;
-  --faint:#616B53;
+  --faint:#7A8568;
   --gold:#C9A24B;
   --gold-hot:#E4BE66;
   --ember:#B4512C;
@@ -86,6 +86,14 @@ img{max-width:100%;height:auto;display:block}
 a{color:var(--gold);text-decoration:none}
 a:hover{color:var(--gold-hot)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+/* Skip link: first focusable, off-screen until Tab. Gold on night ground. */
+.skip{position:absolute;left:12px;top:12px;z-index:100;padding:10px 14px;
+  background:var(--gold);color:var(--night);font:600 14px/1 var(--sans);
+  letter-spacing:.04em;text-decoration:none;
+  clip:rect(0 0 0 0);clip-path:inset(50%);width:1px;height:1px;overflow:hidden;
+  white-space:nowrap}
+.skip:focus,.skip:focus-visible{clip:auto;clip-path:none;width:auto;height:auto;overflow:visible;
+  outline:2px solid var(--gold-hot);outline-offset:3px}
 
 .wrap{width:min(1480px,100% - 48px);margin-inline:auto}
 @media(max-width:560px){ .wrap{width:min(1480px,100% - 32px)} }
@@ -482,6 +490,8 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
 </head>
 <body>
 
+<a class="skip" href="#main">Skip to content</a>
+
 <header>
   <div class="wrap bar">
     <a class="mark" href="/"><img src="/logo.png" alt="Thornswood">Thornswood</a>
@@ -533,6 +543,7 @@ try {
 } catch (e) { }
 </script>
 
+<main id="main">
 <div id="landing">
 <div class="hero">
   <!--
@@ -755,6 +766,7 @@ try {
 </div><!-- /landing -->
 
 <div class="page" id="page" hidden><div class="wrap" id="pagebody"></div></div>
+</main>
 
 <div class="call">
   <div class="wrap">
@@ -821,6 +833,9 @@ burger.onclick = function(){
   nav.hidden = !nav.hidden;
   burger.setAttribute('aria-expanded', String(!nav.hidden));
 };
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && burger.getAttribute('aria-expanded') === 'true') shut();
+});
 Array.prototype.forEach.call(nav.querySelectorAll('a'), function(a){ a.onclick = shut; });
 
 /*
@@ -905,7 +920,8 @@ function ageRemember() {
   try { localStorage.setItem(AGE_KEY, '1'); } catch (e) {}
   var exp = new Date();
   exp.setFullYear(exp.getFullYear() + 1);
-  document.cookie = 'tw-age-18=1; path=/; expires=' + exp.toUTCString() + '; SameSite=Lax';
+  document.cookie = 'tw-age-18=1; path=/; expires=' + exp.toUTCString() + '; SameSite=Lax' +
+    (location.protocol === 'https:' ? '; Secure' : '');
 }
 function showAgeGate() {
   show(
@@ -921,10 +937,13 @@ function showAgeGate() {
     '</div></div>'
   );
   var yes = document.getElementById('ageYes');
-  if (yes) yes.addEventListener('click', function () {
-    ageRemember();
-    location.reload();
-  });
+  if (yes) {
+    yes.addEventListener('click', function () {
+      ageRemember();
+      location.reload();
+    });
+    try { yes.focus(); } catch (e) {}
+  }
 }
 
 if (AGE_PATHS[here] && !ageOk()) {

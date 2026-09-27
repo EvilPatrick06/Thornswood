@@ -2439,11 +2439,12 @@ async function handle(req, res) {
       // actually being served is written into them here. home.html rewrites
       // the same tags for the browser tab.
       const blurb = BLURB[route];
+      let pageTitle = null;
       if (blurb) {
-        const title = blurb[0] === 'Thornswood' ? blurb[0] : blurb[0] + ' · Thornswood';
+        pageTitle = blurb[0] === 'Thornswood' ? blurb[0] : blurb[0] + ' · Thornswood';
         html = html.replace(
           /(<meta property="og:title" id="ogTitle" content=")[^"]*(")/,
-          '$1' + escAttr(title) + '$2');
+          '$1' + escAttr(pageTitle) + '$2');
         for (const re of [/(<meta property="og:description" id="ogDesc" content=")[^"]*(")/,
                           /(<meta name="description" content=")[^"]*(")/]) {
           html = html.replace(re, '$1' + escAttr(blurb[1]) + '$2');
@@ -2460,6 +2461,13 @@ async function handle(req, res) {
         // The remaining public pages draw themselves after an API fetch. Do not
         // paint the home landing while that request is in flight.
         html = html.replace('<div id="landing">', () => '<div id="landing" hidden>');
+        // MD pages get <title> from fillPage (the page's h1). Non-MD routes
+        // used to keep the home title until the page's script ran, so a crawler
+        // or a slow tab saw only Thornswood. Set it from BLURB here.
+        if (pageTitle) {
+          html = html.replace('<title>Thornswood</title>',
+            () => '<title>' + escAttr(pageTitle) + '</title>');
+        }
       }
       return send(res, 200, html, TYPES['.html']);
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }

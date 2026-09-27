@@ -49,6 +49,8 @@ a{color:var(--gold)}
 #gate .err{color:var(--fail);font-size:13px;margin-top:12px;min-height:18px}
 .discord.big{width:100%;justify-content:center;padding:14px;font-size:15px}
 #gate #pwbox{margin-top:10px}
+#gate label{display:block;text-align:left;font:600 11px/1.2 var(--sans);
+  letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0 0 6px}
 #gate .backhome{margin-top:26px;font-size:13px}
 #gate .backhome a{color:var(--faint);text-decoration:none}
 #gate .backhome a:hover{color:var(--gold)}
@@ -540,6 +542,7 @@ tr.adder .plus{color:var(--faint);font-size:16px;line-height:38px}
     <div id="pwbox" hidden>
       <p class="said" style="margin:0 0 12px">Discord sign in is not set up on
         this server yet.</p>
+      <label for="pw">Server password</label>
       <input id="pw" type="password" autocomplete="current-password" placeholder="server password">
       <button class="enter" id="go">Enter</button>
     </div>
