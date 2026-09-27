@@ -677,8 +677,8 @@
               </Grid>
             </Border>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
-              <Grid Margin="36,28,36,10">
+            <!-- No ScrollViewer on Play: the page fits the normal launcher window. Other pages keep theirs. -->
+            <Grid Grid.Row="1" Margin="36,28,36,10">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="1.9*" MinWidth="330"/>
                   <ColumnDefinition Width="30"/>
@@ -706,31 +706,46 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
-                  <!-- The server selector (#605). Which server this build joins,
-                       main or dev, and the buttons to switch. The two servers are
-                       two launcher installs: the dev build is a second launcher in
-                       its own folder. Switching to dev opens it when it is already
-                       here, or checks the person's Discord roles and offers to
-                       install it only when they may. Moved off Settings, where the
-                       old dev-build card used to live. -->
-                  <StackPanel x:Name="ServerPickCard">
+                  <!-- Compact Server selector. One control shows the current
+                       server and opens a dropdown (Main / Dev for now). The two
+                       servers are two launcher installs: picking Dev opens the
+                       second launcher when it is already here, or checks the
+                       person's Discord roles and offers to install it only when
+                       they may (#605). More servers later are more rows in the
+                       popup list. -->
+                  <StackPanel x:Name="ServerPickCard" Margin="0,0,0,26">
                     <TextBlock Text="Server" Style="{StaticResource Eyebrow}"/>
-                    <Border Style="{StaticResource Slab}">
-                      <StackPanel>
-                        <TextBlock x:Name="TxtServerPick" Style="{StaticResource Body}"
-                                   Text="You are on the main server."/>
-                        <TextBlock x:Name="NoteServerPick" Style="{StaticResource Small}"
-                                   Foreground="{DynamicResource Muted}" TextWrapping="Wrap"
-                                   Margin="0,6,0,0"
-                                   Text="The dev build is a second launcher for testing on the dev server. Staff roles only; the launcher checks your Discord roles before it installs it."/>
-                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                          <Button x:Name="BtnServerMain" Style="{StaticResource Ghost}"
-                                  Content="Main server" Margin="0,0,8,0"/>
-                          <Button x:Name="BtnServerDev" Style="{StaticResource Ghost}"
-                                  Content="Switch to the dev server"/>
-                        </StackPanel>
-                      </StackPanel>
-                    </Border>
+                    <Grid>
+                      <Button x:Name="BtnServerPick" Style="{StaticResource Ghost}"
+                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                              Padding="12,8">
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                          </Grid.ColumnDefinitions>
+                          <TextBlock x:Name="TxtServerPick" Grid.Column="0" Text="Main"
+                                     VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1" Text="▾" Margin="12,0,0,0"
+                                     VerticalAlignment="Center" Foreground="{DynamicResource Muted}"/>
+                        </Grid>
+                      </Button>
+                      <Popup x:Name="ServerPickPopup" Placement="Bottom"
+                             PlacementTarget="{Binding ElementName=BtnServerPick}"
+                             StaysOpen="False" AllowsTransparency="True">
+                        <Border Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}"
+                                BorderThickness="1" CornerRadius="2" Padding="4">
+                          <StackPanel>
+                            <Button x:Name="BtnServerMain" Style="{StaticResource Ghost}"
+                                    Content="Main" HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left" Margin="0,0,0,2"/>
+                            <Button x:Name="BtnServerDev" Style="{StaticResource Ghost}"
+                                    Content="Dev" HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left"/>
+                          </StackPanel>
+                        </Border>
+                      </Popup>
+                    </Grid>
                   </StackPanel>
 
                   <!-- Discord is the door. The launcher asks the site who you are
@@ -803,8 +818,7 @@
                     </Border>
                   </StackPanel>
                 </StackPanel>
-              </Grid>
-            </ScrollViewer>
+            </Grid>
 
             <Border x:Name="UpdateBar" Grid.Row="2" Background="{DynamicResource Card}" BorderBrush="{DynamicResource Accent}"
                     BorderThickness="1" CornerRadius="2" Padding="20,16" Margin="36,0,36,16" Visibility="Collapsed">
@@ -1284,7 +1298,7 @@
                     <!-- Repair, Restore Windows folders and Refresh the shortcut icon
                          moved to Diagnostics, Scan and Fix (#607). -->
 
-                    <!-- The dev-build card moved to the Server selector on the Play
+                    <!-- The dev-build card moved to the Server dropdown on the Play
                          page (#605). Choosing the dev server there installs or opens
                          the dev build, after the same Discord role check. -->
 
