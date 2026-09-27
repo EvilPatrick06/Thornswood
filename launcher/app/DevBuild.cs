@@ -125,6 +125,7 @@ namespace Thornswood
             Config dev = Config.Load(Paths.CfgFile);
             dev.Channel = "dev";
             dev.UpdateBranch = "dev";
+            dev.UpdateFeedUrl = "https://thornswood.net/feed-dev/version.json";
             dev.ServerPort = DevPort;
             dev.VoicePort = DevVoicePort;
             dev.VoiceUrl = DevVoiceUrl(dev.VoiceUrl);
