@@ -30,7 +30,10 @@
     ],
     "dev": [
       "Owner",
-      "Dev"
+      "Dev",
+      "Gamemaster",
+      "Moderator",
+      "Loremaster"
     ],
     "slots3": [
       "Thalmor Boot-Licker",
