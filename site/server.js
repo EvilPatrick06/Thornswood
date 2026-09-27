@@ -705,47 +705,9 @@ function listFiles() {
     // the page builds an address from it.
     const sha256 = String(m.sha256 || '').toLowerCase();
     const hash = /^[0-9a-f]{64}$/.test(sha256) ? sha256 : '';
-    // And the VirusTotal report for that build, but only once there is one.
-    //
-    // The page used to build https://www.virustotal.com/gui/file/<hash> from
-    // the hash alone and call it "VirusTotal report". Nothing uploads the
-    // installer to VirusTotal, so on every current build that link landed on
-    // VirusTotal's item-not-found page: the site was promising a report that
-    // did not exist. Checked live on 27 September against
-    // Thornswood-Setup-20260927-0257.exe.
-    //
-    // So the link now comes from files.json and nowhere else. Whoever publishes
-    // the installer sets one of two fields on the exe's entry after the upload
-    // to VirusTotal has actually gone through:
-    //
-    //   vtUrl         the report address, which must be
-    //                 https://www.virustotal.com/gui/file/<this file's sha256>
-    //   vtSubmittedAt when the file was sent there, any non-empty string
-    //
-    // Either one means a report exists and the address is built from the hash
-    // here rather than taken from the file, so a wrong or hostile value in
-    // files.json cannot put a link to somewhere else on the page. Without
-    // either field the page shows the hash and says there is no report yet.
-    //
-    // VirusTotal refuses uploads over 650 MB (its documented upload-URL cap).
-    // Declared inside listFiles so the lift-test in test-download-hash.js can
-    // run this function alone. When there is no report, mark vtSkipped so the
-    // Downloads page can say the file is over that cap (or was refused for
-    // another reason Publish wrote into files.json) rather than implying a
-    // report is still coming. The reason string never goes out: only the flag.
-    const VT_CAP = 650 * 1024 * 1024;
-    const vtWant = hash ? 'https://www.virustotal.com/gui/file/' + hash : '';
-    const vtUrl = String(m.vtUrl || '').trim().toLowerCase();
-    const vtAt = String(m.vtSubmittedAt || '').trim();
-    const vt = (hash && (vtUrl === vtWant || vtAt)) ? vtWant : '';
-    const skipReason = String(m.vtSkipReason || m.vtSkippedReason || '').trim();
-    const explicitSkip = m.vtSkipped === true || m.vtSkipped === 'true' || !!skipReason;
-    const vtSkipped = !vt && (explicitSkip || st.size > VT_CAP);
     out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,
       label: m.label || name, version: m.version || '', note: m.note || '',
-      sha256: hash,
-      vt: vt,
-      vtSkipped: vtSkipped });
+      sha256: hash });
   }
   out.sort((a, b) => b.at - a.at);
   return out;
