@@ -1637,8 +1637,26 @@ if ($repeat) {
 if ($Dev) {
     $mainVer = ''
     $mainTitles = @{}
-    $mainJson = Join-Path (Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases') 'version.json'
+    # Main's public releases clone, beside this repository. Pulled before it is
+    # read so mainVersion and the news marks are what main has published, not
+    # whatever this machine last fetched. Without the pull the Dev News tab
+    # kept showing main on 1.1.37 long after main had moved on (#546).
+    $mainRelDir = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
+    $mainJson = Join-Path $mainRelDir 'version.json'
     if (Test-Path -LiteralPath $mainJson) {
+        if (Test-Path -LiteralPath (Join-Path $mainRelDir '.git')) {
+            $oldPull = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            $pulledMain = & git -C $mainRelDir pull --rebase --quiet 2>&1
+            $pullRc = $LASTEXITCODE
+            $ErrorActionPreference = $oldPull
+            if ($pullRc -ne 0) {
+                Say ("  could not pull main's feed, so the dev marks were left alone: " + ($pulledMain | Out-String).Trim()) 'Yellow'
+                $mainTitles = $null
+            }
+        }
+    }
+    if (($null -ne $mainTitles) -and (Test-Path -LiteralPath $mainJson)) {
         try {
             $mainDoc = Get-Content -LiteralPath $mainJson -Raw | ConvertFrom-Json
             $mainVer = Val $mainDoc 'launcherVersion'
@@ -1652,7 +1670,7 @@ if ($Dev) {
             Say "  could not read main's feed, so the dev marks were left alone: $($_.Exception.Message)" 'Yellow'
             $mainTitles = $null
         }
-    } else {
+    } elseif (-not (Test-Path -LiteralPath $mainJson)) {
         Say '  no main feed beside this one, so the dev marks were left alone' 'Yellow'
         $mainTitles = $null
     }
