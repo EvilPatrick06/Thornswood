@@ -181,6 +181,12 @@ namespace Thornswood
         /// recorded against a mod id whose slug is the one asked for. A machine
         /// can have two collections installed at once (ombo2a on main, 7essxf
         /// on dev), and the numbers must not be mixed up between them.
+        ///
+        /// When those two attributes are missing (ship PC after Set-Collection:
+        /// a locally authored vortex_collection_* with no subscriber install
+        /// metadata), fall back through newestFileId to
+        /// collections###revisions###&lt;id&gt; for the same slug. Same rule as
+        /// Get-CollectionRevisionFromState in LoadOrder.ps1.
         /// </summary>
         public static int CollectionRevisionFromState(string slug)
         {
@@ -200,7 +206,8 @@ namespace Thornswood
 
                 var mine = new HashSet<string>(StringComparer.Ordinal);
                 var rev = new Dictionary<string, int>(StringComparer.Ordinal);
-                foreach (string f in Directory.GetFiles(dir))
+                string[] files = Directory.GetFiles(dir);
+                foreach (string f in files)
                 {
                     string txt;
                     try { txt = VortexStateText(f); }
@@ -222,6 +229,82 @@ namespace Thornswood
                 {
                     int r;
                     if (rev.TryGetValue(id, out r) && r > best) best = r;
+                }
+                if (best > 0) return best;
+
+                var revSlugRe = new Regex(
+                    "collections###revisions###([^#]+)###info###collection###slug[\\x00-\\x1F]{1,4}\"" +
+                    Regex.Escape(slug) + "\"");
+                var fileIdRe = new Regex(
+                    "mods###skyrimse###([^#]+)###attributes###newestFileId[\\x00-\\x1F]{1,4}(\\d+)");
+                var verRe = new Regex(
+                    "mods###skyrimse###([^#]+)###attributes###newestVersion[\\x00-\\x1F]{1,4}\"(\\d+)\"");
+                var revIds = new HashSet<string>(StringComparer.Ordinal);
+                var fileIdMods = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+                var modVer = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (string f in files)
+                {
+                    string txt;
+                    try { txt = VortexStateText(f); }
+                    catch { continue; }
+                    foreach (Match m in revSlugRe.Matches(txt)) revIds.Add(m.Groups[1].Value);
+                    foreach (Match m in fileIdRe.Matches(txt))
+                    {
+                        string fid = m.Groups[2].Value;
+                        List<string> list;
+                        if (!fileIdMods.TryGetValue(fid, out list))
+                        {
+                            list = new List<string>();
+                            fileIdMods[fid] = list;
+                        }
+                        if (!list.Contains(m.Groups[1].Value)) list.Add(m.Groups[1].Value);
+                    }
+                    foreach (Match m in verRe.Matches(txt))
+                    {
+                        int n;
+                        if (!int.TryParse(m.Groups[2].Value, out n)) continue;
+                        string id = m.Groups[1].Value;
+                        int cur;
+                        if (!modVer.TryGetValue(id, out cur) || n > cur) modVer[id] = n;
+                    }
+                }
+                if (revIds.Count == 0) return 0;
+                var revNum = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (string f in files)
+                {
+                    string txt;
+                    try { txt = VortexStateText(f); }
+                    catch { continue; }
+                    foreach (string rid in revIds)
+                    {
+                        var numRe = new Regex(
+                            "collections###revisions###" + Regex.Escape(rid) +
+                            "###info###revisionNumber[\\x00-\\x1F]{1,4}(\\d+)");
+                        foreach (Match m in numRe.Matches(txt))
+                        {
+                            int n;
+                            if (!int.TryParse(m.Groups[1].Value, out n)) continue;
+                            int cur;
+                            if (!revNum.TryGetValue(rid, out cur) || n > cur) revNum[rid] = n;
+                        }
+                    }
+                }
+                foreach (string rid in revIds)
+                {
+                    List<string> mods;
+                    if (!fileIdMods.TryGetValue(rid, out mods)) continue;
+                    int n = 0;
+                    int rn;
+                    if (revNum.TryGetValue(rid, out rn)) n = rn;
+                    if (n <= 0)
+                    {
+                        foreach (string mid in mods)
+                        {
+                            int mv;
+                            if (modVer.TryGetValue(mid, out mv) && mv > n) n = mv;
+                        }
+                    }
+                    if (n > best) best = n;
                 }
                 return best;
             }
@@ -398,7 +481,9 @@ namespace Thornswood
             catch (Exception ex) { Swallow.Note("Checks.CollectionState", ex); }
         }
 
-        /// <summary>Mod ids for a collection slug from state.v2.</summary>
+        /// <summary>Mod ids for a collection slug from state.v2.
+        /// Prefers attributes###collectionSlug; falls back to newestFileId
+        /// tied through collections###revisions (authoring shape).</summary>
         public static List<string> CollectionModIds(string slug)
         {
             var ids = new List<string>();
@@ -411,12 +496,38 @@ namespace Thornswood
                     "mods###skyrimse###([^#]+)###attributes###collectionSlug[\\x00-\\x1F]{1,4}\"" +
                     Regex.Escape(slug) + "\"");
                 var seen = new HashSet<string>(StringComparer.Ordinal);
-                foreach (string f in Directory.GetFiles(dir))
+                string[] files = Directory.GetFiles(dir);
+                foreach (string f in files)
                 {
                     string txt;
                     try { txt = VortexStateText(f); } catch { continue; }
                     foreach (Match m in slugRe.Matches(txt))
                         if (seen.Add(m.Groups[1].Value)) ids.Add(m.Groups[1].Value);
+                }
+                if (ids.Count > 0) return ids;
+
+                var revSlugRe = new Regex(
+                    "collections###revisions###([^#]+)###info###collection###slug[\\x00-\\x1F]{1,4}\"" +
+                    Regex.Escape(slug) + "\"");
+                var fileIdRe = new Regex(
+                    "mods###skyrimse###([^#]+)###attributes###newestFileId[\\x00-\\x1F]{1,4}(\\d+)");
+                var revIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string f in files)
+                {
+                    string txt;
+                    try { txt = VortexStateText(f); } catch { continue; }
+                    foreach (Match m in revSlugRe.Matches(txt)) revIds.Add(m.Groups[1].Value);
+                }
+                if (revIds.Count == 0) return ids;
+                foreach (string f in files)
+                {
+                    string txt;
+                    try { txt = VortexStateText(f); } catch { continue; }
+                    foreach (Match m in fileIdRe.Matches(txt))
+                    {
+                        if (!revIds.Contains(m.Groups[2].Value)) continue;
+                        if (seen.Add(m.Groups[1].Value)) ids.Add(m.Groups[1].Value);
+                    }
                 }
             }
             catch (Exception ex) { Swallow.Note("Checks.CollectionModIds", ex); }

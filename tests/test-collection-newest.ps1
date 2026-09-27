@@ -233,6 +233,37 @@ try {
   Yes 'and Newest is 1 from collections revisions / installed floor' ($csDraft.Newest -eq 1)
   Yes 'so Known is true on a current draft with no newestVersion key' ($csDraft.Known)
 
+
+  # ---- authoring shape: newestFileId, no collectionSlug (live ship PC) ------
+  Clear-State
+  function FileIdAttr([string]$modId, [string]$fileId) {
+    $b = [Collections.Generic.List[byte]]::new()
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes("persistent###mods###skyrimse###$modId###attributes###newestFileId"))
+    $b.Add([byte]$fileId.Length)
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes($fileId))
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes([char]1 + 'persistent###mods###skyrimse'))
+    return $b.ToArray()
+  }
+  $author = [Collections.Generic.List[byte]]::new()
+  $author.AddRange([byte[]](FileIdAttr 'vortex_collection_ZRT7NjhN_' '796316'))
+  $author.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'newestVersion' '"1"'))
+  $author.AddRange([byte[]](RevInfo '796316' '7essxf' 1))
+  Put '000200.log' $author.ToArray()
+  $csAuthor = Get-CollectionState 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf'
+  Yes 'without collectionSlug, Have still reads 1 via newestFileId + revisions table' ($csAuthor.Have -eq 1)
+  Yes 'and Newest is 1 so Known is true on the authoring shape' ($csAuthor.Known)
+  Yes 'ombo2a stays 0 when only 7essxf is wired through newestFileId' ((Get-CollectionRevision 'ombo2a') -eq 0)
+  $modsAuthor = @((Get-CollectionModIds '7essxf') | ForEach-Object { $_ })
+  Yes 'ModIds finds vortex_collection_* via newestFileId when collectionSlug is absent' `
+    ($modsAuthor -contains 'vortex_collection_ZRT7NjhN_')
+  $modsDirA = Join-Path $root 'Vortex\skyrimse\mods'
+  $opaqueA = Join-Path $modsDirA 'vortex_collection_ZRT7NjhN_'
+  $null = New-Item -ItemType Directory -Force -Path $opaqueA
+  $foundA = Get-CollectionInstalledFolder '7essxf'
+  Yes 'InstalledFolder maps via newestFileId when collectionSlug is absent' `
+    ($null -ne $foundA -and ([IO.Path]::GetFullPath($foundA.FullName) -eq [IO.Path]::GetFullPath($opaqueA)))
+  Remove-Item -LiteralPath $modsDirA -Recurse -Force -EA SilentlyContinue
+
   # ---- InstalledFolder via state, with or without collection.json ----------
   Clear-State
   $instFolder = [Collections.Generic.List[byte]]::new()
