@@ -108,18 +108,30 @@ function Remote($script) {
   finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
 }
 
-function OnlineNow {
-  # The gamemode rewrites online.json whenever the number moves. No file, or an
-  # unreadable one, is treated as nobody home rather than as a reason to stop:
-  # this is a courtesy check, not a gate.
-  #
-  # Nothing on the game port is nobody on, whatever online.json says. The
-  # gamemode writes that file only when the count moves, so a killed or
-  # crashed process leaves its last count behind. Measured in review on
-  # 24 September: the live half of the same gap Deploy-DevGamemode closed.
-  # When the box cannot list its ports the count is kept, which errs toward
-  # a warning.
-  $out = Remote @"
+# ==== thornswood live deploy warning ====
+# Shared with tests\test-deploy-gamemode-warning.ps1 and the OnlineNow harness.
+# Deploy-Gamemode.ps1 builds locally and never stops the live server; this is
+# the live half of issue #520 (count only: online.json has no names).
+function Read-LiveOnline($lines) {
+  # Online stays a courtesy count: unreadable or missing is nobody, not a gate.
+  # Data is where restart.json must land so the gamemode sees it.
+  $room = @{ Data = ''; Online = 0; Up = $null; Said = @($lines) }
+  foreach ($line in @($lines)) {
+    $t = "$line".Trim()
+    if ($t -match '^DATA (.+)$') { $room.Data = $Matches[1].Trim() }
+    elseif ($t -match '^ONLINE (\d+)$') { $room.Online = [int]$Matches[1] }
+    elseif ($t -match '^UP (yes|no)$') { $room.Up = ($Matches[1] -eq 'yes') }
+  }
+  # Nothing on the game port is nobody on, whatever online.json still says.
+  if ($room.Up -eq $false) { $room.Online = 0 }
+  if (-not $room.Data) {
+    $room.Data = (($Root -replace '\\', '/').TrimEnd('/') + '/data')
+  }
+  return $room
+}
+
+function Get-LiveOnline {
+  Read-LiveOnline (Remote @"
 `$root = '$Root'.Replace('/','\')
 `$port = 0
 `$d = 'data'
@@ -128,28 +140,127 @@ try {
   `$port = [int]`$s.port
   if (`$s.dataDir) { `$d = [string]`$s.dataDir }
 } catch { }
+`$dataPath = [IO.Path]::Combine(`$root, `$d)
+'DATA ' + `$dataPath.Replace('\', '/')
 `$up = `$true
 if (`$port -gt 0) {
   try {
     `$u = @(Get-NetUDPEndpoint -EA Stop | Where-Object { `$_.LocalPort -eq `$port })
     `$up = (`$u.Count -gt 0)
+    if (`$up) { 'UP yes' } else { 'UP no' }
   } catch { }
 }
-if (-not `$up) { 0 }
+if (-not `$up) { 'ONLINE 0' }
 else {
   try {
-    `$j = Get-Content (Join-Path ([IO.Path]::Combine(`$root, `$d)) 'online.json') -Raw -EA Stop | ConvertFrom-Json
+    `$j = Get-Content (Join-Path `$dataPath 'online.json') -Raw -EA Stop | ConvertFrom-Json
     if (`$null -eq `$j -or `$null -eq `$j.now) { throw 'no count' }
-    `$j.now
-  } catch { 0 }
+    'ONLINE ' + [int]`$j.now
+  } catch { 'ONLINE 0' }
 }
-"@
-  $n = 0
-  foreach ($line in $out) {
-    if ("$line".Trim() -match '^\d+$') { $n = [int]$Matches[0]; break }
+"@)
+}
+
+function OnlineNow {
+  # Kept as a number for callers and for tests\test-deploy-server-online.ps1.
+  return (Get-LiveOnline).Online
+}
+
+function Warn-LiveRoom {
+  # Same switches Deploy-DevGamemode documents: -Now, -Minutes, -Mode, -Why.
+  # Refuses to stop when people are on and the warning cannot go out, unless
+  # -Now was passed. Does not refuse merely because somebody is online: it
+  # warns them first, then the stop below runs.
+  Write-Host ''
+  $room = Get-LiveOnline
+  $on = [int]$room.Online
+
+  if ($Now) {
+    if ($on -gt 0) {
+      Write-Host ("  -Now: {0} online and not warned. They respawn when it comes back." -f $on) -ForegroundColor Yellow
+    } else {
+      Write-Host '  -Now: nobody is online'
+    }
+    return
   }
-  return $n
+
+  if ($on -le 0) {
+    if ($room.Up -eq $false) {
+      Write-Host '  the live server is not listening, so nobody is on it'
+    } else {
+      Write-Host '  nobody is online, going straight down'
+    }
+    return
+  }
+
+  Write-Host ("  $on online, $Mode, giving them $Minutes " +
+              $(if ($Minutes -eq 1) { 'minute' } else { 'minutes' }))
+  $ask = Join-Path $Here '..\vps\Request-Restart.ps1'
+  if (-not (Test-Path -LiteralPath $ask)) {
+    Write-Host ''
+    Write-Host "  THE WARNING DID NOT GO OUT. Request-Restart.ps1 is missing." -ForegroundColor Red
+    Write-Host "  $on people are in the world and the restart below would drop them with no" -ForegroundColor Red
+    Write-Host '  notice. Nothing has been swapped in and the server is still running exactly' -ForegroundColor Red
+    Write-Host '  as it was. Put Request-Restart.ps1 back, or pass -Now if you mean to take' -ForegroundColor Red
+    Write-Host '  it down without telling anybody.' -ForegroundColor Red
+    Remote "Remove-Item -LiteralPath '$rootWin\$stageName' -Recurse -Force -EA SilentlyContinue" | Out-Null
+    exit 1
+  }
+
+  # -RestartFollows because this script stops and starts the task a few
+  # lines below. Request-Restart refuses a kicking mode without it, and
+  # that refusal is the point: a kick with no restart behind it is what
+  # leaves people in an empty world.
+  # Data comes from the box's own server-settings.json (via Get-LiveOnline),
+  # not a hardcoded $Root/data, so restart.json lands where the gamemode looks.
+  & $ask -Minutes $Minutes -Mode $Mode -Why $Why -Vps $Vps -User $User `
+         -Data $room.Data -RestartFollows
+
+  # AND READ WHETHER THE WARNING ACTUALLY WENT OUT.
+  #
+  # This called it and never looked. Request-Restart exits 1 when it
+  # cannot reach the server to announce anything, and the next thing this
+  # script does is stop the task, so a warning that failed meant everybody
+  # in the world was dropped with no notice at all while the log said the
+  # countdown had been given. That is the same shape as entry 118: a step
+  # printed that it had stopped and the caller carried on regardless.
+  #
+  # Nothing has been swapped in at this point and the task is still
+  # running, so stopping here and clearing the stage leaves the server
+  # exactly as it was found. -Now is the way to take it down deliberately
+  # without warning anybody.
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host ''
+    Write-Host "  THE WARNING DID NOT GO OUT. Request-Restart.ps1 exited with $LASTEXITCODE." -ForegroundColor Red
+    Write-Host "  $on people are in the world and the restart below would drop them with no" -ForegroundColor Red
+    Write-Host '  notice. Nothing has been swapped in and the server is still running exactly' -ForegroundColor Red
+    Write-Host '  as it was. Find out why it could not reach the server and run this again,' -ForegroundColor Red
+    Write-Host '  or pass -Now if you mean to take it down without telling anybody.' -ForegroundColor Red
+    Remote "Remove-Item -LiteralPath '$rootWin\$stageName' -Recurse -Force -EA SilentlyContinue" | Out-Null
+    exit 1
+  }
+
+  $deadline = (Get-Date).AddMinutes($Minutes).AddSeconds(20)
+  if ($Mode -eq 'notice') {
+    # Nobody is being put out, so there is no room to wait for emptying.
+    # Just let the notice land and give people a moment to stop swinging.
+    while ((Get-Date) -lt $deadline) { Start-Sleep -Seconds 5 }
+    Write-Host '  notice given, pushing'
+  }
+  else {
+    # Stop early the moment the room is empty. The gamemode kicks everyone at
+    # zero, so this normally returns a few seconds after the countdown rather
+    # than sitting out the whole clock.
+    while ((Get-Date) -lt $deadline) {
+      Start-Sleep -Seconds 15
+      $left = OnlineNow
+      if ($left -le 0) { Write-Host '  room is clear'; break }
+      $mins = [Math]::Max(0, [int]([Math]::Round(($deadline - (Get-Date)).TotalMinutes)))
+      Write-Host "  $left still on, $mins min left"
+    }
+  }
 }
+# ==== end thornswood live deploy warning ====
 
 # ==== deploy-server remote blocks ====
 #
@@ -703,72 +814,8 @@ if ($checkOut -notcontains 'STAGE OK') {
 }
 
 # ------------------------------------------------------------- the warning
-if (-not $Now) {
-  Write-Host ''
-  $on = OnlineNow
-  if ($on -le 0) {
-    Write-Host '  nobody is online, going straight down'
-  }
-  else {
-    Write-Host ("  $on online, $Mode, giving them $Minutes " +
-                $(if ($Minutes -eq 1) { 'minute' } else { 'minutes' }))
-    $ask = Join-Path $Here '..\vps\Request-Restart.ps1'
-    if (Test-Path -LiteralPath $ask) {
-      # -RestartFollows because this script stops and starts the task a few
-      # lines below. Request-Restart refuses a kicking mode without it, and
-      # that refusal is the point: a kick with no restart behind it is what
-      # leaves people in an empty world.
-      & $ask -Minutes $Minutes -Mode $Mode -Why $Why -Vps $Vps -User $User `
-             -Data "$Root/data" -RestartFollows
-
-      # AND READ WHETHER THE WARNING ACTUALLY WENT OUT.
-      #
-      # This called it and never looked. Request-Restart exits 1 when it
-      # cannot reach the server to announce anything, and the next thing this
-      # script does is stop the task, so a warning that failed meant everybody
-      # in the world was dropped with no notice at all while the log said the
-      # countdown had been given. That is the same shape as entry 118: a step
-      # printed that it had stopped and the caller carried on regardless.
-      #
-      # Nothing has been swapped in at this point and the task is still
-      # running, so stopping here and clearing the stage leaves the server
-      # exactly as it was found. -Now is the way to take it down deliberately
-      # without warning anybody.
-      if ($LASTEXITCODE -ne 0) {
-        Write-Host ''
-        Write-Host "  THE WARNING DID NOT GO OUT. Request-Restart.ps1 exited with $LASTEXITCODE." -ForegroundColor Red
-        Write-Host "  $on people are in the world and the restart below would drop them with no" -ForegroundColor Red
-        Write-Host '  notice. Nothing has been swapped in and the server is still running exactly' -ForegroundColor Red
-        Write-Host '  as it was. Find out why it could not reach the server and run this again,' -ForegroundColor Red
-        Write-Host '  or pass -Now if you mean to take it down without telling anybody.' -ForegroundColor Red
-        Remote "Remove-Item -LiteralPath '$rootWin\$stageName' -Recurse -Force -EA SilentlyContinue" | Out-Null
-        exit 1
-      }
-    } else {
-      Write-Host '  Request-Restart.ps1 is missing, warning nobody' -ForegroundColor Yellow
-    }
-
-    $deadline = (Get-Date).AddMinutes($Minutes).AddSeconds(20)
-    if ($Mode -eq 'notice') {
-      # Nobody is being put out, so there is no room to wait for emptying.
-      # Just let the notice land and give people a moment to stop swinging.
-      while ((Get-Date) -lt $deadline) { Start-Sleep -Seconds 5 }
-      Write-Host '  notice given, pushing'
-    }
-    else {
-      # Stop early the moment the room is empty. The gamemode kicks everyone at
-      # zero, so this normally returns a few seconds after the countdown rather
-      # than sitting out the whole clock.
-      while ((Get-Date) -lt $deadline) {
-        Start-Sleep -Seconds 15
-        $left = OnlineNow
-        if ($left -le 0) { Write-Host '  room is clear'; break }
-        $mins = [Math]::Max(0, [int]([Math]::Round(($deadline - (Get-Date)).TotalMinutes)))
-        Write-Host "  $left still on, $mins min left"
-      }
-    }
-  }
-}
+# People on live are counted and warned here. Deploy-Gamemode.ps1 has no stop.
+Warn-LiveRoom
 
 Write-Host ''
 Write-Host 'Stopping, swapping in and starting...'
