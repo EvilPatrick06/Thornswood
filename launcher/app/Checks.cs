@@ -395,7 +395,7 @@ namespace Thornswood
                 behind = have > 0 && newest > 0 && have < newest;
                 known = have > 0 && newest > 0;
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Checks.CollectionState", ex); }
         }
 
         /// <summary>Mod ids for a collection slug from state.v2.</summary>
@@ -419,7 +419,7 @@ namespace Thornswood
                         if (seen.Add(m.Groups[1].Value)) ids.Add(m.Groups[1].Value);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Checks.CollectionModIds", ex); }
             return ids;
         }
 
@@ -505,7 +505,7 @@ namespace Thornswood
                     if (Directory.Exists(p)) return p;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Checks.VortexProfileDir", ex); }
             return null;
         }
 
