@@ -22,6 +22,8 @@ You must be eighteen or over. There is no way for this project to safely run an
 eighteen and over roleplay space with minors in it, so an account found to
 belong to somebody under eighteen is removed rather than warned.
 
+Thornswood contains sexual content between adult characters, violence, and language that is not written for children. Confirming on the download or join page, and the checkbox in the installer, are kept as a record of a statement somebody made, not as verification of age.
+
 You also need to own Skyrim Special Edition on Steam. Thornswood ships no game
 files and cannot be played without it.
 

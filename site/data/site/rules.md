@@ -12,6 +12,9 @@ Before either of them, one condition.
 **Thornswood is an eighteen and over server.** Applying, being in the Discord,
 or connecting to the game is you stating that you are eighteen or older.
 
+Confirming on the download or join page, and the checkbox in the installer,
+are kept as a record of a statement somebody made, not as verification of age.
+
 It contains sexual content between adult characters, violence, and language
 that is not written for children. It is not moderated to be suitable for them
 and it is not going to be.
