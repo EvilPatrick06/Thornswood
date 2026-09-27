@@ -188,6 +188,24 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     let shot = await ask('GET', '/shot/' + webName);
     yes('and /shot will not serve a picture that is only pending (' + shot.status + ')', shot.status === 404);
 
+    // ---- several files from the site form (one POST each) --------------------
+    r = await ask('POST', upQ('batch-a.png', 'Batch'),
+                  { 'content-type': 'image/png', cookie: memberCookie() }, PNG);
+    const batchA = r.json && r.json.name;
+    const rB = await ask('POST', upQ('batch-b.png', 'Batch'),
+                  { 'content-type': 'image/png', cookie: memberCookie() }, PNG);
+    const batchB = rB.json && rB.json.name;
+    const rC = await ask('POST', upQ('batch-c.png', 'Batch'),
+                  { 'content-type': 'image/png', cookie: memberCookie() }, PNG);
+    const batchC = rC.json && rC.json.name;
+    pend = readJson('gallery-pending.json') || [];
+    yes('multi-select batch lands each file on the pending queue',
+        r.status === 200 && rB.status === 200 && rC.status === 200 &&
+        !!pend.find((x) => x.name === batchA) &&
+        !!pend.find((x) => x.name === batchB) &&
+        !!pend.find((x) => x.name === batchC) &&
+        pend.filter((x) => x.by === 'Batch').length === 3);
+
     // ---- the launcher ticket -------------------------------------------------
     r = await ask('POST', upQ('game-shot.jpg', 'Ataxayk') + '&ticket=' + encodeURIComponent(ticket(MEMBER_ID, 'Ataxayk')),
                   { 'content-type': 'image/jpeg' }, PNG);
@@ -212,7 +230,7 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     r = await ask('POST', upQ('notes.txt') + '&ticket=' + encodeURIComponent(ticket(MEMBER_ID, 'Ataxayk')),
                   { 'content-type': 'text/plain' }, Buffer.from('hello'));
     yes('a file that is not an image is refused 415', r.status === 415 && r.json && Array.isArray(r.json.allowed));
-    yes('and refusing it added nothing to the queue', (readJson('gallery-pending.json') || []).length === 2);
+    yes('and refusing it added nothing to the queue', (readJson('gallery-pending.json') || []).length === 5);
 
     // ---- the queue is staff only (access.dev; admin list counts as staff) --
     r = await ask('GET', '/api/gallery/pending', { cookie: memberCookie() });
@@ -220,8 +238,8 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     r = await ask('GET', '/api/gallery/pending', { cookie: playCookie() });
     yes('a play-signed-in member cannot read the pending queue (' + r.status + ')', r.status === 403);
     r = await ask('GET', '/api/gallery/pending', { cookie: adminCookie() });
-    yes('staff reads the pending queue, both submissions on it',
-        r.status === 200 && r.json && Array.isArray(r.json.pending) && r.json.pending.length === 2);
+    yes('staff reads the pending queue, all submissions on it',
+        r.status === 200 && r.json && Array.isArray(r.json.pending) && r.json.pending.length === 5);
 
     // ---- approve -------------------------------------------------------------
     r = await ask('POST', '/api/gallery/approve', { cookie: memberCookie(), 'content-type': 'application/json' },
@@ -238,7 +256,7 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     yes('it is now on gallery.json as { name, url: /shot/name, by }',
         !!galEntry && galEntry.url === '/shot/' + webName && galEntry.by === 'Djinn');
     pend = readJson('gallery-pending.json') || [];
-    yes('and off the pending queue', !pend.find((x) => x.name === webName) && pend.length === 1);
+    yes('and off the pending queue', !pend.find((x) => x.name === webName) && pend.length === 4);
 
     pub = await ask('GET', '/api/public');
     yes('/api/public now hands it out, and only it',
@@ -266,7 +284,7 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
                   JSON.stringify({ name: gameName, deleteFile: true }));
     yes('staff rejects the launcher submission (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
     pend = readJson('gallery-pending.json') || [];
-    yes('it is off the queue', !pend.find((x) => x.name === gameName) && pend.length === 0);
+    yes('it is off the queue', !pend.find((x) => x.name === gameName) && pend.length === 3);
     yes('the upload file was unlinked, because deleteFile was set',
         !fs.existsSync(path.join(dir, 'uploads', gameName)));
     gal = readJson('gallery.json') || [];
