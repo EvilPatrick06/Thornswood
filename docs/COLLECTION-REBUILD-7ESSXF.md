@@ -7,7 +7,7 @@ Steam Skyrim SE 1.6.1170. This page records what changed in the repository, what
 was audited for removal and why, and the steps that can only run on the shipping
 machine.
 
-Gavin's split, and how this PR fits it:
+Patrick's split, and how this PR fits it:
 
 - Pre-collection work promotes to main separately on the ship PC (a main Ship
   plus the deploys). This PR is not required for that promote and does not touch
