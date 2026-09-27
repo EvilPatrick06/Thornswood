@@ -9,31 +9,45 @@ using System.Windows.Media.Imaging;
 namespace Thornswood
 {
     /// <summary>
-    /// The pictures thornswood.net is showing from the world, read here so the
-    /// Play page can turn through them one at a time, and the one door this
-    /// end may write through: reporting a picture that should not be up.
+    /// The pictures thornswood.net is showing from the world, and the doors
+    /// this end may write through: submit, report, and for staff the queue
+    /// behind it (approve, reject, take an approved picture down).
     ///
-    /// The site still keeps the queue and staff still choose what goes into
-    /// gallery.json. Rotation asks /api/public, the same public feed the front
-    /// page reads, so a launcher shows only what is already public and cannot
-    /// put a picture up.
+    /// The site still keeps the queue and gallery.json. Play's rotating card
+    /// and the Gallery page both ask /api/public for what is already public.
+    /// Upload, Report, Accept and Delete live on the Gallery page; Play keeps
+    /// the spotlight only (#731, Gavin 2026-09-27).
     ///
-    /// WHAT THE LAUNCHER MAY DO AT THE SITE, AND WHY IT IS ONLY THIS (#731).
-    /// The gallery doors that came with the site's #675 read who is asking
-    /// out of who(req) in site\server.js, which is the twa Discord cookie a
-    /// browser gets from /auth/discord/callback and nothing else. Two of them,
-    /// /api/gallery/submit and /api/gallery/report, take the launcher's signed
-    /// ticket in the query instead, verified the way /api/play/join verifies
-    /// it. So Report goes over the ticket from here, and approve, reject and
-    /// the delete of an approved shot stay on the site, where the person's
-    /// cookie is: the launcher never sees one, and forging a staff answer at
-    /// this end would be a second door into the same list.
+    /// WHAT THE LAUNCHER MAY DO AT THE SITE (#731).
+    /// /api/gallery/submit and /api/gallery/report take the launcher's signed
+    /// ticket in the query, verified the way /api/play/join verifies it.
     ///
-    /// Everything fails quietly. A site that is down, a picture that will not
-    /// load, an empty list: each leaves the card hidden with nothing said, the
-    /// same way the online count and the roster do. The one thing that does
-    /// speak is Report, because somebody pressed a button and is owed an
-    /// answer.
+    /// The six staff doors took the cookie and nothing else until the site's
+    /// #744 put one gate in front of all of them, galleryStaff, which takes
+    /// either that cookie or a ticket whose Discord account holds a staff role
+    /// (st.dev, the access.dev set: Owner, Dev, Gamemaster, Moderator,
+    /// Loremaster). So the queue, approve, reject and the delete of an approved
+    /// picture are reachable from here over the same ticket Report uses.
+    ///
+    /// Nothing at this end decides who staff are. The site asks Discord about
+    /// the account the ticket names on every one of these calls and refuses
+    /// what it does not like; hiding staff tools from everybody else is
+    /// tidiness on the page, not the gate.
+    ///
+    /// A site older than #744 answers these doors 403 {"error":"staff only"}
+    /// with no "why" beside it, because it never read the ticket at all. That
+    /// one shape is told apart from a real refusal, so an old site is reported
+    /// as an old site instead of as an account that was turned down.
+    ///
+    /// The picture WAITING in the queue cannot be shown as a thumbnail here:
+    /// /up/&lt;name&gt;, the only door that serves one, takes the hub member
+    /// cookie. So the waiting list shows what was sent with it: the name, who
+    /// by, the note and when.
+    ///
+    /// Reading fails quietly. A site that is down, a picture that will not
+    /// load, an empty list: each leaves Play's card hidden with nothing said.
+    /// What speaks is what somebody pressed a button for, because they are
+    /// owed an answer either way.
     /// </summary>
     static class Gallery
     {
@@ -50,8 +64,8 @@ namespace Thornswood
         /// What /api/gallery/who says, for whoever is asking.
         ///
         /// Answered is the useful one here: a site older than the gallery
-        /// doors has no such address and says nothing, and the Play page hides
-        /// Report rather than offering a button that cannot work. The rest is
+        /// doors has no such address and says nothing, and the Gallery page hides
+        /// Report and upload rather than offering buttons that cannot work. The rest is
         /// the site's word about a BROWSER session, so from the launcher, which
         /// carries no cookie, Signed and Staff read false however the person is
         /// signed in elsewhere. Who the launcher is acting for is its ticket,
@@ -73,12 +87,22 @@ namespace Thornswood
         static string Feed { get { return Discord.Site + "/api/public"; } }
 
         /// <summary>
-        /// The site page where staff look through the queue, approve or reject
-        /// what is waiting, and take an approved picture back down. The browser
-        /// is signed in to Discord there, so that page can call the doors this
-        /// end cannot.
+        /// The site page where staff can LOOK at a picture still waiting in the
+        /// queue (that needs the browser's own sign in) and the way through
+        /// when an older site will not take a launcher ticket yet.
         /// </summary>
         public static string StaffPage { get { return Discord.Site + "/uploads"; } }
+
+        /// <summary>One picture waiting in the queue, as /api/gallery/pending lists it.</summary>
+        public class Pending
+        {
+            public string Name = "";
+            public string By = "";
+            public string Note = "";
+            public string From = "";
+            /// <summary>Local time it was sent, or MinValue when the site did not say.</summary>
+            public DateTime When = DateTime.MinValue;
+        }
 
         /// <summary>
         /// Blocking. Call it off the UI thread. The pictures the site is
@@ -223,6 +247,248 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// Blocking. Call it off the UI thread. Sends one screenshot into the
+        /// site's gallery queue over /api/gallery/submit. The body IS the file;
+        /// the ticket, offered name, byline and note ride in the query, matching
+        /// the site's receiveUpload path.
+        ///
+        /// "" when the site took it, and a sentence to show the person when it
+        /// did not. Allowed kinds match the site's GALLERY_ALLOW today: png,
+        /// jpg, jpeg, webp, gif. Screen recordings are not accepted yet; the
+        /// Website lane must widen that list before the launcher can send one.
+        /// </summary>
+        public static string Submit(string path, string by, string note)
+        {
+            if (path == null || path.Trim().Length == 0)
+                return "Choose a picture to send first.";
+            if (!Discord.Linked)
+                return "Connect Discord first, so the site knows who is sending this.";
+            if (!File.Exists(path))
+                return "That file is not there any more.";
+
+            string offered = Path.GetFileName(path);
+            string ext = Path.GetExtension(offered).ToLowerInvariant();
+            if (Array.IndexOf(AllowExt, ext) < 0)
+                return "That kind of file is not allowed. Send a png, jpg, jpeg, webp or gif.";
+
+            // Cap matches the site's GALLERY_CAP (25 MB). Cut here so a huge
+            // file is refused before the bytes leave the machine.
+            const long Cap = 25L * 1024L * 1024L;
+            long len;
+            try { len = new FileInfo(path).Length; }
+            catch (Exception ex)
+            {
+                Swallow.Note("Gallery.Submit size", ex);
+                return "Could not read that file.";
+            }
+            if (len <= 0) return "That file is empty.";
+            if (len > Cap) return "That file is over 25 MB.";
+
+            byte[] data;
+            try { data = File.ReadAllBytes(path); }
+            catch (Exception ex)
+            {
+                Swallow.Note("Gallery.Submit read", ex);
+                return "Could not read that file.";
+            }
+
+            string who = by == null ? "" : by.Trim();
+            if (who.Length > 40) who = who.Substring(0, 40);
+            string remark = note == null ? "" : note.Trim();
+            if (remark.Length > 300) remark = remark.Substring(0, 300);
+
+            string url = Discord.Site + "/api/gallery/submit?ticket=" +
+                         Uri.EscapeDataString(Discord.Ticket) +
+                         "&name=" + Uri.EscapeDataString(offered) +
+                         "&by=" + Uri.EscapeDataString(who) +
+                         "&note=" + Uri.EscapeDataString(remark);
+
+            string reply = "";
+            int code;
+            try { code = Discord.PostBytes(url, data, ContentTypeFor(ext), 60000, out reply); }
+            catch (Exception ex)
+            {
+                Swallow.Note("Gallery.Submit", ex);
+                return "Could not reach thornswood.net to send that picture.";
+            }
+
+            if (code == 200) return "";
+            if (code == 0) return "Could not reach thornswood.net to send that picture.";
+
+            string said = Str(reply, "error");
+            if (said.Length == 0) said = Str(reply, "message");
+            if (said.Length > 0) return said;
+
+            if (code == 401) return "The site would not take this copy's Discord link. Connect Discord again and try once more.";
+            if (code == 403) return "That Discord account is not allowed to send pictures.";
+            if (code == 413) return "That file is over 25 MB.";
+            if (code == 415) return "That kind of file is not allowed. Send a png, jpg, jpeg, webp or gif.";
+            return "The site answered " + code + ", so the picture was not kept.";
+        }
+
+        /// <summary>Extensions the site's GALLERY_ALLOW accepts today.</summary>
+        static readonly string[] AllowExt = new string[] { ".png", ".jpg", ".jpeg", ".webp", ".gif" };
+
+        static string ContentTypeFor(string ext)
+        {
+            if (ext == ".png") return "image/png";
+            if (ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
+            if (ext == ".webp") return "image/webp";
+            if (ext == ".gif") return "image/gif";
+            return "application/octet-stream";
+        }
+
+        /// <summary>
+        /// Blocking. Call it off the UI thread. What is waiting for staff to
+        /// look at, in the order the site keeps it.
+        ///
+        /// bad is "" when the list is the site's own answer, and a sentence to
+        /// show the person when it is not, so an empty list with an empty bad
+        /// means nothing is waiting rather than nothing was learnt.
+        /// </summary>
+        public static List<Pending> Queue(out string bad)
+        {
+            bad = "";
+            var waiting = new List<Pending>();
+            if (!Discord.Linked) { bad = NotLinked; return waiting; }
+
+            string reply;
+            int code = Ask("GET", "/api/gallery/pending", null, out reply);
+            if (code != 200) { bad = Trouble(code, reply, "read the gallery queue"); return waiting; }
+
+            // Only the pending array, so a name or a note somewhere else in the
+            // document is not read as a picture, the same as Load does.
+            string arr = ArrayField(reply, "pending");
+            if (arr.Length == 0) return waiting;
+
+            foreach (Match m in Regex.Matches(arr, "\\{(.*?)\\}", RegexOptions.Singleline))
+            {
+                string body = m.Groups[1].Value;
+                var p = new Pending();
+                p.Name = Str(body, "name");
+                if (p.Name.Length == 0) continue;
+                p.By = Str(body, "by");
+                p.Note = Str(body, "note");
+                p.From = Str(body, "from");
+                p.When = Moment(Num(body, "at"));
+                waiting.Add(p);
+            }
+            return waiting;
+        }
+
+        /// <summary>
+        /// Blocking. Call it off the UI thread. Puts one waiting picture on the
+        /// public gallery. "" when the site did it, and a sentence to show the
+        /// person when it did not.
+        ///
+        /// Doing it twice is not an error: the site leaves a name that is
+        /// already on the gallery where it is and answers 200 either way.
+        /// </summary>
+        public static string Approve(string name)
+        {
+            return Staff("POST", "/api/gallery/approve", name, "approve that picture");
+        }
+
+        /// <summary>
+        /// Blocking. Call it off the UI thread. Takes one waiting picture off
+        /// the queue without putting it up. "" when the site did it, and a
+        /// sentence to show the person when it did not.
+        ///
+        /// The file itself stays in the site's uploads folder. The site's own
+        /// page asks whether to delete it as well; deleting somebody's file for
+        /// good is not a thing to do from one button on a card, so nothing here
+        /// sends deleteFile and the queue entry is all that goes.
+        /// </summary>
+        public static string Reject(string name)
+        {
+            return Staff("POST", "/api/gallery/reject", name, "reject that picture");
+        }
+
+        /// <summary>
+        /// Blocking. Call it off the UI thread. Takes an approved picture off
+        /// the public gallery, which is what a report is answered with. "" when
+        /// the site did it, and a sentence to show the person when it did not.
+        ///
+        /// The site drops any open report against that name in the same move
+        /// and keeps the file, for the same reason Reject does.
+        /// </summary>
+        public static string TakeDown(string name)
+        {
+            return Staff("DELETE", "/api/gallery/approved", name, "take that picture down");
+        }
+
+        /// <summary>
+        /// The three doors that are a name and nothing else, sent the one way:
+        /// this copy's ticket in the query, the name in the body, both escaped.
+        /// </summary>
+        static string Staff(string method, string door, string name, string what)
+        {
+            if (name == null || name.Trim().Length == 0)
+                return "There is no picture on the card to work on.";
+            if (!Discord.Linked) return NotLinked;
+
+            string reply;
+            string body = "{\"name\":\"" + Discord.Escape(name.Trim()) + "\"}";
+            int code = Ask(method, door, body, out reply);
+            if (code == 200) return "";
+            return Trouble(code, reply, what);
+        }
+
+        /// <summary>
+        /// One call to a staff door, with this copy's ticket in the query the
+        /// way Report sends its own. Blocking. The status code, and whatever the
+        /// site said in reply; 0 when it could not be reached at all.
+        /// </summary>
+        static int Ask(string method, string door, string body, out string reply)
+        {
+            reply = "";
+            try
+            {
+                string url = Discord.Site + door + "?ticket=" +
+                             Uri.EscapeDataString(Discord.Ticket);
+                return Discord.Send(method, url, body, out reply);
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("Gallery.Ask " + door, ex);
+                return 0;
+            }
+        }
+
+        const string NotLinked = "Connect Discord first, so the site knows who is asking.";
+
+        /// <summary>
+        /// The sentence to show when a staff door did not answer 200. The site
+        /// says why on every refusal it means, and its own words are better than
+        /// anything invented here, so they are what is shown.
+        ///
+        /// The one refusal that is read rather than repeated is a site older
+        /// than #743: those doors never looked at a ticket, and their 403 is the
+        /// flat "staff only" with no why beside it. Showing that would tell a
+        /// Gamemaster that their account is not staff, when the truth is that
+        /// the site has not been updated yet, so it is named for what it is and
+        /// the person is pointed at the site page, which still works.
+        /// </summary>
+        static string Trouble(int code, string reply, string what)
+        {
+            if (code == 0) return "Could not reach thornswood.net to " + what + ".";
+
+            if (code == 403 && Str(reply, "why").Length == 0 &&
+                Str(reply, "error") == "staff only")
+                return "This thornswood.net does not take staff work from the launcher yet. " +
+                       "Open the Gallery page on thornswood.net until it has been updated.";
+
+            string said = Str(reply, "error");
+            if (said.Length == 0) said = Str(reply, "message");
+            if (said.Length > 0) return said;
+
+            if (code == 401) return "The site would not take this copy's Discord link. Connect Discord again and try once more.";
+            if (code == 403) return "That Discord account may not work the gallery queue.";
+            if (code == 404) return "That picture is not on the gallery any more.";
+            return "The site answered " + code + ", so nothing changed.";
+        }
+
+        /// <summary>
         /// The address to fetch a picture from. An absolute url is used as it
         /// is; a site-relative one such as /shot/&lt;name&gt; hangs off the
         /// site; failing both, the name alone goes to the shot door the site
@@ -332,6 +598,38 @@ namespace Thornswood
         static bool Flag(string json, string key)
         {
             return Regex.IsMatch(json, "\"" + key + "\"\\s*:\\s*true");
+        }
+
+        /// <summary>
+        /// One whole number field out of an object body, or 0 when it is not
+        /// there and when it is not a number.
+        /// </summary>
+        static long Num(string body, string key)
+        {
+            var m = Regex.Match(body, "\"" + key + "\"\\s*:\\s*(-?[0-9]+)");
+            long v;
+            if (!m.Success || !long.TryParse(m.Groups[1].Value, out v)) return 0;
+            return v;
+        }
+
+        /// <summary>
+        /// The site's milliseconds since 1970 as local time, or MinValue when
+        /// there is no time in it, so a queue entry from a site that did not
+        /// say when simply does not say when on the card.
+        /// </summary>
+        static DateTime Moment(long ms)
+        {
+            if (ms <= 0) return DateTime.MinValue;
+            try
+            {
+                return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                       .AddMilliseconds(ms).ToLocalTime();
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("Gallery.Moment", ex);
+                return DateTime.MinValue;
+            }
         }
     }
 }
