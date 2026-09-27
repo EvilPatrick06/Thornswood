@@ -46,6 +46,24 @@ yes('send form hides native file input and offers Choose pictures',
     /\.gal-box \.form input\[type=file\]\{[^}]*clip:rect\(0,0,0,0\)/.test(home) &&
     /id="galPick">Choose pictures</.test(home) &&
     /id="galFileName">No file chosen</.test(home));
+yes('chosen list mounts under the drop zone',
+    /id="galChosen"/.test(home) &&
+    /class="gal-chosen"/.test(home));
+yes('chosen list shows thumbnail, filename, size and Remove',
+    /gal-chosen-thumb/.test(home) &&
+    /gal-chosen-name/.test(home) &&
+    /gal-chosen-size/.test(home) &&
+    /createObjectURL/.test(home) &&
+    /gal-chosen-x/.test(home) &&
+    /textContent = 'Remove'/.test(home) &&
+    /picked\.splice\(idx, 1\)/.test(home));
+yes('chosen list themed charcoal gold',
+    /\.gal-box \.form \.gal-chosen-item\{[^}]*background:var\(--iron\)/.test(home) &&
+    /\.gal-box \.form \.btn\.gal-chosen-x\{[^}]*color:var\(--gold\)/.test(home));
+yes('empty and multi-file labels stay in sync',
+    /No file chosen/.test(home) &&
+    /files chosen/.test(home) &&
+    /picked\.length === 1/.test(home));
 yes('send form has a visible dashed drop zone',
     /id="galDrop"/.test(home) &&
     /Drop pictures here or choose files/.test(home) &&
