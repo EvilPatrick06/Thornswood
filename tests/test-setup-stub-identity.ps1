@@ -4,13 +4,18 @@
   The setup stub names itself. Until the installer is signed (issue #390), the
   window a stranger meets first, UAC and SmartScreen, has only the version
   resource to read, and a blank one leaves it showing the bare file name over
-  "Unknown". Bootstrap.cs fills that in and keeps it stable, so the identity
-  does not change from one build to the next and the Downloads page and FAQ
-  can be written to match what a person sees.
+  "Unknown". Bootstrap.cs fills in the stable product NAME (Title / Product /
+  Company / Copyright). FileVersion and ProductVersion are not hardcoded there;
+  Build-Launcher.ps1 stamps them at compile time from launcher\app\Updater.cs
+  so the stub tracks the launcher release number. The Downloads page and FAQ
+  can still be written to match the stable name strings a person sees.
 
-  This reads Bootstrap.cs and holds it to four things, none of which needs the
-  Windows compiler, so it runs anywhere:
-    - the version resource is there, with a stable product name;
+  This reads Bootstrap.cs and Build-Launcher.ps1 and holds them to:
+    - Bootstrap still has the stable product name attrs (Title/Product/Company/
+      Copyright) and does NOT hardcode AssemblyVersion / AssemblyFileVersion /
+      AssemblyInformationalVersion;
+    - Build-Launcher always generates ThornswoodSetupVersion.cs with those three
+      version attrs from $ver / $verFour and passes it to csc with Bootstrap;
     - every address baked into the exe is https to thornswood.net, and no
       foreign host is compiled in (the two http:// left are XAML namespaces,
       which are names and not places);
@@ -29,9 +34,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here '..\installer\setup\Bootstrap.cs' }
+# This test lives in tests\; repo root is one level up.
+$repoRoot = Split-Path -Parent $Here
+# Legacy: some older checks still resolve Bootstrap via tools\.
+$toolsDir = Join-Path $repoRoot 'tools'
+if (-not $BootstrapPath) { $BootstrapPath = Join-Path $repoRoot 'installer\setup\Bootstrap.cs' }
 
 $script:pass = 0
 $script:fail = 0
@@ -42,18 +49,15 @@ function Yes([string]$what, [bool]$cond) {
 
 $bs = [IO.File]::ReadAllText($BootstrapPath)
 
-# ---- 1. the version resource, and a stable product identity ------------------
-Yes 'the stub carries its own version resource attributes' ($bs -match '(?m)^\s*\[assembly:\s*AssemblyProduct')
+# ---- 1. stable product name in Bootstrap; versions stamped by Build-Launcher --
+Yes 'the stub carries its own product name attributes' ($bs -match '(?m)^\s*\[assembly:\s*AssemblyProduct')
 Yes 'the product name is the stable "Thornswood Setup"' ($bs.Contains('[assembly: AssemblyProduct("Thornswood Setup")]'))
 Yes 'and the UAC program name (AssemblyTitle) is the same' ($bs.Contains('[assembly: AssemblyTitle("Thornswood Setup")]'))
 Yes 'the company is filled in' ($bs.Contains('[assembly: AssemblyCompany("Thornswood")]'))
 Yes 'and a legal copyright notice' ($bs.Contains('[assembly: AssemblyCopyright("Copyright (c) Thornswood")]'))
-$fileVer = [regex]::Match($bs, '\[assembly:\s*AssemblyFileVersion\("([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)"\)\]')
-$prodVer = [regex]::Match($bs, '\[assembly:\s*AssemblyInformationalVersion\("([0-9][0-9.]*)"\)\]')
-Yes 'a four-part file version is set' ($fileVer.Success)
-Yes 'a product version is set' ($prodVer.Success)
-if ($fileVer.Success) { Write-Host ("      FileVersion    " + $fileVer.Groups[1].Value) }
-if ($prodVer.Success) { Write-Host ("      ProductVersion " + $prodVer.Groups[1].Value) }
+Yes 'Bootstrap does NOT hardcode AssemblyVersion' ($bs -notmatch '(?m)^\s*\[assembly:\s*AssemblyVersion')
+Yes 'Bootstrap does NOT hardcode AssemblyFileVersion' ($bs -notmatch '(?m)^\s*\[assembly:\s*AssemblyFileVersion')
+Yes 'Bootstrap does NOT hardcode AssemblyInformationalVersion' ($bs -notmatch '(?m)^\s*\[assembly:\s*AssemblyInformationalVersion')
 
 # ---- 2. https to thornswood.net, and nothing else --------------------------
 Yes 'the one host it is built to reach is https to thornswood.net' (
@@ -96,12 +100,14 @@ Yes 'and the else-branch that enables it when the control is missing is intact' 
     $bs.Contains('// Rather than an installer nobody can ever start.') -and
     $bs.Contains('btnGo.IsEnabled = true;'))
 
-# ---- 5. the build wiring: compiled under the shipped name, with an icon ------
+# ---- 5. the build wiring: shipped name, icon, version stamp from Updater ------
 # OriginalFilename and InternalName come off the /out leaf, and the shipped exe
 # is Thornswood-Setup.exe, so the stub is compiled under that name and then
 # moved onto tools\setup-stub.exe, which packaging copies without recompiling.
 # A file icon (/win32icon) keeps the download from arriving as a blank mark.
-$blPath = Join-Path $Here '..\..\scripts\release\Build-Launcher.ps1'
+# FileVersion/ProductVersion come from a generated ThornswoodSetupVersion.cs
+# stamped from Updater.cs ($ver / $verFour), not from hardcoded Bootstrap attrs.
+$blPath = Join-Path $repoRoot 'scripts\release\Build-Launcher.ps1'
 if (Test-Path -LiteralPath $blPath) {
     $bl = [IO.File]::ReadAllText($blPath)
     Yes 'the setup stub is compiled under its shipped name, Thornswood-Setup.exe' (
@@ -109,6 +115,10 @@ if (Test-Path -LiteralPath $blPath) {
     Yes 'and that is the /out the compiler writes' ($bl.Contains('/out:$stubNew'))
     Yes 'then moved onto the setup-stub.exe packaging copies from' ($bl.Contains('Move-Item $stubNew $stub'))
     Yes 'the stub exe gets a file icon, so it is not a blank mark in the browser' ($bl.Contains('/win32icon:'))
+    Yes 'Build-Launcher generates ThornswoodSetupVersion.cs for the stub' ($bl.Contains('ThornswoodSetupVersion.cs'))
+    Yes 'that file stamps AssemblyFileVersion from $verFour' ($bl.Contains('AssemblyFileVersion("$verFour")'))
+    Yes 'and AssemblyInformationalVersion from $ver' ($bl.Contains('AssemblyInformationalVersion("$ver")'))
+    Yes 'and passes the version .cs to csc via $stubArgs' ($bl.Contains('$stubArgs += $stubVerCs'))
 } else {
     Yes 'Build-Launcher.ps1 is where this expects it' $false
 }
