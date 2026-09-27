@@ -120,14 +120,14 @@ it shipped, before anybody is told to go and get the release:
   answer at all, so an unmirrored site feed offers people the release it last
   held rather than this one.
 - **VirusTotal**, `scripts\release\Publish-VirusTotal.ps1`, the installer
-  lane's script. The installer is what the Downloads page offers and the hash it
-  prints a VirusTotal link for, so that exe is the file it sends, and it asks
-  VirusTotal first because a rerun is normal and the file is most of a gigabyte.
-  `Publish-Installer.ps1` already asks when it publishes a new installer, so this
-  is for the releases that did not rebuild one. It never fails a release: a
-  machine without the key says it is skipping. The key is in the secrets table
-  below. The dev channel leaves this alone, because a dev release does not touch
-  the installer.
+  lane's upload hook. The installer is what the Downloads page offers and the
+  hash it prints a VirusTotal link for, so that exe is the file it is handed, and
+  it asks VirusTotal first because a rerun is normal and the file is most of a
+  gigabyte. `Publish-Installer.ps1` already calls the same hook when it publishes
+  a new installer, so this is for the releases that did not rebuild one. It never
+  fails a release: a machine without the key says it is skipping. The key is in
+  the secrets table below. The website lane owns the page wiring for those
+  download urls.
 
 There is no third step for the launcher. A launcher updates itself from the feed
 it polls, so the remirror is how a launcher update reaches anybody, and the
@@ -135,11 +135,18 @@ it polls, so the remirror is how a launcher update reaches anybody, and the
 install on the shipping machine only (`C:\Thornswood` for main,
 `C:\Thornswood-DevBuild` for dev).
 
+The same block runs on a dev Ship, which is where it gets exercised: everything
+goes to dev first, so the two halves are run several times a week rather than
+once a fortnight. `Publish-PostShip.ps1` finds each hook by name under
+`scripts\` and calls it with the parameters it declares, so neither lane has to
+rename anything to fit, and a hook that is not on the branch yet is a line
+saying which file it looked for rather than a failed release.
+
 Then the site's news, the Discord #news webhook and the game server are told;
 the server warns the room for five minutes and puts everyone back to the
 launcher to update.
 
-A half that does not complete leaves the release published, says which half it
+A half that is there and stops leaves the release published, says which half it
 was with the command that puts it right, and makes Ship exit 1: the tip and its
 follow-ons are meant to go out together. In practice that is the remirror, which
 refuses rather than publish a feed naming bytes the site does not hold.

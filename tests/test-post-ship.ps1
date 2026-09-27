@@ -119,8 +119,11 @@ foreach ($p in 'Channel', 'SkipRemirror', 'SkipVirusTotal', 'NoPause') {
 }
 
 $helperSrc = [IO.File]::ReadAllText($HelperPath, $Utf8)
-Yes '  it calls the website lane''s remirror by path' ($helperSrc -match "\.\.\\deploy\\Remirror-Site-Feed\.ps1")
-Yes '  and the installer lane''s VirusTotal script' ($helperSrc -match "'Publish-VirusTotal\.ps1'")
+Yes '  it looks for the website lane''s remirror at the expected path' (
+    $helperSrc -match "'Remirror-Site-Feed\.ps1'" -and $helperSrc -match "deploy\\Remirror-Site-Feed\.ps1")
+Yes '  and the installer lane''s upload hook at its own' (
+    $helperSrc -match "'Publish-VirusTotal\.ps1'" -and $helperSrc -match "release\\Publish-VirusTotal\.ps1")
+Yes '  and either of them can be named outright' ($declared -contains 'RemirrorScript' -and $declared -contains 'VirusTotalScript')
 # Neither half is reimplemented here, so nothing in it talks to the VPS or to
 # VirusTotal itself.
 Yes '  and does neither job itself: no ssh, no scp, no virustotal.com' (
@@ -219,19 +222,20 @@ $exitIfs = @($ship.Ast.FindAll({ param($n) $n -is $IfAst -and $n.Extent.Text -ma
 Yes '  and Ship exits non-zero because of it' ($exitIfs.Count -ge 1)
 Yes '  while nothing in that block unpublishes anything' ($shipSrc -notmatch 'PostShipFailed[\s\S]{0,400}Unbump')
 
-# ---- the helper, driven against stand-in halves ----------------------------
+# ---- the helper, driven against stand-in hooks ------------------------------
 #
 # A copy of Publish-PostShip.ps1 in a folder shaped like scripts\, beside a
-# stand-in for each half that writes a line and hands back the code it is told
-# to. What is measured is the reading of those codes, not the site or VirusTotal.
+# stand-in for each hook that writes down what it was given and hands back the
+# code it is told to. What is measured is where the hooks are looked for, what
+# they are given, and what their exit codes mean, never the site or VirusTotal.
 $T = Join-Path ([IO.Path]::GetTempPath()) ('ts-post-ship-' + [Guid]::NewGuid().ToString('N'))
 $script:T = $T
 $ps = (Get-Process -Id $PID).Path
-function Run([string]$dir, [string]$leaf, [string[]]$withArgs) {
+function Run([string]$dir, [string[]]$withArgs) {
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $out = & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $dir $leaf) @withArgs 2>&1 | Out-String
+        $out = & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $dir 'Publish-PostShip.ps1') @withArgs 2>&1 | Out-String
         $code = $LASTEXITCODE
     } finally { $ErrorActionPreference = $old }
     return [pscustomobject]@{ Code = $code; Out = $out }
@@ -242,71 +246,98 @@ try {
     $deploy = Join-Path $T 'deploy'
     $rel = Join-Path $T 'Thornswood-Releases'
     $root = Join-Path $T 'Play'
-    $stage = Join-Path (Join-Path (Join-Path $T 'dist') 'Play') '_dist'
+    $dist = Join-Path $T 'dist'
+    $stage = Join-Path (Join-Path $dist 'Play') '_dist'
     New-Item -ItemType Directory -Force -Path $release, $deploy, $rel, $stage | Out-Null
     Copy-Item -LiteralPath $HelperPath -Destination $release -Force
     $setup = Join-Path $stage 'Thornswood-Setup.exe'
     [IO.File]::WriteAllText($setup, 'the installer people download')
-    $dist = Join-Path $T 'dist'
 
-    function Half([string]$dir, [string]$name, [string]$params, [int]$code) {
+    # A stand-in writes its name and every parameter it was actually given, so
+    # the checks below read what the helper passed rather than guessing.
+    function Hook([string]$dir, [string]$name, [string]$params, [int]$code) {
         [IO.File]::WriteAllText((Join-Path $dir ($name + '.ps1')),
             "param($params)`r`n" +
             "Write-Host '$name ran'`r`n" +
             "foreach (`$k in @(`$PSBoundParameters.Keys | Sort-Object)) { Write-Host ('  ' + `$k + '=' + [string]`$PSBoundParameters[`$k]) }`r`n" +
             "exit $code`r`n", $Utf8)
     }
+    # The shapes the two lanes actually landed: the website remirror takes -Dev
+    # and -FeedDir, the installer hook takes -Path and -Sha256.
     $mirrorParams = '[string]$FeedDir, [switch]$Dev, [string[]]$AssetDir, [switch]$Check, [switch]$Verify, [switch]$Quiet'
     $vtParams = '[string]$Path, [string]$Sha256'
 
-    # Main, both halves fine.
-    Half $deploy 'Remirror-Site-Feed' $mirrorParams 0
-    Half $release 'Publish-VirusTotal' $vtParams 0
-    $ok = Run $release 'Publish-PostShip.ps1' @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
-    Yes ("the helper runs both halves on main and passes (exit $($ok.Code))") ($ok.Code -eq 0)
-    Yes '  the remirror ran, told which feed and which clone' (
-        $ok.Out -match 'Remirror-Site-Feed ran' -and $ok.Out -match 'Dev=False' -and $ok.Out -match ('FeedDir=' + [regex]::Escape($rel)))
-    Yes '  VirusTotal ran, on the installer in the staging folder' (
+    # ---- nothing landed yet ------------------------------------------------
+    $none = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("a branch with neither hook on it is not a failed release (exit $($none.Code))") ($none.Code -eq 0)
+    Yes '  and it says which file the remirror would be, and whose it is' (
+        $none.Out -match 'Remirror-Site-Feed\.ps1 is not on this branch' -and $none.Out -match 'website lane')
+    Yes '  and the same for the VirusTotal upload' (
+        $none.Out -match 'Publish-VirusTotal\.ps1 is not on this branch' -and $none.Out -match 'installer lane')
+    Yes '  and says what is still to come rather than that everything is done' ($none.Out -match 'still to come')
+
+    # ---- both landed, main -------------------------------------------------
+    Hook $deploy 'Remirror-Site-Feed' $mirrorParams 0
+    Hook $release 'Publish-VirusTotal' $vtParams 0
+    $ok = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("both hooks on the branch, a main release passes (exit $($ok.Code))") ($ok.Code -eq 0)
+    Yes '  the remirror ran, told the live feed and the clone that was published' (
+        $ok.Out -match 'Remirror-Site-Feed ran' -and $ok.Out -match 'Dev=False' -and
+        $ok.Out -match ('FeedDir=' + [regex]::Escape($rel)))
+    Yes '  and it says where the tip is going' ($ok.Out -match 'the main tip to thornswood\.net/feed/')
+    Yes '  the upload ran, on the installer in the staging folder' (
         $ok.Out -match 'Publish-VirusTotal ran' -and $ok.Out -match ('Path=' + [regex]::Escape($setup)))
-    Yes '  and it says everything that follows the tip is done' ($ok.Out -match 'Everything that follows the main tip is done')
+    Yes '  and it does not pass a parameter the hook never declared' ($ok.Out -notmatch 'NoPause=')
+    Yes '  and says everything that follows the tip is done' ($ok.Out -match 'Everything that follows the main tip is done')
 
-    # Dev: the dev feed, and the installer left alone.
-    $dev = Run $release 'Publish-PostShip.ps1' @('-Channel', 'dev', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
-    Yes ("the dev channel passes (exit $($dev.Code))") ($dev.Code -eq 0)
-    Yes '  the remirror is told it is the dev feed' ($dev.Out -match 'Dev=True')
-    Yes '  and VirusTotal is not asked, because a dev release does not touch the installer' (
-        $dev.Out -notmatch 'Publish-VirusTotal ran' -and $dev.Out -match 'does not touch the installer')
+    # ---- the same block on dev, which is where it gets exercised -----------
+    $dev = Run $release @('-Channel', 'dev', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("the same block runs on dev (exit $($dev.Code))") ($dev.Code -eq 0)
+    Yes '  the remirror is told it is the dev feed' ($dev.Out -match 'Dev=True' -and $dev.Out -match 'thornswood\.net/feed-dev/')
+    Yes '  and the upload runs there too, on the installer this machine holds' (
+        $dev.Out -match 'Publish-VirusTotal ran' -and $dev.Out -match 'did not rebuild the installer')
 
-    # A half that stops.
-    Half $deploy 'Remirror-Site-Feed' $mirrorParams 1
-    $bad = Run $release 'Publish-PostShip.ps1' @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
-    Yes ("a half that stops makes the helper hand back non-zero (exit $($bad.Code))") ($bad.Code -eq 1)
+    # ---- wherever the website lane lands it --------------------------------
+    Move-Item -LiteralPath (Join-Path $deploy 'Remirror-Site-Feed.ps1') -Destination (Join-Path $release 'Remirror-Site-Feed.ps1')
+    $moved = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("the remirror is found in the other folder too (exit $($moved.Code))") ($moved.Code -eq 0 -and $moved.Out -match 'Remirror-Site-Feed ran')
+    $odd = Join-Path $T 'site'
+    New-Item -ItemType Directory -Force -Path $odd | Out-Null
+    Move-Item -LiteralPath (Join-Path $release 'Remirror-Site-Feed.ps1') -Destination (Join-Path $odd 'Remirror-Site-Feed.ps1')
+    $anywhere = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("and anywhere under scripts\ by name (exit $($anywhere.Code))") ($anywhere.Code -eq 0 -and $anywhere.Out -match 'Remirror-Site-Feed ran')
+
+    # ---- and by another name for the same thing ----------------------------
+    Remove-Item -LiteralPath (Join-Path $odd 'Remirror-Site-Feed.ps1') -Force
+    Hook $deploy 'Mirror-Feed' '[string]$ReleaseDir, [string]$Channel, [switch]$NoPause' 0
+    $named = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist,
+                            '-RemirrorScript', (Join-Path $deploy 'Mirror-Feed.ps1'), '-NoPause')
+    Yes ("-RemirrorScript names one outright (exit $($named.Code))") ($named.Code -eq 0 -and $named.Out -match 'Mirror-Feed ran')
+    Yes '  and it is called with the parameters it declares, not the other lane''s' (
+        $named.Out -match 'Channel=main' -and $named.Out -match ('ReleaseDir=' + [regex]::Escape($rel)) -and
+        $named.Out -match 'NoPause=True' -and $named.Out -notmatch 'FeedDir=')
+
+    # ---- a hook that is there and stops ------------------------------------
+    Hook $deploy 'Remirror-Site-Feed' $mirrorParams 1
+    $bad = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("a hook that stops makes the helper hand back non-zero (exit $($bad.Code))") ($bad.Code -eq 1)
     Yes '  and it names that half and the line that puts it right' (
         $bad.Out -match 'The host feed remirror' -and $bad.Out -match 'Remirror-Site-Feed\.ps1')
     Yes '  and the other half still ran, because the tip is already published' ($bad.Out -match 'Publish-VirusTotal ran')
 
-    # Both skipped.
-    Half $deploy 'Remirror-Site-Feed' $mirrorParams 0
-    $skipped = Run $release 'Publish-PostShip.ps1' @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist,
-                                                    '-SkipRemirror', '-SkipVirusTotal', '-NoPause')
+    # ---- skipped, and no installer ----------------------------------------
+    Hook $deploy 'Remirror-Site-Feed' $mirrorParams 0
+    $skipped = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist,
+                              '-SkipRemirror', '-SkipVirusTotal', '-NoPause')
     Yes ("both halves skipped is not a failure (exit $($skipped.Code))") ($skipped.Code -eq 0)
     Yes '  and neither ran' ($skipped.Out -notmatch ' ran')
     Yes '  and it says what an unmirrored feed means' ($skipped.Out -match 'offered that release rather than this one')
 
-    # A half that is not on the machine at all.
-    Remove-Item -LiteralPath (Join-Path $deploy 'Remirror-Site-Feed.ps1') -Force
-    $gone = Run $release 'Publish-PostShip.ps1' @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
-    Yes ("a half that is not there is a failure, not a quiet pass (exit $($gone.Code))") ($gone.Code -eq 1)
-    Yes '  and it says which file is missing and whose it is' (
-        $gone.Out -match 'Remirror-Site-Feed\.ps1 is not here' -and $gone.Out -match 'website lane')
-
-    # No installer on this machine: said, and not a failure, because the file the
-    # page offers is not this machine's to send.
-    Half $deploy 'Remirror-Site-Feed' $mirrorParams 0
     Remove-Item -LiteralPath $setup -Force
-    $noSetup = Run $release 'Publish-PostShip.ps1' @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    $noSetup = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("no installer on this machine is not a failure (exit $($noSetup.Code))") ($noSetup.Code -eq 0)
     Yes '  and it says there is nothing to send' ($noSetup.Out -match 'nothing to send')
+    Yes '  and did not call the upload hook with no file' ($noSetup.Out -notmatch 'Publish-VirusTotal ran')
 }
 finally {
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue

@@ -49,9 +49,13 @@
                                report, so the link it prints beside the SHA-256
                                is not item-not-found
                                (scripts\release\Publish-VirusTotal.ps1, the
-                               installer lane's). A dev release does not touch
-                               the installer, so the dev channel leaves it
-                               alone.
+                               installer lane's upload hook)
+
+  THE SAME BLOCK RUNS ON DEV. Everything goes to dev first, so the dev channel
+  is where this is exercised several times a week rather than once a fortnight.
+  A hook that is not on the branch yet is a line saying which file it looked
+  for, not a failure: only a hook that is there and stops counts as not
+  completing.
 
   THERE IS NO THIRD STEP FOR THE LAUNCHER. The tip customers get is
   version.json, and launchers poll the feed url in it and update themselves, so
@@ -1354,9 +1358,12 @@ else {
   ONE SCRIPT, KEYED OFF THE CHANNEL, AND IT OWNS NEITHER HALF.
   Publish-PostShip.ps1 calls the website lane's Remirror-Site-Feed.ps1 and the
   installer lane's Publish-VirusTotal.ps1, which is the call the first of those
-  asked for in its own header. Ship reads one exit code, Website and Installer
-  have one command to run by hand, and both halves ask before they act, so
-  running it again after a failure does nothing the first run already did.
+  asked for in its own header. It finds each by name under scripts\ and calls it
+  with the parameters it declares, so neither lane has to rename anything to fit,
+  and a hook that has not landed yet is a line rather than a failed release.
+  Ship reads one exit code, Website and Installer have one command to run by
+  hand, and both halves ask before they act, so running it again after a failure
+  does nothing the first run already did.
 
   ORDER. Before the site news, the Discord post and the server's countdown, on
   purpose: those three tell people to update, and the feed has to serve the
