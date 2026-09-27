@@ -4018,7 +4018,7 @@ namespace Thornswood
                 {
                     var r = MessageBox.Show(
                         "The server at " + cfg.ServerAddress + " is not answering.\n\n" +
-                        "Starting anyway gives you a long wait, a black screen and then single player: " +
+                        "Starting anyway gives you a long wait, a black screen and then Skyrim on your own: " +
                         "no character creation, and nothing anyone else can see.\n\nStart the game anyway?",
                         "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                     if (r != MessageBoxResult.Yes) { Log("Not starting. The server is not answering."); return false; }
