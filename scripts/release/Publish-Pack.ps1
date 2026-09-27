@@ -26,8 +26,11 @@ param(
     [string]$Only,
     [switch]$DryRun,
     [string]$Root = 'C:\Thornswood',
-    # The clone of the public releases repo that holds version.json.
-    [string]$ReleaseDir = 'C:\Users\evilp\Downloads\Thornswood-Releases',
+    # The clone of the public releases repo that holds version.json. Empty means
+    # look beside this repository for Thornswood-Releases (same guess as
+    # Set-Collection / Publish-News), so a second machine is not stuck on
+    # Patrick's Downloads path.
+    [string]$ReleaseDir,
     [string]$Repo = 'EvilPatrick06/Thornswood-Releases',
     [switch]$NoPause
 )
@@ -35,6 +38,14 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
+if (-not $ReleaseDir) {
+    $guess = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
+    if (-not (Test-Path (Join-Path $guess '.git'))) {
+        throw "No Thornswood-Releases clone at $guess. Clone it there (git clone https://github.com/EvilPatrick06/Thornswood-Releases), or pass -ReleaseDir."
+    }
+    $ReleaseDir = $guess
+}
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
