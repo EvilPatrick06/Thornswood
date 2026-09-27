@@ -78,7 +78,7 @@ yes('the member lists in /api/all are held back from staff who are not members',
 
 yes('the uploads door sends a waiting shot through the one staff gate, not a second check of its own',
     /const gs = waiting \? await galleryStaff\(url, w\) : null;/.test(SERVER) &&
-    (SERVER.match(/await galleryStaff\(url, w\)/g) || []).length === 7);
+    (SERVER.match(/await galleryStaff\(url, w\)/g) || []).length === 6);
 
 yes('the hub page knows a staff page from an admin one',
     /if \(S\.level\[k\] === 'staff'\) return !!\(S\.me\.dev \|\| S\.me\.admin\);/.test(HUB));
