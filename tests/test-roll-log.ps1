@@ -255,7 +255,7 @@ try {
             Yes 'the command line still names the log, which is how the installer finds its own process' ($line -like ('*' + $vlog + '*'))
         }
     }
-    Yes 'Install-Voice sends the roller up beside the service' ($vtext -match 'Join-Path \$Here ''Roll-Log\.ps1''' -and $vtext -match '/roll-log\.ps1"')
+    Yes 'Install-Voice sends the roller up beside the service' ($vtext -match 'Join-Path \$Here ''\.\.\\vps\\Roll-Log\.ps1''' -and $vtext -match '/roll-log\.ps1"')
     Yes 'Install-Voice rolls voice.log at install rather than deleting it' (
         $vtext -notmatch 'Remove-Item -LiteralPath `\$log\b' -and $vtext -match '& `\$roll -Path `\$log -Force')
 
@@ -313,7 +313,7 @@ try {
         $o = (& $winps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probe 2>&1 | Out-String)
         Yes 'with no roller it still starts python' ($o -match 'reached python')
     }
-    Yes 'Install-Bot sends the roller up beside the bot' ($btext -match 'Join-Path \$Here ''Roll-Log\.ps1''' -and $btext -match '/roll-log\.ps1"')
+    Yes 'Install-Bot sends the roller up beside the bot' ($btext -match 'Join-Path \$Here ''\.\.\\vps\\Roll-Log\.ps1''' -and $btext -match '/roll-log\.ps1"')
 
     # What the bot said on the way up is read from a byte count taken before
     # the start. A roll makes the file shorter than that count, and without
@@ -341,10 +341,53 @@ try {
     # ===================================================== the server installer
     Yes 'Publish-Server sends the roller beside the installer' (
         (Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\release\Publish-Server.ps1') -Raw) -match 'scp \$rollLog "\$\{target\}:C:/Roll-Log\.ps1"')
-    Yes 'the installer puts it in the server''s folder as roll-log.ps1' (
-        $inst -match 'Join-Path \$here ''Roll-Log\.ps1''' -and $inst -match 'Join-Path \$Root ''roll-log\.ps1''')
+    # Same folder first (Publish layout on C:\), then scripts\vps (repo layout).
+    $besideAt = $inst.IndexOf("Join-Path `$here 'Roll-Log.ps1'")
+    $vpsAt = $inst.IndexOf("Join-Path `$here '..\vps\Roll-Log.ps1'")
+    Yes 'the installer looks beside itself, then under scripts\vps, for Roll-Log.ps1' (
+        $besideAt -ge 0 -and $vpsAt -gt $besideAt -and $inst -match 'Join-Path \$Root ''roll-log\.ps1''')
     Yes 'the installer rolls server.log at install rather than deleting it' (
         $inst -notmatch 'Remove-Item -LiteralPath \$log\b' -and $inst -match '& \$roller -Path \$log -Force')
+
+    # Run the installer's own copy lines against both layouts and against neither.
+    $copyFrom = $inst.IndexOf('$rollSrc = $null')
+    $copyTo = $inst.IndexOf('# ---- check the load order')
+    Yes 'the installer''s Roll-Log copy block is intact' ($copyFrom -ge 0 -and $copyTo -gt $copyFrom)
+    if ($copyFrom -ge 0 -and $copyTo -gt $copyFrom) {
+        $copyBody = $inst.Substring($copyFrom, $copyTo - $copyFrom)
+        function Invoke-RollCopy([string]$hereDir, [string]$rootDir) {
+            $here = $hereDir
+            $Root = $rootDir
+            . ([scriptblock]::Create($copyBody))
+            return (Test-Path -LiteralPath (Join-Path $Root 'roll-log.ps1'))
+        }
+        $marker = 'ROLL SOURCE MARKER ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+        $pub = Join-Path $tmp 'pub-layout'
+        $pubRoot = Join-Path $tmp 'pub-root'
+        New-Item -ItemType Directory -Force -Path $pub, $pubRoot | Out-Null
+        Put (Join-Path $pub 'Roll-Log.ps1') $marker
+        Yes 'Publish layout: Roll-Log.ps1 beside the installer is copied' (Invoke-RollCopy $pub $pubRoot)
+        Yes 'Publish layout: the copied roller is the same-folder file' ((Get (Join-Path $pubRoot 'roll-log.ps1')) -eq $marker)
+
+        $repoDeploy = Join-Path $tmp 'repo\scripts\deploy'
+        $repoVpsDir = Join-Path $tmp 'repo\scripts\vps'
+        $repoRoot = Join-Path $tmp 'repo-root'
+        New-Item -ItemType Directory -Force -Path $repoDeploy, $repoVpsDir, $repoRoot | Out-Null
+        $marker2 = 'VPS LAYOUT MARKER ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+        Put (Join-Path $repoVpsDir 'Roll-Log.ps1') $marker2
+        Yes 'repo layout: ..\vps\Roll-Log.ps1 is copied when same-folder is missing' (Invoke-RollCopy $repoDeploy $repoRoot)
+        Yes 'repo layout: the copied roller is the vps file' ((Get (Join-Path $repoRoot 'roll-log.ps1')) -eq $marker2)
+
+        $empty = Join-Path $tmp 'empty-layout'
+        $emptyRoot = Join-Path $tmp 'empty-root'
+        New-Item -ItemType Directory -Force -Path $empty, $emptyRoot | Out-Null
+        $here = $empty
+        $Root = $emptyRoot
+        . ([scriptblock]::Create($copyBody))
+        Yes 'with neither layout the roller is not planted' (-not (Test-Path -LiteralPath (Join-Path $emptyRoot 'roll-log.ps1')))
+        Yes 'with neither layout the yellow warning stays in the installer' (
+            $inst -match 'Write-Host "Roll-Log\.ps1 is not beside this installer, so server\.log will not be rolled at start\." -ForegroundColor Yellow')
+    }
 
     # The folder it deletes on every publish held both logs. Run the real
     # set-aside and the real restore against a temp root.

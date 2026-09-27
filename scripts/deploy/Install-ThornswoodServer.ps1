@@ -1,4 +1,4 @@
-﻿<#
+<#
   Install-ThornswoodServer.ps1
 
   Run this ON THE VPS, after Bootstrap-VPS.ps1, as Administrator.
@@ -261,9 +261,17 @@ if ($logBak -and (Test-Path -LiteralPath $logBak)) {
 # not rolled, so it is said here rather than stopped over.
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-$rollSrc = Join-Path $here '..\vps\Roll-Log.ps1'
+# Publish-Server scp's Roll-Log.ps1 to C:\ beside this installer. Repo layout
+# keeps it under scripts\vps\. Prefer the same folder, then the repo path.
+$rollSrc = $null
+foreach ($cand in @(
+    (Join-Path $here 'Roll-Log.ps1'),
+    (Join-Path $here '..\vps\Roll-Log.ps1')
+)) {
+    if (Test-Path -LiteralPath $cand) { $rollSrc = $cand; break }
+}
 $roller  = Join-Path $Root 'roll-log.ps1'
-if (Test-Path -LiteralPath $rollSrc) {
+if ($rollSrc) {
     Copy-Item -LiteralPath $rollSrc -Destination $roller -Force
 } else {
     Write-Host "Roll-Log.ps1 is not beside this installer, so server.log will not be rolled at start." -ForegroundColor Yellow
