@@ -1,6 +1,18 @@
 ﻿<#
   Add-TempleRespawn.ps1
 
+  RETIRED. DO NOT RUN. Respawn - Death Overhaul left the collection with the
+  needs rebuild (issue #480) and is in no live load order. Everything below
+  installs it and puts it back into plugins.txt and loadorder.txt, so running
+  it now would add a plugin the server does not carry and shift every index
+  after it, which is the client's "Expect EVERYTHING BREAK". It also turns the
+  server's own death system off, and nothing would then decide where anybody
+  wakes up. It refuses to run, and the rest of the file is kept for the
+  history of how the mod was installed. site\data\known.md is where the
+  removal is written down for people.
+
+  What it used to do, and what is left of it:
+
   Stops people respawning on the spot where they died. Respawn - Death
   Overhaul sends you to the Temple of Kynareth or the nearest Hall of the
   Dead instead, which is the closest thing Skyrim has to a soulslike bonfire.
@@ -26,6 +38,15 @@ param(
     [switch]$NoShip,
     [switch]$NoPause
 )
+
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Add-TempleRespawn.ps1 is retired and installs nothing. ' +
+       'Respawn - Death Overhaul is out of the collection (issue #480) and out of the live load ' +
+       'order, so installing it now would put a plugin in plugins.txt that the server does not ' +
+       'carry and every mod form after it would resolve to the wrong object. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if the ' +
+       'mod comes back to the collection, and read the header first.')
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
