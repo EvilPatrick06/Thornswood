@@ -1076,25 +1076,6 @@ if ($OneFile) {
     Say '  the setup program is far bigger than it should be' 'Red'; $ok = $false
 }
 
-# The version resource is the only thing UAC, SmartScreen and the anti-virus
-# heuristics read off this until it is signed (#390, held). Build-Launcher.ps1
-# stamps it from Bootstrap.cs and Updater.cs (#666/#671); this reads it back off
-# the exe about to be published, so a blank, generic or stale one shows as a
-# line here rather than as a fresh VirusTotal detection after it ships. Not
-# fatal: a version-resource read that misbehaves must never hold up a release,
-# and the pull request build already refuses a branch whose stub reads wrong.
-$verHarness = Join-Path $here '..\..\tests\test-setup-version.ps1'
-if (Test-Path -LiteralPath $verHarness) {
-    $verOut = & $verHarness -Path $exe -NoPause 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Say '  the setup program is missing its honest version resource (company / product / version).' 'Yellow'
-        $verOut | ForEach-Object { Say "    $_" 'DarkGray' }
-        Say '    It is stamped by Build-Launcher.ps1; rebuild the stub before this goes to the site.' 'Yellow'
-    } else {
-        Say '  version resource present and honest (CompanyName / ProductName / FileVersion)' 'Green'
-    }
-}
-
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 $listing = & $7z l $zip 2>&1
 $ErrorActionPreference = $old
