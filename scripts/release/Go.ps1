@@ -258,6 +258,26 @@ foreach ($pair in $menuPairs) {
   Note $pair[1]
 }
 
+# ---------------------------------------------------------- required data --
+# Plugins the load order names that Vortex does not yet deploy under that
+# exact filename. Ship packs and the installer also place these (Ship-Rules
+# Ensure-ShipRequiredData). Take a file out of game\required-data when the
+# collection deploys the same Data\ path.
+Head 'Required data'
+$reqSrc = Join-Path $Here '..\..\game\required-data'
+if (Test-Path -LiteralPath $reqSrc) {
+  foreach ($f in @(Get-ChildItem -LiteralPath $reqSrc -File -EA SilentlyContinue)) {
+    if ($f.Name -eq 'README.md') { continue }
+    $dst = Join-Path $Game ('Data\' + $f.Name)
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+    if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
+    Copy-Item -LiteralPath $f.FullName -Destination $dst -Force
+    Note ('Data\' + $f.Name)
+  }
+} else {
+  Gone 'game\required-data is not in the repo'
+}
+
 # ----------------------------------------------------------------- plugins --
 Head 'Plugins'
 $plSrc = Join-Path $Here '..\..\game\plugins'

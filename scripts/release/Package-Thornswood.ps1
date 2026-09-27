@@ -1,4 +1,4 @@
-﻿<#
+<#
   Package-Thornswood.ps1
   Turns the built install at C:\Thornswood into the single file your friends run.
 
@@ -349,6 +349,18 @@ function Test-FromCollection([string]$rel) {
 }
 
 Say '  Listing the build...'
+# Place plugins the load order names that Vortex does not deploy under that
+# name (game\required-data). Same ensure Publish-Update runs before its scan.
+$repoRoot = Join-Path $Here '..\..'
+try {
+    $req = @(Ensure-ShipRequiredData $GameDir $repoRoot)
+    if ($req.Count) {
+        Say ("  required data placed into the game folder: {0}" -f ($req -join ', ')) 'Green'
+    }
+} catch {
+    Die ("Could not place game\required-data into $GameDir : " + $_.Exception.Message)
+}
+
 $all = @(Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)
 $prefix = $GameDir.TrimEnd('\') + '\'
 
