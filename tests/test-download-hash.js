@@ -1,25 +1,8 @@
 // test-download-hash.js
 //
-// The Downloads page prints the installer's SHA-256 beside its size and date,
-// and links VirusTotal's report on that hash only when there is one.
-//
-// From the To Do List, entry 176: "the SHA-256 beside the size and date, and a
-// link to the VirusTotal report for that hash rather than instructions for
-// running one." The long warning that entry also wanted shortened is gone
-// already, removed at Patrick's request on 20 September (2fa5dbe). The hash and
-// the link were the two things still missing, and nothing computed a hash for
-// the page to print.
-//
-// THE LINK WAS A PROMISE NOBODY KEPT, and that half is what changed on
-// 27 September. It was built from the hash alone, and nothing uploads the
-// installer to VirusTotal, so on every current build "VirusTotal report" led to
-// VirusTotal's item-not-found page. Checked live that day against
-// Thornswood-Setup-20260927-0257.exe. So files.json now says whether a report
-// exists, on the exe's own entry, as either vtUrl (the address for that file's
-// own hash) or vtSubmittedAt (when it was sent there). With neither, the page
-// prints the hash and says there is no report yet. The address is always built
-// from the hash the site already has, so no value in files.json can point the
-// link at somewhere else.
+// The Downloads page prints the installer's SHA-256 beside its size and date.
+// VirusTotal report links and over-cap waiting copy are gone: Setup is
+// Authenticode-signed, and the site no longer promises a VT report.
 //
 // THREE HALVES, AND THIS RUNS ALL THREE, because the value has to survive the
 // whole trip and a field name spelt differently at any one stop drops it
@@ -159,7 +142,7 @@ async function main() {
     const by = list();
     const e = by['Thornswood-Setup-20260924-0100.exe'] || {};
     yes('/api/public carries the exe\'s sha256', e.sha256 === good);
-    yes('in lower case, the way VirusTotal writes it in its addresses', e.sha256 === good.toLowerCase());
+    yes('in lower case', e.sha256 === good.toLowerCase());
     yes('a value that is not a SHA-256 does not go out',
         (by['Thornswood-Setup-20260924-0100.zip'] || {}).sha256 === '');
     yes('a file files.json says nothing about gets an empty one',
@@ -169,94 +152,28 @@ async function main() {
         e.size === exeBytes.length && e.hidden === false &&
         (by['Thornswood-Setup-20260924-0100.zip'] || {}).hidden === true);
 
-    // The VirusTotal report, which only exists once somebody has sent the file
-    // there. files.json is the only thing that says so, and the address always
-    // comes from the hash rather than from the file.
-    const report = 'https://www.virustotal.com/gui/file/' + good;
-    const withMeta = (extra) => {
-      const m = JSON.parse(JSON.stringify(meta));
-      Object.assign(m['Thornswood-Setup-20260924-0100.exe'], extra);
-      fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(m));
-      return (list()['Thornswood-Setup-20260924-0100.exe'] || {}).vt;
-    };
-    yes('no report yet: nothing for the page to link', e.vt === '');
-    yes('vtUrl for this file\'s own hash: the report goes out',
-        withMeta({ vtUrl: report }) === report);
-    yes('and in upper case, the way somebody would paste it out of Get-FileHash',
-        withMeta({ vtUrl: 'https://www.virustotal.com/gui/file/' + good.toUpperCase() }) === report);
-    yes('vtSubmittedAt on its own is enough, and the address is built here',
-        withMeta({ vtSubmittedAt: '2026-09-27 03:10' }) === report);
-    yes('a vtUrl for somebody else\'s hash is refused',
-        withMeta({ vtUrl: 'https://www.virustotal.com/gui/file/' + sha(Buffer.from('another file')) }) === '');
-    yes('and so is a vtUrl pointing anywhere but VirusTotal',
-        withMeta({ vtUrl: 'https://evil.example/gui/file/' + good }) === '');
-    yes('and so is one that is not an address at all',
-        withMeta({ vtUrl: '"><img src=x onerror=alert(1)>' }) === '');
-    yes('an entry with no hash never gets a report, whatever it claims',
-        (function () {
-          const m = JSON.parse(JSON.stringify(meta));
-          m['Thornswood-Setup-20260924-0100.zip'].vtSubmittedAt = 'yesterday';
-          fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(m));
-          return (list()['Thornswood-Setup-20260924-0100.zip'] || {}).vt === '';
-        })());
-    fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(meta));
+    // VirusTotal fields no longer go out on /api/public.
+    yes('listFiles does not emit vt', !('vt' in e));
+    yes('listFiles does not emit vtSkipped', !('vtSkipped' in e));
+    yes('listFiles has no VT_CAP constant any more', !/VT_CAP/.test(lf[0]));
 
-    // VirusTotal will not take a file over 650 MB. listFiles marks those
-    // (and any entry Publish explicitly skipped) so the page can say so
-    // instead of implying a report is still coming. The reason string stays
-    // in files.json and never goes out on the API.
-    const CAP = 650 * 1024 * 1024;
-    yes('listFiles names the same 650 MB cap the page uses',
-        /const VT_CAP = 650 \* 1024 \* 1024;/.test(lf[0]));
-    const withSkip = (extra) => {
+    // Stale vtUrl / vtSkipped in files.json must not leak onto the API.
+    const withMeta = (extra) => {
       const m = JSON.parse(JSON.stringify(meta));
       Object.assign(m['Thornswood-Setup-20260924-0100.exe'], extra);
       fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(m));
       return list()['Thornswood-Setup-20260924-0100.exe'] || {};
     };
-    yes('under the cap with no report: vtSkipped is false',
-        withSkip({}).vtSkipped === false);
-    yes('vtSkipped: true in files.json marks the entry without a report',
-        withSkip({ vtSkipped: true }).vtSkipped === true &&
-        withSkip({ vtSkipped: true }).vt === '');
-    yes('vtSkipReason alone is enough, and the reason string does not go out',
-        (function () {
-          const e = withSkip({ vtSkipReason: 'key out of quota' });
-          return e.vtSkipped === true && e.vt === '' &&
-                 !('vtSkipReason' in e) && !JSON.stringify(e).includes('quota');
-        })());
-    yes('vtSkippedReason is accepted the same way',
-        withSkip({ vtSkippedReason: 'refused' }).vtSkipped === true);
-    yes('a report wins over an explicit skip: the link still goes out',
-        withSkip({ vtSkipped: true, vtUrl: report }).vt === report &&
-        withSkip({ vtSkipped: true, vtUrl: report }).vtSkipped === false);
-    fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(meta));
-
-    // A real file over the cap. Written short then size lied about via a
-    // stubbed stat so the test does not need a 650 MB fixture on disk.
-    const bigName = "Thornswood-Setup-over-cap.exe";
-    fs.writeFileSync(path.join(files, bigName), 'tiny');
-    const realStat = fs.statSync;
-    const bigMeta = JSON.parse(JSON.stringify(meta));
-    bigMeta[bigName] = { label: 'huge', sha256: sha(Buffer.from('tiny')).toUpperCase() };
-    fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(bigMeta));
-    const listBig = new Function("fs", "path", "FILES", "jsonFile",
-      lf[0] + '\nreturn listFiles;')({
-        readdirSync: () => fs.readdirSync(files),
-        statSync: (p) => {
-          const st = realStat(p);
-          if (String(p).endsWith(bigName)) {
-            return Object.assign(Object.create(Object.getPrototypeOf(st)), st, {
-              size: CAP + 1, isFile: () => true
-            });
-          }
-          return st;
-        },
-        readFileSync: fs.readFileSync
-      }, path, files, jsonFile);
-    const big = listBig().find((f) => f.name === bigName) || {};
-    yes('on-disk size over the cap: vtSkipped is true and there is no report',
-        big.vtSkipped === true && big.vt === '' && big.size === CAP + 1);
+    const leaked = withMeta({
+      vtUrl: 'https://www.virustotal.com/gui/file/' + good,
+      vtSubmittedAt: '2026-09-27 03:10',
+      vtSkipped: true,
+      vtSkipReason: 'key out of quota'
+    });
+    yes('stale vtUrl in files.json does not appear on the API', !('vt' in leaked) && leaked.sha256 === good);
+    yes('stale vtSkipped in files.json does not appear on the API', !('vtSkipped' in leaked));
+    yes('and a skip-reason string never goes out either',
+        !('vtSkipReason' in leaked) && !JSON.stringify(leaked).includes('quota'));
     fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(meta));
   }
 
@@ -275,13 +192,11 @@ async function main() {
       return new Promise((r) => setImmediate(() => r(html || '')));
     }
     const H = sha(Buffer.from('thornswood'));
-    const VT = 'https://www.virustotal.com/gui/file/' + H;
-    const exe = (size, hash, vt, extra) => Object.assign({ name: 'Thornswood-Setup-20260924-0100.exe', size: size,
+    const exe = (size, hash, extra) => Object.assign({ name: 'Thornswood-Setup-20260924-0100.exe', size: size,
       at: 2, hidden: false, label: 'Thornswood installer', version: '2026-09-24 01:00',
-      note: '', sha256: hash, vt: vt === undefined ? '' : vt }, extra || {});
+      note: '', sha256: hash }, extra || {});
     const zip = (hidden) => ({ name: 'Thornswood-Setup-20260924-0100.zip', size: 385154603,
       at: 1, hidden: hidden, label: 'payload', version: '', note: '', sha256: '' });
-    // The small print under the button, the paragraph with the size in it.
     const SIZE = /\d (KB|MB|GB)\b/;
     const small = (html) => {
       const m = html.match(/<p class="also faintly">[\s\S]*?<\/p>/g) || [];
@@ -289,10 +204,10 @@ async function main() {
     };
 
     const cases = [
-      ['one file build', [exe(560000000, H, VT)]],
+      ['one file build', [exe(560000000, H)]],
       ['stub with a hidden payload, which is what the site serves now',
-        [exe(400000, H, VT), zip(true)]],
-      ['stub with the payload beside it', [exe(400000, H, VT), zip(false)]]
+        [exe(400000, H), zip(true)]],
+      ['stub with the payload beside it', [exe(400000, H), zip(false)]]
     ];
     for (const c of cases) {
       const html = await render({ files: c[1] });
@@ -301,29 +216,13 @@ async function main() {
       yes(c[0] + ': the SHA-256 is printed', p.indexOf('SHA-256') >= 0 && p.indexOf(H) >= 0);
       yes(c[0] + ': beside the size and the date',
           SIZE.test(p) && p.indexOf('9-24-2026 1:00 AM') >= 0 && p.indexOf(H) > p.indexOf('9-24-2026'));
-      yes(c[0] + ': with a link to VirusTotal\'s report on that hash',
-          p.indexOf('href="' + VT + '"') >= 0);
-      yes(c[0] + ': which opens somewhere else rather than leaving the page',
-          /href="https:\/\/www\.virustotal\.com\/gui\/file\/[0-9a-f]{64}" target="_blank" rel="noopener"/.test(p));
-      yes(c[0] + ': and the line above the button names both checks',
-          /SHA-256 and VirusTotal report below/.test(html));
+      yes(c[0] + ': with no VirusTotal report line',
+          !/virustotal/i.test(html) && !/VirusTotal report/.test(html));
+      yes(c[0] + ': and the line above the button names the SHA-256 check',
+          /The SHA-256 below lets you check/.test(html));
+      yes(c[0] + ': and names the signed publisher',
+          /signed as Gavin Knotts/.test(html));
     }
-
-    // A hash and no report, which is every build until somebody uploads one.
-    // The hash still shows, and the page says there is no report rather than
-    // linking VirusTotal's item-not-found page.
-    const waiting = await render({ files: [exe(560000000, H)] });
-    const wp = small(waiting);
-    yes('a build nobody has sent to VirusTotal: the SHA-256 still shows',
-        wp.indexOf('SHA-256') >= 0 && wp.indexOf(H) >= 0);
-    yes('and it is not linked to a report that does not exist',
-        !/virustotal\.com/i.test(waiting) && waiting.indexOf('href="' + VT + '"') < 0);
-    yes('and the page says so in one line, without inventing a finding',
-        /No VirusTotal report for this build yet/.test(wp) &&
-        !/(clean|no detections|\d+ *\/ *\d+ *engines)/i.test(wp));
-    yes('and the line above the button names only the check that is there',
-        /The SHA-256 below lets you check/.test(waiting) &&
-        !/VirusTotal report below/.test(waiting));
 
     const none = await render({ files: [exe(560000000, '')] });
     yes('no hash on the site: the size and date still show', / MB/.test(small(none)));
@@ -335,56 +234,19 @@ async function main() {
     const bad = await render({ files: [exe(560000000, '"><img src=x onerror=alert(1)>')] });
     yes('a value that is not a SHA-256 is never put in the page',
         bad.indexOf('<img') < 0 && bad.indexOf('SHA-256') < 0 && !/virustotal/i.test(bad));
-    // A site that has not been redeployed sends no vt field, and one that has
-    // been tampered with can send anything. Neither gets a link.
-    const stale = await render({ files: [exe(560000000, H, undefined)] });
-    yes('a site older than this, with a hash and no vt field, links nothing',
-        stale.indexOf(H) >= 0 && !/virustotal\.com/i.test(stale));
 
-    // Over VirusTotal's 650 MB upload cap: say so, keep the hash, never imply
-    // a report might still appear.
-    const CAP = 650 * 1024 * 1024;
-    yes('the page names the same 650 MB cap listFiles uses',
-        /var VT_CAP = 650 \* 1024 \* 1024;/.test(body));
-    const over = await render({ files: [exe(CAP + 1, H)] });
-    const op = small(over);
-    yes('over the cap with no report: the SHA-256 still shows',
-        op.indexOf('SHA-256') >= 0 && op.indexOf(H) >= 0);
-    yes('and the page says the file is over VirusTotal\'s 650 MB upload cap',
-        /over VirusTotal's 650 MB upload cap/.test(op) &&
-        /cannot/.test(op));
-    yes('and it does not say a report is coming later',
-        !/No VirusTotal report for this build yet/.test(op) &&
-        !/virustotal\.com/i.test(over));
-    yes('and invents no clean or detection verdict',
-        !/(clean|no detections|\d+ *\/ *\d+ *engines)/i.test(op));
+    // Stale vt fields from an older API must not paint a report on the page.
+    const staleVt = await render({ files: [exe(560000000, H, {
+      vt: 'https://www.virustotal.com/gui/file/' + H,
+      vtSkipped: true
+    })] });
+    yes('a stale vt field on the payload is ignored',
+        staleVt.indexOf(H) >= 0 && !/virustotal\.com/i.test(staleVt) &&
+        !/VirusTotal report/.test(staleVt));
 
-    // A report that somehow exists for a huge file still links (hand upload).
-    const hugeLinked = await render({ files: [exe(CAP + 1, H, VT)] });
-    yes('over the cap but with a vt link: the report is linked',
-        small(hugeLinked).indexOf('href="' + VT + '"') >= 0);
-    yes('and the over-cap line is not shown when there is a report',
-        !/650 MB upload cap/.test(small(hugeLinked)));
-
-    // Explicit skip under the cap: waiting copy, not the over-cap line.
-    const skipped = await render({ files: [exe(560000000, H, '', { vtSkipped: true })] });
-    yes('under the cap with vtSkipped: the waiting line, not the over-cap line',
-        /No VirusTotal report for this build yet/.test(small(skipped)) &&
-        !/650 MB upload cap/.test(small(skipped)));
-    const reasonOut = await render({ files: [exe(560000000, H, '',
-      { vtSkipped: true, vtSkipReason: 'key out of quota' })] });
-    yes('and a skip-reason string from the API is never printed',
-        !/quota/i.test(reasonOut) &&
-        /No VirusTotal report for this build yet/.test(reasonOut));
-
-    for (const nasty of ['javascript:alert(1)', '" onmouseover="alert(1)',
-                         'https://www.virustotal.com/gui/file/' + sha(Buffer.from('somebody else')),
-                         'https://evil.example/gui/file/' + H]) {
-      const out = await render({ files: [exe(560000000, H, nasty)] });
-      yes('a vt value the site should never have sent is not linked: ' + nasty.slice(0, 32),
-          out.indexOf('href="' + nasty + '"') < 0 && out.indexOf(nasty) < 0 &&
-          /No VirusTotal report for this build yet/.test(out));
-    }
+    yes('the page has no VT_CAP constant any more', !/VT_CAP/.test(body));
+    yes('and does not mention VirusTotal\'s 650 MB upload cap',
+        !/650 MB upload cap/.test(body) && !/VirusTotal/i.test(body));
   }
 
   // ----------------------------------------------- what the entry ruled out
@@ -394,6 +256,8 @@ async function main() {
       !/(put|upload|drop) (the|this) file (in)?to VirusTotal/i.test(page));
   yes('nobody is told to switch Defender off',
       !/(switch|turn)(ing)? off[^.<]{0,40}Defender|Defender[^.<]{0,40}(switch|turn)(ed)? off/i.test(page));
+  yes('the page does not claim the installer is unsigned',
+      !/not signed yet/i.test(page) && !/publisher Unknown/i.test(page));
 }
 
 main().catch((e) => { fail++; console.log('FAIL  ' + (e && e.stack || e)); }).then(() => {
