@@ -537,6 +537,31 @@ foreach ($f in 'plugins.txt', 'loadorder.txt') {
     if (Test-Path $src) { $now[":profile:$f"] = (Get-FileHash $src -Algorithm SHA256).Hash }
 }
 
+# WHAT A SAVE ACTUALLY CARES ABOUT, kept apart from the hash above. The hash
+# moves on any byte: line endings, a comment, the file rewritten in the same
+# order. Until 27 September any of those put "The load order moved, so start a
+# new character" under the release, and it went out on 1.1.95, 1.1.96 and dev
+# 1.1.101.6 in two days, telling testers to throw characters away. A save only
+# minds the plugins that are ON and the order they load in, so this key is that
+# list and nothing else: the starred lines of plugins.txt, in order, trimmed
+# and lower cased. The hash still decides whether a pack ships; this decides
+# whether people are told to start over.
+function Get-ActiveOrderKey([string]$path) {
+    $on = @(Get-Content -LiteralPath $path -ErrorAction Stop |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_.StartsWith('*') } |
+            ForEach-Object { $_.Substring(1).Trim().ToLowerInvariant() } |
+            Where-Object { $_ })
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($on -join "`n")) | ForEach-Object { $_.ToString('x2') }) }
+    finally { $sha.Dispose() }
+}
+$orderSrc = Join-Path $ProfileDir 'Default\plugins.txt'
+if (Test-Path $orderSrc) {
+    try { $now[':order:plugins'] = Get-ActiveOrderKey $orderSrc }
+    catch { Say "  could not read the active plugin order from $orderSrc`: $($_.Exception.Message)" 'Yellow' }
+}
+
 # The launcher's own source. Nothing here ships as a file, it all ends up
 # compiled into one exe, which is why a release that only changed the launcher
 # used to produce an empty file list and a news post that said nothing. Hashed
@@ -645,8 +670,13 @@ foreach ($k in $prev.Keys) { if (-not $now.ContainsKey($k)) { $removed += $k } }
 
 $profileChanged = @($changed | Where-Object { $_ -like ':profile:*' })
 $srcChanged     = @($changed | Where-Object { $_ -like ':src:*' })
-$changed        = @($changed | Where-Object { $_ -notlike ':profile:*' -and $_ -notlike ':src:*' })
-$removed        = @($removed | Where-Object { $_ -notlike ':profile:*' -and $_ -notlike ':src:*' -and -not (Test-Machine $_) })
+# Only a real change to the active plugins and their order, and only when the
+# last release recorded one to compare with: the first Ship after this key
+# arrived has nothing to compare, and saying "start over" then would be the
+# same false alarm this exists to stop. See Get-ActiveOrderKey.
+$orderMoved     = $prev.ContainsKey(':order:plugins') -and $now.ContainsKey(':order:plugins') -and ($prev[':order:plugins'] -ne $now[':order:plugins'])
+$changed        = @($changed | Where-Object { $_ -notlike ':profile:*' -and $_ -notlike ':src:*' -and $_ -notlike ':order:*' })
+$removed        = @($removed | Where-Object { $_ -notlike ':profile:*' -and $_ -notlike ':src:*' -and $_ -notlike ':order:*' -and -not (Test-Machine $_) })
 
 # ---- what a removal is allowed to be --------------------------------------
 #
@@ -1591,7 +1621,15 @@ if ($changed.Count) {
     $details += ('{0:n0} file{1} to download, {2:n1} MB' -f $changed.Count, $(if ($changed.Count -eq 1) { '' } else { 's' }), ($changedBytes / 1MB))
 }
 elseif (-not $srcChanged.Count) { $details += 'Nothing to download, this one is bookkeeping' }
-if ($profileChanged.Count) { $details += 'The load order moved, so start a new character or expect the old save to complain' }
+if ($orderMoved) { $details += 'The load order moved, so start a new character or expect the old save to complain' }
+
+# One line once. The 1.1.101 note read "Launcher 1.1.101" twice, because the
+# notes carried it and the line above adds it too. First one kept, in order.
+$seenDetail = @{}
+$details = @($details | Where-Object {
+    $k = ([string]$_).Trim().ToLowerInvariant()
+    if ($seenDetail.ContainsKey($k)) { $false } else { $seenDetail[$k] = $true; $true }
+})
 
 # The full path list. Eighty lines of SKSE ini paths is the ugliest thing that
 # could sit under a release note, and this feed is public now, so it is built
