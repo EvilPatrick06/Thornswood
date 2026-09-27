@@ -269,7 +269,7 @@ Head 'Compiling'
 # twice. Everything the launcher needs is in $refs by hand, so csc.rsp has
 # nothing to add.
 $cscArgs = @(
-    '/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
+    '/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/debug:pdbonly',
     "/out:$exe",
     "/win32icon:$((Resolve-Path $icon).Path)",
     "/resource:$((Resolve-Path $xaml).Path),ui.xaml"
@@ -339,6 +339,12 @@ $ErrorActionPreference = $old
 
 if ($rc -ne 0 -or -not (Test-Path $exe)) { Die "csc.exe exited with $rc" }
 Say ("  Thornswood.exe  {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
+$pdb = [IO.Path]::ChangeExtension($exe, '.pdb')
+if (Test-Path -LiteralPath $pdb) {
+    Say ("  Thornswood.pdb  {0:n0} KB (kept beside the exe; packs and the installer leave it out)" -f ((Get-Item $pdb).Length / 1KB)) 'DarkGray'
+} else {
+    Say '  Thornswood.pdb did not appear beside the exe' 'Yellow'
+}
 if (Test-Path -LiteralPath $oldExe) {
     try {
         Remove-Item -LiteralPath $oldExe -Force
@@ -366,7 +372,7 @@ if (Test-Path $stubSrc) {
     $stub = Join-Path $Here '..\..\tools\setup-stub.exe'
     $stubNew = Join-Path $env:TEMP 'Thornswood-Setup.exe'
     if (Test-Path $stubNew) { Remove-Item $stubNew -Force }
-    $stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
+    $stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/debug:pdbonly',
                   "/out:$stubNew", "/win32icon:$((Resolve-Path $icon).Path)")
     if (Test-Path $logoSml) { $stubArgs += "/resource:$((Resolve-Path $logoSml).Path),logo.png" }
     foreach ($r in $refs) { $stubArgs += "/reference:$r" }
@@ -405,6 +411,13 @@ using System.Reflection;
         if (Test-Path $stub) { Remove-Item $stub -Force }
         Move-Item $stubNew $stub
         Say ("  setup-stub.exe  {0:n0} KB" -f ((Get-Item $stub).Length / 1KB)) 'Green'
+        $stubPdbNew = [IO.Path]::ChangeExtension($stubNew, '.pdb')
+        $stubPdb = [IO.Path]::ChangeExtension($stub, '.pdb')
+        if (Test-Path -LiteralPath $stubPdbNew) {
+            if (Test-Path -LiteralPath $stubPdb) { Remove-Item -LiteralPath $stubPdb -Force }
+            Move-Item -LiteralPath $stubPdbNew -Destination $stubPdb
+            Say ("  setup-stub.pdb  {0:n0} KB (shipping machine only)" -f ((Get-Item $stubPdb).Length / 1KB)) 'DarkGray'
+        }
     }
 }
 

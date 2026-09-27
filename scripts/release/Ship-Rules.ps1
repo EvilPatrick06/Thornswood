@@ -28,6 +28,8 @@
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
       Get-ShipRequiredDataRoot     game\required-data in the repo
       Ensure-ShipRequiredData      place those files into Data\ before a pack or installer scan
+      Get-ShipSymbolDir            where this machine keeps launcher/setup .pdb per version (#462)
+      Save-ShipSymbols             copy .pdb from a build folder into Get-ShipSymbolDir
 
   Paths are relative to the game folder, with backslashes.
 #>
@@ -735,4 +737,43 @@ function Ensure-ShipRequiredData([string]$GameDir, [string]$RepoDir) {
         $placed.Add($rel)
     }
     return ,$placed.ToArray()
+}
+
+# ------------------------------------------------------------ launcher symbols
+#
+# Issue #462. /debug:pdbonly makes Thornswood.pdb (and setup-stub.pdb) beside
+# the built exes. Those files carry absolute source paths from the build
+# machine and method names. They NEVER leave this machine inside a pack, the
+# installer, or a public release asset. Package-Thornswood.ps1 and
+# Publish-Update.ps1 already skip any *.pdb under the game folder; this names
+# the same rule for the launcher and the setup stub.
+#
+# Kept per version under Get-ShipSymbolDir so a customer's launcher.log IL
+# offsets (Shell.cs fault handler) can be mapped to a line later. Shipping the
+# pdb to customers as a second launcher asset needs a #dev decision first.
+
+function Get-ShipSymbolDir([string]$Version) {
+    $root = Join-Path $env:LOCALAPPDATA 'Thornswood\symbols'
+    if ([string]::IsNullOrWhiteSpace($Version)) { return $root }
+    return (Join-Path $root $Version)
+}
+
+# Copies every .pdb found in $FromDir into Get-ShipSymbolDir $Version.
+# Returns the paths written. Missing pdbs are fine (older CI builds, or a
+# main Ship that took the verified exe and never compiled here).
+function Save-ShipSymbols([string]$FromDir, [string]$Version) {
+    if ([string]::IsNullOrWhiteSpace($FromDir) -or -not (Test-Path -LiteralPath $FromDir)) {
+        return ,@()
+    }
+    $dest = Get-ShipSymbolDir $Version
+    if (-not (Test-Path -LiteralPath $dest)) {
+        $null = New-Item -ItemType Directory -Force -Path $dest
+    }
+    $written = New-Object System.Collections.Generic.List[string]
+    foreach ($pdb in @(Get-ChildItem -LiteralPath $FromDir -Filter '*.pdb' -File -EA SilentlyContinue)) {
+        $to = Join-Path $dest $pdb.Name
+        Copy-Item -LiteralPath $pdb.FullName -Destination $to -Force
+        $written.Add($to)
+    }
+    return ,$written.ToArray()
 }
