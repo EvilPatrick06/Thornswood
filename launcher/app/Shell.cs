@@ -92,6 +92,15 @@ namespace Thornswood
         static bool closedForUpdate = false;
         static bool installWhenSeen = false;
         static int inPlayTicks = 0;
+        // Said once in launcher.log, not every thirty seconds: which feed the
+        // checks read, and the first in play check that could not be made.
+        // Both were invisible before (#445): the address was nowhere in the
+        // log, and the in play catch was empty, so a launcher that had spent
+        // the hour's sixty anonymous GitHub requests looked exactly like one
+        // that had checked and found nothing.
+        static string feedSaid = "";
+        static bool inPlayFailSaid;
+        static bool notChangedSaid;
         static int modTab;   // 0 server plugins, 1 script extender, 2 your own, 3 add-ons
         static Border addonsCard;
         // Ids being installed or removed right now, so a second click on the
@@ -928,6 +937,17 @@ namespace Thornswood
             txtStatus.Text = m;
             try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + m + Environment.NewLine); }
             catch { }
+        }
+
+        /// <summary>
+        /// One line in launcher.log and nothing on the status line, for
+        /// something whoever reads a report needs and whoever is playing does
+        /// not. Safe from any thread, which Log is not: Log writes to a control.
+        /// </summary>
+        static void LogOnly(string m)
+        {
+            try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + m + Environment.NewLine); }
+            catch { /* the log is the only place this line could have gone */ }
         }
 
         // ------------------------------------------------------------- pages
@@ -5359,6 +5379,18 @@ namespace Thornswood
         {
             checkFailed = false;
             pendingDoc = v;
+
+            // Where the answer came from, once, and again if it ever changes.
+            // A line in launcher.log naming thornswood.net is what says the
+            // checks are off the GitHub Contents API and its sixty anonymous
+            // requests an hour, and a line naming api.github.com is what says
+            // the site feed is missing and the fallback is carrying it (#445).
+            if (feedSaid != Updater.LastFeedUrl)
+            {
+                feedSaid = Updater.LastFeedUrl;
+                LogOnly("Update checks read " + feedSaid + ".");
+            }
+
             bool install = installWhenSeen;
             installWhenSeen = false;
 
@@ -5536,6 +5568,16 @@ namespace Thornswood
                     if (v != null)
                     {
                         failed = false;
+                        // Once a session, so launcher.log can show the feed's
+                        // ETag doing its job: a check that cost a few bytes and
+                        // one that downloaded the whole ninety kilobyte
+                        // document look identical from the outside (#445).
+                        if (Updater.LastNotModified && !notChangedSaid)
+                        {
+                            notChangedSaid = true;
+                            LogOnly("The update feed answered that nothing has changed, so this check cost " +
+                                    "a few bytes instead of the whole feed. This is said once a session.");
+                        }
                         List<Pack> packs = Updater.Pending(v);
                         bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version)
                                            && !string.IsNullOrEmpty(v.launcherUrl);
@@ -5546,7 +5588,25 @@ namespace Thornswood
                         what = string.Join(", ", parts.ToArray());
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    // Once a session, in launcher.log only (#445). This catch
+                    // was empty, so a launcher that had spent the hour's sixty
+                    // anonymous GitHub requests left no line anywhere and
+                    // looked exactly like one that had checked and found
+                    // nothing: a search of launcher.log for the rate limit
+                    // wording found nothing on any machine. Every thirty
+                    // seconds would be a hundred and twenty lines an hour, so
+                    // the first one is the one that is kept, and the clock is
+                    // left alone either way by the failed flag above.
+                    if (!inPlayFailSaid)
+                    {
+                        inPlayFailSaid = true;
+                        LogOnly("The update check could not be made while the game runs, reading " +
+                                Updater.LastFeedUrl + ". It runs again in thirty seconds, and this " +
+                                "is said once a session. What came back: " + ex.Message);
+                    }
+                }
                 try
                 {
                     win.Dispatcher.BeginInvoke(new Action(delegate

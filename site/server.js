@@ -2682,8 +2682,35 @@ async function handle(req, res) {
     if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
       return send(res, 404, 'no such file', 'text/plain');
     }
+    /*
+      AN ETAG, AND 304 FOR A LAUNCHER THAT ALREADY HAS THIS ONE. #445.
+
+      Every launcher asks for this file every thirty seconds while somebody is
+      in a session, because the countdown that closes the game for an update
+      has to land inside the server's five minute window. The document is about
+      ninety kilobytes and only changes when somebody ships, so nearly ten
+      megabytes an hour per launcher was the same bytes over again.
+
+      no-cache stays as it is. It means "ask before reusing this", not "do not
+      keep it", which is exactly what a feed wants: the launcher still asks
+      every thirty seconds and hears about a release straight away, and the
+      answer is a few bytes when nothing has moved.
+
+      The tag is size and modified time, the same shape the static and asset
+      branches use, so whatever writes a new version.json changes it.
+    */
+    const vst = fs.statSync(file);
+    const vtag = '"' + vst.size.toString(16) + '-' + Math.floor(vst.mtimeMs).toString(16) + '"';
+    if (String(req.headers['if-none-match'] || '') === vtag) {
+      res.writeHead(304, {
+        'etag': vtag,
+        'cache-control': 'no-cache',
+        'x-content-type-options': 'nosniff'
+      });
+      return res.end();
+    }
     return send(res, 200, fs.readFileSync(file), 'application/json; charset=utf-8',
-      { 'Cache-Control': 'no-cache' });
+      { 'Cache-Control': 'no-cache', 'ETag': vtag });
   }
 
   const feedAsset = p.match(/^\/(feed(?:-dev)?)\/assets\/([0-9a-f]{64})$/);

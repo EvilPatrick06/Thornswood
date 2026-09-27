@@ -23,6 +23,66 @@ namespace Thornswood
         /// </summary>
         public static int FeedCollectionRevision;
 
+        /// <summary>
+        /// The address the last check actually read version.json from, so
+        /// launcher.log can be read back afterwards and say where the checks
+        /// went. The site feed on thornswood.net costs nothing; the GitHub
+        /// Contents API fallback spends one of the sixty anonymous requests an
+        /// hour that every launcher on the address shares (#445).
+        /// </summary>
+        public static string LastFeedUrl = "";
+
+        /// <summary>
+        /// True when the last check was answered out of the cache below
+        /// because the feed said nothing had changed, so nothing was
+        /// downloaded.
+        /// </summary>
+        public static bool LastNotModified;
+
+        /// <summary>
+        /// One answer from the site feed: the document, the ETag it arrived
+        /// with, and the address it came from. All three together, in one
+        /// object that is never edited after it is built, because a check from
+        /// the timer and a check somebody pressed can be in flight at the same
+        /// time. Three separate fields could be left holding one check's tag
+        /// beside another's document, and a launcher asking with a tag that
+        /// does not belong to the copy it holds would be told nothing had
+        /// changed and go on believing an older feed.
+        /// </summary>
+        class Cached
+        {
+            public string Url;
+            public string Etag;
+            public VersionDoc Doc;
+        }
+
+        // The last answer the site feed gave.
+        //
+        // While somebody plays, Check runs every thirty seconds, because the
+        // countdown that closes the game has to land inside the server's five
+        // minute window (Shell.CheckUpdatesInPlay). The document is around
+        // ninety kilobytes and only changes when somebody ships, so that was
+        // ten megabytes an hour per launcher to be told the same thing. With
+        // the tag on the next request the site answers 304 and no body.
+        //
+        // In memory and not in config.json on purpose: the tag is worth
+        // nothing without the document it belongs to, and a config that kept
+        // the tag alone would start up, ask with it, be told nothing had
+        // changed, and have nothing to read.
+        static Cached cached;
+
+        // How long the GitHub Contents API fallback is left alone after a try.
+        //
+        // The site feed is asked every thirty seconds in play, and before this
+        // every one of those checks fell through to GitHub the moment the site
+        // missed: a hundred and twenty Contents API calls an hour against an
+        // allowance of sixty per address, so one site hiccup spent the hour's
+        // allowance in half an hour, for everybody on the connection at once.
+        // The site is still asked every thirty seconds, which is what the
+        // countdown needs. Only the fallback waits.
+        static readonly TimeSpan GithubRest = TimeSpan.FromMinutes(5);
+        static DateTime githubTried = DateTime.MinValue;
+
         // WebClient has no timeout worth the name, and the default is long
         // enough that a GitHub which accepts the connection and then says
         // nothing looks like a hung launcher. The same helper Online and
@@ -170,25 +230,25 @@ namespace Thornswood
 
         /// <summary>
         /// Reads version.json. Prefers UpdateFeedUrl (direct https on the
-        /// site, #649). If that fails or is unset, falls back to the GitHub
-        /// Contents API on UpdateRepo/UpdateBranch so Thornswood-Releases
-        /// stays a hot rollback. Returns null if updates are off.
+        /// site, #649), with the ETag of the last copy so an unchanged feed is
+        /// answered 304 and not downloaded again. If that fails or is unset,
+        /// falls back to the GitHub Contents API on UpdateRepo/UpdateBranch so
+        /// Thornswood-Releases stays a hot rollback, at most once every
+        /// GithubRest because that is the request with a quota on it (#445).
+        /// Returns null if updates are off.
         /// </summary>
         public static VersionDoc Check(Config cfg)
         {
             if (!Enabled(cfg)) return null;
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
+            LastNotModified = false;
 
             Exception hostFail = null;
             if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
             {
                 string feedUrl = cfg.UpdateFeedUrl.Trim();
-                try
-                {
-                    CheckUrl(feedUrl);
-                    using (var wc = Client(cfg, false, feedUrl))
-                        return VersionDoc.Parse(wc.DownloadData(feedUrl));
-                }
+                LastFeedUrl = feedUrl;
+                try { return FromSite(cfg, feedUrl); }
                 catch (Exception ex)
                 {
                     // Site feed missed; try GitHub so a site outage does not
@@ -203,6 +263,15 @@ namespace Thornswood
                 return null;
             }
 
+            // The fallback is the one that costs quota, so it is not taken on
+            // every thirty second check while the site is down. Until its rest
+            // is up, the site's failure is what the caller gets, which reads as
+            // no answer rather than as no update and so leaves the in play
+            // clock where it is (Shell.CheckUpdatesInPlay).
+            if (hostFail != null && (DateTime.Now - githubTried) < GithubRest)
+                throw WrapFeedFail(hostFail, true);
+            githubTried = DateTime.Now;
+
             string branch = string.IsNullOrEmpty(cfg.UpdateBranch) ? "main" : cfg.UpdateBranch;
             List<string> tries = RepoCandidates(cfg.UpdateRepo);
             Exception last = null;
@@ -211,6 +280,7 @@ namespace Thornswood
             {
                 string url = "https://api.github.com/repos/" + repo +
                              "/contents/version.json?ref=" + branch;
+                LastFeedUrl = url;
                 try
                 {
                     VersionDoc doc;
@@ -272,6 +342,68 @@ namespace Thornswood
             if (last != null) throw WrapFeedFail(last, false);
             if (hostFail != null) throw WrapFeedFail(hostFail, true);
             throw new Exception("could not reach the update feed");
+        }
+
+        /// <summary>
+        /// version.json straight off the site feed, asking with the ETag of the
+        /// copy already in hand so an unchanged document is not downloaded
+        /// again (#445). The answer is the same VersionDoc either way, so
+        /// nothing above here has to know which of the two it got.
+        /// </summary>
+        static VersionDoc FromSite(Config cfg, string feedUrl)
+        {
+            CheckUrl(feedUrl);
+            // Read once. Anything that replaces it while this check is out
+            // replaces the whole object, so what is used below cannot change
+            // underneath it.
+            Cached have = cached;
+            bool asked = have != null
+                         && have.Doc != null
+                         && !string.IsNullOrEmpty(have.Etag)
+                         && string.Equals(have.Url, feedUrl, StringComparison.Ordinal);
+            using (var wc = Client(cfg, false, feedUrl))
+            {
+                if (asked) wc.Headers["If-None-Match"] = have.Etag;
+                byte[] body;
+                try { body = wc.DownloadData(feedUrl); }
+                catch (WebException wex)
+                {
+                    // The .NET Framework hands a 304 back as a WebException
+                    // rather than as an answer, so the one reply this cache
+                    // exists to get arrives as a throw. Anything else really
+                    // is a failed check and goes on up.
+                    if (asked && NotChanged(wex))
+                    {
+                        LastNotModified = true;
+                        return have.Doc;
+                    }
+                    throw;
+                }
+                // Belt as well as braces, for a stack that hands a 304 back as
+                // an answer with no body instead of throwing.
+                if (asked && (body == null || body.Length == 0))
+                {
+                    LastNotModified = true;
+                    return have.Doc;
+                }
+                VersionDoc doc = VersionDoc.Parse(body);
+                // Kept only once the document parsed, so a tag is never held
+                // beside something the launcher could not read.
+                string tag = null;
+                if (wc.ResponseHeaders != null) tag = wc.ResponseHeaders["ETag"];
+                var fresh = new Cached();
+                fresh.Url = feedUrl;
+                fresh.Etag = tag == null ? "" : tag.Trim();
+                fresh.Doc = doc;
+                cached = fresh;
+                return doc;
+            }
+        }
+
+        static bool NotChanged(WebException wex)
+        {
+            var r = wex.Response as HttpWebResponse;
+            return r != null && (int)r.StatusCode == 304;
         }
 
         static Exception WrapFeedFail(Exception ex, bool fromHost)
