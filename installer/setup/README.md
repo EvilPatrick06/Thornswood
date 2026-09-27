@@ -45,18 +45,22 @@ installer. The address it downloads from is written into `Bootstrap.cs`.
 
 `Thornswood-Setup.exe` is not signed yet (that is issue #390), so until it is,
 Windows cannot show a verified publisher and the UAC prompt's publisher line
-reads `Unknown`. Everything else the prompt and the file's Properties show is
-filled in from a version resource `Bootstrap.cs` carries itself, and is kept
-stable so it does not change from one build to the next. The build date rides in
-the file name, never in the product identity. Website owns the Downloads and FAQ
+reads `Unknown`. The product NAME strings the prompt and the file's Properties
+show come from a version resource `Bootstrap.cs` carries itself, and those names
+are kept stable so they do not change from one build to the next. File version
+and Product version are not hardcoded in Bootstrap; `Build-Launcher.ps1` stamps
+them at compile time from `launcher\app\Updater.cs` (`Version = "x.y.z"`), so
+the stub tracks the launcher release number (e.g. File version `1.1.95.0`,
+Product version `1.1.95` when the launcher is at 1.1.95). The build date rides
+in the file name, never in the product name. Website owns the Downloads and FAQ
 copy; these are the exact strings to write it against: Program name
 (`FileDescription`), the UAC prompt's first line, is `Thornswood Setup`;
 Verified publisher is `Unknown` until #390 signs it; Product name, shown in
 Properties and to SmartScreen, is `Thornswood Setup`; Company is `Thornswood`;
-Copyright is `Copyright (c) Thornswood`; File version is `1.0.0.0`; Product
-version is `1.0.0`; and the Original file name is `Thornswood-Setup.exe`. The
-setup window's own title bar says `Thornswood Setup` too, so the name is the
-same from the download link through UAC to the window, and the emblem is
-compiled in as the file's icon, so the download is not a blank mark in the
-browser. `tests\test-setup-stub-identity.ps1` holds all of these to what is
-here.
+Copyright is `Copyright (c) Thornswood`; File version and Product version match
+the current launcher release from Updater.cs; and the Original file name is
+`Thornswood-Setup.exe`. The setup window's own title bar says `Thornswood Setup`
+too, so the name is the same from the download link through UAC to the window,
+and the emblem is compiled in as the file's icon, so the download is not a blank
+mark in the browser. `tests\test-setup-stub-identity.ps1` holds the name
+strings and the Build-Launcher version-stamping wiring to what is here.
