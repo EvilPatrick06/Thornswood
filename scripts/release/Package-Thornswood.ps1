@@ -732,6 +732,11 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]
     }
     $lines += @(
         '',
+        'The full licence texts sit beside this note in the install folder:',
+        '  GPL-3.0.txt             GNU GPL version 3 (skymp5-client, skyrim-platform)',
+        '  AGPL-3.0.txt            GNU AGPL version 3 (MpClientPlugin.dll, the server)',
+        '  WebView2-LICENSE.txt    Microsoft WebView2 SDK (inside the launcher)',
+        '',
         'The launcher''s updates can bring newer builds of these files, so this note',
         'names the build this installer brought. https://thornswood.net/credits',
         'names the build in the current release.',
@@ -747,6 +752,19 @@ try {
 } catch {
     Die ("SOURCE CODE.txt could not be written: " + $_.Exception.Message + ". This installer carries SkyMP's GPL and AGPL files and has to say where their source is.")
 }
+
+# Full GPL / AGPL / WebView2 texts next to SOURCE CODE.txt (issue #421). Vendored
+# under installer\licences from the recorded fork commit and THIRD-PARTY.md, so a
+# machine without the engine submodule still ships the same bytes.
+$licenceSrc = Join-Path $PSScriptRoot '..\..\installer\licences'
+foreach ($lic in @('GPL-3.0.txt', 'AGPL-3.0.txt', 'WebView2-LICENSE.txt')) {
+    $from = Join-Path $licenceSrc $lic
+    if (-not (Test-Path -LiteralPath $from)) {
+        Die ("installer\licences\$lic is missing. The installer has to hand the GPL, AGPL and WebView2 texts with the files (#421).")
+    }
+    Copy-Item -LiteralPath $from -Destination (Join-Path $stage $lic) -Force
+}
+Say '  GPL-3.0.txt, AGPL-3.0.txt and WebView2-LICENSE.txt staged beside SOURCE CODE.txt' 'Green'
 
 $cfgSrc = Join-Path $Root 'config.json'
 if (Test-Path $cfgSrc) { Copy-Item $cfgSrc $stage -Force }

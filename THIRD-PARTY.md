@@ -407,15 +407,15 @@ branch any more.
 
 ## What is still missing
 
-- The GPL text does reach people, through Nexus: the Thornswood Client Runtime
+- The GPL text reaches people through Nexus: the Thornswood Client Runtime
   installs `Data\Docs\Thornswood Client Runtime\licences\SkyrimPlatform-LICENSE.txt`,
   the GNU General Public License version 3, with the CEF, Chromium, ANGLE, ICU
-  and Node texts beside it, for everybody who installs the collection. Nothing
-  hands a person the AGPL text, which MpClientPlugin.dll and the server are
-  under, and nothing hands them this list or the WebView2 notice together with
-  the files. The WebView2 notice is on the public credits page only. The
-  installer says where the source is (`SOURCE CODE.txt`, above), but the
-  launcher's updates and the release pages on GitHub say nothing about source.
+  and Node texts beside it, for everybody who installs the collection. The
+  installer also hands `GPL-3.0.txt`, `AGPL-3.0.txt` and `WebView2-LICENSE.txt`
+  into the install folder beside `SOURCE CODE.txt` (Package-Thornswood.ps1
+  stages them from `installer\licences`, Setup copies them, Uninstall removes
+  them). The launcher's updates and the release pages on GitHub still say
+  nothing about source beside the feed files themselves.
 - The Client Runtime's README names the fork's branch and no commit, and
   `___systemPolyfill.js` is gone from that branch, so the README's directions
   do not lead to that file's source. The exact place is under "Where the

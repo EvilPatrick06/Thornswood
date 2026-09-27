@@ -273,6 +273,28 @@ $uninstall = Get-Content -LiteralPath (Join-Path $Here '..\launcher\app\Uninstal
 Yes 'Uninstall.cs removes SOURCE CODE.txt from the install folder' `
     ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "SOURCE CODE\.txt"\)\)')
 
+# Full GPL / AGPL / WebView2 texts beside the note (issue #421).
+$licenceDir = Join-Path $Here '..\installer\licences'
+Yes 'installer\licences holds GPL-3.0.txt' (Test-Path -LiteralPath (Join-Path $licenceDir 'GPL-3.0.txt'))
+Yes 'installer\licences holds AGPL-3.0.txt' (Test-Path -LiteralPath (Join-Path $licenceDir 'AGPL-3.0.txt'))
+Yes 'installer\licences holds WebView2-LICENSE.txt' (Test-Path -LiteralPath (Join-Path $licenceDir 'WebView2-LICENSE.txt'))
+$agplHead = if (Test-Path -LiteralPath (Join-Path $licenceDir 'AGPL-3.0.txt')) { Get-Content -LiteralPath (Join-Path $licenceDir 'AGPL-3.0.txt') -TotalCount 5 | Out-String } else { '' }
+$gplHead  = if (Test-Path -LiteralPath (Join-Path $licenceDir 'GPL-3.0.txt'))  { Get-Content -LiteralPath (Join-Path $licenceDir 'GPL-3.0.txt')  -TotalCount 5 | Out-String } else { '' }
+Yes 'AGPL-3.0.txt is the GNU Affero GPL v3' ($agplHead -match 'GNU AFFERO GENERAL PUBLIC LICENSE' -and $agplHead -match 'Version 3')
+Yes 'GPL-3.0.txt is the GNU GPL v3 (not Affero)' ($gplHead -match 'GNU GENERAL PUBLIC LICENSE' -and $gplHead -match 'Version 3' -and $gplHead -notmatch 'AFFERO')
+Yes 'Package-Thornswood.ps1 stages the three licence texts into the stage' `
+    ($package -match "installer\\licences" -and $package -match "'AGPL-3\.0\.txt'" -and $package -match "'GPL-3\.0\.txt'" -and $package -match "'WebView2-LICENSE\.txt'")
+Yes 'Setup-Thornswood.ps1 copies the three licence texts into the install folder' `
+    ($setup -match "'AGPL-3\.0\.txt'" -and $setup -match "'GPL-3\.0\.txt'" -and $setup -match "'WebView2-LICENSE\.txt'")
+Yes 'Uninstall.cs removes AGPL-3.0.txt from the install folder' `
+    ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "AGPL-3\.0\.txt"\)\)')
+Yes 'Uninstall.cs removes GPL-3.0.txt from the install folder' `
+    ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "GPL-3\.0\.txt"\)\)')
+Yes 'Uninstall.cs removes WebView2-LICENSE.txt from the install folder' `
+    ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "WebView2-LICENSE\.txt"\)\)')
+Yes 'SOURCE CODE.txt notice names the three licence files beside it' `
+    ($note -match 'AGPL-3\.0\.txt' -and $note -match 'GPL-3\.0\.txt' -and $note -match 'WebView2-LICENSE\.txt')
+
 # ---- the credits page ------------------------------------------------------
 $credits = Get-Content -LiteralPath $creditsPath -Raw
 $at = $credits.IndexOf("<a id='source'></a>")
