@@ -15,19 +15,19 @@
 # the shipped exe, and SHA256SUMS is what proves the download is that exe and
 # nothing else.
 #
-# WHY IT IS PINNED. runs-on names a DATED image, not windows-latest, so a runner
-# image rebuilt by GitHub cannot change what ships without a commit here. Every
-# action is pinned to a full-length commit SHA for the same reason: a moved tag
-# on an action cannot change what runs. This is the layer Azure Artifact Signing
-# goes on top of later (issue #457, and the signing entry): signing needs the
-# secrets that are not in this repository yet, so it is a follow-up, and until
-# then the checksum file is the whole of the verification.
+# WHY IT IS PINNED. runs-on names the dedicated self-hosted runner by its exact
+# labels, including thornswood-vps, so another runner cannot pick up a release
+# build accidentally. Every action is pinned to a full-length commit SHA for the
+# same reason: a moved tag on an action cannot change what runs. This is the
+# layer Azure Artifact Signing goes on top of later (issue #457, and the
+# signing entry): signing needs the secrets that are not in this repository yet,
+# so it is a follow-up, and until then the checksum file is the whole of the verification.
 #
-# WHERE IT RUNS. windows-2022 is a GitHub-hosted image. The build check and the
-# nightly run on the VPS self-hosted runner because GitHub's hosted minutes were
-# blocked on billing (issue #437); a real tag trial of this workflow needs those
-# minutes enabled, or runs-on changed to the self-hosted label. Said in the pull
-# request so it is not a surprise on the first tag.
+# WHERE IT RUNS. This job uses the dedicated self-hosted Windows X64 runner
+# labeled thornswood-vps. The build check and nightly run there too. This avoids
+# the GitHub-hosted minute spending limit (issue #437); a real tag trial can run
+# as soon as this change is merged. Said in the pull request so it is not a
+# surprise on the first tag.
 name: Release launcher
 on:
   push:
@@ -51,7 +51,7 @@ concurrency:
 jobs:
   launcher:
     name: Build the release launcher
-    runs-on: windows-2022
+    runs-on: [self-hosted, Windows, X64, thornswood-vps]
     # The build is about two minutes; past this it is stuck, not slow.
     timeout-minutes: 20
     steps:
