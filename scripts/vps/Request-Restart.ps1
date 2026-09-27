@@ -51,11 +51,16 @@ param(
   # is the promise that the other half is coming; without one of these two a
   # mode that kicks is refused outright.
   [switch]$RestartFollows,
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [string]$User = 'Administrator',
   [string]$Data = 'C:/Thornswood-Server/data'
 )
 
+
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here 'Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 

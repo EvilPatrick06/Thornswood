@@ -8,13 +8,13 @@
   It asks for the new address, shows you what it is about to change, and waits
   for a yes before touching anything.
 
-  Why this exists: the address of the box is written into twenty three files.
-  Nineteen admin scripts keep it as the default for -Vps, so every deploy,
-  every check and every publish would keep talking to the old machine. The
-  launcher source keeps it twice more, which is what a fresh install uses
-  before it has ever checked for an update. Changing those by hand is how you
-  end up with a website that deploys to a dead box for two days without
-  anybody noticing.
+  Why this exists: the address of the box lives in scripts\vps\vps.json, and
+  the admin scripts read it through Vps.ps1. The same address is still written
+  into 18 other files that genuinely embed it: the launcher source, the
+  plugins, the docs, and a few config examples. Changing those by hand is how
+  you end up with a website that deploys to a dead box for two days without
+  anybody noticing. This script walks the repo (vps.json included) so one
+  address change stays one address change.
 
   It also adds a line to the launcher so that every copy already installed on
   somebody's machine moves itself across the first time it runs. The old

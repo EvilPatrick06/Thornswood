@@ -1,4 +1,4 @@
-﻿<#
+<#
   Install-Voice.ps1
 
   Puts the proximity voice service on the VPS beside the game server and opens
@@ -29,7 +29,7 @@ param(
   # The site the voice server asks about character creation choices. Empty
   # turns that check off, which is how this behaved before it existed.
   [string]$Site = 'https://thornswood.net',
-    [string]$VpsHost  = '192.135.112.23',
+    [string]$VpsHost  = '',
     [string]$VpsUser  = 'Administrator',
     [string]$Root     = 'C:\Thornswood-Voice',
     [int]$Port        = 7778,
@@ -72,6 +72,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }

@@ -1,4 +1,4 @@
-﻿<#
+<#
   Publish-Server.ps1
 
   Run this ON YOUR LAPTOP. It packs the server, sends it to the VPS, installs it
@@ -55,7 +55,7 @@ param(
     [ValidateSet('main', 'dev')][string]$Channel = 'main',
     [switch]$NoNews,
     [switch]$NoPush,
-    [string]$VpsHost  = '192.135.112.23',
+    [string]$VpsHost  = '',
     [string]$VpsUser  = 'Administrator',
     [string]$Dist     = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
     [string]$Zip      = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerZip),
@@ -85,6 +85,8 @@ if ($IsDev) {
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -367,7 +369,7 @@ if (-not (Test-Path -LiteralPath $live)) {
 # THE PORTS ARE THE CHANNEL'S, AND THEY USED TO BE THE LIVE ONES EITHER WAY.
 #
 # 21 September, on the first dev publish of the engine changes, this printed
-# "Thornswood is up at 192.135.112.23:7777" at the end of a run that had
+# "Thornswood is up at <live address:port>" at the end of a run that had
 # correctly said "dev channel: port 7787" at the top. Both numbers here were
 # written in, so a dev publish probed the LIVE resources port, got an answer
 # from the LIVE server, and reported a healthy dev server without ever having

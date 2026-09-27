@@ -34,6 +34,8 @@ param(
 $ErrorActionPreference = 'Continue'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+$script:VpsAddress = Get-ThornswoodVpsAddress
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 $Dev = ($Channel -eq 'dev')
 
@@ -279,10 +281,10 @@ if ($NoVps) {
 } else {
   $sshOk = $false
   try {
-    $out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 Administrator@192.135.112.23 'echo THORNSWOOD_OK' 2>&1 | Out-String
+    $out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "Administrator@$($script:VpsAddress)" 'echo THORNSWOOD_OK' 2>&1 | Out-String
     $sshOk = ($out -match 'THORNSWOOD_OK')
   } catch { $sshOk = $false }
-  Ready 'ssh to the VPS works without a password' $sshOk '192.135.112.23' `
+  Ready 'ssh to the VPS works without a password' $sshOk $script:VpsAddress `
     '.\scripts\vps\Setup-SshKey.ps1        then Patrick runs .\scripts\vps\Add-VpsKey.ps1 to put the public half on the box' 'either'
   Say '  note  ssh is needed by Deploy-*, Publish-Server and the Check scripts that ask the box. A Ship itself does not use it.' 'DarkGray'
 }

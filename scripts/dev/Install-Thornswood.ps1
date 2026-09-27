@@ -24,7 +24,7 @@ param(
     [string]$Root   = 'C:\Thornswood',
     [string]$Server = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
     [string]$Client = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ClientDist),
-    [string]$ServerIp = '192.135.112.23',
+    [string]$ServerIp = '',
     [string]$ServerPort = '7777',
     [string[]]$Only = @(),
     [string[]]$Skip = @(),
@@ -47,6 +47,8 @@ $ErrorActionPreference = 'Continue'
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $ServerIp) { $ServerIp = Get-ThornswoodVpsAddress }
 $Data = Join-Path $Root 'Game\Data'
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

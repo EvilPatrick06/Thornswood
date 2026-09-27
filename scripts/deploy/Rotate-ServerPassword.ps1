@@ -45,7 +45,7 @@ param(
   [int]$Minutes = 5,
   [string]$Why = 'a password change',
   [switch]$Now,
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [string]$User = 'Administrator',
   [string]$DocsRoot   = 'C:/Thornswood-Docs',
   [string]$ServerRoot = 'C:/Thornswood-Server',
@@ -56,6 +56,8 @@ $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))

@@ -23,7 +23,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [string]$User = 'Administrator',
   [string]$Root = 'C:/Thornswood-Docs',
   # Short on purpose. A public news page is the last handful of releases, not
@@ -72,6 +72,8 @@ function PropList($obj, $name) {
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 if (-not $From) {
   $cut = Join-Path $Here 'news-from.txt'

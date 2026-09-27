@@ -1,4 +1,4 @@
-﻿<#
+<#
   Get-Logs.ps1
 
   Brings the server's own logs down to this machine so they can be read whole.
@@ -31,7 +31,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Vps   = '192.135.112.23',
+    [string]$Vps   = '',
     [string]$User  = 'Administrator',
     [int]$Lines    = 4000,
     [switch]$All,
@@ -61,6 +61,8 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here 'Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $Out) {
     $Out = Join-Path (Split-Path -Parent (Split-Path -Parent $Here)) 'logs'
     if ($Dev) { $Out = Join-Path $Out 'dev' }
@@ -158,7 +160,7 @@ foreach ($l in $logs) {
   THROUGH THE SITE FIRST, BECAUSE THAT IS HOW EVERYTHING ELSE REACHES IT.
 
   This asked http://<vps>:7778/health and nothing else, and on 21 and 22
-  September it printed "no answer from 192.135.112.23:7778" on every pull.
+  September it printed "no answer from <live>:7778" on every pull.
   That read as the voice service being down. It was not: measured on
   22 September, https://thornswood.net/voice/health answers 200 and says
 

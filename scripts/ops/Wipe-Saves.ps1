@@ -1,4 +1,4 @@
-﻿<#
+<#
   Wipe-Saves.ps1
 
       .\scripts\ops\Wipe-Saves.ps1
@@ -63,7 +63,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [string]$User = 'Administrator',
   # There was a -Task here naming one scheduled task. It is gone because the
   # tasks are now read off the box, one per server folder found, and a
@@ -75,6 +75,11 @@ param(
   [switch]$Yes
 )
 
+
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 
