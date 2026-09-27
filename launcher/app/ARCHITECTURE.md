@@ -49,7 +49,7 @@ the part to check first.
 
 ### What the exe is
 
-`tools\Build-Launcher.ps1` compiles every `launcher\app\*.cs` with the .NET
+`scripts\release\Build-Launcher.ps1` compiles every `launcher\app\*.cs` with the .NET
 Framework 4 csc (C# 5 only) into `<Root>\Launcher\Thornswood.exe`. It embeds,
 as resources: `launcher\ui.xaml`, the emblem, header art and video, the WebView2
 DLLs, `launcher\voice-host.html`, the `Thornswood.ini` template from
@@ -170,7 +170,7 @@ what it wrote into `Profile\Packs\<pack id>.files`, the id into
 script in the temp folder, `st-update-<process id>.cmd`, that swaps it in once
 this process has gone and keeps the old one until the new one has started
 (see SelfSwap below). `Version` at the top of the file is the launcher's
-version, moved by `tools\Bump-Version.ps1` before a Ship. In the launcher,
+version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launcher,
 `Shell.cs:4457 CheckUpdatesBackground()` asks, `OnVersionDoc` decides,
 `Shell.cs:4903 RunUpdate()` installs, and `Shell.cs:4477 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
