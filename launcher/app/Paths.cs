@@ -43,7 +43,7 @@ namespace Thornswood
 
             string own = Path.Combine(Root, "Game");
             string steam = "";
-            try { steam = Steam.SkyrimPath(); } catch { }
+            try { steam = Steam.SkyrimPath(); } catch (Exception ex) { Swallow.Note("Paths.Init, Steam.SkyrimPath", ex); }
 
             // The launcher's own copy wins whenever it is there, so an upgrade
             // never moves somebody's game out from under them mid-session.

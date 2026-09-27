@@ -108,7 +108,7 @@ namespace Thornswood
                          Path.GetFileName(file) + ". It has its own copy now, so nothing outside " +
                          Paths.Game + " is written.");
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Enforce.MakeItOurs, " + file, ex); }
         }
 
         static List<Rule> Rules()
@@ -215,7 +215,7 @@ namespace Thornswood
                 File.WriteAllLines(file, lines.ToArray());
                 return true;
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Enforce.SetOrAdd, " + file, ex); }
             return false;
         }
 
@@ -248,7 +248,7 @@ namespace Thornswood
                     return true;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Enforce.Set, " + file, ex); }
             return false;
         }
 

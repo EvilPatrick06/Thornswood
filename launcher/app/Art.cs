@@ -103,7 +103,7 @@ namespace Thornswood
                 // The one an older build wrote is only taking up room now.
                 foreach (string f in Directory.GetFiles(Paths.LauncherDir, "header-*.mp4"))
                     if (!string.Equals(f, want, StringComparison.OrdinalIgnoreCase))
-                        try { File.Delete(f); } catch { }
+                        try { File.Delete(f); } catch (Exception ex) { Swallow.Note("Art.HeaderVideo, deleting old " + f, ex); }
 
                 headerVideo = want;
             }

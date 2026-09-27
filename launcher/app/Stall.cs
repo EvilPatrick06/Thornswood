@@ -70,7 +70,7 @@ namespace Thornswood
                                   " The last line before this was: " + lastLogged);
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Shell.StartStallWatch", ex); }
                 }
             });
             t.IsBackground = true;
