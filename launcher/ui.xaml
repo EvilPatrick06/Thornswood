@@ -144,6 +144,13 @@
                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Card}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
               </Trigger>
+              <!-- Keyboard focus is drawn the same as hover, so a person
+                   moving through the chrome buttons with Tab can see where
+                   they are (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="b" Property="Background" Value="{DynamicResource Card}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -173,6 +180,12 @@
                 <Setter TargetName="bar" Property="Fill" Value="{DynamicResource Accent}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
+              </Trigger>
+              <!-- Tabbing to a nav item lights its accent bar, so keyboard
+                   focus is as plain to see as the page it is on (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="bar" Property="Fill" Value="{DynamicResource Accent}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -207,6 +220,11 @@
                 <Setter TargetName="b" Property="Background" Value="{DynamicResource CardHover}"/>
                 <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Accent}"/>
               </Trigger>
+              <!-- Keyboard focus lights the accent border, the same edge
+                   hover gives, so a Tab lands somewhere a person can see (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+              </Trigger>
               <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -224,6 +242,9 @@
             <Border Background="Transparent" Padding="0,2"><ContentPresenter/></Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource Accent}"/></Trigger>
+              <!-- A link in focus reads in the accent, so Tab shows it the
+                   same way the pointer does (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="Foreground" Value="{DynamicResource Accent}"/></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -244,10 +265,16 @@
             <Grid>
               <Border x:Name="b" Background="{DynamicResource Accent}" CornerRadius="2"/>
               <Rectangle Height="1" VerticalAlignment="Top" Margin="1,1,1,0" Fill="#33FFFFFF"/>
+              <!-- The focus ring sits on top of the accent fill, drawn in the
+                   ink that reads on it, and shows only when the button is
+                   reached by keyboard (#602). -->
+              <Rectangle x:Name="ring" RadiusX="2" RadiusY="2" Margin="3" Visibility="Collapsed"
+                         Stroke="{DynamicResource AccentInk}" StrokeThickness="1.5" StrokeDashArray="2 2"/>
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Opacity" Value="0.88"/></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ring" Property="Visibility" Value="Visible"/></Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Card}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Faint}"/>
@@ -267,11 +294,18 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="sb" Background="{DynamicResource Accent}" CornerRadius="2">
-              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
-            </Border>
+            <Grid>
+              <Border x:Name="sb" Background="{DynamicResource Accent}" CornerRadius="2">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+              </Border>
+              <!-- Shown only on keyboard focus, in the ink that reads on the
+                   accent fill, so Tab lands somewhere visible (#602). -->
+              <Rectangle x:Name="ring" RadiusX="2" RadiusY="2" Margin="3" Visibility="Collapsed"
+                         Stroke="{DynamicResource AccentInk}" StrokeThickness="1.5" StrokeDashArray="2 2"/>
+            </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="sb" Property="Opacity" Value="0.86"/></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ring" Property="Visibility" Value="Visible"/></Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="sb" Property="Background" Value="{DynamicResource Card}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Faint}"/>
@@ -377,6 +411,12 @@
                 <Setter TargetName="tick" Property="Visibility" Value="Visible"/>
               </Trigger>
               <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+              </Trigger>
+              <!-- Keyboard focus lights the box edge, the same as hover, so a
+                   person tabbing through the settings can see the tick they
+                   are about to toggle (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
                 <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Accent}"/>
               </Trigger>
             </ControlTemplate.Triggers>
