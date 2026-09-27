@@ -303,13 +303,36 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .shot img{width:100%;height:100%;object-fit:cover}
 .shot-card{display:flex;flex-direction:column;gap:8px}
 .shot-card .shot-actions{display:flex;flex-wrap:wrap;gap:8px}
-.gal-box{margin-top:28px;padding:22px;border:1px solid var(--edge);background:var(--iron)}
-.gal-box h2{font:600 18px/1.3 var(--carve);letter-spacing:.04em;margin:0 0 12px}
-.gal-box .hint{color:var(--faint);margin:0 0 14px}
-.gal-pending .file,.gal-reports .file{display:flex;gap:12px;align-items:center;
-  flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--edge)}
-.gal-pending .thumb,.gal-reports .thumb{width:96px;height:60px;object-fit:cover;
-  border:1px solid var(--edge);background:var(--stone)}
+/* Gallery submit box: same dark gold panel language as the rest of the site,
+   not a separate olive slab. Staff queue and reports live on the hub only. */
+.gal-box{margin-top:28px;padding:26px 28px;border:1px solid var(--edge);
+  background:var(--stone);border-radius:2px;
+  box-shadow:inset 0 1px 0 rgba(201,162,75,.08)}
+.gal-box h2{font:600 clamp(20px,2.4vw,26px)/1.22 var(--carve);letter-spacing:.03em;
+  margin:0 0 10px;color:var(--gold)}
+.gal-box .hint{color:var(--quiet);margin:0 0 16px;font:400 15.5px/1.55 var(--serif)}
+.gal-box .form label{color:var(--page)}
+.gal-box .form input[type=file]{display:block;width:100%;margin-top:8px;
+  padding:10px 12px;background:var(--night);border:1px solid var(--edge2);
+  color:var(--page);border-radius:2px;font:400 14px/1.4 var(--sans)}
+.gal-box .form input[type=text]{background:var(--night)}
+
+/* Home gallery slideshow of approved public shots. */
+.gal-show{position:relative;margin-top:34px;border:1px solid var(--edge);
+  background:var(--stone);border-radius:2px;overflow:hidden;
+  aspect-ratio:16/9;max-height:480px}
+.gal-show img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;transition:opacity .7s ease}
+.gal-show img.on{opacity:1}
+.gal-show .gal-cap{position:absolute;left:0;right:0;bottom:0;padding:18px 22px;
+  background:linear-gradient(180deg,transparent,rgba(11,14,10,.88));
+  color:var(--page);font:400 15px/1.4 var(--serif);z-index:2}
+.gal-show .gal-cap a{border-bottom:1px solid rgba(201,162,75,.45)}
+.gal-dots{display:flex;gap:8px;justify-content:center;margin-top:16px}
+.gal-dots button{width:9px;height:9px;padding:0;border-radius:50%;
+  border:1px solid var(--edge2);background:transparent;cursor:pointer}
+.gal-dots button.on{background:var(--gold);border-color:var(--gold)}
+.gal-more{margin-top:22px}
 
 .release{display:flex;gap:22px;align-items:baseline;flex-wrap:wrap;
   padding:22px 0;border-bottom:1px solid var(--edge)}
@@ -388,6 +411,7 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
       <a href="/rules">Rules</a>
       <a href="/classes">Professions</a>
       <a href="/roadmap">Roadmap</a>
+      <a href="/gallery">Gallery</a>
       <a href="/news">News</a>
       <a href="https://www.patreon.com/thornswood" id="navPatreon"
          target="_blank" rel="noopener">Patreon</a>
@@ -622,9 +646,11 @@ try {
   <div class="wrap">
     <div class="eyebrow">From the world</div>
     <h2>What has happened here so far</h2>
-    <p class="lede">Every picture on this page was taken by somebody playing.
-      Send yours in and it goes up.</p>
-    <div class="gallery" id="gallery"></div>
+    <p class="lede">Every picture here was taken by somebody playing.
+      The gallery is open to anyone.</p>
+    <div class="gal-show" id="galleryShow" aria-live="polite"></div>
+    <div class="gal-dots" id="galleryDots" hidden></div>
+    <p class="gal-more"><a href="/gallery">See the gallery &rarr;</a></p>
   </div>
 </section>
 
@@ -670,6 +696,7 @@ try {
       </div>
       <div>
         <h4>Community</h4>
+        <a href="/gallery">Gallery</a>
         <a href="DISCORD_URL" target="_blank" rel="noopener">Discord</a>
         <a href="https://www.patreon.com/thornswood" id="footPatreon"
            target="_blank" rel="noopener">Patreon</a>
@@ -850,8 +877,9 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
     show(out);
   }).catch(function () { show('<h1>Every release</h1><p>Could not load it.</p>'); });
 } else if (here === '/gallery') {
-  /* Public approved shots, plus a submit form for signed-in members and the
-     staff tools (pending queue, delete, reports) for access.dev roles. */
+  /* Public approved shots and a themed submit form for signed-in members.
+     Staff queue, approve, reject, delete and the reports inbox live on the
+     hub Gallery page only. Public report is the per-image flag on live shots. */
   Promise.all([
     fetch('/api/public').then(function (r) { return r.json(); }),
     fetch('/api/gallery/who', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return {}; })
@@ -880,15 +908,8 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
     } else {
       out += '<div class="gal-box"><p class="hint">Sign in with Discord to send a picture. ' +
         'The launcher can send one in from the game as well.</p>' +
-        '<p><a class="btn" href="/auth/discord?back=' + encodeURIComponent('/gallery') +
+        '<p><a class="btn first" href="/auth/discord?back=' + encodeURIComponent('/gallery') +
         '">Sign in with Discord</a></p></div>';
-    }
-
-    if (who.staff) {
-      out += '<div class="gal-box gal-pending" id="galPending"><h2>Waiting for approval</h2>' +
-        '<p class="hint">Loading the queue.</p></div>';
-      out += '<div class="gal-box gal-reports" id="galReports"><h2>Reports</h2>' +
-        '<p class="hint">Loading reports.</p></div>';
     }
 
     if (!shots.length) {
@@ -899,16 +920,13 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
         var card = '<div class="shot-card"><div class="shot"><img src="' + esc(g.url) +
           '" alt="' + esc(g.by || '') + '" loading="lazy"></div>';
         if (g.by) card += '<div class="also faintly">' + esc(g.by) + '</div>';
-        card += '<div class="shot-actions">';
-        if (who.canSubmit) {
-          card += '<button class="btn" type="button" data-galreport="' + esc(g.name) +
-            '">Report</button>';
+        // Per-image report for live public shots only. No staff inbox here.
+        if (who.signed || who.canSubmit) {
+          card += '<div class="shot-actions">' +
+            '<button class="btn ghost" type="button" data-galreport="' + esc(g.name) +
+            '">Report</button></div>';
         }
-        if (who.staff) {
-          card += '<button class="btn" type="button" data-galdel="' + esc(g.name) +
-            '">Delete</button>';
-        }
-        card += '</div></div>';
+        card += '</div>';
         return card;
       }).join('') + '</div>';
     }
@@ -942,7 +960,6 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
             if (x.ok && x.j && x.j.ok) {
               said('Sent. Staff will look at it before it goes up.');
               if (f) f.value = '';
-              if (who.staff) loadPending();
             } else {
               said((x.j && (x.j.error || x.j.why)) || 'Could not send it.', true);
             }
@@ -963,109 +980,13 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
           body: JSON.stringify({ name: b.getAttribute('data-galreport'), why: why })
         }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
           .then(function (x) {
-            if (x.ok) { b.textContent = 'Reported'; if (who.staff) loadReports(); }
+            if (x.ok) { b.textContent = 'Reported'; }
             else { b.disabled = false; window.alert((x.j && x.j.error) || 'Could not report it.'); }
           })
           .catch(function () { b.disabled = false; window.alert('Could not report it.'); });
       });
     });
-
-    document.querySelectorAll('[data-galdel]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        if (!window.confirm('Delete ' + b.getAttribute('data-galdel') + ' from the gallery? Tick OK to also remove the file.')) return;
-        var delFile = window.confirm('Also delete the uploaded file?');
-        b.disabled = true; b.textContent = 'Deleting';
-        fetch('/api/gallery/approved', {
-          method: 'DELETE', credentials: 'same-origin',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name: b.getAttribute('data-galdel'), deleteFile: delFile })
-        }).then(function (r) {
-          if (r.ok) location.reload();
-          else { b.disabled = false; b.textContent = 'Delete'; window.alert('Could not delete it.'); }
-        }).catch(function () { b.disabled = false; b.textContent = 'Delete'; });
-      });
-    });
-
-    function loadPending() {
-      var box = document.getElementById('galPending');
-      if (!box) return;
-      fetch('/api/gallery/pending', { credentials: 'same-origin' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) {
-          var q = (d && d.pending) || [];
-          var html = '<h2>Waiting for approval' + (q.length ? ' · ' + q.length : '') + '</h2>';
-          if (!q.length) html += '<p class="hint">Nothing waiting.</p>';
-          q.forEach(function (g) {
-            var href = '/up/' + encodeURIComponent(g.name);
-            html += '<div class="file">' +
-              '<a href="' + href + '" target="_blank"><img class="thumb" src="' + href + '" alt=""></a>' +
-              '<div style="flex:1;min-width:160px"><div>' + esc(g.name) + '</div>' +
-              '<div class="hint">' + (g.by ? esc(g.by) + ' · ' : '') + 'from ' + esc(g.from || '?') +
-              (g.note ? '<br>' + esc(g.note) : '') + '</div></div>' +
-              '<button class="btn first" type="button" data-galok="' + esc(g.name) + '">Approve</button>' +
-              '<button class="btn" type="button" data-galno="' + esc(g.name) + '">Reject</button>' +
-              '</div>';
-          });
-          box.innerHTML = html;
-          box.querySelectorAll('[data-galok]').forEach(function (b) {
-            b.onclick = function () {
-              b.disabled = true;
-              fetch('/api/gallery/approve', {
-                method: 'POST', credentials: 'same-origin',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ name: b.getAttribute('data-galok') })
-              }).then(function () { location.reload(); });
-            };
-          });
-          box.querySelectorAll('[data-galno]').forEach(function (b) {
-            b.onclick = function () {
-              if (!window.confirm('Reject ' + b.getAttribute('data-galno') + '?')) return;
-              var delFile = window.confirm('Also delete the upload?');
-              b.disabled = true;
-              fetch('/api/gallery/reject', {
-                method: 'POST', credentials: 'same-origin',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ name: b.getAttribute('data-galno'), deleteFile: delFile })
-              }).then(function () { loadPending(); });
-            };
-          });
-        });
-    }
-
-    function loadReports() {
-      var box = document.getElementById('galReports');
-      if (!box) return;
-      fetch('/api/gallery/reports', { credentials: 'same-origin' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) {
-          var q = (d && d.reports) || [];
-          var html = '<h2>Reports' + (q.length ? ' · ' + q.length : '') + '</h2>';
-          if (!q.length) html += '<p class="hint">No open reports.</p>';
-          q.slice().reverse().forEach(function (r) {
-            html += '<div class="file"><div style="flex:1;min-width:160px">' +
-              '<div>' + esc(r.name) + '</div>' +
-              '<div class="hint">' + (r.why ? esc(r.why) + ' · ' : '') +
-              'from ' + esc(r.from || '?') + '</div></div>' +
-              '<button class="btn" type="button" data-galdismiss="' + esc(r.id) +
-              '">Dismiss</button></div>';
-          });
-          box.innerHTML = html;
-          box.querySelectorAll('[data-galdismiss]').forEach(function (b) {
-            b.onclick = function () {
-              b.disabled = true;
-              fetch('/api/gallery/report/dismiss', {
-                method: 'POST', credentials: 'same-origin',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ id: b.getAttribute('data-galdismiss') })
-              }).then(function () { loadReports(); });
-            };
-          });
-        });
-    }
-
-    if (who.staff) { loadPending(); loadReports(); }
   }).catch(function () { show('<h1>From the world</h1><p>Could not load it.</p>'); });
-
 } else if (here === '/downloads') {
   /* This is the How to join section off the front page. It lived there and on
      this page in two different shapes, which meant two places to keep right
@@ -1392,17 +1313,62 @@ fetch('/api/public', { credentials:'same-origin' })
       rel.innerHTML = '<p class="lede">Nothing shipped yet.</p>';
     }
 
-    // The band stays off the page until there is something in it. Four empty
-    // boxes saying nothing is here yet is worse than no band at all.
-    var g = document.getElementById('gallery');
+    // Home slideshow of approved public shots. Hidden until there is at least
+    // one, because an empty carousel is worse than no band. Staff tools stay
+    // on the hub; this only turns through what strangers already see.
+    var show = document.getElementById('galleryShow');
+    var dots = document.getElementById('galleryDots');
     var band = document.getElementById('gallerySection');
     var shots = d.gallery || [];
-    if (g && band && shots.length) {
+    if (show && band && shots.length) {
       band.hidden = false;
-      shots.slice(0, 8).forEach(function(s){
-        g.insertAdjacentHTML('beforeend',
-          '<div class="shot"><img src="' + esc(s.url) + '" alt="' + esc(s.by || '') + '" loading="lazy"></div>');
+      var i = 0;
+      shots.forEach(function (s, n) {
+        var img = document.createElement('img');
+        img.src = s.url;
+        img.alt = s.by || '';
+        img.loading = n === 0 ? 'eager' : 'lazy';
+        if (n === 0) img.className = 'on';
+        show.appendChild(img);
       });
+      var cap = document.createElement('div');
+      cap.className = 'gal-cap';
+      cap.innerHTML = (shots[0].by ? esc(shots[0].by) + ' \u00b7 ' : '') +
+        '<a href="/gallery">Open the gallery</a>';
+      show.appendChild(cap);
+      if (shots.length > 1 && dots) {
+        dots.hidden = false;
+        shots.forEach(function (_s, n) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.setAttribute('aria-label', 'Picture ' + (n + 1));
+          if (n === 0) b.className = 'on';
+          b.onclick = function () { go(n); };
+          dots.appendChild(b);
+        });
+      }
+      function go(n) {
+        i = n;
+        var imgs = show.querySelectorAll('img');
+        for (var k = 0; k < imgs.length; k++) {
+          imgs[k].className = k === i ? 'on' : '';
+        }
+        if (dots) {
+          var bs = dots.querySelectorAll('button');
+          for (var k = 0; k < bs.length; k++) {
+            bs[k].className = k === i ? 'on' : '';
+          }
+        }
+        cap.innerHTML = (shots[i].by ? esc(shots[i].by) + ' \u00b7 ' : '') +
+          '<a href="/gallery">Open the gallery</a>';
+      }
+      var reduce = false;
+      try {
+        reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      } catch (e) {}
+      if (!reduce && shots.length > 1) {
+        setInterval(function () { go((i + 1) % shots.length); }, 5000);
+      }
     }
   })
   .catch(function(){
