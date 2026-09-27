@@ -108,8 +108,8 @@ uploads pack and launcher as a GitHub release in the releases repo, rewrites
 
 The tip customers get is that `version.json`, and launchers poll the feed url in
 it. So two things follow the tip, both run by
-`scripts\release\Publish-PostShip.ps1`, which Ship calls once per half with the
-channel it shipped, and then the release is announced as it always was:
+`scripts\release\Publish-PostShip.ps1`, which Ship calls for the remirror with
+the channel it shipped, and then the release is announced as it always was:
 
 1. **The host feed remirror**, the website lane's script, called as
    `& (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') -Dev:$Dev`. The
@@ -122,18 +122,13 @@ channel it shipped, and then the release is announced as it always was:
    falls back to the GitHub feed only when the site feed does not answer at all,
    so an unmirrored site feed offers people the release it last held rather than
    this one.
-2. **The VirusTotal upload**, the installer lane's script, called as
-   `.\scripts\release\Publish-VirusTotal.ps1 -Path <file> -Sha256 <hex>` on the
-   installer exe the Downloads page offers, which is the hash the page prints a
-   VirusTotal link for. It reads the key from the environment variable
-   `VT_API_KEY` and nowhere else, and a missing key or an answer it cannot use is
-   one line and exit 0; the key is in the secrets table below.
-   `Publish-Installer.ps1` calls the same script after it hashes and sends a new
-   installer, so this covers the releases that did not rebuild one. The website
-   lane owns the page wiring for those download urls.
-3. **The site news, the #news post and the server's countdown**, unchanged, the
-   news main only as it always was. Those three tell people to update, which is
-   why the feed is mirrored before them.
+2. **The site news, the #news post and the server's countdown**, unchanged, the
+   news main only as it always was. Those tell people to update, which is why
+   the feed is mirrored before them.
+
+VirusTotal is no longer part of publish (#802). Code signing covers trust
+(#390). `Publish-VirusTotal.ps1` and `Add-VirusTotalComment.ps1` stay as
+optional manual tools; `Publish-Installer.ps1` and Ship do not call them.
 
 There is no third step for the launcher. A launcher updates itself from the feed
 it polls, so the remirror is how a launcher update reaches anybody, and the
@@ -142,9 +137,9 @@ install on the shipping machine only (`C:\Thornswood` for main,
 `C:\Thornswood-DevBuild` for dev).
 
 The same block runs on a dev Ship, which is where it gets exercised: everything
-goes to dev first, so the two halves are run several times a week rather than
-once a fortnight. `Publish-PostShip.ps1` finds each hook by name under
-`scripts\` and calls it with the parameters it declares, so neither lane has to
+goes to dev first, so the remirror is run several times a week rather than once
+a fortnight. `Publish-PostShip.ps1` finds the remirror by name under `scripts\`
+and calls it with the parameters it declares, so that lane does not have to
 rename anything to fit, and a hook that is not on the branch yet is a line
 saying which file it looked for rather than a failed release.
 
@@ -343,7 +338,7 @@ says **not enforced** where nothing checks it.
 | Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` makes one when `key.txt` is missing and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |
 | GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and every release: `Publish-Update.ps1` uploads to the releases repo with `gh`, and every launcher installs what that feed says. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to both repos is Patrick's to give or take away. |
 | VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, and its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. None of the scripts needs the Administrator password; `Add-VpsKey.ps1` exists so nobody else has to hold it. | You. First move the old key aside: rename both `.ssh\thornswood_ed25519` and `.ssh\thornswood_ed25519.pub`, say by adding `.old`. While the old key still opens the VPS, `Setup-SshKey.ps1` says it already works and stops, and while the `.pub` is there it uses that one again rather than making a new one. Passing `-KeyPath` a new file does not get round this, because that first check goes through your ssh config, which still names the old key. Then `Setup-SshKey.ps1 -KeyOnly` makes a new key at the same path and prints its public line. Patrick adds it with `Add-VpsKey.ps1 -PublicKey '<the new line>'` and takes the old one off with `Add-VpsKey.ps1 -PublicKey '<the line in the .old .pub>' -Remove`. For his own key, Patrick runs `Setup-SshKey.ps1` without `-KeyOnly`, which asks for the Administrator password once and puts the new key on itself, and then removes the old line the same way. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes and the old line is off. |
-| VirusTotal API key | the environment variable `VT_API_KEY` on the machine that ships, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account, for anybody holding it: the quota and whatever that account can see. The files it sends are ones the site is already handing out. | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it says it is skipping and publishes exactly as before, which is why no switch on Ship turns the upload off. |
+| VirusTotal API key | the environment variable `VT_API_KEY` on the machine that runs the optional manual upload, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account when somebody runs the manual tool. Publish, Package, and Ship do not call it (#802). | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it skips a manual run; publish does not need the key. |
 | Code signing | `tools\signing.json` on a machine that signs. It names the setup and holds no key: the credential is the Azure account behind Artifact Signing, or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Whoever owns the Azure signing account, in Azure. Without the file `Sign-Artifact.ps1` signs nothing and the build carries on unsigned. |
 
 **The rule for this table.** A control that does not exist is listed as

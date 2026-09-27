@@ -21,12 +21,6 @@
   generations is several gigabytes of VPS disk for something nobody has ever
   rolled back to.
 
-  IT ALSO SENDS THE EXE TO VIRUSTOTAL, through Publish-VirusTotal.ps1, so the
-  report the Downloads page links to for that hash exists. That needs the
-  VirusTotal key in the environment variable VT_API_KEY on the machine that
-  ships, and nowhere else: a machine without it says it is skipping and
-  publishes exactly as it always did. Nothing about the upload can fail a
-  publish that has already happened.
 #>
 [CmdletBinding()]
 param(
@@ -116,10 +110,9 @@ if (-not (Test-Path -LiteralPath $exe)) {
 }
 $exeItem = Get-Item -LiteralPath $exe
 # The SHA-256 of the exact file people download. The Downloads page prints it
-# beside the size and date, with a link to VirusTotal's report on that hash, so
-# somebody who wants to know what they are about to run can read a report
-# rather than upload the file themselves (To Do entry 176). Nothing wrote one
-# before, so the page had nothing to print.
+# beside the size and date so somebody can check what they got. VirusTotal is
+# no longer part of publish: code signing covers trust, and a manual send is
+# scripts\release\Publish-VirusTotal.ps1 when somebody wants a report.
 $exeSha = (Get-FileHash -LiteralPath $exeItem.FullName -Algorithm SHA256).Hash
 
 # A one file build is decided by the exe rather than by the switch, because the
@@ -241,107 +234,3 @@ Write-Host ''
 # door that no longer exists, and it read as if the password still crossed
 # the wire in clear.
 Write-Host "  on the site under Downloads: https://thornswood.net" -ForegroundColor Green
-# Where the page's VirusTotal link for this build goes. Printed here so that is
-# one click to check.
-Write-Host "  VirusTotal: https://www.virustotal.com/gui/file/$($exeSha.ToLowerInvariant())"
-
-# And the file goes there, so that address is a report rather than the
-# "item not found" page it landed on from 24 September until now. Publishing
-# has already succeeded by this point and nothing below may undo it:
-# Publish-VirusTotal.ps1 exits 0 whatever happens, prints one line saying
-# which, and a machine without VT_API_KEY set says it is skipping and stops.
-# Called with the hash measured above so there is one measurement of it, which
-# that script checks against its own. After a send or an already-has, the tip
-# exe entry in files.json is marked with vtUrl and vtSubmittedAt so Downloads
-# can show the report link; a soft skip sets vtSkipReason instead (#740). The
-# try is the belt to its braces: this script runs under
-# $ErrorActionPreference = 'Stop', so anything that threw in there rather than
-# returning would take a finished publish down with it.
-# Mark the tip exe in files.json so Downloads can tell a real report from a
-# missing one (#740). Publish-VirusTotal writes a small name=value outcome;
-# the mark payload is name=value too (base64), never JSON, because Windows
-# PowerShell on the VPS turns an ISO-8601 vtSubmittedAt into a DateTime and
-# ConvertTo-Json then drops the Z. Nothing below may undo a finished publish.
-$vtOutcome = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-vt-outcome-' + [Guid]::NewGuid().ToString('N') + '.txt')
-try {
-  & (Join-Path $Here 'Publish-VirusTotal.ps1') -Path $exeItem.FullName -Sha256 $exeSha -OutcomePath $vtOutcome
-  $vtStatus = ''
-  $vtSkip = ''
-  if (Test-Path -LiteralPath $vtOutcome) {
-    foreach ($line in [IO.File]::ReadAllLines($vtOutcome)) {
-      if ($line -match '^(?i)status=(.*)$') { $vtStatus = $Matches[1].Trim() }
-      elseif ($line -match '^(?i)skipReason=(.*)$') { $vtSkip = $Matches[1].Trim() }
-    }
-  }
-  # vtUrl is built only from the exe hash measured above, lowercase, so a
-  # wrong value in the outcome cannot point Downloads somewhere else.
-  $vtSha = $exeSha.ToLowerInvariant()
-  $vtUrl = 'https://www.virustotal.com/gui/file/' + $vtSha
-  $markLines = @()
-  if ($vtStatus -eq 'sent' -or $vtStatus -eq 'already-has') {
-    $vtAt = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture)
-    $markLines = @('vtUrl=' + $vtUrl, 'vtSubmittedAt=' + $vtAt, 'clearSkip=1')
-  }
-  elseif ($vtSkip -in @('over-650mb', 'no-key', 'upload-failed')) {
-    $markLines = @('vtSkipReason=' + $vtSkip)
-  }
-  if ($markLines.Count -gt 0) {
-    $markB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($markLines -join [char]10)))
-    $exeName = $exeItem.Name
-    try {
-      Remote @"
-`$f = Join-Path '$rootWin\files' 'files.json'
-if (-not (Test-Path `$f)) { 'no files.json to mark'; return }
-`$all = @{}
-try {
-  (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
-    ForEach-Object { `$all[`$_.Name] = `$_.Value }
-} catch { 'files.json unread, mark skipped'; return }
-`$name = '$exeName'
-if (-not `$all.ContainsKey(`$name)) { 'no tip exe entry to mark'; return }
-`$entry = `$all[`$name]
-`$raw = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$markB64'))
-`$mark = @{}
-foreach (`$line in (`$raw -split [char]10)) {
-  `$line = `$line.Trim()
-  if (-not `$line) { continue }
-  `$eq = `$line.IndexOf('=')
-  if (`$eq -lt 1) { continue }
-  `$mark[`$line.Substring(0, `$eq)] = `$line.Substring(`$eq + 1)
-}
-function Set-Note(`$obj, [string]`$n, `$v) {
-  if (`$obj -is [hashtable]) { `$obj[`$n] = `$v; return `$obj }
-  `$p = `$obj.PSObject.Properties[`$n]
-  if (`$p) { `$p.Value = `$v } else { `$obj | Add-Member NoteProperty `$n `$v -Force }
-  return `$obj
-}
-function Clear-Note(`$obj, [string]`$n) {
-  if (`$obj -is [hashtable]) { `$obj.Remove(`$n); return `$obj }
-  if (`$obj.PSObject.Properties[`$n]) { `$obj.PSObject.Properties.Remove(`$n) }
-  return `$obj
-}
-if (`$mark.ContainsKey('vtUrl')) {
-  `$entry = Set-Note `$entry 'vtUrl' `$mark['vtUrl']
-  `$entry = Set-Note `$entry 'vtSubmittedAt' `$mark['vtSubmittedAt']
-  `$entry = Clear-Note `$entry 'vtSkipReason'
-} elseif (`$mark.ContainsKey('vtSkipReason')) {
-  `$entry = Set-Note `$entry 'vtSkipReason' `$mark['vtSkipReason']
-  `$entry = Clear-Note `$entry 'vtUrl'
-  `$entry = Clear-Note `$entry 'vtSubmittedAt'
-}
-`$all[`$name] = `$entry
-[IO.File]::WriteAllText(`$f, (`$all | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding(`$false)))
-'marked ' + `$name
-"@ | ForEach-Object { "  $_" }
-    }
-    catch {
-      Write-Host ("  VirusTotal: files.json mark skipped (" + $_.Exception.Message + ")") -ForegroundColor Yellow
-    }
-  }
-}
-catch {
-  Write-Host ("  VirusTotal: not sent (" + $_.Exception.Message + ")") -ForegroundColor Yellow
-}
-finally {
-  Remove-Item -LiteralPath $vtOutcome -Force -ErrorAction SilentlyContinue
-}

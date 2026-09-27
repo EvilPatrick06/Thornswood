@@ -257,11 +257,10 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     Stub 'Publish-News' '' ''
     Stub 'Publish-Discord' '[switch]$Dev' ''
     Stub 'Request-Restart' '[double]$Minutes, [string]$Mode, [string]$Why, [string]$Data' ''
-    # What follows a tip: the host feed remirror and the VirusTotal upload, one
-    # script run once per half. The real one reaches the VPS, the site and
-    # VirusTotal, so a dry run must not call it at all and a real Ship calls it
-    # twice. Ship reads each exit code and says at the end whether they
-    # completed, so this hands back 0 like the rest.
+    # What follows a tip: the host feed remirror. The real one reaches the VPS
+    # and the site, so a dry run must not call it at all and a real Ship calls it
+    # once. Ship reads the exit code and says at the end whether it completed,
+    # so this hands back 0 like the rest.
     Stub 'Publish-PostShip' ('[string]$Channel, [string]$Root, [string]$DistRoot, [string]$Only, ' +
                              '[string]$Installer, [switch]$AlsoLauncher, [switch]$NoPause') ''
     foreach ($n in 'git', 'gh', 'ssh', 'scp') {
@@ -360,14 +359,14 @@ if ($dir) {
     # switch can hold either half back, so nothing here says -Skip anything, and
     # no clone is passed: the remirror works its own out from the channel.
     $post = Called $r 'Publish-PostShip'
-    Yes ('R what follows the tip runs twice, one half each, for main, with the install and the staging folder' +
+    Yes ('R what follows the tip runs once (remirror) for main, with the install and the staging folder' +
          $(if ($post.Count) { ' (' + ($post -join '; ') + ')' } else { '' })) (
-        $post.Count -eq 2 -and
+        $post.Count -eq 1 -and
         @($post | Where-Object { $_ -match ' -Channel main\b' -and $_.Contains(' -Root ' + $root) -and
                                  $_.Contains(' -DistRoot ' + $dist) -and $_ -notmatch ' -Skip' -and
-                                 $_ -notmatch ' -ReleaseDir' }).Count -eq 2 -and
+                                 $_ -notmatch ' -ReleaseDir' }).Count -eq 1 -and
         @($post | Where-Object { $_ -match ' -Only Remirror\b' }).Count -eq 1 -and
-        @($post | Where-Object { $_ -match ' -Only VirusTotal\b' }).Count -eq 1)
+        @($post | Where-Object { $_ -match ' -Only VirusTotal\b' }).Count -eq 0)
     # And the only launcher install is the mid-release one, into the root this
     # release was built from, before the publisher: there is no second one after
     # the tip, because a launcher updates itself from the feed it polls.
