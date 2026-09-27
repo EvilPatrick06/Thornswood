@@ -38,14 +38,18 @@ namespace Thornswood
     //   Ok/Warn/Bad state, and never the accent
     static class Themes
     {
-        static Theme Make(string name, string note, bool light, string[] pairs)
+        static Theme Make(string name, string note, bool light, string[] pairs, string swatch = null)
         {
             var t = new Theme();
             t.Name = name;
             t.Note = note;
             t.Light = light;
             for (int i = 0; i < pairs.Length; i += 2) t.Colors[pairs[i]] = pairs[i + 1];
-            t.Swatch = t.Colors["Accent"];
+            // The square on a theme's button is its accent, the one colour that
+            // tells the themes apart at a glance. A theme may hand its own in
+            // instead: Snow's accent is a blue that runs through its whole UI,
+            // but its button shows a white square, for the cold-daylight look.
+            t.Swatch = swatch ?? t.Colors["Accent"];
             return t;
         }
 
@@ -115,21 +119,13 @@ namespace Thornswood
                 "AccentInk","#171200", "Ok","#7D9A4A", "Warn","#D2762A",
                 "Bad","#BF4436" }),
 
-            Make("Parchment", "Ink on warm paper. Light.", true, new string[] {
-                "Bg","#EFEAE0", "Panel","#F8F4EC", "Card","#FFFDF8",
-                "CardHover","#F2ECE0", "Deep","#E4DDD0", "Line","#D8CFBE",
-                "Edge","#FFFFFF", "Ink","#221D16", "Muted","#5E5546",
-                "Faint","#8C8372", "Accent","#A2572A", "AccentSoft","#28A2572A",
-                "AccentInk","#FFF6EF", "Ok","#4A7D52", "Warn","#94702B",
-                "Bad","#A03A2E" }),
-
             Make("Snow", "Cold daylight. Light.", true, new string[] {
                 "Bg","#EEF1F4", "Panel","#F8FAFC", "Card","#FFFFFF",
                 "CardHover","#EFF3F7", "Deep","#E2E7EC", "Line","#D3DAE1",
                 "Edge","#FFFFFF", "Ink","#1A1F24", "Muted","#55606B",
                 "Faint","#8794A0", "Accent","#2F6FA8", "AccentSoft","#282F6FA8",
                 "AccentInk","#F2F8FC", "Ok","#3C7D4E", "Warn","#8A6A20",
-                "Bad","#A33A2E" }),
+                "Bad","#A33A2E" }, "#FFFFFF"),
 
         };
 
