@@ -68,7 +68,7 @@ namespace Thornswood
                     string full = Path.Combine(Paths.Game, rel);
                     if (File.Exists(full)) found.Add(full);
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Firewall.Present, " + rel, ex); }
             }
             return found;
         }
@@ -138,7 +138,7 @@ namespace Thornswood
             finally
             {
                 try { if (script != null) File.Delete(script); }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Firewall.Ensure, deleting script", ex); }
             }
 
             return helpers.Count == 1

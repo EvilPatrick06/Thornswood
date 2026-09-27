@@ -340,7 +340,7 @@ namespace Thornswood
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Config.Load, reading " + path, ex); }
             return new Config();
         }
 

@@ -92,7 +92,7 @@ namespace Thornswood
             // own folder has to be put back, and Restore will not move a
             // backup onto a name that already exists. It also unblocks the
             // mklink attempt below, which refuses a path that is already there.
-            if (made) { try { Directory.Delete(link); } catch { } }
+            if (made) { try { Directory.Delete(link); } catch (Exception ex) { Swallow.Note("Junction.Create, removing leftover " + link, ex); } }
 
             string shell = null;
             try
