@@ -153,7 +153,10 @@ jobs:
           # Entry 239. A catch with nothing in it leaves no line in
           # launcher.log when it fires, and there were 386 of them on 24 Sep.
           # Red when any file in launcher\app has more than
-          # scripts\dev\swallow-baseline.txt allows; the script says what to do.
+          # scripts\dev\swallow-baseline.txt allows, and since #756 red when a
+          # file has fewer and its line has not been lowered with it, so the
+          # lowering lands in the branch that made the count fall rather than
+          # waiting for somebody to notice. The script says what to do.
           .\scripts\dev\Check-Swallow.ps1
 
       - name: Build the launcher

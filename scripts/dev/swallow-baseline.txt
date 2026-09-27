@@ -21,7 +21,10 @@
 # catch is counted as one. Nothing in launcher\app does that today.
 #
 # A number here only goes down. When a file's count drops, lower its line in
-# the same pull request. To make a catch stop counting, log it with
+# the same pull request: since #756 the check is red until you do, the same as
+# it is for a rise, because a fall that only printed a yellow line was left for
+# whoever came next and two of these lines then sat a catch high from #706 and
+# #709 until #753 found them by eye. To make a catch stop counting, log it with
 # Swallow.Note (launcher\app\Swallow.cs). Raising a number is a decision for
 # Patrick, not a fix.
 #
