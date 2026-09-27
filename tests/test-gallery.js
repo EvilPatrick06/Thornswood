@@ -19,7 +19,10 @@
       /api/play/join, verified the same way: a good ticket is taken, a broken
       one is refused, and a banned account is refused;
     - only images are taken, so a .txt is refused;
-    - the pending queue is admin only, and never on /api/public;
+    - the pending queue is staff only, and never on /api/public;
+    - every staff door takes a launcher ticket for a staff account as well as
+      the hub cookie (#743), and refuses a ticket for somebody who may only
+      play, a broken one, and a banned one;
     - approve moves a submission onto gallery.json as { name, url, by }, is
       idempotent, and then /api/public and /shot serve it;
     - reject takes it off the queue and, when asked, unlinks the upload, and
@@ -360,6 +363,71 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     pend = readJson('gallery-pending.json') || [];
     yes('delete-approved did not clear the pending queue',
         !!pend.find((x) => x.name === playWebName) && !!pend.find((x) => x.name === moreName));
+
+    // ---- a launcher ticket at the staff doors (#743) -------------------------
+    // The same signed ticket /api/play/join takes, in the query the way submit
+    // and report already read theirs, and st.dev asked of it rather than
+    // st.play: ADMIN_ID is on the admin list, so standing() makes it staff,
+    // and MEMBER_ID is only allowed to play.
+    const staffT = '?ticket=' + encodeURIComponent(ticket(ADMIN_ID, 'Admin'));
+    const playT = '?ticket=' + encodeURIComponent(ticket(MEMBER_ID, 'Ataxayk'));
+    const asJson = { 'content-type': 'application/json' };
+
+    r = await ask('GET', '/api/gallery/pending');
+    yes('no cookie and no ticket is still the 403 staff only it always was (' + r.status + ')',
+        r.status === 403 && r.json && r.json.error === 'staff only');
+    r = await ask('GET', '/api/gallery/pending?ticket=' + encodeURIComponent('tk1.nope.nope'));
+    yes('a ticket that is not signed is the same 403 staff only (' + r.status + ')',
+        r.status === 403 && r.json && r.json.error === 'staff only');
+    r = await ask('GET', '/api/gallery/pending' + playT);
+    yes('a ticket for somebody who may only play cannot read the queue (' + r.status + ')',
+        r.status === 403 && r.json && r.json.why === 'role');
+    r = await ask('GET', '/api/gallery/pending?ticket=' + encodeURIComponent(ticket(BANNED_ID, 'Nope')));
+    yes('a banned account is refused at the queue too (' + r.status + ')',
+        r.status === 403 && r.json && (r.json.why === 'guild' || r.json.why === 'banned'));
+    r = await ask('GET', '/api/gallery/pending' + staffT);
+    yes('a staff ticket reads the pending queue (' + r.status + ')',
+        r.status === 200 && r.json && Array.isArray(r.json.pending) &&
+        r.json.pending.length === 5 && r.json.pending.some((x) => x.name === playWebName));
+
+    r = await ask('POST', '/api/gallery/approve' + playT, asJson, JSON.stringify({ name: playWebName }));
+    yes('a play ticket cannot approve (' + r.status + ')', r.status === 403 && r.json && r.json.why === 'role');
+    r = await ask('POST', '/api/gallery/approve' + staffT, asJson, JSON.stringify({ name: playWebName, by: 'Member' }));
+    yes('a staff ticket approves (' + r.status + ')', r.status === 200 && r.json && r.json.approved === true);
+    gal = readJson('gallery.json') || [];
+    yes('and the approved shot is on gallery.json with its url and by',
+        gal.some((g) => g.name === playWebName && g.url === '/shot/' + playWebName && g.by === 'Member'));
+
+    r = await ask('POST', '/api/gallery/report', { cookie: playCookie(), 'content-type': 'application/json' },
+                  JSON.stringify({ name: playWebName, why: 'over a ticket' }));
+    const ticketReport = r.json ? r.json.id : '';
+    r = await ask('GET', '/api/gallery/reports' + playT);
+    yes('a play ticket cannot list reports (' + r.status + ')', r.status === 403 && r.json && r.json.why === 'role');
+    r = await ask('GET', '/api/gallery/reports' + staffT);
+    yes('a staff ticket lists the open report',
+        r.status === 200 && r.json && r.json.reports.some((x) => x.id === ticketReport));
+    r = await ask('POST', '/api/gallery/report/dismiss' + staffT, asJson, JSON.stringify({ id: ticketReport }));
+    yes('a staff ticket dismisses it (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
+
+    r = await ask('DELETE', '/api/gallery/approved' + playT, asJson, JSON.stringify({ name: playWebName }));
+    yes('a play ticket cannot delete an approved shot (' + r.status + ')',
+        r.status === 403 && r.json && r.json.why === 'role');
+    yes('so the shot is still on gallery.json',
+        (readJson('gallery.json') || []).some((g) => g.name === playWebName));
+    r = await ask('DELETE', '/api/gallery/approved' + staffT, asJson,
+                  JSON.stringify({ name: playWebName, deleteFile: true }));
+    yes('a staff ticket deletes it (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
+    yes('it is off gallery.json and the file is gone',
+        !(readJson('gallery.json') || []).some((g) => g.name === playWebName) &&
+        !fs.existsSync(path.join(dir, 'uploads', playWebName)));
+
+    r = await ask('POST', '/api/gallery/reject' + playT, asJson, JSON.stringify({ name: moreName }));
+    yes('a play ticket cannot reject (' + r.status + ')', r.status === 403 && r.json && r.json.why === 'role');
+    r = await ask('POST', '/api/gallery/reject' + staffT, asJson, JSON.stringify({ name: moreName }));
+    yes('a staff ticket rejects (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
+    pend = readJson('gallery-pending.json') || [];
+    yes('and the queue is down to the three batch submissions',
+        pend.length === 3 && !pend.find((x) => x.name === moreName));
 
   } catch (e) {
     fail++;
