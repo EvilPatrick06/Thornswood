@@ -1102,7 +1102,7 @@ namespace Thornswood
         /// decides who built them. Removing either of the other two because
         /// this exists would be a straight loss.
         /// </summary>
-        public const string ExpectedSigner = "";
+        public const string ExpectedSigner = "Gavin Knotts";
 
         /// <summary>
         /// The Subject of whoever signed a file, or an empty string when it is
