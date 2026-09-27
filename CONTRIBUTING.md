@@ -243,7 +243,9 @@ the team before code; nobody settles it alone, and a Claude never does.
     squashed merge leaves the branch looking unmerged to git.
 - Every pull request gets the build check (.github/workflows/build.yml, about
   two minutes: the secret scan, every script and file parses, the writing
-  rules, the launcher window, and the launcher compiles with the .NET
+  rules, the ownership page (`tests\test-ownership.js`, the one harness fast
+  enough to run here, added by issue #752), the launcher window, the count of
+  silent catches in the launcher, and the launcher compiles with the .NET
   Framework csc). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green and you have said so in
   #staff-general. Run the test harnesses your change touches yourself. All
