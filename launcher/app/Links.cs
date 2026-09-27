@@ -13,6 +13,12 @@ namespace Thornswood
     // Every entry here was looked up and confirmed against the page itself. If
     // a name is not in the table, the row falls back to a Nexus search for that
     // name rather than guessing at an address that might be the wrong mod.
+    //
+    // Only mods this build ships belong here. A mod that leaves the collection
+    // loses its entry in the same change, so the launcher never sends anybody
+    // to a page for something they cannot have. Revision 5 of the collection
+    // took out Tavern Games, SunHelm Survival and SunHelm Diseases, and their
+    // entries came out with them.
     static class Links
     {
         const string N = "https://www.nexusmods.com/skyrimspecialedition/mods/";
@@ -72,9 +78,7 @@ namespace Thornswood
             A("Apocalypse", 1090);
             A("Odin", 46000);
             A("Triumvirate", 39170);
-            A("SunHelmSurvival", 39414);
             A("FishingInSkyrim", 47618);
-            A("TavernGames", 1668);
             A("Gourmet", 96876);
             A("Skyrim Unbound", 27962);
             A("SkyrimUnbound", 27962);
@@ -162,7 +166,6 @@ namespace Thornswood
 
             // Patch and add-on plugins are named after their parent mod.
             P("Gourmet", 96876);
-            P("SunHelm", 39414);
             P("Skyrim Unbound", 27962);
             P("Embers XD", 37085);
             P("Water for ENB", 37061);
@@ -214,7 +217,7 @@ namespace Thornswood
             string k = Norm(name);
             if (k.Length == 0) return null;
 
-            // "Embers XD - Patch - SunHelm Survival" narrows to "Embers XD - Patch",
+            // "Embers XD - Patch - Gourmet Tables" narrows to "Embers XD - Patch",
             // then to "Embers XD", which is in the table.
             string probe = k;
             while (true)
